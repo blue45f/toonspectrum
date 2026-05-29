@@ -5,7 +5,7 @@ import { Container } from "@/components/section";
 import { ReviewCard } from "@/components/review-card";
 import { Stars } from "@/components/ui/stars";
 import { spectrumGradient } from "@/lib/genre-color";
-import { SortTabs, type ReviewSort } from "./_components/sort-tabs";
+import { ReviewControls, type ReviewSort } from "./_components/review-controls";
 
 export const metadata: Metadata = {
   title: "리뷰 피드 — 독자들이 남긴 한 줄",
@@ -59,7 +59,13 @@ export default async function ReviewsPage({
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  const feed = sortReviews(allReviewsJoined(), sort);
+  const spoilerHidden = sp.spoiler === "hide";
+  const ratingFilter = sp.rating;
+  let pool = allReviewsJoined();
+  if (spoilerHidden) pool = pool.filter((r) => !r.spoiler);
+  if (ratingFilter === "high") pool = pool.filter((r) => r.rating >= 4);
+  else if (ratingFilter === "low") pool = pool.filter((r) => r.rating <= 3);
+  const feed = sortReviews(pool, sort);
 
   return (
     <div>
@@ -109,15 +115,25 @@ export default async function ReviewsPage({
           {/* ── 메인: 정렬 + 피드 ── */}
           <div className="min-w-0 lg:order-1">
             <div className="mb-6 rail -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-              <SortTabs active={sort} />
+              <ReviewControls />
             </div>
 
-            {/* 반응형 masonry (CSS columns) */}
-            <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-              {feed.map((r) => (
-                <ReviewCard key={r.id} review={r} title={r.title} showTitle />
-              ))}
-            </div>
+            <p className="mb-4 text-sm text-fg-3">
+              <span className="numeral text-fg-2">{feed.length}</span>개의 리뷰
+            </p>
+
+            {feed.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
+                조건에 맞는 리뷰가 없어요. 필터를 조정해 보세요.
+              </div>
+            ) : (
+              /* 반응형 masonry (CSS columns) */
+              <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+                {feed.map((r) => (
+                  <ReviewCard key={r.id} review={r} title={r.title} showTitle />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── 우측 레일: 가장 많이 리뷰된 작품 ── */}
