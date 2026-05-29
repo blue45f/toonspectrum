@@ -18,6 +18,7 @@ import { AvailabilityRouter } from "@/components/availability";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { ReadStateSelector } from "@/components/read-state";
 import { CollectionAdd } from "@/components/collection-add";
+import { AuthorLine } from "@/components/author-line";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewCard } from "@/components/review-card";
 import { STATUS_LABEL, AGE_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
@@ -128,11 +129,7 @@ export default async function TitleDetailPage({
             {title.altTitles && title.altTitles.length > 0 && (
               <p className="mt-1.5 text-sm text-fg-3">{title.altTitles.join(" · ")}</p>
             )}
-            <p className="mt-2 text-sm text-fg-2">
-              글 {title.author}
-              {title.artist && title.artist !== title.author && ` · 그림 ${title.artist}`}
-              <span className="text-fg-3"> · {title.releaseYear}</span>
-            </p>
+            <AuthorLine author={title.author} artist={title.artist} year={title.releaseYear} />
           </div>
 
           {/* 평점 블록 */}

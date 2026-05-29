@@ -15,6 +15,24 @@ export function allTitles(): Title[] {
   return TITLES;
 }
 
+// 작품의 참여 작가(글·그림) 이름 목록 — 쉼표/슬래시 분리
+export function namesOf(t: Title): string[] {
+  const raw = [t.author, t.artist].filter(Boolean).join(", ");
+  return [...new Set(raw.split(/[,/]/).map((s) => s.trim()).filter((s) => s && s !== "미상"))];
+}
+
+export function authorWorks(name: string): Title[] {
+  return TITLES.filter((t) => namesOf(t).includes(name)).sort(
+    (a, b) => b.stats.views - a.stats.views
+  );
+}
+
+export function allAuthorNames(): string[] {
+  const set = new Set<string>();
+  TITLES.forEach((t) => namesOf(t).forEach((n) => set.add(n)));
+  return [...set];
+}
+
 export function titlesByType(type: WorkType): Title[] {
   return TITLES.filter((t) => t.type === type);
 }
