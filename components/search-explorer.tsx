@@ -68,6 +68,7 @@ export function SearchExplorer({
   const [sort, setSort] = useState<SortKey>(initialQuery ? "relevance" : "popular");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [showFilters, setShowFilters] = useState(false);
+  const [limit, setLimit] = useState(24);
 
   const results = useMemo(() => {
     const filters: SearchFilters = {
@@ -86,6 +87,19 @@ export function SearchExplorer({
     };
     return searchTitles(TITLES, filters, sort);
   }, [q, types, genres, tags, status, platforms, ages, minRating, yearRange, freeOnly, adaptedOnly, sort]);
+
+  // 필터/정렬이 바뀌면 페이지네이션 리셋 (렌더 중 파생 상태 조정 패턴)
+  const [prevResults, setPrevResults] = useState(results);
+  if (prevResults !== results) {
+    setPrevResults(results);
+    setLimit(24);
+  }
+
+  const shown = results.slice(0, limit);
+  const typeCount = {
+    webtoon: results.filter((t) => t.type === "webtoon").length,
+    webnovel: results.filter((t) => t.type === "webnovel").length,
+  };
 
   const activeCount =
     types.length +
@@ -340,6 +354,11 @@ export function SearchExplorer({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-fg-2">
             <span className="numeral text-fg">{results.length}</span>편
+            {results.length > 0 && (
+              <span className="text-fg-3">
+                {" "}· 웹툰 {typeCount.webtoon} · 웹소설 {typeCount.webnovel}
+              </span>
+            )}
             {q && <span className="text-fg-3"> · {`'${q}'`}</span>}
           </p>
           <div className="flex items-center gap-2">
@@ -402,18 +421,32 @@ export function SearchExplorer({
               필터 초기화하기
             </button>
           </div>
-        ) : view === "grid" ? (
-          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
-            {results.map((t) => (
-              <TitleCard key={t.id} title={t} />
-            ))}
-          </div>
         ) : (
-          <div className="mt-5 flex flex-col gap-2.5">
-            {results.map((t) => (
-              <TitleRow key={t.id} title={t} />
-            ))}
-          </div>
+          <>
+            {view === "grid" ? (
+              <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+                {shown.map((t) => (
+                  <TitleCard key={t.id} title={t} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 flex flex-col gap-2.5">
+                {shown.map((t) => (
+                  <TitleRow key={t.id} title={t} />
+                ))}
+              </div>
+            )}
+            {shown.length < results.length && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={() => setLimit((l) => l + 24)}
+                  className="rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                >
+                  더 보기 <span className="text-fg-3">({results.length - shown.length}개 더)</span>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
