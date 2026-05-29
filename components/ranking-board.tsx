@@ -11,7 +11,8 @@ import {
   type RankAxis,
   type RankPeriod,
 } from "@/lib/ranking";
-import type { WorkType, Title } from "@/lib/types";
+import type { WorkType, Title, PlatformId } from "@/lib/types";
+import { GENRES } from "@/lib/taxonomy";
 import { RankRow, MiniPoster } from "./rank-row";
 import { TitleCard } from "./title-card";
 import { PlatformTags } from "./availability";
@@ -27,7 +28,10 @@ function metricFor(axis: RankAxis): (t: Title) => { label: string; value: string
     case "trending":
       return (t) => ({ label: "트렌드", value: String(Math.round(t.stats.trendingScore)) });
     case "rating":
+    case "hidden":
       return (t) => ({ label: "평점", value: t.stats.ratingAvg.toFixed(1) });
+    case "favorites":
+      return (t) => ({ label: "관심", value: formatCount(t.stats.bookmarks) });
     case "binge":
       return (t) => ({ label: "몰입지수", value: String(Math.round(t.stats.bingeIndex)) });
     case "completed":
@@ -44,10 +48,12 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
   const [axis, setAxis] = useState<RankAxis>(initialAxis);
   const [period, setPeriod] = useState<RankPeriod>("weekly");
   const [type, setType] = useState<WorkType | "all">("all");
+  const [genre, setGenre] = useState<string>("all");
+  const [platform, setPlatform] = useState<PlatformId | "all">("all");
   const [view, setView] = useState<View>("list");
 
   const meta = axisMeta(axis);
-  const ranked = rankBy(TITLES, axis, { period, type, limit: 50 });
+  const ranked = rankBy(TITLES, axis, { period, type, genre, platform, limit: 50 });
   const metric = metricFor(axis);
 
   return (
@@ -108,21 +114,49 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
         </div>
       </div>
 
-      {/* 보기 방식 토글 */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-fg-3">
-          <span className="numeral text-fg">{ranked.length}</span>편
-        </span>
-        <Segmented
-          size="sm"
-          value={view}
-          onChange={(v) => setView(v as View)}
-          items={[
-            { value: "list", label: (<span className="flex items-center gap-1.5"><LayoutList size={14} />리스트</span>) },
-            { value: "poster", label: (<span className="flex items-center gap-1.5"><LayoutGrid size={14} />포스터</span>) },
-            { value: "compact", label: (<span className="flex items-center gap-1.5"><Rows3 size={14} />컴팩트</span>) },
-          ]}
-        />
+      {/* 필터(장르·플랫폼) + 보기 방식 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            className="h-9 rounded-lg border border-line bg-card px-2.5 text-sm text-fg-2 outline-none transition-colors focus:border-accent/50"
+            aria-label="장르 필터"
+          >
+            <option value="all">전체 장르</option>
+            {GENRES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+          <Segmented
+            size="sm"
+            value={platform}
+            onChange={(v) => setPlatform(v as PlatformId | "all")}
+            items={[
+              { value: "all", label: "전체" },
+              { value: "naver-webtoon", label: "네이버웹툰" },
+              { value: "kakao-webtoon", label: "카카오웹툰" },
+              { value: "naver-series", label: "시리즈" },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-fg-3">
+            <span className="numeral text-fg">{ranked.length}</span>편
+          </span>
+          <Segmented
+            size="sm"
+            value={view}
+            onChange={(v) => setView(v as View)}
+            items={[
+              { value: "list", label: (<span className="flex items-center gap-1.5"><LayoutList size={14} />리스트</span>) },
+              { value: "poster", label: (<span className="flex items-center gap-1.5"><LayoutGrid size={14} />포스터</span>) },
+              { value: "compact", label: (<span className="flex items-center gap-1.5"><Rows3 size={14} />컴팩트</span>) },
+            ]}
+          />
+        </div>
       </div>
 
       {/* 랭킹 — 3가지 표시 방식 */}

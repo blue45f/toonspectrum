@@ -1,24 +1,38 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { TITLES } from "@/lib/data";
+import { TITLES, activeTags } from "@/lib/data";
 import { searchTitles, type SearchFilters, type SortKey } from "@/lib/search";
 import type { WorkType, SerialStatus, AgeRating, PlatformId } from "@/lib/types";
 import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { TitleCard, TitleRow } from "./title-card";
 import { GenreChip } from "./ui/chip";
-import { Segmented } from "./ui/segmented";
 import { cn } from "@/lib/utils";
 import { Search, SlidersHorizontal, X, LayoutGrid, List, Gift, Link2 } from "lucide-react";
 
 const SORTS: { value: SortKey; label: string }[] = [
-  { value: "relevance", label: "관련도" },
-  { value: "rating", label: "평점" },
-  { value: "popular", label: "인기" },
-  { value: "trending", label: "급상승" },
-  { value: "newest", label: "최신" },
+  { value: "relevance", label: "관련도순" },
+  { value: "rating", label: "평점순" },
+  { value: "popular", label: "인기순" },
+  { value: "trending", label: "급상승순" },
+  { value: "bookmarks", label: "관심순" },
+  { value: "completion", label: "완독률순" },
+  { value: "newest", label: "최신순" },
+  { value: "title", label: "가나다순" },
 ];
+
+const YEAR_RANGES: { label: string; range: [number, number] | null }[] = [
+  { label: "전체", range: null },
+  { label: "2022+", range: [2022, 9999] },
+  { label: "2018-21", range: [2018, 2021] },
+  { label: "2014-17", range: [2014, 2017] },
+  { label: "~2013", range: [0, 2013] },
+];
+
+const TOP_TAGS = activeTags()
+  .slice(0, 18)
+  .map((t) => t.tag);
 
 function toggle<T>(arr: T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -47,6 +61,8 @@ export function SearchExplorer({
   const [platforms, setPlatforms] = useState<PlatformId[]>([]);
   const [ages, setAges] = useState<AgeRating[]>([]);
   const [minRating, setMinRating] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
+  const [yearRange, setYearRange] = useState<[number, number] | null>(null);
   const [freeOnly, setFreeOnly] = useState(initialFree);
   const [adaptedOnly, setAdaptedOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>(initialQuery ? "relevance" : "popular");
@@ -58,29 +74,36 @@ export function SearchExplorer({
       q,
       types: types.length ? types : undefined,
       genres: genres.length ? genres : undefined,
+      tags: tags.length ? tags : undefined,
       status: status.length ? status : undefined,
       platforms: platforms.length ? platforms : undefined,
       ageRatings: ages.length ? ages : undefined,
       minRating: minRating || undefined,
+      yearMin: yearRange?.[0],
+      yearMax: yearRange?.[1],
       freeOnly,
       adaptedOnly,
     };
     return searchTitles(TITLES, filters, sort);
-  }, [q, types, genres, status, platforms, ages, minRating, freeOnly, adaptedOnly, sort]);
+  }, [q, types, genres, tags, status, platforms, ages, minRating, yearRange, freeOnly, adaptedOnly, sort]);
 
   const activeCount =
     types.length +
     genres.length +
+    tags.length +
     status.length +
     platforms.length +
     ages.length +
     (minRating ? 1 : 0) +
+    (yearRange ? 1 : 0) +
     (freeOnly ? 1 : 0) +
     (adaptedOnly ? 1 : 0);
 
   const reset = () => {
     setTypes([]);
     setGenres([]);
+    setTags([]);
+    setYearRange(null);
     setStatus([]);
     setPlatforms([]);
     setAges([]);
@@ -117,6 +140,49 @@ export function SearchExplorer({
               <GenreChip genre={g} active={genres.includes(g)} size="sm" />
             </button>
           ))}
+        </div>
+      </FacetGroup>
+
+      <FacetGroup title="태그">
+        <div className="flex flex-wrap gap-1.5">
+          {TOP_TAGS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTags((p) => toggle(p, t))}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                tags.includes(t)
+                  ? "border-accent/50 bg-accent-soft text-accent"
+                  : "border-line bg-raised/50 text-fg-3 hover:text-fg"
+              )}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      </FacetGroup>
+
+      <FacetGroup title="연재 연도">
+        <div className="flex flex-wrap gap-1.5">
+          {YEAR_RANGES.map((y) => {
+            const on =
+              (y.range === null && !yearRange) ||
+              (y.range && yearRange && y.range[0] === yearRange[0] && y.range[1] === yearRange[1]);
+            return (
+              <button
+                key={y.label}
+                onClick={() => setYearRange(y.range)}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                  on
+                    ? "border-accent/50 bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-2 hover:text-fg"
+                )}
+              >
+                {y.label}
+              </button>
+            );
+          })}
         </div>
       </FacetGroup>
 
@@ -284,12 +350,18 @@ export function SearchExplorer({
               <SlidersHorizontal size={14} /> 필터
               {activeCount > 0 && <span className="text-accent">{activeCount}</span>}
             </button>
-            <Segmented
-              size="sm"
+            <select
               value={sort}
-              onChange={setSort}
-              items={SORTS}
-            />
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="h-8 rounded-lg border border-line bg-card px-2.5 text-[0.8125rem] text-fg-2 outline-none transition-colors focus:border-accent/50"
+              aria-label="정렬"
+            >
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
             <div className="hidden rounded-lg border border-line bg-card p-0.5 sm:flex">
               {(["grid", "list"] as const).map((v) => (
                 <button

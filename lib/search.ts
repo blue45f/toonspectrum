@@ -9,6 +9,8 @@ export interface SearchFilters {
   platforms?: PlatformId[];
   ageRatings?: AgeRating[];
   minRating?: number;
+  yearMin?: number;
+  yearMax?: number;
   freeOnly?: boolean; // 무료/기다무만
   adaptedOnly?: boolean; // 원작/2차창작 연결된 작품만
 }
@@ -18,6 +20,8 @@ export type SortKey =
   | "rating"
   | "popular"
   | "trending"
+  | "bookmarks"
+  | "completion"
   | "newest"
   | "title";
 
@@ -62,6 +66,8 @@ function passFilters(t: Title, f: SearchFilters): boolean {
   if (f.platforms?.length && !t.availability.some((a) => f.platforms!.includes(a.platformId)))
     return false;
   if (f.minRating && t.stats.ratingAvg < f.minRating) return false;
+  if (f.yearMin && t.releaseYear < f.yearMin) return false;
+  if (f.yearMax && t.releaseYear > f.yearMax) return false;
   if (f.freeOnly && !t.availability.some((a) => a.pricing === "free" || a.pricing === "wait-free"))
     return false;
   if (f.adaptedOnly && !t.adaptedFrom && !hasAdaptation(t)) return false;
@@ -107,6 +113,10 @@ export function sortTitles(list: Title[], sort: SortKey, q = ""): Title[] {
       return arr.sort((a, b) => b.stats.views - a.stats.views);
     case "trending":
       return arr.sort((a, b) => b.stats.trendingScore - a.stats.trendingScore);
+    case "bookmarks":
+      return arr.sort((a, b) => b.stats.bookmarks - a.stats.bookmarks);
+    case "completion":
+      return arr.sort((a, b) => b.stats.completionRate - a.stats.completionRate);
     case "newest":
       return arr.sort((a, b) => b.releaseYear - a.releaseYear);
     case "title":

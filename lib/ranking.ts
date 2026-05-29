@@ -1,10 +1,12 @@
-import type { Title, WorkType } from "./types";
+import type { Title, WorkType, PlatformId } from "./types";
 import { seededRandom } from "./utils";
 
 export type RankAxis =
   | "popular" // 실시간 인기
   | "rating" // 평점 명작
   | "trending" // 급상승
+  | "favorites" // 관심 폭발
+  | "hidden" // 숨은 명작
   | "completed" // 완결 정주행
   | "binge" // 정주행 몰입
   | "rookie"; // 기대 신작
@@ -35,11 +37,25 @@ export const RANK_AXES: RankAxisMeta[] = [
     formula: "트렌드지수 + max(0, 순위상승)×3 + log(조회수)",
   },
   {
+    key: "favorites",
+    label: "관심 폭발",
+    desc: "독자가 가장 많이 찜한 작품",
+    emoji: "💗",
+    formula: "log(관심)×14 + log(좋아요)×4 + 베이즈평점×6",
+  },
+  {
     key: "rating",
     label: "평점 명작",
     desc: "독자 평점이 검증한 수작",
     emoji: "⭐",
     formula: "베이즈평점(C=4.0, m=800) ×20 + log(평가수)×2",
+  },
+  {
+    key: "hidden",
+    label: "숨은 명작",
+    desc: "조회는 적어도 평점이 높은 저평가작",
+    emoji: "💎",
+    formula: "베이즈평점×22 − log(조회수)×3.5 + log(평가수)×2",
   },
   {
     key: "binge",
@@ -110,6 +126,10 @@ function rawScore(t: Title, axis: RankAxis): number {
       return s.trendingScore * 1.0 + Math.max(0, s.rankDelta) * 3 + Math.log10(s.views + 1);
     case "rating":
       return bayesRating(t) * 20 + Math.log10(s.ratingCount + 1) * 2;
+    case "favorites":
+      return Math.log10(s.bookmarks + 1) * 14 + Math.log10(s.likes + 1) * 4 + bayesRating(t) * 6;
+    case "hidden":
+      return bayesRating(t) * 22 - Math.log10(s.views + 1) * 3.5 + Math.log10(s.ratingCount + 1) * 2;
     case "binge":
       return s.bingeIndex * 1.0 + s.completionRate * 0.4;
     case "completed":
@@ -131,13 +151,24 @@ export interface RankedTitle {
 export function rankBy(
   all: Title[],
   axis: RankAxis,
-  opts: { period?: RankPeriod; type?: WorkType | "all"; limit?: number } = {}
+  opts: {
+    period?: RankPeriod;
+    type?: WorkType | "all";
+    genre?: string | "all";
+    platform?: PlatformId | "all";
+    limit?: number;
+  } = {}
 ): RankedTitle[] {
-  const { period = "weekly", type = "all", limit } = opts;
+  const { period = "weekly", type = "all", genre = "all", platform = "all", limit } = opts;
   let pool = all;
   if (type !== "all") pool = pool.filter((t) => t.type === type);
+  if (genre !== "all") pool = pool.filter((t) => t.genres.includes(genre));
+  if (platform !== "all")
+    pool = pool.filter((t) => t.availability.some((a) => a.platformId === platform));
   if (axis === "completed") pool = pool.filter((t) => t.status === "completed");
   if (axis === "rookie") pool = pool.filter((t) => t.releaseYear >= 2022);
+  // 숨은 명작: 평가가 너무 적은 작품은 제외(신뢰도)
+  if (axis === "hidden") pool = pool.filter((t) => t.stats.ratingCount >= 300);
 
   const scored = pool
     .map((t) => ({ t, raw: rawScore(t, axis) * periodFactor(t, axis, period) }))
