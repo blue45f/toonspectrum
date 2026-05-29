@@ -6,7 +6,7 @@ import { rankBy } from "@/lib/ranking";
 import { sortTitles } from "@/lib/search";
 import { Container, Section, Rail } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
-import { RankRow } from "@/components/rank-row";
+import { LiveRanking } from "@/components/live-ranking";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { TitlePoster } from "@/components/title-poster";
 import { RatingInline } from "@/components/ui/stars";
@@ -23,7 +23,6 @@ import { Search, ArrowRight, Layers } from "lucide-react";
 export default function HomePage() {
   const featured = TITLES.filter((t) => t.featured);
   const spotlight = [...featured].sort((a, b) => b.stats.views - a.stats.views)[0];
-  const popular = rankBy(TITLES, "popular", { limit: 7 });
   const topRated = rankBy(TITLES, "rating", { limit: 12 }).map((r) => r.title);
   const waitFree = sortTitles(
     TITLES.filter((t) =>
@@ -154,14 +153,10 @@ export default function HomePage() {
         <Section
           eyebrow="LIVE RANKING"
           title="실시간 인기 랭킹"
-          desc="조회·관심·좋아요를 종합한 지금 가장 뜨거운 작품"
+          desc="네이버·카카오에서 지금 가장 뜨거운 작품을 실시간 집계"
           action={{ label: "전체 랭킹", href: "/ranking" }}
         >
-          <div className="rounded-2xl border border-line bg-panel/40 p-2 sm:p-3">
-            {popular.map((r) => (
-              <RankRow key={r.title.id} ranked={r} />
-            ))}
-          </div>
+          <LiveRanking />
         </Section>
 
         {todayReleases.length > 0 && (
