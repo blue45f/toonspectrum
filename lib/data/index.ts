@@ -1,11 +1,14 @@
 import type { Title, SeedReview, WorkType } from "../types";
 import { TITLES } from "./titles";
-import { SEED_REVIEWS } from "./reviews";
+import { SEED_REVIEWS as RAW_REVIEWS } from "./reviews";
 
-export { TITLES, SEED_REVIEWS };
+export { TITLES };
 
 const BY_ID = new Map<string, Title>(TITLES.map((t) => [t.id, t]));
 const BY_SLUG = new Map<string, Title>(TITLES.map((t) => [t.slug, t]));
+
+// 크롤 데이터가 갱신되며 일부 작품이 빠질 수 있으므로, 존재하는 작품의 리뷰만 노출(고아 리뷰 방지)
+export const SEED_REVIEWS: SeedReview[] = RAW_REVIEWS.filter((r) => BY_ID.has(r.titleId));
 
 export function getTitle(idOrSlug: string): Title | undefined {
   return BY_ID.get(idOrSlug) ?? BY_SLUG.get(idOrSlug);

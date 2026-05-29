@@ -41,8 +41,9 @@ export function SiteFooter() {
             왜 봐야 하는지 한 곳에서 답합니다.
           </p>
           <p className="mt-4 text-xs leading-relaxed text-fg-3/70">
-            작품 메타데이터와 조회·관심·별점은 <span className="text-fg-2">네이버 웹툰·시리즈에서 수집한
-            실데이터</span>입니다. 평가 수·분포·완독률 등 일부 보조 지표와 리뷰는 데모용 추정·예시입니다.
+            작품 메타데이터·표지는 <span className="text-fg-2">네이버 웹툰·시리즈, 카카오웹툰에서 수집한
+            실데이터</span>입니다. 네이버의 조회·관심·별점은 실수집, 카카오웹툰의 평점·조회와 평가 수·완독률
+            등 일부 지표 및 리뷰는 데모용 추정·예시입니다.
           </p>
         </div>
 

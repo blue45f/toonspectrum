@@ -326,6 +326,97 @@ function buildOriginNovels(webtoons, seriesNovels) {
   return [...novelByName.values()];
 }
 
+// ── 카카오웹툰 (2번째 실 플랫폼) ───────────────────
+const KW_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const KW_H = {
+  "User-Agent": UA,
+  Referer: "https://webtoon.kakao.com/",
+  Origin: "https://webtoon.kakao.com",
+  Accept: "application/json",
+};
+function kwGenres(keywords = []) {
+  const text = keywords.join(" ");
+  const out = new Set();
+  for (const g of ALLOWED) if (text.includes(g)) out.add(g);
+  if (out.has("로맨스") && out.has("판타지")) {
+    out.delete("로맨스");
+    out.delete("판타지");
+    out.add("로판");
+  }
+  if (/무협|무림/.test(text)) out.add("무협");
+  const arr = [...out].filter((g) => ALLOWED.has(g));
+  return arr.length ? arr.slice(0, 3) : ["드라마"];
+}
+async function crawlKakaoWebtoon() {
+  const map = new Map();
+  for (const d of KW_DAYS) {
+    const j = await getJSON(
+      `https://gateway-kw.kakao.com/section/v2/timetables/days?placement=timetable_${d}`,
+      KW_H
+    );
+    for (const sec of j?.data ?? [])
+      for (const grp of sec.cardGroups ?? [])
+        for (const card of grp.cards ?? []) {
+          const c = card.content;
+          if (c?.id && c.title && !map.has(c.id)) map.set(c.id, c);
+        }
+    await sleep(90);
+  }
+  const cards = [...map.values()];
+  console.log(`카카오웹툰 수집: ${cards.length}`);
+  return cards.slice(0, 44).map((c, i) => {
+    const authors = (c.authors ?? []).filter((a) => a.type === "AUTHOR").map((a) => a.name);
+    const illus = (c.authors ?? []).filter((a) => a.type === "ILLUSTRATOR").map((a) => a.name);
+    const kws = (c.seoKeywords ?? []).map((k) => String(k).replace(/^#/, "").trim()).filter(Boolean);
+    const genres = kwGenres(kws);
+    const bg = typeof c.backgroundColor === "string" && /^#/.test(c.backgroundColor) ? c.backgroundColor : null;
+    const imgUrl = c.backgroundImage || c.featuredCharacterImageA; // 카카오 CDN 은 확장자 필요
+    const ratingAvg = Math.round((4.3 + (hashInt(String(c.id)) % 5) * 0.1) * 10) / 10; // 추정
+    const views = 6_000_000 - i * 90_000 + (hashInt(String(c.id)) % 500_000); // 추정
+    const ratingCount = 400 + (hashInt(String(c.id)) % 1200); // 낮게 → 베이즈가 평점랭킹 지배 방지
+    return {
+      _normTitle: norm(c.title),
+      id: `kw-${c.id}`,
+      slug: `kw-${c.id}`,
+      type: "webtoon",
+      title: c.title,
+      author: authors.join(", ") || "미상",
+      artist: illus.join(", ") || undefined,
+      genres,
+      tags: kws.slice(0, 5),
+      synopsis:
+        (c.catchphraseTwoLines || "").replace(/\s+/g, " ").trim().slice(0, 200) ||
+        `${c.title} · 카카오웹툰 연재작.`,
+      cover: bg ? [bg, coverGradient(String(c.id), genres)[1]] : coverGradient(String(c.id), genres),
+      coverImage: imgUrl ? proxied(imgUrl + ".webp") : undefined,
+      status: "ongoing",
+      ageRating: c.adult ? "19" : "all",
+      releaseYear: 2023,
+      availability: [
+        {
+          platformId: "kakao-webtoon",
+          pricing: "wait-free",
+          isOriginal: true,
+          url: `https://webtoon.kakao.com/content/${c.seoId || c.id}/${c.id}`,
+        },
+      ],
+      stats: {
+        views,
+        likes: Math.round(views * 0.04),
+        bookmarks: Math.round(views * 0.04),
+        ratingAvg,
+        ratingCount,
+        ratingDist: synthDist(ratingAvg, ratingCount),
+        rankDelta: 0,
+        trendingScore: Math.max(45, 90 - i),
+        completionRate: 70,
+        bingeIndex: 72,
+      },
+      featured: false,
+    };
+  });
+}
+
 function fmt(n) {
   if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, "")}억`;
   if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")}만`;
@@ -357,13 +448,39 @@ async function main() {
   }
   const originNovels = buildOriginNovels(webtoons, series);
   const linked = webtoons.filter((w) => w.adaptedFrom).length;
+
+  // 카카오웹툰 (2번째 실 플랫폼)
+  let kakao = [];
+  try {
+    kakao = await crawlKakaoWebtoon();
+  } catch (e) {
+    console.log("카카오웹툰 크롤 스킵:", e.message);
+  }
+  // 교차 매칭: 같은 제목이면 네이버 작품에 카카오 가용성 추가(진짜 크로스플랫폼), 아니면 신규
+  const naverByName = new Map(webtoons.map((w) => [norm(w.title), w]));
+  const kakaoNew = [];
+  let crossLinked = 0;
+  for (const k of kakao) {
+    const match = naverByName.get(k._normTitle);
+    if (match) {
+      if (!match.availability.some((a) => a.platformId === "kakao-webtoon")) {
+        match.availability.push(k.availability[0]);
+        crossLinked++;
+      }
+    } else {
+      kakaoNew.push(k);
+    }
+  }
+
   // 시리즈 보너스 중 웹툰과 연결 안 된 것도 standalone 으로 포함
   const novels = [...series, ...originNovels];
-  const all = [...webtoons.map(clean), ...novels.map(clean)];
+  const all = [...webtoons.map(clean), ...novels.map(clean), ...kakaoNew.map(clean)];
   pickFeatured(all);
 
-  const header = `// 자동 생성 — scripts/crawl.mjs (네이버 웹툰/시리즈 실데이터 벤치마킹)\n// 재생성: node scripts/crawl.mjs\n// 웹툰: 조회·관심·별점·장르·시놉시스·연재요일·표지썸네일·연재시작연도 실수집. 웹소설: 원작정보 기반 + 시리즈 보강. 일부 파생지표(평가수·분포·완독률 등)는 추정.\nimport type { Title } from "../types";\n\nexport const TITLES: Title[] = `;
+  const header = `// 자동 생성 — scripts/crawl.mjs (네이버 웹툰/시리즈 + 카카오웹툰 실데이터 벤치마킹)\n// 재생성: node scripts/crawl.mjs\n// 네이버 웹툰/시리즈: 조회·관심·별점·장르·시놉시스·연재요일·표지·연재연도 실수집. 카카오웹툰: 제목·작가·태그·표지 실수집(평점·조회는 추정). 일부 파생지표(평가수·분포·완독률)는 추정.\nimport type { Title } from "../types";\n\nexport const TITLES: Title[] = `;
   await writeFile(path.resolve("lib/data/titles.ts"), header + JSON.stringify(all, null, 2) + ";\n", "utf8");
-  console.log(`완료: ${all.length}편 — 웹툰 ${webtoons.length}, 웹소설 ${novels.length}(시리즈 ${series.length}+원작파생 ${originNovels.length}), 어댑테이션 연결 ${linked}`);
+  console.log(
+    `완료: ${all.length}편 — 네이버웹툰 ${webtoons.length}, 웹소설 ${novels.length}, 카카오웹툰 신규 ${kakaoNew.length}(+교차연결 ${crossLinked}), 어댑테이션 ${linked}`
+  );
 }
 main();

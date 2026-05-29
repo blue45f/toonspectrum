@@ -51,10 +51,11 @@ export function RankingMethod() {
         <p className="flex gap-2">
           <Info size={14} className="mt-0.5 shrink-0 text-good/80" />
           <span>
-            <span className="font-medium text-fg-2">데이터 출처</span> — 제목·작가·장르·시놉시스와{" "}
-            <span className="text-fg-2">조회수·관심수·별점</span>은 네이버 웹툰/시리즈에서 실제로
-            수집한 데이터입니다. 평가 수·평점 분포·완독률·몰입 지수 등 공개되지 않는 일부 보조 지표는
-            추정값입니다. 순위는 위 산식으로 <span className="text-fg-2">실제 데이터</span>에 대해 계산됩니다.
+            <span className="font-medium text-fg-2">데이터 출처</span> — 제목·작가·장르·시놉시스·표지와{" "}
+            <span className="text-fg-2">네이버의 조회수·관심수·별점</span>은 네이버 웹툰/시리즈에서 실제
+            수집한 데이터입니다. 카카오웹툰은 메타데이터·표지를 실수집하되 평점·조회는 추정이며, 평가 수·평점
+            분포·완독률 등 비공개 지표도 추정값입니다. 순위는 위 산식으로 계산됩니다(베이즈 보정이 추정 평점의
+            영향을 억제).
           </span>
         </p>
       </div>

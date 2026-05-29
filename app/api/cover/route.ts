@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 
-// 표지 이미지 프록시 — 네이버 이미지 CDN 핫링크/CORS 우회.
-// 허용 호스트(pstatic.net)만 프록시하여 SSRF 차단.
-const ALLOWED = /(^|\.)pstatic\.net$/;
+// 표지 이미지 프록시 — 네이버/카카오 이미지 CDN 핫링크/CORS 우회.
+// 허용 호스트만 프록시하여 SSRF 차단.
+const ALLOWED = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net)$/;
 
 export async function GET(req: NextRequest) {
   const u = req.nextUrl.searchParams.get("u");
@@ -19,10 +19,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const referer = /kakao/.test(url.hostname)
+      ? "https://webtoon.kakao.com/"
+      : "https://comic.naver.com/";
     const upstream = await fetch(url.toString(), {
       headers: {
-        // 네이버 CDN 은 referer 검사 → 네이버 referer 로 우회
-        Referer: "https://comic.naver.com/",
+        // CDN referer 검사 우회 (호스트별)
+        Referer: referer,
         "User-Agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
