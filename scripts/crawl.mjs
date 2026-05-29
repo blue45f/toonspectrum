@@ -10,7 +10,7 @@ const UA =
 const HW = { "User-Agent": UA, Referer: "https://comic.naver.com/", Accept: "application/json" };
 const HS = { "User-Agent": UA, Referer: "https://series.naver.com/" };
 const WEBTOON_CAP = 80;
-const NOVEL_BONUS_CAP = 30;
+const NOVEL_BONUS_CAP = 42;
 
 async function getJSON(url, headers = HW) {
   const c = new AbortController();
@@ -221,7 +221,7 @@ async function crawlSeriesNovels() {
   const out = [];
   const seen = new Set();
   for (const [code, genre] of Object.entries(NGENRE)) {
-    for (let page = 1; page <= 2; page++) {
+    for (let page = 1; page <= 3; page++) {
       const html = await getSeries(
         `https://series.naver.com/novel/categoryProductList.series?categoryTypeCode=genre&genreCode=${code}&page=${page}`
       );
@@ -313,6 +313,7 @@ function buildOriginNovels(webtoons, seriesNovels) {
       tags: ["원작", ...w.tags.filter((t) => t !== "원작소설")].slice(0, 5),
       synopsis: `웹툰 「${w.title}」의 원작 웹소설. 글 ${w._originAuthors.join(", ")}.`,
       cover: coverGradient(id, w.genres),
+      coverImage: w.coverImage, // 같은 IP — 웹툰화 표지를 상속(원작 소설 썸네일 보강)
       status: "ongoing",
       ageRating: w.ageRating,
       releaseYear: Math.max(2010, w.releaseYear - 1),

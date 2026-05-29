@@ -38,16 +38,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1527620874,
-      "likes": 1381102,
-      "bookmarks": 1381102,
+      "likes": 1381108,
+      "bookmarks": 1381108,
       "ratingAvg": 4.8,
-      "ratingCount": 441953,
+      "ratingCount": 441955,
       "ratingDist": [
         0,
         1,
         1554,
-        118441,
-        321957
+        118442,
+        321958
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -94,8 +94,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 881614870,
-      "likes": 1897433,
-      "bookmarks": 1897433,
+      "likes": 1897434,
+      "bookmarks": 1897434,
       "ratingAvg": 4.9,
       "ratingCount": 607179,
       "ratingDist": [
@@ -149,16 +149,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 774860256,
-      "likes": 1386292,
-      "bookmarks": 1386292,
+      "likes": 1386295,
+      "bookmarks": 1386295,
       "ratingAvg": 4.8,
-      "ratingCount": 443613,
+      "ratingCount": 443614,
       "ratingDist": [
         0,
         1,
         1560,
         118886,
-        323166
+        323167
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -202,8 +202,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 644053615,
-      "likes": 323913,
-      "bookmarks": 323913,
+      "likes": 323914,
+      "bookmarks": 323914,
       "ratingAvg": 4.8,
       "ratingCount": 103652,
       "ratingDist": [
@@ -261,16 +261,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 354266224,
-      "likes": 2462972,
-      "bookmarks": 2462972,
+      "likes": 2462985,
+      "bookmarks": 2462985,
       "ratingAvg": 4.7,
-      "ratingCount": 788151,
+      "ratingCount": 788155,
       "ratingDist": [
         0,
         3,
         4867,
-        265723,
-        517558
+        265724,
+        517560
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -317,16 +317,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 343529092,
-      "likes": 2740574,
-      "bookmarks": 2740574,
+      "likes": 2740583,
+      "bookmarks": 2740583,
       "ratingAvg": 4.9,
-      "ratingCount": 876984,
+      "ratingCount": 876987,
       "ratingDist": [
         0,
         1,
         1717,
-        182588,
-        692678
+        182589,
+        692681
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -435,8 +435,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 253649540,
-      "likes": 485819,
-      "bookmarks": 485819,
+      "likes": 485820,
+      "bookmarks": 485820,
       "ratingAvg": 5,
       "ratingCount": 155462,
       "ratingDist": [
@@ -494,16 +494,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 225292680,
-      "likes": 256979,
-      "bookmarks": 256979,
+      "likes": 256980,
+      "bookmarks": 256980,
       "ratingAvg": 5,
-      "ratingCount": 82233,
+      "ratingCount": 82234,
       "ratingDist": [
         0,
         0,
         88,
         13050,
-        69095
+        69096
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -547,8 +547,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 218908912,
-      "likes": 159845,
-      "bookmarks": 159845,
+      "likes": 159844,
+      "bookmarks": 159844,
       "ratingAvg": 4.5,
       "ratingCount": 51150,
       "ratingDist": [
@@ -602,16 +602,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 211127300,
-      "likes": 1309753,
-      "bookmarks": 1309753,
+      "likes": 1309750,
+      "bookmarks": 1309750,
       "ratingAvg": 5,
-      "ratingCount": 419121,
+      "ratingCount": 419120,
       "ratingDist": [
         0,
         0,
         448,
         66514,
-        352159
+        352158
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -713,8 +713,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 156759386,
-      "likes": 156911,
-      "bookmarks": 156911,
+      "likes": 156914,
+      "bookmarks": 156914,
       "ratingAvg": 5,
       "ratingCount": 50212,
       "ratingDist": [
@@ -820,8 +820,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 129213391,
-      "likes": 791699,
-      "bookmarks": 791699,
+      "likes": 791701,
+      "bookmarks": 791701,
       "ratingAvg": 4.9,
       "ratingCount": 253344,
       "ratingDist": [
@@ -875,16 +875,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 112350625,
-      "likes": 917340,
-      "bookmarks": 917340,
+      "likes": 917346,
+      "bookmarks": 917346,
       "ratingAvg": 4.9,
-      "ratingCount": 293549,
+      "ratingCount": 293551,
       "ratingDist": [
         0,
         0,
         575,
         61117,
-        231857
+        231859
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -930,8 +930,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 107824492,
-      "likes": 456644,
-      "bookmarks": 456644,
+      "likes": 456643,
+      "bookmarks": 456643,
       "ratingAvg": 5,
       "ratingCount": 146126,
       "ratingDist": [
@@ -989,8 +989,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 103340238,
-      "likes": 325126,
-      "bookmarks": 325126,
+      "likes": 325124,
+      "bookmarks": 325124,
       "ratingAvg": 5,
       "ratingCount": 104040,
       "ratingDist": [
@@ -1047,8 +1047,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 84216016,
-      "likes": 148122,
-      "bookmarks": 148122,
+      "likes": 148123,
+      "bookmarks": 148123,
       "ratingAvg": 4.9,
       "ratingCount": 47399,
       "ratingDist": [
@@ -1105,8 +1105,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 69839914,
-      "likes": 1124608,
-      "bookmarks": 1124608,
+      "likes": 1124609,
+      "bookmarks": 1124609,
       "ratingAvg": 5,
       "ratingCount": 359875,
       "ratingDist": [
@@ -1155,16 +1155,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 60153936,
-      "likes": 118135,
-      "bookmarks": 118135,
+      "likes": 118136,
+      "bookmarks": 118136,
       "ratingAvg": 5,
-      "ratingCount": 37803,
+      "ratingCount": 37804,
       "ratingDist": [
         0,
         0,
         40,
         5999,
-        31763
+        31764
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1262,8 +1262,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 42620145,
-      "likes": 404684,
-      "bookmarks": 404684,
+      "likes": 404685,
+      "bookmarks": 404685,
       "ratingAvg": 5,
       "ratingCount": 129499,
       "ratingDist": [
@@ -1314,16 +1314,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 38823639,
-      "likes": 274171,
-      "bookmarks": 274171,
+      "likes": 274183,
+      "bookmarks": 274183,
       "ratingAvg": 5,
-      "ratingCount": 87735,
+      "ratingCount": 87739,
       "ratingDist": [
         0,
         0,
         94,
-        13923,
-        73718
+        13924,
+        73721
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1372,16 +1372,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 24100237,
-      "likes": 155598,
-      "bookmarks": 155598,
+      "likes": 155599,
+      "bookmarks": 155599,
       "ratingAvg": 5,
-      "ratingCount": 49791,
+      "ratingCount": 49792,
       "ratingDist": [
         0,
         0,
         53,
         7902,
-        41836
+        41837
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1430,16 +1430,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 21435315,
-      "likes": 297743,
-      "bookmarks": 297743,
+      "likes": 297742,
+      "bookmarks": 297742,
       "ratingAvg": 4.9,
-      "ratingCount": 95278,
+      "ratingCount": 95277,
       "ratingDist": [
         0,
         0,
         187,
         19837,
-        75255
+        75254
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1489,16 +1489,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17565586,
-      "likes": 95547,
-      "bookmarks": 95547,
+      "likes": 95549,
+      "bookmarks": 95549,
       "ratingAvg": 4.9,
-      "ratingCount": 30575,
+      "ratingCount": 30576,
       "ratingDist": [
         0,
         0,
         60,
         6366,
-        24149
+        24150
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1596,16 +1596,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 14985196,
-      "likes": 323884,
-      "bookmarks": 323884,
+      "likes": 323886,
+      "bookmarks": 323886,
       "ratingAvg": 5,
-      "ratingCount": 103643,
+      "ratingCount": 103644,
       "ratingDist": [
         0,
         0,
         111,
         16448,
-        87084
+        87085
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1702,16 +1702,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13319379,
-      "likes": 547606,
-      "bookmarks": 547606,
+      "likes": 547609,
+      "bookmarks": 547609,
       "ratingAvg": 5,
-      "ratingCount": 175234,
+      "ratingCount": 175235,
       "ratingDist": [
         0,
         0,
         187,
-        27809,
-        147237
+        27810,
+        147238
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1761,8 +1761,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 12394615,
-      "likes": 78866,
-      "bookmarks": 78866,
+      "likes": 78867,
+      "bookmarks": 78867,
       "ratingAvg": 5,
       "ratingCount": 25237,
       "ratingDist": [
@@ -1813,16 +1813,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 11202926,
-      "likes": 376422,
-      "bookmarks": 376422,
+      "likes": 376431,
+      "bookmarks": 376431,
       "ratingAvg": 4.7,
-      "ratingCount": 120455,
+      "ratingCount": 120458,
       "ratingDist": [
         0,
         0,
         744,
-        40611,
-        79100
+        40612,
+        79102
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1867,16 +1867,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 10409921,
-      "likes": 705519,
-      "bookmarks": 705519,
+      "likes": 705527,
+      "bookmarks": 705527,
       "ratingAvg": 4.8,
-      "ratingCount": 225766,
+      "ratingCount": 225769,
       "ratingDist": [
         0,
         0,
         794,
-        60504,
-        164467
+        60505,
+        164470
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1925,16 +1925,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 9610578,
-      "likes": 313777,
-      "bookmarks": 313777,
+      "likes": 313782,
+      "bookmarks": 313782,
       "ratingAvg": 5,
-      "ratingCount": 100409,
+      "ratingCount": 100410,
       "ratingDist": [
         0,
         0,
         107,
         15935,
-        84367
+        84368
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -1983,16 +1983,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1464454,
-      "likes": 599273,
-      "bookmarks": 599273,
+      "likes": 599278,
+      "bookmarks": 599278,
       "ratingAvg": 4.9,
-      "ratingCount": 191767,
+      "ratingCount": 191769,
       "ratingDist": [
         0,
         0,
         375,
         39926,
-        151466
+        151467
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2041,16 +2041,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 294030,
-      "likes": 729167,
-      "bookmarks": 729167,
+      "likes": 729171,
+      "bookmarks": 729171,
       "ratingAvg": 5,
-      "ratingCount": 233333,
+      "ratingCount": 233335,
       "ratingDist": [
         0,
         0,
         250,
         37030,
-        196054
+        196055
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -2099,16 +2099,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 195958,
-      "bookmarks": 195958,
+      "likes": 195966,
+      "bookmarks": 195966,
       "ratingAvg": 5,
-      "ratingCount": 62707,
+      "ratingCount": 62709,
       "ratingDist": [
         0,
         0,
         67,
         9952,
-        52688
+        52690
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2158,16 +2158,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 250553,
-      "bookmarks": 250553,
+      "likes": 250560,
+      "bookmarks": 250560,
       "ratingAvg": 5,
-      "ratingCount": 80177,
+      "ratingCount": 80179,
       "ratingDist": [
         0,
         0,
         86,
         12724,
-        67367
+        67369
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2217,16 +2217,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 959390,
-      "bookmarks": 959390,
+      "likes": 959398,
+      "bookmarks": 959398,
       "ratingAvg": 4.9,
-      "ratingCount": 307005,
+      "ratingCount": 307007,
       "ratingDist": [
         0,
         0,
         601,
-        63918,
-        242485
+        63919,
+        242487
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2273,16 +2273,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 344873,
-      "bookmarks": 344873,
+      "likes": 344893,
+      "bookmarks": 344893,
       "ratingAvg": 5,
-      "ratingCount": 110359,
+      "ratingCount": 110366,
       "ratingDist": [
         0,
         0,
         118,
-        17514,
-        92727
+        17515,
+        92733
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2332,16 +2332,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 304060,
-      "bookmarks": 304060,
+      "likes": 304063,
+      "bookmarks": 304063,
       "ratingAvg": 5,
-      "ratingCount": 97299,
+      "ratingCount": 97300,
       "ratingDist": [
         0,
         0,
         104,
         15441,
-        81754
+        81755
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2391,16 +2391,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 507796,
-      "bookmarks": 507796,
+      "likes": 507799,
+      "bookmarks": 507799,
       "ratingAvg": 4.9,
-      "ratingCount": 162495,
+      "ratingCount": 162496,
       "ratingDist": [
         0,
         0,
         318,
-        33831,
-        128345
+        33832,
+        128346
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2449,10 +2449,10 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 739494,
-      "bookmarks": 739494,
+      "likes": 739497,
+      "bookmarks": 739497,
       "ratingAvg": 5,
-      "ratingCount": 236638,
+      "ratingCount": 236639,
       "ratingDist": [
         0,
         0,
@@ -2507,8 +2507,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 362271,
-      "bookmarks": 362271,
+      "likes": 362273,
+      "bookmarks": 362273,
       "ratingAvg": 5,
       "ratingCount": 115927,
       "ratingDist": [
@@ -2566,8 +2566,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 23153,
-      "bookmarks": 23153,
+      "likes": 23154,
+      "bookmarks": 23154,
       "ratingAvg": 4.8,
       "ratingCount": 7409,
       "ratingDist": [
@@ -2625,16 +2625,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 167567,
-      "bookmarks": 167567,
+      "likes": 167576,
+      "bookmarks": 167576,
       "ratingAvg": 5,
-      "ratingCount": 53621,
+      "ratingCount": 53624,
       "ratingDist": [
         0,
         0,
         57,
         8510,
-        45054
+        45057
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2685,16 +2685,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70594,
-      "bookmarks": 70594,
+      "likes": 70597,
+      "bookmarks": 70597,
       "ratingAvg": 5,
-      "ratingCount": 22590,
+      "ratingCount": 22591,
       "ratingDist": [
         0,
         0,
         24,
         3585,
-        18981
+        18982
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2743,8 +2743,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 287438,
-      "bookmarks": 287438,
+      "likes": 287437,
+      "bookmarks": 287437,
       "ratingAvg": 5,
       "ratingCount": 91980,
       "ratingDist": [
@@ -2802,16 +2802,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 174172,
-      "bookmarks": 174172,
+      "likes": 174175,
+      "bookmarks": 174175,
       "ratingAvg": 4.9,
-      "ratingCount": 55735,
+      "ratingCount": 55736,
       "ratingDist": [
         0,
         0,
         109,
         11604,
-        44022
+        44023
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2858,8 +2858,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 155968,
-      "bookmarks": 155968,
+      "likes": 155970,
+      "bookmarks": 155970,
       "ratingAvg": 5,
       "ratingCount": 49910,
       "ratingDist": [
@@ -2916,16 +2916,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 50687,
-      "bookmarks": 50687,
+      "likes": 50727,
+      "bookmarks": 50727,
       "ratingAvg": 4.9,
-      "ratingCount": 16220,
+      "ratingCount": 16233,
       "ratingDist": [
         0,
         0,
         32,
-        3377,
-        12811
+        3380,
+        12821
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -3034,16 +3034,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66759,
-      "bookmarks": 66759,
+      "likes": 66763,
+      "bookmarks": 66763,
       "ratingAvg": 4.9,
-      "ratingCount": 21363,
+      "ratingCount": 21364,
       "ratingDist": [
         0,
         0,
         42,
         4448,
-        16873
+        16874
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3093,16 +3093,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70235,
-      "bookmarks": 70235,
+      "likes": 70259,
+      "bookmarks": 70259,
       "ratingAvg": 4.9,
-      "ratingCount": 22475,
+      "ratingCount": 22483,
       "ratingDist": [
         0,
         0,
         44,
-        4679,
-        17752
+        4681,
+        17758
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3152,16 +3152,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 90579,
-      "bookmarks": 90579,
+      "likes": 90588,
+      "bookmarks": 90588,
       "ratingAvg": 5,
-      "ratingCount": 28985,
+      "ratingCount": 28988,
       "ratingDist": [
         0,
         0,
         31,
         4600,
-        24354
+        24357
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3211,16 +3211,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 317554,
-      "bookmarks": 317554,
+      "likes": 317561,
+      "bookmarks": 317561,
       "ratingAvg": 5,
-      "ratingCount": 101617,
+      "ratingCount": 101620,
       "ratingDist": [
         0,
         0,
         109,
         16127,
-        85382
+        85384
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3269,16 +3269,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 19124,
-      "bookmarks": 19124,
+      "likes": 19140,
+      "bookmarks": 19140,
       "ratingAvg": 4.8,
-      "ratingCount": 6120,
+      "ratingCount": 6125,
       "ratingDist": [
         0,
         0,
         22,
-        1640,
-        4458
+        1641,
+        4462
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -3386,16 +3386,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 91697,
-      "bookmarks": 91697,
+      "likes": 91707,
+      "bookmarks": 91707,
       "ratingAvg": 5,
-      "ratingCount": 29343,
+      "ratingCount": 29346,
       "ratingDist": [
         0,
         0,
         31,
         4657,
-        24655
+        24657
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3444,16 +3444,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 293431,
-      "bookmarks": 293431,
+      "likes": 293437,
+      "bookmarks": 293437,
       "ratingAvg": 5,
-      "ratingCount": 93898,
+      "ratingCount": 93900,
       "ratingDist": [
         0,
         0,
         100,
         14902,
-        78896
+        78898
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3502,16 +3502,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 47860,
-      "bookmarks": 47860,
+      "likes": 47868,
+      "bookmarks": 47868,
       "ratingAvg": 4.9,
-      "ratingCount": 15315,
+      "ratingCount": 15318,
       "ratingDist": [
         0,
         0,
         30,
         3189,
-        12096
+        12099
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3618,16 +3618,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 107644,
-      "bookmarks": 107644,
+      "likes": 107652,
+      "bookmarks": 107652,
       "ratingAvg": 5,
-      "ratingCount": 34446,
+      "ratingCount": 34449,
       "ratingDist": [
         0,
         0,
         37,
         5467,
-        28943
+        28945
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3678,16 +3678,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 118799,
-      "bookmarks": 118799,
+      "likes": 118802,
+      "bookmarks": 118802,
       "ratingAvg": 5,
-      "ratingCount": 38016,
+      "ratingCount": 38017,
       "ratingDist": [
         0,
         0,
         41,
         6033,
-        31942
+        31943
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3737,8 +3737,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70908,
-      "bookmarks": 70908,
+      "likes": 70909,
+      "bookmarks": 70909,
       "ratingAvg": 4.9,
       "ratingCount": 22691,
       "ratingDist": [
@@ -3793,16 +3793,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 279738,
-      "bookmarks": 279738,
+      "likes": 279742,
+      "bookmarks": 279742,
       "ratingAvg": 4.9,
-      "ratingCount": 89516,
+      "ratingCount": 89517,
       "ratingDist": [
         0,
         0,
         175,
         18637,
-        70703
+        70704
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3851,16 +3851,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66148,
-      "bookmarks": 66148,
+      "likes": 66155,
+      "bookmarks": 66155,
       "ratingAvg": 4.9,
-      "ratingCount": 21167,
+      "ratingCount": 21170,
       "ratingDist": [
         0,
         0,
         41,
-        4407,
-        16719
+        4408,
+        16721
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3910,8 +3910,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 94605,
-      "bookmarks": 94605,
+      "likes": 94607,
+      "bookmarks": 94607,
       "ratingAvg": 4.9,
       "ratingCount": 30274,
       "ratingDist": [
@@ -3968,16 +3968,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 83122,
-      "bookmarks": 83122,
+      "likes": 83129,
+      "bookmarks": 83129,
       "ratingAvg": 5,
-      "ratingCount": 26599,
+      "ratingCount": 26601,
       "ratingDist": [
         0,
         0,
         28,
-        4221,
-        22349
+        4222,
+        22351
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4026,16 +4026,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 138522,
-      "bookmarks": 138522,
+      "likes": 138680,
+      "bookmarks": 138680,
       "ratingAvg": 5,
-      "ratingCount": 44327,
+      "ratingCount": 44378,
       "ratingDist": [
         0,
         0,
         47,
-        7035,
-        37245
+        7043,
+        37288
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4080,8 +4080,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 100553,
-      "bookmarks": 100553,
+      "likes": 100554,
+      "bookmarks": 100554,
       "ratingAvg": 4.8,
       "ratingCount": 32177,
       "ratingDist": [
@@ -4138,16 +4138,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 35481,
-      "bookmarks": 35481,
+      "likes": 35512,
+      "bookmarks": 35512,
       "ratingAvg": 4.9,
-      "ratingCount": 11354,
+      "ratingCount": 11364,
       "ratingDist": [
         0,
         0,
         22,
-        2364,
-        8968
+        2366,
+        8976
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -4196,16 +4196,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 127457,
-      "bookmarks": 127457,
+      "likes": 127467,
+      "bookmarks": 127467,
       "ratingAvg": 5,
-      "ratingCount": 40786,
+      "ratingCount": 40789,
       "ratingDist": [
         0,
         0,
         44,
         6473,
-        34270
+        34272
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4254,16 +4254,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 23930,
-      "bookmarks": 23930,
+      "likes": 23939,
+      "bookmarks": 23939,
       "ratingAvg": 4.9,
-      "ratingCount": 7658,
+      "ratingCount": 7660,
       "ratingDist": [
         0,
         0,
         15,
-        1594,
-        6049
+        1595,
+        6050
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -4313,16 +4313,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 54760,
-      "bookmarks": 54760,
+      "likes": 54763,
+      "bookmarks": 54763,
       "ratingAvg": 4.8,
-      "ratingCount": 17523,
+      "ratingCount": 17524,
       "ratingDist": [
         0,
         0,
         62,
         4696,
-        12765
+        12766
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4430,16 +4430,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 186158,
-      "bookmarks": 186158,
+      "likes": 186166,
+      "bookmarks": 186166,
       "ratingAvg": 5,
-      "ratingCount": 59571,
+      "ratingCount": 59573,
       "ratingDist": [
         0,
         0,
         64,
         9454,
-        50053
+        50055
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4489,16 +4489,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 119534,
-      "bookmarks": 119534,
+      "likes": 119537,
+      "bookmarks": 119537,
       "ratingAvg": 4.9,
-      "ratingCount": 38251,
+      "ratingCount": 38252,
       "ratingDist": [
         0,
         0,
         75,
         7964,
-        30212
+        30213
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4547,16 +4547,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 26586,
-      "bookmarks": 26586,
+      "likes": 26609,
+      "bookmarks": 26609,
       "ratingAvg": 4.9,
-      "ratingCount": 8508,
+      "ratingCount": 8515,
       "ratingDist": [
         0,
         0,
         17,
-        1771,
-        6720
+        1773,
+        6726
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -5946,6 +5946,558 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
+    "id": "ns-14189985",
+    "slug": "ns-14189985",
+    "type": "webnovel",
+    "title": "위험한 감각",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "위험한 감각 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14189985"
+      }
+    ],
+    "stats": {
+      "views": 4988121,
+      "likes": 249406,
+      "bookmarks": 249406,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 99762,
+      "ratingDist": [
+        0,
+        7,
+        3370,
+        59238,
+        37147
+      ],
+      "rankDelta": 0,
+      "trendingScore": 62,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14049973",
+    "slug": "ns-14049973",
+    "type": "webnovel",
+    "title": "신성한 학교에서",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "신성한 학교에서 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260415_13%2Fpocket_1776232623222oBn3X_JPEG%2F%25BD%25C5%25BC%25BA%25C7%25D0%25B1%25B3_3.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14049973"
+      }
+    ],
+    "stats": {
+      "views": 4961389,
+      "likes": 248069,
+      "bookmarks": 248069,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 99228,
+      "ratingDist": [
+        0,
+        9,
+        3996,
+        61481,
+        33741
+      ],
+      "rankDelta": 0,
+      "trendingScore": 61,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14068945",
+    "slug": "ns-14068945",
+    "type": "webnovel",
+    "title": "봄을 그리는 겨울",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "봄을 그리는 겨울 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14068945"
+      }
+    ],
+    "stats": {
+      "views": 4394229,
+      "likes": 219711,
+      "bookmarks": 219711,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 87884,
+      "ratingDist": [
+        0,
+        11,
+        4198,
+        56525,
+        27149
+      ],
+      "rankDelta": 0,
+      "trendingScore": 60,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14068962",
+    "slug": "ns-14068962",
+    "type": "webnovel",
+    "title": "어쩌다 우리가",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "어쩌다 우리가 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14068962"
+      }
+    ],
+    "stats": {
+      "views": 4244170,
+      "likes": 212209,
+      "bookmarks": 212209,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 84884,
+      "ratingDist": [
+        0,
+        14,
+        4785,
+        56384,
+        23701
+      ],
+      "rankDelta": 0,
+      "trendingScore": 59,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14183302",
+    "slug": "ns-14183302",
+    "type": "webnovel",
+    "title": "해코지",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "해코지 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14183302"
+      }
+    ],
+    "stats": {
+      "views": 4572884,
+      "likes": 228644,
+      "bookmarks": 228644,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 91458,
+      "ratingDist": [
+        0,
+        21,
+        6053,
+        62421,
+        22963
+      ],
+      "rankDelta": 0,
+      "trendingScore": 58,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14190808",
+    "slug": "ns-14190808",
+    "type": "webnovel",
+    "title": "길들임에 관하여",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "길들임에 관하여 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14190808"
+      }
+    ],
+    "stats": {
+      "views": 4283925,
+      "likes": 214196,
+      "bookmarks": 214196,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 85678,
+      "ratingDist": [
+        0,
+        26,
+        6624,
+        59781,
+        19247
+      ],
+      "rankDelta": 0,
+      "trendingScore": 57,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-13993754",
+    "slug": "ns-13993754",
+    "type": "webnovel",
+    "title": "너 아니면 안되는 나는",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "너 아니면 안되는 나는 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=13993754"
+      }
+    ],
+    "stats": {
+      "views": 3815835,
+      "likes": 190792,
+      "bookmarks": 190792,
+      "ratingAvg": 4.6,
+      "ratingCount": 76317,
+      "ratingDist": [
+        0,
+        1,
+        806,
+        31520,
+        43990
+      ],
+      "rankDelta": 0,
+      "trendingScore": 56,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14190107",
+    "slug": "ns-14190107",
+    "type": "webnovel",
+    "title": "망배우는 관심이 고프다",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "망배우는 관심이 고프다 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260519_154%2Fpocket_17791787858992Vest_JPEG%2F%25B8%25C1%25B9%25E8%25BF%25EC%25B4%25C2%25B0%25FC%25BD%25C9%25C0%25CC%25B0%25ED%25C7%25C1%25B4%25D9_%25C0%25FC%25C0%25DA%25C3%25A5%25C7%25A5%25C1%25F6_%25C3%25D6%25C1%25BE.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14190107"
+      }
+    ],
+    "stats": {
+      "views": 3990653,
+      "likes": 199533,
+      "bookmarks": 199533,
+      "ratingAvg": 4.56,
+      "ratingCount": 79813,
+      "ratingDist": [
+        0,
+        1,
+        1036,
+        35462,
+        43314
+      ],
+      "rankDelta": 0,
+      "trendingScore": 55,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14150652",
+    "slug": "ns-14150652",
+    "type": "webnovel",
+    "title": "서큐버스 디지즈(Succubus disease)",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "서큐버스 디지즈(Succubus disease) · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14150652"
+      }
+    ],
+    "stats": {
+      "views": 3329782,
+      "likes": 166489,
+      "bookmarks": 166489,
+      "ratingAvg": 4.52,
+      "ratingCount": 66596,
+      "ratingDist": [
+        0,
+        1,
+        1057,
+        31677,
+        33861
+      ],
+      "rankDelta": 0,
+      "trendingScore": 54,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-13989140",
+    "slug": "ns-13989140",
+    "type": "webnovel",
+    "title": "파문(波紋)",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "파문(波紋) · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=13989140"
+      }
+    ],
+    "stats": {
+      "views": 3416411,
+      "likes": 170821,
+      "bookmarks": 170821,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 68328,
+      "ratingDist": [
+        0,
+        2,
+        1320,
+        34619,
+        32387
+      ],
+      "rankDelta": 0,
+      "trendingScore": 53,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14183310",
+    "slug": "ns-14183310",
+    "type": "webnovel",
+    "title": "저격",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "저격 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14183310"
+      }
+    ],
+    "stats": {
+      "views": 3672855,
+      "likes": 183643,
+      "bookmarks": 183643,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 73457,
+      "ratingDist": [
+        0,
+        3,
+        1719,
+        39443,
+        32293
+      ],
+      "rankDelta": 0,
+      "trendingScore": 52,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14183719",
+    "slug": "ns-14183719",
+    "type": "webnovel",
+    "title": "교활한 구원",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "교활한 구원 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14183719"
+      }
+    ],
+    "stats": {
+      "views": 3519002,
+      "likes": 175950,
+      "bookmarks": 175950,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 70380,
+      "ratingDist": [
+        0,
+        4,
+        1984,
+        39844,
+        28549
+      ],
+      "rankDelta": 0,
+      "trendingScore": 51,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
     "id": "nv-1683810545",
     "slug": "nv-1683810545",
     "type": "webnovel",
@@ -5967,6 +6519,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 62)",
       "oklch(0.28 0.1 102)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F822657%2Fthumbnail%2Fthumbnail_IMAG21_99e49512-e05d-48c3-846d-d898f78523df.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -5978,17 +6531,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1503318,
-      "likes": 200442,
-      "bookmarks": 200442,
+      "views": 1503360,
+      "likes": 200448,
+      "bookmarks": 200448,
       "ratingAvg": 5,
-      "ratingCount": 80177,
+      "ratingCount": 80179,
       "ratingDist": [
         0,
         0,
         86,
         12724,
-        67367
+        67369
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6019,6 +6572,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 62)",
       "oklch(0.28 0.1 102)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F796075%2Fthumbnail%2Fthumbnail_IMAG21_31f75c4c-81c9-454a-8d92-9e23b577e1a5.jpg",
     "status": "ongoing",
     "ageRating": "12",
     "releaseYear": 2021,
@@ -6030,17 +6584,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1824360,
-      "likes": 243248,
-      "bookmarks": 243248,
+      "views": 1824378,
+      "likes": 243250,
+      "bookmarks": 243250,
       "ratingAvg": 5,
-      "ratingCount": 97299,
+      "ratingCount": 97300,
       "ratingDist": [
         0,
         0,
         104,
         15441,
-        81754
+        81755
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6071,6 +6625,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 62)",
       "oklch(0.28 0.1 102)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F833702%2Fthumbnail%2Fthumbnail_IMAG21_aad66c46-90fc-4d2d-8cb9-46fc0ff0abc2.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6082,17 +6637,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1005402,
-      "likes": 134054,
-      "bookmarks": 134054,
+      "views": 1005456,
+      "likes": 134061,
+      "bookmarks": 134061,
       "ratingAvg": 5,
-      "ratingCount": 53622,
+      "ratingCount": 53624,
       "ratingDist": [
         0,
         0,
         57,
         8510,
-        45055
+        45057
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6122,6 +6677,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F821195%2Fthumbnail%2Fthumbnail_IMAG21_4eff0192-8237-4ec7-b74c-bd66cfd25d51.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6133,7 +6689,7 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1724628,
+      "views": 1724622,
       "likes": 229950,
       "bookmarks": 229950,
       "ratingAvg": 5,
@@ -6173,6 +6729,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 138)",
       "oklch(0.28 0.1 178)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F807775%2Fthumbnail%2Fthumbnail_IMAG21_3c8e26fe-0df1-46b8-b874-e1a986995864.jpg",
     "status": "ongoing",
     "ageRating": "all",
     "releaseYear": 2022,
@@ -6184,17 +6741,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1045032,
-      "likes": 139338,
-      "bookmarks": 139338,
+      "views": 1045050,
+      "likes": 139340,
+      "bookmarks": 139340,
       "ratingAvg": 5,
-      "ratingCount": 55735,
+      "ratingCount": 55736,
       "ratingDist": [
         0,
         0,
         60,
         8845,
-        46830
+        46831
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6224,6 +6781,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 12)",
       "oklch(0.28 0.1 52)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6276,6 +6834,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 62)",
       "oklch(0.28 0.1 102)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F834686%2Fthumbnail%2Fthumbnail_IMAG21_5100418c-ad0f-4c77-b3fb-6b8b7f585888.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6287,17 +6846,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 400554,
-      "likes": 53407,
-      "bookmarks": 53407,
+      "views": 400578,
+      "likes": 53410,
+      "bookmarks": 53410,
       "ratingAvg": 5,
-      "ratingCount": 21363,
+      "ratingCount": 21364,
       "ratingDist": [
         0,
         0,
         23,
         3390,
-        17950
+        17951
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6327,6 +6886,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F849510%2Fthumbnail%2Fthumbnail_IMAG21_6e5604e7-13fd-4e78-8455-fdd5b3ec1ecb.jpg",
     "status": "ongoing",
     "ageRating": "all",
     "releaseYear": 2025,
@@ -6338,17 +6898,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 421410,
-      "likes": 56188,
-      "bookmarks": 56188,
+      "views": 421554,
+      "likes": 56207,
+      "bookmarks": 56207,
       "ratingAvg": 5,
-      "ratingCount": 22475,
+      "ratingCount": 22483,
       "ratingDist": [
         0,
         0,
         24,
-        3567,
-        18884
+        3568,
+        18891
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6378,6 +6938,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F818780%2Fthumbnail%2Fthumbnail_IMAG21_3280cf30-80e7-407b-bd9a-5028cb8850e9.jpg",
     "status": "ongoing",
     "ageRating": "all",
     "releaseYear": 2022,
@@ -6389,17 +6950,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 543474,
-      "likes": 72463,
-      "bookmarks": 72463,
+      "views": 543528,
+      "likes": 72470,
+      "bookmarks": 72470,
       "ratingAvg": 5,
-      "ratingCount": 28985,
+      "ratingCount": 28988,
       "ratingDist": [
         0,
         0,
         31,
         4600,
-        24354
+        24357
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6429,6 +6990,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F795297%2Fthumbnail%2Fthumbnail_IMAG21_2011c0f2-3b1c-4e32-9076-ee0eb9c6f684.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2021,
@@ -6480,6 +7042,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F840845%2Fthumbnail%2Fthumbnail_IMAG21_4f467d2a-6c56-48d3-8054-13f63b314c95.jpg",
     "status": "ongoing",
     "ageRating": "12",
     "releaseYear": 2024,
@@ -6491,17 +7054,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 550182,
-      "likes": 73358,
-      "bookmarks": 73358,
+      "views": 550242,
+      "likes": 73366,
+      "bookmarks": 73366,
       "ratingAvg": 5,
-      "ratingCount": 29343,
+      "ratingCount": 29346,
       "ratingDist": [
         0,
         0,
         31,
         4657,
-        24655
+        24657
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6531,6 +7094,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F841126%2Fthumbnail%2Fthumbnail_IMAG21_e2200d45-f256-4c5b-a259-97fae1d607a3.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2024,
@@ -6542,17 +7106,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 645864,
-      "likes": 86115,
-      "bookmarks": 86115,
+      "views": 645912,
+      "likes": 86122,
+      "bookmarks": 86122,
       "ratingAvg": 5,
-      "ratingCount": 34446,
+      "ratingCount": 34449,
       "ratingDist": [
         0,
         0,
         37,
         5467,
-        28943
+        28945
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6583,6 +7147,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 62)",
       "oklch(0.28 0.1 102)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F829195%2Fthumbnail%2Fthumbnail_IMAG21_70e13aca-ac81-4e47-b856-6c5d8651a0c5.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6594,17 +7159,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 425448,
-      "likes": 56726,
-      "bookmarks": 56726,
+      "views": 425454,
+      "likes": 56727,
+      "bookmarks": 56727,
       "ratingAvg": 5,
-      "ratingCount": 22690,
+      "ratingCount": 22691,
       "ratingDist": [
         0,
         0,
         24,
         3601,
-        19065
+        19066
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6634,6 +7199,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 290)",
       "oklch(0.28 0.1 330)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845918%2Fthumbnail%2Fthumbnail_IMAG21_02da73d3-890e-4778-8148-4b02da0c9ba7.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2024,
@@ -6645,17 +7211,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 396888,
-      "likes": 52918,
-      "bookmarks": 52918,
+      "views": 396930,
+      "likes": 52924,
+      "bookmarks": 52924,
       "ratingAvg": 5,
-      "ratingCount": 21167,
+      "ratingCount": 21170,
       "ratingDist": [
         0,
         0,
         23,
-        3359,
-        17785
+        3360,
+        17788
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6685,6 +7251,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 12)",
       "oklch(0.28 0.1 52)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F814742%2Fthumbnail%2Fthumbnail_IMAG21_78eadccd-67fa-4657-be55-365b69520a45.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2022,
@@ -6696,9 +7263,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 567630,
-      "likes": 75684,
-      "bookmarks": 75684,
+      "views": 567642,
+      "likes": 75686,
+      "bookmarks": 75686,
       "ratingAvg": 5,
       "ratingCount": 30274,
       "ratingDist": [
@@ -6736,6 +7303,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845531%2Fthumbnail%2Fthumbnail_IMAG21_965eb180-1ea8-4aae-af26-433008b051db.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2024,
@@ -6747,17 +7315,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 831132,
-      "likes": 110818,
-      "bookmarks": 110818,
+      "views": 832080,
+      "likes": 110944,
+      "bookmarks": 110944,
       "ratingAvg": 5,
-      "ratingCount": 44327,
+      "ratingCount": 44378,
       "ratingDist": [
         0,
         0,
         47,
-        7035,
-        37245
+        7043,
+        37288
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6787,6 +7355,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F849898%2Fthumbnail%2Fthumbnail_IMAG21_a2bb0dde-6ec3-46f1-8e69-3ab35a6f863f.jpg",
     "status": "ongoing",
     "ageRating": "19",
     "releaseYear": 2023,
@@ -6798,17 +7367,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 143580,
-      "likes": 19144,
-      "bookmarks": 19144,
+      "views": 143634,
+      "likes": 19151,
+      "bookmarks": 19151,
       "ratingAvg": 5,
-      "ratingCount": 7658,
+      "ratingCount": 7660,
       "ratingDist": [
         0,
         0,
         8,
-        1215,
-        6434
+        1216,
+        6436
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6838,6 +7407,7 @@ export const TITLES: Title[] = [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F826381%2Fthumbnail%2Fthumbnail_IMAG21_217f89e9-1191-4674-b248-44aec3e7f69c.jpg",
     "status": "ongoing",
     "ageRating": "15",
     "releaseYear": 2023,
@@ -6849,17 +7419,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1116948,
-      "likes": 148926,
-      "bookmarks": 148926,
+      "views": 1116996,
+      "likes": 148933,
+      "bookmarks": 148933,
       "ratingAvg": 5,
-      "ratingCount": 59570,
+      "ratingCount": 59573,
       "ratingDist": [
         0,
         0,
         64,
         9454,
-        50053
+        50055
       ],
       "rankDelta": 0,
       "trendingScore": 60,
