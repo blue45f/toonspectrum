@@ -21,6 +21,7 @@ interface AppState {
   reads: Record<string, ReadState>; // titleId -> 상태
   likedReviews: Record<string, boolean>; // reviewId -> liked
   subscriptions: Record<string, boolean>; // titleId -> 연재 알림 구독
+  adultVerified: boolean; // 성인(만 19세+) 자가 인증 — 19금 콘텐츠 표시
   collections: Collection[];
   ratingScale: RatingScale;
 
@@ -31,6 +32,7 @@ interface AppState {
   deleteReview: (titleId: string) => void;
   toggleLikeReview: (reviewId: string) => void;
   toggleSubscription: (titleId: string) => void;
+  setAdultVerified: (v: boolean) => void;
   setRatingScale: (s: RatingScale) => void;
 
   createCollection: (name: string, emoji: string) => string;
@@ -58,6 +60,7 @@ export const useApp = create<AppState>()(
       reads: {},
       likedReviews: {},
       subscriptions: {},
+      adultVerified: false,
       collections: seedCollections,
       ratingScale: "star",
 
@@ -96,6 +99,7 @@ export const useApp = create<AppState>()(
         set((s) => ({
           subscriptions: { ...s.subscriptions, [titleId]: !s.subscriptions[titleId] },
         })),
+      setAdultVerified: (adultVerified) => set({ adultVerified }),
       setRatingScale: (ratingScale) => set({ ratingScale }),
 
       createCollection: (name, emoji) => {

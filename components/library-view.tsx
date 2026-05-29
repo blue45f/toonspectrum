@@ -65,6 +65,8 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const collections = useApp((s) => s.collections);
   const createCollection = useApp((s) => s.createCollection);
   const deleteCollection = useApp((s) => s.deleteCollection);
+  const adultVerified = useApp((s) => s.adultVerified);
+  const setAdultVerified = useApp((s) => s.setAdultVerified);
   const resetAll = useApp((s) => s.resetAll);
 
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -354,14 +356,28 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         />
       )}
 
-      {(readIds.length > 0 || ratedIds.length > 0) && (
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-5 text-xs text-fg-3">
+        <span>
+          성인 인증:{" "}
+          <span className={adultVerified ? "font-medium text-good" : "text-fg-2"}>
+            {adultVerified ? "인증됨 · 19금 표시" : "미인증 · 19금 가림"}
+          </span>
+        </span>
         <button
-          onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
-          className="mt-4 self-start text-xs text-fg-3 hover:text-bad"
+          onClick={() => setAdultVerified(!adultVerified)}
+          className="rounded-md border border-line px-2 py-0.5 transition-colors hover:text-fg"
         >
-          서재 데이터 초기화
+          {adultVerified ? "인증 해제" : "성인 인증하기 (만 19세+)"}
         </button>
-      )}
+        {(readIds.length > 0 || ratedIds.length > 0) && (
+          <button
+            onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
+            className="hover:text-bad"
+          >
+            서재 데이터 초기화
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AdultOverlay } from "./adult-overlay";
 
 const SIZE = {
   sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.6rem]", wm: "text-[3.5rem]" },
@@ -107,6 +108,9 @@ export function TitlePoster({
           </p>
         )}
       </div>
+
+      {/* 19금 성인 인증 게이트 */}
+      {title.ageRating === "19" && <AdultOverlay compact={size === "sm"} />}
     </div>
   );
 }

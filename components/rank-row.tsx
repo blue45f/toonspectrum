@@ -6,13 +6,14 @@ import { GenreChip } from "./ui/chip";
 import { PlatformTags } from "./availability";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
+import { AdultOverlay } from "./adult-overlay";
 
 // 미니 표지 썸네일
 export function MiniPoster({
   title,
   className,
 }: {
-  title: { title: string; cover: [string, string]; type: string; coverImage?: string };
+  title: { title: string; cover: [string, string]; type: string; coverImage?: string; ageRating?: string };
   className?: string;
 }) {
   return (
@@ -35,6 +36,7 @@ export function MiniPoster({
       ) : (
         title.title.charAt(0)
       )}
+      {title.ageRating === "19" && <AdultOverlay compact />}
     </span>
   );
 }
