@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+/* ============================================================
+   WEBDEX — 활자와 스펙트럼 (Type & Spectrum)
+   따뜻한 잉크-블랙 위의 에디토리얼 다크. OKLCH 토큰.
+   ============================================================ */
+
+@theme {
+  /* 중립 — 따뜻한 잉크(hue ~70), #000/#fff 금지 */
+  --color-canvas: oklch(0.155 0.008 70);
+  --color-panel: oklch(0.185 0.009 68);
+  --color-card: oklch(0.208 0.01 66);
+  --color-raised: oklch(0.247 0.011 64);
+  --color-line: oklch(0.305 0.012 64);
+  --color-line-strong: oklch(0.42 0.013 64);
+  --color-fg: oklch(0.95 0.01 85);
+  --color-fg-2: oklch(0.745 0.012 78);
+  --color-fg-3: oklch(0.57 0.012 76);
+
+  /* 악센트 — persimmon(감/주홍). 라이브·액티브·프라이머리 전용 */
+  --color-accent: oklch(0.72 0.185 42);
+  --color-accent-2: oklch(0.66 0.2 38);
+  --color-accent-soft: oklch(0.72 0.185 42 / 0.14);
+  --color-on-accent: oklch(0.2 0.02 60);
+
+  /* 보조·시맨틱 */
+  --color-cool: oklch(0.8 0.11 232);
+  --color-good: oklch(0.8 0.15 150);
+  --color-warn: oklch(0.82 0.15 80);
+  --color-bad: oklch(0.66 0.2 25);
+
+  /* 타이포 — grotesque=데이터/serif=문학/sans=한국어UI */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", var(--font-sans);
+  --font-serif: "Nanum Myeongjo", "Pretendard Variable", ui-serif, Georgia, serif;
+
+  /* 모션 */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 반경 */
+  --radius-xl: 1.1rem;
+  --radius-2xl: 1.4rem;
+
+  /* 애니메이션 */
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-up: fade-up 0.5s var(--ease-out-expo) both;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: oklch(0.72 0.185 42 / 0.3);
+    color: var(--color-fg);
+  }
+
+  /* 포커스 가시성 — 접근성 */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* 얇은 스크롤바 (절제) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 99px;
+    border: 3px solid var(--color-canvas);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-line-strong);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================
+   시그니처 유틸리티
+   ============================================================ */
+
+/* 숫자는 tabular */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ledger 그리드 해어라인 — 색인/대장 텍스처 */
+@utility bg-ledger {
+  background-image:
+    linear-gradient(to right, oklch(0.95 0.01 85 / 0.022) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.95 0.01 85 / 0.022) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* 미세 상단 하이라이트 (다크 표면 깊이감) */
+@utility surface-hl {
+  box-shadow: inset 0 1px 0 0 oklch(1 0 0 / 0.04);
+}
+
+/* 필름 그레인 노이즈 — 타이포그래픽 커버의 에디토리얼 질감 */
+@utility noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 디스플레이 넘버럴 */
+@utility numeral {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+/* 영문 라벨 (대문자 트래킹) */
+@utility eyebrow {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+/* 스켈레톤 시머 */
+@utility skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--color-raised) 30%,
+    oklch(0.3 0.011 64) 50%,
+    var(--color-raised) 70%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: 0.5rem;
+}
+
+/* 텍스트 밸런스/클램프 */
+@utility text-balance {
+  text-wrap: balance;
+}
+
+/* 스크롤 진입 리빌 (scroll-driven, 미지원 브라우저는 그대로 노출) */
+.reveal-children > * {
+  animation: fade-up linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 48%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-children > * {
+    animation: none;
+  }
+}
+
+/* 가로 스크롤 레일 (스크롤바 숨김) */
+@utility rail {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
