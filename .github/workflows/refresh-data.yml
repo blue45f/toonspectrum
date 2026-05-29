@@ -1,0 +1,56 @@
+name: Refresh data
+
+# 네이버/카카오 실데이터를 12시간마다 재수집해 커밋 (서버 실행 = 세션 무관 durable)
+# 주의: 네이버/카카오가 GitHub Actions IP를 차단할 수 있음. 차단/부족 시 안전장치로 커밋하지 않음.
+on:
+  schedule:
+    - cron: "23 */12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Crawl real data
+        run: node scripts/crawl.mjs
+
+      - name: Sanity check (>= 100 titles)
+        run: |
+          COUNT=$(node -e 'const s=require("fs").readFileSync("lib/data/titles.ts","utf8");console.log((s.match(/"id":/g)||[]).length)')
+          echo "titles: $COUNT"
+          if [ "$COUNT" -lt 100 ]; then echo "::error::too few titles ($COUNT), aborting"; exit 1; fi
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/data/titles.ts
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+          else
+            git commit -m "chore(data): 데이터 신선도 자동 갱신 [skip ci]"
+            git push
+          fi
