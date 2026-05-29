@@ -13,7 +13,9 @@ export default async function LibraryPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const sp = await searchParams;
-  const tab = (["shelf", "rated", "taste", "collections"] as const).find((t) => t === sp.tab) ?? "shelf";
+  const tab =
+    (["shelf", "rated", "alerts", "taste", "collections"] as const).find((t) => t === sp.tab) ??
+    "shelf";
 
   return (
     <Container size="wide" className="py-10">

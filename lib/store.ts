@@ -20,6 +20,7 @@ interface AppState {
   reviews: Record<string, UserReview>; // titleId -> review
   reads: Record<string, ReadState>; // titleId -> 상태
   likedReviews: Record<string, boolean>; // reviewId -> liked
+  subscriptions: Record<string, boolean>; // titleId -> 연재 알림 구독
   collections: Collection[];
   ratingScale: RatingScale;
 
@@ -29,6 +30,7 @@ interface AppState {
   upsertReview: (review: UserReview) => void;
   deleteReview: (titleId: string) => void;
   toggleLikeReview: (reviewId: string) => void;
+  toggleSubscription: (titleId: string) => void;
   setRatingScale: (s: RatingScale) => void;
 
   createCollection: (name: string, emoji: string) => string;
@@ -55,6 +57,7 @@ export const useApp = create<AppState>()(
       reviews: {},
       reads: {},
       likedReviews: {},
+      subscriptions: {},
       collections: seedCollections,
       ratingScale: "star",
 
@@ -88,6 +91,10 @@ export const useApp = create<AppState>()(
       toggleLikeReview: (reviewId) =>
         set((s) => ({
           likedReviews: { ...s.likedReviews, [reviewId]: !s.likedReviews[reviewId] },
+        })),
+      toggleSubscription: (titleId) =>
+        set((s) => ({
+          subscriptions: { ...s.subscriptions, [titleId]: !s.subscriptions[titleId] },
         })),
       setRatingScale: (ratingScale) => set({ ratingScale }),
 
@@ -123,6 +130,7 @@ export const useApp = create<AppState>()(
           reviews: {},
           reads: {},
           likedReviews: {},
+          subscriptions: {},
           collections: seedCollections,
         }),
     }),

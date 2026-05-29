@@ -9,13 +9,15 @@ import type { ReadState } from "@/lib/types";
 import { UnderlineTabs, Segmented } from "./ui/segmented";
 import { TitleCard } from "./title-card";
 import { MiniPoster } from "./rank-row";
-import { Stars } from "./ui/stars";
+import { Stars, RatingInline } from "./ui/stars";
 import { MeterBar } from "./ui/spectrum-bar";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
+import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
-import { Sparkles, Plus, Trash2, BookHeart, Star, Compass, FolderHeart } from "lucide-react";
+import { Sparkles, Plus, Trash2, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
 
-type Tab = "shelf" | "rated" | "taste" | "collections";
+type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
+const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
 const READ_TABS: { value: ReadState; label: string }[] = [
   { value: "want", label: "관심" },
   { value: "reading", label: "보는 중" },
@@ -59,6 +61,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const hydrated = useHydrated();
   const reads = useApp((s) => s.reads);
   const ratings = useApp((s) => s.ratings);
+  const subscriptions = useApp((s) => s.subscriptions);
   const collections = useApp((s) => s.collections);
   const createCollection = useApp((s) => s.createCollection);
   const deleteCollection = useApp((s) => s.deleteCollection);
@@ -87,6 +90,14 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   readIds.forEach(([, st]) => (counts[st] = (counts[st] ?? 0) + 1));
   const shelfTitles = readIds.filter(([, st]) => st === readTab).map(([id]) => getTitle(id)!).filter(Boolean);
 
+  // 연재 알림 — 구독한 작품을 요일별로
+  const subTitles = Object.entries(subscriptions)
+    .filter(([, on]) => on)
+    .map(([id]) => getTitle(id))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+  const todayDay = WEEK_DAYS[DAY_FROM_GETDAY[new Date().getDay()]];
+  const todaySubs = subTitles.filter((t) => t.updateDays?.includes(todayDay));
+
   return (
     <div className="flex flex-col gap-6">
       <UnderlineTabs
@@ -95,6 +106,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         items={[
           { value: "shelf", label: `서재 ${readIds.length || ""}`.trim() },
           { value: "rated", label: `평가 ${ratedIds.length || ""}`.trim() },
+          { value: "alerts", label: `연재 알림 ${subTitles.length || ""}`.trim() },
           { value: "taste", label: "취향 분석" },
           { value: "collections", label: "컬렉션" },
         ]}
@@ -260,6 +272,74 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                   </div>
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 연재 알림 */}
+      {tab === "alerts" && (
+        <div className="flex flex-col gap-6">
+          {subTitles.length === 0 ? (
+            <EmptyTeach
+              icon={BellRing}
+              title="구독한 연재가 없어요"
+              desc="작품 상세에서 '연재 알림 받기'를 켜면 요일별 업데이트를 모아 보여드려요."
+              cta={{ label: "연재 캘린더 보기", href: "/calendar" }}
+            />
+          ) : (
+            <>
+              {todaySubs.length > 0 && (
+                <div className="rounded-2xl border border-accent/40 bg-accent-soft/40 p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <BellRing size={16} className="text-accent" />
+                    <h3 className="font-semibold text-fg">
+                      오늘({todayDay}) 새 회차 {todaySubs.length}편
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                    {todaySubs.map((t) => (
+                      <TitleCard key={t.id} title={t} size="sm" />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col gap-5">
+                {WEEK_DAYS.map((day) => {
+                  const list = subTitles.filter((t) => t.updateDays?.includes(day));
+                  if (list.length === 0) return null;
+                  const isToday = day === todayDay;
+                  return (
+                    <div key={day}>
+                      <h4
+                        className={cn(
+                          "mb-2.5 flex items-center gap-2 text-sm font-semibold",
+                          isToday ? "text-accent" : "text-fg-2"
+                        )}
+                      >
+                        <span className="font-display">{day}요일</span>
+                        <span className="text-xs font-normal text-fg-3">{list.length}편</span>
+                        {isToday && <span className="text-[0.65rem]">· 오늘</span>}
+                      </h4>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {list.map((t) => (
+                          <Link
+                            key={t.id}
+                            href={`/title/${t.slug}`}
+                            className="group flex items-center gap-3 rounded-xl border border-line bg-card p-2.5 transition-colors hover:border-line-strong"
+                          >
+                            <MiniPoster title={t} className="w-9" />
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg group-hover:text-accent">
+                              {t.title}
+                            </span>
+                            <RatingInline value={t.stats.ratingAvg} size="xs" />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
         </div>

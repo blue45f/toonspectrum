@@ -18,6 +18,7 @@ import { AvailabilityRouter } from "@/components/availability";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { ReadStateSelector } from "@/components/read-state";
 import { CollectionAdd } from "@/components/collection-add";
+import { SubscribeButton } from "@/components/subscribe-button";
 import { AuthorLine } from "@/components/author-line";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewCard } from "@/components/review-card";
@@ -95,6 +96,9 @@ export default async function TitleDetailPage({
           <TitlePoster title={title} size="lg" />
           <ReadStateSelector titleId={title.id} />
           <CollectionAdd titleId={title.id} />
+          {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (
+            <SubscribeButton titleId={title.id} days={title.updateDays} />
+          )}
           <div className="rounded-2xl border border-line bg-panel/50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <MapPin size={15} className="text-accent" />
