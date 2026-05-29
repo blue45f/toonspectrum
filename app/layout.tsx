@@ -5,6 +5,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { CommandPalette } from "@/components/command-palette";
 import { MotionProvider } from "@/components/motion-provider";
+import { AuthSessionProvider } from "@/components/auth/session-provider";
+import { StoreSync } from "@/components/auth/store-sync";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -54,14 +56,17 @@ export default function RootLayout({
         >
           본문 바로가기
         </a>
-        <MotionProvider>
-          <CommandPalette />
-          <SiteHeader />
-          <main id="main" className="flex-1 pb-[72px] md:pb-0">
-            {children}
-          </main>
-          <SiteFooter />
-        </MotionProvider>
+        <AuthSessionProvider>
+          <StoreSync />
+          <MotionProvider>
+            <CommandPalette />
+            <SiteHeader />
+            <main id="main" className="flex-1 pb-[72px] md:pb-0">
+              {children}
+            </main>
+            <SiteFooter />
+          </MotionProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

@@ -46,3 +46,12 @@ next-env.d.ts
 # dev/QA artifacts (browser automation, screenshots)
 /.playwright-mcp/
 /*.png
+
+# local database (libSQL/SQLite)
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+!.env.example

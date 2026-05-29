@@ -5,6 +5,21 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { useSyncExternalStore } from "react";
 import type { ReadState, UserReview } from "./types";
 
+// 로그인 시 변경을 DB API로 write-through (게스트는 localStorage만)
+function apiPost(path: string, body: unknown, method = "POST") {
+  if (typeof window === "undefined") return;
+  fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+}
+
+export interface HydratePayload {
+  ratings: Record<string, number>;
+  reads: Record<string, ReadState>;
+  subscriptions: Record<string, boolean>;
+  reviews: Record<string, UserReview>;
+  likedReviews: Record<string, boolean>;
+  collections: Collection[];
+}
+
 export type RatingScale = "star" | "ten" | "hundred";
 
 export interface Collection {
@@ -24,6 +39,9 @@ interface AppState {
   adultVerified: boolean; // 성인(만 19세+) 자가 인증 — 19금 콘텐츠 표시
   collections: Collection[];
   ratingScale: RatingScale;
+  userId: string | null; // 로그인 사용자 (있으면 DB write-through)
+  setUserId: (id: string | null) => void;
+  hydrateFromServer: (data: HydratePayload) => void;
 
   setRating: (titleId: string, rating: number) => void;
   clearRating: (titleId: string) => void;
@@ -63,42 +81,74 @@ export const useApp = create<AppState>()(
       adultVerified: false,
       collections: seedCollections,
       ratingScale: "star",
+      userId: null,
 
-      setRating: (titleId, rating) =>
-        set((s) => ({ ratings: { ...s.ratings, [titleId]: rating } })),
-      clearRating: (titleId) =>
+      setUserId: (userId) => set({ userId }),
+      hydrateFromServer: (d) =>
+        set({
+          ratings: d.ratings,
+          reads: d.reads,
+          subscriptions: d.subscriptions,
+          reviews: d.reviews,
+          likedReviews: d.likedReviews,
+          collections: d.collections.length ? d.collections : seedCollections,
+        }),
+
+      setRating: (titleId, rating) => {
+        set((s) => ({ ratings: { ...s.ratings, [titleId]: rating } }));
+        if (get().userId) apiPost("/api/me/rating", { titleId, value: rating });
+      },
+      clearRating: (titleId) => {
         set((s) => {
           const next = { ...s.ratings };
           delete next[titleId];
           return { ratings: next };
-        }),
-      setRead: (titleId, state) =>
+        });
+        if (get().userId) apiPost("/api/me/rating", { titleId, value: null });
+      },
+      setRead: (titleId, state) => {
         set((s) => {
           const next = { ...s.reads };
           if (state === null) delete next[titleId];
           else next[titleId] = state;
           return { reads: next };
-        }),
-      upsertReview: (review) =>
+        });
+        if (get().userId) apiPost("/api/me/read", { titleId, state });
+      },
+      upsertReview: (review) => {
         set((s) => ({
           reviews: { ...s.reviews, [review.titleId]: review },
-          // 리뷰 작성 시 평점도 동기화
           ratings: { ...s.ratings, [review.titleId]: review.rating },
-        })),
-      deleteReview: (titleId) =>
+        }));
+        if (get().userId)
+          apiPost("/api/me/review", {
+            titleId: review.titleId,
+            rating: review.rating,
+            text: review.text,
+            tags: review.tags,
+            spoiler: review.spoiler,
+          });
+      },
+      deleteReview: (titleId) => {
         set((s) => {
           const next = { ...s.reviews };
           delete next[titleId];
           return { reviews: next };
-        }),
-      toggleLikeReview: (reviewId) =>
+        });
+        if (get().userId) apiPost("/api/me/review", { titleId }, "DELETE");
+      },
+      toggleLikeReview: (reviewId) => {
         set((s) => ({
           likedReviews: { ...s.likedReviews, [reviewId]: !s.likedReviews[reviewId] },
-        })),
-      toggleSubscription: (titleId) =>
+        }));
+        if (get().userId) apiPost("/api/me/review-like", { reviewId });
+      },
+      toggleSubscription: (titleId) => {
         set((s) => ({
           subscriptions: { ...s.subscriptions, [titleId]: !s.subscriptions[titleId] },
-        })),
+        }));
+        if (get().userId) apiPost("/api/me/subscription", { titleId });
+      },
       setAdultVerified: (adultVerified) => set({ adultVerified }),
       setRatingScale: (ratingScale) => set({ ratingScale }),
 
@@ -110,11 +160,14 @@ export const useApp = create<AppState>()(
             { id, name, emoji, titleIds: [], createdAt: "2025-05-29T00:00:00Z" },
           ],
         }));
+        if (get().userId) apiPost("/api/me/collection", { action: "create", name, emoji });
         return id;
       },
-      deleteCollection: (id) =>
-        set((s) => ({ collections: s.collections.filter((c) => c.id !== id) })),
-      toggleInCollection: (collectionId, titleId) =>
+      deleteCollection: (id) => {
+        set((s) => ({ collections: s.collections.filter((c) => c.id !== id) }));
+        if (get().userId) apiPost("/api/me/collection", { action: "delete", id });
+      },
+      toggleInCollection: (collectionId, titleId) => {
         set((s) => ({
           collections: s.collections.map((c) => {
             if (c.id !== collectionId) return c;
@@ -126,7 +179,9 @@ export const useApp = create<AppState>()(
                 : [...c.titleIds, titleId],
             };
           }),
-        })),
+        }));
+        if (get().userId) apiPost("/api/me/collection", { action: "toggle", id: collectionId, titleId });
+      },
 
       resetAll: () =>
         set({

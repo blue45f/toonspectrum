@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { spectrumGradient } from "@/lib/genre-color";
+import { AuthMenu } from "./auth/auth-menu";
 
 const NAV = [
   { label: "홈", href: "/", icon: Home, exact: true },
@@ -105,6 +106,7 @@ export function SiteHeader() {
               <Library size={16} />
               <span className="hidden lg:inline">내 서재</span>
             </Link>
+            <AuthMenu />
           </div>
         </div>
       </header>
