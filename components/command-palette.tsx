@@ -3,7 +3,7 @@
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TITLES } from "@/lib/data";
+import type { Title } from "@/lib/types";
 import { suggest } from "@/lib/search";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { RatingInline } from "./ui/stars";
@@ -23,8 +23,9 @@ const QUICK = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [titles, setTitles] = useState<Title[]>([]);
   const router = useRouter();
-  const results = q.trim() ? suggest(TITLES, q, 7) : [];
+  const results = q.trim() && titles.length ? suggest(titles, q, 7) : [];
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -44,13 +45,17 @@ export function CommandPalette() {
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
+    // 작품 데이터는 팔레트를 처음 열 때 지연 로드 (초기 번들에서 분리)
+    if (open && titles.length === 0) {
+      import("@/lib/data").then((m) => setTitles(m.TITLES));
+    }
     // 닫힐 때 질의 초기화 (effect 동기 setState 회피 위해 다음 틱으로 지연)
     const id = open ? undefined : setTimeout(() => setQ(""), 0);
     return () => {
       document.body.style.overflow = "";
       if (id) clearTimeout(id);
     };
-  }, [open]);
+  }, [open, titles.length]);
 
   const go = (href: string) => {
     setOpen(false);
