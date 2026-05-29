@@ -11,6 +11,7 @@ import {
   BarChart3,
   MessageSquareQuote,
   Sparkles,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { spectrumGradient } from "@/lib/genre-color";
@@ -18,6 +19,7 @@ import { spectrumGradient } from "@/lib/genre-color";
 const NAV = [
   { label: "홈", href: "/", icon: Home, exact: true },
   { label: "랭킹", href: "/ranking", icon: TrendingUp },
+  { label: "연재", href: "/calendar", icon: CalendarDays },
   { label: "추천", href: "/recommend", icon: Sparkles },
   { label: "탐색", href: "/explore", icon: Compass },
   { label: "리뷰", href: "/reviews", icon: MessageSquareQuote },
