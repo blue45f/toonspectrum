@@ -13,6 +13,7 @@ import { RatingInline } from "@/components/ui/stars";
 import { GenreChip } from "@/components/ui/chip";
 import { AvailabilityDots } from "@/components/availability";
 import { OpenSearchButton } from "@/components/open-search-button";
+import { HomePersonal } from "@/components/home-personal";
 import { CountUp } from "@/components/count-up";
 import { buttonClass } from "@/components/ui/button";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
@@ -148,6 +149,8 @@ export default function HomePage() {
       </section>
 
       <Container size="wide" className="reveal-children flex flex-col gap-20 py-16">
+        <HomePersonal />
+
         <Section
           eyebrow="LIVE RANKING"
           title="실시간 인기 랭킹"
