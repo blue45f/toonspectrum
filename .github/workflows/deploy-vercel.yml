@@ -1,0 +1,63 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'pages/**'
+      - 'components/**'
+      - 'public/**'
+      - 'src/**'
+      - 'styles/**'
+      - 'next.config.*'
+      - 'vercel.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-vercel.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Skip deployment when Vercel token is not configured
+        if: env.VERCEL_TOKEN == ''
+        run: echo "VERCEL_TOKEN is not configured; skipping Vercel deployment."
+
+      - uses: actions/setup-node@v6
+        if: env.VERCEL_TOKEN != ''
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm@11.4.0
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Install Vercel CLI
+        if: env.VERCEL_TOKEN != ''
+        run: npm i -g vercel@latest
+
+      - name: Deploy frontend to Vercel production
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          vercel deploy --prod --confirm --token "$VERCEL_TOKEN"
