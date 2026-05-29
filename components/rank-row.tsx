@@ -3,7 +3,7 @@ import type { RankedTitle } from "@/lib/ranking";
 import { cn, formatCount } from "@/lib/utils";
 import { RatingInline } from "./ui/stars";
 import { GenreChip } from "./ui/chip";
-import { AvailabilityDots } from "./availability";
+import { PlatformTags } from "./availability";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
 
@@ -107,28 +107,20 @@ export function RankRow({
           <span className="hidden text-xs text-fg-3 sm:inline">
             {title.author} · {STATUS_LABEL[title.status]}
           </span>
-          <GenreChip genre={title.genres[0]} size="sm" className="sm:hidden" />
+          <PlatformTags availability={title.availability} max={2} />
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-1.5 sm:flex">
+        <div className="hidden items-center gap-1.5 lg:flex">
           {title.genres.slice(0, 2).map((g) => (
             <GenreChip key={g} genre={g} size="sm" />
           ))}
         </div>
-        {m ? (
-          <div className="w-16 text-right">
-            <div className="numeral text-sm text-fg">{m.value}</div>
-            <div className="text-[0.62rem] text-fg-3">{m.label}</div>
-          </div>
-        ) : (
-          <div className="w-16 text-right">
-            <div className="numeral text-sm text-fg">{formatCount(title.stats.views)}</div>
-            <div className="text-[0.62rem] text-fg-3">조회</div>
-          </div>
-        )}
-        <AvailabilityDots availability={title.availability} className="hidden lg:flex" max={3} />
+        <div className="w-16 text-right">
+          <div className="numeral text-sm text-fg">{m ? m.value : formatCount(title.stats.views)}</div>
+          <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
+        </div>
       </div>
     </Link>
   );

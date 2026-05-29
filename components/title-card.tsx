@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Title } from "@/lib/types";
 import { TitlePoster } from "./title-poster";
-import { AvailabilityDots, bestPricing } from "./availability";
+import { AvailabilityDots, PlatformTags, bestPricing } from "./availability";
 import { BookmarkButton } from "./bookmark-button";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { RatingInline } from "./ui/stars";
@@ -87,7 +87,7 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
           {title.genres.slice(0, 2).map((g) => (
             <GenreChip key={g} genre={g} size="sm" />
           ))}
-          <AvailabilityDots availability={title.availability} className="ml-auto" max={4} />
+          <PlatformTags availability={title.availability} className="ml-auto" max={2} />
         </div>
       </div>
     </Link>

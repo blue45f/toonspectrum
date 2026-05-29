@@ -40,6 +40,43 @@ export function AvailabilityDots({
   );
 }
 
+// 플랫폼 회사명 태그 (브랜드 컬러 도트 + 이름) — 목록용
+export function PlatformTags({
+  availability,
+  max = 2,
+  className,
+}: {
+  availability: Availability[];
+  max?: number;
+  className?: string;
+}) {
+  const shown = availability.slice(0, max);
+  const rest = availability.length - shown.length;
+  return (
+    <span className={cn("inline-flex flex-wrap items-center gap-1", className)}>
+      {shown.map((a) => {
+        const p = PLATFORMS[a.platformId];
+        return (
+          <span
+            key={a.platformId}
+            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.68rem] font-medium leading-none"
+            style={{
+              color: p.color,
+              borderColor: `color-mix(in srgb, ${p.color} 38%, transparent)`,
+              backgroundColor: `color-mix(in srgb, ${p.color} 12%, transparent)`,
+            }}
+            title={`${p.name} · ${PRICING_FULL[a.pricing]}`}
+          >
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+            {p.short}
+          </span>
+        );
+      })}
+      {rest > 0 && <span className="text-[0.65rem] text-fg-3 tnum">+{rest}</span>}
+    </span>
+  );
+}
+
 // 풀 라우터 — "어디서 봐" 신호판 (상세 페이지)
 export function AvailabilityRouter({
   availability,
