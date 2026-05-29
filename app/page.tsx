@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TITLES, adaptationsOf, activeTags, SEED_REVIEWS } from "@/lib/data";
 import { PLATFORM_LIST } from "@/lib/platforms";
-import { GENRES } from "@/lib/taxonomy";
+import { GENRES, WEEK_DAYS } from "@/lib/taxonomy";
 import { rankBy } from "@/lib/ranking";
 import { sortTitles } from "@/lib/search";
 import { Container, Section, Rail } from "@/components/section";
@@ -38,6 +38,14 @@ export default function HomePage() {
     .slice(0, 3);
 
   const tags = activeTags().slice(0, 14);
+
+  // 오늘 연재 (실제 연재요일 기반)
+  const todayDay = WEEK_DAYS[[6, 0, 1, 2, 3, 4, 5][new Date().getDay()]];
+  const todayReleases = TITLES.filter(
+    (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.includes(todayDay)
+  )
+    .sort((a, b) => b.stats.views - a.stats.views)
+    .slice(0, 12);
 
   return (
     <div>
@@ -152,6 +160,21 @@ export default function HomePage() {
             ))}
           </div>
         </Section>
+
+        {todayReleases.length > 0 && (
+          <Section
+            eyebrow="TODAY"
+            title={`오늘(${todayDay}) 새로 올라오는`}
+            desc="오늘 새 회차가 공개되는 연재작"
+            action={{ label: "연재 캘린더", href: "/calendar" }}
+          >
+            <Rail>
+              {todayReleases.map((t) => (
+                <TitleCard key={t.id} title={t} />
+              ))}
+            </Rail>
+          </Section>
+        )}
 
         <Section
           eyebrow="GENRE SPECTRUM"

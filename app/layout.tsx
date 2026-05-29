@@ -48,10 +48,18 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col bg-canvas text-fg">
+        <a
+          href="#main"
+          className="sr-only z-[200] rounded-lg bg-accent px-4 py-2 font-medium text-on-accent focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        >
+          본문 바로가기
+        </a>
         <MotionProvider>
           <CommandPalette />
           <SiteHeader />
-          <main className="flex-1 pb-[72px] md:pb-0">{children}</main>
+          <main id="main" className="flex-1 pb-[72px] md:pb-0">
+            {children}
+          </main>
           <SiteFooter />
         </MotionProvider>
       </body>
