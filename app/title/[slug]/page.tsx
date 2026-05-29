@@ -22,6 +22,7 @@ import { SubscribeButton } from "@/components/subscribe-button";
 import { AuthorLine } from "@/components/author-line";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewCard } from "@/components/review-card";
+import { LiveReviews } from "@/components/live-reviews";
 import { STATUS_LABEL, AGE_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
 import { formatCount, formatFull } from "@/lib/utils";
 import { Eye, Heart, Bookmark, Star, Layers, MapPin } from "lucide-react";
@@ -251,13 +252,23 @@ export default async function TitleDetailPage({
             <ReviewForm titleId={title.id} />
           </div>
           <div className="flex flex-col gap-3">
+            <LiveReviews titleId={title.id} />
             {reviews.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
-                <p className="text-sm text-fg-2">아직 리뷰가 없어요.</p>
-                <p className="mt-1 text-xs text-fg-3">첫 리뷰를 남겨 정주행 길잡이가 되어주세요.</p>
+                <p className="text-sm text-fg-2">아직 샘플 리뷰가 없어요.</p>
+                <p className="mt-1 text-xs text-fg-3">
+                  로그인 후 첫 리뷰를 남기면 모든 독자에게 공유됩니다.
+                </p>
               </div>
             ) : (
-              reviews.map((r) => <ReviewCard key={r.id} review={r} />)
+              <>
+                {reviews.length > 0 && (
+                  <p className="text-xs text-fg-3">샘플 리뷰 {reviews.length}</p>
+                )}
+                {reviews.map((r) => (
+                  <ReviewCard key={r.id} review={r} />
+                ))}
+              </>
             )}
           </div>
         </div>
