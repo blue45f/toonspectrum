@@ -70,7 +70,23 @@ export default async function TitleDetailPage({
   ];
 
   return (
-    <Container size="wide" className="py-8 lg:py-10">
+    <Container size="wide" className="relative py-8 lg:py-10">
+      {/* 앰비언트 표지 배경 (실제 표지 블러) */}
+      {title.coverImage && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[480px] w-screen -translate-x-1/2 overflow-hidden"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={title.coverImage}
+            alt=""
+            className="size-full scale-110 object-cover opacity-25 blur-2xl"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-canvas/30 via-canvas/85 to-canvas" />
+        </div>
+      )}
+
       {/* ░ HERO ░ */}
       <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
         {/* 좌: 포스터 + 액션 + 어디서봐 */}
