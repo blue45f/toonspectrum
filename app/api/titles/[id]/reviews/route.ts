@@ -8,6 +8,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const rows = await db
     .select({
       id: reviews.id,
+      userId: reviews.userId,
       rating: reviews.rating,
       text: reviews.text,
       tags: reviews.tags,
@@ -34,6 +35,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return Response.json(
     rows.map((r) => ({
       id: r.id,
+      userId: r.userId,
       author: r.author ?? "익명",
       avatar: r.avatar ?? "#7c5cfc",
       rating: fromDb(r.rating),

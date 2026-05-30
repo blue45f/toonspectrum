@@ -87,10 +87,11 @@ export interface Title {
   editorNote?: string; // 에디터 한줄평
 }
 
-// 시드 리뷰 (데모용 샘플)
+// 시드 리뷰 (데모용 샘플) / DB 리뷰 공용 표시 형태
 export interface SeedReview {
   id: string;
   titleId: string;
+  userId?: string; // DB 리뷰일 때 작성자 (공개 프로필 링크용). 시드엔 없음.
   author: string; // 닉네임
   avatar: string; // 아바타 그라디언트 시드 컬러 (hex)
   rating: number; // 0.5 ~ 5 (0.5 단위)

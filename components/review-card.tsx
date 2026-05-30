@@ -33,6 +33,16 @@ export function ReviewCard({
   const toggleLike = useApp((s) => s.toggleLikeReview);
   const likeCount = review.likes + (hydrated && liked ? 1 : 0);
   const hideText = review.spoiler && !revealed;
+  const profileHref = review.userId ? `/u/${review.userId}` : null;
+
+  const avatar = (
+    <span
+      className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white ring-1 ring-white/10"
+      style={{ background: `linear-gradient(140deg, ${review.avatar}, oklch(0.3 0.05 60))` }}
+    >
+      {review.author.charAt(0)}
+    </span>
+  );
 
   return (
     <article
@@ -42,15 +52,25 @@ export function ReviewCard({
       )}
     >
       <header className="flex items-center gap-3">
-        <span
-          className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white ring-1 ring-white/10"
-          style={{ background: `linear-gradient(140deg, ${review.avatar}, oklch(0.3 0.05 60))` }}
-        >
-          {review.author.charAt(0)}
-        </span>
+        {profileHref ? (
+          <Link href={profileHref} className="shrink-0 transition-opacity hover:opacity-80">
+            {avatar}
+          </Link>
+        ) : (
+          avatar
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold text-fg">{review.author}</span>
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                className="truncate text-sm font-semibold text-fg transition-colors hover:text-accent"
+              >
+                {review.author}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-semibold text-fg">{review.author}</span>
+            )}
             {review.progress && (
               <Badge tone={PROGRESS_TONE[review.progress] ?? "neutral"}>{review.progress}</Badge>
             )}
