@@ -17,6 +17,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/auth/providers")
@@ -34,9 +35,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // 포커스 트랩(Tab 순환을 다이얼로그 내부로 가둠) + 닫힐 때 호출 트리거로 포커스 복원
+  // 포커스 트랩(Tab 순환을 다이얼로그 내부로 가둠) + 닫힐 때 호출 트리거로 포커스 복원.
+  // prevActive 캡처는 포커스 이동보다 먼저여야 트리거(예: '로그인' 버튼)가 잡힌다.
+  // (autoFocus는 commit 단계라 effect보다 먼저 실행돼 트리거 대신 입력을 캡처하므로 사용하지 않음)
   useEffect(() => {
     const prevActive = document.activeElement as HTMLElement | null;
+    emailRef.current?.focus(); // 열릴 때 이메일로 포커스 이동
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !panelRef.current) return;
       const f = panelRef.current.querySelectorAll<HTMLElement>(
@@ -45,6 +49,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       if (f.length === 0) return;
       const first = f[0];
       const last = f[f.length - 1];
+      // 포커스가 패널 밖이면 무조건 첫 요소로 회수 (배경으로 탭 이탈 방지)
+      if (!panelRef.current.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
@@ -160,12 +170,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               </>
             )}
             <input
+              ref={emailRef}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="이메일"
               aria-label="이메일"
-              autoFocus
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             <input

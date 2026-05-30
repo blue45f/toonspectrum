@@ -40,7 +40,7 @@ export function SiteFooter() {
             네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
             왜 봐야 하는지 한 곳에서 답합니다.
           </p>
-          <p className="mt-4 text-xs leading-relaxed text-fg-3/70">
+          <p className="mt-4 text-xs leading-relaxed text-fg-3">
             작품 메타데이터·표지는 <span className="text-fg-2">네이버 웹툰·시리즈, 카카오웹툰에서 수집한
             실데이터</span>입니다. 네이버의 조회·관심·별점은 실수집, 카카오웹툰의 평점·조회와 평가 수·완독률
             등 일부 지표 및 리뷰는 데모용 추정·예시입니다.

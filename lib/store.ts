@@ -84,17 +84,17 @@ export const useApp = create<AppState>()(
       userId: null,
 
       setUserId: (userId) => set({ userId }),
-      // 서버 데이터를 로컬과 병합(로컬 전용 키 보존). 충돌 키는 서버 우선.
-      // 로그인 직전 게스트 데이터가 덮어써져 사라지던 문제 방지 (서버는 /api/me/merge 로 이미 통합됨).
+      // 서버를 진실원천으로 교체(replace). 게스트 데이터는 로그인 시 /api/me/merge 가 먼저 서버로
+      // 병합하므로 여기서 덮어써도 손실이 없고, 다른 기기에서의 삭제·변경도 정확히 반영된다.
       hydrateFromServer: (d) =>
-        set((s) => ({
-          ratings: { ...s.ratings, ...d.ratings },
-          reads: { ...s.reads, ...d.reads },
-          subscriptions: { ...s.subscriptions, ...d.subscriptions },
-          reviews: { ...s.reviews, ...d.reviews },
-          likedReviews: { ...s.likedReviews, ...d.likedReviews },
-          collections: mergeCollections(s.collections, d.collections),
-        })),
+        set({
+          ratings: d.ratings,
+          reads: d.reads,
+          subscriptions: d.subscriptions,
+          reviews: d.reviews,
+          likedReviews: d.likedReviews,
+          collections: d.collections,
+        }),
 
       setRating: (titleId, rating) => {
         set((s) => ({ ratings: { ...s.ratings, [titleId]: rating } }));
@@ -207,15 +207,6 @@ function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return h;
-}
-
-// 컬렉션 병합 — 이름 기준 dedupe(서버 우선). 게스트 전용(이름 미일치) 컬렉션은 보존.
-function mergeCollections(local: Collection[], server: Collection[]): Collection[] {
-  const byName = new Map<string, Collection>();
-  for (const c of server) byName.set(c.name, c);
-  for (const c of local) if (!byName.has(c.name)) byName.set(c.name, c);
-  const merged = [...byName.values()];
-  return merged.length ? merged : seedCollections;
 }
 
 // SSR/CSR 하이드레이션 가드 — persist 가 클라이언트에서 채워질 때까지 false.
