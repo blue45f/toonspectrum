@@ -70,11 +70,13 @@ export default async function TitleDetailPage({
   // (평가수는 전 작품 파생값이라 정확수치 대신 약식 표기로 false precision 회피)
   const estimated = statsAreEstimated(title);
 
+  // 추정 작품(카카오웹툰·웹소설)은 조회·좋아요·관심·평가가 모두 합성값 → '≈'로 명시
+  const fmtStat = (v: number) => (estimated ? `≈${formatCount(v)}` : formatCount(v));
   const stats = [
-    { icon: Eye, label: "조회", value: formatCount(title.stats.views) },
-    { icon: Heart, label: "좋아요", value: formatCount(title.stats.likes) },
-    { icon: Bookmark, label: "관심", value: formatCount(title.stats.bookmarks) },
-    { icon: Star, label: "평가", value: formatCount(title.stats.ratingCount) },
+    { icon: Eye, label: "조회", value: fmtStat(title.stats.views) },
+    { icon: Heart, label: "좋아요", value: fmtStat(title.stats.likes) },
+    { icon: Bookmark, label: "관심", value: fmtStat(title.stats.bookmarks) },
+    { icon: Star, label: "평가", value: fmtStat(title.stats.ratingCount) },
   ];
 
   return (
