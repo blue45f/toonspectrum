@@ -16,7 +16,8 @@ export function BookmarkButton({
   const hydrated = useHydrated();
   const state = useApp((s) => s.reads[titleId]);
   const setRead = useApp((s) => s.setRead);
-  const active = hydrated && !!state;
+  // '관심(want)'만 북마크로 간주 — 하차/완독/보는 중 상태를 토글로 덮어쓰지 않도록
+  const active = hydrated && state === "want";
 
   return (
     <button

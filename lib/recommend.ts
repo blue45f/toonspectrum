@@ -137,9 +137,10 @@ export function recommendForTaste(
             : matchedT[0]
               ? `${matchedT[0]} 코드 일치`
               : "평점 높은 추천작";
-      return { title: t, score, reason };
+      return { title: t, score, reason, hasAffinity: matchedG.length > 0 || matchedT.length > 0 };
     })
-    .filter((x) => x.score > 0)
+    // 취향(장르·태그) 일치가 있는 작품만 — 평점만 높은 무관 작품이 'FOR YOU'에 섞이지 않도록
+    .filter((x) => x.hasAffinity)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ title, reason }) => ({ title, reason }));

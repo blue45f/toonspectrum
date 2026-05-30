@@ -108,7 +108,8 @@ export default async function TitleDetailPage({
           <div className="rounded-2xl border border-line bg-panel/50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <MapPin size={15} className="text-accent" />
-              <h2 className="text-sm font-semibold text-fg">어디서 볼 수 있나요</h2>
+              {/* 사이드 패널 라벨 — 문서 개요상 h1보다 앞서므로 heading이 아닌 일반 텍스트로 */}
+              <p className="text-sm font-semibold text-fg">어디서 볼 수 있나요</p>
             </div>
             <AvailabilityRouter availability={title.availability} />
             <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">

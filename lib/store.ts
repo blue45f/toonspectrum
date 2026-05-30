@@ -219,7 +219,7 @@ export function useHydrated(): boolean {
   );
 }
 
-// 파생 셀렉터 헬퍼
+// 파생 셀렉터 헬퍼 — '관심(want)'만 북마크로 간주
 export function useIsBookmarked(titleId: string): boolean {
-  return useApp((s) => !!s.reads[titleId]);
+  return useApp((s) => s.reads[titleId] === "want");
 }
