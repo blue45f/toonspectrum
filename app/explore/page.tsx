@@ -77,6 +77,12 @@ export default async function ExplorePage({
     sort
   );
 
+  // 점진적 노출(서버 사이드 페이지네이션) — 무필터 시 전체(184편)를 한 번에 렌더하지 않음
+  const PAGE_SIZE = 40;
+  const showCount = Math.min(Math.max(Number(sp.show) || PAGE_SIZE, PAGE_SIZE), results.length);
+  const shown = results.slice(0, showCount);
+  const hasMore = results.length > shown.length;
+
   const tags = activeTags().slice(0, 18);
   const hasFilter = Boolean(genre || tag || type || sp.sort);
   const accent = genre ? genreColor(genre, 0.84) : undefined;
@@ -264,11 +270,27 @@ export default async function ExplorePage({
 
         {/* ░░ RESULT GRID / EMPTY STATE ░░ */}
         {results.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {results.map((t) => (
-              <TitleCard key={t.id} title={t} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {shown.map((t) => (
+                <TitleCard key={t.id} title={t} />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="mt-10 flex justify-center">
+                <Link
+                  href={buildHref(current, { show: String(showCount + PAGE_SIZE) })}
+                  scroll={false}
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                >
+                  더 보기
+                  <span className="numeral text-fg-3">
+                    {shown.length} / {results.length}
+                  </span>
+                </Link>
+              </div>
+            )}
+          </>
         ) : (
           <EmptyState current={current} />
         )}

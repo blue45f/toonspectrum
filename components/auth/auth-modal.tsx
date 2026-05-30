@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { X, LogIn, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [oauth, setOauth] = useState<string[]>([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/auth/providers")
@@ -32,6 +33,32 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // 포커스 트랩(Tab 순환을 다이얼로그 내부로 가둠) + 닫힐 때 호출 트리거로 포커스 복원
+  useEffect(() => {
+    const prevActive = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const f = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (f.length === 0) return;
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      prevActive?.focus?.();
+    };
+  }, []);
 
   const submit = async () => {
     setErr("");
@@ -64,8 +91,14 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[12vh]">
-      <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <button
+        aria-label="닫기"
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={mode === "login" ? "로그인" : "회원가입"}
