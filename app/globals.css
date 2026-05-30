@@ -15,7 +15,7 @@
   --color-line-strong: oklch(0.42 0.013 64);
   --color-fg: oklch(0.95 0.01 85);
   --color-fg-2: oklch(0.745 0.012 78);
-  --color-fg-3: oklch(0.57 0.012 76);
+  --color-fg-3: oklch(0.64 0.012 76); /* WCAG AA: card/raised에서 4.5:1 통과 (이전 0.57은 미달) */
 
   /* 악센트 — persimmon(감/주홍). 라이브·액티브·프라이머리 전용 */
   --color-accent: oklch(0.72 0.185 42);
