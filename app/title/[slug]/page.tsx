@@ -24,6 +24,7 @@ import { ReviewForm } from "@/components/review-form";
 import { ReviewCard } from "@/components/review-card";
 import { LiveReviews } from "@/components/live-reviews";
 import { STATUS_LABEL, AGE_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
+import { statsAreEstimated } from "@/lib/estimate";
 import { formatCount, formatFull } from "@/lib/utils";
 import { Eye, Heart, Bookmark, Star, Layers, MapPin } from "lucide-react";
 
@@ -64,6 +65,9 @@ export default async function TitleDetailPage({
 
   const reviewAvg =
     reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+
+  // 별점·평가수가 실수집(네이버 웹툰)이 아니라 추정값인 작품인지 — 표시에 '추정' 명시
+  const estimated = statsAreEstimated(title);
 
   const stats = [
     { icon: Eye, label: "조회", value: formatCount(title.stats.views) },
@@ -142,9 +146,14 @@ export default async function TitleDetailPage({
             <div className="flex items-center gap-3">
               <span className="numeral text-4xl text-accent">{title.stats.ratingAvg.toFixed(1)}</span>
               <div>
-                <Stars value={title.stats.ratingAvg} size="md" />
+                <div className="flex items-center gap-1.5">
+                  <Stars value={title.stats.ratingAvg} size="md" />
+                  {estimated && <Badge tone="neutral">추정</Badge>}
+                </div>
                 <p className="mt-1 text-xs text-fg-3">
-                  {formatFull(title.stats.ratingCount)}명의 평가
+                  {estimated
+                    ? `약 ${formatCount(title.stats.ratingCount)} 평가 (추정)`
+                    : `${formatFull(title.stats.ratingCount)}명의 평가`}
                 </p>
               </div>
             </div>
@@ -186,7 +195,8 @@ export default async function TitleDetailPage({
 
       {/* ░ 지표 ░ */}
       <section className="mt-14">
-        <p className="eyebrow mb-4 text-accent">METRICS · 지표</p>
+        <p className="eyebrow mb-1 text-accent">METRICS · 지표</p>
+        <p className="mb-4 text-xs text-fg-3">완독률·몰입·분포는 데모용 추정 지표입니다.</p>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-line bg-card p-5">
             <h3 className="mb-4 text-sm font-semibold text-fg">평점 분포</h3>

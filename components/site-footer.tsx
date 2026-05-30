@@ -37,7 +37,7 @@ export function SiteFooter() {
             <span className="font-display text-lg font-bold tracking-[-0.02em]">WEBDEX</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-fg-3">
-            네이버·카카오·리디·문피아·노벨피아를 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
+            네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
             왜 봐야 하는지 한 곳에서 답합니다.
           </p>
           <p className="mt-4 text-xs leading-relaxed text-fg-3/70">

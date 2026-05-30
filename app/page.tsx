@@ -71,7 +71,7 @@ export default function HomePage() {
               <span className="font-serif font-normal italic text-accent">한 권의 색인</span>으로.
             </h1>
             <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-fg-2">
-              네이버·카카오·리디·문피아·노벨피아를 가로질러 검색하고, 6개 축으로 줄 세우고, 솔직한
+              네이버 웹툰·시리즈와 카카오웹툰을 가로질러 검색하고, 6개 축으로 줄 세우고, 솔직한
               리뷰로 정합니다. 무엇을, 어디서, 왜 봐야 하는지 한 곳에서.
             </p>
 
