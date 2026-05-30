@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 // 표지 이미지 프록시 — 네이버/카카오 이미지 CDN 핫링크/CORS 우회.
 // 허용 호스트만 프록시하고, 리다이렉트도 매 홉 재검증하여 SSRF 차단.
 const ALLOWED = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net)$/;
+const OK_TYPE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i; // 실제 이미지 서브타입만 허용
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -55,8 +56,8 @@ export async function GET(req: NextRequest) {
     if (!upstream.ok || !upstream.body) return new Response("upstream error", { status: 502 });
 
     const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
-    // 이미지만 통과 — 프록시를 임의 콘텐츠 페치 수단으로 악용하지 못하도록
-    if (!contentType.startsWith("image/")) return new Response("not an image", { status: 415 });
+    // 구체 이미지 서브타입만 통과 — 프록시를 임의 콘텐츠 페치 수단으로 악용하지 못하도록
+    if (!OK_TYPE.test(contentType)) return new Response("not an image", { status: 415 });
 
     return new Response(upstream.body, {
       status: 200,
