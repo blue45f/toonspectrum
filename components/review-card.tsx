@@ -98,6 +98,7 @@ export function ReviewCard({
 
       <div className="relative">
         <p
+          aria-hidden={hideText}
           className={cn(
             "text-pretty text-sm leading-relaxed text-fg-2 transition-[filter]",
             hideText && "select-none blur-[6px]"
@@ -108,6 +109,7 @@ export function ReviewCard({
         {hideText && (
           <button
             onClick={() => setRevealed(true)}
+            aria-label="스포일러 내용 보기"
             className="absolute inset-0 flex items-center justify-center gap-1.5 text-xs font-medium text-fg-2 hover:text-fg"
           >
             <EyeOff size={14} /> 스포일러 — 눌러서 보기

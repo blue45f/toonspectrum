@@ -24,6 +24,15 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       .catch(() => {});
   }, []);
 
+  // Escape 로 닫기 (키보드 접근성)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const submit = async () => {
     setErr("");
     setBusy(true);
@@ -57,6 +66,9 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[12vh]">
       <button aria-label="닫기" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode === "login" ? "로그인" : "회원가입"}
         className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-black/50"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
@@ -96,14 +108,17 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="닉네임"
+                  aria-label="닉네임"
                   className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
                 />
                 <div className="flex items-center gap-2 px-1">
                   <span className="text-xs text-fg-3">아바타</span>
-                  {AVATARS.map((c) => (
+                  {AVATARS.map((c, i) => (
                     <button
                       key={c}
                       onClick={() => setAvatar(c)}
+                      aria-label={`아바타 색상 ${i + 1}`}
+                      aria-pressed={avatar === c}
                       className={cn("size-6 rounded-full ring-2 transition", avatar === c ? "ring-accent" : "ring-transparent")}
                       style={{ background: c }}
                     />
@@ -116,6 +131,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="이메일"
+              aria-label="이메일"
+              autoFocus
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             <input
@@ -124,6 +141,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="비밀번호 (6자 이상)"
+              aria-label="비밀번호"
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             {err && <p className="text-xs text-bad">{err}</p>}

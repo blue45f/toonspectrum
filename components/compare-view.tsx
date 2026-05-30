@@ -63,9 +63,11 @@ function Picker({
       <div className="flex items-center gap-2 border-b border-line px-3">
         <Search size={15} className="text-fg-3" />
         <input
+          type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="작품 검색"
+          aria-label="작품 검색"
           className="h-11 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
         />
       </div>

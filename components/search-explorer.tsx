@@ -335,12 +335,14 @@ export function SearchExplorer({
         <div className="flex items-center gap-2 rounded-2xl border border-line bg-card px-4 focus-within:border-accent/50">
           <Search size={18} className="text-fg-3" />
           <input
+            type="search"
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
               if (e.target.value && sort === "popular") setSort("relevance");
             }}
             placeholder="작품, 작가, 태그를 검색하세요"
+            aria-label="작품, 작가, 태그 검색"
             className="h-12 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
           />
           {q && (
