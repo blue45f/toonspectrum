@@ -48,7 +48,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   providers,
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? "dev-only-secret-change-in-prod-please-0001",
+  // 프로덕션에선 AUTH_SECRET 미주입 시 undefined → NextAuth가 부팅 단계에서 실패(fail-fast).
+  // 공개 상수로 폴백하면 세션 위조가 가능하므로, 폴백은 비프로덕션 개발 편의에서만 허용.
+  secret:
+    process.env.AUTH_SECRET ??
+    (process.env.NODE_ENV === "production" ? undefined : "dev-only-secret-not-for-production"),
   callbacks: {
     jwt({ token, user }) {
       if (user?.id) token.id = user.id;

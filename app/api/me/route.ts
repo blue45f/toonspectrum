@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, users, ratings, reads, subscriptions, reviews, reviewLikes, collections, collectionItems } from "@/lib/db";
 import { getUserId, unauthorized, fromDb } from "@/lib/api-helpers";
 
@@ -8,20 +8,24 @@ export async function GET() {
   if (!uid) return unauthorized();
 
   const [me] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
-  const [rt, rd, sub, rv, lk, cols, colItems] = await Promise.all([
+  const [rt, rd, sub, rv, lk, cols] = await Promise.all([
     db.select().from(ratings).where(eq(ratings.userId, uid)),
     db.select().from(reads).where(eq(reads.userId, uid)),
     db.select().from(subscriptions).where(eq(subscriptions.userId, uid)),
     db.select().from(reviews).where(eq(reviews.userId, uid)),
     db.select().from(reviewLikes).where(eq(reviewLikes.userId, uid)),
     db.select().from(collections).where(eq(collections.userId, uid)),
-    db.select().from(collectionItems),
   ]);
 
-  const colIds = new Set(cols.map((c) => c.id));
+  // 컬렉션 아이템은 이 사용자의 컬렉션 id로 한정해 조회(과거: 전체 테이블 스캔 후 JS 필터)
+  const colIds = cols.map((c) => c.id);
+  const colItems = colIds.length
+    ? await db.select().from(collectionItems).where(inArray(collectionItems.collectionId, colIds))
+    : [];
+
   const itemsByCol: Record<string, string[]> = {};
   for (const it of colItems) {
-    if (colIds.has(it.collectionId)) (itemsByCol[it.collectionId] ??= []).push(it.titleId);
+    (itemsByCol[it.collectionId] ??= []).push(it.titleId);
   }
 
   return Response.json({
