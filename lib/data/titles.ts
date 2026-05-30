@@ -38,16 +38,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1527620874,
-      "likes": 1381112,
-      "bookmarks": 1381112,
+      "likes": 1381122,
+      "bookmarks": 1381122,
       "ratingAvg": 4.8,
-      "ratingCount": 441956,
+      "ratingCount": 441959,
       "ratingDist": [
         0,
         1,
         1554,
-        118442,
-        321959
+        118443,
+        321961
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -94,16 +94,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 881614870,
-      "likes": 1897399,
-      "bookmarks": 1897399,
+      "likes": 1897378,
+      "bookmarks": 1897378,
       "ratingAvg": 4.9,
-      "ratingCount": 607168,
+      "ratingCount": 607161,
       "ratingDist": [
         0,
         0,
         1189,
-        126412,
-        479567
+        126411,
+        479561
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -149,16 +149,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 774860256,
-      "likes": 1386324,
-      "bookmarks": 1386324,
+      "likes": 1386369,
+      "bookmarks": 1386369,
       "ratingAvg": 4.8,
-      "ratingCount": 443624,
+      "ratingCount": 443638,
       "ratingDist": [
         0,
         1,
         1560,
-        118889,
-        323174
+        118893,
+        323184
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -202,16 +202,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 644053615,
-      "likes": 323908,
-      "bookmarks": 323908,
+      "likes": 323900,
+      "bookmarks": 323900,
       "ratingAvg": 4.8,
-      "ratingCount": 103651,
+      "ratingCount": 103648,
       "ratingDist": [
         0,
         0,
         365,
-        27778,
-        75508
+        27777,
+        75506
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -261,16 +261,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 354266224,
-      "likes": 2463027,
-      "bookmarks": 2463027,
+      "likes": 2463138,
+      "bookmarks": 2463138,
       "ratingAvg": 4.7,
-      "ratingCount": 788169,
+      "ratingCount": 788204,
       "ratingDist": [
         0,
         3,
         4867,
-        265729,
-        517570
+        265741,
+        517593
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -317,16 +317,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 343529092,
-      "likes": 2740631,
-      "bookmarks": 2740631,
+      "likes": 2740784,
+      "bookmarks": 2740784,
       "ratingAvg": 4.9,
-      "ratingCount": 877002,
+      "ratingCount": 877051,
       "ratingDist": [
         0,
         1,
         1717,
-        182592,
-        692693
+        182602,
+        692731
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -376,8 +376,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 257694256,
-      "likes": 80886,
-      "bookmarks": 80886,
+      "likes": 80888,
+      "bookmarks": 80888,
       "ratingAvg": 5,
       "ratingCount": 25884,
       "ratingDist": [
@@ -435,16 +435,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 253649540,
-      "likes": 485821,
-      "bookmarks": 485821,
+      "likes": 485818,
+      "bookmarks": 485818,
       "ratingAvg": 5,
-      "ratingCount": 155463,
+      "ratingCount": 155462,
       "ratingDist": [
         0,
         0,
         166,
         24672,
-        130625
+        130624
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -494,16 +494,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 225292680,
-      "likes": 256986,
-      "bookmarks": 256986,
+      "likes": 257000,
+      "bookmarks": 257000,
       "ratingAvg": 5,
-      "ratingCount": 82236,
+      "ratingCount": 82240,
       "ratingDist": [
         0,
         0,
         88,
         13051,
-        69097
+        69101
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -547,10 +547,10 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 218908912,
-      "likes": 159842,
-      "bookmarks": 159842,
+      "likes": 159843,
+      "bookmarks": 159843,
       "ratingAvg": 4.5,
-      "ratingCount": 51149,
+      "ratingCount": 51150,
       "ratingDist": [
         0,
         1,
@@ -602,16 +602,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 211127300,
-      "likes": 1309745,
-      "bookmarks": 1309745,
+      "likes": 1309741,
+      "bookmarks": 1309741,
       "ratingAvg": 5,
-      "ratingCount": 419118,
+      "ratingCount": 419117,
       "ratingDist": [
         0,
         0,
         448,
         66514,
-        352156
+        352155
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -660,16 +660,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 162951846,
-      "likes": 588441,
-      "bookmarks": 588441,
+      "likes": 588435,
+      "bookmarks": 588435,
       "ratingAvg": 4.8,
-      "ratingCount": 188301,
+      "ratingCount": 188299,
       "ratingDist": [
         0,
         0,
         662,
-        50464,
-        137175
+        50463,
+        137173
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -713,16 +713,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 156759386,
-      "likes": 156942,
-      "bookmarks": 156942,
+      "likes": 156973,
+      "bookmarks": 156973,
       "ratingAvg": 5,
-      "ratingCount": 50221,
+      "ratingCount": 50231,
       "ratingDist": [
         0,
         0,
         54,
-        7970,
-        42197
+        7972,
+        42206
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -767,16 +767,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 141372969,
-      "likes": 896455,
-      "bookmarks": 896455,
+      "likes": 896462,
+      "bookmarks": 896462,
       "ratingAvg": 5,
-      "ratingCount": 286866,
+      "ratingCount": 286868,
       "ratingDist": [
         0,
         0,
         307,
-        45525,
-        241034
+        45526,
+        241035
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -820,16 +820,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 129213391,
-      "likes": 791692,
-      "bookmarks": 791692,
+      "likes": 791709,
+      "bookmarks": 791709,
       "ratingAvg": 4.9,
-      "ratingCount": 253341,
+      "ratingCount": 253347,
       "ratingDist": [
         0,
         0,
         496,
-        52746,
-        200099
+        52747,
+        200104
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -872,16 +872,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 122034683,
-      "likes": 721181,
-      "bookmarks": 721181,
+      "likes": 721171,
+      "bookmarks": 721171,
       "ratingAvg": 5,
-      "ratingCount": 230778,
+      "ratingCount": 230775,
       "ratingDist": [
         0,
         0,
         247,
         36624,
-        193907
+        193904
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -927,16 +927,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 112350625,
-      "likes": 917332,
-      "bookmarks": 917332,
+      "likes": 917326,
+      "bookmarks": 917326,
       "ratingAvg": 4.9,
-      "ratingCount": 293546,
+      "ratingCount": 293544,
       "ratingDist": [
         0,
         0,
         575,
         61116,
-        231855
+        231853
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -982,16 +982,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 107824492,
-      "likes": 456649,
-      "bookmarks": 456649,
+      "likes": 456656,
+      "bookmarks": 456656,
       "ratingAvg": 5,
-      "ratingCount": 146128,
+      "ratingCount": 146130,
       "ratingDist": [
         0,
         0,
         156,
-        23190,
-        122781
+        23191,
+        122783
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1041,16 +1041,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 103340238,
-      "likes": 325120,
-      "bookmarks": 325120,
+      "likes": 325111,
+      "bookmarks": 325111,
       "ratingAvg": 5,
-      "ratingCount": 104038,
+      "ratingCount": 104036,
       "ratingDist": [
         0,
         0,
         111,
-        16511,
-        87416
+        16510,
+        87414
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -1099,8 +1099,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 84216016,
-      "likes": 148120,
-      "bookmarks": 148120,
+      "likes": 148118,
+      "bookmarks": 148118,
       "ratingAvg": 4.9,
       "ratingCount": 47398,
       "ratingDist": [
@@ -1157,16 +1157,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 69839914,
-      "likes": 1124608,
-      "bookmarks": 1124608,
+      "likes": 1124600,
+      "bookmarks": 1124600,
       "ratingAvg": 5,
-      "ratingCount": 359875,
+      "ratingCount": 359872,
       "ratingDist": [
         0,
         0,
         385,
-        57112,
-        302378
+        57111,
+        302376
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1207,8 +1207,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 60153936,
-      "likes": 118137,
-      "bookmarks": 118137,
+      "likes": 118138,
+      "bookmarks": 118138,
       "ratingAvg": 5,
       "ratingCount": 37804,
       "ratingDist": [
@@ -1260,8 +1260,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 51061931,
-      "likes": 4009,
-      "bookmarks": 4009,
+      "likes": 4008,
+      "bookmarks": 4008,
       "ratingAvg": 4,
       "ratingCount": 1283,
       "ratingDist": [
@@ -1314,16 +1314,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 42620145,
-      "likes": 404692,
-      "bookmarks": 404692,
+      "likes": 404687,
+      "bookmarks": 404687,
       "ratingAvg": 5,
-      "ratingCount": 129501,
+      "ratingCount": 129500,
       "ratingDist": [
         0,
         0,
         138,
         20552,
-        108811
+        108810
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1366,16 +1366,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 38823639,
-      "likes": 274280,
-      "bookmarks": 274280,
+      "likes": 274378,
+      "bookmarks": 274378,
       "ratingAvg": 5,
-      "ratingCount": 87770,
+      "ratingCount": 87801,
       "ratingDist": [
         0,
         0,
         94,
-        13929,
-        73747
+        13934,
+        73773
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1424,8 +1424,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 24100237,
-      "likes": 155597,
-      "bookmarks": 155597,
+      "likes": 155598,
+      "bookmarks": 155598,
       "ratingAvg": 5,
       "ratingCount": 49791,
       "ratingDist": [
@@ -1482,16 +1482,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 21435315,
-      "likes": 297743,
-      "bookmarks": 297743,
+      "likes": 297756,
+      "bookmarks": 297756,
       "ratingAvg": 4.9,
-      "ratingCount": 95278,
+      "ratingCount": 95282,
       "ratingDist": [
         0,
         0,
         187,
-        19837,
-        75255
+        19838,
+        75258
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1541,16 +1541,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17565586,
-      "likes": 95548,
-      "bookmarks": 95548,
+      "likes": 95549,
+      "bookmarks": 95549,
       "ratingAvg": 4.9,
-      "ratingCount": 30575,
+      "ratingCount": 30576,
       "ratingDist": [
         0,
         0,
         60,
         6366,
-        24149
+        24150
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1593,8 +1593,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17131272,
-      "likes": 107556,
-      "bookmarks": 107556,
+      "likes": 107555,
+      "bookmarks": 107555,
       "ratingAvg": 4.9,
       "ratingCount": 34418,
       "ratingDist": [
@@ -1648,16 +1648,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 14985196,
-      "likes": 323890,
-      "bookmarks": 323890,
+      "likes": 323895,
+      "bookmarks": 323895,
       "ratingAvg": 5,
-      "ratingCount": 103645,
+      "ratingCount": 103646,
       "ratingDist": [
         0,
         0,
         111,
-        16448,
-        87086
+        16449,
+        87087
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1702,16 +1702,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13381599,
-      "likes": 73915,
-      "bookmarks": 73915,
+      "likes": 73921,
+      "bookmarks": 73921,
       "ratingAvg": 4.8,
-      "ratingCount": 23653,
+      "ratingCount": 23655,
       "ratingDist": [
         0,
         0,
         83,
         6339,
-        17231
+        17232
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1754,16 +1754,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13319379,
-      "likes": 547641,
-      "bookmarks": 547641,
+      "likes": 547673,
+      "bookmarks": 547673,
       "ratingAvg": 5,
-      "ratingCount": 175245,
+      "ratingCount": 175255,
       "ratingDist": [
         0,
         0,
         187,
-        27811,
-        147246
+        27813,
+        147255
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1813,16 +1813,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 12394615,
-      "likes": 78869,
-      "bookmarks": 78869,
+      "likes": 78874,
+      "bookmarks": 78874,
       "ratingAvg": 5,
-      "ratingCount": 25238,
+      "ratingCount": 25240,
       "ratingDist": [
         0,
         0,
         27,
-        4005,
-        21206
+        4006,
+        21207
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1865,16 +1865,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 11202926,
-      "likes": 376475,
-      "bookmarks": 376475,
+      "likes": 376551,
+      "bookmarks": 376551,
       "ratingAvg": 4.7,
-      "ratingCount": 120472,
+      "ratingCount": 120496,
       "ratingDist": [
         0,
         0,
         744,
-        40617,
-        79111
+        40625,
+        79127
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1919,16 +1919,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 10409921,
-      "likes": 705584,
-      "bookmarks": 705584,
+      "likes": 705687,
+      "bookmarks": 705687,
       "ratingAvg": 4.8,
-      "ratingCount": 225787,
+      "ratingCount": 225820,
       "ratingDist": [
         0,
         0,
         794,
-        60510,
-        164483
+        60519,
+        164507
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1977,16 +1977,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 9610578,
-      "likes": 313806,
-      "bookmarks": 313806,
+      "likes": 313826,
+      "bookmarks": 313826,
       "ratingAvg": 5,
-      "ratingCount": 100418,
+      "ratingCount": 100424,
       "ratingDist": [
         0,
         0,
         107,
-        15936,
-        84374
+        15937,
+        84379
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -2035,16 +2035,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1464454,
-      "likes": 599315,
-      "bookmarks": 599315,
+      "likes": 599348,
+      "bookmarks": 599348,
       "ratingAvg": 4.9,
-      "ratingCount": 191781,
+      "ratingCount": 191791,
       "ratingDist": [
         0,
         0,
         375,
-        39929,
-        151477
+        39931,
+        151485
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2093,16 +2093,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 294030,
-      "likes": 729151,
-      "bookmarks": 729151,
+      "likes": 729165,
+      "bookmarks": 729165,
       "ratingAvg": 5,
-      "ratingCount": 233328,
+      "ratingCount": 233333,
       "ratingDist": [
         0,
         0,
-        249,
-        37029,
-        196049
+        250,
+        37030,
+        196054
       ],
       "rankDelta": 0,
       "trendingScore": 62,
@@ -2151,16 +2151,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 196024,
-      "bookmarks": 196024,
+      "likes": 196130,
+      "bookmarks": 196130,
       "ratingAvg": 5,
-      "ratingCount": 62728,
+      "ratingCount": 62762,
       "ratingDist": [
         0,
         0,
         67,
-        9955,
-        52706
+        9960,
+        52735
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2210,16 +2210,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 250624,
-      "bookmarks": 250624,
+      "likes": 250704,
+      "bookmarks": 250704,
       "ratingAvg": 5,
-      "ratingCount": 80200,
+      "ratingCount": 80225,
       "ratingDist": [
         0,
         0,
         86,
-        12728,
-        67387
+        12732,
+        67408
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2269,16 +2269,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 959438,
-      "bookmarks": 959438,
+      "likes": 959501,
+      "bookmarks": 959501,
       "ratingAvg": 4.9,
-      "ratingCount": 307020,
+      "ratingCount": 307040,
       "ratingDist": [
         0,
         0,
         601,
-        63922,
-        242497
+        63926,
+        242513
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2325,16 +2325,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 345026,
-      "bookmarks": 345026,
+      "likes": 345261,
+      "bookmarks": 345261,
       "ratingAvg": 5,
-      "ratingCount": 110408,
+      "ratingCount": 110484,
       "ratingDist": [
         0,
         0,
         118,
-        17522,
-        92768
+        17534,
+        92832
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2384,16 +2384,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 304102,
-      "bookmarks": 304102,
+      "likes": 304158,
+      "bookmarks": 304158,
       "ratingAvg": 5,
-      "ratingCount": 97313,
+      "ratingCount": 97331,
       "ratingDist": [
         0,
         0,
         104,
-        15443,
-        81765
+        15446,
+        81781
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2443,8 +2443,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 507802,
-      "bookmarks": 507802,
+      "likes": 507804,
+      "bookmarks": 507804,
       "ratingAvg": 4.9,
       "ratingCount": 162497,
       "ratingDist": [
@@ -2501,16 +2501,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 739494,
-      "bookmarks": 739494,
+      "likes": 739536,
+      "bookmarks": 739536,
       "ratingAvg": 5,
-      "ratingCount": 236638,
+      "ratingCount": 236652,
       "ratingDist": [
         0,
         0,
         253,
-        37554,
-        198831
+        37556,
+        198842
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2559,16 +2559,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 362304,
-      "bookmarks": 362304,
+      "likes": 362365,
+      "bookmarks": 362365,
       "ratingAvg": 5,
-      "ratingCount": 115937,
+      "ratingCount": 115957,
       "ratingDist": [
         0,
         0,
         124,
-        18399,
-        97414
+        18402,
+        97431
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2618,16 +2618,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 23176,
-      "bookmarks": 23176,
+      "likes": 23195,
+      "bookmarks": 23195,
       "ratingAvg": 4.8,
-      "ratingCount": 7416,
+      "ratingCount": 7422,
       "ratingDist": [
         0,
         0,
         26,
-        1987,
-        5402
+        1989,
+        5407
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2677,16 +2677,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 167627,
-      "bookmarks": 167627,
+      "likes": 167699,
+      "bookmarks": 167699,
       "ratingAvg": 5,
-      "ratingCount": 53641,
+      "ratingCount": 53664,
       "ratingDist": [
         0,
         0,
         57,
-        8513,
-        45071
+        8516,
+        45090
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2737,16 +2737,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70620,
-      "bookmarks": 70620,
+      "likes": 70645,
+      "bookmarks": 70645,
       "ratingAvg": 5,
-      "ratingCount": 22598,
+      "ratingCount": 22606,
       "ratingDist": [
         0,
         0,
         24,
-        3586,
-        18988
+        3588,
+        18994
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2795,16 +2795,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 287487,
-      "bookmarks": 287487,
+      "likes": 287534,
+      "bookmarks": 287534,
       "ratingAvg": 5,
-      "ratingCount": 91996,
+      "ratingCount": 92011,
       "ratingDist": [
         0,
         0,
         98,
-        14600,
-        77298
+        14602,
+        77311
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2854,16 +2854,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 174197,
-      "bookmarks": 174197,
+      "likes": 174239,
+      "bookmarks": 174239,
       "ratingAvg": 4.9,
-      "ratingCount": 55743,
+      "ratingCount": 55756,
       "ratingDist": [
         0,
         0,
         109,
-        11606,
-        44028
+        11608,
+        44038
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2910,16 +2910,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 155998,
-      "bookmarks": 155998,
+      "likes": 156044,
+      "bookmarks": 156044,
       "ratingAvg": 5,
-      "ratingCount": 49919,
+      "ratingCount": 49934,
       "ratingDist": [
         0,
         0,
         53,
-        7922,
-        41944
+        7924,
+        41956
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2968,16 +2968,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 50928,
-      "bookmarks": 50928,
+      "likes": 51215,
+      "bookmarks": 51215,
       "ratingAvg": 4.9,
-      "ratingCount": 16297,
+      "ratingCount": 16389,
       "ratingDist": [
         0,
         0,
         32,
-        3393,
-        12872
+        3412,
+        12945
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -3026,16 +3026,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 126737,
-      "bookmarks": 126737,
+      "likes": 126787,
+      "bookmarks": 126787,
       "ratingAvg": 4.9,
-      "ratingCount": 40556,
+      "ratingCount": 40572,
       "ratingDist": [
         0,
         0,
         79,
-        8444,
-        32033
+        8447,
+        32045
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3086,16 +3086,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66798,
-      "bookmarks": 66798,
+      "likes": 66851,
+      "bookmarks": 66851,
       "ratingAvg": 4.9,
-      "ratingCount": 21375,
+      "ratingCount": 21392,
       "ratingDist": [
         0,
         0,
         42,
-        4450,
-        16883
+        4454,
+        16896
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3145,16 +3145,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70518,
-      "bookmarks": 70518,
+      "likes": 70800,
+      "bookmarks": 70800,
       "ratingAvg": 4.9,
-      "ratingCount": 22566,
+      "ratingCount": 22656,
       "ratingDist": [
         0,
         0,
         44,
-        4698,
-        17824
+        4717,
+        17895
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3204,16 +3204,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 90665,
-      "bookmarks": 90665,
+      "likes": 90736,
+      "bookmarks": 90736,
       "ratingAvg": 5,
-      "ratingCount": 29013,
+      "ratingCount": 29036,
       "ratingDist": [
         0,
         0,
         31,
-        4604,
-        24378
+        4608,
+        24397
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3263,16 +3263,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 317606,
-      "bookmarks": 317606,
+      "likes": 317660,
+      "bookmarks": 317660,
       "ratingAvg": 5,
-      "ratingCount": 101634,
+      "ratingCount": 101651,
       "ratingDist": [
         0,
         0,
         109,
-        16129,
-        85396
+        16132,
+        85410
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3321,16 +3321,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 19203,
-      "bookmarks": 19203,
+      "likes": 19285,
+      "bookmarks": 19285,
       "ratingAvg": 4.8,
-      "ratingCount": 6145,
+      "ratingCount": 6171,
       "ratingDist": [
         0,
         0,
         22,
-        1647,
-        4477
+        1654,
+        4495
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -3379,16 +3379,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 91754,
-      "bookmarks": 91754,
+      "likes": 91839,
+      "bookmarks": 91839,
       "ratingAvg": 5,
-      "ratingCount": 29361,
+      "ratingCount": 29388,
       "ratingDist": [
         0,
         0,
         31,
-        4660,
-        24670
+        4664,
+        24693
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3438,16 +3438,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 388985,
-      "bookmarks": 388985,
+      "likes": 389009,
+      "bookmarks": 389009,
       "ratingAvg": 4.9,
-      "ratingCount": 124475,
+      "ratingCount": 124483,
       "ratingDist": [
         0,
         0,
         244,
-        25916,
-        98316
+        25917,
+        98322
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3496,16 +3496,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 293505,
-      "bookmarks": 293505,
+      "likes": 293591,
+      "bookmarks": 293591,
       "ratingAvg": 5,
-      "ratingCount": 93922,
+      "ratingCount": 93949,
       "ratingDist": [
         0,
         0,
         100,
-        14905,
-        78916
+        14910,
+        78939
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3554,16 +3554,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 47928,
-      "bookmarks": 47928,
+      "likes": 47996,
+      "bookmarks": 47996,
       "ratingAvg": 4.9,
-      "ratingCount": 15337,
+      "ratingCount": 15359,
       "ratingDist": [
         0,
         0,
         30,
-        3193,
-        12114
+        3198,
+        12131
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3612,16 +3612,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 37081,
-      "bookmarks": 37081,
+      "likes": 37091,
+      "bookmarks": 37091,
       "ratingAvg": 5,
-      "ratingCount": 11866,
+      "ratingCount": 11869,
       "ratingDist": [
         0,
         0,
         13,
-        1883,
-        9970
+        1884,
+        9973
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3670,16 +3670,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 107693,
-      "bookmarks": 107693,
+      "likes": 107745,
+      "bookmarks": 107745,
       "ratingAvg": 5,
-      "ratingCount": 34462,
+      "ratingCount": 34478,
       "ratingDist": [
         0,
         0,
         37,
-        5469,
-        28956
+        5472,
+        28969
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3730,16 +3730,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 118808,
-      "bookmarks": 118808,
+      "likes": 118816,
+      "bookmarks": 118816,
       "ratingAvg": 5,
-      "ratingCount": 38019,
+      "ratingCount": 38021,
       "ratingDist": [
         0,
         0,
         41,
         6034,
-        31945
+        31946
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3789,16 +3789,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70920,
-      "bookmarks": 70920,
+      "likes": 70947,
+      "bookmarks": 70947,
       "ratingAvg": 4.9,
-      "ratingCount": 22694,
+      "ratingCount": 22703,
       "ratingDist": [
         0,
         0,
         44,
-        4725,
-        17925
+        4727,
+        17932
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3848,16 +3848,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66213,
-      "bookmarks": 66213,
+      "likes": 66288,
+      "bookmarks": 66288,
       "ratingAvg": 4.9,
-      "ratingCount": 21188,
+      "ratingCount": 21212,
       "ratingDist": [
         0,
         0,
-        41,
-        4411,
-        16735
+        42,
+        4416,
+        16754
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3904,16 +3904,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 279764,
-      "bookmarks": 279764,
+      "likes": 279781,
+      "bookmarks": 279781,
       "ratingAvg": 4.9,
-      "ratingCount": 89524,
+      "ratingCount": 89530,
       "ratingDist": [
         0,
         0,
         175,
-        18639,
-        70710
+        18640,
+        70715
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3962,16 +3962,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 94624,
-      "bookmarks": 94624,
+      "likes": 94643,
+      "bookmarks": 94643,
       "ratingAvg": 4.9,
-      "ratingCount": 30280,
+      "ratingCount": 30286,
       "ratingDist": [
         0,
         0,
         59,
-        6304,
-        23916
+        6306,
+        23921
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4020,16 +4020,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 83161,
-      "bookmarks": 83161,
+      "likes": 83224,
+      "bookmarks": 83224,
       "ratingAvg": 5,
-      "ratingCount": 26612,
+      "ratingCount": 26632,
       "ratingDist": [
         0,
         0,
         28,
-        4223,
-        22360
+        4226,
+        22377
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4078,16 +4078,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 139414,
-      "bookmarks": 139414,
+      "likes": 139928,
+      "bookmarks": 139928,
       "ratingAvg": 5,
-      "ratingCount": 44612,
+      "ratingCount": 44777,
       "ratingDist": [
         0,
         0,
         48,
-        7080,
-        37484
+        7106,
+        37623
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4132,16 +4132,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 100558,
-      "bookmarks": 100558,
+      "likes": 100553,
+      "bookmarks": 100553,
       "ratingAvg": 4.8,
-      "ratingCount": 32179,
+      "ratingCount": 32177,
       "ratingDist": [
         0,
         0,
         113,
-        8624,
-        23442
+        8623,
+        23440
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4190,16 +4190,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 35728,
-      "bookmarks": 35728,
+      "likes": 35990,
+      "bookmarks": 35990,
       "ratingAvg": 4.9,
-      "ratingCount": 11433,
+      "ratingCount": 11517,
       "ratingDist": [
         0,
         0,
-        22,
-        2380,
-        9030
+        23,
+        2398,
+        9097
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -4248,16 +4248,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 127514,
-      "bookmarks": 127514,
+      "likes": 127590,
+      "bookmarks": 127590,
       "ratingAvg": 5,
-      "ratingCount": 40804,
+      "ratingCount": 40829,
       "ratingDist": [
         0,
         0,
         44,
-        6476,
-        34285
+        6480,
+        34306
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4306,16 +4306,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 24001,
-      "bookmarks": 24001,
+      "likes": 24098,
+      "bookmarks": 24098,
       "ratingAvg": 4.9,
-      "ratingCount": 7680,
+      "ratingCount": 7711,
       "ratingDist": [
         0,
         0,
         15,
-        1599,
-        6066
+        1605,
+        6090
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -4365,16 +4365,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 54774,
-      "bookmarks": 54774,
+      "likes": 54782,
+      "bookmarks": 54782,
       "ratingAvg": 4.8,
-      "ratingCount": 17528,
+      "ratingCount": 17530,
       "ratingDist": [
         0,
         0,
         62,
-        4697,
-        12769
+        4698,
+        12770
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4424,16 +4424,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 29303,
-      "bookmarks": 29303,
+      "likes": 29316,
+      "bookmarks": 29316,
       "ratingAvg": 5,
-      "ratingCount": 9377,
+      "ratingCount": 9381,
       "ratingDist": [
         0,
         0,
         10,
-        1488,
-        7879
+        1489,
+        7882
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4482,16 +4482,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 186226,
-      "bookmarks": 186226,
+      "likes": 186271,
+      "bookmarks": 186271,
       "ratingAvg": 5,
-      "ratingCount": 59592,
+      "ratingCount": 59607,
       "ratingDist": [
         0,
         0,
         64,
-        9457,
-        50071
+        9460,
+        50084
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4541,21 +4541,67 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 119567,
-      "bookmarks": 119567,
+      "likes": 119619,
+      "bookmarks": 119619,
       "ratingAvg": 4.9,
-      "ratingCount": 38261,
+      "ratingCount": 38278,
       "ratingDist": [
         0,
         0,
         75,
-        7966,
-        30220
+        7969,
+        30234
       ],
       "rankDelta": 0,
       "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14171381",
+    "slug": "ns-14171381",
+    "type": "webnovel",
+    "title": "내가 숨긴 아이",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "내가 숨긴 아이 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260515_144%2Fpocket_1778821049225PteGo_JPEG%2F%25B3%25BB%25B0%25A1_%25BC%25FB%25B1%25E4_%25BE%25C6%25C0%25CC_15%25BC%25BC_%25BF%25CF%2528260511%2529.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14171381"
+      }
+    ],
+    "stats": {
+      "views": 9255740,
+      "likes": 462787,
+      "bookmarks": 462787,
+      "ratingAvg": 4.6,
+      "ratingCount": 185115,
+      "ratingDist": [
+        0,
+        2,
+        1954,
+        76456,
+        106703
+      ],
+      "rankDelta": 0,
+      "trendingScore": 92,
+      "completionRate": 72,
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -4586,20 +4632,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 9370247,
-      "likes": 468512,
-      "bookmarks": 468512,
-      "ratingAvg": 4.6,
-      "ratingCount": 187405,
+      "views": 9220247,
+      "likes": 461012,
+      "bookmarks": 461012,
+      "ratingAvg": 4.56,
+      "ratingCount": 184405,
       "ratingDist": [
         0,
         2,
-        1979,
-        77402,
-        108023
+        2393,
+        81934,
+        100075
       ],
       "rankDelta": 0,
-      "trendingScore": 92,
+      "trendingScore": 91,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -4632,20 +4678,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 9340299,
-      "likes": 467015,
-      "bookmarks": 467015,
-      "ratingAvg": 4.56,
-      "ratingCount": 186806,
+      "views": 9190299,
+      "likes": 459515,
+      "bookmarks": 459515,
+      "ratingAvg": 4.52,
+      "ratingCount": 183806,
       "ratingDist": [
         0,
         3,
-        2424,
-        83001,
-        101378
+        2918,
+        87429,
+        93456
       ],
       "rankDelta": 0,
-      "trendingScore": 91,
+      "trendingScore": 90,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -4678,22 +4724,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8942973,
-      "likes": 447149,
-      "bookmarks": 447149,
-      "ratingAvg": 4.52,
-      "ratingCount": 178860,
+      "views": 8792973,
+      "likes": 439649,
+      "bookmarks": 439649,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 175860,
       "ratingDist": [
         0,
-        3,
-        2839,
-        85076,
-        90941
+        5,
+        3398,
+        89102,
+        83356
       ],
       "rankDelta": 0,
-      "trendingScore": 90,
+      "trendingScore": 89,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -4724,20 +4770,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8669446,
-      "likes": 433472,
-      "bookmarks": 433472,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 173389,
+      "views": 8519446,
+      "likes": 425972,
+      "bookmarks": 425972,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 170389,
       "ratingDist": [
         0,
-        5,
-        3350,
-        87850,
-        82184
+        6,
+        3986,
+        91490,
+        74906
       ],
       "rankDelta": 0,
-      "trendingScore": 89,
+      "trendingScore": 88,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4770,20 +4816,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8864351,
-      "likes": 443218,
-      "bookmarks": 443218,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 177287,
+      "views": 8714351,
+      "likes": 435718,
+      "bookmarks": 435718,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 174287,
       "ratingDist": [
         0,
-        6,
-        4148,
-        95194,
-        77938
+        9,
+        4912,
+        98668,
+        70698
       ],
       "rankDelta": 0,
-      "trendingScore": 88,
+      "trendingScore": 87,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4816,20 +4862,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8882702,
-      "likes": 444135,
-      "bookmarks": 444135,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 177654,
+      "views": 8732702,
+      "likes": 436635,
+      "bookmarks": 436635,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 174654,
       "ratingDist": [
         0,
-        9,
-        5007,
-        100574,
-        72064
+        12,
+        5900,
+        103708,
+        65034
       ],
       "rankDelta": 0,
-      "trendingScore": 87,
+      "trendingScore": 86,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4862,22 +4908,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8440418,
-      "likes": 422021,
-      "bookmarks": 422021,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 168808,
+      "views": 8290418,
+      "likes": 414521,
+      "bookmarks": 414521,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 165808,
       "ratingDist": [
         0,
-        12,
-        5702,
-        100237,
-        62857
+        15,
+        6678,
+        102733,
+        56381
       ],
       "rankDelta": 0,
-      "trendingScore": 86,
+      "trendingScore": 85,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -4908,20 +4954,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8132040,
-      "likes": 406602,
-      "bookmarks": 406602,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 162641,
+      "views": 7982040,
+      "likes": 399102,
+      "bookmarks": 399102,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 159641,
       "ratingDist": [
         0,
-        15,
-        6550,
-        100771,
-        55304
+        20,
+        7626,
+        102678,
+        49317
       ],
       "rankDelta": 0,
-      "trendingScore": 85,
+      "trendingScore": 84,
       "completionRate": 72,
       "bingeIndex": 90
     },
@@ -4954,20 +5000,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8446879,
-      "likes": 422344,
-      "bookmarks": 422344,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 168938,
+      "views": 8296879,
+      "likes": 414844,
+      "bookmarks": 414844,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 165938,
       "ratingDist": [
         0,
-        21,
-        8070,
-        108657,
-        52189
+        28,
+        9354,
+        110223,
+        46332
       ],
       "rankDelta": 0,
-      "trendingScore": 84,
+      "trendingScore": 83,
       "completionRate": 72,
       "bingeIndex": 90
     },
@@ -5000,22 +5046,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8142353,
-      "likes": 407118,
-      "bookmarks": 407118,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 162847,
+      "views": 7992353,
+      "likes": 399618,
+      "bookmarks": 399618,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 159847,
       "ratingDist": [
         0,
-        28,
-        9180,
-        108170,
-        45469
+        37,
+        10579,
+        109097,
+        40134
       ],
       "rankDelta": 0,
-      "trendingScore": 83,
+      "trendingScore": 82,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5046,20 +5092,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7794899,
-      "likes": 389745,
-      "bookmarks": 389745,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 155898,
+      "views": 7644899,
+      "likes": 382245,
+      "bookmarks": 382245,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 152898,
       "ratingDist": [
         0,
-        36,
-        10318,
-        106401,
-        39143
+        47,
+        11821,
+        106683,
+        34347
       ],
       "rankDelta": 0,
-      "trendingScore": 82,
+      "trendingScore": 81,
       "completionRate": 72,
       "bingeIndex": 89
     },
@@ -5092,22 +5138,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7838411,
-      "likes": 391921,
-      "bookmarks": 391921,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 156768,
+      "views": 7688411,
+      "likes": 384421,
+      "bookmarks": 384421,
+      "ratingAvg": 4.6,
+      "ratingCount": 153768,
       "ratingDist": [
         0,
-        48,
-        12120,
-        109383,
-        35217
+        1,
+        1623,
+        63509,
+        88634
       ],
       "rankDelta": 0,
-      "trendingScore": 81,
+      "trendingScore": 80,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5138,20 +5184,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7719292,
-      "likes": 385965,
-      "bookmarks": 385965,
-      "ratingAvg": 4.6,
-      "ratingCount": 154386,
+      "views": 7569292,
+      "likes": 378465,
+      "bookmarks": 378465,
+      "ratingAvg": 4.56,
+      "ratingCount": 151386,
       "ratingDist": [
         0,
-        1,
-        1630,
-        63764,
-        88990
+        2,
+        1965,
+        67264,
+        82156
       ],
       "rankDelta": 0,
-      "trendingScore": 80,
+      "trendingScore": 79,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -5184,63 +5230,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7568325,
-      "likes": 378416,
-      "bookmarks": 378416,
-      "ratingAvg": 4.56,
-      "ratingCount": 151366,
-      "ratingDist": [
-        0,
-        2,
-        1964,
-        67255,
-        82145
-      ],
-      "rankDelta": 0,
-      "trendingScore": 79,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14171381",
-    "slug": "ns-14171381",
-    "type": "webnovel",
-    "title": "내가 숨긴 아이",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "내가 숨긴 아이 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260515_144%2Fpocket_1778821049225PteGo_JPEG%2F%25B3%25BB%25B0%25A1_%25BC%25FB%25B1%25E4_%25BE%25C6%25C0%25CC_15%25BC%25BC_%25BF%25CF%2528260511%2529.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14171381"
-      }
-    ],
-    "stats": {
-      "views": 7155740,
-      "likes": 357787,
-      "bookmarks": 357787,
+      "views": 7418325,
+      "likes": 370916,
+      "bookmarks": 370916,
       "ratingAvg": 4.52,
-      "ratingCount": 143115,
+      "ratingCount": 148366,
       "ratingDist": [
         0,
         3,
-        2272,
-        68074,
-        72767
+        2355,
+        70571,
+        75437
       ],
       "rankDelta": 0,
       "trendingScore": 78,
@@ -6525,17 +6525,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1503744,
-      "likes": 200499,
-      "bookmarks": 200499,
+      "views": 1504224,
+      "likes": 200563,
+      "bookmarks": 200563,
       "ratingAvg": 5,
-      "ratingCount": 80200,
+      "ratingCount": 80225,
       "ratingDist": [
         0,
         0,
         86,
-        12728,
-        67387
+        12732,
+        67408
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6578,17 +6578,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1824612,
-      "likes": 243282,
-      "bookmarks": 243282,
+      "views": 1824948,
+      "likes": 243326,
+      "bookmarks": 243326,
       "ratingAvg": 5,
-      "ratingCount": 97313,
+      "ratingCount": 97330,
       "ratingDist": [
         0,
         0,
         104,
-        15443,
-        81765
+        15446,
+        81780
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6631,17 +6631,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1005762,
-      "likes": 134102,
-      "bookmarks": 134102,
+      "views": 1006194,
+      "likes": 134159,
+      "bookmarks": 134159,
       "ratingAvg": 5,
-      "ratingCount": 53641,
+      "ratingCount": 53664,
       "ratingDist": [
         0,
         0,
         57,
-        8513,
-        45071
+        8516,
+        45090
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6683,17 +6683,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1724922,
-      "likes": 229990,
-      "bookmarks": 229990,
+      "views": 1725204,
+      "likes": 230027,
+      "bookmarks": 230027,
       "ratingAvg": 5,
-      "ratingCount": 91996,
+      "ratingCount": 92011,
       "ratingDist": [
         0,
         0,
         98,
-        14600,
-        77298
+        14602,
+        77311
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6735,17 +6735,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1045182,
-      "likes": 139358,
-      "bookmarks": 139358,
+      "views": 1045434,
+      "likes": 139391,
+      "bookmarks": 139391,
       "ratingAvg": 5,
-      "ratingCount": 55743,
+      "ratingCount": 55756,
       "ratingDist": [
         0,
         0,
         60,
-        8846,
-        46837
+        8848,
+        46848
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6787,17 +6787,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 760422,
-      "likes": 101390,
-      "bookmarks": 101390,
+      "views": 760722,
+      "likes": 101430,
+      "bookmarks": 101430,
       "ratingAvg": 5,
-      "ratingCount": 40556,
+      "ratingCount": 40572,
       "ratingDist": [
         0,
         0,
         43,
-        6436,
-        34076
+        6439,
+        34090
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6840,17 +6840,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 400788,
-      "likes": 53438,
-      "bookmarks": 53438,
+      "views": 401106,
+      "likes": 53481,
+      "bookmarks": 53481,
       "ratingAvg": 5,
-      "ratingCount": 21375,
+      "ratingCount": 21392,
       "ratingDist": [
         0,
         0,
         23,
-        3392,
-        17960
+        3395,
+        17974
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6892,17 +6892,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 423108,
-      "likes": 56414,
-      "bookmarks": 56414,
+      "views": 424800,
+      "likes": 56640,
+      "bookmarks": 56640,
       "ratingAvg": 5,
-      "ratingCount": 22566,
+      "ratingCount": 22656,
       "ratingDist": [
         0,
         0,
         24,
-        3581,
-        18961
+        3595,
+        19036
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6944,17 +6944,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 543990,
-      "likes": 72532,
-      "bookmarks": 72532,
+      "views": 544416,
+      "likes": 72589,
+      "bookmarks": 72589,
       "ratingAvg": 5,
-      "ratingCount": 29013,
+      "ratingCount": 29036,
       "ratingDist": [
         0,
         0,
         31,
-        4604,
-        24378
+        4608,
+        24397
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6996,17 +6996,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 550524,
-      "likes": 73403,
-      "bookmarks": 73403,
+      "views": 551034,
+      "likes": 73471,
+      "bookmarks": 73471,
       "ratingAvg": 5,
-      "ratingCount": 29361,
+      "ratingCount": 29388,
       "ratingDist": [
         0,
         0,
         31,
-        4660,
-        24670
+        4664,
+        24693
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7048,17 +7048,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2333910,
-      "likes": 311188,
-      "bookmarks": 311188,
+      "views": 2334054,
+      "likes": 311207,
+      "bookmarks": 311207,
       "ratingAvg": 5,
-      "ratingCount": 124475,
+      "ratingCount": 124483,
       "ratingDist": [
         0,
         0,
         133,
-        19754,
-        104588
+        19755,
+        104595
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7100,17 +7100,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 646158,
-      "likes": 86154,
-      "bookmarks": 86154,
+      "views": 646470,
+      "likes": 86196,
+      "bookmarks": 86196,
       "ratingAvg": 5,
-      "ratingCount": 34462,
+      "ratingCount": 34478,
       "ratingDist": [
         0,
         0,
         37,
-        5469,
-        28956
+        5472,
+        28969
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7153,17 +7153,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 425520,
-      "likes": 56736,
-      "bookmarks": 56736,
+      "views": 425682,
+      "likes": 56758,
+      "bookmarks": 56758,
       "ratingAvg": 5,
-      "ratingCount": 22694,
+      "ratingCount": 22703,
       "ratingDist": [
         0,
         0,
         24,
-        3602,
-        19068
+        3603,
+        19076
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7205,17 +7205,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 397278,
-      "likes": 52970,
-      "bookmarks": 52970,
+      "views": 397728,
+      "likes": 53030,
+      "bookmarks": 53030,
       "ratingAvg": 5,
-      "ratingCount": 21188,
+      "ratingCount": 21212,
       "ratingDist": [
         0,
         0,
         23,
-        3363,
-        17803
+        3366,
+        17823
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7257,17 +7257,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 567744,
-      "likes": 75699,
-      "bookmarks": 75699,
+      "views": 567858,
+      "likes": 75714,
+      "bookmarks": 75714,
       "ratingAvg": 5,
-      "ratingCount": 30280,
+      "ratingCount": 30286,
       "ratingDist": [
         0,
         0,
         32,
-        4805,
-        25442
+        4806,
+        25447
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7309,17 +7309,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 836484,
-      "likes": 111531,
-      "bookmarks": 111531,
+      "views": 839568,
+      "likes": 111942,
+      "bookmarks": 111942,
       "ratingAvg": 5,
-      "ratingCount": 44612,
+      "ratingCount": 44777,
       "ratingDist": [
         0,
         0,
         48,
-        7080,
-        37484
+        7106,
+        37623
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7361,17 +7361,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 144006,
-      "likes": 19201,
-      "bookmarks": 19201,
+      "views": 144588,
+      "likes": 19278,
+      "bookmarks": 19278,
       "ratingAvg": 5,
-      "ratingCount": 7680,
+      "ratingCount": 7711,
       "ratingDist": [
         0,
         0,
         8,
-        1219,
-        6453
+        1224,
+        6479
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7413,17 +7413,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1117356,
-      "likes": 148981,
-      "bookmarks": 148981,
+      "views": 1117626,
+      "likes": 149017,
+      "bookmarks": 149017,
       "ratingAvg": 5,
-      "ratingCount": 59592,
+      "ratingCount": 59607,
       "ratingDist": [
         0,
         0,
         64,
-        9457,
-        50071
+        9460,
+        50084
       ],
       "rankDelta": 0,
       "trendingScore": 60,
