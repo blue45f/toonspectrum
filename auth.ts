@@ -6,6 +6,7 @@ import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
 import { db, users, accounts, sessions, verificationTokens } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth-crypto";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // 세션에 user.id 노출
 declare module "next-auth" {
@@ -19,7 +20,9 @@ const providers: NextAuthConfig["providers"] = [
   Credentials({
     name: "이메일",
     credentials: { email: {}, password: {} },
-    authorize: async (creds) => {
+    authorize: async (creds, request) => {
+      // 크리덴셜 스터핑 완화 — IP당 10분에 10회
+      if (!rateLimit(`login:${clientIp(request as Request)}`, 10, 10 * 60_000)) return null;
       const email = String(creds?.email ?? "").toLowerCase().trim();
       const password = String(creds?.password ?? "");
       if (!email || !password) return null;

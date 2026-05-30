@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/lib/db";
 import { hashPassword } from "@/lib/auth-crypto";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const AVATARS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
 
 export async function POST(req: NextRequest) {
+  // 가입 남용/이메일 열거 완화 — IP당 10분에 5회
+  if (!rateLimit(`signup:${clientIp(req)}`, 5, 10 * 60_000)) {
+    return NextResponse.json({ error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." }, { status: 429 });
+  }
+
   let body: { email?: string; password?: string; name?: string; avatar?: string };
   try {
     body = await req.json();
