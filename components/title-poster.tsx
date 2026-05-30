@@ -1,6 +1,7 @@
 import type { Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AdultOverlay } from "./adult-overlay";
+import { CoverImage } from "./cover-image";
 
 const SIZE = {
   sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.6rem]", wm: "text-[3.5rem]" },
@@ -26,6 +27,18 @@ export function TitlePoster({
   const isNovel = title.type === "webnovel";
   // 제목 첫 글자 — 워터마크 글리프
   const glyph = title.title.replace(/[^가-힣A-Za-z0-9]/g, "").charAt(0) || "W";
+  const glyphNode = (
+    <div
+      className={cn(
+        "absolute -right-2 top-1 select-none font-bold leading-none text-fg/10 mix-blend-overlay",
+        isNovel ? "font-serif" : "font-display",
+        s.wm
+      )}
+      aria-hidden
+    >
+      {glyph}
+    </div>
+  );
 
   return (
     <div
@@ -35,13 +48,12 @@ export function TitlePoster({
       )}
       style={{ background: `linear-gradient(145deg, ${from}, ${to})` }}
     >
-      {/* 실제 표지 이미지 (있을 때 우선) */}
+      {/* 실제 표지 이미지 (있을 때 우선, 로드 실패 시 글리프 폴백) */}
       {title.coverImage && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <CoverImage
           src={title.coverImage}
           alt={`${title.title} 표지`}
-          loading="lazy"
+          fallback={glyphNode}
           className="absolute inset-0 size-full object-cover"
         />
       )}
@@ -56,18 +68,7 @@ export function TitlePoster({
       {/* 필름 그레인 */}
       <div className="noise pointer-events-none absolute inset-0 opacity-[0.14] mix-blend-overlay" aria-hidden />
       {/* 워터마크 글리프 (이미지 없을 때만) */}
-      {!title.coverImage && (
-        <div
-          className={cn(
-            "absolute -right-2 top-1 select-none font-bold leading-none text-fg/10 mix-blend-overlay",
-            isNovel ? "font-serif" : "font-display",
-            s.wm
-          )}
-          aria-hidden
-        >
-          {glyph}
-        </div>
-      )}
+      {!title.coverImage && glyphNode}
       {/* 하단 스크림 */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
 

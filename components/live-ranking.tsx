@@ -3,6 +3,7 @@ import { getLiveRanking, type LiveItem } from "@/lib/server/live";
 import { rankBy } from "@/lib/ranking";
 import { TITLES } from "@/lib/data";
 import { RankRow } from "./rank-row";
+import { CoverImage } from "./cover-image";
 import { Stars } from "./ui/stars";
 import { ArrowUpRight, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,8 +21,7 @@ function LiveRow({ item }: { item: LiveItem }) {
       </span>
       <span className="relative aspect-[3/4] w-9 shrink-0 overflow-hidden rounded-md bg-raised ring-1 ring-white/10">
         {item.thumbnail && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.thumbnail} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+          <CoverImage src={item.thumbnail} alt="" className="absolute inset-0 size-full object-cover" />
         )}
       </span>
       <span className="min-w-0 flex-1">

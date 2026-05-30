@@ -7,6 +7,7 @@ import { PlatformTags } from "./availability";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
 import { AdultOverlay } from "./adult-overlay";
+import { CoverImage } from "./cover-image";
 
 // 미니 표지 썸네일
 export function MiniPoster({
@@ -26,11 +27,10 @@ export function MiniPoster({
       style={{ background: `linear-gradient(145deg, ${title.cover[0]}, ${title.cover[1]})` }}
     >
       {title.coverImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <CoverImage
           src={title.coverImage}
           alt=""
-          loading="lazy"
+          fallback={title.title.charAt(0)}
           className="absolute inset-0 size-full object-cover"
         />
       ) : (
