@@ -6,18 +6,21 @@ import { Container } from "@/components/section";
 import { MiniPoster } from "@/components/rank-row";
 import { RatingInline } from "@/components/ui/stars";
 import { AvailabilityDots } from "@/components/availability";
-import { cn } from "@/lib/utils";
+import { cn, kstDayOfWeek } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "연재 캘린더",
   description: "요일별 웹툰 연재 일정. 오늘 올라오는 작품을 한눈에.",
 };
 
+// '오늘'이 빌드 시각에 박제되지 않도록 ISR로 1시간마다 재생성 (정적 무기한 캐시 방지)
+export const revalidate = 3600;
+
 const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5]; // getDay() 0=일 → WEEK_DAYS 인덱스
 
 export default function CalendarPage() {
-  // 서버 렌더 시점의 오늘 (Asia/Seoul 근사)
-  const todayIdx = DAY_IDX_FROM_GETDAY[new Date().getDay()];
+  // 재생성 시점의 오늘 (KST 기준)
+  const todayIdx = DAY_IDX_FROM_GETDAY[kstDayOfWeek()];
 
   const ongoing = TITLES.filter(
     (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.length

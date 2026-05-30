@@ -2,6 +2,7 @@
 // Next ISR(`revalidate`) 캐시로 N초마다 갱신. 실패 시 빈 배열(상위 호출부가 스냅샷 폴백).
 // (하드코딩 스냅샷이 아니라 실제 소스에서 동적 페치하는 경로 데모)
 import { getTitle } from "@/lib/data";
+import { kstDayOfWeek } from "@/lib/utils";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -99,7 +100,7 @@ async function fetchKakao(day: string): Promise<LiveItem[]> {
 
 // 실시간 인기 — 네이버 + 카카오 오늘자 인기 순서를 교차 병합
 export async function getLiveRanking(limit = 12): Promise<{ items: LiveItem[]; day: string }> {
-  const day = WEEK[new Date().getDay()];
+  const day = WEEK[kstDayOfWeek()]; // KST 기준 요일 (소스가 KST로 요일별 랭킹 제공)
   const [naver, kakao] = await Promise.all([fetchNaver(day), fetchKakao(day)]);
   const merged: LiveItem[] = [];
   const max = Math.max(naver.length, kakao.length);

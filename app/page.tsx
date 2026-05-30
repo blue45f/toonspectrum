@@ -17,8 +17,11 @@ import { HomePersonal } from "@/components/home-personal";
 import { CountUp } from "@/components/count-up";
 import { buttonClass } from "@/components/ui/button";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
-import { formatCount } from "@/lib/utils";
+import { formatCount, kstDayOfWeek } from "@/lib/utils";
 import { Search, ArrowRight, Layers } from "lucide-react";
+
+// '오늘 연재'/실시간 랭킹 신선도를 명시적으로 고정 (자식 fetch revalidate에 암묵 의존하지 않도록)
+export const revalidate = 600;
 
 export default function HomePage() {
   const featured = TITLES.filter((t) => t.featured);
@@ -39,8 +42,8 @@ export default function HomePage() {
 
   const tags = activeTags().slice(0, 14);
 
-  // 오늘 연재 (실제 연재요일 기반)
-  const todayDay = WEEK_DAYS[[6, 0, 1, 2, 3, 4, 5][new Date().getDay()]];
+  // 오늘 연재 (실제 연재요일 기반, KST)
+  const todayDay = WEEK_DAYS[[6, 0, 1, 2, 3, 4, 5][kstDayOfWeek()]];
   const todayReleases = TITLES.filter(
     (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.includes(todayDay)
   )
