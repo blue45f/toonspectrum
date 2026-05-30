@@ -43,4 +43,34 @@ describe("rankBy", () => {
     const list = Array.from({ length: 10 }, (_, i) => makeTitle({ id: `n${i}` }));
     expect(rankBy(list, "popular", { period: "all", limit: 3 })).toHaveLength(3);
   });
+
+  it("관심 폭발축: 관심(bookmarks) 많은 작품이 위로", () => {
+    const a = makeTitle({ id: "a", stats: { bookmarks: 50 } });
+    const b = makeTitle({ id: "b", stats: { bookmarks: 5_000_000 } });
+    expect(rankBy([a, b], "favorites", { period: "all" })[0].title.id).toBe("b");
+  });
+
+  it("숨은 명작축: 같은 고평점이면 조회 적은 쪽이 위 + 평가 적으면 제외", () => {
+    const lowViews = makeTitle({ id: "low", stats: { ratingAvg: 4.8, ratingCount: 5000, views: 10_000 } });
+    const highViews = makeTitle({ id: "high", stats: { ratingAvg: 4.8, ratingCount: 5000, views: 500_000_000 } });
+    const tooFew = makeTitle({ id: "few", stats: { ratingAvg: 5.0, ratingCount: 100, views: 1000 } });
+    const ranked = rankBy([lowViews, highViews, tooFew], "hidden", { period: "all" });
+    const ids = ranked.map((r) => r.title.id);
+    expect(ids).not.toContain("few"); // ratingCount < 300 제외
+    expect(ids.indexOf("low")).toBeLessThan(ids.indexOf("high"));
+  });
+
+  it("장르 필터: 해당 장르만", () => {
+    const r = makeTitle({ id: "r", genres: ["로맨스"] });
+    const f = makeTitle({ id: "f", genres: ["판타지"] });
+    const ranked = rankBy([r, f], "popular", { period: "all", genre: "로맨스" });
+    expect(ranked.map((x) => x.title.id)).toEqual(["r"]);
+  });
+
+  it("플랫폼 필터: 해당 플랫폼 가용성만", () => {
+    const naver = makeTitle({ id: "n", availability: [{ platformId: "naver-webtoon", pricing: "free" }] });
+    const kakao = makeTitle({ id: "k", availability: [{ platformId: "kakao-webtoon", pricing: "wait-free" }] });
+    const ranked = rankBy([naver, kakao], "popular", { period: "all", platform: "kakao-webtoon" });
+    expect(ranked.map((x) => x.title.id)).toEqual(["k"]);
+  });
 });

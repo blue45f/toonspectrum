@@ -63,3 +63,29 @@ describe("suggest", () => {
     expect(suggest(titles, "")).toEqual([]);
   });
 });
+
+describe("태그·연도 필터 + 정렬", () => {
+  const set = [
+    makeTitle({ id: "x", tags: ["사이다", "먼치킨"], releaseYear: 2024, stats: { bookmarks: 100, completionRate: 90 } }),
+    makeTitle({ id: "y", tags: ["힐링"], releaseYear: 2016, stats: { bookmarks: 9_000_000, completionRate: 50 } }),
+    makeTitle({ id: "z", tags: ["사이다"], releaseYear: 2011, stats: { bookmarks: 200, completionRate: 99 } }),
+  ];
+
+  it("태그 필터(모든 태그 포함)", () => {
+    expect(searchTitles(set, { tags: ["사이다"] }).map((t) => t.id).sort()).toEqual(["x", "z"]);
+    expect(searchTitles(set, { tags: ["사이다", "먼치킨"] }).map((t) => t.id)).toEqual(["x"]);
+  });
+
+  it("연도 범위 필터", () => {
+    expect(searchTitles(set, { yearMin: 2014, yearMax: 2021 }).map((t) => t.id)).toEqual(["y"]);
+    expect(searchTitles(set, { yearMin: 2022 }).map((t) => t.id)).toEqual(["x"]);
+  });
+
+  it("정렬: 관심순", () => {
+    expect(sortTitles(set, "bookmarks")[0].id).toBe("y");
+  });
+
+  it("정렬: 완독률순", () => {
+    expect(sortTitles(set, "completion")[0].id).toBe("z");
+  });
+});
