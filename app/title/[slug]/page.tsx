@@ -101,7 +101,7 @@ export default async function TitleDetailPage({
       <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
         {/* 좌: 포스터 + 액션 + 어디서봐 */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
-          <TitlePoster title={title} size="lg" />
+          <TitlePoster title={title} size="lg" priority />
           <ReadStateSelector titleId={title.id} />
           <CollectionAdd titleId={title.id} />
           {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (

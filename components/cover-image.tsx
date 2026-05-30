@@ -9,16 +9,25 @@ export function CoverImage({
   alt,
   fallback,
   className,
+  priority,
 }: {
   src: string;
   alt: string;
   fallback?: React.ReactNode;
   className?: string;
+  priority?: boolean; // above-the-fold 커버는 즉시 로드(LCP 개선)
 }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <>{fallback ?? null}</>;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={className} />
+    <img
+      src={src}
+      alt={alt}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
+      onError={() => setFailed(true)}
+      className={className}
+    />
   );
 }

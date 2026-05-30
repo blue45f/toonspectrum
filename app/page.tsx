@@ -118,7 +118,7 @@ export default function HomePage() {
               >
                 <div className="grid grid-cols-[1.1fr_1fr]">
                   <div className="transition-transform duration-500 ease-out-expo group-hover:scale-[1.03]">
-                    <TitlePoster title={spotlight} size="lg" className="rounded-none border-0" />
+                    <TitlePoster title={spotlight} size="lg" className="rounded-none border-0" priority />
                   </div>
                   <div className="flex flex-col gap-3 p-5">
                     <div className="flex flex-wrap gap-1.5">

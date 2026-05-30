@@ -16,11 +16,13 @@ export function TitlePoster({
   size = "md",
   className,
   rank,
+  priority,
 }: {
   title: Title;
   size?: keyof typeof SIZE;
   className?: string;
   rank?: number;
+  priority?: boolean;
 }) {
   const s = SIZE[size];
   const [from, to] = title.cover;
@@ -54,6 +56,7 @@ export function TitlePoster({
           src={title.coverImage}
           alt={`${title.title} 표지`}
           fallback={glyphNode}
+          priority={priority}
           className="absolute inset-0 size-full object-cover"
         />
       )}
