@@ -8,6 +8,7 @@ import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
 import { AdultOverlay } from "./adult-overlay";
 import { CoverImage } from "./cover-image";
+import { statsAreEstimated } from "@/lib/estimate";
 
 // 미니 표지 썸네일
 export function MiniPoster({
@@ -104,7 +105,7 @@ export function RankRow({
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <RatingInline value={title.stats.ratingAvg} size="xs" />
+          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
           <span className="hidden text-line-strong sm:inline">·</span>
           <span className="hidden text-xs text-fg-3 sm:inline">
             {title.author} · {STATUS_LABEL[title.status]}

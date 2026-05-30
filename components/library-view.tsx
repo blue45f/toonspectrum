@@ -11,6 +11,7 @@ import { TitleCard } from "./title-card";
 import { MiniPoster } from "./rank-row";
 import { Stars, RatingInline } from "./ui/stars";
 import { MeterBar } from "./ui/spectrum-bar";
+import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
@@ -334,7 +335,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg group-hover:text-accent">
                               {t.title}
                             </span>
-                            <RatingInline value={t.stats.ratingAvg} size="xs" />
+                            <RatingInline value={t.stats.ratingAvg} estimated={statsAreEstimated(t)} size="xs" />
                           </Link>
                         ))}
                       </div>

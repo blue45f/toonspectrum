@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getTitle } from "@/lib/data";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
+import { statsAreEstimated } from "@/lib/estimate";
 
 export const alt = "WEBDEX";
 export const size = { width: 1200, height: 630 };
@@ -27,9 +28,10 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
   const status = t ? STATUS_LABEL[t.status] : "";
   const genres = t?.genres.slice(0, 3).join("  ·  ") ?? "";
   const rating = t ? t.stats.ratingAvg.toFixed(1) : "";
+  const estimated = t ? statsAreEstimated(t) : false;
   const author = t?.author ?? "";
 
-  const text = `WEBDEX웹툰·웹소설 통합 인덱스 별점★ ${title} ${genres} ${type} ${status} ${author}`;
+  const text = `WEBDEX웹툰·웹소설 통합 인덱스 별점★ 추정 ${title} ${genres} ${type} ${status} ${author}`;
   const font = await loadKoreanFont(text);
 
   return new ImageResponse(
@@ -78,6 +80,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
         {/* 하단: 평점 */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 40, fontWeight: 800 }}>
           <span style={{ color: "#ef6f3c" }}>★ {rating}</span>
+          {estimated && <span style={{ fontSize: 28, color: "#b9b1a2", fontWeight: 400 }}>· 추정</span>}
           {status && <span style={{ fontSize: 28, color: "#b9b1a2", fontWeight: 400 }}>· {status}</span>}
         </div>
       </div>

@@ -25,7 +25,7 @@ import { ReviewCard } from "@/components/review-card";
 import { LiveReviews } from "@/components/live-reviews";
 import { STATUS_LABEL, AGE_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
-import { formatCount, formatFull } from "@/lib/utils";
+import { formatCount } from "@/lib/utils";
 import { Eye, Heart, Bookmark, Star, Layers, MapPin } from "lucide-react";
 
 export async function generateStaticParams() {
@@ -66,7 +66,8 @@ export default async function TitleDetailPage({
   const reviewAvg =
     reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 
-  // 별점·평가수가 실수집(네이버 웹툰)이 아니라 추정값인 작품인지 — 표시에 '추정' 명시
+  // 별점이 실수집(네이버 웹툰)이 아니라 합성값인 작품인지 — 표시에 '추정' 명시.
+  // (평가수는 전 작품 파생값이라 정확수치 대신 약식 표기로 false precision 회피)
   const estimated = statsAreEstimated(title);
 
   const stats = [
@@ -153,7 +154,7 @@ export default async function TitleDetailPage({
                 <p className="mt-1 text-xs text-fg-3">
                   {estimated
                     ? `약 ${formatCount(title.stats.ratingCount)} 평가 (추정)`
-                    : `${formatFull(title.stats.ratingCount)}명의 평가`}
+                    : `${formatCount(title.stats.ratingCount)}명의 평가`}
                 </p>
               </div>
             </div>

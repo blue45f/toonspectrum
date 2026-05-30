@@ -18,6 +18,7 @@ import { TitleCard } from "./title-card";
 import { PlatformTags } from "./availability";
 import { RatingInline } from "./ui/stars";
 import { Segmented } from "./ui/segmented";
+import { statsAreEstimated } from "@/lib/estimate";
 import { cn, formatCount } from "@/lib/utils";
 import { FunctionSquare, LayoutList, LayoutGrid, Rows3 } from "lucide-react";
 
@@ -200,7 +201,7 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
                     {r.title.title}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <RatingInline value={r.title.stats.ratingAvg} size="xs" />
+                    <RatingInline value={r.title.stats.ratingAvg} estimated={statsAreEstimated(r.title)} size="xs" />
                     <PlatformTags availability={r.title.availability} max={1} />
                   </span>
                 </span>

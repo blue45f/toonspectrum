@@ -18,6 +18,7 @@ import { CountUp } from "@/components/count-up";
 import { buttonClass } from "@/components/ui/button";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { formatCount, kstDayOfWeek } from "@/lib/utils";
+import { statsAreEstimated } from "@/lib/estimate";
 import { Search, ArrowRight, Layers } from "lucide-react";
 
 // '오늘 연재'/실시간 랭킹 신선도를 명시적으로 고정 (자식 fetch revalidate에 암묵 의존하지 않도록)
@@ -129,6 +130,7 @@ export default function HomePage() {
                     <RatingInline
                       value={spotlight.stats.ratingAvg}
                       count={spotlight.stats.ratingCount}
+                      estimated={statsAreEstimated(spotlight)}
                       size="sm"
                     />
                     {spotlight.editorNote && (

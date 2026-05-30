@@ -7,6 +7,7 @@ import { GenreSpectrum } from "./ui/spectrum-bar";
 import { RatingInline } from "./ui/stars";
 import { GenreChip } from "./ui/chip";
 import { STATUS_LABEL } from "@/lib/taxonomy";
+import { statsAreEstimated } from "@/lib/estimate";
 import { cn } from "@/lib/utils";
 
 // 표준 그리드 카드 — 포스터 + 메타
@@ -45,7 +46,7 @@ export function TitleCard({
 
       <div className="mt-2 flex flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
-          <RatingInline value={title.stats.ratingAvg} size="xs" />
+          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
           <span className={cn("text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
@@ -82,7 +83,12 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
         </div>
         <p className="line-clamp-2 text-xs leading-relaxed text-fg-3">{title.synopsis}</p>
         <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1">
-          <RatingInline value={title.stats.ratingAvg} count={title.stats.ratingCount} size="xs" />
+          <RatingInline
+            value={title.stats.ratingAvg}
+            count={title.stats.ratingCount}
+            estimated={statsAreEstimated(title)}
+            size="xs"
+          />
           <span className="text-line-strong">·</span>
           {title.genres.slice(0, 2).map((g) => (
             <GenreChip key={g} genre={g} size="sm" />

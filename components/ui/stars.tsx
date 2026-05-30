@@ -43,22 +43,30 @@ export function Stars({
   );
 }
 
-// 평점 + 숫자 묶음
+// 평점 + 숫자 묶음. estimated=합성 지표(카카오웹툰·웹소설)면 '≈'로 추정임을 표시.
 export function RatingInline({
   value,
   count,
   size = "sm",
+  estimated,
   className,
 }: {
   value: number;
   count?: number;
   size?: keyof typeof SIZES;
+  estimated?: boolean;
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5", className)}>
+    <span
+      className={cn("inline-flex items-center gap-1.5", className)}
+      title={estimated ? "추정 별점" : undefined}
+    >
       <Stars value={value} size={size} />
-      <span className="numeral text-sm text-fg">{value.toFixed(1)}</span>
+      <span className="numeral text-sm text-fg">
+        {estimated && <span className="text-fg-3" aria-hidden>≈</span>}
+        {value.toFixed(1)}
+      </span>
       {count != null && (
         <span className="text-xs text-fg-3 tnum">({count.toLocaleString("ko-KR")})</span>
       )}

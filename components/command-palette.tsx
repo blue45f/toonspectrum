@@ -7,6 +7,7 @@ import type { Title } from "@/lib/types";
 import { suggest } from "@/lib/search";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { RatingInline } from "./ui/stars";
+import { statsAreEstimated } from "@/lib/estimate";
 import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords } from "lucide-react";
 import { genreColor } from "@/lib/genre-color";
 
@@ -153,7 +154,7 @@ export function CommandPalette() {
                       · {t.author}
                     </span>
                   </span>
-                  <RatingInline value={t.stats.ratingAvg} size="xs" />
+                  <RatingInline value={t.stats.ratingAvg} estimated={statsAreEstimated(t)} size="xs" />
                   <CornerDownLeft
                     size={13}
                     className="text-fg-3 opacity-0 data-[selected=true]:opacity-100"

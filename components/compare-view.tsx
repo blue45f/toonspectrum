@@ -9,6 +9,7 @@ import { GenreSpectrum } from "./ui/spectrum-bar";
 import { GenreChip } from "./ui/chip";
 import { AvailabilityDots } from "./availability";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
+import { statsAreEstimated } from "@/lib/estimate";
 import { cn, formatCount } from "@/lib/utils";
 import { Search, X, Swords } from "lucide-react";
 
@@ -92,7 +93,7 @@ function Picker({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{t.title}</span>
                 <span className="text-xs text-fg-3">
-                  {TYPE_LABEL[t.type]} · ★{t.stats.ratingAvg.toFixed(1)}
+                  {TYPE_LABEL[t.type]} · ★{statsAreEstimated(t) ? "≈" : ""}{t.stats.ratingAvg.toFixed(1)}
                 </span>
               </span>
             </button>
@@ -107,6 +108,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
   const [titles, setTitles] = useState<Title[] | null>(null);
   const [a, setA] = useState<Title | null>(null);
   const [b, setB] = useState<Title | null>(null);
+  // 비교 두 작품 중 하나라도 합성 지표(카카오웹툰·웹소설)면 우열 강조를 끈다(추정값으로 우열 판정 방지)
+  const eitherEstimated = !!a && !!b && (statsAreEstimated(a) || statsAreEstimated(b));
 
   useEffect(() => {
     let mounted = true;
@@ -147,8 +150,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
             {METRICS.map((m, i) => {
               const va = m.get(a);
               const vb = m.get(b);
-              const aWin = m.better === "high" && va > vb;
-              const bWin = m.better === "high" && vb > va;
+              const aWin = m.better === "high" && va > vb && !eitherEstimated;
+              const bWin = m.better === "high" && vb > va && !eitherEstimated;
               return (
                 <div
                   key={m.label}
@@ -168,6 +171,12 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
               );
             })}
           </div>
+
+          {eitherEstimated && (
+            <p className="-mt-4 text-center text-xs text-fg-3">
+              ≈ 비교 작품 중 카카오웹툰·웹소설은 별점·조회 등이 추정값이라 우열 표시를 생략했어요.
+            </p>
+          )}
 
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
             {[a, b].flatMap((t, idx) =>

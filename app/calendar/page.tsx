@@ -5,6 +5,7 @@ import { WEEK_DAYS } from "@/lib/taxonomy";
 import { Container } from "@/components/section";
 import { MiniPoster } from "@/components/rank-row";
 import { RatingInline } from "@/components/ui/stars";
+import { statsAreEstimated } from "@/lib/estimate";
 import { AvailabilityDots } from "@/components/availability";
 import { cn, kstDayOfWeek } from "@/lib/utils";
 
@@ -89,7 +90,7 @@ export default function CalendarPage() {
                           {t.title}
                         </span>
                         <span className="flex items-center justify-between gap-1">
-                          <RatingInline value={t.stats.ratingAvg} size="xs" />
+                          <RatingInline value={t.stats.ratingAvg} estimated={statsAreEstimated(t)} size="xs" />
                           <AvailabilityDots availability={t.availability} max={2} />
                         </span>
                       </span>
