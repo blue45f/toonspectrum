@@ -38,16 +38,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1527620874,
-      "likes": 1381122,
-      "bookmarks": 1381122,
+      "likes": 1381120,
+      "bookmarks": 1381120,
       "ratingAvg": 4.8,
-      "ratingCount": 441959,
+      "ratingCount": 441958,
       "ratingDist": [
         0,
         1,
         1554,
         118443,
-        321961
+        321960
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -94,16 +94,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 881614870,
-      "likes": 1897378,
-      "bookmarks": 1897378,
+      "likes": 1897339,
+      "bookmarks": 1897339,
       "ratingAvg": 4.9,
-      "ratingCount": 607161,
+      "ratingCount": 607148,
       "ratingDist": [
         0,
         0,
         1189,
-        126411,
-        479561
+        126408,
+        479551
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -149,16 +149,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 774860256,
-      "likes": 1386369,
-      "bookmarks": 1386369,
+      "likes": 1386405,
+      "bookmarks": 1386405,
       "ratingAvg": 4.8,
-      "ratingCount": 443638,
+      "ratingCount": 443650,
       "ratingDist": [
         0,
         1,
         1560,
-        118893,
-        323184
+        118896,
+        323193
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -202,16 +202,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 644053615,
-      "likes": 323900,
-      "bookmarks": 323900,
+      "likes": 323903,
+      "bookmarks": 323903,
       "ratingAvg": 4.8,
-      "ratingCount": 103648,
+      "ratingCount": 103649,
       "ratingDist": [
         0,
         0,
         365,
         27777,
-        75506
+        75507
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -261,16 +261,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 354266224,
-      "likes": 2463138,
-      "bookmarks": 2463138,
+      "likes": 2463233,
+      "bookmarks": 2463233,
       "ratingAvg": 4.7,
-      "ratingCount": 788204,
+      "ratingCount": 788235,
       "ratingDist": [
         0,
         3,
         4867,
-        265741,
-        517593
+        265751,
+        517613
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -317,16 +317,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 343529092,
-      "likes": 2740784,
-      "bookmarks": 2740784,
+      "likes": 2740856,
+      "bookmarks": 2740856,
       "ratingAvg": 4.9,
-      "ratingCount": 877051,
+      "ratingCount": 877074,
       "ratingDist": [
         0,
         1,
         1717,
-        182602,
-        692731
+        182607,
+        692749
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -376,8 +376,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 257694256,
-      "likes": 80888,
-      "bookmarks": 80888,
+      "likes": 80887,
+      "bookmarks": 80887,
       "ratingAvg": 5,
       "ratingCount": 25884,
       "ratingDist": [
@@ -494,8 +494,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 225292680,
-      "likes": 257000,
-      "bookmarks": 257000,
+      "likes": 257001,
+      "bookmarks": 257001,
       "ratingAvg": 5,
       "ratingCount": 82240,
       "ratingDist": [
@@ -506,7 +506,7 @@ export const TITLES: Title[] = [
         69101
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -547,10 +547,10 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 218908912,
-      "likes": 159843,
-      "bookmarks": 159843,
+      "likes": 159841,
+      "bookmarks": 159841,
       "ratingAvg": 4.5,
-      "ratingCount": 51150,
+      "ratingCount": 51149,
       "ratingDist": [
         0,
         1,
@@ -602,16 +602,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 211127300,
-      "likes": 1309741,
-      "bookmarks": 1309741,
+      "likes": 1309721,
+      "bookmarks": 1309721,
       "ratingAvg": 5,
-      "ratingCount": 419117,
+      "ratingCount": 419111,
       "ratingDist": [
         0,
         0,
         448,
-        66514,
-        352155
+        66513,
+        352150
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -660,16 +660,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 162951846,
-      "likes": 588435,
-      "bookmarks": 588435,
+      "likes": 588421,
+      "bookmarks": 588421,
       "ratingAvg": 4.8,
-      "ratingCount": 188299,
+      "ratingCount": 188295,
       "ratingDist": [
         0,
         0,
         662,
-        50463,
-        137173
+        50462,
+        137170
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -713,16 +713,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 156759386,
-      "likes": 156973,
-      "bookmarks": 156973,
+      "likes": 156993,
+      "bookmarks": 156993,
       "ratingAvg": 5,
-      "ratingCount": 50231,
+      "ratingCount": 50238,
       "ratingDist": [
         0,
         0,
         54,
-        7972,
-        42206
+        7973,
+        42212
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -767,16 +767,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 141372969,
-      "likes": 896462,
-      "bookmarks": 896462,
+      "likes": 896453,
+      "bookmarks": 896453,
       "ratingAvg": 5,
-      "ratingCount": 286868,
+      "ratingCount": 286865,
       "ratingDist": [
         0,
         0,
         307,
-        45526,
-        241035
+        45525,
+        241033
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -820,16 +820,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 129213391,
-      "likes": 791709,
-      "bookmarks": 791709,
+      "likes": 791730,
+      "bookmarks": 791730,
       "ratingAvg": 4.9,
-      "ratingCount": 253347,
+      "ratingCount": 253354,
       "ratingDist": [
         0,
         0,
         496,
-        52747,
-        200104
+        52748,
+        200110
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -872,16 +872,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 122034683,
-      "likes": 721171,
-      "bookmarks": 721171,
+      "likes": 721163,
+      "bookmarks": 721163,
       "ratingAvg": 5,
-      "ratingCount": 230775,
+      "ratingCount": 230772,
       "ratingDist": [
         0,
         0,
         247,
-        36624,
-        193904
+        36623,
+        193902
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -927,16 +927,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 112350625,
-      "likes": 917326,
-      "bookmarks": 917326,
+      "likes": 917317,
+      "bookmarks": 917317,
       "ratingAvg": 4.9,
-      "ratingCount": 293544,
+      "ratingCount": 293541,
       "ratingDist": [
         0,
         0,
         575,
-        61116,
-        231853
+        61115,
+        231851
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -982,16 +982,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 107824492,
-      "likes": 456656,
-      "bookmarks": 456656,
+      "likes": 456665,
+      "bookmarks": 456665,
       "ratingAvg": 5,
-      "ratingCount": 146130,
+      "ratingCount": 146133,
       "ratingDist": [
         0,
         0,
         156,
         23191,
-        122783
+        122786
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1041,19 +1041,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 103340238,
-      "likes": 325111,
-      "bookmarks": 325111,
+      "likes": 325098,
+      "bookmarks": 325098,
       "ratingAvg": 5,
-      "ratingCount": 104036,
+      "ratingCount": 104031,
       "ratingDist": [
         0,
         0,
         111,
         16510,
-        87414
+        87410
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -1099,16 +1099,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 84216016,
-      "likes": 148118,
-      "bookmarks": 148118,
+      "likes": 148115,
+      "bookmarks": 148115,
       "ratingAvg": 4.9,
-      "ratingCount": 47398,
+      "ratingCount": 47397,
       "ratingDist": [
         0,
         0,
         93,
         9868,
-        37437
+        37436
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1157,16 +1157,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 69839914,
-      "likes": 1124600,
-      "bookmarks": 1124600,
+      "likes": 1124588,
+      "bookmarks": 1124588,
       "ratingAvg": 5,
-      "ratingCount": 359872,
+      "ratingCount": 359868,
       "ratingDist": [
         0,
         0,
         385,
         57111,
-        302376
+        302372
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1207,16 +1207,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 60153936,
-      "likes": 118138,
-      "bookmarks": 118138,
+      "likes": 118131,
+      "bookmarks": 118131,
       "ratingAvg": 5,
-      "ratingCount": 37804,
+      "ratingCount": 37802,
       "ratingDist": [
         0,
         0,
         40,
         5999,
-        31764
+        31762
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1314,8 +1314,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 42620145,
-      "likes": 404687,
-      "bookmarks": 404687,
+      "likes": 404689,
+      "bookmarks": 404689,
       "ratingAvg": 5,
       "ratingCount": 129500,
       "ratingDist": [
@@ -1366,16 +1366,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 38823639,
-      "likes": 274378,
-      "bookmarks": 274378,
+      "likes": 274507,
+      "bookmarks": 274507,
       "ratingAvg": 5,
-      "ratingCount": 87801,
+      "ratingCount": 87842,
       "ratingDist": [
         0,
         0,
         94,
-        13934,
-        73773
+        13940,
+        73808
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1424,16 +1424,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 24100237,
-      "likes": 155598,
-      "bookmarks": 155598,
+      "likes": 155590,
+      "bookmarks": 155590,
       "ratingAvg": 5,
-      "ratingCount": 49791,
+      "ratingCount": 49789,
       "ratingDist": [
         0,
         0,
         53,
-        7902,
-        41836
+        7901,
+        41834
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1482,16 +1482,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 21435315,
-      "likes": 297756,
-      "bookmarks": 297756,
+      "likes": 297764,
+      "bookmarks": 297764,
       "ratingAvg": 4.9,
-      "ratingCount": 95282,
+      "ratingCount": 95284,
       "ratingDist": [
         0,
         0,
         187,
         19838,
-        75258
+        75259
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1541,16 +1541,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17565586,
-      "likes": 95549,
-      "bookmarks": 95549,
+      "likes": 95554,
+      "bookmarks": 95554,
       "ratingAvg": 4.9,
-      "ratingCount": 30576,
+      "ratingCount": 30577,
       "ratingDist": [
         0,
         0,
         60,
         6366,
-        24150
+        24151
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1593,16 +1593,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17131272,
-      "likes": 107555,
-      "bookmarks": 107555,
+      "likes": 107553,
+      "bookmarks": 107553,
       "ratingAvg": 4.9,
-      "ratingCount": 34418,
+      "ratingCount": 34417,
       "ratingDist": [
         0,
         0,
         67,
         7166,
-        27185
+        27184
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1648,16 +1648,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 14985196,
-      "likes": 323895,
-      "bookmarks": 323895,
+      "likes": 323900,
+      "bookmarks": 323900,
       "ratingAvg": 5,
-      "ratingCount": 103646,
+      "ratingCount": 103648,
       "ratingDist": [
         0,
         0,
         111,
         16449,
-        87087
+        87088
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1702,16 +1702,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13381599,
-      "likes": 73921,
-      "bookmarks": 73921,
+      "likes": 73926,
+      "bookmarks": 73926,
       "ratingAvg": 4.8,
-      "ratingCount": 23655,
+      "ratingCount": 23656,
       "ratingDist": [
         0,
         0,
         83,
-        6339,
-        17232
+        6340,
+        17233
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1754,16 +1754,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13319379,
-      "likes": 547673,
-      "bookmarks": 547673,
+      "likes": 547715,
+      "bookmarks": 547715,
       "ratingAvg": 5,
-      "ratingCount": 175255,
+      "ratingCount": 175269,
       "ratingDist": [
         0,
         0,
         187,
-        27813,
-        147255
+        27815,
+        147266
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1813,16 +1813,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 12394615,
-      "likes": 78874,
-      "bookmarks": 78874,
+      "likes": 78877,
+      "bookmarks": 78877,
       "ratingAvg": 5,
-      "ratingCount": 25240,
+      "ratingCount": 25241,
       "ratingDist": [
         0,
         0,
         27,
         4006,
-        21207
+        21208
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1865,16 +1865,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 11202926,
-      "likes": 376551,
-      "bookmarks": 376551,
+      "likes": 376593,
+      "bookmarks": 376593,
       "ratingAvg": 4.7,
-      "ratingCount": 120496,
+      "ratingCount": 120510,
       "ratingDist": [
         0,
         0,
         744,
-        40625,
-        79127
+        40630,
+        79136
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1919,16 +1919,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 10409921,
-      "likes": 705687,
-      "bookmarks": 705687,
+      "likes": 705795,
+      "bookmarks": 705795,
       "ratingAvg": 4.8,
-      "ratingCount": 225820,
+      "ratingCount": 225854,
       "ratingDist": [
         0,
         0,
         794,
-        60519,
-        164507
+        60528,
+        164532
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1977,10 +1977,10 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 9610578,
-      "likes": 313826,
-      "bookmarks": 313826,
+      "likes": 313821,
+      "bookmarks": 313821,
       "ratingAvg": 5,
-      "ratingCount": 100424,
+      "ratingCount": 100423,
       "ratingDist": [
         0,
         0,
@@ -1989,7 +1989,7 @@ export const TITLES: Title[] = [
         84379
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2035,16 +2035,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1464454,
-      "likes": 599348,
-      "bookmarks": 599348,
+      "likes": 599393,
+      "bookmarks": 599393,
       "ratingAvg": 4.9,
-      "ratingCount": 191791,
+      "ratingCount": 191806,
       "ratingDist": [
         0,
         0,
-        375,
-        39931,
-        151485
+        376,
+        39934,
+        151496
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2093,19 +2093,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 294030,
-      "likes": 729165,
-      "bookmarks": 729165,
+      "likes": 729160,
+      "bookmarks": 729160,
       "ratingAvg": 5,
-      "ratingCount": 233333,
+      "ratingCount": 233331,
       "ratingDist": [
         0,
         0,
         250,
-        37030,
-        196054
+        37029,
+        196052
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2151,16 +2151,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 196130,
-      "bookmarks": 196130,
+      "likes": 196301,
+      "bookmarks": 196301,
       "ratingAvg": 5,
-      "ratingCount": 62762,
+      "ratingCount": 62816,
       "ratingDist": [
         0,
         0,
         67,
-        9960,
-        52735
+        9969,
+        52780
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2210,16 +2210,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 250704,
-      "bookmarks": 250704,
+      "likes": 250820,
+      "bookmarks": 250820,
       "ratingAvg": 5,
-      "ratingCount": 80225,
+      "ratingCount": 80262,
       "ratingDist": [
         0,
         0,
         86,
-        12732,
-        67408
+        12738,
+        67439
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2269,16 +2269,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 959501,
-      "bookmarks": 959501,
+      "likes": 959536,
+      "bookmarks": 959536,
       "ratingAvg": 4.9,
-      "ratingCount": 307040,
+      "ratingCount": 307052,
       "ratingDist": [
         0,
         0,
         601,
-        63926,
-        242513
+        63928,
+        242522
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2325,16 +2325,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 345261,
-      "bookmarks": 345261,
+      "likes": 345510,
+      "bookmarks": 345510,
       "ratingAvg": 5,
-      "ratingCount": 110484,
+      "ratingCount": 110563,
       "ratingDist": [
         0,
         0,
         118,
-        17534,
-        92832
+        17546,
+        92898
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2384,16 +2384,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 304158,
-      "bookmarks": 304158,
+      "likes": 304244,
+      "bookmarks": 304244,
       "ratingAvg": 5,
-      "ratingCount": 97331,
+      "ratingCount": 97358,
       "ratingDist": [
         0,
         0,
         104,
-        15446,
-        81781
+        15451,
+        81803
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2443,16 +2443,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 507804,
-      "bookmarks": 507804,
+      "likes": 507817,
+      "bookmarks": 507817,
       "ratingAvg": 4.9,
-      "ratingCount": 162497,
+      "ratingCount": 162501,
       "ratingDist": [
         0,
         0,
         318,
-        33832,
-        128347
+        33833,
+        128350
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2501,16 +2501,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 739536,
-      "bookmarks": 739536,
+      "likes": 739549,
+      "bookmarks": 739549,
       "ratingAvg": 5,
-      "ratingCount": 236652,
+      "ratingCount": 236656,
       "ratingDist": [
         0,
         0,
         253,
-        37556,
-        198842
+        37557,
+        198846
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2559,16 +2559,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 362365,
-      "bookmarks": 362365,
+      "likes": 362429,
+      "bookmarks": 362429,
       "ratingAvg": 5,
-      "ratingCount": 115957,
+      "ratingCount": 115977,
       "ratingDist": [
         0,
         0,
         124,
-        18402,
-        97431
+        18405,
+        97447
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2618,16 +2618,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 23195,
-      "bookmarks": 23195,
+      "likes": 23234,
+      "bookmarks": 23234,
       "ratingAvg": 4.8,
-      "ratingCount": 7422,
+      "ratingCount": 7435,
       "ratingDist": [
         0,
         0,
         26,
-        1989,
-        5407
+        1993,
+        5416
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2677,16 +2677,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 167699,
-      "bookmarks": 167699,
+      "likes": 167769,
+      "bookmarks": 167769,
       "ratingAvg": 5,
-      "ratingCount": 53664,
+      "ratingCount": 53686,
       "ratingDist": [
         0,
         0,
         57,
-        8516,
-        45090
+        8520,
+        45109
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2737,16 +2737,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70645,
-      "bookmarks": 70645,
+      "likes": 70675,
+      "bookmarks": 70675,
       "ratingAvg": 5,
-      "ratingCount": 22606,
+      "ratingCount": 22616,
       "ratingDist": [
         0,
         0,
         24,
-        3588,
-        18994
+        3589,
+        19003
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2795,16 +2795,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 287534,
-      "bookmarks": 287534,
+      "likes": 287603,
+      "bookmarks": 287603,
       "ratingAvg": 5,
-      "ratingCount": 92011,
+      "ratingCount": 92033,
       "ratingDist": [
         0,
         0,
         98,
-        14602,
-        77311
+        14606,
+        77329
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2854,16 +2854,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 174239,
-      "bookmarks": 174239,
+      "likes": 174290,
+      "bookmarks": 174290,
       "ratingAvg": 4.9,
-      "ratingCount": 55756,
+      "ratingCount": 55773,
       "ratingDist": [
         0,
         0,
         109,
-        11608,
-        44038
+        11612,
+        44052
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2910,16 +2910,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 156044,
-      "bookmarks": 156044,
+      "likes": 156078,
+      "bookmarks": 156078,
       "ratingAvg": 5,
-      "ratingCount": 49934,
+      "ratingCount": 49945,
       "ratingDist": [
         0,
         0,
         53,
-        7924,
-        41956
+        7926,
+        41965
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2968,16 +2968,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 51215,
-      "bookmarks": 51215,
+      "likes": 51550,
+      "bookmarks": 51550,
       "ratingAvg": 4.9,
-      "ratingCount": 16389,
+      "ratingCount": 16496,
       "ratingDist": [
         0,
         0,
         32,
-        3412,
-        12945
+        3434,
+        13029
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -2985,65 +2985,6 @@ export const TITLES: Title[] = [
       "bingeIndex": 96
     },
     "featured": false
-  },
-  {
-    "id": "nw-825332",
-    "slug": "nw-825332",
-    "type": "webtoon",
-    "title": "아포칼립스에 집을 숨김",
-    "author": "DD",
-    "artist": "송지형",
-    "genres": [
-      "액션"
-    ],
-    "tags": [
-      "액션",
-      "생존",
-      "크리처",
-      "고인물",
-      "서바이벌",
-      "아포칼립스"
-    ],
-    "synopsis": "3년 뒤, 이 세상이 멸망하리라 예측하고 온갖 대비를 해온 '멸망주의자' 박규. 그리고 그의 예상대로, 어느 날 서울 핵 공습을 시작으로 전 세계는 핵 전쟁에 돌입. 미증유의 아포칼립스가 펼쳐진다. 모두의 비웃음에도 불구하고 전 재산을 털어 3년 전부터 묵묵히 자신만의 방공호를 파내려 간 보람이 있는 주인공 박규. 과연 그가 이 모든 일들을 내다본 것은 단순한 우연의 일치일까?",
-    "cover": [
-      "oklch(0.45 0.14 12)",
-      "oklch(0.28 0.1 52)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2024,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=825332"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 126787,
-      "bookmarks": 126787,
-      "ratingAvg": 4.9,
-      "ratingCount": 40572,
-      "ratingDist": [
-        0,
-        0,
-        79,
-        8447,
-        32045
-      ],
-      "rankDelta": 0,
-      "trendingScore": 50,
-      "completionRate": 92,
-      "bingeIndex": 96
-    },
-    "featured": false,
-    "adaptedFrom": "nv-697669952"
   },
   {
     "id": "nw-834686",
@@ -3086,16 +3027,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66851,
-      "bookmarks": 66851,
+      "likes": 66950,
+      "bookmarks": 66950,
       "ratingAvg": 4.9,
-      "ratingCount": 21392,
+      "ratingCount": 21424,
       "ratingDist": [
         0,
         0,
         42,
-        4454,
-        16896
+        4460,
+        16922
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3104,6 +3045,65 @@ export const TITLES: Title[] = [
     },
     "featured": false,
     "adaptedFrom": "nv-365493576"
+  },
+  {
+    "id": "nw-825332",
+    "slug": "nw-825332",
+    "type": "webtoon",
+    "title": "아포칼립스에 집을 숨김",
+    "author": "DD",
+    "artist": "송지형",
+    "genres": [
+      "액션"
+    ],
+    "tags": [
+      "액션",
+      "생존",
+      "크리처",
+      "고인물",
+      "서바이벌",
+      "아포칼립스"
+    ],
+    "synopsis": "3년 뒤, 이 세상이 멸망하리라 예측하고 온갖 대비를 해온 '멸망주의자' 박규. 그리고 그의 예상대로, 어느 날 서울 핵 공습을 시작으로 전 세계는 핵 전쟁에 돌입. 미증유의 아포칼립스가 펼쳐진다. 모두의 비웃음에도 불구하고 전 재산을 털어 3년 전부터 묵묵히 자신만의 방공호를 파내려 간 보람이 있는 주인공 박규. 과연 그가 이 모든 일들을 내다본 것은 단순한 우연의 일치일까?",
+    "cover": [
+      "oklch(0.45 0.14 12)",
+      "oklch(0.28 0.1 52)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2024,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=825332"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 126840,
+      "bookmarks": 126840,
+      "ratingAvg": 4.9,
+      "ratingCount": 40589,
+      "ratingDist": [
+        0,
+        0,
+        79,
+        8451,
+        32059
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 92,
+      "bingeIndex": 96
+    },
+    "featured": false,
+    "adaptedFrom": "nv-697669952"
   },
   {
     "id": "nw-849510",
@@ -3145,16 +3145,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70800,
-      "bookmarks": 70800,
+      "likes": 71118,
+      "bookmarks": 71118,
       "ratingAvg": 4.9,
-      "ratingCount": 22656,
+      "ratingCount": 22758,
       "ratingDist": [
         0,
         0,
-        44,
-        4717,
-        17895
+        45,
+        4738,
+        17975
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3204,16 +3204,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 90736,
-      "bookmarks": 90736,
+      "likes": 90823,
+      "bookmarks": 90823,
       "ratingAvg": 5,
-      "ratingCount": 29036,
+      "ratingCount": 29063,
       "ratingDist": [
         0,
         0,
         31,
-        4608,
-        24397
+        4612,
+        24420
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3263,16 +3263,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 317660,
-      "bookmarks": 317660,
+      "likes": 317720,
+      "bookmarks": 317720,
       "ratingAvg": 5,
-      "ratingCount": 101651,
+      "ratingCount": 101670,
       "ratingDist": [
         0,
         0,
         109,
-        16132,
-        85410
+        16135,
+        85426
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3321,16 +3321,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 19285,
-      "bookmarks": 19285,
+      "likes": 19414,
+      "bookmarks": 19414,
       "ratingAvg": 4.8,
-      "ratingCount": 6171,
+      "ratingCount": 6212,
       "ratingDist": [
         0,
         0,
         22,
-        1654,
-        4495
+        1665,
+        4525
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -3379,16 +3379,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 91839,
-      "bookmarks": 91839,
+      "likes": 91930,
+      "bookmarks": 91930,
       "ratingAvg": 5,
-      "ratingCount": 29388,
+      "ratingCount": 29418,
       "ratingDist": [
         0,
         0,
         31,
-        4664,
-        24693
+        4669,
+        24718
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3438,16 +3438,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 389009,
-      "bookmarks": 389009,
+      "likes": 389024,
+      "bookmarks": 389024,
       "ratingAvg": 4.9,
-      "ratingCount": 124483,
+      "ratingCount": 124488,
       "ratingDist": [
         0,
         0,
         244,
-        25917,
-        98322
+        25918,
+        98326
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3496,16 +3496,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 293591,
-      "bookmarks": 293591,
+      "likes": 293717,
+      "bookmarks": 293717,
       "ratingAvg": 5,
-      "ratingCount": 93949,
+      "ratingCount": 93989,
       "ratingDist": [
         0,
         0,
-        100,
-        14910,
-        78939
+        101,
+        14916,
+        78972
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3554,16 +3554,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 47996,
-      "bookmarks": 47996,
+      "likes": 48074,
+      "bookmarks": 48074,
       "ratingAvg": 4.9,
-      "ratingCount": 15359,
+      "ratingCount": 15384,
       "ratingDist": [
         0,
         0,
         30,
-        3198,
-        12131
+        3203,
+        12151
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3612,16 +3612,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 37091,
-      "bookmarks": 37091,
+      "likes": 37117,
+      "bookmarks": 37117,
       "ratingAvg": 5,
-      "ratingCount": 11869,
+      "ratingCount": 11877,
       "ratingDist": [
         0,
         0,
         13,
-        1884,
-        9973
+        1885,
+        9979
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3670,16 +3670,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 107745,
-      "bookmarks": 107745,
+      "likes": 107820,
+      "bookmarks": 107820,
       "ratingAvg": 5,
-      "ratingCount": 34478,
+      "ratingCount": 34502,
       "ratingDist": [
         0,
         0,
         37,
-        5472,
-        28969
+        5475,
+        28990
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3730,16 +3730,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 118816,
-      "bookmarks": 118816,
+      "likes": 118820,
+      "bookmarks": 118820,
       "ratingAvg": 5,
-      "ratingCount": 38021,
+      "ratingCount": 38022,
       "ratingDist": [
         0,
         0,
         41,
         6034,
-        31946
+        31947
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3789,16 +3789,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 70947,
-      "bookmarks": 70947,
+      "likes": 70970,
+      "bookmarks": 70970,
       "ratingAvg": 4.9,
-      "ratingCount": 22703,
+      "ratingCount": 22710,
       "ratingDist": [
         0,
         0,
         44,
-        4727,
-        17932
+        4728,
+        17937
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3848,16 +3848,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66288,
-      "bookmarks": 66288,
+      "likes": 66374,
+      "bookmarks": 66374,
       "ratingAvg": 4.9,
-      "ratingCount": 21212,
+      "ratingCount": 21240,
       "ratingDist": [
         0,
         0,
         42,
-        4416,
-        16754
+        4422,
+        16776
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3904,16 +3904,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 279781,
-      "bookmarks": 279781,
+      "likes": 279799,
+      "bookmarks": 279799,
       "ratingAvg": 4.9,
-      "ratingCount": 89530,
+      "ratingCount": 89536,
       "ratingDist": [
         0,
         0,
         175,
-        18640,
-        70715
+        18641,
+        70719
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3962,16 +3962,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 94643,
-      "bookmarks": 94643,
+      "likes": 94666,
+      "bookmarks": 94666,
       "ratingAvg": 4.9,
-      "ratingCount": 30286,
+      "ratingCount": 30293,
       "ratingDist": [
         0,
         0,
         59,
-        6306,
-        23921
+        6307,
+        23927
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -3980,63 +3980,6 @@ export const TITLES: Title[] = [
     },
     "featured": false,
     "adaptedFrom": "nv-447779892"
-  },
-  {
-    "id": "nw-843310",
-    "slug": "nw-843310",
-    "type": "webtoon",
-    "title": "장편단편선",
-    "author": "기주주",
-    "artist": "기주주",
-    "genres": [
-      "드라마"
-    ],
-    "tags": [
-      "드라마",
-      "흑백",
-      "독자PICK",
-      "로맨스",
-      "괴담"
-    ],
-    "synopsis": "장편의 감상이 느껴지는 다양한 장르의 단편 모음집. 스릴러와 개그, 드라마와 로맨스 등 장르를 넘나드는 다양한 단편을 한 번에 즐겨보세요.",
-    "cover": [
-      "oklch(0.45 0.14 35)",
-      "oklch(0.28 0.1 75)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F843310%2Fthumbnail%2Fthumbnail_IMAG21_3cf6d1eb-a9e8-4c2b-8598-fbe7c57e4b04.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2025,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=843310"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 83224,
-      "bookmarks": 83224,
-      "ratingAvg": 5,
-      "ratingCount": 26632,
-      "ratingDist": [
-        0,
-        0,
-        28,
-        4226,
-        22377
-      ],
-      "rankDelta": 0,
-      "trendingScore": 50,
-      "completionRate": 93,
-      "bingeIndex": 97
-    },
-    "featured": false
   },
   {
     "id": "nw-845531",
@@ -4078,16 +4021,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 139928,
-      "bookmarks": 139928,
+      "likes": 140774,
+      "bookmarks": 140774,
       "ratingAvg": 5,
-      "ratingCount": 44777,
+      "ratingCount": 45048,
       "ratingDist": [
         0,
         0,
         48,
-        7106,
-        37623
+        7149,
+        37851
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4096,6 +4039,63 @@ export const TITLES: Title[] = [
     },
     "featured": false,
     "adaptedFrom": "nv-800959187"
+  },
+  {
+    "id": "nw-843310",
+    "slug": "nw-843310",
+    "type": "webtoon",
+    "title": "장편단편선",
+    "author": "기주주",
+    "artist": "기주주",
+    "genres": [
+      "드라마"
+    ],
+    "tags": [
+      "드라마",
+      "흑백",
+      "독자PICK",
+      "로맨스",
+      "괴담"
+    ],
+    "synopsis": "장편의 감상이 느껴지는 다양한 장르의 단편 모음집. 스릴러와 개그, 드라마와 로맨스 등 장르를 넘나드는 다양한 단편을 한 번에 즐겨보세요.",
+    "cover": [
+      "oklch(0.45 0.14 35)",
+      "oklch(0.28 0.1 75)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F843310%2Fthumbnail%2Fthumbnail_IMAG21_3cf6d1eb-a9e8-4c2b-8598-fbe7c57e4b04.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2025,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=843310"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 83295,
+      "bookmarks": 83295,
+      "ratingAvg": 5,
+      "ratingCount": 26654,
+      "ratingDist": [
+        0,
+        0,
+        29,
+        4230,
+        22396
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
+    },
+    "featured": false
   },
   {
     "id": "nw-832243",
@@ -4132,16 +4132,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 100553,
-      "bookmarks": 100553,
+      "likes": 100557,
+      "bookmarks": 100557,
       "ratingAvg": 4.8,
-      "ratingCount": 32177,
+      "ratingCount": 32178,
       "ratingDist": [
         0,
         0,
         113,
-        8623,
-        23440
+        8624,
+        23441
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4190,79 +4190,21 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 35990,
-      "bookmarks": 35990,
+      "likes": 36363,
+      "bookmarks": 36363,
       "ratingAvg": 4.9,
-      "ratingCount": 11517,
+      "ratingCount": 11636,
       "ratingDist": [
         0,
         0,
         23,
-        2398,
-        9097
+        2423,
+        9191
       ],
       "rankDelta": 0,
       "trendingScore": 75,
       "completionRate": 92,
       "bingeIndex": 96
-    },
-    "featured": false
-  },
-  {
-    "id": "nw-843017",
-    "slug": "nw-843017",
-    "type": "webtoon",
-    "title": "포도가 익기 전에",
-    "author": "삼태",
-    "artist": "삼태",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [
-      "로맨스",
-      "오피스",
-      "감성",
-      "드라마",
-      "오피스로맨스",
-      "성장드라마"
-    ],
-    "synopsis": "어릴적 사건으로 수영의 집에 빚을 진 태은의 아버지는 매달 100만원을 수영의 집에 보낸다. 시간이 흘러 성인이 된 두사람은 새로 부임한 팀장과 팀의 막내로 만나게 되고 아슬아슬한 회사 생활을 이어간다.. “팀장님, 저한테 왜 잘해줘요?” “너한테 빚이 있어서.” “그럼 저 왜 미워하세요?” “그게 내 빚인지는 잘 모르겠어서.”",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F843017%2Fthumbnail%2Fthumbnail_IMAG21_b411c7f4-e8ee-4bc5-868a-5a9f5cdeb0d0.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2025,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=843017"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 127590,
-      "bookmarks": 127590,
-      "ratingAvg": 5,
-      "ratingCount": 40829,
-      "ratingDist": [
-        0,
-        0,
-        44,
-        6480,
-        34306
-      ],
-      "rankDelta": 0,
-      "trendingScore": 50,
-      "completionRate": 93,
-      "bingeIndex": 97
     },
     "featured": false
   },
@@ -4306,16 +4248,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 24098,
-      "bookmarks": 24098,
+      "likes": 24297,
+      "bookmarks": 24297,
       "ratingAvg": 4.9,
-      "ratingCount": 7711,
+      "ratingCount": 7775,
       "ratingDist": [
         0,
         0,
         15,
-        1605,
-        6090
+        1619,
+        6141
       ],
       "rankDelta": 0,
       "trendingScore": 75,
@@ -4324,6 +4266,64 @@ export const TITLES: Title[] = [
     },
     "featured": false,
     "adaptedFrom": "nv-1629294240"
+  },
+  {
+    "id": "nw-843017",
+    "slug": "nw-843017",
+    "type": "webtoon",
+    "title": "포도가 익기 전에",
+    "author": "삼태",
+    "artist": "삼태",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [
+      "로맨스",
+      "오피스",
+      "감성",
+      "드라마",
+      "오피스로맨스",
+      "성장드라마"
+    ],
+    "synopsis": "어릴적 사건으로 수영의 집에 빚을 진 태은의 아버지는 매달 100만원을 수영의 집에 보낸다. 시간이 흘러 성인이 된 두사람은 새로 부임한 팀장과 팀의 막내로 만나게 되고 아슬아슬한 회사 생활을 이어간다.. “팀장님, 저한테 왜 잘해줘요?” “너한테 빚이 있어서.” “그럼 저 왜 미워하세요?” “그게 내 빚인지는 잘 모르겠어서.”",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F843017%2Fthumbnail%2Fthumbnail_IMAG21_b411c7f4-e8ee-4bc5-868a-5a9f5cdeb0d0.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2025,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=843017"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 127692,
+      "bookmarks": 127692,
+      "ratingAvg": 5,
+      "ratingCount": 40861,
+      "ratingDist": [
+        0,
+        0,
+        44,
+        6485,
+        34333
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
+    },
+    "featured": false
   },
   {
     "id": "nw-842977",
@@ -4365,16 +4365,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 54782,
-      "bookmarks": 54782,
+      "likes": 54793,
+      "bookmarks": 54793,
       "ratingAvg": 4.8,
-      "ratingCount": 17530,
+      "ratingCount": 17534,
       "ratingDist": [
         0,
         0,
         62,
-        4698,
-        12770
+        4699,
+        12773
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4424,16 +4424,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 29316,
-      "bookmarks": 29316,
+      "likes": 29325,
+      "bookmarks": 29325,
       "ratingAvg": 5,
-      "ratingCount": 9381,
+      "ratingCount": 9384,
       "ratingDist": [
         0,
         0,
         10,
         1489,
-        7882
+        7885
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4482,16 +4482,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 186271,
-      "bookmarks": 186271,
+      "likes": 186369,
+      "bookmarks": 186369,
       "ratingAvg": 5,
-      "ratingCount": 59607,
+      "ratingCount": 59638,
       "ratingDist": [
         0,
         0,
         64,
-        9460,
-        50084
+        9465,
+        50110
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4541,16 +4541,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 119619,
-      "bookmarks": 119619,
+      "likes": 119673,
+      "bookmarks": 119673,
       "ratingAvg": 4.9,
-      "ratingCount": 38278,
+      "ratingCount": 38295,
       "ratingDist": [
         0,
         0,
         75,
-        7969,
-        30234
+        7973,
+        30247
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -4560,43 +4560,43 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "ns-14171381",
-    "slug": "ns-14171381",
+    "id": "ns-14202100",
+    "slug": "ns-14202100",
     "type": "webnovel",
-    "title": "내가 숨긴 아이",
+    "title": "설맹 (Snow Blind)",
     "author": "미상",
     "genres": [
       "로맨스"
     ],
     "tags": [],
-    "synopsis": "내가 숨긴 아이 · 네이버 시리즈 인기 웹소설.",
+    "synopsis": "설맹 (Snow Blind) · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260515_144%2Fpocket_1778821049225PteGo_JPEG%2F%25B3%25BB%25B0%25A1_%25BC%25FB%25B1%25E4_%25BE%25C6%25C0%25CC_15%25BC%25BC_%25BF%25CF%2528260511%2529.jpg%3Ftype%3Dm79",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
     "status": "ongoing",
-    "ageRating": "all",
+    "ageRating": "19",
     "releaseYear": 2022,
     "availability": [
       {
         "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14171381"
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14202100"
       }
     ],
     "stats": {
-      "views": 9255740,
-      "likes": 462787,
-      "bookmarks": 462787,
+      "views": 9463616,
+      "likes": 473181,
+      "bookmarks": 473181,
       "ratingAvg": 4.6,
-      "ratingCount": 185115,
+      "ratingCount": 189272,
       "ratingDist": [
         0,
         2,
-        1954,
-        76456,
-        106703
+        1998,
+        78173,
+        109099
       ],
       "rankDelta": 0,
       "trendingScore": 92,
@@ -4606,43 +4606,43 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "ns-13509236",
-    "slug": "ns-13509236",
+    "id": "ns-14190439",
+    "slug": "ns-14190439",
     "type": "webnovel",
-    "title": "네 동생한테 제대로 먹혔어!",
+    "title": "남사친의 취향",
     "author": "미상",
     "genres": [
       "로맨스"
     ],
     "tags": [],
-    "synopsis": "네 동생한테 제대로 먹혔어! · 네이버 시리즈 인기 웹소설.",
+    "synopsis": "남사친의 취향 · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260525_149%2Fpocket_1779716336959avHly_JPEG%2F1779716336736.jpg%3Ftype%3Dm79",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
     "status": "ongoing",
-    "ageRating": "all",
+    "ageRating": "19",
     "releaseYear": 2022,
     "availability": [
       {
         "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13509236"
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14190439"
       }
     ],
     "stats": {
-      "views": 9220247,
-      "likes": 461012,
-      "bookmarks": 461012,
+      "views": 9387675,
+      "likes": 469384,
+      "bookmarks": 469384,
       "ratingAvg": 4.56,
-      "ratingCount": 184405,
+      "ratingCount": 187754,
       "ratingDist": [
         0,
-        2,
-        2393,
-        81934,
-        100075
+        3,
+        2437,
+        83422,
+        101892
       ],
       "rankDelta": 0,
       "trendingScore": 91,
@@ -4652,21 +4652,21 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "ns-14201478",
-    "slug": "ns-14201478",
+    "id": "ns-11845714",
+    "slug": "ns-11845714",
     "type": "webnovel",
-    "title": "당신의 남편은 오늘도 회식 중이죠?",
+    "title": "써머 어게인",
     "author": "미상",
     "genres": [
       "로맨스"
     ],
     "tags": [],
-    "synopsis": "당신의 남편은 오늘도 회식 중이죠? · 네이버 시리즈 인기 웹소설.",
+    "synopsis": "써머 어게인 · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260521_21%2Fpocket_1779347548003cIzfz_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20241111_150%2Fpocket_1731306955814zFVDi_JPEG%2F%25BD%25E1%25B8%25D3%25BE%25EE%25B0%25D4%25C0%25CE%2528%25B3%25B2%25C1%25D6v%2529_1%25BA%25CE.jpg%3Ftype%3Dm79",
     "status": "ongoing",
     "ageRating": "all",
     "releaseYear": 2022,
@@ -4674,21 +4674,21 @@ export const TITLES: Title[] = [
       {
         "platformId": "naver-series",
         "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14201478"
+        "url": "https://series.naver.com/novel/detail.series?productNo=11845714"
       }
     ],
     "stats": {
-      "views": 9190299,
-      "likes": 459515,
-      "bookmarks": 459515,
+      "views": 8856801,
+      "likes": 442840,
+      "bookmarks": 442840,
       "ratingAvg": 4.52,
-      "ratingCount": 183806,
+      "ratingCount": 177136,
       "ratingDist": [
         0,
         3,
-        2918,
-        87429,
-        93456
+        2812,
+        84256,
+        90065
       ],
       "rankDelta": 0,
       "trendingScore": 90,
@@ -4698,43 +4698,43 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "ns-14169147",
-    "slug": "ns-14169147",
+    "id": "ns-14202094",
+    "slug": "ns-14202094",
     "type": "webnovel",
-    "title": "7년 연애, 그리고 내 직장 동료와 바람이 났다",
+    "title": "발화(發火)",
     "author": "미상",
     "genres": [
       "로맨스"
     ],
     "tags": [],
-    "synopsis": "7년 연애, 그리고 내 직장 동료와 바람이 났다 · 네이버 시리즈 인기 웹소설.",
+    "synopsis": "발화(發火) · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260529_138%2Fpocket_1780029416536H21Fg_PNG%2F1780029415912.png%3Ftype%3Dm79",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
     "status": "ongoing",
-    "ageRating": "all",
+    "ageRating": "19",
     "releaseYear": 2022,
     "availability": [
       {
         "platformId": "naver-series",
         "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14169147"
+        "url": "https://series.naver.com/novel/detail.series?productNo=14202094"
       }
     ],
     "stats": {
-      "views": 8792973,
-      "likes": 439649,
-      "bookmarks": 439649,
+      "views": 9014294,
+      "likes": 450715,
+      "bookmarks": 450715,
       "ratingAvg": 4.4799999999999995,
-      "ratingCount": 175860,
+      "ratingCount": 180286,
       "ratingDist": [
         0,
         5,
-        3398,
-        89102,
-        83356
+        3483,
+        91345,
+        85453
       ],
       "rankDelta": 0,
       "trendingScore": 89,
@@ -4790,16 +4790,16 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "ns-14202079",
-    "slug": "ns-14202079",
+    "id": "ns-14202112",
+    "slug": "ns-14202112",
     "type": "webnovel",
-    "title": "캄캄해진 뒤에야 보이는",
+    "title": "백아",
     "author": "미상",
     "genres": [
       "로맨스"
     ],
     "tags": [],
-    "synopsis": "캄캄해진 뒤에야 보이는 · 네이버 시리즈 인기 웹소설.",
+    "synopsis": "백아 · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
@@ -4812,70 +4812,24 @@ export const TITLES: Title[] = [
       {
         "platformId": "naver-series",
         "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14202079"
+        "url": "https://series.naver.com/novel/detail.series?productNo=14202112"
       }
     ],
     "stats": {
-      "views": 8714351,
-      "likes": 435718,
-      "bookmarks": 435718,
+      "views": 8713583,
+      "likes": 435679,
+      "bookmarks": 435679,
       "ratingAvg": 4.3999999999999995,
-      "ratingCount": 174287,
+      "ratingCount": 174272,
       "ratingDist": [
         0,
         9,
         4912,
-        98668,
-        70698
+        98659,
+        70692
       ],
       "rankDelta": 0,
       "trendingScore": 87,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-11423641",
-    "slug": "ns-11423641",
-    "type": "webnovel",
-    "title": "구단버스 불태워도 되나요?",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "구단버스 불태워도 되나요? · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=11423641"
-      }
-    ],
-    "stats": {
-      "views": 8732702,
-      "likes": 436635,
-      "bookmarks": 436635,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 174654,
-      "ratingDist": [
-        0,
-        12,
-        5900,
-        103708,
-        65034
-      ],
-      "rankDelta": 0,
-      "trendingScore": 86,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4908,22 +4862,298 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8290418,
-      "likes": 414521,
-      "bookmarks": 414521,
+      "views": 8440418,
+      "likes": 422021,
+      "bookmarks": 422021,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 168808,
+      "ratingDist": [
+        0,
+        12,
+        5702,
+        100237,
+        62857
+      ],
+      "rankDelta": 0,
+      "trendingScore": 86,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14171381",
+    "slug": "ns-14171381",
+    "type": "webnovel",
+    "title": "내가 숨긴 아이",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "내가 숨긴 아이 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260515_144%2Fpocket_1778821049225PteGo_JPEG%2F%25B3%25BB%25B0%25A1_%25BC%25FB%25B1%25E4_%25BE%25C6%25C0%25CC_15%25BC%25BC_%25BF%25CF%2528260511%2529.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14171381"
+      }
+    ],
+    "stats": {
+      "views": 8205740,
+      "likes": 410287,
+      "bookmarks": 410287,
       "ratingAvg": 4.319999999999999,
-      "ratingCount": 165808,
+      "ratingCount": 164115,
       "ratingDist": [
         0,
         15,
-        6678,
-        102733,
-        56381
+        6610,
+        101684,
+        55806
       ],
       "rankDelta": 0,
       "trendingScore": 85,
       "completionRate": 72,
       "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-13509236",
+    "slug": "ns-13509236",
+    "type": "webnovel",
+    "title": "네 동생한테 제대로 먹혔어!",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "네 동생한테 제대로 먹혔어! · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260525_149%2Fpocket_1779716336959avHly_JPEG%2F1779716336736.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=13509236"
+      }
+    ],
+    "stats": {
+      "views": 8170247,
+      "likes": 408512,
+      "bookmarks": 408512,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 163405,
+      "ratingDist": [
+        0,
+        21,
+        7806,
+        105099,
+        50479
+      ],
+      "rankDelta": 0,
+      "trendingScore": 84,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14201478",
+    "slug": "ns-14201478",
+    "type": "webnovel",
+    "title": "당신의 남편은 오늘도 회식 중이죠?",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "당신의 남편은 오늘도 회식 중이죠? · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260521_21%2Fpocket_1779347548003cIzfz_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14201478"
+      }
+    ],
+    "stats": {
+      "views": 8140299,
+      "likes": 407015,
+      "bookmarks": 407015,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 162806,
+      "ratingDist": [
+        0,
+        28,
+        9178,
+        108143,
+        45458
+      ],
+      "rankDelta": 0,
+      "trendingScore": 83,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14169147",
+    "slug": "ns-14169147",
+    "type": "webnovel",
+    "title": "7년 연애, 그리고 내 직장 동료와 바람이 났다",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "7년 연애, 그리고 내 직장 동료와 바람이 났다 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260529_138%2Fpocket_1780029416536H21Fg_PNG%2F1780029415912.png%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14169147"
+      }
+    ],
+    "stats": {
+      "views": 7742973,
+      "likes": 387149,
+      "bookmarks": 387149,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 154860,
+      "ratingDist": [
+        0,
+        35,
+        10249,
+        105693,
+        38882
+      ],
+      "rankDelta": 0,
+      "trendingScore": 82,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14202079",
+    "slug": "ns-14202079",
+    "type": "webnovel",
+    "title": "캄캄해진 뒤에야 보이는",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "캄캄해진 뒤에야 보이는 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14202079"
+      }
+    ],
+    "stats": {
+      "views": 7814351,
+      "likes": 390718,
+      "bookmarks": 390718,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 156287,
+      "ratingDist": [
+        0,
+        48,
+        12083,
+        109048,
+        35109
+      ],
+      "rankDelta": 0,
+      "trendingScore": 81,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-11423641",
+    "slug": "ns-11423641",
+    "type": "webnovel",
+    "title": "구단버스 불태워도 되나요?",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "구단버스 불태워도 되나요? · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=11423641"
+      }
+    ],
+    "stats": {
+      "views": 7832702,
+      "likes": 391635,
+      "bookmarks": 391635,
+      "ratingAvg": 4.6,
+      "ratingCount": 156654,
+      "ratingDist": [
+        0,
+        2,
+        1654,
+        64701,
+        90298
+      ],
+      "rankDelta": 0,
+      "trendingScore": 80,
+      "completionRate": 72,
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -4954,22 +5184,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7982040,
-      "likes": 399102,
-      "bookmarks": 399102,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 159641,
+      "views": 7232040,
+      "likes": 361602,
+      "bookmarks": 361602,
+      "ratingAvg": 4.56,
+      "ratingCount": 144641,
       "ratingDist": [
         0,
-        20,
-        7626,
-        102678,
-        49317
+        2,
+        1877,
+        64267,
+        78495
       ],
       "rankDelta": 0,
-      "trendingScore": 84,
+      "trendingScore": 79,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5000,22 +5230,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8296879,
-      "likes": 414844,
-      "bookmarks": 414844,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 165938,
+      "views": 7546879,
+      "likes": 377344,
+      "bookmarks": 377344,
+      "ratingAvg": 4.52,
+      "ratingCount": 150938,
       "ratingDist": [
         0,
-        28,
-        9354,
-        110223,
-        46332
+        3,
+        2396,
+        71795,
+        76744
       ],
       "rankDelta": 0,
-      "trendingScore": 83,
+      "trendingScore": 78,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5046,22 +5276,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7992353,
-      "likes": 399618,
-      "bookmarks": 399618,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 159847,
+      "views": 7242353,
+      "likes": 362118,
+      "bookmarks": 362118,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 144847,
       "ratingDist": [
         0,
-        37,
-        10579,
-        109097,
-        40134
+        4,
+        2799,
+        73389,
+        68656
       ],
       "rankDelta": 0,
-      "trendingScore": 82,
+      "trendingScore": 77,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5092,22 +5322,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7644899,
-      "likes": 382245,
-      "bookmarks": 382245,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 152898,
+      "views": 6894899,
+      "likes": 344745,
+      "bookmarks": 344745,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 137898,
       "ratingDist": [
         0,
-        47,
-        11821,
-        106683,
-        34347
+        5,
+        3226,
+        74044,
+        60622
       ],
       "rankDelta": 0,
-      "trendingScore": 81,
+      "trendingScore": 76,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5138,22 +5368,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7688411,
-      "likes": 384421,
-      "bookmarks": 384421,
-      "ratingAvg": 4.6,
-      "ratingCount": 153768,
+      "views": 6938411,
+      "likes": 346921,
+      "bookmarks": 346921,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 138768,
       "ratingDist": [
         0,
-        1,
-        1623,
-        63509,
-        88634
+        7,
+        3911,
+        78559,
+        56290
       ],
       "rankDelta": 0,
-      "trendingScore": 80,
+      "trendingScore": 75,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5184,22 +5414,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7569292,
-      "likes": 378465,
-      "bookmarks": 378465,
-      "ratingAvg": 4.56,
-      "ratingCount": 151386,
+      "views": 6819292,
+      "likes": 340965,
+      "bookmarks": 340965,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 136386,
       "ratingDist": [
         0,
-        2,
-        1965,
-        67264,
-        82156
+        9,
+        4607,
+        80985,
+        50785
       ],
       "rankDelta": 0,
-      "trendingScore": 79,
+      "trendingScore": 74,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5230,22 +5460,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7418325,
-      "likes": 370916,
-      "bookmarks": 370916,
-      "ratingAvg": 4.52,
-      "ratingCount": 148366,
+      "views": 6668325,
+      "likes": 333416,
+      "bookmarks": 333416,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 133366,
       "ratingDist": [
         0,
-        3,
-        2355,
-        70571,
-        75437
+        12,
+        5371,
+        82633,
+        45350
       ],
       "rankDelta": 0,
-      "trendingScore": 78,
+      "trendingScore": 73,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5276,22 +5506,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7304138,
-      "likes": 365207,
-      "bookmarks": 365207,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 146083,
+      "views": 6554138,
+      "likes": 327707,
+      "bookmarks": 327707,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 131083,
       "ratingDist": [
         0,
-        4,
-        2822,
-        74015,
-        69242
+        17,
+        6262,
+        84310,
+        40494
       ],
       "rankDelta": 0,
-      "trendingScore": 77,
+      "trendingScore": 72,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5322,22 +5552,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7017483,
-      "likes": 350874,
-      "bookmarks": 350874,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 140350,
+      "views": 6267483,
+      "likes": 313374,
+      "bookmarks": 313374,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 125350,
       "ratingDist": [
         0,
-        5,
-        3284,
-        75361,
-        61700
+        21,
+        7066,
+        83263,
+        35000
       ],
       "rankDelta": 0,
-      "trendingScore": 76,
+      "trendingScore": 71,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5368,22 +5598,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6882143,
-      "likes": 344107,
-      "bookmarks": 344107,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 137643,
+      "views": 6132143,
+      "likes": 306607,
+      "bookmarks": 306607,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 122643,
       "ratingDist": [
         0,
-        7,
-        3880,
-        77923,
-        55834
+        28,
+        8117,
+        83705,
+        30793
       ],
       "rankDelta": 0,
-      "trendingScore": 75,
+      "trendingScore": 70,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5414,22 +5644,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6508091,
-      "likes": 325405,
-      "bookmarks": 325405,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 130162,
+      "views": 5758091,
+      "likes": 287905,
+      "bookmarks": 287905,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 115162,
       "ratingDist": [
         0,
-        9,
-        4397,
-        77289,
-        48467
+        35,
+        8903,
+        80353,
+        25870
       ],
       "rankDelta": 0,
-      "trendingScore": 74,
+      "trendingScore": 69,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5460,22 +5690,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6733387,
-      "likes": 336669,
-      "bookmarks": 336669,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 134668,
+      "views": 5983387,
+      "likes": 299169,
+      "bookmarks": 299169,
+      "ratingAvg": 4.6,
+      "ratingCount": 119668,
       "ratingDist": [
         0,
-        13,
-        5424,
-        83439,
-        45792
+        1,
+        1263,
+        49425,
+        68978
       ],
       "rankDelta": 0,
-      "trendingScore": 73,
+      "trendingScore": 68,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5506,22 +5736,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6374177,
-      "likes": 318709,
-      "bookmarks": 318709,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 127484,
+      "views": 5624177,
+      "likes": 281209,
+      "bookmarks": 281209,
+      "ratingAvg": 4.56,
+      "ratingCount": 112484,
       "ratingDist": [
         0,
-        16,
-        6090,
-        81995,
-        39383
+        2,
+        1460,
+        49979,
+        61044
       ],
       "rankDelta": 0,
-      "trendingScore": 72,
+      "trendingScore": 67,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5552,22 +5782,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6414772,
-      "likes": 320739,
-      "bookmarks": 320739,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 128296,
+      "views": 5664772,
+      "likes": 283239,
+      "bookmarks": 283239,
+      "ratingAvg": 4.52,
+      "ratingCount": 113296,
       "ratingDist": [
         0,
-        22,
-        7232,
-        85220,
-        35822
+        2,
+        1798,
+        53890,
+        57605
       ],
       "rankDelta": 0,
-      "trendingScore": 71,
+      "trendingScore": 66,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5598,22 +5828,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6055984,
-      "likes": 302799,
-      "bookmarks": 302799,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 121120,
+      "views": 5305984,
+      "likes": 265299,
+      "bookmarks": 265299,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 106120,
       "ratingDist": [
         0,
-        28,
-        8016,
-        82665,
-        30411
+        3,
+        2050,
+        53767,
+        50300
       ],
       "rankDelta": 0,
-      "trendingScore": 70,
+      "trendingScore": 65,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5644,22 +5874,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5933799,
-      "likes": 296690,
-      "bookmarks": 296690,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 118676,
+      "views": 5183799,
+      "likes": 259190,
+      "bookmarks": 259190,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 103676,
       "ratingDist": [
         0,
-        36,
-        9175,
-        82805,
-        26660
+        4,
+        2426,
+        55669,
+        45578
       ],
       "rankDelta": 0,
-      "trendingScore": 69,
+      "trendingScore": 64,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5690,22 +5920,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6092204,
-      "likes": 304610,
-      "bookmarks": 304610,
-      "ratingAvg": 4.6,
-      "ratingCount": 121844,
+      "views": 5342204,
+      "likes": 267110,
+      "bookmarks": 267110,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 106844,
       "ratingDist": [
         0,
-        1,
-        1286,
-        50324,
-        70233
+        5,
+        3011,
+        60487,
+        43341
       ],
       "rankDelta": 0,
-      "trendingScore": 68,
+      "trendingScore": 63,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5736,22 +5966,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5791833,
-      "likes": 289592,
-      "bookmarks": 289592,
-      "ratingAvg": 4.56,
-      "ratingCount": 115837,
+      "views": 5041833,
+      "likes": 252092,
+      "bookmarks": 252092,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 100837,
       "ratingDist": [
         0,
-        2,
-        1503,
-        51468,
-        62864
+        7,
+        3406,
+        59876,
+        37548
       ],
       "rankDelta": 0,
-      "trendingScore": 67,
+      "trendingScore": 62,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5782,22 +6012,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5634795,
-      "likes": 281740,
-      "bookmarks": 281740,
-      "ratingAvg": 4.52,
-      "ratingCount": 112696,
+      "views": 4884795,
+      "likes": 244240,
+      "bookmarks": 244240,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 97696,
       "ratingDist": [
         0,
-        2,
-        1789,
-        53605,
-        57300
+        9,
+        3935,
+        60532,
+        33220
       ],
       "rankDelta": 0,
-      "trendingScore": 66,
+      "trendingScore": 61,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5828,22 +6058,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5145886,
-      "likes": 257294,
-      "bookmarks": 257294,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 102918,
+      "views": 4395886,
+      "likes": 219794,
+      "bookmarks": 219794,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 87918,
       "ratingDist": [
         0,
-        3,
-        1988,
-        52145,
-        48782
+        11,
+        4200,
+        56547,
+        27160
       ],
       "rankDelta": 0,
-      "trendingScore": 65,
+      "trendingScore": 60,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5874,22 +6104,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5336359,
-      "likes": 266818,
-      "bookmarks": 266818,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 106727,
+      "views": 4586359,
+      "likes": 229318,
+      "bookmarks": 229318,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 91727,
       "ratingDist": [
         0,
-        4,
-        2497,
-        57307,
-        46919
+        16,
+        5171,
+        60929,
+        25612
       ],
       "rankDelta": 0,
-      "trendingScore": 64,
+      "trendingScore": 59,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5920,22 +6150,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4914134,
-      "likes": 245707,
-      "bookmarks": 245707,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 98283,
+      "views": 4164134,
+      "likes": 208207,
+      "bookmarks": 208207,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 83283,
       "ratingDist": [
         0,
-        5,
-        2770,
-        55640,
-        39868
+        19,
+        5512,
+        56841,
+        20911
       ],
       "rankDelta": 0,
-      "trendingScore": 63,
+      "trendingScore": 58,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5966,22 +6196,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4988121,
-      "likes": 249406,
-      "bookmarks": 249406,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 99762,
+      "views": 4238121,
+      "likes": 211906,
+      "bookmarks": 211906,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 84762,
       "ratingDist": [
         0,
-        7,
-        3370,
-        59238,
-        37147
+        26,
+        6553,
+        59142,
+        19041
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 57,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -6012,22 +6242,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4961389,
-      "likes": 248069,
-      "bookmarks": 248069,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 99228,
+      "views": 4211389,
+      "likes": 210569,
+      "bookmarks": 210569,
+      "ratingAvg": 4.6,
+      "ratingCount": 84228,
       "ratingDist": [
         0,
-        9,
-        3996,
-        61481,
-        33741
+        1,
+        889,
+        34788,
+        48550
       ],
       "rankDelta": 0,
-      "trendingScore": 61,
+      "trendingScore": 56,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -6058,22 +6288,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4394229,
-      "likes": 219711,
-      "bookmarks": 219711,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 87884,
+      "views": 3644229,
+      "likes": 182211,
+      "bookmarks": 182211,
+      "ratingAvg": 4.56,
+      "ratingCount": 72884,
       "ratingDist": [
         0,
-        11,
-        4198,
-        56525,
-        27149
+        1,
+        946,
+        32384,
+        39554
       ],
       "rankDelta": 0,
-      "trendingScore": 60,
+      "trendingScore": 55,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -6104,22 +6334,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4244170,
-      "likes": 212209,
-      "bookmarks": 212209,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 84884,
+      "views": 3494170,
+      "likes": 174709,
+      "bookmarks": 174709,
+      "ratingAvg": 4.52,
+      "ratingCount": 69884,
       "ratingDist": [
         0,
-        14,
-        4785,
-        56384,
-        23701
+        1,
+        1109,
+        33241,
+        35532
       ],
       "rankDelta": 0,
-      "trendingScore": 59,
+      "trendingScore": 54,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -6150,22 +6380,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4572884,
-      "likes": 228644,
-      "bookmarks": 228644,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 91458,
+      "views": 3822884,
+      "likes": 191144,
+      "bookmarks": 191144,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 76458,
       "ratingDist": [
         0,
-        21,
-        6053,
-        62421,
-        22963
+        2,
+        1477,
+        38739,
+        36240
       ],
       "rankDelta": 0,
-      "trendingScore": 58,
+      "trendingScore": 53,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -6196,22 +6426,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 4283925,
-      "likes": 214196,
-      "bookmarks": 214196,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 85678,
+      "views": 3533925,
+      "likes": 176696,
+      "bookmarks": 176696,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 70678,
       "ratingDist": [
         0,
-        26,
-        6624,
-        59781,
-        19247
+        3,
+        1654,
+        37951,
+        31071
       ],
       "rankDelta": 0,
-      "trendingScore": 57,
+      "trendingScore": 52,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -6242,247 +6472,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 3815835,
-      "likes": 190792,
-      "bookmarks": 190792,
-      "ratingAvg": 4.6,
-      "ratingCount": 76317,
-      "ratingDist": [
-        0,
-        1,
-        806,
-        31520,
-        43990
-      ],
-      "rankDelta": 0,
-      "trendingScore": 56,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14190107",
-    "slug": "ns-14190107",
-    "type": "webnovel",
-    "title": "망배우는 관심이 고프다",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "망배우는 관심이 고프다 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260519_154%2Fpocket_17791787858992Vest_JPEG%2F%25B8%25C1%25B9%25E8%25BF%25EC%25B4%25C2%25B0%25FC%25BD%25C9%25C0%25CC%25B0%25ED%25C7%25C1%25B4%25D9_%25C0%25FC%25C0%25DA%25C3%25A5%25C7%25A5%25C1%25F6_%25C3%25D6%25C1%25BE.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14190107"
-      }
-    ],
-    "stats": {
-      "views": 3990653,
-      "likes": 199533,
-      "bookmarks": 199533,
-      "ratingAvg": 4.56,
-      "ratingCount": 79813,
-      "ratingDist": [
-        0,
-        1,
-        1036,
-        35462,
-        43314
-      ],
-      "rankDelta": 0,
-      "trendingScore": 55,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14150652",
-    "slug": "ns-14150652",
-    "type": "webnovel",
-    "title": "서큐버스 디지즈(Succubus disease)",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "서큐버스 디지즈(Succubus disease) · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14150652"
-      }
-    ],
-    "stats": {
-      "views": 3329782,
-      "likes": 166489,
-      "bookmarks": 166489,
-      "ratingAvg": 4.52,
-      "ratingCount": 66596,
-      "ratingDist": [
-        0,
-        1,
-        1057,
-        31677,
-        33861
-      ],
-      "rankDelta": 0,
-      "trendingScore": 54,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13989140",
-    "slug": "ns-13989140",
-    "type": "webnovel",
-    "title": "파문(波紋)",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "파문(波紋) · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13989140"
-      }
-    ],
-    "stats": {
-      "views": 3416411,
-      "likes": 170821,
-      "bookmarks": 170821,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 68328,
-      "ratingDist": [
-        0,
-        2,
-        1320,
-        34619,
-        32387
-      ],
-      "rankDelta": 0,
-      "trendingScore": 53,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14183310",
-    "slug": "ns-14183310",
-    "type": "webnovel",
-    "title": "저격",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "저격 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14183310"
-      }
-    ],
-    "stats": {
-      "views": 3672855,
-      "likes": 183643,
-      "bookmarks": 183643,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 73457,
+      "views": 3065835,
+      "likes": 153292,
+      "bookmarks": 153292,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 61317,
       "ratingDist": [
         0,
         3,
-        1719,
-        39443,
-        32293
-      ],
-      "rankDelta": 0,
-      "trendingScore": 52,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14183719",
-    "slug": "ns-14183719",
-    "type": "webnovel",
-    "title": "교활한 구원",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "교활한 구원 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14183719"
-      }
-    ],
-    "stats": {
-      "views": 3519002,
-      "likes": 175950,
-      "bookmarks": 175950,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 70380,
-      "ratingDist": [
-        0,
-        4,
-        1984,
-        39844,
-        28549
+        1728,
+        34713,
+        24873
       ],
       "rankDelta": 0,
       "trendingScore": 51,
@@ -6525,17 +6525,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1504224,
-      "likes": 200563,
-      "bookmarks": 200563,
+      "views": 1504920,
+      "likes": 200656,
+      "bookmarks": 200656,
       "ratingAvg": 5,
-      "ratingCount": 80225,
+      "ratingCount": 80262,
       "ratingDist": [
         0,
         0,
         86,
-        12732,
-        67408
+        12738,
+        67439
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6578,17 +6578,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1824948,
-      "likes": 243326,
-      "bookmarks": 243326,
+      "views": 1825464,
+      "likes": 243395,
+      "bookmarks": 243395,
       "ratingAvg": 5,
-      "ratingCount": 97330,
+      "ratingCount": 97358,
       "ratingDist": [
         0,
         0,
         104,
-        15446,
-        81780
+        15451,
+        81803
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6631,17 +6631,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1006194,
-      "likes": 134159,
-      "bookmarks": 134159,
+      "views": 1006614,
+      "likes": 134215,
+      "bookmarks": 134215,
       "ratingAvg": 5,
-      "ratingCount": 53664,
+      "ratingCount": 53686,
       "ratingDist": [
         0,
         0,
         57,
-        8516,
-        45090
+        8520,
+        45109
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6683,17 +6683,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1725204,
-      "likes": 230027,
-      "bookmarks": 230027,
+      "views": 1725618,
+      "likes": 230082,
+      "bookmarks": 230082,
       "ratingAvg": 5,
-      "ratingCount": 92011,
+      "ratingCount": 92033,
       "ratingDist": [
         0,
         0,
         98,
-        14602,
-        77311
+        14606,
+        77329
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6735,69 +6735,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1045434,
-      "likes": 139391,
-      "bookmarks": 139391,
+      "views": 1045740,
+      "likes": 139432,
+      "bookmarks": 139432,
       "ratingAvg": 5,
-      "ratingCount": 55756,
+      "ratingCount": 55773,
       "ratingDist": [
         0,
         0,
         60,
-        8848,
-        46848
-      ],
-      "rankDelta": 0,
-      "trendingScore": 60,
-      "completionRate": 80,
-      "bingeIndex": 82
-    },
-    "featured": false
-  },
-  {
-    "id": "nv-697669952",
-    "slug": "nv-697669952",
-    "type": "webnovel",
-    "title": "아포칼립스에 집을 숨김",
-    "author": "로드워리어",
-    "genres": [
-      "액션"
-    ],
-    "tags": [
-      "원작",
-      "액션",
-      "생존",
-      "크리처",
-      "고인물"
-    ],
-    "synopsis": "웹툰 「아포칼립스에 집을 숨김」의 원작 웹소설. 글 로드워리어.",
-    "cover": [
-      "oklch(0.45 0.14 12)",
-      "oklch(0.28 0.1 52)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2023,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/"
-      }
-    ],
-    "stats": {
-      "views": 760722,
-      "likes": 101430,
-      "bookmarks": 101430,
-      "ratingAvg": 5,
-      "ratingCount": 40572,
-      "ratingDist": [
-        0,
-        0,
-        43,
-        6439,
-        34090
+        8851,
+        46862
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6840,17 +6788,69 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 401106,
-      "likes": 53481,
-      "bookmarks": 53481,
+      "views": 401700,
+      "likes": 53560,
+      "bookmarks": 53560,
       "ratingAvg": 5,
-      "ratingCount": 21392,
+      "ratingCount": 21424,
       "ratingDist": [
         0,
         0,
         23,
-        3395,
-        17974
+        3400,
+        18001
+      ],
+      "rankDelta": 0,
+      "trendingScore": 60,
+      "completionRate": 80,
+      "bingeIndex": 82
+    },
+    "featured": false
+  },
+  {
+    "id": "nv-697669952",
+    "slug": "nv-697669952",
+    "type": "webnovel",
+    "title": "아포칼립스에 집을 숨김",
+    "author": "로드워리어",
+    "genres": [
+      "액션"
+    ],
+    "tags": [
+      "원작",
+      "액션",
+      "생존",
+      "크리처",
+      "고인물"
+    ],
+    "synopsis": "웹툰 「아포칼립스에 집을 숨김」의 원작 웹소설. 글 로드워리어.",
+    "cover": [
+      "oklch(0.45 0.14 12)",
+      "oklch(0.28 0.1 52)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2023,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/"
+      }
+    ],
+    "stats": {
+      "views": 761040,
+      "likes": 101472,
+      "bookmarks": 101472,
+      "ratingAvg": 5,
+      "ratingCount": 40589,
+      "ratingDist": [
+        0,
+        0,
+        43,
+        6441,
+        34104
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6892,17 +6892,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 424800,
-      "likes": 56640,
-      "bookmarks": 56640,
+      "views": 426708,
+      "likes": 56894,
+      "bookmarks": 56894,
       "ratingAvg": 5,
-      "ratingCount": 22656,
+      "ratingCount": 22758,
       "ratingDist": [
         0,
         0,
         24,
-        3595,
-        19036
+        3612,
+        19122
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6944,17 +6944,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 544416,
-      "likes": 72589,
-      "bookmarks": 72589,
+      "views": 544938,
+      "likes": 72658,
+      "bookmarks": 72658,
       "ratingAvg": 5,
-      "ratingCount": 29036,
+      "ratingCount": 29063,
       "ratingDist": [
         0,
         0,
         31,
-        4608,
-        24397
+        4612,
+        24420
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6996,17 +6996,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 551034,
-      "likes": 73471,
-      "bookmarks": 73471,
+      "views": 551580,
+      "likes": 73544,
+      "bookmarks": 73544,
       "ratingAvg": 5,
-      "ratingCount": 29388,
+      "ratingCount": 29418,
       "ratingDist": [
         0,
         0,
         31,
-        4664,
-        24693
+        4669,
+        24718
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7048,17 +7048,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2334054,
-      "likes": 311207,
-      "bookmarks": 311207,
+      "views": 2334144,
+      "likes": 311219,
+      "bookmarks": 311219,
       "ratingAvg": 5,
-      "ratingCount": 124483,
+      "ratingCount": 124488,
       "ratingDist": [
         0,
         0,
         133,
-        19755,
-        104595
+        19756,
+        104599
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7100,17 +7100,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 646470,
-      "likes": 86196,
-      "bookmarks": 86196,
+      "views": 646920,
+      "likes": 86256,
+      "bookmarks": 86256,
       "ratingAvg": 5,
-      "ratingCount": 34478,
+      "ratingCount": 34502,
       "ratingDist": [
         0,
         0,
         37,
-        5472,
-        28969
+        5475,
+        28990
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7153,17 +7153,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 425682,
-      "likes": 56758,
-      "bookmarks": 56758,
+      "views": 425820,
+      "likes": 56776,
+      "bookmarks": 56776,
       "ratingAvg": 5,
-      "ratingCount": 22703,
+      "ratingCount": 22710,
       "ratingDist": [
         0,
         0,
         24,
-        3603,
-        19076
+        3604,
+        19082
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7205,17 +7205,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 397728,
-      "likes": 53030,
-      "bookmarks": 53030,
+      "views": 398244,
+      "likes": 53099,
+      "bookmarks": 53099,
       "ratingAvg": 5,
-      "ratingCount": 21212,
+      "ratingCount": 21240,
       "ratingDist": [
         0,
         0,
         23,
-        3366,
-        17823
+        3371,
+        17847
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7257,17 +7257,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 567858,
-      "likes": 75714,
-      "bookmarks": 75714,
+      "views": 567996,
+      "likes": 75733,
+      "bookmarks": 75733,
       "ratingAvg": 5,
-      "ratingCount": 30286,
+      "ratingCount": 30293,
       "ratingDist": [
         0,
         0,
         32,
-        4806,
-        25447
+        4807,
+        25453
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7309,17 +7309,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 839568,
-      "likes": 111942,
-      "bookmarks": 111942,
+      "views": 844644,
+      "likes": 112619,
+      "bookmarks": 112619,
       "ratingAvg": 5,
-      "ratingCount": 44777,
+      "ratingCount": 45048,
       "ratingDist": [
         0,
         0,
         48,
-        7106,
-        37623
+        7149,
+        37851
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7361,17 +7361,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 144588,
-      "likes": 19278,
-      "bookmarks": 19278,
+      "views": 145782,
+      "likes": 19438,
+      "bookmarks": 19438,
       "ratingAvg": 5,
-      "ratingCount": 7711,
+      "ratingCount": 7775,
       "ratingDist": [
         0,
         0,
         8,
-        1224,
-        6479
+        1234,
+        6533
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7413,17 +7413,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1117626,
-      "likes": 149017,
-      "bookmarks": 149017,
+      "views": 1118214,
+      "likes": 149095,
+      "bookmarks": 149095,
       "ratingAvg": 5,
-      "ratingCount": 59607,
+      "ratingCount": 59638,
       "ratingDist": [
         0,
         0,
         64,
-        9460,
-        50084
+        9465,
+        50110
       ],
       "rankDelta": 0,
       "trendingScore": 60,
