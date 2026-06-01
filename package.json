@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -p tsconfig.vite.json && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "start": "vite preview --host 0.0.0.0",
+    "dev:next": "next dev",
+    "build:next": "next build",
+    "start:next": "next start",
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
     "dev:all": "pnpm -r --parallel dev",
     "build:all": "pnpm -r run build",
@@ -25,6 +29,7 @@
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-router-dom": "^7.16.0",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },
@@ -33,11 +38,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^8.0.16",
     "vitest": "^4.1.7"
   }
 }

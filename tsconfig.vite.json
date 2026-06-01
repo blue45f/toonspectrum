@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "plugins": [],
+    "paths": {
+      "@/*": ["./*"],
+      "next/link": ["./src/compat/next-link.tsx"],
+      "next/navigation": ["./src/compat/next-navigation.ts"],
+      "next-auth/react": ["./src/compat/next-auth-react.tsx"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "app/insights/_components/**/*.tsx",
+    "app/reviews/_components/**/*.tsx",
+    "vite.config.ts"
+  ],
+  "exclude": ["node_modules", "apps/**", ".next/**"]
+}

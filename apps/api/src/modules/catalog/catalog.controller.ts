@@ -8,7 +8,9 @@ import {
   Param,
   Post,
   Query,
+  Res,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { CatalogService } from "./catalog.service";
 
 type QueryMap = Record<string, string | string[] | undefined>;
@@ -46,6 +48,62 @@ interface SearchQuery {
 @Controller()
 export class CatalogController {
   constructor(@Inject(CatalogService) private readonly catalogService: CatalogService) {}
+
+  @Get("/cover")
+  async proxyCover(@Query("u") rawUrl: string | undefined, @Res() res: Response) {
+    if (!rawUrl) return res.status(400).send("missing u");
+
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      return res.status(400).send("bad url");
+    }
+
+    if (!allowedCoverUrl(url)) return res.status(403).send("forbidden host");
+
+    try {
+      let upstream: globalThis.Response | null = null;
+      for (let hop = 0; hop < 4; hop++) {
+        const response = await fetch(url.toString(), {
+          headers: {
+            Referer: coverRefererFor(url.hostname),
+            "User-Agent": COVER_USER_AGENT,
+            Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+          },
+          redirect: "manual",
+        });
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("location");
+          if (!location) return res.status(502).send("bad redirect");
+          let nextUrl: URL;
+          try {
+            nextUrl = new URL(location, url);
+          } catch {
+            return res.status(502).send("bad redirect");
+          }
+          if (!allowedCoverUrl(nextUrl)) return res.status(403).send("forbidden redirect");
+          url = nextUrl;
+          continue;
+        }
+        upstream = response;
+        break;
+      }
+
+      if (!upstream) return res.status(502).send("too many redirects");
+      if (!upstream.ok) return res.status(502).send("upstream error");
+
+      const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
+      if (!COVER_OK_TYPE.test(contentType)) return res.status(415).send("not an image");
+
+      const body = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
+      return res.status(200).send(body);
+    } catch {
+      return res.status(502).send("fetch failed");
+    }
+  }
 
   @Get("/home")
   @Header("Cache-Control", "no-store, max-age=0")
@@ -135,4 +193,17 @@ function normalizeQueryMap(query: QueryMap): Record<string, string> {
     }
   }
   return out;
+}
+
+const COVER_ALLOWED_HOST = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net)$/;
+const COVER_OK_TYPE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i;
+const COVER_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function allowedCoverUrl(url: URL) {
+  return url.protocol === "https:" && COVER_ALLOWED_HOST.test(url.hostname);
+}
+
+function coverRefererFor(hostname: string) {
+  return /kakao/.test(hostname) ? "https://webtoon.kakao.com/" : "https://comic.naver.com/";
 }
