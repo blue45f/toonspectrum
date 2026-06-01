@@ -3,6 +3,8 @@ import { statsAreEstimated } from "../estimate";
 import {
   getLiveRanking,
   getLiveStatusSignals,
+  getLiveRankingPlatforms,
+  getLiveStatusPlatforms,
   type LiveItem,
   type LiveRankingResult,
   type LiveSourceStatus,
@@ -32,6 +34,8 @@ const validGenres = new Set<string>(["all", ...GENRES]);
 const validPlatforms = new Set<PlatformId | "all">(["all", ...PLATFORM_LIST.map((p) => p.id)]);
 const validStatuses = new Set<SerialStatus | "all">(["all", "ongoing", "completed", "hiatus"]);
 const validPricing = new Set<Pricing | "all">(["all", "free", "wait-free", "paid", "subscription"]);
+const LIVE_RANKING_PLATFORMS = getLiveRankingPlatforms();
+const LIVE_STATUS_PLATFORMS = getLiveStatusPlatforms();
 
 interface QueryReader {
   get(name: string): string | null;
@@ -163,7 +167,7 @@ export function shouldFetchLiveSignals(params: Pick<RankingParams, "axis" | "per
     (params.axis === "popular" || params.axis === "trending") &&
     (params.period === "daily" || params.period === "weekly") &&
     (params.type === "all" || params.type === "webtoon") &&
-    (params.platform === "all" || params.platform === "naver-webtoon" || params.platform === "kakao-webtoon")
+    (params.platform === "all" ? LIVE_RANKING_PLATFORMS.size > 0 : LIVE_RANKING_PLATFORMS.has(params.platform))
   );
 }
 
@@ -172,7 +176,7 @@ export function shouldFetchStatusSignals(
 ): boolean {
   return (
     (params.type === "all" || params.type === "webtoon") &&
-    (params.platform === "all" || params.platform === "naver-webtoon") &&
+    (params.platform === "all" ? LIVE_STATUS_PLATFORMS.size > 0 : LIVE_STATUS_PLATFORMS.has(params.platform)) &&
     (params.status !== "all" || params.axis === "completed" || params.axis === "popular" || params.axis === "trending")
   );
 }
