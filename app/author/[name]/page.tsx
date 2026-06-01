@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { authorWorks, allAuthorNames } from "@/lib/data";
+import { getAuthorData, getAuthorStaticParams } from "@/lib/server/author";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
+import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Stars } from "@/components/ui/stars";
 import { GenreChip } from "@/components/ui/chip";
 import { formatCount } from "@/lib/utils";
 import { PenLine } from "lucide-react";
 
 export async function generateStaticParams() {
-  return allAuthorNames().map((name) => ({ name: encodeURIComponent(name) }));
+  return getAuthorStaticParams();
 }
 
 export async function generateMetadata({
@@ -24,13 +25,10 @@ export async function generateMetadata({
 
 export default async function AuthorPage({ params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
-  const author = decodeURIComponent(name);
-  const works = authorWorks(author);
-  if (works.length === 0) notFound();
+  const data = await getAuthorData(name);
+  if (!data) notFound();
 
-  const totalViews = works.reduce((s, t) => s + t.stats.views, 0);
-  const avg = works.reduce((s, t) => s + t.stats.ratingAvg, 0) / works.length;
-  const genres = [...new Set(works.flatMap((t) => t.genres))].slice(0, 6);
+  const { author, works, totalViews, avg, genres } = data;
 
   return (
     <Container size="wide" className="py-10">
@@ -69,6 +67,10 @@ export default async function AuthorPage({ params }: { params: Promise<{ name: s
         {works.map((t) => (
           <TitleCard key={t.id} title={t} />
         ))}
+      </div>
+
+      <div className="mt-12">
+        <FanCafePanel scope="author" targetId={author} targetLabel={author} compact />
       </div>
     </Container>
   );

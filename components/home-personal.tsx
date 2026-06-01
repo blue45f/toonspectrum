@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useApp, useHydrated } from "@/lib/store";
 import type { Title } from "@/lib/types";
-import { buildTasteProfile, recommendForTaste } from "@/lib/recommend";
 import { Section, Rail } from "./section";
 import { TitleCard } from "./title-card";
 
@@ -13,24 +12,42 @@ export function HomePersonal() {
   const hydrated = useHydrated();
   const reads = useApp((s) => s.reads);
   const ratings = useApp((s) => s.ratings);
-  const [titles, setTitles] = useState<Title[] | null>(null);
+  const [reading, setReading] = useState<Title[]>([]);
+  const [recs, setRecs] = useState<Title[]>([]);
 
   const hasData = hydrated && (Object.keys(reads).length > 0 || Object.keys(ratings).length > 0);
 
   useEffect(() => {
-    if (hasData && !titles) import("@/lib/data").then((m) => setTitles(m.TITLES));
-  }, [hasData, titles]);
+    if (!hasData) return;
+    let alive = true;
+    const controller = new AbortController();
+    fetch("/api/recommend", {
+      method: "POST",
+      body: JSON.stringify({ picked: [], ratings, reads }),
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("recommend failed");
+        return res.json() as Promise<{ reading: Title[]; tasteRecs: { title: Title }[] }>;
+      })
+      .then((data) => {
+        if (!alive) return;
+        setReading(data.reading);
+        setRecs(data.tasteRecs.map((item) => item.title));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setReading([]);
+        setRecs([]);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [hasData, ratings, reads]);
 
-  if (!hasData || !titles) return null;
-
-  const byId = new Map(titles.map((t) => [t.id, t]));
-  const reading = Object.entries(reads)
-    .filter(([, s]) => s === "reading" || s === "want")
-    .map(([id]) => byId.get(id))
-    .filter((t): t is Title => Boolean(t));
-  const seen = new Set([...Object.keys(reads), ...Object.keys(ratings)]);
-  const profile = buildTasteProfile(titles, ratings, reads);
-  const recs = recommendForTaste(titles, profile, seen, 12).map((r) => r.title);
+  if (!hasData) return null;
 
   if (reading.length === 0 && recs.length === 0) return null;
 

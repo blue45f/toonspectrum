@@ -81,7 +81,7 @@ export const TITLES: Title[] = [
       "oklch(0.28 0.1 330)"
     ],
     "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F183559%2Fthumbnail%2Fthumbnail_IMAG21_5f3fec31-5c95-4afe-a73f-3046288edb47.jpg",
-    "status": "completed",
+    "status": "hiatus",
     "ageRating": "12",
     "releaseYear": 2010,
     "availability": [
@@ -862,7 +862,7 @@ export const TITLES: Title[] = [
       "oklch(0.28 0.1 330)"
     ],
     "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F650305%2Fthumbnail%2Fthumbnail_IMAG21_9e070729-5990-4653-90dd-1158847c1c68.jpg",
-    "status": "completed",
+    "status": "hiatus",
     "ageRating": "15",
     "releaseYear": 2015,
     "availability": [
@@ -1142,7 +1142,7 @@ export const TITLES: Title[] = [
       "oklch(0.28 0.1 330)"
     ],
     "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F316909%2Fthumbnail%2Fthumbnail_IMAG21_3473513801691247160.jpg",
-    "status": "completed",
+    "status": "hiatus",
     "ageRating": "all",
     "releaseYear": 2011,
     "availability": [
@@ -1583,7 +1583,7 @@ export const TITLES: Title[] = [
       "oklch(0.28 0.1 75)"
     ],
     "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F677452%2Fthumbnail%2Fthumbnail_IMAG21_05f30a57-88b9-4798-8987-4851f1b28f5a.jpg",
-    "status": "completed",
+    "status": "hiatus",
     "ageRating": "12",
     "releaseYear": 2016,
     "availability": [
@@ -1800,7 +1800,7 @@ export const TITLES: Title[] = [
       "oklch(0.28 0.1 178)"
     ],
     "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F701535%2Fthumbnail%2Fthumbnail_IMAG21_2abe5b1a-9104-417f-9995-0db15c6db7be.jpg",
-    "status": "completed",
+    "status": "hiatus",
     "ageRating": "15",
     "releaseYear": 2017,
     "availability": [

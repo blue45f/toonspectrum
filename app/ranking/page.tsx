@@ -6,7 +6,7 @@ import { RANK_AXES, type RankAxis } from "@/lib/ranking";
 
 export const metadata: Metadata = {
   title: "통합 랭킹",
-  description: "6개 축으로 줄 세운 웹툰·웹소설 통합 랭킹. 투명한 산식과 함께.",
+  description: "8개 축으로 줄 세운 웹툰·웹소설 통합 랭킹. 실시간 API와 투명한 산식과 함께.",
 };
 
 export default async function RankingPage({
@@ -24,8 +24,8 @@ export default async function RankingPage({
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
         <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
-          플랫폼을 가로질러 한 줄로 세웁니다. 단순 조회수가 아니라 6개의 축으로, 그리고 각 순위가
-          어떤 산식으로 매겨졌는지 투명하게 공개합니다.
+          플랫폼을 가로질러 한 줄로 세웁니다. 단순 조회수가 아니라 8개의 축으로, 인기와 급상승은
+          API에서 실시간 소스를 받아 보정하고 각 순위의 산식은 투명하게 공개합니다.
         </p>
       </header>
 

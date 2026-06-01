@@ -9,8 +9,8 @@ import {
   reviewLikes,
   collections,
   collectionItems,
-} from "@/lib/db";
-import { fromDb } from "@/lib/api-helpers";
+} from "../db";
+import { fromDb } from "../api-helpers";
 
 // 로그인 사용자의 전체 데이터를 클라이언트 하이드레이션 형태로 반환 (GET /api/me · POST /api/me/merge 공용)
 export async function loadMe(uid: string) {

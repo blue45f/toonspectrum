@@ -30,7 +30,7 @@ export function AuthMenu() {
   const initial = (u.name ?? u.email ?? "U").charAt(0).toUpperCase();
 
   return (
-    <div className="relative">
+      <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         className="grid size-10 place-items-center rounded-xl border border-line bg-accent text-sm font-bold text-on-accent transition-transform active:scale-95"
@@ -46,6 +46,15 @@ export function AuthMenu() {
               <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
               <p className="truncate text-xs text-fg-3">{u.email}</p>
             </div>
+            {((u.role ?? "") === "admin" || (u.role ?? "") === "operator") && (
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+              >
+                관리자 콘솔
+              </Link>
+            )}
             <Link
               href="/library"
               onClick={() => setOpen(false)}

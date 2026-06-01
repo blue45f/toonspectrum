@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getTitle } from "@/lib/data";
+import { findTitle } from "@/lib/server/title";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 
@@ -22,7 +22,7 @@ async function loadKoreanFont(text: string): Promise<ArrayBuffer | null> {
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const t = getTitle(slug);
+  const t = findTitle(slug);
   const title = t?.title ?? "WEBDEX";
   const type = t ? TYPE_LABEL[t.type] : "";
   const status = t ? STATUS_LABEL[t.status] : "";

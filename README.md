@@ -80,6 +80,8 @@ node scripts/crawl.mjs    # lib/data/titles.ts 재생성 (요일·완결 웹툰 
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000
+pnpm dev:api     # http://127.0.0.1:4001
+pnpm dev:all     # 웹앱 + Nest API 동시 실행
 pnpm build && pnpm start   # 프로덕션
 ```
 
@@ -92,6 +94,7 @@ components/          UI 프리미티브 + 시그니처 컴포넌트
 lib/                 데이터 모델 · 시드 · 검색/랭킹/추천 로직 · 스토어
   data/              작품 46편 + 리뷰 시드 데이터
 docs/                경쟁 서비스 분석
+apps/api/            NestJS 백엔드 (현재 me API 라우트 이전 단계로 운영)
 ```
 
 <br/>

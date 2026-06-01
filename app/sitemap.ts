@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { TITLES } from "@/lib/data";
+import { getTitleSitemapEntries } from "@/lib/server/title";
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://webdex.app";
 
@@ -11,10 +11,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: p === "" ? 1 : 0.7,
     })
   );
-  const titles = TITLES.map((t) => ({
-    url: `${BASE}/title/${t.slug}`,
-    changeFrequency: "weekly" as const,
-    priority: 0.5,
-  }));
-  return [...routes, ...titles];
+  return [...routes, ...getTitleSitemapEntries(BASE)];
 }

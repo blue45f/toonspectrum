@@ -60,15 +60,7 @@ interface AppState {
   resetAll: () => void;
 }
 
-const seedCollections: Collection[] = [
-  {
-    id: "default-binge",
-    name: "주말 정주행 리스트",
-    emoji: "🍿",
-    titleIds: [],
-    createdAt: "2025-01-04T00:00:00Z",
-  },
-];
+const seedCollections: Collection[] = [];
 
 export const useApp = create<AppState>()(
   persist(

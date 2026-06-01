@@ -72,6 +72,7 @@ export function RankRow({
   const { title, rank, delta } = ranked;
   const top3 = rank <= 3;
   const m = metric?.(title);
+  const live = ranked.evidence?.liveMatched ? ranked.evidence : null;
   return (
     <Link
       href={`/title/${title.slug}`}
@@ -111,7 +112,15 @@ export function RankRow({
             {title.author} · {STATUS_LABEL[title.status]}
           </span>
           <PlatformTags availability={title.availability} max={2} />
+          {live && (
+            <span className="rounded-md border border-good/30 bg-[oklch(0.8_0.15_150/0.1)] px-1.5 py-0.5 text-[0.65rem] font-medium text-good">
+              LIVE #{live.liveRank} · {live.livePlatform}
+            </span>
+          )}
         </div>
+        <p className="mt-1 line-clamp-1 max-w-3xl text-xs leading-relaxed text-fg-3 sm:line-clamp-2">
+          {title.synopsis}
+        </p>
       </div>
 
       <div className="flex items-center gap-3">

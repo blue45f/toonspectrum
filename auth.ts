@@ -1,26 +1,39 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
+import type {} from "next-auth/jwt";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Credentials from "next-auth/providers/credentials";
 import Kakao from "next-auth/providers/kakao";
 import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
-import { db, users, accounts, sessions, verificationTokens } from "@/lib/db";
-import { verifyPassword } from "@/lib/auth-crypto";
-import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { db, users, accounts, sessions, verificationTokens } from "./lib/db";
+import { verifyPassword } from "./lib/auth-crypto";
+import { rateLimit, clientIp } from "./lib/rate-limit";
 
 // 세션에 user.id 노출
 declare module "next-auth" {
   interface Session {
-    user: { id: string } & DefaultUserShape;
+    user: { id: string; role: AuthUserRole } & DefaultUserShape;
+  }
+  interface User {
+    role?: AuthUserRole;
   }
 }
+
+type AuthUserRole = "admin" | "creator" | "operator" | "user";
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    role?: AuthUserRole;
+  }
+}
+
 type DefaultUserShape = { name?: string | null; email?: string | null; image?: string | null };
 
 const providers: NextAuthConfig["providers"] = [
   Credentials({
     name: "이메일",
     credentials: { email: {}, password: {} },
-    authorize: async (creds, request) => {
+  authorize: async (creds, request) => {
       // 크리덴셜 스터핑 완화 — IP당 10분에 10회
       if (!rateLimit(`login:${clientIp(request as Request)}`, 10, 10 * 60_000)) return null;
       const email = String(creds?.email ?? "").toLowerCase().trim();
@@ -28,10 +41,46 @@ const providers: NextAuthConfig["providers"] = [
       if (!email || !password) return null;
       const [u] = await db.select().from(users).where(eq(users.email, email)).limit(1);
       if (!u || !verifyPassword(password, u.passwordHash)) return null;
-      return { id: u.id, name: u.name, email: u.email, image: u.image, avatar: u.avatar };
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        avatar: u.avatar,
+        role: normalizeUserRole(u.role),
+      };
     },
   }),
 ];
+
+function normalizeUserRole(value: string | null | undefined): AuthUserRole {
+  const role = String(value ?? "").toLowerCase();
+  if (role === "admin" || role === "creator" || role === "operator") return role;
+  return "user";
+}
+
+function normalizeAdminEmailList(): Set<string> {
+  const raw = process.env.ADMIN_EMAILS ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+async function resolveRoleByUserId(userId: string): Promise<AuthUserRole> {
+  if (!userId) return "user";
+  const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const envRoles = normalizeAdminEmailList();
+  const roleFromDb = normalizeUserRole(row?.role);
+  const email = String(row?.email ?? "").toLowerCase();
+  if (envRoles.has(email) && roleFromDb === "user") {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
+    return "admin";
+  }
+  return roleFromDb;
+}
 
 // OAuth 는 키가 있을 때만 활성 (없으면 앱 안 깨짐)
 if (process.env.AUTH_KAKAO_ID && process.env.AUTH_KAKAO_SECRET) {
@@ -56,13 +105,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret:
     process.env.AUTH_SECRET ??
     (process.env.NODE_ENV === "production" ? undefined : "dev-only-secret-not-for-production"),
-  callbacks: {
-    jwt({ token, user }) {
+    callbacks: {
+    async jwt({ token, user }) {
       if (user?.id) token.id = user.id;
+      if (user?.role) token.role = user.role;
+      if (token.id && !token.role) {
+        token.role = await resolveRoleByUserId(String(token.id));
+      }
       return token;
     },
     session({ session, token }) {
       if (token?.id) session.user.id = String(token.id);
+      session.user.role = token?.role ?? "user";
       return session;
     },
   },

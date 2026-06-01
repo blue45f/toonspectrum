@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq, desc, inArray, sql } from "drizzle-orm";
 import { UserRound, MessageSquareText, Star, Heart } from "lucide-react";
 import { db, users, reviews, ratings, reviewLikes } from "@/lib/db";
-import { getTitle } from "@/lib/data";
+import { findTitle } from "@/lib/server/title";
 import { fromDb } from "@/lib/api-helpers";
 import type { SeedReview, Title } from "@/lib/types";
 import { Container } from "@/components/section";
@@ -64,7 +64,7 @@ async function getProfile(id: string) {
   // 리뷰 → 표시형(SeedReview) + 작품 조인 (사라진 작품 제외)
   const joined = reviewRows
     .map((r) => {
-      const title = getTitle(r.titleId);
+      const title = findTitle(r.titleId);
       if (!title) return null;
       const review: SeedReview = {
         id: r.id,
@@ -96,7 +96,7 @@ async function getProfile(id: string) {
   // 취향 장르 — 평가·리뷰한 작품의 장르 빈도 (별점 가중)
   const genreScore = new Map<string, number>();
   for (const [titleId, value] of ratingByTitle) {
-    const t = getTitle(titleId);
+    const t = findTitle(titleId);
     if (!t) continue;
     const w = value >= 4 ? 2 : 1;
     for (const g of t.genres) genreScore.set(g, (genreScore.get(g) ?? 0) + w);
@@ -108,7 +108,7 @@ async function getProfile(id: string) {
 
   // 최애 — 가장 높게 평가한 작품 (동률이면 조회수 높은 쪽)
   const favorites: Title[] = [...ratingByTitle.entries()]
-    .map(([titleId, value]) => ({ t: getTitle(titleId), value }))
+    .map(([titleId, value]) => ({ t: findTitle(titleId), value }))
     .filter((x): x is { t: Title; value: number } => Boolean(x.t))
     .sort((a, b) => b.value - a.value || b.t.stats.views - a.t.stats.views)
     .slice(0, 5)

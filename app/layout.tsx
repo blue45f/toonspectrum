@@ -15,7 +15,16 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
+function getMetadataBase() {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://webdex.app");
+  } catch {
+    return new URL("https://webdex.app");
+  }
+}
+
 export const metadata: Metadata = {
+  metadataBase: getMetadataBase(),
   title: {
     default: "WEBDEX — 웹툰·웹소설 통합 인덱스",
     template: "%s · WEBDEX",

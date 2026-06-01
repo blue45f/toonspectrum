@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { TITLES, getTitle } from "@/lib/data";
-import { buildTasteProfile, recommendForTaste } from "@/lib/recommend";
 import { useApp, useHydrated } from "@/lib/store";
-import type { ReadState } from "@/lib/types";
+import type { ReadState, Title } from "@/lib/types";
 import { UnderlineTabs, Segmented } from "./ui/segmented";
 import { TitleCard } from "./title-card";
 import { MiniPoster } from "./rank-row";
@@ -25,6 +23,27 @@ const READ_TABS: { value: ReadState; label: string }[] = [
   { value: "done", label: "완독" },
   { value: "dropped", label: "하차" },
 ];
+
+type TasteProfile = {
+  affinityType: "webtoon" | "webnovel" | "balanced";
+  ratedCount: number;
+  avgRating: number;
+  topGenres: { name: string; weight: number }[];
+  topTags: { name: string; weight: number }[];
+};
+
+type TasteRec = {
+  title: Title;
+  reason: string;
+};
+
+const EMPTY_PROFILE: TasteProfile = {
+  affinityType: "balanced",
+  ratedCount: 0,
+  avgRating: 0,
+  topGenres: [],
+  topTags: [],
+};
 
 function EmptyTeach({
   icon: Icon,
@@ -72,6 +91,61 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [readTab, setReadTab] = useState<ReadState>("want");
+  const [titlesById, setTitlesById] = useState<Record<string, Title>>({});
+  const [profile, setProfile] = useState<TasteProfile>(EMPTY_PROFILE);
+  const [recs, setRecs] = useState<TasteRec[]>([]);
+
+  const titleIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.keys(reads).forEach((id) => ids.add(id));
+    Object.keys(ratings).forEach((id) => ids.add(id));
+    Object.entries(subscriptions).forEach(([id, on]) => {
+      if (on) ids.add(id);
+    });
+    collections.forEach((collection) => collection.titleIds.forEach((id) => ids.add(id)));
+    return Array.from(ids).sort();
+  }, [collections, ratings, reads, subscriptions]);
+
+  const titleIdsKey = titleIds.join(",");
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const controller = new AbortController();
+
+    async function loadLibraryData() {
+      const [catalog, recommendation] = await Promise.all([
+        titleIdsKey
+          ? fetch(`/api/titles?ids=${encodeURIComponent(titleIdsKey)}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            }).then((res) => (res.ok ? res.json() : { items: [] }))
+          : Promise.resolve({ items: [] }),
+        fetch("/api/recommend", {
+          method: "POST",
+          cache: "no-store",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ratings, reads }),
+        }).then((res) => (res.ok ? res.json() : { profile: EMPTY_PROFILE, tasteRecs: [] })),
+      ]);
+
+      const nextById: Record<string, Title> = {};
+      for (const title of (catalog.items ?? []) as Title[]) nextById[title.id] = title;
+
+      setTitlesById(nextById);
+      setProfile((recommendation.profile as TasteProfile | undefined) ?? EMPTY_PROFILE);
+      setRecs((recommendation.tasteRecs as TasteRec[] | undefined) ?? []);
+    }
+
+    loadLibraryData().catch((error) => {
+      if ((error as Error).name !== "AbortError") {
+        setProfile(EMPTY_PROFILE);
+        setRecs([]);
+      }
+    });
+
+    return () => controller.abort();
+  }, [hydrated, ratings, reads, titleIdsKey]);
 
   if (!hydrated) {
     return (
@@ -85,19 +159,19 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
 
   const readIds = Object.entries(reads);
   const ratedIds = Object.entries(ratings).sort((a, b) => b[1] - a[1]);
-  const seen = new Set([...Object.keys(reads), ...Object.keys(ratings)]);
-  const profile = buildTasteProfile(TITLES, ratings, reads);
-  const recs = recommendForTaste(TITLES, profile, seen, 10);
 
   const counts: Record<ReadState, number> = { want: 0, reading: 0, done: 0, dropped: 0 };
   readIds.forEach(([, st]) => (counts[st] = (counts[st] ?? 0) + 1));
-  const shelfTitles = readIds.filter(([, st]) => st === readTab).map(([id]) => getTitle(id)!).filter(Boolean);
+  const shelfTitles = readIds
+    .filter(([, st]) => st === readTab)
+    .map(([id]) => titlesById[id])
+    .filter((title): title is Title => Boolean(title));
 
   // 연재 알림 — 구독한 작품을 요일별로
   const subTitles = Object.entries(subscriptions)
     .filter(([, on]) => on)
-    .map(([id]) => getTitle(id))
-    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+    .map(([id]) => titlesById[id])
+    .filter((title): title is Title => Boolean(title));
   const todayDay = WEEK_DAYS[DAY_FROM_GETDAY[new Date().getDay()]];
   const todaySubs = subTitles.filter((t) => t.updateDays?.includes(todayDay));
 
@@ -156,7 +230,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           ) : (
             <div className="flex flex-col gap-2.5">
               {ratedIds.map(([id, r]) => {
-                const t = getTitle(id);
+                const t = titlesById[id];
                 if (!t) return null;
                 return (
                   <Link
@@ -352,6 +426,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
       {tab === "collections" && (
         <CollectionsTab
           collections={collections}
+          titlesById={titlesById}
           onCreate={createCollection}
           onDelete={deleteCollection}
         />
@@ -385,10 +460,12 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
 
 function CollectionsTab({
   collections,
+  titlesById,
   onCreate,
   onDelete,
 }: {
   collections: ReturnType<typeof useApp.getState>["collections"];
+  titlesById: Record<string, Title>;
   onCreate: (name: string, emoji: string) => string;
   onDelete: (id: string) => void;
 }) {
@@ -442,7 +519,7 @@ function CollectionsTab({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {collections.map((c) => {
-            const titles = c.titleIds.map((id) => getTitle(id)).filter(Boolean).slice(0, 5);
+            const titles = c.titleIds.map((id) => titlesById[id]).filter(Boolean).slice(0, 5);
             return (
               <div key={c.id} className="rounded-2xl border border-line bg-card p-5">
                 <div className="flex items-center justify-between">

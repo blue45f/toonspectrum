@@ -1,9 +1,5 @@
 import Link from "next/link";
-import { TITLES, adaptationsOf, activeTags, SEED_REVIEWS } from "@/lib/data";
-import { PLATFORM_LIST } from "@/lib/platforms";
-import { GENRES, WEEK_DAYS } from "@/lib/taxonomy";
-import { rankBy } from "@/lib/ranking";
-import { sortTitles } from "@/lib/search";
+import { getHomeData } from "@/lib/server/home";
 import { Container, Section, Rail } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { LiveRanking } from "@/components/live-ranking";
@@ -17,39 +13,27 @@ import { HomePersonal } from "@/components/home-personal";
 import { CountUp } from "@/components/count-up";
 import { buttonClass } from "@/components/ui/button";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
-import { formatCount, kstDayOfWeek } from "@/lib/utils";
+import { formatCount } from "@/lib/utils";
 import { statsAreEstimated } from "@/lib/estimate";
 import { Search, ArrowRight, Layers } from "lucide-react";
 
 // '오늘 연재'/실시간 랭킹 신선도를 명시적으로 고정 (자식 fetch revalidate에 암묵 의존하지 않도록)
 export const revalidate = 600;
 
-export default function HomePage() {
-  const featured = TITLES.filter((t) => t.featured);
-  const spotlight = [...featured].sort((a, b) => b.stats.views - a.stats.views)[0];
-  const topRated = rankBy(TITLES, "rating", { limit: 12 }).map((r) => r.title);
-  const waitFree = sortTitles(
-    TITLES.filter((t) =>
-      t.availability.some((a) => a.pricing === "free" || a.pricing === "wait-free")
-    ),
-    "popular"
-  ).slice(0, 12);
-  const newest = sortTitles(TITLES, "newest").slice(0, 12);
-
-  const families = TITLES.filter((t) => t.type === "webnovel" && adaptationsOf(t).length > 0)
-    .map((novel) => ({ original: novel, adaptations: adaptationsOf(novel) }))
-    .sort((a, b) => b.original.stats.views - a.original.stats.views)
-    .slice(0, 3);
-
-  const tags = activeTags().slice(0, 14);
-
-  // 오늘 연재 (실제 연재요일 기반, KST)
-  const todayDay = WEEK_DAYS[[6, 0, 1, 2, 3, 4, 5][kstDayOfWeek()]];
-  const todayReleases = TITLES.filter(
-    (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.includes(todayDay)
-  )
-    .sort((a, b) => b.stats.views - a.stats.views)
-    .slice(0, 12);
+export default async function HomePage() {
+  const {
+    featured,
+    spotlight,
+    topRated,
+    waitFree,
+    newest,
+    families,
+    tags,
+    todayDay,
+    todayReleases,
+    genres,
+    stats,
+  } = await getHomeData();
 
   return (
     <div>
@@ -90,10 +74,10 @@ export default function HomePage() {
 
             <dl className="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-line pt-5">
               {[
-                { v: TITLES.length, suffix: "", label: "수록 작품" },
-                { v: PLATFORM_LIST.length, suffix: "", label: "연재 플랫폼" },
-                { v: GENRES.length, suffix: "", label: "장르 스펙트럼" },
-                { v: SEED_REVIEWS.length, suffix: "+", label: "독자 리뷰" },
+                { v: stats.titles, suffix: "", label: "수록 작품" },
+                { v: stats.platforms, suffix: "", label: "연재 플랫폼" },
+                { v: stats.genres, suffix: "", label: "장르 스펙트럼" },
+                { v: stats.reviews, suffix: "+", label: "독자 리뷰" },
               ].map((s) => (
                 <div key={s.label} className="flex items-baseline gap-2">
                   <dd className="numeral text-2xl text-fg">
@@ -187,11 +171,11 @@ export default function HomePage() {
         >
           <div
             className="mb-5 h-1.5 w-full rounded-full"
-            style={{ background: spectrumGradient(GENRES) }}
+            style={{ background: spectrumGradient(genres) }}
             aria-hidden
           />
           <div className="flex flex-wrap gap-2">
-            {GENRES.map((g) => (
+            {genres.map((g) => (
               <Link key={g} href={`/explore?genre=${encodeURIComponent(g)}`}>
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-transform duration-150 hover:scale-105"

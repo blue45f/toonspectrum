@@ -4,7 +4,6 @@ import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Title } from "@/lib/types";
-import { suggest } from "@/lib/search";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { RatingInline } from "./ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
@@ -25,9 +24,8 @@ const QUICK = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [titles, setTitles] = useState<Title[]>([]);
+  const [results, setResults] = useState<Title[]>([]);
   const router = useRouter();
-  const results = q.trim() && titles.length ? suggest(titles, q, 7) : [];
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -47,17 +45,39 @@ export function CommandPalette() {
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    // 작품 데이터는 팔레트를 처음 열 때 지연 로드 (초기 번들에서 분리)
-    if (open && titles.length === 0) {
-      import("@/lib/data").then((m) => setTitles(m.TITLES));
-    }
     // 닫힐 때 질의 초기화 (effect 동기 setState 회피 위해 다음 틱으로 지연)
     const id = open ? undefined : setTimeout(() => setQ(""), 0);
     return () => {
       document.body.style.overflow = "";
       if (id) clearTimeout(id);
     };
-  }, [open, titles.length]);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !q.trim()) {
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    fetch(`/api/search?sort=relevance&q=${encodeURIComponent(q)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("search failed");
+        return res.json() as Promise<{ items: Title[] }>;
+      })
+      .then((data) => {
+        if (alive) setResults(data.items.slice(0, 7));
+      })
+      .catch(() => {
+        if (alive) setResults([]);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [open, q]);
 
   const go = (href: string) => {
     setOpen(false);
@@ -85,7 +105,10 @@ export function CommandPalette() {
           <Search size={18} className="text-fg-3" />
           <Command.Input
             value={q}
-            onValueChange={setQ}
+            onValueChange={(value) => {
+              setQ(value);
+              if (!value.trim()) setResults([]);
+            }}
             placeholder="작품, 작가, 태그를 검색하세요…"
             className="h-14 flex-1 bg-transparent text-[0.95rem] text-fg outline-none placeholder:text-fg-3"
           />

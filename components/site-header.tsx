@@ -12,6 +12,7 @@ import {
   MessageSquareQuote,
   Sparkles,
   CalendarDays,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { spectrumGradient } from "@/lib/genre-color";
@@ -24,12 +25,13 @@ const NAV = [
   { label: "추천", href: "/recommend", icon: Sparkles },
   { label: "탐색", href: "/explore", icon: Compass },
   { label: "리뷰", href: "/reviews", icon: MessageSquareQuote },
+  { label: "커뮤니티", href: "/community", icon: MessageCircle },
   { label: "인사이트", href: "/insights", icon: BarChart3 },
 ];
 
 // 모바일 하단 탭바는 핵심 4개만 (+ 서재)
 const MOBILE_NAV = NAV.filter((n) =>
-  ["/", "/ranking", "/recommend", "/explore"].includes(n.href)
+  ["/", "/ranking", "/recommend", "/explore", "/community", "/reviews"].includes(n.href)
 );
 
 function useActive() {
@@ -113,7 +115,7 @@ export function SiteHeader() {
 
       {/* 모바일 하단 탭바 */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-panel/90 backdrop-blur-xl md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5">
+        <div className="mx-auto grid max-w-md grid-cols-7">
           {MOBILE_NAV.map((n) => {
             const active = isActive(n.href, n.exact);
             return (

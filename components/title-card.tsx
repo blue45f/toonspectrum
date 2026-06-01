@@ -55,6 +55,7 @@ export function TitleCard({
           </span>
           <AvailabilityDots availability={title.availability} max={3} />
         </div>
+        <p className="line-clamp-2 text-xs leading-relaxed text-fg-3">{title.synopsis}</p>
       </div>
     </Link>
   );

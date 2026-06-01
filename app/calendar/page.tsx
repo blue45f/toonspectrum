@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { TITLES } from "@/lib/data";
-import { WEEK_DAYS } from "@/lib/taxonomy";
+import { getCalendarData } from "@/lib/server/calendar";
 import { Container } from "@/components/section";
 import { MiniPoster } from "@/components/rank-row";
 import { RatingInline } from "@/components/ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
 import { AvailabilityDots } from "@/components/availability";
-import { cn, kstDayOfWeek } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "연재 캘린더",
@@ -17,21 +16,8 @@ export const metadata: Metadata = {
 // '오늘'이 빌드 시각에 박제되지 않도록 ISR로 1시간마다 재생성 (정적 무기한 캐시 방지)
 export const revalidate = 3600;
 
-const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5]; // getDay() 0=일 → WEEK_DAYS 인덱스
-
-export default function CalendarPage() {
-  // 재생성 시점의 오늘 (KST 기준)
-  const todayIdx = DAY_IDX_FROM_GETDAY[kstDayOfWeek()];
-
-  const ongoing = TITLES.filter(
-    (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.length
-  );
-  const byDay = WEEK_DAYS.map((day) =>
-    ongoing
-      .filter((t) => t.updateDays!.includes(day))
-      .sort((a, b) => b.stats.views - a.stats.views)
-  );
-  const todayCount = byDay[todayIdx]?.length ?? 0;
+export default async function CalendarPage() {
+  const { todayIdx, todayDay, todayCount, days } = await getCalendarData();
 
   return (
     <Container size="wide" className="py-10">
@@ -40,15 +26,14 @@ export default function CalendarPage() {
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
         <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
           요일별 웹툰 연재 일정입니다. 오늘은{" "}
-          <span className="font-semibold text-accent">{WEEK_DAYS[todayIdx]}요일</span>, 새 회차가
+          <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가
           올라오는 작품이 <span className="numeral text-fg">{todayCount}</span>편 있어요.
         </p>
       </header>
 
       <div className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
-        {WEEK_DAYS.map((day, i) => {
+        {days.map(({ day, items: list }, i) => {
           const isToday = i === todayIdx;
-          const list = byDay[i];
           return (
             <section
               key={day}

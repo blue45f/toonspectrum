@@ -6,6 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "dev:api": "pnpm --filter @webtoon-nest/api dev",
+    "dev:all": "pnpm -r --parallel dev",
+    "build:all": "pnpm -r run build",
     "lint": "eslint",
     "test": "vitest run"
   },

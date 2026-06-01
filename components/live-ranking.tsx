@@ -1,8 +1,5 @@
 import Link from "next/link";
 import { getLiveRanking, type LiveItem } from "@/lib/server/live";
-import { rankBy } from "@/lib/ranking";
-import { TITLES } from "@/lib/data";
-import { RankRow } from "./rank-row";
 import { CoverImage } from "./cover-image";
 import { Stars } from "./ui/stars";
 import { ArrowUpRight, Radio } from "lucide-react";
@@ -61,20 +58,14 @@ function LiveRow({ item }: { item: LiveItem }) {
   );
 }
 
-// 실시간 인기 — 네이버/카카오에서 런타임 ISR 페치. 실패 시 스냅샷 폴백.
+// 실시간 인기 — 네이버/카카오에서 런타임 ISR 페치. 실패 시 상태만 표시해 정적 순위로 가장하지 않는다.
 export async function LiveRanking() {
   const { items } = await getLiveRanking(12);
 
   if (items.length === 0) {
-    const popular = rankBy(TITLES, "popular", { limit: 8 });
     return (
-      <div className="rounded-2xl border border-line bg-panel/40 p-2 sm:p-3">
-        <p className="px-2 pb-2 text-xs text-fg-3">
-          실시간 집계가 일시적으로 어려워 최근 스냅샷을 표시합니다.
-        </p>
-        {popular.map((r) => (
-          <RankRow key={r.title.id} ranked={r} />
-        ))}
+      <div className="rounded-2xl border border-line bg-panel/40 p-5 text-sm text-fg-3">
+        실시간 집계가 일시적으로 어렵습니다. 통합 랭킹의 API 산식 폴백을 확인해 주세요.
       </div>
     );
   }

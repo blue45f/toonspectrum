@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { TITLES, activeTags } from "@/lib/data";
-import { searchTitles, type SortKey } from "@/lib/search";
-import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
+import { TYPE_LABEL } from "@/lib/taxonomy";
 import type { WorkType } from "@/lib/types";
+import { getExploreData, type ExploreSort } from "@/lib/server/explore";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { genreColor, genreTint, genreBorder, spectrumGradient } from "@/lib/genre-color";
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
 
 type SP = Record<string, string | undefined>;
 
-const SORTS: { key: SortKey; label: string }[] = [
+const SORTS: { key: ExploreSort; label: string }[] = [
   { key: "popular", label: "인기순" },
   { key: "rating", label: "평점순" },
   { key: "trending", label: "급상승" },
@@ -49,41 +48,9 @@ export default async function ExplorePage({
   searchParams: Promise<SP>;
 }) {
   const sp = await searchParams;
-
-  const genre = sp.genre && GENRES.includes(sp.genre as (typeof GENRES)[number]) ? sp.genre : undefined;
-  const tag = sp.tag || undefined;
-  const type =
-    sp.type === "webtoon" || sp.type === "webnovel" ? (sp.type as WorkType) : undefined;
-  const sort: SortKey =
-    sp.sort === "rating" || sp.sort === "trending" || sp.sort === "newest" || sp.sort === "popular"
-      ? sp.sort
-      : "popular";
-
-  // 현재 활성 필터를 유지하는 base (정규화된 값만)
-  const current: SP = {
-    genre,
-    tag,
-    type,
-    sort: sp.sort ? sort : undefined,
-  };
-
-  const results = searchTitles(
-    TITLES,
-    {
-      genres: genre ? [genre] : undefined,
-      tags: tag ? [tag] : undefined,
-      types: type ? [type] : undefined,
-    },
-    sort
-  );
-
-  // 점진적 노출(서버 사이드 페이지네이션) — 무필터 시 전체(184편)를 한 번에 렌더하지 않음
-  const PAGE_SIZE = 40;
-  const showCount = Math.min(Math.max(Number(sp.show) || PAGE_SIZE, PAGE_SIZE), results.length);
-  const shown = results.slice(0, showCount);
-  const hasMore = results.length > shown.length;
-
-  const tags = activeTags().slice(0, 18);
+  const { filters, current, results, shown, hasMore, showCount, pageSize, tags, genres } =
+    await getExploreData(sp);
+  const { genre, tag, type, sort } = filters;
   const hasFilter = Boolean(genre || tag || type || sp.sort);
   const accent = genre ? genreColor(genre, 0.84) : undefined;
 
@@ -132,12 +99,12 @@ export default async function ExplorePage({
           <div className="mt-8">
             <div
               className="h-2 w-full rounded-full"
-              style={{ background: spectrumGradient([...GENRES]) }}
+              style={{ background: spectrumGradient([...genres]) }}
               aria-hidden
             />
             {/* 18개 장르 색 칩 (Link). 활성 장르는 알파/링으로 강조 */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {GENRES.map((g) => {
+              {genres.map((g) => {
                 const active = g === genre;
                 return (
                   <Link
@@ -279,7 +246,7 @@ export default async function ExplorePage({
             {hasMore && (
               <div className="mt-10 flex justify-center">
                 <Link
-                  href={buildHref(current, { show: String(showCount + PAGE_SIZE) })}
+                  href={buildHref(current, { show: String(showCount + pageSize) })}
                   scroll={false}
                   className="inline-flex items-center gap-2 rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
                 >

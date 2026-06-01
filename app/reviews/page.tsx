@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SEED_REVIEWS, allReviewsJoined, getTitle } from "@/lib/data";
+import { getReviewsData } from "@/lib/server/reviews";
 import { Container } from "@/components/section";
 import { ReviewCard } from "@/components/review-card";
 import { Stars } from "@/components/ui/stars";
 import { spectrumGradient } from "@/lib/genre-color";
-import { ReviewControls, type ReviewSort } from "./_components/review-controls";
+import { ReviewControls } from "./_components/review-controls";
 
 export const metadata: Metadata = {
   title: "리뷰 피드 — 독자들이 남긴 한 줄",
@@ -13,59 +13,17 @@ export const metadata: Metadata = {
     "정주행을 끝낸 독자들의 솔직한 한 줄. 최신·공감·별점순으로 읽는 WEBDEX 리뷰 피드.",
 };
 
-const SORTS: ReviewSort[] = ["recent", "likes", "high", "low"];
-
-function sortReviews<T extends { createdAt: string; likes: number; rating: number }>(
-  list: T[],
-  sort: ReviewSort
-): T[] {
-  const copy = [...list];
-  switch (sort) {
-    case "likes":
-      return copy.sort((a, b) => b.likes - a.likes);
-    case "high":
-      return copy.sort((a, b) => b.rating - a.rating);
-    case "low":
-      return copy.sort((a, b) => a.rating - b.rating);
-    case "recent":
-    default:
-      return copy.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-  }
-}
-
 export default async function ReviewsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const sort: ReviewSort = SORTS.includes(sp.sort as ReviewSort)
-    ? (sp.sort as ReviewSort)
-    : "recent";
-
-  // ── 통계 ledger ──
-  const total = SEED_REVIEWS.length;
-  const avg = total ? SEED_REVIEWS.reduce((s, r) => s + r.rating, 0) / total : 0;
-  const spoilerCount = SEED_REVIEWS.filter((r) => r.spoiler).length;
-  const spoilerPct = total ? Math.round((spoilerCount / total) * 100) : 0;
-  const distinctTitles = new Set(SEED_REVIEWS.map((r) => r.titleId)).size;
-
-  // ── 가장 많이 리뷰된 작품 TOP 5 ──
-  const byTitle = new Map<string, number>();
-  for (const r of SEED_REVIEWS) byTitle.set(r.titleId, (byTitle.get(r.titleId) ?? 0) + 1);
-  const topReviewed = Array.from(byTitle.entries())
-    .map(([titleId, count]) => ({ title: getTitle(titleId), count }))
-    .filter((x): x is { title: NonNullable<ReturnType<typeof getTitle>>; count: number } => !!x.title)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
-  const spoilerHidden = sp.spoiler === "hide";
-  const ratingFilter = sp.rating;
-  let pool = allReviewsJoined();
-  if (spoilerHidden) pool = pool.filter((r) => !r.spoiler);
-  if (ratingFilter === "high") pool = pool.filter((r) => r.rating >= 4);
-  else if (ratingFilter === "low") pool = pool.filter((r) => r.rating <= 3);
-  const feed = sortReviews(pool, sort);
+  const { feed, topReviewed, stats } = await getReviewsData({
+    sort: sp.sort,
+    spoiler: sp.spoiler,
+    rating: sp.rating,
+  });
 
   return (
     <div>
@@ -85,25 +43,25 @@ export default async function ReviewsPage({
             <dl className="mt-9 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-6">
               <div className="flex flex-col gap-1">
                 <dt className="text-xs text-fg-3">총 리뷰</dt>
-                <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>
+                <dd className="numeral tnum text-2xl text-fg">{stats.total.toLocaleString("ko-KR")}</dd>
               </div>
               <div className="flex flex-col gap-1">
                 <dt className="text-xs text-fg-3">평균 별점</dt>
                 <dd className="flex items-center gap-2">
-                  <Stars value={avg} size="sm" />
-                  <span className="numeral tnum text-2xl text-fg">{avg.toFixed(2)}</span>
+                  <Stars value={stats.avg} size="sm" />
+                  <span className="numeral tnum text-2xl text-fg">{stats.avg.toFixed(2)}</span>
                 </dd>
               </div>
               <div className="flex flex-col gap-1">
                 <dt className="text-xs text-fg-3">스포일러 포함</dt>
                 <dd className="numeral tnum text-2xl text-fg">
-                  {spoilerPct}
+                  {stats.spoilerPct}
                   <span className="ml-0.5 text-base text-fg-3">%</span>
                 </dd>
               </div>
               <div className="flex flex-col gap-1">
                 <dt className="text-xs text-fg-3">리뷰된 작품</dt>
-                <dd className="numeral tnum text-2xl text-fg">{distinctTitles.toLocaleString("ko-KR")}</dd>
+                <dd className="numeral tnum text-2xl text-fg">{stats.distinctTitles.toLocaleString("ko-KR")}</dd>
               </div>
             </dl>
           </div>

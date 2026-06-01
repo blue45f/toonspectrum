@@ -146,6 +146,13 @@ export interface RankedTitle {
   rank: number;
   score: number;
   delta: number; // 표시용 순위 변동
+  evidence?: {
+    source: "formula" | "live";
+    liveMatched?: boolean;
+    liveRank?: number;
+    livePlatform?: string;
+    liveBoost?: number;
+  };
 }
 
 export function rankBy(

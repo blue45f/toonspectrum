@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import {
-  TITLES,
-  getTitle,
-  reviewsFor,
-  originalOf,
-  adaptationsOf,
-} from "@/lib/data";
-import { similarTitles } from "@/lib/recommend";
+import { findTitle, getTitleDetail, getTitleStaticParams } from "@/lib/server/title";
 import { Container, Section, Rail } from "@/components/section";
 import { TitlePoster } from "@/components/title-poster";
 import { TitleCard } from "@/components/title-card";
@@ -23,13 +16,14 @@ import { AuthorLine } from "@/components/author-line";
 import { ReviewForm } from "@/components/review-form";
 import { ReviewCard } from "@/components/review-card";
 import { LiveReviews } from "@/components/live-reviews";
+import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { STATUS_LABEL, AGE_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 import { formatCount } from "@/lib/utils";
 import { Eye, Heart, Bookmark, Star, Layers, MapPin } from "lucide-react";
 
 export async function generateStaticParams() {
-  return TITLES.map((t) => ({ slug: t.slug }));
+  return getTitleStaticParams();
 }
 
 export async function generateMetadata({
@@ -38,7 +32,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const t = getTitle(slug);
+  const t = findTitle(slug);
   if (!t) return { title: "작품을 찾을 수 없어요" };
   return {
     title: `${t.title} · ${TYPE_LABEL[t.type]}`,
@@ -52,19 +46,10 @@ export default async function TitleDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const title = getTitle(slug);
-  if (!title) notFound();
+  const detail = await getTitleDetail(slug);
+  if (!detail) notFound();
 
-  const reviews = [...reviewsFor(title.id)].sort((a, b) => b.likes - a.likes);
-  const similar = similarTitles(TITLES, title, 8);
-
-  // 어댑테이션 패밀리
-  const original = originalOf(title) ?? title;
-  const adaptations = adaptationsOf(original);
-  const hasFamily = adaptations.length > 0;
-
-  const reviewAvg =
-    reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+  const { title, reviews, similar, original, adaptations, hasFamily, reviewAvg, reviewCount } = detail;
 
   // 별점이 실수집(네이버 웹툰)이 아니라 합성값인 작품인지 — 표시에 '추정' 명시.
   // (평가수는 전 작품 파생값이라 정확수치 대신 약식 표기로 false precision 회피)
@@ -76,7 +61,7 @@ export default async function TitleDetailPage({
     { icon: Eye, label: "조회", value: fmtStat(title.stats.views) },
     { icon: Heart, label: "좋아요", value: fmtStat(title.stats.likes) },
     { icon: Bookmark, label: "관심", value: fmtStat(title.stats.bookmarks) },
-    { icon: Star, label: "평가", value: fmtStat(title.stats.ratingCount) },
+    { icon: Star, label: "평가", value: fmtStat(reviewCount) },
   ];
 
   return (
@@ -148,16 +133,16 @@ export default async function TitleDetailPage({
           {/* 평점 블록 */}
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-card p-5">
             <div className="flex items-center gap-3">
-              <span className="numeral text-4xl text-accent">{title.stats.ratingAvg.toFixed(1)}</span>
+              <span className="numeral text-4xl text-accent">{reviewAvg.toFixed(1)}</span>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <Stars value={title.stats.ratingAvg} size="md" />
+                  <Stars value={reviewAvg} size="md" />
                   {estimated && <Badge tone="neutral">추정</Badge>}
                 </div>
                 <p className="mt-1 text-xs text-fg-3">
                   {estimated
-                    ? `약 ${formatCount(title.stats.ratingCount)} 평가 (추정)`
-                    : `${formatCount(title.stats.ratingCount)}명의 평가`}
+                    ? `약 ${formatCount(reviewCount)} 평가 (추정)`
+                    : `${formatCount(reviewCount)}개의 평가`}
                 </p>
               </div>
             </div>
@@ -245,6 +230,15 @@ export default async function TitleDetailPage({
         </Section>
       )}
 
+      <Section
+        className="mt-14"
+        eyebrow="COMMUNITY"
+        title={`${title.title} 팬카페`}
+        desc="작품 해석, 정주행 메모, 팬아트 아이디어를 독자들과 나눕니다."
+      >
+        <FanCafePanel scope="title" targetId={title.id} targetLabel={title.title} />
+      </Section>
+
       {/* ░ 리뷰 ░ */}
       <Section
         className="mt-14"
@@ -269,7 +263,7 @@ export default async function TitleDetailPage({
             <LiveReviews titleId={title.id} />
             {reviews.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
-                <p className="text-sm text-fg-2">아직 샘플 리뷰가 없어요.</p>
+                <p className="text-sm text-fg-2">아직 리뷰가 없어요.</p>
                 <p className="mt-1 text-xs text-fg-3">
                   로그인 후 첫 리뷰를 남기면 모든 독자에게 공유됩니다.
                 </p>
@@ -277,10 +271,10 @@ export default async function TitleDetailPage({
             ) : (
               <>
                 {reviews.length > 0 && (
-                  <p className="text-xs text-fg-3">샘플 리뷰 {reviews.length}</p>
+                  <p className="text-xs text-fg-3">리뷰 {reviews.length}개</p>
                 )}
                 {reviews.map((r) => (
-                  <ReviewCard key={r.id} review={r} />
+                  <ReviewCard key={r.id} review={r} enableReplies />
                 ))}
               </>
             )}

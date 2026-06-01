@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { TITLES, activeTags } from "@/lib/data";
-import { searchTitles, type SearchFilters, type SortKey } from "@/lib/search";
-import type { WorkType, SerialStatus, AgeRating, PlatformId } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import type { SortKey } from "@/lib/search";
+import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib/types";
 import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { TitleCard, TitleRow } from "./title-card";
@@ -29,10 +28,6 @@ const YEAR_RANGES: { label: string; range: [number, number] | null }[] = [
   { label: "2014-17", range: [2014, 2017] },
   { label: "~2013", range: [0, 2013] },
 ];
-
-const TOP_TAGS = activeTags()
-  .slice(0, 18)
-  .map((t) => t.tag);
 
 function toggle<T>(arr: T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -69,37 +64,64 @@ export function SearchExplorer({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [limit, setLimit] = useState(24);
+  const [results, setResults] = useState<Title[]>([]);
+  const [typeCount, setTypeCount] = useState({ webtoon: 0, webnovel: 0 });
+  const [topTags, setTopTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const results = useMemo(() => {
-    const filters: SearchFilters = {
-      q,
-      types: types.length ? types : undefined,
-      genres: genres.length ? genres : undefined,
-      tags: tags.length ? tags : undefined,
-      status: status.length ? status : undefined,
-      platforms: platforms.length ? platforms : undefined,
-      ageRatings: ages.length ? ages : undefined,
-      minRating: minRating || undefined,
-      yearMin: yearRange?.[0],
-      yearMax: yearRange?.[1],
-      freeOnly,
-      adaptedOnly,
+  const query = useMemo(() => {
+    const params = new URLSearchParams({ sort });
+    if (q) params.set("q", q);
+    if (types.length) params.set("types", types.join(","));
+    if (genres.length) params.set("genres", genres.join(","));
+    if (tags.length) params.set("tags", tags.join(","));
+    if (status.length) params.set("status", status.join(","));
+    if (platforms.length) params.set("platforms", platforms.join(","));
+    if (ages.length) params.set("ages", ages.join(","));
+    if (minRating) params.set("minRating", String(minRating));
+    if (yearRange) {
+      params.set("yearMin", String(yearRange[0]));
+      params.set("yearMax", String(yearRange[1]));
+    }
+    if (freeOnly) params.set("freeOnly", "true");
+    if (adaptedOnly) params.set("adaptedOnly", "true");
+    return params.toString();
+  }, [adaptedOnly, ages, freeOnly, genres, minRating, platforms, q, sort, status, tags, types, yearRange]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    fetch(`/api/search?${query}`, { cache: "no-store", signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("search failed");
+        return res.json() as Promise<{
+          items: Title[];
+          typeCount: { webtoon: number; webnovel: number };
+          topTags: string[];
+        }>;
+      })
+      .then((data) => {
+        if (!alive) return;
+        setResults(data.items);
+        setTypeCount(data.typeCount);
+        setTopTags(data.topTags);
+        setLimit(24);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setResults([]);
+        setTypeCount({ webtoon: 0, webnovel: 0 });
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
     };
-    return searchTitles(TITLES, filters, sort);
-  }, [q, types, genres, tags, status, platforms, ages, minRating, yearRange, freeOnly, adaptedOnly, sort]);
-
-  // 필터/정렬이 바뀌면 페이지네이션 리셋 (렌더 중 파생 상태 조정 패턴)
-  const [prevResults, setPrevResults] = useState(results);
-  if (prevResults !== results) {
-    setPrevResults(results);
-    setLimit(24);
-  }
+  }, [query]);
 
   const shown = results.slice(0, limit);
-  const typeCount = {
-    webtoon: results.filter((t) => t.type === "webtoon").length,
-    webnovel: results.filter((t) => t.type === "webnovel").length,
-  };
 
   const activeCount =
     types.length +
@@ -159,7 +181,7 @@ export function SearchExplorer({
 
       <FacetGroup title="태그">
         <div className="flex flex-wrap gap-1.5">
-          {TOP_TAGS.map((t) => (
+          {topTags.map((t) => (
             <button
               key={t}
               onClick={() => setTags((p) => toggle(p, t))}
@@ -416,7 +438,17 @@ export function SearchExplorer({
         )}
 
         {/* 결과 */}
-        {results.length === 0 ? (
+        {loading ? (
+          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="space-y-3">
+                <div className="skeleton aspect-[3/4] rounded-xl" />
+                <div className="skeleton h-4 w-3/4" />
+                <div className="skeleton h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : results.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
             <p className="text-sm text-fg-2">조건에 맞는 작품이 없어요.</p>
             <button onClick={reset} className="mt-2 text-sm text-accent hover:underline">
