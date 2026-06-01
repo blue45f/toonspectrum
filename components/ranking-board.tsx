@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import Link from "@/src/compat/router-link";
 import {
   RANK_AXES,
@@ -54,6 +54,7 @@ interface RankingMeta {
     enabled: boolean;
     day: string | null;
     fetchedAt: string | null;
+    nextRefreshAt: string | null;
     ttlSeconds: number | null;
     timeoutMs: number | null;
     fetched: number;
@@ -357,6 +358,10 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const forceRefresh = useRef(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(60_000);
+  const [nextRefreshAt, setNextRefreshAt] = useState<number | null>(null);
+  const [refreshCountdown, setRefreshCountdown] = useState<number | null>(null);
 
   const axisDetail = axisMeta(axis);
   const metric = metricFor(axis);
@@ -372,6 +377,7 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
       minRating: String(minRating),
       rising: String(risingOnly),
       limit: "50",
+      refresh: "false",
     });
     return params.toString();
   }, [axis, genre, minRating, period, platform, pricing, risingOnly, status, type]);
@@ -381,11 +387,18 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
     const controller = new AbortController();
 
     async function load(silent = false) {
+      const shouldForce = forceRefresh.current;
       setState((prev) => (silent && prev === "ready" ? "refreshing" : "loading"));
       setError(null);
+      const url = new URLSearchParams(query);
+      if (shouldForce) {
+        url.set("refresh", "true");
+      } else {
+        url.delete("refresh");
+      }
 
       try {
-        const res = await fetch(`/api/ranking?${query}`, {
+        const res = await fetch(`/api/ranking?${url.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -395,25 +408,60 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
         setRanked(data.items);
         setRankingMeta(data.meta);
         setInsights(data.insights);
+        const ttlSeconds =
+          data.meta.live.ttlSeconds ??
+          (data.meta.live.enabled ? Math.max(30, data.meta.refreshSeconds) : data.meta.refreshSeconds);
+        setPollIntervalMs(Math.max(30_000, Math.min(300_000, ttlSeconds * 1000)));
+        if (data.meta.live.fetchedAt) {
+          if (data.meta.live.nextRefreshAt) {
+            const scheduled = new Date(data.meta.live.nextRefreshAt).getTime();
+            if (Number.isFinite(scheduled)) {
+              setNextRefreshAt(scheduled);
+            } else {
+              setNextRefreshAt(new Date(data.meta.live.fetchedAt).getTime() + ttlSeconds * 1000);
+            }
+          } else {
+            setNextRefreshAt(new Date(data.meta.live.fetchedAt).getTime() + ttlSeconds * 1000);
+          }
+        } else {
+          setNextRefreshAt(Date.now() + Math.max(30_000, Math.min(300_000, ttlSeconds * 1000)));
+        }
         setState("ready");
       } catch (err) {
         if (!alive || controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "랭킹을 불러오지 못했습니다.");
         setState("error");
+      } finally {
+        forceRefresh.current = false;
       }
     }
 
     load();
-    const timer = window.setInterval(() => load(true), 60_000);
+    const timer = window.setInterval(() => load(true), pollIntervalMs);
     return () => {
       alive = false;
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [query, refreshKey]);
+  }, [pollIntervalMs, query, refreshKey]);
+
+  useEffect(() => {
+    if (!nextRefreshAt) {
+      setRefreshCountdown(null);
+      return;
+    }
+
+    const tick = () => {
+      setRefreshCountdown(Math.max(0, Math.floor((nextRefreshAt - Date.now()) / 1000)));
+    };
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [nextRefreshAt]);
 
   const isLoading = state === "loading";
   const isRefreshing = state === "refreshing";
+  const refreshLabel = refreshCountdown === null ? "자동 갱신 대기" : `${refreshCountdown}초`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -584,7 +632,10 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
           </div>
           <button
             type="button"
-            onClick={() => setRefreshKey((current) => current + 1)}
+            onClick={() => {
+              forceRefresh.current = true;
+              setRefreshKey((current) => current + 1);
+            }}
             className="inline-flex size-10 items-center justify-center rounded-lg border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
             title="랭킹 새로고침"
             aria-label="랭킹 새로고침"
@@ -592,6 +643,9 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
             <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
           </button>
           <span className="inline-flex h-10 items-center rounded-lg border border-line bg-card px-3 text-sm text-fg-3">
+            <span className="mr-1 text-fg">다음 갱신:</span>
+            <span className="numeral mr-1 text-fg">{refreshLabel}</span>
+            <span>·</span>
             <span className="numeral mr-1 text-fg">{ranked.length}</span>편
           </span>
           <Segmented

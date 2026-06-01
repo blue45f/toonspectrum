@@ -3,16 +3,44 @@ import type { PlatformId, SerialStatus } from "../types";
 import { PLATFORMS } from "../platforms";
 import { kstDayOfWeek } from "../utils";
 
+type CacheEntry<T> = { signature: string; fetchedAt: number; expiresAt: number; result: T };
+
+interface LiveFetchOptions {
+  forceRefresh?: boolean;
+  allowStale?: boolean;
+}
+
 // 서버 전용 — 외부 플랫폼에서 실시간 랭킹/완결 신호를 가져온다.
 // 현재는 네이버/카카오가 실사용 상태이며, 리디·레진·봄툰·탑툰·포스타입은 어댑터 슬롯을 선등록합니다.
 // 플랫폼별 어댑터만 구현하면 라이브 보정 파이프라인은 동일하게 동작합니다.
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const REVALIDATE = 600; // 10분 (최대한 실시간성 유지 + 캐시로 소스 보호)
+const REVALIDATE = parseConfigNumber(process.env.WEBTOON_LIVE_TTL_SECONDS, 120, 30, 1800);
 const TIMEOUT_MS = 3500;
 const STATUS_FINISHED_PAGE_CAP = 12;
 const WEEK = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const LIVE_CACHE_TTL_MS = REVALIDATE * 1000;
+const LIVE_REFRESH_INTERVAL_SECONDS = parseConfigNumber(
+  process.env.WEBTOON_LIVE_REFRESH_INTERVAL_SECONDS,
+  Math.min(300, Math.max(60, REVALIDATE)),
+  30,
+  1800
+);
+const SCHEDULE_LIMIT = 30;
+
+let liveRankingScheduler: ReturnType<typeof setInterval> | null = null;
 type LiveSourceName = "네이버웹툰" | "카카오웹툰" | "리디" | "레진" | "봄툰" | "탑툰" | "포스타입";
+
+function parseConfigNumber(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
 
 export interface LiveItem {
   key: string;
@@ -65,13 +93,11 @@ export interface LiveStatusResult {
   sources: LiveSourceStatus[];
 }
 
-let statusCache:
-  | {
-      signature: string;
-      expiresAt: number;
-      result: LiveStatusResult;
-    }
-  | null = null;
+let statusCache: CacheEntry<LiveStatusResult> | null = null;
+const statusInflight = new Map<string, Promise<LiveStatusResult>>();
+
+let liveRankingCache: CacheEntry<LiveRankingResult> | null = null;
+const liveRankingInflight = new Map<string, Promise<LiveRankingResult>>();
 
 interface LiveRankingSource {
   platformId: PlatformId;
@@ -233,6 +259,31 @@ async function fetchKakao(day: string, limit = 8): Promise<LiveFetchResult> {
 function statusSignature(knownKeys?: Set<string>): string {
   if (!knownKeys?.size) return "*";
   return [...knownKeys].sort().join(",");
+}
+
+function isCacheFresh<T>(cache: CacheEntry<T> | null, signature: string, now: number): cache is CacheEntry<T> {
+  return Boolean(cache && cache.signature === signature && cache.expiresAt > now);
+}
+
+function makeCacheEntry<T>(
+  signature: string,
+  result: T,
+  now: number
+): { signature: string; fetchedAt: number; expiresAt: number; result: T } {
+  return { signature, fetchedAt: now, expiresAt: now + LIVE_CACHE_TTL_MS, result };
+}
+
+function resolveLiveRankingSources(platformFilter?: Set<PlatformId> | null): LiveRankingSource[] {
+  if (!platformFilter || platformFilter.size === 0) {
+    return LIVE_RANKING_SOURCES.filter((source) => source.enabled);
+  }
+
+  return LIVE_RANKING_SOURCES.filter((source) => source.enabled && platformFilter.has(source.platformId));
+}
+
+function liveRankingSignature(day: string, limit: number, sources: LiveRankingSource[]): string {
+  const ids = [...sources].map((source) => source.platformId).sort().join(",");
+  return `${day}|${limit}|${ids || "none"}`;
 }
 
 function naverStatusFrom(raw: Record<string, unknown>): LiveStatusSignal["status"] {
@@ -423,89 +474,139 @@ export function getLiveStatusPlatforms(): Set<PlatformId> {
   );
 }
 
+export function startLiveRankingScheduler(limit = SCHEDULE_LIMIT, intervalSeconds = LIVE_REFRESH_INTERVAL_SECONDS): void {
+  if (liveRankingScheduler) return;
+  const interval = Math.max(20, Math.min(1800, intervalSeconds));
+  liveRankingScheduler = globalThis.setInterval(() => {
+    void getLiveRanking(limit, null, { forceRefresh: true }).catch(() => {});
+  }, interval * 1000);
+  void getLiveRanking(limit, null, { forceRefresh: true }).catch(() => {});
+}
+
 // 실시간 인기 — 등록된 활성 소스의 오늘자 인기 순서를 병합
-export async function getLiveRanking(limit = 12): Promise<LiveRankingResult> {
+export async function getLiveRanking(
+  limit = 12,
+  platformFilter?: Set<PlatformId> | null,
+  options: LiveFetchOptions = {}
+): Promise<LiveRankingResult> {
   const day = WEEK[kstDayOfWeek()]; // KST 기준 요일 (소스가 KST로 요일별 랭킹 제공)
-  const activeSources = LIVE_RANKING_SOURCES.filter((source) => source.enabled);
-  if (!activeSources.length) {
-    return {
-      items: [],
+  const activeSources = resolveLiveRankingSources(platformFilter);
+  const signature = liveRankingSignature(day, limit, activeSources);
+  const now = Date.now();
+  const { allowStale = false, forceRefresh = false } = options;
+
+  if (!forceRefresh && isCacheFresh(liveRankingCache, signature, now)) {
+    return liveRankingCache.result;
+  }
+
+  if (!forceRefresh && allowStale && liveRankingCache && liveRankingCache.signature === signature) {
+    if (!liveRankingInflight.has(signature)) {
+      void getLiveRanking(limit, platformFilter, { ...options, forceRefresh: true });
+    }
+    return liveRankingCache.result;
+  }
+
+  const inFlight = liveRankingInflight.get(signature);
+  if (inFlight) return inFlight;
+
+  const request = (async () => {
+    const sourceResults = await (async () => {
+      if (!activeSources.length) {
+        return [
+          {
+            items: [],
+            status: {
+              name: "네이버웹툰" as const,
+              ok: true,
+              fetched: 0,
+              latencyMs: 0,
+              message: "no active sources",
+            },
+          },
+        ];
+      }
+      return Promise.all(activeSources.map((source) => source.fetchRanking(day, limit)));
+    })();
+
+    const merged: LiveItem[] = [];
+    const max = Math.max(...sourceResults.map((result) => result.items.length), 0);
+    for (let i = 0; i < max && merged.length < limit; i += 1) {
+      for (const result of sourceResults) {
+        if (!result.items[i]) continue;
+        merged.push(result.items[i]);
+        if (merged.length >= limit) break;
+      }
+    }
+
+    const result: LiveRankingResult = {
+      items: merged.map((it, i) => ({ ...it, rank: i + 1 })),
       day,
       fetchedAt: new Date().toISOString(),
       ttlSeconds: REVALIDATE,
       timeoutMs: TIMEOUT_MS,
-      sources: [],
+      sources: sourceResults.map((result) => result.status),
     };
-  }
+    liveRankingCache = makeCacheEntry(signature, result, now);
+    return result;
+  })();
 
-  const sourceResults = await Promise.all(activeSources.map((source) => source.fetchRanking(day, limit)));
-  const merged: LiveItem[] = [];
-  const max = Math.max(...sourceResults.map((result) => result.items.length), 0);
-  for (let i = 0; i < max && merged.length < limit; i += 1) {
-    for (const result of sourceResults) {
-      if (!result.items[i]) continue;
-      merged.push(result.items[i]);
-      if (merged.length >= limit) break;
-    }
+  liveRankingInflight.set(signature, request);
+  try {
+    return await request;
+  } finally {
+    liveRankingInflight.delete(signature);
   }
-
-  return {
-    items: merged.map((it, i) => ({ ...it, rank: i + 1 })),
-    day,
-    fetchedAt: new Date().toISOString(),
-    ttlSeconds: REVALIDATE,
-    timeoutMs: TIMEOUT_MS,
-    sources: sourceResults.map((result) => result.status),
-  };
 }
 
 export async function getLiveStatusSignals(knownKeys?: Set<string>): Promise<LiveStatusResult> {
   const signature = statusSignature(knownKeys);
   const now = Date.now();
-  if (statusCache && statusCache.signature === signature && statusCache.expiresAt > now) {
-    return statusCache.result;
-  }
+  if (isCacheFresh(statusCache, signature, now)) return statusCache.result;
 
-  const statusSources = LIVE_RANKING_SOURCES.filter((source) => source.enabled && source.fetchStatusSignals);
-  if (!statusSources.length) {
-    const result = {
-      items: [],
+  const inFlight = statusInflight.get(signature);
+  if (inFlight) return inFlight;
+
+  const request = (async () => {
+    const statusSources = LIVE_RANKING_SOURCES.filter((source) => source.enabled && source.fetchStatusSignals);
+    if (!statusSources.length) {
+      const result = {
+        items: [],
+        fetchedAt: new Date().toISOString(),
+        ttlSeconds: REVALIDATE,
+        timeoutMs: TIMEOUT_MS,
+        sources: [],
+      };
+      statusCache = makeCacheEntry(signature, result, now);
+      return result;
+    }
+
+    const fetchedStatuses = await Promise.all(
+      statusSources.map((source) => source.fetchStatusSignals!(knownKeys).then((result) => result))
+    );
+    const deduped = new Map<string, LiveStatusSignal>();
+    for (const fetched of fetchedStatuses) {
+      for (const signal of fetched.statusItems) {
+        if (!deduped.has(signal.key)) {
+          deduped.set(signal.key, signal);
+        }
+      }
+    }
+
+    const result: LiveStatusResult = {
+      items: [...deduped.values()],
       fetchedAt: new Date().toISOString(),
       ttlSeconds: REVALIDATE,
       timeoutMs: TIMEOUT_MS,
-      sources: [],
+      sources: fetchedStatuses.map((fetched) => fetched.status),
     };
-    statusCache = {
-      signature,
-      expiresAt: now + REVALIDATE * 1000,
-      result,
-    };
+    statusCache = makeCacheEntry(signature, result, now);
     return result;
-  }
+  })();
 
-  const fetchedStatuses = await Promise.all(
-    statusSources.map((source) => source.fetchStatusSignals!(knownKeys).then((result) => result))
-  );
-  const deduped = new Map<string, LiveStatusSignal>();
-  for (const fetched of fetchedStatuses) {
-    for (const signal of fetched.statusItems) {
-      if (!deduped.has(signal.key)) {
-        deduped.set(signal.key, signal);
-      }
-    }
+  statusInflight.set(signature, request);
+  try {
+    return await request;
+  } finally {
+    statusInflight.delete(signature);
   }
-
-  const result = {
-    items: [...deduped.values()],
-    fetchedAt: new Date().toISOString(),
-    ttlSeconds: REVALIDATE,
-    timeoutMs: TIMEOUT_MS,
-    sources: fetchedStatuses.map((fetched) => fetched.status),
-  };
-  statusCache = {
-    signature,
-    expiresAt: now + REVALIDATE * 1000,
-    result,
-  };
-  return result;
 }

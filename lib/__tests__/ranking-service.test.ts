@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getRankingData, normalizeRankingParams, shouldFetchLiveSignals } from "../server/ranking-service";
+import {
+  getRankingData,
+  normalizeRankingParams,
+  shouldFetchLiveSignals,
+  type LiveRankingFetcher,
+} from "../server/ranking-service";
 import type { LiveRankingResult } from "../server/live";
 import { makeTitle } from "./fixtures";
 
@@ -160,5 +165,67 @@ describe("ranking service", () => {
     expect(data.items).toHaveLength(1);
     expect(data.items[0]?.title.id).toBe("nw-rest");
     expect(data.items[0]?.title.status).toBe("hiatus");
+  });
+
+  it("refresh=true는 라이브 수집을 강제 동기 갱신 모드로 요청한다", async () => {
+    const calls: Array<{
+      limit: number;
+      options: {
+        forceRefresh?: boolean;
+        allowStale?: boolean;
+      } | undefined;
+    }> = [];
+    const fixedTime = "2026-06-01T00:00:00.000Z";
+    const ttlSeconds = 90;
+    const live: LiveRankingFetcher = async (limit, _platformFilter, options) => {
+      calls.push({ limit: limit ?? 0, options });
+      return {
+        items: [],
+        day: "sat",
+        fetchedAt: fixedTime,
+        ttlSeconds,
+        timeoutMs: 3500,
+        sources: [{ name: "네이버웹툰" as const, ok: true, fetched: 0, latencyMs: 12, message: "test" }],
+      };
+    };
+
+    const data = await getRankingData(
+      query({ axis: "popular", period: "daily", refresh: "true", limit: "5" }),
+      {
+        catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
+        fetchLive: live,
+        now: () => new Date("2026-06-01T00:00:10.000Z"),
+      }
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.options?.forceRefresh).toBe(true);
+    expect(calls[0]?.options?.allowStale).toBe(false);
+    expect(data.meta.live.nextRefreshAt).toBe(new Date(Date.parse(fixedTime) + ttlSeconds * 1000).toISOString());
+  });
+
+  it("refresh가 없으면 라이브 수집은 stale 폴백용 옵션을 사용한다", async () => {
+    const calls: Array<{
+      options: {
+        forceRefresh?: boolean;
+        allowStale?: boolean;
+      } | undefined;
+    }> = [];
+    const live: LiveRankingFetcher = async (_limit, _platformFilter, options) => {
+      calls.push({ options });
+      return emptyLive();
+    };
+
+    await getRankingData(
+      query({ axis: "popular", period: "daily", limit: "5" }),
+      {
+        catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
+        fetchLive: live,
+      }
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.options?.forceRefresh).toBe(false);
+    expect(calls[0]?.options?.allowStale).toBe(true);
   });
 });

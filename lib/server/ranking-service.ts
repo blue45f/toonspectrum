@@ -52,6 +52,7 @@ export interface RankingParams {
   minRating: number;
   onlyRising: boolean;
   limit: number;
+  refresh: boolean;
 }
 
 export interface RankingInsights {
@@ -101,6 +102,7 @@ export interface RankingResponse {
       enabled: boolean;
       day: string | null;
       fetchedAt: string | null;
+      nextRefreshAt: string | null;
       ttlSeconds: number | null;
       timeoutMs: number | null;
       fetched: number;
@@ -115,7 +117,11 @@ export interface RankingResponse {
   insights: RankingInsights;
 }
 
-export type LiveRankingFetcher = (limit?: number) => Promise<LiveRankingResult>;
+export type LiveRankingFetcher = (
+  limit?: number,
+  platformFilter?: Set<PlatformId> | null,
+  options?: { forceRefresh?: boolean; allowStale?: boolean }
+) => Promise<LiveRankingResult>;
 export type LiveStatusFetcher = (knownKeys?: Set<string>) => Promise<LiveStatusResult>;
 
 function pick<T extends string>(raw: string | null, allowed: Set<T>, fallback: T): T {
@@ -126,6 +132,10 @@ function pickLimit(raw: string | null): number {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_RANKING_LIMIT;
   return Math.max(1, Math.min(MAX_RANKING_LIMIT, Math.floor(parsed)));
+}
+
+function pickRefresh(raw: string | null): boolean {
+  return raw === "1" || raw === "true";
 }
 
 function pickRating(raw: string | null): number {
@@ -157,6 +167,7 @@ export function normalizeRankingParams(q: QueryReader): RankingParams {
     status: pick(q.get("status"), validStatuses, "all"),
     pricing: pick(q.get("pricing"), validPricing, "all"),
     minRating: pickRating(q.get("minRating")),
+    refresh: pickRefresh(q.get("refresh")),
     onlyRising: q.get("rising") === "true",
     limit: pickLimit(q.get("limit")),
   };
@@ -461,14 +472,26 @@ export async function getRankingData(
   let liveItems: LiveItem[] = [];
   let liveDay: string | null = null;
   let liveFetchedAt: string | null = null;
+  let liveNextRefreshAt: string | null = null;
   let liveTtlSeconds: number | null = null;
   let timeoutMs: number | null = null;
   let liveSources: LiveSourceStatus[] = [];
   if (shouldFetchLive) {
-    const live = await fetchLive(30);
+    const platformFilter =
+      params.platform === "all" ? null : new Set<PlatformId>([params.platform]);
+    const live = await fetchLive(30, platformFilter, {
+      forceRefresh: params.refresh,
+      allowStale: !params.refresh,
+    });
     liveItems = live.items;
     liveDay = live.day;
     liveFetchedAt = live.fetchedAt;
+    if (live.fetchedAt && live.ttlSeconds) {
+      const fetchedAtMs = Date.parse(live.fetchedAt);
+      if (Number.isFinite(fetchedAtMs)) {
+        liveNextRefreshAt = new Date(fetchedAtMs + live.ttlSeconds * 1000).toISOString();
+      }
+    }
     liveTtlSeconds = live.ttlSeconds;
     timeoutMs = live.timeoutMs;
     liveSources = live.sources;
@@ -503,6 +526,7 @@ export async function getRankingData(
         enabled: shouldFetchLive,
         day: liveDay,
         fetchedAt: liveFetchedAt,
+        nextRefreshAt: liveNextRefreshAt,
         ttlSeconds: liveTtlSeconds,
         timeoutMs,
         fetched: liveItems.length,

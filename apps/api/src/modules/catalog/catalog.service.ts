@@ -7,6 +7,7 @@ import { getHomeData } from "../../../../../lib/server/home";
 import { getCalendarData } from "../../../../../lib/server/calendar";
 import { getInsightsData } from "../../../../../lib/server/insights";
 import { getExploreData } from "../../../../../lib/server/explore";
+import { startLiveRankingScheduler } from "../../../../../lib/server/live";
 import { getRankingData, getRankingHealth } from "../../../../../lib/server/ranking-service";
 import { getAuthorData } from "../../../../../lib/server/author";
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
@@ -68,6 +69,10 @@ type RatingMap = Record<string, number>;
 
 @Injectable()
 export class CatalogService {
+  constructor() {
+    startLiveRankingScheduler();
+  }
+
   async getHomeData() {
     return getHomeData();
   }

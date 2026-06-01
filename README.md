@@ -76,6 +76,7 @@ node scripts/crawl.mjs    # lib/data/titles.ts 재생성 (요일·완결 웹툰 
 - **표지 썸네일**: 핫링크/CORS 회피를 위해 Nest API의 `/api/cover` 프록시(허용 호스트 `*.pstatic.net`, `*.kakaopagecdn.com`, `*.kakaocdn.net`)를 경유해 표시.
 - 평가 수·평점 분포·완독률·몰입 지수 등 공개되지 않는 일부 보조 지표는 추정값이며, 랭킹은 실제 수집 데이터에 산식을 적용해 계산합니다.
 - **플랫폼 확장**: `PlatformId`/`PLATFORMS`는 네이버·카카오 외에 리디, 레진, 봄툰, 탑툰, 포스타입까지 등록할 수 있는 구조입니다. 실제 완결·휴재·랭킹 신호는 플랫폼별 수집 어댑터를 추가해 보강합니다.
+- **랭킹 실시간성**: 실시간 라이브 보정은 `WEBTOON_LIVE_TTL_SECONDS`(기본 120초)와 `WEBTOON_LIVE_REFRESH_INTERVAL_SECONDS`(기본 TTL 기반, 최소 60초)로 운영합니다. 더 빠르게 만들고 싶으면 두 값 모두 축소하세요. (단, 외부 소스 호출량이 늘어납니다.)
 
 ## 실행
 
