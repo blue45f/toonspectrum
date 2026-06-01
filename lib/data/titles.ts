@@ -38,16 +38,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1527620874,
-      "likes": 1381103,
-      "bookmarks": 1381103,
+      "likes": 1381118,
+      "bookmarks": 1381118,
       "ratingAvg": 4.8,
-      "ratingCount": 441953,
+      "ratingCount": 441958,
       "ratingDist": [
         0,
         1,
         1554,
-        118441,
-        321957
+        118443,
+        321960
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -94,16 +94,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 881614870,
-      "likes": 1897242,
-      "bookmarks": 1897242,
+      "likes": 1897223,
+      "bookmarks": 1897223,
       "ratingAvg": 4.9,
-      "ratingCount": 607117,
+      "ratingCount": 607111,
       "ratingDist": [
         0,
         0,
         1189,
-        126402,
-        479526
+        126400,
+        479521
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -149,16 +149,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 774860256,
-      "likes": 1386425,
-      "bookmarks": 1386425,
+      "likes": 1386469,
+      "bookmarks": 1386469,
       "ratingAvg": 4.8,
-      "ratingCount": 443656,
+      "ratingCount": 443670,
       "ratingDist": [
         0,
         1,
         1560,
-        118898,
-        323197
+        118901,
+        323207
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -202,16 +202,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 644053615,
-      "likes": 323891,
-      "bookmarks": 323891,
+      "likes": 323888,
+      "bookmarks": 323888,
       "ratingAvg": 4.8,
-      "ratingCount": 103645,
+      "ratingCount": 103644,
       "ratingDist": [
         0,
         0,
         365,
         27776,
-        75504
+        75503
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -261,16 +261,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 354266224,
-      "likes": 2463318,
-      "bookmarks": 2463318,
+      "likes": 2463411,
+      "bookmarks": 2463411,
       "ratingAvg": 4.7,
-      "ratingCount": 788262,
+      "ratingCount": 788292,
       "ratingDist": [
         0,
         3,
         4868,
-        265760,
-        517631
+        265771,
+        517650
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -317,16 +317,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 343529092,
-      "likes": 2740945,
-      "bookmarks": 2740945,
+      "likes": 2741027,
+      "bookmarks": 2741027,
       "ratingAvg": 4.9,
-      "ratingCount": 877102,
+      "ratingCount": 877129,
       "ratingDist": [
         0,
         1,
         1717,
-        182613,
-        692772
+        182618,
+        692793
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -376,16 +376,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 257694256,
-      "likes": 80886,
-      "bookmarks": 80886,
+      "likes": 80885,
+      "bookmarks": 80885,
       "ratingAvg": 5,
-      "ratingCount": 25884,
+      "ratingCount": 25883,
       "ratingDist": [
         0,
         0,
         28,
         4108,
-        21749
+        21748
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -435,16 +435,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 253649540,
-      "likes": 485805,
-      "bookmarks": 485805,
+      "likes": 485821,
+      "bookmarks": 485821,
       "ratingAvg": 5,
-      "ratingCount": 155458,
+      "ratingCount": 155463,
       "ratingDist": [
         0,
         0,
         166,
-        24671,
-        130621
+        24672,
+        130625
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -494,16 +494,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 225292680,
-      "likes": 257002,
-      "bookmarks": 257002,
+      "likes": 257007,
+      "bookmarks": 257007,
       "ratingAvg": 5,
-      "ratingCount": 82241,
+      "ratingCount": 82242,
       "ratingDist": [
         0,
         0,
         88,
         13052,
-        69101
+        69102
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -547,8 +547,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 218908912,
-      "likes": 159838,
-      "bookmarks": 159838,
+      "likes": 159836,
+      "bookmarks": 159836,
       "ratingAvg": 4.5,
       "ratingCount": 51148,
       "ratingDist": [
@@ -602,16 +602,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 211127300,
-      "likes": 1309692,
-      "bookmarks": 1309692,
+      "likes": 1309686,
+      "bookmarks": 1309686,
       "ratingAvg": 5,
-      "ratingCount": 419101,
+      "ratingCount": 419100,
       "ratingDist": [
         0,
         0,
         448,
         66511,
-        352142
+        352141
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -660,16 +660,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 162951846,
-      "likes": 588395,
-      "bookmarks": 588395,
+      "likes": 588385,
+      "bookmarks": 588385,
       "ratingAvg": 4.8,
-      "ratingCount": 188286,
+      "ratingCount": 188283,
       "ratingDist": [
         0,
         0,
         662,
-        50460,
-        137164
+        50459,
+        137162
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -713,16 +713,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 156759386,
-      "likes": 157036,
-      "bookmarks": 157036,
+      "likes": 157061,
+      "bookmarks": 157061,
       "ratingAvg": 5,
-      "ratingCount": 50252,
+      "ratingCount": 50260,
       "ratingDist": [
         0,
         0,
         54,
-        7975,
-        42223
+        7976,
+        42230
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -767,16 +767,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 141372969,
-      "likes": 896449,
-      "bookmarks": 896449,
+      "likes": 896447,
+      "bookmarks": 896447,
       "ratingAvg": 5,
-      "ratingCount": 286864,
+      "ratingCount": 286863,
       "ratingDist": [
         0,
         0,
         307,
         45525,
-        241032
+        241031
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -820,21 +820,73 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 129213391,
-      "likes": 791766,
-      "bookmarks": 791766,
+      "likes": 791773,
+      "bookmarks": 791773,
       "ratingAvg": 4.9,
-      "ratingCount": 253365,
+      "ratingCount": 253367,
       "ratingDist": [
         0,
         0,
         496,
         52751,
-        200118
+        200120
       ],
       "rankDelta": 0,
       "trendingScore": 50,
       "completionRate": 90,
       "bingeIndex": 96
+    },
+    "featured": false
+  },
+  {
+    "id": "nw-679519",
+    "slug": "nw-679519",
+    "type": "webtoon",
+    "title": "대학일기",
+    "author": "자까",
+    "artist": "자까",
+    "genres": [
+      "코미디"
+    ],
+    "tags": [
+      "개그",
+      "컷툰",
+      "완결개그"
+    ],
+    "synopsis": "로망이 꽃피는 캠퍼스는 없다. 극사실주의에 기반한 너무나 현실적인 우리의 대학일기",
+    "cover": [
+      "oklch(0.45 0.14 100)",
+      "oklch(0.28 0.1 140)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F679519%2Fthumbnail%2Fthumbnail_IMAG21_3559076483126814265.jpg",
+    "status": "completed",
+    "ageRating": "all",
+    "releaseYear": 2016,
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=679519"
+      }
+    ],
+    "stats": {
+      "views": 122034683,
+      "likes": 721172,
+      "bookmarks": 721172,
+      "ratingAvg": 5,
+      "ratingCount": 230775,
+      "ratingDist": [
+        0,
+        0,
+        247,
+        36624,
+        193904
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 90,
+      "bingeIndex": 97
     },
     "featured": false
   },
@@ -930,16 +982,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 107824492,
-      "likes": 456665,
-      "bookmarks": 456665,
+      "likes": 456683,
+      "bookmarks": 456683,
       "ratingAvg": 5,
-      "ratingCount": 146133,
+      "ratingCount": 146139,
       "ratingDist": [
         0,
         0,
         156,
-        23191,
-        122786
+        23192,
+        122791
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -989,19 +1041,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 103340238,
-      "likes": 325082,
-      "bookmarks": 325082,
+      "likes": 325075,
+      "bookmarks": 325075,
       "ratingAvg": 5,
-      "ratingCount": 104026,
+      "ratingCount": 104024,
       "ratingDist": [
         0,
         0,
         111,
         16509,
-        87406
+        87404
       ],
       "rankDelta": 0,
-      "trendingScore": 50,
+      "trendingScore": 62,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -1047,19 +1099,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 84216016,
-      "likes": 148105,
-      "bookmarks": 148105,
+      "likes": 148110,
+      "bookmarks": 148110,
       "ratingAvg": 4.9,
-      "ratingCount": 47394,
+      "ratingCount": 47395,
       "ratingDist": [
         0,
         0,
         93,
-        9867,
-        37434
+        9868,
+        37435
       ],
       "rankDelta": 0,
-      "trendingScore": 50,
+      "trendingScore": 62,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -1105,19 +1157,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 69839914,
-      "likes": 1124577,
-      "bookmarks": 1124577,
+      "likes": 1124593,
+      "bookmarks": 1124593,
       "ratingAvg": 5,
-      "ratingCount": 359865,
+      "ratingCount": 359870,
       "ratingDist": [
         0,
         0,
         385,
-        57110,
-        302370
+        57111,
+        302374
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -1155,16 +1207,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 60153936,
-      "likes": 118134,
-      "bookmarks": 118134,
+      "likes": 118141,
+      "bookmarks": 118141,
       "ratingAvg": 5,
-      "ratingCount": 37803,
+      "ratingCount": 37805,
       "ratingDist": [
         0,
         0,
         40,
-        5999,
-        31763
+        6000,
+        31765
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1262,16 +1314,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 42620145,
-      "likes": 404688,
-      "bookmarks": 404688,
+      "likes": 404699,
+      "bookmarks": 404699,
       "ratingAvg": 5,
-      "ratingCount": 129500,
+      "ratingCount": 129504,
       "ratingDist": [
         0,
         0,
         138,
         20552,
-        108810
+        108813
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1314,16 +1366,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 38823639,
-      "likes": 274676,
-      "bookmarks": 274676,
+      "likes": 274766,
+      "bookmarks": 274766,
       "ratingAvg": 5,
-      "ratingCount": 87896,
+      "ratingCount": 87925,
       "ratingDist": [
         0,
         0,
         94,
-        13949,
-        73853
+        13954,
+        73877
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1372,10 +1424,10 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 24100237,
-      "likes": 155584,
-      "bookmarks": 155584,
+      "likes": 155588,
+      "bookmarks": 155588,
       "ratingAvg": 5,
-      "ratingCount": 49787,
+      "ratingCount": 49788,
       "ratingDist": [
         0,
         0,
@@ -1442,7 +1494,7 @@ export const TITLES: Title[] = [
         75260
       ],
       "rankDelta": 0,
-      "trendingScore": 50,
+      "trendingScore": 62,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -1489,16 +1541,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17565586,
-      "likes": 95557,
-      "bookmarks": 95557,
+      "likes": 95554,
+      "bookmarks": 95554,
       "ratingAvg": 4.9,
-      "ratingCount": 30578,
+      "ratingCount": 30577,
       "ratingDist": [
         0,
         0,
         60,
         6366,
-        24152
+        24151
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1541,16 +1593,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 17131272,
-      "likes": 107549,
-      "bookmarks": 107549,
+      "likes": 107548,
+      "bookmarks": 107548,
       "ratingAvg": 4.9,
-      "ratingCount": 34416,
+      "ratingCount": 34415,
       "ratingDist": [
         0,
         0,
         67,
         7165,
-        27183
+        27182
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1596,16 +1648,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 14985196,
-      "likes": 323923,
-      "bookmarks": 323923,
+      "likes": 323945,
+      "bookmarks": 323945,
       "ratingAvg": 5,
-      "ratingCount": 103655,
+      "ratingCount": 103662,
       "ratingDist": [
         0,
         0,
         111,
-        16450,
-        87094
+        16451,
+        87100
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1650,16 +1702,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13381599,
-      "likes": 73919,
-      "bookmarks": 73919,
+      "likes": 73926,
+      "bookmarks": 73926,
       "ratingAvg": 4.8,
-      "ratingCount": 23654,
+      "ratingCount": 23656,
       "ratingDist": [
         0,
         0,
         83,
-        6339,
-        17232
+        6340,
+        17233
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1702,16 +1754,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 13319379,
-      "likes": 547780,
-      "bookmarks": 547780,
+      "likes": 547841,
+      "bookmarks": 547841,
       "ratingAvg": 5,
-      "ratingCount": 175290,
+      "ratingCount": 175309,
       "ratingDist": [
         0,
         0,
         187,
-        27818,
-        147284
+        27821,
+        147300
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1761,8 +1813,8 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 12394615,
-      "likes": 78886,
-      "bookmarks": 78886,
+      "likes": 78887,
+      "bookmarks": 78887,
       "ratingAvg": 5,
       "ratingCount": 25244,
       "ratingDist": [
@@ -1813,16 +1865,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 11202926,
-      "likes": 376713,
-      "bookmarks": 376713,
+      "likes": 376808,
+      "bookmarks": 376808,
       "ratingAvg": 4.7,
-      "ratingCount": 120548,
+      "ratingCount": 120579,
       "ratingDist": [
         0,
         0,
-        744,
-        40642,
-        79161
+        745,
+        40653,
+        79181
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1867,16 +1919,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 10409921,
-      "likes": 705963,
-      "bookmarks": 705963,
+      "likes": 706074,
+      "bookmarks": 706074,
       "ratingAvg": 4.8,
-      "ratingCount": 225908,
+      "ratingCount": 225944,
       "ratingDist": [
         0,
         0,
         795,
-        60542,
-        164571
+        60552,
+        164597
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1925,16 +1977,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 9610578,
-      "likes": 313830,
-      "bookmarks": 313830,
+      "likes": 313839,
+      "bookmarks": 313839,
       "ratingAvg": 5,
-      "ratingCount": 100426,
+      "ratingCount": 100428,
       "ratingDist": [
         0,
         0,
         107,
         15938,
-        84381
+        84383
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -1983,16 +2035,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 1464454,
-      "likes": 599515,
-      "bookmarks": 599515,
+      "likes": 599595,
+      "bookmarks": 599595,
       "ratingAvg": 4.9,
-      "ratingCount": 191845,
+      "ratingCount": 191870,
       "ratingDist": [
         0,
         0,
         376,
-        39942,
-        151527
+        39947,
+        151547
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2041,16 +2093,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 294030,
-      "likes": 729162,
-      "bookmarks": 729162,
+      "likes": 729190,
+      "bookmarks": 729190,
       "ratingAvg": 5,
-      "ratingCount": 233332,
+      "ratingCount": 233341,
       "ratingDist": [
         0,
         0,
         250,
-        37030,
-        196053
+        37031,
+        196060
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2099,19 +2151,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 196680,
-      "bookmarks": 196680,
+      "likes": 196913,
+      "bookmarks": 196913,
       "ratingAvg": 5,
-      "ratingCount": 62938,
+      "ratingCount": 63012,
       "ratingDist": [
         0,
         0,
         67,
-        9988,
-        52882
+        10000,
+        52945
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2158,19 +2210,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 251225,
-      "bookmarks": 251225,
+      "likes": 251491,
+      "bookmarks": 251491,
       "ratingAvg": 5,
-      "ratingCount": 80392,
+      "ratingCount": 80477,
       "ratingDist": [
         0,
         0,
         86,
-        12758,
-        67548
+        12772,
+        67619
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2217,19 +2269,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 959690,
-      "bookmarks": 959690,
+      "likes": 959813,
+      "bookmarks": 959813,
       "ratingAvg": 4.9,
-      "ratingCount": 307101,
+      "ratingCount": 307140,
       "ratingDist": [
         0,
         0,
         601,
-        63938,
-        242561
+        63947,
+        242592
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -2273,19 +2325,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 346221,
-      "bookmarks": 346221,
+      "likes": 346706,
+      "bookmarks": 346706,
       "ratingAvg": 5,
-      "ratingCount": 110791,
+      "ratingCount": 110946,
       "ratingDist": [
         0,
         0,
-        118,
-        17582,
-        93090
+        119,
+        17607,
+        93220
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2332,16 +2384,16 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 304465,
-      "bookmarks": 304465,
+      "likes": 304594,
+      "bookmarks": 304594,
       "ratingAvg": 5,
-      "ratingCount": 97429,
+      "ratingCount": 97470,
       "ratingDist": [
         0,
         0,
         104,
-        15462,
-        81863
+        15468,
+        81897
       ],
       "rankDelta": 0,
       "trendingScore": 50,
@@ -2391,19 +2443,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 507838,
-      "bookmarks": 507838,
+      "likes": 507878,
+      "bookmarks": 507878,
       "ratingAvg": 4.9,
-      "ratingCount": 162508,
+      "ratingCount": 162521,
       "ratingDist": [
         0,
         0,
         318,
-        33834,
-        128356
+        33837,
+        128366
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -2449,19 +2501,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 739575,
-      "bookmarks": 739575,
+      "likes": 739611,
+      "bookmarks": 739611,
       "ratingAvg": 5,
-      "ratingCount": 236664,
+      "ratingCount": 236676,
       "ratingDist": [
         0,
         0,
         253,
-        37558,
-        198852
+        37560,
+        198863
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2507,19 +2559,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 362643,
-      "bookmarks": 362643,
+      "likes": 362833,
+      "bookmarks": 362833,
       "ratingAvg": 5,
-      "ratingCount": 116046,
+      "ratingCount": 116107,
       "ratingDist": [
         0,
         0,
         124,
-        18416,
-        97505
+        18426,
+        97557
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2566,21 +2618,80 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 23275,
-      "bookmarks": 23275,
+      "likes": 23321,
+      "bookmarks": 23321,
       "ratingAvg": 4.8,
-      "ratingCount": 7448,
+      "ratingCount": 7463,
       "ratingDist": [
         0,
         0,
         26,
-        1996,
-        5426
+        2000,
+        5437
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 95
+    },
+    "featured": false
+  },
+  {
+    "id": "nw-845271",
+    "slug": "nw-845271",
+    "type": "webtoon",
+    "title": "먹는 인생2",
+    "author": "홍끼",
+    "artist": "홍끼",
+    "genres": [
+      "일상"
+    ],
+    "tags": [
+      "일상",
+      "컷툰",
+      "공감",
+      "결혼생활",
+      "가족",
+      "연애/결혼공감"
+    ],
+    "synopsis": "행복한 일상에는 맛있는 음식이 빠질 수 없지! 맛있는 음식을 탐험하며 이어지는 일상 이야기",
+    "cover": [
+      "oklch(0.45 0.14 162)",
+      "oklch(0.28 0.1 202)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845271%2Fthumbnail%2Fthumbnail_IMAG21_b5f0f7d6-3527-4afb-8d66-f4de65d4d0ff.jpg",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2025,
+    "updateDays": [
+      "월",
+      "목"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=845271"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 70792,
+      "bookmarks": 70792,
+      "ratingAvg": 5,
+      "ratingCount": 22653,
+      "ratingDist": [
+        0,
+        0,
+        24,
+        3595,
+        19034
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
     },
     "featured": false
   },
@@ -2625,83 +2736,24 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 168061,
-      "bookmarks": 168061,
+      "likes": 168265,
+      "bookmarks": 168265,
       "ratingAvg": 5,
-      "ratingCount": 53780,
+      "ratingCount": 53845,
       "ratingDist": [
         0,
         0,
         58,
-        8535,
-        45188
+        8545,
+        45242
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
     "featured": false,
     "adaptedFrom": "nv-979745232"
-  },
-  {
-    "id": "nw-845271",
-    "slug": "nw-845271",
-    "type": "webtoon",
-    "title": "먹는 인생2",
-    "author": "홍끼",
-    "artist": "홍끼",
-    "genres": [
-      "일상"
-    ],
-    "tags": [
-      "일상",
-      "컷툰",
-      "공감",
-      "결혼생활",
-      "가족",
-      "연애/결혼공감"
-    ],
-    "synopsis": "행복한 일상에는 맛있는 음식이 빠질 수 없지! 맛있는 음식을 탐험하며 이어지는 일상 이야기",
-    "cover": [
-      "oklch(0.45 0.14 162)",
-      "oklch(0.28 0.1 202)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845271%2Fthumbnail%2Fthumbnail_IMAG21_b5f0f7d6-3527-4afb-8d66-f4de65d4d0ff.jpg",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2025,
-    "updateDays": [
-      "월",
-      "목"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=845271"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 70754,
-      "bookmarks": 70754,
-      "ratingAvg": 5,
-      "ratingCount": 22641,
-      "ratingDist": [
-        0,
-        0,
-        24,
-        3593,
-        19024
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 93,
-      "bingeIndex": 97
-    },
-    "featured": false
   },
   {
     "id": "nw-821195",
@@ -2743,19 +2795,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 288133,
-      "bookmarks": 288133,
+      "likes": 289163,
+      "bookmarks": 289163,
       "ratingAvg": 5,
-      "ratingCount": 92203,
+      "ratingCount": 92532,
       "ratingDist": [
         0,
         0,
         99,
-        14633,
-        77472
+        14685,
+        77748
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -2802,19 +2854,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 174420,
-      "bookmarks": 174420,
+      "likes": 174497,
+      "bookmarks": 174497,
       "ratingAvg": 4.9,
-      "ratingCount": 55814,
+      "ratingCount": 55839,
       "ratingDist": [
         0,
         0,
         109,
-        11620,
-        44084
+        11626,
+        44104
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -2861,48 +2913,51 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 53061,
-      "bookmarks": 53061,
+      "likes": 54382,
+      "bookmarks": 54382,
       "ratingAvg": 4.9,
-      "ratingCount": 16980,
+      "ratingCount": 17402,
       "ratingDist": [
         0,
         0,
-        33,
-        3535,
-        13412
+        34,
+        3623,
+        13745
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
     "featured": false
   },
   {
-    "id": "nw-844810",
-    "slug": "nw-844810",
+    "id": "nw-825332",
+    "slug": "nw-825332",
     "type": "webtoon",
-    "title": "죽여주는 변호사",
-    "author": "김정현",
-    "artist": "김정현",
+    "title": "아포칼립스에 집을 숨김",
+    "author": "DD",
+    "artist": "송지형",
     "genres": [
       "액션"
     ],
     "tags": [
       "액션",
-      "액션판타지",
-      "개그"
+      "생존",
+      "크리처",
+      "고인물",
+      "서바이벌",
+      "아포칼립스"
     ],
-    "synopsis": "킬러 조직 ‘글로리 클럽’의 C급 킬러 변호길. 어쩌다 보니 ‘변호사’가 되어버렸다. 하늘이 있으면 바닥도 있는 법! [킬러 배드로]와 세계관을 공유하지만 배드로는 구경도 못한 우리의 소시민 ‘킬러 변호길’의 이야기.",
+    "synopsis": "3년 뒤, 이 세상이 멸망하리라 예측하고 온갖 대비를 해온 '멸망주의자' 박규. 그리고 그의 예상대로, 어느 날 서울 핵 공습을 시작으로 전 세계는 핵 전쟁에 돌입. 미증유의 아포칼립스가 펼쳐진다. 모두의 비웃음에도 불구하고 전 재산을 털어 3년 전부터 묵묵히 자신만의 방공호를 파내려 간 보람이 있는 주인공 박규. 과연 그가 이 모든 일들을 내다본 것은 단순한 우연의 일치일까?",
     "cover": [
       "oklch(0.45 0.14 12)",
       "oklch(0.28 0.1 52)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F844810%2Fthumbnail%2Fthumbnail_IMAG21_cb5b50a4-1529-439e-bae6-951651d14d89.jpeg",
-    "status": "hiatus",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
+    "status": "ongoing",
     "ageRating": "15",
-    "releaseYear": 2025,
+    "releaseYear": 2024,
     "updateDays": [
       "월"
     ],
@@ -2911,28 +2966,29 @@ export const TITLES: Title[] = [
         "platformId": "naver-webtoon",
         "pricing": "free",
         "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=844810"
+        "url": "https://comic.naver.com/webtoon/list?titleId=825332"
       }
     ],
     "stats": {
       "views": 0,
-      "likes": 156198,
-      "bookmarks": 156198,
-      "ratingAvg": 5,
-      "ratingCount": 49983,
+      "likes": 127162,
+      "bookmarks": 127162,
+      "ratingAvg": 4.9,
+      "ratingCount": 40692,
       "ratingDist": [
         0,
         0,
-        53,
-        7932,
-        41997
+        80,
+        8472,
+        32140
       ],
       "rankDelta": 0,
       "trendingScore": 50,
-      "completionRate": 93,
-      "bingeIndex": 97
+      "completionRate": 92,
+      "bingeIndex": 96
     },
-    "featured": false
+    "featured": false,
+    "adaptedFrom": "nv-697669952"
   },
   {
     "id": "nw-834686",
@@ -2975,83 +3031,24 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 67211,
-      "bookmarks": 67211,
+      "likes": 67355,
+      "bookmarks": 67355,
       "ratingAvg": 4.9,
-      "ratingCount": 21508,
+      "ratingCount": 21554,
       "ratingDist": [
         0,
         0,
         42,
-        4478,
-        16988
+        4488,
+        17024
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
     "featured": false,
     "adaptedFrom": "nv-365493576"
-  },
-  {
-    "id": "nw-825332",
-    "slug": "nw-825332",
-    "type": "webtoon",
-    "title": "아포칼립스에 집을 숨김",
-    "author": "DD",
-    "artist": "송지형",
-    "genres": [
-      "액션"
-    ],
-    "tags": [
-      "액션",
-      "생존",
-      "크리처",
-      "고인물",
-      "서바이벌",
-      "아포칼립스"
-    ],
-    "synopsis": "3년 뒤, 이 세상이 멸망하리라 예측하고 온갖 대비를 해온 '멸망주의자' 박규. 그리고 그의 예상대로, 어느 날 서울 핵 공습을 시작으로 전 세계는 핵 전쟁에 돌입. 미증유의 아포칼립스가 펼쳐진다. 모두의 비웃음에도 불구하고 전 재산을 털어 3년 전부터 묵묵히 자신만의 방공호를 파내려 간 보람이 있는 주인공 박규. 과연 그가 이 모든 일들을 내다본 것은 단순한 우연의 일치일까?",
-    "cover": [
-      "oklch(0.45 0.14 12)",
-      "oklch(0.28 0.1 52)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2024,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=825332"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 127047,
-      "bookmarks": 127047,
-      "ratingAvg": 4.9,
-      "ratingCount": 40655,
-      "ratingDist": [
-        0,
-        0,
-        80,
-        8464,
-        32111
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 92,
-      "bingeIndex": 96
-    },
-    "featured": false,
-    "adaptedFrom": "nv-697669952"
   },
   {
     "id": "nw-849510",
@@ -3093,24 +3090,79 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 72064,
-      "bookmarks": 72064,
+      "likes": 72788,
+      "bookmarks": 72788,
       "ratingAvg": 4.9,
-      "ratingCount": 23060,
+      "ratingCount": 23292,
       "ratingDist": [
         0,
         0,
-        45,
-        4801,
-        18214
+        46,
+        4849,
+        18397
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
     "featured": false,
     "adaptedFrom": "nv-1539418320"
+  },
+  {
+    "id": "nw-844810",
+    "slug": "nw-844810",
+    "type": "webtoon",
+    "title": "죽여주는 변호사",
+    "author": "김정현",
+    "artist": "김정현",
+    "genres": [
+      "액션"
+    ],
+    "tags": [
+      "액션",
+      "액션판타지",
+      "개그"
+    ],
+    "synopsis": "킬러 조직 ‘글로리 클럽’의 C급 킬러 변호길. 어쩌다 보니 ‘변호사’가 되어버렸다. 하늘이 있으면 바닥도 있는 법! [킬러 배드로]와 세계관을 공유하지만 배드로는 구경도 못한 우리의 소시민 ‘킬러 변호길’의 이야기.",
+    "cover": [
+      "oklch(0.45 0.14 12)",
+      "oklch(0.28 0.1 52)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F844810%2Fthumbnail%2Fthumbnail_IMAG21_cb5b50a4-1529-439e-bae6-951651d14d89.jpeg",
+    "status": "hiatus",
+    "ageRating": "15",
+    "releaseYear": 2025,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=844810"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 156271,
+      "bookmarks": 156271,
+      "ratingAvg": 5,
+      "ratingCount": 50007,
+      "ratingDist": [
+        0,
+        0,
+        53,
+        7936,
+        42017
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
+    },
+    "featured": false
   },
   {
     "id": "nw-818780",
@@ -3152,19 +3204,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 91059,
-      "bookmarks": 91059,
+      "likes": 91189,
+      "bookmarks": 91189,
       "ratingAvg": 5,
-      "ratingCount": 29139,
+      "ratingCount": 29180,
       "ratingDist": [
         0,
         0,
         31,
-        4624,
-        24483
+        4631,
+        24518
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -3211,19 +3263,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 317883,
-      "bookmarks": 317883,
+      "likes": 317982,
+      "bookmarks": 317982,
       "ratingAvg": 5,
-      "ratingCount": 101723,
+      "ratingCount": 101754,
       "ratingDist": [
         0,
         0,
         109,
-        16143,
-        85471
+        16148,
+        85497
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -3269,19 +3321,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 19851,
-      "bookmarks": 19851,
+      "likes": 20123,
+      "bookmarks": 20123,
       "ratingAvg": 4.8,
-      "ratingCount": 6352,
+      "ratingCount": 6439,
       "ratingDist": [
         0,
         0,
-        22,
-        1702,
-        4627
+        23,
+        1726,
+        4691
       ],
       "rankDelta": 0,
-      "trendingScore": 87,
+      "trendingScore": 75,
       "completionRate": 92,
       "bingeIndex": 95
     },
@@ -3327,19 +3379,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 389080,
-      "bookmarks": 389080,
+      "likes": 389152,
+      "bookmarks": 389152,
       "ratingAvg": 4.9,
-      "ratingCount": 124506,
+      "ratingCount": 124529,
       "ratingDist": [
         0,
         0,
         244,
-        25922,
-        98340
+        25927,
+        98358
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -3386,19 +3438,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 92239,
-      "bookmarks": 92239,
+      "likes": 92458,
+      "bookmarks": 92458,
       "ratingAvg": 5,
-      "ratingCount": 29516,
+      "ratingCount": 29587,
       "ratingDist": [
         0,
         0,
         32,
-        4684,
-        24800
+        4695,
+        24860
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -3444,19 +3496,78 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 293933,
-      "bookmarks": 293933,
+      "likes": 294115,
+      "bookmarks": 294115,
       "ratingAvg": 5,
-      "ratingCount": 94059,
+      "ratingCount": 94117,
       "ratingDist": [
         0,
         0,
         101,
-        14927,
-        79031
+        14936,
+        79080
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
+    },
+    "featured": false
+  },
+  {
+    "id": "nw-817945",
+    "slug": "nw-817945",
+    "type": "webtoon",
+    "title": "어린이집 다니는 구나",
+    "author": "구나",
+    "artist": "구나",
+    "genres": [
+      "일상"
+    ],
+    "tags": [
+      "일상",
+      "컷툰",
+      "공감",
+      "무해한",
+      "러블리",
+      "힐링"
+    ],
+    "synopsis": "\"노는 게 제일 좋아!\" 라고 했더니 정말 노는 게 직업이 됐다?! 매일 동심의 세계로 출퇴근한지 어쩌다 10년째! 아이들이라면 알 만큼 안다고 생각했는데... 예측불가한 말과 행동들은 여전히 새롭기만 하다. 그런 아이들에게 언제나 \"그랬구나\" 라고 말해주는, 10년차 프로공감러 구나가 들려주는 어린이집 선생님 이야기",
+    "cover": [
+      "oklch(0.45 0.14 162)",
+      "oklch(0.28 0.1 202)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F817945%2Fthumbnail%2Fthumbnail_IMAG21_c90a6d9e-3df5-41c4-b11a-7c6e61a89174.jpg",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2023,
+    "updateDays": [
+      "월",
+      "수"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=817945"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 118842,
+      "bookmarks": 118842,
+      "ratingAvg": 5,
+      "ratingCount": 38029,
+      "ratingDist": [
+        0,
+        0,
+        41,
+        6035,
+        31953
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -3502,19 +3613,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 48255,
-      "bookmarks": 48255,
+      "likes": 48392,
+      "bookmarks": 48392,
       "ratingAvg": 4.9,
-      "ratingCount": 15442,
+      "ratingCount": 15485,
       "ratingDist": [
         0,
         0,
         30,
-        3215,
-        12197
+        3224,
+        12231
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -3560,19 +3671,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 37189,
-      "bookmarks": 37189,
+      "likes": 37233,
+      "bookmarks": 37233,
       "ratingAvg": 5,
-      "ratingCount": 11900,
+      "ratingCount": 11915,
       "ratingDist": [
         0,
         0,
         13,
-        1889,
-        9999
+        1891,
+        10011
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -3618,83 +3729,24 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 108028,
-      "bookmarks": 108028,
+      "likes": 108157,
+      "bookmarks": 108157,
       "ratingAvg": 5,
-      "ratingCount": 34569,
+      "ratingCount": 34610,
       "ratingDist": [
         0,
         0,
         37,
-        5486,
-        29046
+        5493,
+        29080
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
     "featured": false,
     "adaptedFrom": "nv-1605341444"
-  },
-  {
-    "id": "nw-817945",
-    "slug": "nw-817945",
-    "type": "webtoon",
-    "title": "어린이집 다니는 구나",
-    "author": "구나",
-    "artist": "구나",
-    "genres": [
-      "일상"
-    ],
-    "tags": [
-      "일상",
-      "컷툰",
-      "공감",
-      "무해한",
-      "러블리",
-      "힐링"
-    ],
-    "synopsis": "\"노는 게 제일 좋아!\" 라고 했더니 정말 노는 게 직업이 됐다?! 매일 동심의 세계로 출퇴근한지 어쩌다 10년째! 아이들이라면 알 만큼 안다고 생각했는데... 예측불가한 말과 행동들은 여전히 새롭기만 하다. 그런 아이들에게 언제나 \"그랬구나\" 라고 말해주는, 10년차 프로공감러 구나가 들려주는 어린이집 선생님 이야기",
-    "cover": [
-      "oklch(0.45 0.14 162)",
-      "oklch(0.28 0.1 202)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F817945%2Fthumbnail%2Fthumbnail_IMAG21_c90a6d9e-3df5-41c4-b11a-7c6e61a89174.jpg",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2023,
-    "updateDays": [
-      "월",
-      "수"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=817945"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 118832,
-      "bookmarks": 118832,
-      "ratingAvg": 5,
-      "ratingCount": 38026,
-      "ratingDist": [
-        0,
-        0,
-        41,
-        6035,
-        31951
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 93,
-      "bingeIndex": 97
-    },
-    "featured": false
   },
   {
     "id": "nw-829195",
@@ -3737,19 +3789,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 71068,
-      "bookmarks": 71068,
+      "likes": 71115,
+      "bookmarks": 71115,
       "ratingAvg": 4.9,
-      "ratingCount": 22742,
+      "ratingCount": 22757,
       "ratingDist": [
         0,
         0,
         45,
-        4735,
-        17963
+        4738,
+        17974
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -3796,19 +3848,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 66663,
-      "bookmarks": 66663,
+      "likes": 66852,
+      "bookmarks": 66852,
       "ratingAvg": 4.9,
-      "ratingCount": 21332,
+      "ratingCount": 21393,
       "ratingDist": [
         0,
         0,
         42,
-        4441,
-        16849
+        4454,
+        16897
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -3852,19 +3904,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 279802,
-      "bookmarks": 279802,
+      "likes": 279825,
+      "bookmarks": 279825,
       "ratingAvg": 4.9,
-      "ratingCount": 89537,
+      "ratingCount": 89544,
       "ratingDist": [
         0,
         0,
         175,
-        18642,
-        70720
+        18643,
+        70726
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
@@ -3910,83 +3962,24 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 94744,
-      "bookmarks": 94744,
+      "likes": 94819,
+      "bookmarks": 94819,
       "ratingAvg": 4.9,
-      "ratingCount": 30318,
+      "ratingCount": 30342,
       "ratingDist": [
         0,
         0,
         59,
-        6312,
-        23946
+        6317,
+        23965
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
     "featured": false,
     "adaptedFrom": "nv-447779892"
-  },
-  {
-    "id": "nw-845531",
-    "slug": "nw-845531",
-    "type": "webtoon",
-    "title": "빌런의 순정",
-    "author": "수민",
-    "artist": "수민",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [
-      "로맨스",
-      "첫사랑",
-      "능력남",
-      "재벌남",
-      "집착남",
-      "사연녀"
-    ],
-    "synopsis": "비서인 연우는 부사장 윤석의 가스라이팅과 괴롭힘에 고향인 목산군으로 도망간다. 그곳에서 설양 건설의 전무 성헌을 만나게 되고, 얼음장 같던 성헌의 마음은 따스한 봄과 닮은 연우에게 녹아 스며든다. 한편 윤석은 연우를 찾으러 나서는데...",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845531%2Fthumbnail%2Fthumbnail_IMAG21_965eb180-1ea8-4aae-af26-433008b051db.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2025,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=845531"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 141592,
-      "bookmarks": 141592,
-      "ratingAvg": 5,
-      "ratingCount": 45309,
-      "ratingDist": [
-        0,
-        0,
-        48,
-        7191,
-        38070
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 93,
-      "bingeIndex": 97
-    },
-    "featured": false,
-    "adaptedFrom": "nv-800959187"
   },
   {
     "id": "nw-843310",
@@ -4027,74 +4020,21 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 83530,
-      "bookmarks": 83530,
+      "likes": 83673,
+      "bookmarks": 83673,
       "ratingAvg": 5,
-      "ratingCount": 26730,
+      "ratingCount": 26775,
       "ratingDist": [
         0,
         0,
         29,
-        4242,
-        22459
+        4249,
+        22497
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
-    },
-    "featured": false
-  },
-  {
-    "id": "nw-832243",
-    "slug": "nw-832243",
-    "type": "webtoon",
-    "title": "정신 차려, 전승연",
-    "author": "제민",
-    "artist": "제민",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [
-      "로맨스"
-    ],
-    "synopsis": "예쁜 얼굴, 큰 키, 특유의 분위기 덕에 인기가 많은 승연은 PC방에서 알바하며, 자신에게 호의를 보이는 남자 손님들에게 값싼 자존감을 얻곤 한다. 4학년이 된 지금은 학업에 매진해야 하는 걸 알지만, 쉽게 PC방 알바를 그만두지 못하는 승연은 은근 매력있는 이범을 만나게 되는데...",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F832243%2Fthumbnail%2Fthumbnail_IMAG21_10198941-e7d8-4a0e-abc5-cabc6759cca9.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2024,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=832243"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 100580,
-      "bookmarks": 100580,
-      "ratingAvg": 4.8,
-      "ratingCount": 32186,
-      "ratingDist": [
-        0,
-        0,
-        113,
-        8626,
-        23447
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 92,
-      "bingeIndex": 95
     },
     "featured": false
   },
@@ -4138,21 +4078,192 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 37487,
-      "bookmarks": 37487,
+      "likes": 38213,
+      "bookmarks": 38213,
       "ratingAvg": 4.9,
-      "ratingCount": 11996,
+      "ratingCount": 12228,
       "ratingDist": [
         0,
         0,
-        23,
-        2498,
-        9475
+        24,
+        2546,
+        9658
       ],
       "rankDelta": 0,
-      "trendingScore": 87,
+      "trendingScore": 75,
       "completionRate": 92,
       "bingeIndex": 96
+    },
+    "featured": false
+  },
+  {
+    "id": "nw-851187",
+    "slug": "nw-851187",
+    "type": "webtoon",
+    "title": "그린스킨",
+    "author": "승기사",
+    "artist": "파김치",
+    "genres": [
+      "판타지"
+    ],
+    "tags": [
+      "판타지",
+      "액션판타지",
+      "자극적인",
+      "생존",
+      "크리처",
+      "차원이동"
+    ],
+    "synopsis": "이세계에서 10년을 버텼다. 하지만 돌아온 건 배신과 죽음. 다시눈을 뜬 순간, 나는 인간이 아닌 고블린이 되어 있었다.",
+    "cover": [
+      "oklch(0.45 0.14 290)",
+      "oklch(0.28 0.1 330)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F851187%2Fthumbnail%2Fthumbnail_IMAG21_8da70ccf-1c0a-4279-8069-7abd08b32a4c.jpg",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2024,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=851187"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 5361,
+      "bookmarks": 5361,
+      "ratingAvg": 4.7,
+      "ratingCount": 1716,
+      "ratingDist": [
+        0,
+        0,
+        11,
+        579,
+        1127
+      ],
+      "rankDelta": 0,
+      "trendingScore": 75,
+      "completionRate": 91,
+      "bingeIndex": 94
+    },
+    "featured": false,
+    "adaptedFrom": "nv-1374052156"
+  },
+  {
+    "id": "nw-845531",
+    "slug": "nw-845531",
+    "type": "webtoon",
+    "title": "빌런의 순정",
+    "author": "수민",
+    "artist": "수민",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [
+      "로맨스",
+      "첫사랑",
+      "능력남",
+      "재벌남",
+      "집착남",
+      "사연녀"
+    ],
+    "synopsis": "비서인 연우는 부사장 윤석의 가스라이팅과 괴롭힘에 고향인 목산군으로 도망간다. 그곳에서 설양 건설의 전무 성헌을 만나게 되고, 얼음장 같던 성헌의 마음은 따스한 봄과 닮은 연우에게 녹아 스며든다. 한편 윤석은 연우를 찾으러 나서는데...",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F845531%2Fthumbnail%2Fthumbnail_IMAG21_965eb180-1ea8-4aae-af26-433008b051db.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2025,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=845531"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 141877,
+      "bookmarks": 141877,
+      "ratingAvg": 5,
+      "ratingCount": 45401,
+      "ratingDist": [
+        0,
+        0,
+        49,
+        7205,
+        38147
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
+    },
+    "featured": false,
+    "adaptedFrom": "nv-800959187"
+  },
+  {
+    "id": "nw-832243",
+    "slug": "nw-832243",
+    "type": "webtoon",
+    "title": "정신 차려, 전승연",
+    "author": "제민",
+    "artist": "제민",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [
+      "로맨스"
+    ],
+    "synopsis": "예쁜 얼굴, 큰 키, 특유의 분위기 덕에 인기가 많은 승연은 PC방에서 알바하며, 자신에게 호의를 보이는 남자 손님들에게 값싼 자존감을 얻곤 한다. 4학년이 된 지금은 학업에 매진해야 하는 걸 알지만, 쉽게 PC방 알바를 그만두지 못하는 승연은 은근 매력있는 이범을 만나게 되는데...",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F832243%2Fthumbnail%2Fthumbnail_IMAG21_10198941-e7d8-4a0e-abc5-cabc6759cca9.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2024,
+    "updateDays": [
+      "월"
+    ],
+    "availability": [
+      {
+        "platformId": "naver-webtoon",
+        "pricing": "free",
+        "isOriginal": true,
+        "url": "https://comic.naver.com/webtoon/list?titleId=832243"
+      }
+    ],
+    "stats": {
+      "views": 0,
+      "likes": 100604,
+      "bookmarks": 100604,
+      "ratingAvg": 4.8,
+      "ratingCount": 32193,
+      "ratingDist": [
+        0,
+        0,
+        113,
+        8628,
+        23452
+      ],
+      "rankDelta": 0,
+      "trendingScore": 50,
+      "completionRate": 92,
+      "bingeIndex": 95
     },
     "featured": false
   },
@@ -4196,50 +4307,50 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 127951,
-      "bookmarks": 127951,
+      "likes": 128084,
+      "bookmarks": 128084,
       "ratingAvg": 5,
-      "ratingCount": 40944,
+      "ratingCount": 40987,
       "ratingDist": [
         0,
         0,
         44,
-        6498,
-        34402
+        6505,
+        34439
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
     "featured": false
   },
   {
-    "id": "nw-849898",
-    "slug": "nw-849898",
+    "id": "nw-831416",
+    "slug": "nw-831416",
     "type": "webtoon",
-    "title": "페일 블루 아이즈",
-    "author": "LICO",
-    "artist": "당도삼십",
+    "title": "중세 판타지 속 망나니 경비조장",
+    "author": "스튜디오MW",
+    "artist": "혜륜",
     "genres": [
-      "로맨스"
+      "판타지"
     ],
     "tags": [
-      "로맨스",
-      "예술",
-      "고자극드라마",
-      "리얼로맨스",
-      "감성적인",
-      "자극적인"
+      "판타지",
+      "고인물",
+      "차원이동",
+      "이세계",
+      "먼치킨",
+      "소설원작"
     ],
-    "synopsis": "주은은 자신을 늘 외롭게 만드는 가족을 떠나 홀연히 영국으로 향한다. 그곳에서 만난 창백한 푸른눈의 남자, 에덴. 조악한 문신으로 온몸을 뒤덮은, 쓰레기 같은 펑크를 노래하는, 주변의 모든 여자를 열병에 들끓게 만드는, 하지만 살면서 본 가장 다정하고 가장 아름다운 남자. 주은은 그가 위험하다는 걸 알면서도 불가항력으로 그에게 끌리게 되는데…",
+    "synopsis": "노동법도 없는 무식한 중세. 전쟁과 빈곤, 마법과 비상식이 지배하는 이곳에서 경비조장은 오늘도 뺑이를 친다.",
     "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
+      "oklch(0.45 0.14 290)",
+      "oklch(0.28 0.1 330)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F849898%2Fthumbnail%2Fthumbnail_IMAG21_a2bb0dde-6ec3-46f1-8e69-3ab35a6f863f.jpg",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F831416%2Fthumbnail%2Fthumbnail_IMAG21_7261b246-0061-462a-abe7-0768f79c3b05.jpg",
     "status": "ongoing",
-    "ageRating": "19",
+    "ageRating": "15",
     "releaseYear": 2024,
     "updateDays": [
       "월"
@@ -4249,29 +4360,29 @@ export const TITLES: Title[] = [
         "platformId": "naver-webtoon",
         "pricing": "free",
         "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=849898"
+        "url": "https://comic.naver.com/webtoon/list?titleId=831416"
       }
     ],
     "stats": {
       "views": 0,
-      "likes": 24710,
-      "bookmarks": 24710,
-      "ratingAvg": 4.9,
-      "ratingCount": 7907,
+      "likes": 74360,
+      "bookmarks": 74360,
+      "ratingAvg": 5,
+      "ratingCount": 23795,
       "ratingDist": [
         0,
         0,
-        15,
-        1646,
-        6245
+        25,
+        3776,
+        19993
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 92,
-      "bingeIndex": 96
+      "trendingScore": 50,
+      "completionRate": 93,
+      "bingeIndex": 97
     },
     "featured": false,
-    "adaptedFrom": "nv-1629294240"
+    "adaptedFrom": "nv-2028916517"
   },
   {
     "id": "nw-828167",
@@ -4314,79 +4425,21 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 29352,
-      "bookmarks": 29352,
+      "likes": 29373,
+      "bookmarks": 29373,
       "ratingAvg": 5,
-      "ratingCount": 9393,
+      "ratingCount": 9399,
       "ratingDist": [
         0,
         0,
         10,
-        1491,
-        7892
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 93,
-      "bingeIndex": 97
-    },
-    "featured": false
-  },
-  {
-    "id": "nw-842977",
-    "slug": "nw-842977",
-    "type": "webtoon",
-    "title": "1초에 100만원",
-    "author": "이지호, 도보리",
-    "artist": "웨이브",
-    "genres": [
-      "판타지"
-    ],
-    "tags": [
-      "판타지",
-      "사이다",
-      "고자극드라마",
-      "자극적인",
-      "공감",
-      "하이퍼리얼리즘"
-    ],
-    "synopsis": "1초마다 100만원씩 한도가 올라가는 신비의 지갑. 단, 조건이 있다. 지갑에서 돈을 꺼내 쓰는 만큼 나와 관련된 무언가가 줄어든다는 것! 문제는, 줄어드는 것이 무엇인지는 알 수 없다고 하는데...? 그럼에도 지갑의 소유주가 되겠다고 결심한 사람들. 오늘 하루만, 이번 달까지만… 1초마다 100만원씩 생기는 달달한 현실에 이들은 자신이 어떤 대가를 치르고 있는지도 모른 채 돈을 꺼내고 또 꺼낸다. 불로소득으로 얻은 천문학적인 금액으로 원하는 행복을 살 수 있을까? 혹은, 그들이 잃고 있는 것이야",
-    "cover": [
-      "oklch(0.45 0.14 290)",
-      "oklch(0.28 0.1 330)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F842977%2Fthumbnail%2Fthumbnail_IMAG21_c4db8bbe-1c56-47e1-a9bd-4807cc4477a7.jpg",
-    "status": "hiatus",
-    "ageRating": "15",
-    "releaseYear": 2025,
-    "updateDays": [
-      "월"
-    ],
-    "availability": [
-      {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=842977"
-      }
-    ],
-    "stats": {
-      "views": 0,
-      "likes": 54798,
-      "bookmarks": 54798,
-      "ratingAvg": 4.8,
-      "ratingCount": 17535,
-      "ratingDist": [
-        0,
-        0,
-        62,
-        4699,
-        12774
+        1492,
+        7897
       ],
       "rankDelta": 0,
       "trendingScore": 50,
-      "completionRate": 92,
-      "bingeIndex": 95
+      "completionRate": 93,
+      "bingeIndex": 97
     },
     "featured": false
   },
@@ -4430,19 +4483,19 @@ export const TITLES: Title[] = [
     ],
     "stats": {
       "views": 0,
-      "likes": 186519,
-      "bookmarks": 186519,
+      "likes": 186644,
+      "bookmarks": 186644,
       "ratingAvg": 5,
-      "ratingCount": 59686,
+      "ratingCount": 59726,
       "ratingDist": [
         0,
         0,
         64,
-        9472,
-        50150
+        9478,
+        50184
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 93,
       "bingeIndex": 97
     },
@@ -4450,31 +4503,31 @@ export const TITLES: Title[] = [
     "adaptedFrom": "nv-710603139"
   },
   {
-    "id": "nw-840329",
-    "slug": "nw-840329",
+    "id": "nw-844226",
+    "slug": "nw-844226",
     "type": "webtoon",
-    "title": "십이지소녀",
-    "author": "지지, MAJOR",
-    "artist": "지지",
+    "title": "경경수의 개발만화",
+    "author": "경경수",
+    "artist": "경경수",
     "genres": [
-      "드라마"
+      "코미디"
     ],
     "tags": [
-      "드라마",
-      "하렘",
-      "러브코미디",
-      "동양풍로맨스",
-      "이능력",
-      "청춘"
+      "개그",
+      "컷툰",
+      "독자PICK",
+      "일상",
+      "가벼운",
+      "무해한"
     ],
-    "synopsis": "십이지 신을 정하는 게임에서 13위로 순위에 들지 못한 고양이 니나, 니나에 의해 몇 천년만에 십이지 게임은 다시 시작되고 열두 신이 세상에 강림하게 된다. 유쾌하고 러블리한 본격 초능력 판타지 소녀 액션!!",
+    "synopsis": "오늘도 에러 알람과 함께 시작되는 개발자의 하루. 출근길엔 버그 확인, 회의실에선 눈치게임, 밤엔 장애 리포트 작성. 하지만 그 모든 삽질조차 만화 소재가 된다. 출근부터 야근까지, 모든 순간을 웃음으로 리팩토링한 개발자 개그만화! 진짜 개발 몰라도 웃김. 그냥 웃고 가세요.",
     "cover": [
-      "oklch(0.45 0.14 35)",
-      "oklch(0.28 0.1 75)"
+      "oklch(0.45 0.14 100)",
+      "oklch(0.28 0.1 140)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F840329%2Fthumbnail%2Fthumbnail_IMAG21_98526ab3-c032-4a67-8512-ac19ab5ed9c5.jpg",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F844226%2Fthumbnail%2Fthumbnail_IMAG21_149b3a07-940d-440b-82e9-0106a0510dc6.jpg",
     "status": "ongoing",
-    "ageRating": "15",
+    "ageRating": "all",
     "releaseYear": 2025,
     "updateDays": [
       "월"
@@ -4484,84 +4537,670 @@ export const TITLES: Title[] = [
         "platformId": "naver-webtoon",
         "pricing": "free",
         "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=840329"
+        "url": "https://comic.naver.com/webtoon/list?titleId=844226"
       }
     ],
     "stats": {
       "views": 0,
-      "likes": 119779,
-      "bookmarks": 119779,
+      "likes": 19285,
+      "bookmarks": 19285,
       "ratingAvg": 4.9,
-      "ratingCount": 38329,
+      "ratingCount": 6171,
       "ratingDist": [
         0,
         0,
-        75,
-        7980,
-        30274
+        12,
+        1285,
+        4874
       ],
       "rankDelta": 0,
-      "trendingScore": 62,
+      "trendingScore": 50,
       "completionRate": 92,
       "bingeIndex": 96
     },
     "featured": false
   },
   {
-    "id": "nw-850709",
-    "slug": "nw-850709",
-    "type": "webtoon",
-    "title": "헤어져서 팝니다",
-    "author": "헛둘",
-    "artist": "정동생",
+    "id": "ns-14183305",
+    "slug": "ns-14183305",
+    "type": "webnovel",
+    "title": "디 오리진 (The Origin)",
+    "author": "미상",
     "genres": [
       "로맨스"
     ],
-    "tags": [
-      "로맨스",
-      "햇살남",
-      "후회남",
-      "미친작화",
-      "다정남",
-      "청춘로맨스"
-    ],
-    "synopsis": "대학교 4학년, ‘서정하’. 그녀는 과거 사귀었던 전남친이 준 스피커를 중고판매하기로 한다. 이유는 간단하다. 잘생기고 다정한 썸남, ‘박민준’이 생긴 그녀에게 그 스피커는 골칫덩이니까. 후련한 마음으로 중고 거래를 하는 ‘서정하’에게 찾아온 것은… 거래를 하러 온 전남친, ‘최서훈’. “이게 얼마짜리인데 고작 18만원에 팔아!?” 본격 중고거래로 시작하는 삼각관계 로맨스드라마!",
+    "tags": [],
+    "synopsis": "디 오리진 (The Origin) · 네이버 시리즈 인기 웹소설.",
     "cover": [
       "oklch(0.45 0.14 5)",
       "oklch(0.28 0.1 45)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F850709%2Fthumbnail%2Fthumbnail_IMAG21_481ba875-be9e-4168-b63e-f9cba5ae10e2.jpg",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
     "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2026,
-    "updateDays": [
-      "월"
-    ],
+    "ageRating": "19",
+    "releaseYear": 2022,
     "availability": [
       {
-        "platformId": "naver-webtoon",
-        "pricing": "free",
-        "isOriginal": true,
-        "url": "https://comic.naver.com/webtoon/list?titleId=850709"
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14183305"
       }
     ],
     "stats": {
-      "views": 0,
-      "likes": 28241,
-      "bookmarks": 28241,
-      "ratingAvg": 4.9,
-      "ratingCount": 9037,
+      "views": 9672881,
+      "likes": 483644,
+      "bookmarks": 483644,
+      "ratingAvg": 4.6,
+      "ratingCount": 193458,
       "ratingDist": [
         0,
+        2,
+        2042,
+        79902,
+        111512
+      ],
+      "rankDelta": 0,
+      "trendingScore": 92,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14229037",
+    "slug": "ns-14229037",
+    "type": "webnovel",
+    "title": "위험한 본능",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "위험한 본능 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260528_15%2Fpocket_1779953797569pMhon_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14229037"
+      }
+    ],
+    "stats": {
+      "views": 9358898,
+      "likes": 467945,
+      "bookmarks": 467945,
+      "ratingAvg": 4.56,
+      "ratingCount": 187178,
+      "ratingDist": [
         0,
-        18,
-        1882,
-        7138
+        3,
+        2429,
+        83167,
+        101580
+      ],
+      "rankDelta": 0,
+      "trendingScore": 91,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14205047",
+    "slug": "ns-14205047",
+    "type": "webnovel",
+    "title": "은밀한 친구 오빠",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "은밀한 친구 오빠 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "wait-free",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14205047"
+      }
+    ],
+    "stats": {
+      "views": 9075073,
+      "likes": 453754,
+      "bookmarks": 453754,
+      "ratingAvg": 4.52,
+      "ratingCount": 181502,
+      "ratingDist": [
+        0,
+        3,
+        2881,
+        86333,
+        92285
+      ],
+      "rankDelta": 0,
+      "trendingScore": 90,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14209287",
+    "slug": "ns-14209287",
+    "type": "webnovel",
+    "title": "로맨스의 법칙",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "로맨스의 법칙 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260522_5%2Fpocket_1779438579281gFeMj_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14209287"
+      }
+    ],
+    "stats": {
+      "views": 8803863,
+      "likes": 440193,
+      "bookmarks": 440193,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 176077,
+      "ratingDist": [
+        0,
+        5,
+        3402,
+        89212,
+        83458
+      ],
+      "rankDelta": 0,
+      "trendingScore": 89,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14209291",
+    "slug": "ns-14209291",
+    "type": "webnovel",
+    "title": "프린세스 메이커",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "프린세스 메이커 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260522_118%2Fpocket_1779438528137G4XL7_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14209291"
+      }
+    ],
+    "stats": {
+      "views": 8653838,
+      "likes": 432692,
+      "bookmarks": 432692,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 173077,
+      "ratingDist": [
+        0,
+        6,
+        4049,
+        92934,
+        76088
+      ],
+      "rankDelta": 0,
+      "trendingScore": 88,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14212748",
+    "slug": "ns-14212748",
+    "type": "webnovel",
+    "title": "들개",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "들개 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14212748"
+      }
+    ],
+    "stats": {
+      "views": 8484197,
+      "likes": 424210,
+      "bookmarks": 424210,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 169684,
+      "ratingDist": [
+        0,
+        8,
+        4783,
+        96062,
+        68831
       ],
       "rankDelta": 0,
       "trendingScore": 87,
-      "completionRate": 92,
-      "bingeIndex": 96
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14209211",
+    "slug": "ns-14209211",
+    "type": "webnovel",
+    "title": "집착 늑대가 돌아왔다",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "집착 늑대가 돌아왔다 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260526_182%2Fpocket_1779775655303Njawf_JPEG%2Fcover.jpg%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14209211"
+      }
+    ],
+    "stats": {
+      "views": 8354086,
+      "likes": 417704,
+      "bookmarks": 417704,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 167082,
+      "ratingDist": [
+        0,
+        11,
+        5644,
+        99212,
+        62215
+      ],
+      "rankDelta": 0,
+      "trendingScore": 86,
+      "completionRate": 72,
+      "bingeIndex": 91
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-12834377",
+    "slug": "ns-12834377",
+    "type": "webnovel",
+    "title": "솔스티스 Solstice",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "솔스티스 Solstice · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=12834377"
+      }
+    ],
+    "stats": {
+      "views": 8613781,
+      "likes": 430689,
+      "bookmarks": 430689,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 172276,
+      "ratingDist": [
+        0,
+        16,
+        6938,
+        106741,
+        58581
+      ],
+      "rankDelta": 0,
+      "trendingScore": 85,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-13097329",
+    "slug": "ns-13097329",
+    "type": "webnovel",
+    "title": "솔스티스 Solstice",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "솔스티스 Solstice · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=13097329"
+      }
+    ],
+    "stats": {
+      "views": 7962962,
+      "likes": 398148,
+      "bookmarks": 398148,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 159259,
+      "ratingDist": [
+        0,
+        20,
+        7608,
+        102432,
+        49199
+      ],
+      "rankDelta": 0,
+      "trendingScore": 84,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14196162",
+    "slug": "ns-14196162",
+    "type": "webnovel",
+    "title": "용담리 34호",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "용담리 34호 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14196162"
+      }
+    ],
+    "stats": {
+      "views": 8011726,
+      "likes": 400586,
+      "bookmarks": 400586,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 160234,
+      "ratingDist": [
+        0,
+        27,
+        9033,
+        106434,
+        44740
+      ],
+      "rankDelta": 0,
+      "trendingScore": 83,
+      "completionRate": 72,
+      "bingeIndex": 90
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14191103",
+    "slug": "ns-14191103",
+    "type": "webnovel",
+    "title": "오빠 친구 권동하는 후회하게 될 거야",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "오빠 친구 권동하는 후회하게 될 거야 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14191103"
+      }
+    ],
+    "stats": {
+      "views": 8010866,
+      "likes": 400543,
+      "bookmarks": 400543,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 160217,
+      "ratingDist": [
+        0,
+        37,
+        10604,
+        109349,
+        40227
+      ],
+      "rankDelta": 0,
+      "trendingScore": 82,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14202562",
+    "slug": "ns-14202562",
+    "type": "webnovel",
+    "title": "조폭 아저씨와 나쁜 짓",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "조폭 아저씨와 나쁜 짓 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14202562"
+      }
+    ],
+    "stats": {
+      "views": 7809584,
+      "likes": 390479,
+      "bookmarks": 390479,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 156192,
+      "ratingDist": [
+        0,
+        48,
+        12075,
+        108981,
+        35087
+      ],
+      "rankDelta": 0,
+      "trendingScore": 81,
+      "completionRate": 72,
+      "bingeIndex": 89
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-14169147",
+    "slug": "ns-14169147",
+    "type": "webnovel",
+    "title": "7년 연애, 그리고 내 직장 동료와 바람이 났다",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "7년 연애, 그리고 내 직장 동료와 바람이 났다 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260601_73%2Fpocket_1780299899440M1fbH_PNG%2F1780299898763.png%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=14169147"
+      }
+    ],
+    "stats": {
+      "views": 7442973,
+      "likes": 372149,
+      "bookmarks": 372149,
+      "ratingAvg": 4.6,
+      "ratingCount": 148860,
+      "ratingDist": [
+        0,
+        1,
+        1572,
+        61482,
+        85805
+      ],
+      "rankDelta": 0,
+      "trendingScore": 80,
+      "completionRate": 72,
+      "bingeIndex": 92
+    },
+    "featured": false
+  },
+  {
+    "id": "ns-2560570",
+    "slug": "ns-2560570",
+    "type": "webnovel",
+    "title": "우리의 시간",
+    "author": "미상",
+    "genres": [
+      "로맨스"
+    ],
+    "tags": [],
+    "synopsis": "우리의 시간 · 네이버 시리즈 인기 웹소설.",
+    "cover": [
+      "oklch(0.45 0.14 5)",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260601_130%2Fpocket_17802910235415ppEr_PNG%2F1780291022861.png%3Ftype%3Dm79",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2022,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/novel/detail.series?productNo=2560570"
+      }
+    ],
+    "stats": {
+      "views": 7208415,
+      "likes": 360421,
+      "bookmarks": 360421,
+      "ratingAvg": 4.56,
+      "ratingCount": 144168,
+      "ratingDist": [
+        0,
+        2,
+        1871,
+        64056,
+        78239
+      ],
+      "rankDelta": 0,
+      "trendingScore": 79,
+      "completionRate": 72,
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -4592,20 +5231,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 9267655,
-      "likes": 463383,
-      "bookmarks": 463383,
-      "ratingAvg": 4.6,
-      "ratingCount": 185353,
+      "views": 7167655,
+      "likes": 358383,
+      "bookmarks": 358383,
+      "ratingAvg": 4.52,
+      "ratingCount": 143353,
       "ratingDist": [
         0,
-        2,
-        1957,
-        76554,
-        106840
+        3,
+        2276,
+        68187,
+        72888
       ],
       "rankDelta": 0,
-      "trendingScore": 92,
+      "trendingScore": 78,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -4638,22 +5277,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 9102192,
-      "likes": 455110,
-      "bookmarks": 455110,
-      "ratingAvg": 4.56,
-      "ratingCount": 182044,
+      "views": 7002192,
+      "likes": 350110,
+      "bookmarks": 350110,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 140044,
       "ratingDist": [
         0,
-        2,
-        2362,
-        80885,
-        98794
+        4,
+        2706,
+        70955,
+        66379
       ],
       "rankDelta": 0,
-      "trendingScore": 91,
+      "trendingScore": 77,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -4684,22 +5323,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8833624,
-      "likes": 441681,
-      "bookmarks": 441681,
-      "ratingAvg": 4.52,
-      "ratingCount": 176672,
+      "views": 6733624,
+      "likes": 336681,
+      "bookmarks": 336681,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 134672,
       "ratingDist": [
         0,
-        3,
-        2805,
-        84035,
-        89829
+        5,
+        3151,
+        72312,
+        59204
       ],
       "rankDelta": 0,
-      "trendingScore": 90,
+      "trendingScore": 76,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -4730,20 +5369,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8682630,
-      "likes": 434132,
-      "bookmarks": 434132,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 173653,
+      "views": 6582630,
+      "likes": 329132,
+      "bookmarks": 329132,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 131653,
       "ratingDist": [
         0,
-        5,
-        3355,
-        87984,
-        82309
+        7,
+        3711,
+        74532,
+        53404
       ],
       "rankDelta": 0,
-      "trendingScore": 89,
+      "trendingScore": 75,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4776,20 +5415,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8796188,
-      "likes": 439809,
-      "bookmarks": 439809,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 175924,
+      "views": 6696188,
+      "likes": 334809,
+      "bookmarks": 334809,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 133924,
       "ratingDist": [
         0,
-        6,
-        4116,
-        94462,
-        77339
+        9,
+        4524,
+        79523,
+        49868
       ],
       "rankDelta": 0,
-      "trendingScore": 88,
+      "trendingScore": 74,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -4822,22 +5461,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8411172,
-      "likes": 420559,
-      "bookmarks": 420559,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 168224,
+      "views": 6311172,
+      "likes": 315559,
+      "bookmarks": 315559,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 126224,
       "ratingDist": [
         0,
-        8,
-        4741,
-        95235,
-        68239
+        12,
+        5084,
+        78207,
+        42921
       ],
       "rankDelta": 0,
-      "trendingScore": 87,
+      "trendingScore": 73,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -4868,22 +5507,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8381779,
-      "likes": 419089,
-      "bookmarks": 419089,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 167636,
+      "views": 6281779,
+      "likes": 314089,
+      "bookmarks": 314089,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 125636,
       "ratingDist": [
         0,
-        11,
-        5663,
-        99541,
-        62421
+        16,
+        6002,
+        80807,
+        38812
       ],
       "rankDelta": 0,
-      "trendingScore": 86,
+      "trendingScore": 72,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -4914,20 +5553,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8324148,
-      "likes": 416207,
-      "bookmarks": 416207,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 166483,
+      "views": 6224148,
+      "likes": 311207,
+      "bookmarks": 311207,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 124483,
       "ratingDist": [
         0,
-        16,
-        6705,
-        103152,
-        56611
+        21,
+        7017,
+        82687,
+        34757
       ],
       "rankDelta": 0,
-      "trendingScore": 85,
+      "trendingScore": 71,
       "completionRate": 72,
       "bingeIndex": 90
     },
@@ -4960,22 +5599,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8174142,
-      "likes": 408707,
-      "bookmarks": 408707,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 163483,
+      "views": 6074142,
+      "likes": 303707,
+      "bookmarks": 303707,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 121483,
       "ratingDist": [
         0,
-        21,
-        7810,
-        105149,
-        50504
+        28,
+        8040,
+        82913,
+        30502
       ],
       "rankDelta": 0,
-      "trendingScore": 84,
+      "trendingScore": 70,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5006,22 +5645,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 8023182,
-      "likes": 401159,
-      "bookmarks": 401159,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 160464,
+      "views": 5923182,
+      "likes": 296159,
+      "bookmarks": 296159,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 118464,
       "ratingDist": [
         0,
-        27,
-        9046,
-        106587,
-        44804
+        36,
+        9159,
+        82657,
+        26612
       ],
       "rankDelta": 0,
-      "trendingScore": 83,
+      "trendingScore": 69,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5052,22 +5691,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7992378,
-      "likes": 399619,
-      "bookmarks": 399619,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 159848,
+      "views": 5892378,
+      "likes": 294619,
+      "bookmarks": 294619,
+      "ratingAvg": 4.6,
+      "ratingCount": 117848,
       "ratingDist": [
         0,
-        37,
-        10579,
-        109097,
-        40135
+        1,
+        1244,
+        48673,
+        67929
       ],
       "rankDelta": 0,
-      "trendingScore": 82,
+      "trendingScore": 68,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5098,66 +5737,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7807848,
-      "likes": 390392,
-      "bookmarks": 390392,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 156157,
+      "views": 5707848,
+      "likes": 285392,
+      "bookmarks": 285392,
+      "ratingAvg": 4.56,
+      "ratingCount": 114157,
       "ratingDist": [
         0,
-        48,
-        12073,
-        108957,
-        35080
+        2,
+        1481,
+        50722,
+        61952
       ],
       "rankDelta": 0,
-      "trendingScore": 81,
-      "completionRate": 72,
-      "bingeIndex": 89
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14205047",
-    "slug": "ns-14205047",
-    "type": "webnovel",
-    "title": "은밀한 친구 오빠",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "은밀한 친구 오빠 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14205047"
-      }
-    ],
-    "stats": {
-      "views": 7575073,
-      "likes": 378754,
-      "bookmarks": 378754,
-      "ratingAvg": 4.6,
-      "ratingCount": 151502,
-      "ratingDist": [
-        0,
-        1,
-        1599,
-        62573,
-        87328
-      ],
-      "rankDelta": 0,
-      "trendingScore": 80,
+      "trendingScore": 67,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -5190,20 +5783,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7469832,
-      "likes": 373492,
-      "bookmarks": 373492,
-      "ratingAvg": 4.56,
-      "ratingCount": 149397,
+      "views": 5519832,
+      "likes": 275992,
+      "bookmarks": 275992,
+      "ratingAvg": 4.52,
+      "ratingCount": 110397,
       "ratingDist": [
         0,
         2,
-        1939,
-        66380,
-        81076
+        1752,
+        52511,
+        56131
       ],
       "rankDelta": 0,
-      "trendingScore": 79,
+      "trendingScore": 66,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -5236,22 +5829,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6987998,
-      "likes": 349400,
-      "bookmarks": 349400,
-      "ratingAvg": 4.52,
-      "ratingCount": 139760,
+      "views": 5037998,
+      "likes": 251900,
+      "bookmarks": 251900,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 100760,
       "ratingDist": [
         0,
         3,
-        2219,
-        66478,
-        71061
+        1947,
+        51052,
+        47759
       ],
       "rankDelta": 0,
-      "trendingScore": 78,
+      "trendingScore": 65,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5282,20 +5875,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7393287,
-      "likes": 369664,
-      "bookmarks": 369664,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 147866,
+      "views": 5443287,
+      "likes": 272164,
+      "bookmarks": 272164,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 108866,
       "ratingDist": [
         0,
         4,
-        2857,
-        74918,
-        70087
+        2547,
+        58456,
+        47859
       ],
       "rankDelta": 0,
-      "trendingScore": 77,
+      "trendingScore": 64,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -5328,20 +5921,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7210969,
-      "likes": 360548,
-      "bookmarks": 360548,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 144219,
+      "views": 5260969,
+      "likes": 263048,
+      "bookmarks": 263048,
+      "ratingAvg": 4.3999999999999995,
+      "ratingCount": 105219,
       "ratingDist": [
         0,
         5,
-        3374,
-        77438,
-        63401
+        2966,
+        59567,
+        42681
       ],
       "rankDelta": 0,
-      "trendingScore": 76,
+      "trendingScore": 63,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -5374,20 +5967,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 7001614,
-      "likes": 350081,
-      "bookmarks": 350081,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 140032,
+      "views": 5051614,
+      "likes": 252581,
+      "bookmarks": 252581,
+      "ratingAvg": 4.359999999999999,
+      "ratingCount": 101032,
       "ratingDist": [
         0,
         7,
-        3947,
-        79275,
-        56803
+        3413,
+        59992,
+        37620
       ],
       "rankDelta": 0,
-      "trendingScore": 75,
+      "trendingScore": 62,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -5420,22 +6013,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6855421,
-      "likes": 342771,
-      "bookmarks": 342771,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 137108,
+      "views": 4905421,
+      "likes": 245271,
+      "bookmarks": 245271,
+      "ratingAvg": 4.319999999999999,
+      "ratingCount": 98108,
       "ratingDist": [
         0,
         9,
-        4631,
-        81414,
-        51054
+        3951,
+        60787,
+        33361
       ],
       "rankDelta": 0,
-      "trendingScore": 74,
+      "trendingScore": 61,
       "completionRate": 72,
-      "bingeIndex": 91
+      "bingeIndex": 90
     },
     "featured": false
   },
@@ -5466,20 +6059,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6822006,
-      "likes": 341100,
-      "bookmarks": 341100,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 136440,
+      "views": 4872006,
+      "likes": 243600,
+      "bookmarks": 243600,
+      "ratingAvg": 4.279999999999999,
+      "ratingCount": 97440,
       "ratingDist": [
         0,
-        13,
-        5495,
-        84537,
-        46395
+        12,
+        4655,
+        62671,
+        30101
       ],
       "rankDelta": 0,
-      "trendingScore": 73,
+      "trendingScore": 60,
       "completionRate": 72,
       "bingeIndex": 90
     },
@@ -5512,20 +6105,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6013718,
-      "likes": 300686,
-      "bookmarks": 300686,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 120274,
+      "views": 4063718,
+      "likes": 203186,
+      "bookmarks": 203186,
+      "ratingAvg": 4.239999999999999,
+      "ratingCount": 81274,
       "ratingDist": [
         0,
-        15,
-        5746,
-        77358,
-        37155
+        14,
+        4582,
+        53986,
+        22693
       ],
       "rankDelta": 0,
-      "trendingScore": 72,
+      "trendingScore": 59,
       "completionRate": 72,
       "bingeIndex": 90
     },
@@ -5558,22 +6151,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6035298,
-      "likes": 301765,
-      "bookmarks": 301765,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 120706,
+      "views": 4085298,
+      "likes": 204265,
+      "bookmarks": 204265,
+      "ratingAvg": 4.199999999999999,
+      "ratingCount": 81706,
       "ratingDist": [
         0,
-        21,
-        6804,
-        80178,
-        33703
+        19,
+        5408,
+        55765,
+        20515
       ],
       "rankDelta": 0,
-      "trendingScore": 71,
+      "trendingScore": 58,
       "completionRate": 72,
-      "bingeIndex": 90
+      "bingeIndex": 89
     },
     "featured": false
   },
@@ -5604,20 +6197,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6085234,
-      "likes": 304262,
-      "bookmarks": 304262,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 121705,
+      "views": 4135234,
+      "likes": 206762,
+      "bookmarks": 206762,
+      "ratingAvg": 4.159999999999999,
+      "ratingCount": 82705,
       "ratingDist": [
         0,
-        28,
-        8055,
-        83064,
-        30558
+        25,
+        6394,
+        57707,
+        18579
       ],
       "rankDelta": 0,
-      "trendingScore": 70,
+      "trendingScore": 57,
       "completionRate": 72,
       "bingeIndex": 89
     },
@@ -5650,22 +6243,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 6027008,
-      "likes": 301350,
-      "bookmarks": 301350,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 120540,
+      "views": 4077008,
+      "likes": 203850,
+      "bookmarks": 203850,
+      "ratingAvg": 4.6,
+      "ratingCount": 81540,
       "ratingDist": [
         0,
-        37,
-        9319,
-        84106,
-        27078
+        1,
+        861,
+        33678,
+        47001
       ],
       "rankDelta": 0,
-      "trendingScore": 69,
+      "trendingScore": 56,
       "completionRate": 72,
-      "bingeIndex": 89
+      "bingeIndex": 92
     },
     "featured": false
   },
@@ -5696,20 +6289,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5666458,
-      "likes": 283323,
-      "bookmarks": 283323,
-      "ratingAvg": 4.6,
-      "ratingCount": 113329,
+      "views": 3716458,
+      "likes": 185823,
+      "bookmarks": 185823,
+      "ratingAvg": 4.56,
+      "ratingCount": 74329,
       "ratingDist": [
         0,
         1,
-        1196,
-        46807,
-        65324
+        965,
+        33026,
+        40338
       ],
       "rankDelta": 0,
-      "trendingScore": 68,
+      "trendingScore": 55,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -5742,20 +6335,20 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5359606,
-      "likes": 267980,
-      "bookmarks": 267980,
-      "ratingAvg": 4.56,
-      "ratingCount": 107192,
+      "views": 3409606,
+      "likes": 170480,
+      "bookmarks": 170480,
+      "ratingAvg": 4.52,
+      "ratingCount": 68192,
       "ratingDist": [
         0,
         1,
-        1391,
-        47627,
-        58172
+        1082,
+        32436,
+        34672
       ],
       "rankDelta": 0,
-      "trendingScore": 67,
+      "trendingScore": 54,
       "completionRate": 72,
       "bingeIndex": 92
     },
@@ -5788,22 +6381,22 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5760251,
-      "likes": 288013,
-      "bookmarks": 288013,
-      "ratingAvg": 4.52,
-      "ratingCount": 115205,
+      "views": 3810251,
+      "likes": 190513,
+      "bookmarks": 190513,
+      "ratingAvg": 4.4799999999999995,
+      "ratingCount": 76205,
       "ratingDist": [
         0,
         2,
-        1829,
-        54798,
-        58576
+        1472,
+        38610,
+        36120
       ],
       "rankDelta": 0,
-      "trendingScore": 66,
+      "trendingScore": 53,
       "completionRate": 72,
-      "bingeIndex": 92
+      "bingeIndex": 91
     },
     "featured": false
   },
@@ -5829,25 +6422,25 @@ export const TITLES: Title[] = [
     "availability": [
       {
         "platformId": "naver-series",
-        "pricing": "wait-free",
+        "pricing": "paid",
         "url": "https://series.naver.com/novel/detail.series?productNo=13859736"
       }
     ],
     "stats": {
-      "views": 5110384,
-      "likes": 255519,
-      "bookmarks": 255519,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 102208,
+      "views": 3160384,
+      "likes": 158019,
+      "bookmarks": 158019,
+      "ratingAvg": 4.4399999999999995,
+      "ratingCount": 63208,
       "ratingDist": [
         0,
-        3,
-        1975,
-        51785,
-        48445
+        2,
+        1479,
+        33940,
+        27787
       ],
       "rankDelta": 0,
-      "trendingScore": 65,
+      "trendingScore": 52,
       "completionRate": 72,
       "bingeIndex": 91
     },
@@ -5880,615 +6473,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 5292314,
-      "likes": 264616,
-      "bookmarks": 264616,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 105846,
-      "ratingDist": [
-        0,
-        4,
-        2476,
-        56834,
-        46532
-      ],
-      "rankDelta": 0,
-      "trendingScore": 64,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14208087",
-    "slug": "ns-14208087",
-    "type": "webnovel",
-    "title": "설산 마을 저택의 제물이 되었다",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "설산 마을 저택의 제물이 되었다 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14208087"
-      }
-    ],
-    "stats": {
-      "views": 4935576,
-      "likes": 246779,
-      "bookmarks": 246779,
+      "views": 3342314,
+      "likes": 167116,
+      "bookmarks": 167116,
       "ratingAvg": 4.3999999999999995,
-      "ratingCount": 98712,
-      "ratingDist": [
-        0,
-        5,
-        2782,
-        55883,
-        40042
-      ],
-      "rankDelta": 0,
-      "trendingScore": 63,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13864557",
-    "slug": "ns-13864557",
-    "type": "webnovel",
-    "title": "멸망로맨스",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "멸망로맨스 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260309_222%2Fpocket_1773029636193VBoPR_JPEG%2F%25BD%25BA%25C5%25E4%25B8%25AE%25C0%25DB_%25B8%25EA%25B8%25C1%25B7%25CE%25B8%25C7%25BD%25BA_%25BD%25C3%25B8%25AE%25C1%25EE_%25BB%25E7%25C0%25CC%25C1%25EE.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13864557"
-      }
-    ],
-    "stats": {
-      "views": 4587677,
-      "likes": 229384,
-      "bookmarks": 229384,
-      "ratingAvg": 4.359999999999999,
-      "ratingCount": 91754,
-      "ratingDist": [
-        0,
-        6,
-        3099,
-        54483,
-        34166
-      ],
-      "rankDelta": 0,
-      "trendingScore": 62,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13621300",
-    "slug": "ns-13621300",
-    "type": "webnovel",
-    "title": "호랑 선비님",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "호랑 선비님 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13621300"
-      }
-    ],
-    "stats": {
-      "views": 4581520,
-      "likes": 229076,
-      "bookmarks": 229076,
-      "ratingAvg": 4.319999999999999,
-      "ratingCount": 91630,
-      "ratingDist": [
-        0,
-        9,
-        3690,
-        56773,
-        31158
-      ],
-      "rankDelta": 0,
-      "trendingScore": 61,
-      "completionRate": 72,
-      "bingeIndex": 90
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14193475",
-    "slug": "ns-14193475",
-    "type": "webnovel",
-    "title": "해를 따라 피어나는 꽃",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "해를 따라 피어나는 꽃 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14193475"
-      }
-    ],
-    "stats": {
-      "views": 4648182,
-      "likes": 232409,
-      "bookmarks": 232409,
-      "ratingAvg": 4.279999999999999,
-      "ratingCount": 92964,
-      "ratingDist": [
-        0,
-        12,
-        4441,
-        59793,
-        28719
-      ],
-      "rankDelta": 0,
-      "trendingScore": 60,
-      "completionRate": 72,
-      "bingeIndex": 90
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14195289",
-    "slug": "ns-14195289",
-    "type": "webnovel",
-    "title": "아이가 아파서요",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "아이가 아파서요 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14195289"
-      }
-    ],
-    "stats": {
-      "views": 4440487,
-      "likes": 222024,
-      "bookmarks": 222024,
-      "ratingAvg": 4.239999999999999,
-      "ratingCount": 88810,
-      "ratingDist": [
-        0,
-        15,
-        5006,
-        58991,
-        24797
-      ],
-      "rankDelta": 0,
-      "trendingScore": 59,
-      "completionRate": 72,
-      "bingeIndex": 90
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14207417",
-    "slug": "ns-14207417",
-    "type": "webnovel",
-    "title": "완벽한 비서의 속사정",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "완벽한 비서의 속사정 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14207417"
-      }
-    ],
-    "stats": {
-      "views": 4211740,
-      "likes": 210587,
-      "bookmarks": 210587,
-      "ratingAvg": 4.199999999999999,
-      "ratingCount": 84235,
-      "ratingDist": [
-        0,
-        19,
-        5575,
-        57491,
-        21150
-      ],
-      "rankDelta": 0,
-      "trendingScore": 58,
-      "completionRate": 72,
-      "bingeIndex": 89
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13629696",
-    "slug": "ns-13629696",
-    "type": "webnovel",
-    "title": "흉액",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "흉액 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13629696"
-      }
-    ],
-    "stats": {
-      "views": 4440024,
-      "likes": 222001,
-      "bookmarks": 222001,
-      "ratingAvg": 4.159999999999999,
-      "ratingCount": 88800,
-      "ratingDist": [
-        0,
-        27,
-        6865,
-        61959,
-        19948
-      ],
-      "rankDelta": 0,
-      "trendingScore": 57,
-      "completionRate": 72,
-      "bingeIndex": 89
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13789825",
-    "slug": "ns-13789825",
-    "type": "webnovel",
-    "title": "오빠 친구가 잘해서",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "오빠 친구가 잘해서 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260220_245%2Fpocket_177155940899804H94_JPEG%2Fcover.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13789825"
-      }
-    ],
-    "stats": {
-      "views": 3718043,
-      "likes": 185902,
-      "bookmarks": 185902,
-      "ratingAvg": 4.6,
-      "ratingCount": 74361,
-      "ratingDist": [
-        0,
-        1,
-        785,
-        30712,
-        42863
-      ],
-      "rankDelta": 0,
-      "trendingScore": 56,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13792724",
-    "slug": "ns-13792724",
-    "type": "webnovel",
-    "title": "빼앗은 아내",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "빼앗은 아내 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13792724"
-      }
-    ],
-    "stats": {
-      "views": 3554021,
-      "likes": 177701,
-      "bookmarks": 177701,
-      "ratingAvg": 4.56,
-      "ratingCount": 71080,
-      "ratingDist": [
-        0,
-        1,
-        922,
-        31582,
-        38574
-      ],
-      "rankDelta": 0,
-      "trendingScore": 55,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14208099",
-    "slug": "ns-14208099",
-    "type": "webnovel",
-    "title": "낭자를 그려도 되겠습니까",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "낭자를 그려도 되겠습니까 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fssl.pstatic.net%2Fstatic%2Fnstore%2Fthumb%2F19over_book2_79x119.gif",
-    "status": "ongoing",
-    "ageRating": "19",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14208099"
-      }
-    ],
-    "stats": {
-      "views": 3585543,
-      "likes": 179277,
-      "bookmarks": 179277,
-      "ratingAvg": 4.52,
-      "ratingCount": 71711,
-      "ratingDist": [
-        0,
-        1,
-        1138,
-        34110,
-        36461
-      ],
-      "rankDelta": 0,
-      "trendingScore": 54,
-      "completionRate": 72,
-      "bingeIndex": 92
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13789499",
-    "slug": "ns-13789499",
-    "type": "webnovel",
-    "title": "오늘부터 등청합니다",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "오늘부터 등청합니다 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260220_79%2Fpocket_1771557132903A6Ruo_JPEG%2FLlog-work_from_today_cover-serial%2528cp_site_ver%2529.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13789499"
-      }
-    ],
-    "stats": {
-      "views": 3271666,
-      "likes": 163583,
-      "bookmarks": 163583,
-      "ratingAvg": 4.4799999999999995,
-      "ratingCount": 65433,
-      "ratingDist": [
-        0,
-        2,
-        1264,
-        33153,
-        31014
-      ],
-      "rankDelta": 0,
-      "trendingScore": 53,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-14202717",
-    "slug": "ns-14202717",
-    "type": "webnovel",
-    "title": "친구 오빠의 나쁜 손",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "친구 오빠의 나쁜 손 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260521_123%2Fpocket_17793544206467JoyH_JPEG%2Fbadhand.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=14202717"
-      }
-    ],
-    "stats": {
-      "views": 3457812,
-      "likes": 172891,
-      "bookmarks": 172891,
-      "ratingAvg": 4.4399999999999995,
-      "ratingCount": 69156,
+      "ratingCount": 66846,
       "ratingDist": [
         0,
         3,
-        1618,
-        37133,
-        30402
-      ],
-      "rankDelta": 0,
-      "trendingScore": 52,
-      "completionRate": 72,
-      "bingeIndex": 91
-    },
-    "featured": false
-  },
-  {
-    "id": "ns-13694660",
-    "slug": "ns-13694660",
-    "type": "webnovel",
-    "title": "님과 함께",
-    "author": "미상",
-    "genres": [
-      "로맨스"
-    ],
-    "tags": [],
-    "synopsis": "님과 함께 · 네이버 시리즈 인기 웹소설.",
-    "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fcomicthumb-phinf.pstatic.net%2F20260126_227%2Fpocket_1769392576197KK22W_JPEG%2Fcover.jpg%3Ftype%3Dm79",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2022,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "wait-free",
-        "url": "https://series.naver.com/novel/detail.series?productNo=13694660"
-      }
-    ],
-    "stats": {
-      "views": 3524431,
-      "likes": 176222,
-      "bookmarks": 176222,
-      "ratingAvg": 4.3999999999999995,
-      "ratingCount": 70489,
-      "ratingDist": [
-        0,
-        4,
-        1987,
-        39905,
-        28593
+        1884,
+        37843,
+        27116
       ],
       "rankDelta": 0,
       "trendingScore": 51,
@@ -6531,17 +6526,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1507350,
-      "likes": 200980,
-      "bookmarks": 200980,
+      "views": 1508946,
+      "likes": 201193,
+      "bookmarks": 201193,
       "ratingAvg": 5,
-      "ratingCount": 80392,
+      "ratingCount": 80477,
       "ratingDist": [
         0,
         0,
         86,
-        12758,
-        67548
+        12772,
+        67619
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6584,17 +6579,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1826790,
-      "likes": 243572,
-      "bookmarks": 243572,
+      "views": 1827564,
+      "likes": 243675,
+      "bookmarks": 243675,
       "ratingAvg": 5,
-      "ratingCount": 97429,
+      "ratingCount": 97470,
       "ratingDist": [
         0,
         0,
         104,
-        15462,
-        81863
+        15468,
+        81897
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6637,17 +6632,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1008366,
-      "likes": 134449,
-      "bookmarks": 134449,
+      "views": 1009590,
+      "likes": 134612,
+      "bookmarks": 134612,
       "ratingAvg": 5,
-      "ratingCount": 53780,
+      "ratingCount": 53845,
       "ratingDist": [
         0,
         0,
         58,
-        8535,
-        45188
+        8545,
+        45242
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6689,17 +6684,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1728798,
-      "likes": 230506,
-      "bookmarks": 230506,
+      "views": 1734978,
+      "likes": 231330,
+      "bookmarks": 231330,
       "ratingAvg": 5,
-      "ratingCount": 92202,
+      "ratingCount": 92532,
       "ratingDist": [
         0,
         0,
         99,
-        14632,
-        77471
+        14685,
+        77748
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6741,17 +6736,69 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1046520,
-      "likes": 139536,
-      "bookmarks": 139536,
+      "views": 1046982,
+      "likes": 139598,
+      "bookmarks": 139598,
       "ratingAvg": 5,
-      "ratingCount": 55814,
+      "ratingCount": 55839,
       "ratingDist": [
         0,
         0,
         60,
-        8858,
-        46897
+        8862,
+        46918
+      ],
+      "rankDelta": 0,
+      "trendingScore": 60,
+      "completionRate": 80,
+      "bingeIndex": 82
+    },
+    "featured": false
+  },
+  {
+    "id": "nv-697669952",
+    "slug": "nv-697669952",
+    "type": "webnovel",
+    "title": "아포칼립스에 집을 숨김",
+    "author": "로드워리어",
+    "genres": [
+      "액션"
+    ],
+    "tags": [
+      "원작",
+      "액션",
+      "생존",
+      "크리처",
+      "고인물"
+    ],
+    "synopsis": "웹툰 「아포칼립스에 집을 숨김」의 원작 웹소설. 글 로드워리어.",
+    "cover": [
+      "oklch(0.45 0.14 12)",
+      "oklch(0.28 0.1 52)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
+    "status": "ongoing",
+    "ageRating": "15",
+    "releaseYear": 2023,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/"
+      }
+    ],
+    "stats": {
+      "views": 762972,
+      "likes": 101730,
+      "bookmarks": 101730,
+      "ratingAvg": 5,
+      "ratingCount": 40692,
+      "ratingDist": [
+        0,
+        0,
+        44,
+        6458,
+        34191
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6794,69 +6841,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 403266,
-      "likes": 53769,
-      "bookmarks": 53769,
+      "views": 404130,
+      "likes": 53884,
+      "bookmarks": 53884,
       "ratingAvg": 5,
-      "ratingCount": 21508,
+      "ratingCount": 21554,
       "ratingDist": [
         0,
         0,
         23,
-        3413,
-        18072
-      ],
-      "rankDelta": 0,
-      "trendingScore": 60,
-      "completionRate": 80,
-      "bingeIndex": 82
-    },
-    "featured": false
-  },
-  {
-    "id": "nv-697669952",
-    "slug": "nv-697669952",
-    "type": "webnovel",
-    "title": "아포칼립스에 집을 숨김",
-    "author": "로드워리어",
-    "genres": [
-      "액션"
-    ],
-    "tags": [
-      "원작",
-      "액션",
-      "생존",
-      "크리처",
-      "고인물"
-    ],
-    "synopsis": "웹툰 「아포칼립스에 집을 숨김」의 원작 웹소설. 글 로드워리어.",
-    "cover": [
-      "oklch(0.45 0.14 12)",
-      "oklch(0.28 0.1 52)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F825332%2Fthumbnail%2Fthumbnail_IMAG21_303156ff-1e4d-4c2a-954e-515ae0c65bbe.jpg",
-    "status": "ongoing",
-    "ageRating": "15",
-    "releaseYear": 2023,
-    "availability": [
-      {
-        "platformId": "naver-series",
-        "pricing": "paid",
-        "url": "https://series.naver.com/"
-      }
-    ],
-    "stats": {
-      "views": 762282,
-      "likes": 101638,
-      "bookmarks": 101638,
-      "ratingAvg": 5,
-      "ratingCount": 40655,
-      "ratingDist": [
-        0,
-        0,
-        43,
-        6452,
-        34160
+        3421,
+        18110
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6898,17 +6893,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 432384,
-      "likes": 57651,
-      "bookmarks": 57651,
+      "views": 436728,
+      "likes": 58230,
+      "bookmarks": 58230,
       "ratingAvg": 5,
-      "ratingCount": 23060,
+      "ratingCount": 23292,
       "ratingDist": [
         0,
         0,
         25,
-        3660,
-        19376
+        3696,
+        19571
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -6950,17 +6945,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 546354,
-      "likes": 72847,
-      "bookmarks": 72847,
+      "views": 547134,
+      "likes": 72951,
+      "bookmarks": 72951,
       "ratingAvg": 5,
-      "ratingCount": 29139,
+      "ratingCount": 29180,
       "ratingDist": [
         0,
         0,
         31,
-        4624,
-        24483
+        4631,
+        24518
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7002,17 +6997,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2334480,
-      "likes": 311264,
-      "bookmarks": 311264,
+      "views": 2334912,
+      "likes": 311322,
+      "bookmarks": 311322,
       "ratingAvg": 5,
-      "ratingCount": 124506,
+      "ratingCount": 124529,
       "ratingDist": [
         0,
         0,
         133,
-        19759,
-        104614
+        19763,
+        104633
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7054,17 +7049,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 553434,
-      "likes": 73791,
-      "bookmarks": 73791,
+      "views": 554748,
+      "likes": 73966,
+      "bookmarks": 73966,
       "ratingAvg": 5,
-      "ratingCount": 29516,
+      "ratingCount": 29586,
       "ratingDist": [
         0,
         0,
         32,
-        4684,
-        24800
+        4695,
+        24859
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7106,17 +7101,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 648168,
-      "likes": 86422,
-      "bookmarks": 86422,
+      "views": 648942,
+      "likes": 86526,
+      "bookmarks": 86526,
       "ratingAvg": 5,
-      "ratingCount": 34569,
+      "ratingCount": 34610,
       "ratingDist": [
         0,
         0,
         37,
-        5486,
-        29046
+        5493,
+        29080
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7159,17 +7154,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 426408,
-      "likes": 56854,
-      "bookmarks": 56854,
+      "views": 426690,
+      "likes": 56892,
+      "bookmarks": 56892,
       "ratingAvg": 5,
-      "ratingCount": 22742,
+      "ratingCount": 22757,
       "ratingDist": [
         0,
         0,
         24,
-        3609,
-        19109
+        3612,
+        19121
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7211,17 +7206,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 399978,
-      "likes": 53330,
-      "bookmarks": 53330,
+      "views": 401112,
+      "likes": 53482,
+      "bookmarks": 53482,
       "ratingAvg": 5,
-      "ratingCount": 21332,
+      "ratingCount": 21393,
       "ratingDist": [
         0,
         0,
         23,
-        3385,
-        17924
+        3395,
+        17975
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7263,17 +7258,69 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 568464,
-      "likes": 75795,
-      "bookmarks": 75795,
+      "views": 568914,
+      "likes": 75855,
+      "bookmarks": 75855,
       "ratingAvg": 5,
-      "ratingCount": 30318,
+      "ratingCount": 30342,
       "ratingDist": [
         0,
         0,
         32,
-        4811,
-        25474
+        4815,
+        25494
+      ],
+      "rankDelta": 0,
+      "trendingScore": 60,
+      "completionRate": 80,
+      "bingeIndex": 82
+    },
+    "featured": false
+  },
+  {
+    "id": "nv-1374052156",
+    "slug": "nv-1374052156",
+    "type": "webnovel",
+    "title": "그린스킨",
+    "author": "흙수저",
+    "genres": [
+      "판타지"
+    ],
+    "tags": [
+      "원작",
+      "판타지",
+      "액션판타지",
+      "자극적인",
+      "생존"
+    ],
+    "synopsis": "웹툰 「그린스킨」의 원작 웹소설. 글 흙수저.",
+    "cover": [
+      "oklch(0.45 0.14 290)",
+      "oklch(0.28 0.1 330)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F851187%2Fthumbnail%2Fthumbnail_IMAG21_8da70ccf-1c0a-4279-8069-7abd08b32a4c.jpg",
+    "status": "ongoing",
+    "ageRating": "19",
+    "releaseYear": 2023,
+    "availability": [
+      {
+        "platformId": "naver-series",
+        "pricing": "paid",
+        "url": "https://series.naver.com/"
+      }
+    ],
+    "stats": {
+      "views": 32166,
+      "likes": 4289,
+      "bookmarks": 4289,
+      "ratingAvg": 4.8,
+      "ratingCount": 1716,
+      "ratingDist": [
+        0,
+        0,
+        6,
+        460,
+        1250
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7315,17 +7362,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 849552,
-      "likes": 113274,
-      "bookmarks": 113274,
+      "views": 851262,
+      "likes": 113502,
+      "bookmarks": 113502,
       "ratingAvg": 5,
-      "ratingCount": 45310,
+      "ratingCount": 45401,
       "ratingDist": [
         0,
         0,
-        48,
-        7191,
-        38071
+        49,
+        7205,
+        38147
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7335,29 +7382,29 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
-    "id": "nv-1629294240",
-    "slug": "nv-1629294240",
+    "id": "nv-2028916517",
+    "slug": "nv-2028916517",
     "type": "webnovel",
-    "title": "페일 블루 아이즈",
-    "author": "피숙혜",
+    "title": "중세 판타지 속 망나니 경비조장",
+    "author": "곰돌이는",
     "genres": [
-      "로맨스"
+      "판타지"
     ],
     "tags": [
       "원작",
-      "로맨스",
-      "예술",
-      "고자극드라마",
-      "리얼로맨스"
+      "판타지",
+      "고인물",
+      "차원이동",
+      "이세계"
     ],
-    "synopsis": "웹툰 「페일 블루 아이즈」의 원작 웹소설. 글 피숙혜.",
+    "synopsis": "웹툰 「중세 판타지 속 망나니 경비조장」의 원작 웹소설. 글 곰돌이는.",
     "cover": [
-      "oklch(0.45 0.14 5)",
-      "oklch(0.28 0.1 45)"
+      "oklch(0.45 0.14 290)",
+      "oklch(0.28 0.1 330)"
     ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F849898%2Fthumbnail%2Fthumbnail_IMAG21_a2bb0dde-6ec3-46f1-8e69-3ab35a6f863f.jpg",
+    "coverImage": "/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F831416%2Fthumbnail%2Fthumbnail_IMAG21_7261b246-0061-462a-abe7-0768f79c3b05.jpg",
     "status": "ongoing",
-    "ageRating": "19",
+    "ageRating": "15",
     "releaseYear": 2023,
     "availability": [
       {
@@ -7367,17 +7414,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 148260,
-      "likes": 19768,
-      "bookmarks": 19768,
+      "views": 446160,
+      "likes": 59488,
+      "bookmarks": 59488,
       "ratingAvg": 5,
-      "ratingCount": 7907,
+      "ratingCount": 23795,
       "ratingDist": [
         0,
         0,
-        8,
-        1255,
-        6644
+        25,
+        3776,
+        19993
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -7419,17 +7466,17 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 1119114,
-      "likes": 149215,
-      "bookmarks": 149215,
+      "views": 1119864,
+      "likes": 149315,
+      "bookmarks": 149315,
       "ratingAvg": 5,
-      "ratingCount": 59686,
+      "ratingCount": 59726,
       "ratingDist": [
         0,
         0,
         64,
-        9472,
-        50150
+        9478,
+        50184
       ],
       "rankDelta": 0,
       "trendingScore": 60,
@@ -9368,6 +9415,60 @@ export const TITLES: Title[] = [
     "featured": false
   },
   {
+    "id": "kw-4756",
+    "slug": "kw-4756",
+    "type": "webtoon",
+    "title": "상무님, 손만 잡고 잘게요",
+    "author": "김수연",
+    "artist": "김수연",
+    "genres": [
+      "로맨스",
+      "코미디"
+    ],
+    "tags": [
+      "설레는",
+      "감동적인",
+      "로맨스",
+      "로맨틱코미디물"
+    ],
+    "synopsis": "비가 오면 악몽을 꾸던 내가 그와의 하룻밤으로 악몽에서 벗어나게 되었다?",
+    "cover": [
+      "#3d3249",
+      "oklch(0.28 0.1 45)"
+    ],
+    "coverImage": "/api/cover?u=https%3A%2F%2Fkr-a.kakaopagecdn.com%2FP%2FC%2F4756%2Fbg%2F2x%2F89070cf5-7b96-42e0-9f58-01dc434064fa.webp",
+    "status": "ongoing",
+    "ageRating": "all",
+    "releaseYear": 2023,
+    "availability": [
+      {
+        "platformId": "kakao-webtoon",
+        "pricing": "wait-free",
+        "isOriginal": true,
+        "url": "https://webtoon.kakao.com/content/상무님-손만-잡고-잘게요/4756"
+      }
+    ],
+    "stats": {
+      "views": 2863684,
+      "likes": 114547,
+      "bookmarks": 114547,
+      "ratingAvg": 4.7,
+      "ratingCount": 884,
+      "ratingDist": [
+        0,
+        0,
+        5,
+        298,
+        580
+      ],
+      "rankDelta": 0,
+      "trendingScore": 54,
+      "completionRate": 70,
+      "bingeIndex": 72
+    },
+    "featured": false
+  },
+  {
     "id": "kw-4346",
     "slug": "kw-4346",
     "type": "webtoon",
@@ -9401,9 +9502,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2859809,
-      "likes": 114392,
-      "bookmarks": 114392,
+      "views": 2769809,
+      "likes": 110792,
+      "bookmarks": 110792,
       "ratingAvg": 4.7,
       "ratingCount": 609,
       "ratingDist": [
@@ -9414,7 +9515,7 @@ export const TITLES: Title[] = [
         400
       ],
       "rankDelta": 0,
-      "trendingScore": 54,
+      "trendingScore": 53,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9455,9 +9556,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2744885,
-      "likes": 109795,
-      "bookmarks": 109795,
+      "views": 2654885,
+      "likes": 106195,
+      "bookmarks": 106195,
       "ratingAvg": 4.3,
       "ratingCount": 885,
       "ratingDist": [
@@ -9468,7 +9569,7 @@ export const TITLES: Title[] = [
         287
       ],
       "rankDelta": 0,
-      "trendingScore": 53,
+      "trendingScore": 52,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9509,9 +9610,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2650045,
-      "likes": 106002,
-      "bookmarks": 106002,
+      "views": 2560045,
+      "likes": 102402,
+      "bookmarks": 102402,
       "ratingAvg": 4.3,
       "ratingCount": 845,
       "ratingDist": [
@@ -9522,7 +9623,7 @@ export const TITLES: Title[] = [
         274
       ],
       "rankDelta": 0,
-      "trendingScore": 52,
+      "trendingScore": 51,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9562,9 +9663,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2590641,
-      "likes": 103626,
-      "bookmarks": 103626,
+      "views": 2500641,
+      "likes": 100026,
+      "bookmarks": 100026,
       "ratingAvg": 4.4,
       "ratingCount": 1441,
       "ratingDist": [
@@ -9575,7 +9676,7 @@ export const TITLES: Title[] = [
         585
       ],
       "rankDelta": 0,
-      "trendingScore": 51,
+      "trendingScore": 50,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9616,9 +9717,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2496829,
-      "likes": 99873,
-      "bookmarks": 99873,
+      "views": 2406829,
+      "likes": 96273,
+      "bookmarks": 96273,
       "ratingAvg": 4.7,
       "ratingCount": 1229,
       "ratingDist": [
@@ -9629,7 +9730,7 @@ export const TITLES: Title[] = [
         807
       ],
       "rankDelta": 0,
-      "trendingScore": 50,
+      "trendingScore": 49,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9670,9 +9771,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2377009,
-      "likes": 95080,
-      "bookmarks": 95080,
+      "views": 2287009,
+      "likes": 91480,
+      "bookmarks": 91480,
       "ratingAvg": 4.7,
       "ratingCount": 1409,
       "ratingDist": [
@@ -9683,7 +9784,7 @@ export const TITLES: Title[] = [
         925
       ],
       "rankDelta": 0,
-      "trendingScore": 49,
+      "trendingScore": 48,
       "completionRate": 70,
       "bingeIndex": 72
     },
@@ -9723,9 +9824,9 @@ export const TITLES: Title[] = [
       }
     ],
     "stats": {
-      "views": 2317014,
-      "likes": 92681,
-      "bookmarks": 92681,
+      "views": 2227014,
+      "likes": 89081,
+      "bookmarks": 89081,
       "ratingAvg": 4.7,
       "ratingCount": 1414,
       "ratingDist": [
@@ -9734,60 +9835,6 @@ export const TITLES: Title[] = [
         9,
         477,
         929
-      ],
-      "rankDelta": 0,
-      "trendingScore": 48,
-      "completionRate": 70,
-      "bingeIndex": 72
-    },
-    "featured": false
-  },
-  {
-    "id": "kw-4129",
-    "slug": "kw-4129",
-    "type": "webtoon",
-    "title": "룬의 아이들",
-    "author": "목인",
-    "artist": "단호박먼치킨, 쿄나",
-    "genres": [
-      "무협",
-      "액션"
-    ],
-    "tags": [
-      "가슴 먹먹한",
-      "처절한",
-      "액션/무협",
-      "성장물"
-    ],
-    "synopsis": "반드시 살아남아라! 겨울검 윈터러를 지키기 위한 보리스의 여정이 시작된다",
-    "cover": [
-      "#8198b3",
-      "oklch(0.28 0.1 62)"
-    ],
-    "coverImage": "/api/cover?u=https%3A%2F%2Fkr-a.kakaopagecdn.com%2FP%2FC%2F4129%2Fbg%2F2x%2F96ddd7de-e988-4937-8173-8440c521dbf6.webp",
-    "status": "ongoing",
-    "ageRating": "all",
-    "releaseYear": 2023,
-    "availability": [
-      {
-        "platformId": "kakao-webtoon",
-        "pricing": "wait-free",
-        "isOriginal": true,
-        "url": "https://webtoon.kakao.com/content/룬의-아이들/4129"
-      }
-    ],
-    "stats": {
-      "views": 2227828,
-      "likes": 89113,
-      "bookmarks": 89113,
-      "ratingAvg": 4.6,
-      "ratingCount": 1028,
-      "ratingDist": [
-        0,
-        0,
-        11,
-        425,
-        593
       ],
       "rankDelta": 0,
       "trendingScore": 47,
