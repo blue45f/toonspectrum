@@ -1,6 +1,7 @@
 import Link from "@/src/compat/router-link";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+import { buttonClass } from "./ui/button";
 
 export function Section({
   eyebrow,
@@ -25,18 +26,16 @@ export function Section({
           <h2 className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
             {title}
           </h2>
-          {desc && <p className="mt-1.5 text-sm text-fg-3">{desc}</p>}
+          {desc && <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{desc}</p>}
         </div>
         {action && (
           <Link
             href={action.href}
-            className="group inline-flex w-fit items-center gap-1 text-sm font-medium text-fg-2 transition-colors hover:text-accent"
+            className={buttonClass({ size: "sm", variant: "quiet", className: "group gap-1" })}
+            aria-label={`${action.label} 바로가기`}
           >
             {action.label}
-            <ArrowRight
-              size={15}
-              className="transition-transform duration-150 group-hover:translate-x-0.5"
-            />
+            <ArrowRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />
           </Link>
         )}
       </header>

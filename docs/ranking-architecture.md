@@ -22,6 +22,12 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 
 작품 카탈로그는 더 이상 `lib/data/titles.ts` 파일을 운영 데이터의 주 저장소로 보지 않습니다. 파일은 개발용 seed/fallback이며, 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장합니다.
 
+랭킹에 없는 작품도 검색 가능해야 하므로 crawler는 두 레벨로 동작합니다.
+
+- **색인 레벨**: 공개 목록/카탈로그에 있는 작품을 가능한 한 넓게 수집해 검색, 상세 진입, 플랫폼 라우팅에 사용합니다.
+- **상세 레벨**: 호출량이 큰 상세 API는 상위 작품 또는 환경변수로 지정한 범위만 보강합니다.
+- 랭킹은 색인 전체에 산식을 적용하지만, live 보정은 실제 라이브 소스와 매칭되는 작품에만 적용합니다.
+
 - 저장 테이블: `catalog_snapshot`
   - `snapshot`: 정규화된 `Title[]` JSON
   - `source`, `sourceVersion`, `titleCount`, `isCurrent`
@@ -35,6 +41,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
   - 라이브 랭킹 스케줄러와 카탈로그 수집 스케줄러를 분리 실행
 - 수집 흐름:
   - `scripts/crawl.mjs --json --no-file` 실행
+  - `WEBDEX_SOURCE_IDS` allowlist에 포함된 구현 소스만 실행
   - stdout JSON을 파싱해 `Title[]` 검증
   - 동일 hash면 새 스냅샷을 만들지 않고 메모리 카탈로그만 새로고침
   - 변경 hash면 기존 스냅샷을 `isCurrent=false`로 내리고 새 스냅샷을 current로 저장
@@ -54,8 +61,63 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
   JSON stdout 최대 버퍼.
 - `CATALOG_INGEST_TRIGGER_TOKEN`  
   수동 실행 필수 토큰. 미설정이면 수동 실행 API는 거부됩니다.
-- `WEBDEX_CRAWL_DELAY_MS`, `WEBDEX_WEBTOON_CAP`, `WEBDEX_SERIES_BONUS_CAP`, `WEBDEX_KAKAO_WEBTOON_CAP`, `WEBDEX_WEBTOON_FINISHED_PAGES`, `WEBDEX_SERIES_PAGES_PER_GENRE`  
+- `WEBDEX_CRAWL_DELAY_MS`, `WEBDEX_WEBTOON_CAP`, `WEBDEX_WEBTOON_DETAIL_CAP`, `WEBDEX_SERIES_BONUS_CAP`, `WEBDEX_KAKAO_WEBTOON_CAP`, `WEBDEX_LEZHIN_CAP`, `WEBDEX_WEBTOON_FINISHED_PAGES`, `WEBDEX_SERIES_PAGES_PER_GENRE`
   플랫폼별 호출량과 범위를 제한하는 크롤러 안전장치입니다.
+  - `WEBDEX_WEBTOON_CAP`은 전체 색인 개수 제한입니다. 비워두면 공개 목록 전체를 색인합니다.
+  - `WEBDEX_WEBTOON_DETAIL_CAP`은 별도 상세 API를 호출할 상위 작품 수입니다. 전체 검색성을 유지하면서 외부 호출량을 줄이기 위한 2단계 수집 한도입니다.
+- `WEBDEX_SOURCE_IDS`
+  실행할 수집 소스 allowlist입니다. 기본값은 `naver-webtoon,naver-series,kakao-webtoon,lezhin`입니다. `all`은 레지스트리 전체를 뜻하지만, 실제 crawler 구현이 없는 소스는 `/api/catalog/ingest/status`의 `sourcePlan.pending`에 남고 실행되지 않습니다.
+
+### 국내 전체 확장을 위한 수집 레지스트리
+
+국내 전체 웹툰/웹소설을 다루기 위해 플랫폼 목록과 실제 crawler 구현을 분리했습니다.
+
+- 레지스트리 파일: `lib/server/catalog-sources.ts`
+- 플랫폼 모델: `lib/types.ts`, `lib/platforms.ts`
+- 현재 crawler 구현 소스:
+  - `naver-webtoon`
+  - `naver-series`
+  - `kakao-webtoon`
+  - `lezhin`
+- pending 소스:
+  - `kakao-page`, `ridi`, `munpia`, `joara`, `novelpia`, `bomtoon`, `toptoon`, `postype`
+  - `mrblue`, `comico`, `toomics`, `bufftoon`, `bookcube`, `onestory`, `peanutoon`, `kyobo`, `yes24`
+
+새 플랫폼을 활성화하는 순서는 아래와 같습니다.
+
+1. `catalog-sources.ts`에 source metadata를 추가하거나 기존 pending 항목을 업데이트합니다.
+2. 플랫폼 약관, robots, 공식 API/제휴 피드, 호출량 제한, 성인/유료/UGC 경계를 확인합니다.
+3. crawler adapter를 구현하고 `implementation: "crawler"`로 변경합니다.
+4. `WEBDEX_SOURCE_IDS`에 해당 source id를 추가합니다.
+5. staging에서 `/api/catalog/ingest/status`와 `catalog_ingest_run` 실패율을 확인한 뒤 운영에 반영합니다.
+
+이 구조는 “모든 플랫폼을 한 번에 무차별 크롤”하지 않습니다. 모든 플랫폼을 **수집 가능한 슬롯**으로 등록하되, 법적/운영 검토가 끝난 소스만 실행하는 방식입니다.
+
+### 소스 활성화 승인 게이트
+
+새 소스는 코드에 등록되더라도 바로 실행되지 않습니다. `implementation: "partner-required"` 또는 `"manual"` 상태의 소스는 `/api/catalog/ingest/status`의 `sourcePlan.pending`에만 노출되고 crawler 실행 대상에서 제외됩니다.
+
+운영에서 `"crawler"`로 승격하려면 아래 항목을 모두 통과해야 합니다.
+
+1. **권한/정책 확인**
+   - 공개 API, 공식 피드, 제휴 데이터 제공 계약이 있으면 그 경로를 우선합니다.
+   - robots.txt, 이용약관, API 약관에서 자동 수집을 금지하거나 제한하면 crawler로 승격하지 않습니다.
+   - 로그인, 성인 인증, 결제, CAPTCHA, 앱 전용 API 우회가 필요한 경로는 사용하지 않습니다.
+
+2. **데이터 범위 확인**
+   - 작품명, 작가명, 공개 랭킹/평점/조회 수치, 공개 플랫폼 URL, 연재 상태, 연재요일, 공개 태그 등 검색과 랭킹에 필요한 최소 메타데이터만 저장합니다.
+   - 본문, 회차 이미지 바이너리, 댓글/리뷰 원문, 개인 식별 가능 데이터, 비공개 유료 수치는 저장하지 않습니다.
+   - 외부 리뷰 데이터는 공식 제공 또는 사용자가 WEBDEX에 직접 작성한 데이터만 운영 저장소에 넣습니다.
+
+3. **호출량/장애 대응**
+   - 플랫폼별 지연, cap, timeout을 환경변수로 둡니다.
+   - 429/403/차단 징후가 반복되면 해당 source id를 `WEBDEX_SOURCE_IDS`에서 제거하거나 `CATALOG_INGEST_MODE=off`로 전환합니다.
+   - 멀티 인스턴스에서는 카탈로그 수집 스케줄러를 한 인스턴스에서만 실행합니다.
+
+4. **검증/추적**
+   - staging에서 최소 3회 이상 성공한 `catalog_ingest_run`과 snapshot hash 안정성을 확인합니다.
+   - UI에는 `meta.source`, `meta.reliability`, `sourcePlan`, snapshot `sourceVersion`을 노출해 사용자가 live/산식/폴백을 구분할 수 있게 합니다.
+   - 삭제 요청, 플랫폼 차단 요청, 출처 정정 요청을 처리할 운영 경로를 둡니다.
 
 ## 법적 리스크 완화 원칙
 
@@ -264,12 +326,21 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 
 ## Data boundaries
 
-- `lib/data/*` is the current server catalog source.
+- `catalog_snapshot` is the current server catalog source in production.
+- `lib/data/*` is seed/fallback data for local development and empty DB recovery.
 - `lib/server/*` is the server service boundary.
 - `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
 - `components/*` must not import `TITLES` or `SEED_REVIEWS`.
 
 If a future source becomes available, replace the server catalog boundary first. Avoid pushing raw provider-specific data into client components.
+
+## Legal / Policy References
+
+Operational review should cite the current text of these sources before enabling a new crawler:
+
+- Korean Copyright Act, including database producer rights: https://www.law.go.kr/법령/저작권법
+- Personal Information Protection Act, including collection/use grounds: https://www.law.go.kr/법령/개인정보보호법
+- Robots Exclusion Protocol (RFC 9309): https://www.rfc-editor.org/rfc/rfc9309
 
 ## Runtime configuration
 
@@ -288,8 +359,11 @@ If a future source becomes available, replace the server catalog boundary first.
 - `CATALOG_INGEST_TRIGGER_TOKEN`
 - `WEBDEX_CRAWL_DELAY_MS`
 - `WEBDEX_WEBTOON_CAP`
+- `WEBDEX_WEBTOON_DETAIL_CAP`
 - `WEBDEX_SERIES_BONUS_CAP`
 - `WEBDEX_KAKAO_WEBTOON_CAP`
+- `WEBDEX_LEZHIN_CAP`
+- `WEBDEX_SOURCE_IDS`
 
 `apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 라이브 스케줄러를 시작해 초기 요청 전 캐시 예열을 수행합니다.
 

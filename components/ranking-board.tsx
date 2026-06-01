@@ -126,6 +126,7 @@ const axisIcons: Record<RankAxis, ComponentType<{ size?: number; className?: str
   completed: Flag,
   rookie: Sprout,
 };
+const RANKING_DEFAULT_LIMIT = "200";
 
 function metricFor(axis: RankAxis): (t: Title) => { label: string; value: string } {
   switch (axis) {
@@ -357,12 +358,18 @@ function SignalWorkbench({
   );
 }
 
-export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAxis }) {
+export function RankingBoard({
+  initialAxis = "popular",
+  initialPlatform = "all",
+}: {
+  initialAxis?: RankAxis;
+  initialPlatform?: PlatformId | "all";
+}) {
   const [axis, setAxis] = useState<RankAxis>(initialAxis);
   const [period, setPeriod] = useState<RankPeriod>("weekly");
   const [type, setType] = useState<WorkType | "all">("all");
   const [genre, setGenre] = useState<string>("all");
-  const [platform, setPlatform] = useState<PlatformId | "all">("all");
+  const [platform, setPlatform] = useState<PlatformId | "all">(initialPlatform);
   const [status, setStatus] = useState<SerialStatus | "all">("all");
   const [pricing, setPricing] = useState<Pricing | "all">("all");
   const [minRating, setMinRating] = useState(0);
@@ -392,7 +399,7 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
       pricing,
       minRating: String(minRating),
       rising: String(risingOnly),
-      limit: "50",
+      limit: RANKING_DEFAULT_LIMIT,
       refresh: "false",
     });
     return params.toString();
@@ -595,6 +602,7 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
               { value: "naver-webtoon", label: "네이버웹툰" },
               { value: "kakao-webtoon", label: "카카오웹툰" },
               { value: "naver-series", label: "시리즈" },
+              { value: "lezhin", label: "레진" },
             ]}
           />
           <Segmented

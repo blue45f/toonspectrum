@@ -22,7 +22,16 @@ export type PlatformId =
   | "lezhin"
   | "bomtoon"
   | "toptoon"
-  | "postype";
+  | "postype"
+  | "mrblue"
+  | "comico"
+  | "toomics"
+  | "bufftoon"
+  | "bookcube"
+  | "onestory"
+  | "peanutoon"
+  | "kyobo"
+  | "yes24";
 
 export interface Platform {
   id: PlatformId;

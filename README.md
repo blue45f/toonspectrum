@@ -72,16 +72,17 @@ node scripts/crawl.mjs                 # 개발 seed 파일 재생성
 node scripts/crawl.mjs --json --no-file # 서버 스케줄러용 JSON 출력
 ```
 
-- **웹툰**: 요일별/완결 목록 + 작품 상세 API에서 제목·작가·**별점·조회수·관심수·장르·시놉시스·태그·연재요일·연령등급·연재 시작 연도·표지 썸네일**을 수집.
+- **웹툰**: 요일별/완결 목록 전체를 검색 색인으로 저장하고, 상위/설정 범위는 상세 API로 제목·작가·**별점·조회수·관심수·장르·시놉시스·태그·연재요일·연령등급·연재 시작 연도·표지 썸네일**을 보강합니다. 카카오웹툰/레진 공개 카탈로그도 추가로 정규화합니다.
 - **웹소설**: 웹툰의 원작 정보(`novelOriginAuthors`)로 실제 원작 엔트리와 **원작↔웹툰 어댑테이션 연결**을 생성하고, 네이버 시리즈 장르 랭킹으로 보강.
 - **표지 썸네일**: 핫링크/CORS 회피를 위해 Nest API의 `/api/cover` 프록시(허용 호스트 `*.pstatic.net`, `*.kakaopagecdn.com`, `*.kakaocdn.net`)를 경유해 표시.
 - 평가 수·평점 분포·완독률·몰입 지수 등 공개되지 않는 일부 보조 지표는 추정값이며, 랭킹은 실제 수집 데이터에 산식을 적용해 계산합니다.
-- **플랫폼 확장**: `PlatformId`/`PLATFORMS`는 네이버·카카오 외에 리디, 레진, 봄툰, 탑툰, 포스타입까지 등록할 수 있는 구조입니다. 실제 완결·휴재·랭킹 신호는 플랫폼별 수집 어댑터를 추가해 보강합니다.
+- **플랫폼 확장**: `PlatformId`/`PLATFORMS`와 `lib/server/catalog-sources.ts`는 네이버·카카오 외에 리디, 문피아, 조아라, 노벨피아, 레진, 봄툰, 탑툰, 포스타입, 미스터블루, 코미코, 투믹스, 버프툰, 북큐브, 원스토리, 피너툰, 교보, 예스24까지 국내 웹툰/웹소설 수집 슬롯을 관리합니다. 현재 crawler 구현 소스는 네이버웹툰·네이버시리즈·카카오웹툰·레진이며, 리디처럼 Cloudflare/로그인/성인 인증/약관 검토가 필요한 소스는 우회하지 않고 pending으로 남깁니다.
 - **DB 주기 갱신**:
   - `CATALOG_INGEST_MODE=off|fixed`
   - `CATALOG_INGEST_INTERVAL_SECONDS=1800`
   - `CATALOG_INGEST_TRIGGER_TOKEN` 설정 시 `/api/catalog/ingest/run` 수동 실행 가능
   - `/api/catalog/ingest/status`에서 current snapshot, 최근 실행 이력, 다음 실행 예정 시각 확인
+  - `WEBDEX_SOURCE_IDS=naver-webtoon,naver-series,kakao-webtoon,lezhin`로 실제 실행 소스를 제한
 - **랭킹 실시간성**: 실시간 라이브 보정은 환경변수로 운영합니다.
   - `WEBTOON_LIVE_REFRESH_MODE` (`fixed` / `adaptive` / `off`)
   - `WEBTOON_LIVE_TTL_SECONDS` (기본 120초)

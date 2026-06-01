@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeCatalogIngestConfig, parseCrawlerJsonPayload } from "../server/catalog-ingest";
+import { buildCatalogSourcePlan } from "../server/catalog-sources";
 
 describe("catalog ingest helpers", () => {
   it("crawler stdout에서 JSON 페이로드를 안전하게 파싱한다", () => {
@@ -33,5 +34,18 @@ describe("catalog ingest helpers", () => {
     expect(config.timeoutMs).toBe(600000);
     expect(config.maxOutputMb).toBe(1);
     expect(config.scriptPath).toBe("custom/crawl.mjs");
+  });
+
+  it("국내 플랫폼 수집 소스를 구현 상태와 정책 상태로 분리한다", () => {
+    const config = normalizeCatalogIngestConfig({
+      WEBDEX_SOURCE_IDS: "naver-webtoon,kakao-webtoon,ridi,munpia",
+    });
+    const plan = buildCatalogSourcePlan(config.sourceIds);
+
+    expect(config.sourceIds).toEqual(["naver-webtoon", "kakao-webtoon", "ridi", "munpia"]);
+    expect(plan.enabled.map((source) => source.id)).toEqual(["naver-webtoon", "kakao-webtoon"]);
+    expect(plan.pending.map((source) => source.id)).toEqual(["ridi", "munpia"]);
+    expect(plan.coverage.domesticWebtoonSources).toBeGreaterThan(5);
+    expect(plan.coverage.domesticWebnovelSources).toBeGreaterThan(5);
   });
 });

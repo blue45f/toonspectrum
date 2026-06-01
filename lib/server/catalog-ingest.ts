@@ -6,6 +6,7 @@ import { desc, eq } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
 import { getCatalogState, loadCatalogSnapshot, resetCatalogToSeed } from "../data";
 import type { Title } from "../types";
+import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,6 +20,7 @@ export interface CatalogIngestConfig {
   maxOutputMb: number;
   scriptPath: string;
   triggerToken: string;
+  sourceIds: ReturnType<typeof parseCatalogSourceIds>;
 }
 
 export interface CatalogCrawlerPayload {
@@ -64,6 +66,7 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
     maxOutputMb: parseBoundedInt(env.CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB, 12, 1, 200),
     scriptPath: env.CATALOG_CRAWL_SCRIPT || path.join("scripts", "crawl.mjs"),
     triggerToken: env.CATALOG_INGEST_TRIGGER_TOKEN || "",
+    sourceIds: parseCatalogSourceIds(env.WEBDEX_SOURCE_IDS),
   };
 }
 
@@ -193,6 +196,7 @@ export async function getCatalogIngestStatus(config = normalizeCatalogIngestConf
 
   return {
     config: withoutToken(config),
+    sourcePlan: buildCatalogSourcePlan(config.sourceIds),
     currentSnapshot: currentSnapshot
       ? {
           id: currentSnapshot.id,
@@ -248,6 +252,7 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
       timeoutMs: config.timeoutMs,
       intervalSeconds: config.intervalSeconds,
       mode: config.mode,
+      sourceIds: config.sourceIds,
       force: Boolean(options.force),
     },
   });
@@ -339,7 +344,7 @@ async function executeCrawler(config: CatalogIngestConfig): Promise<CatalogCrawl
     encoding: "utf8",
     timeout: config.timeoutMs,
     maxBuffer: config.maxOutputMb * 1024 * 1024,
-    env: { ...process.env, TZ: process.env.TZ ?? "Asia/Seoul" },
+    env: { ...process.env, TZ: process.env.TZ ?? "Asia/Seoul", WEBDEX_SOURCE_IDS: config.sourceIds.join(",") },
   });
   return parseCrawlerJsonPayload(stdout);
 }
@@ -437,6 +442,7 @@ function withoutToken(config: CatalogIngestConfig) {
     timeoutMs: config.timeoutMs,
     maxOutputMb: config.maxOutputMb,
     scriptPath: config.scriptPath,
+    sourceIds: config.sourceIds,
     triggerTokenConfigured: Boolean(config.triggerToken),
   };
 }

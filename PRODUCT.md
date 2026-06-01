@@ -46,6 +46,7 @@ register: product
 
 - 운영 카탈로그의 권위 소스는 서버 DB `catalog_snapshot`이다. `lib/data/titles.ts`는 seed/fallback으로만 사용한다.
 - 수집은 `scripts/crawl.mjs --json --no-file` → Nest `CatalogService` → DB 스냅샷 저장 → 메모리 카탈로그 갱신 순서로 흐른다.
+- 국내 전체 확장은 `lib/server/catalog-sources.ts`의 source registry가 관리한다. 현재 crawler 소스(네이버웹툰·네이버시리즈·카카오웹툰·레진)와 제휴/정책 확인이 필요한 pending 소스를 분리한다.
 - 기본 수집 모드는 `CATALOG_INGEST_MODE=off`이며, 플랫폼별 약관/robots/API 정책/제휴 가능성을 확인한 뒤 `fixed`로 전환한다.
 - 저장 데이터는 작품 메타데이터, 공개 수치, 플랫폼 URL, 출처/갱신 메타데이터로 제한한다. 유료 본문, 회차 이미지 바이너리, 댓글/외부 리뷰 원문, 개인정보는 저장하지 않는다.
 - 모든 랭킹은 응답 메타데이터에 산식, source, reliability, snapshot/sourceVersion을 드러내 실제 공개 수치와 추정 지표를 구분한다.
