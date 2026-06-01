@@ -26,7 +26,7 @@ import {
 import type { PlatformId, Pricing, SerialStatus, Title, WorkType } from "../types";
 
 export const DEFAULT_RANKING_LIMIT = 50;
-export const MAX_RANKING_LIMIT = 100;
+export const MAX_RANKING_LIMIT = 1000;
 export const RANKING_REFRESH_SECONDS = 60;
 
 const validAxes = new Set<RankAxis>(RANK_AXES.map((a) => a.key));

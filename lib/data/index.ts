@@ -1,33 +1,124 @@
-import type { Title, SeedReview, WorkType } from "../types";
-import { TITLES } from "./titles";
+import type { SeedReview, Title, WorkType } from "../types";
+import { TITLES as SEED_TITLES } from "./titles";
 import { SEED_REVIEWS as RAW_REVIEWS } from "./reviews";
 
-export { TITLES };
+export type CatalogSource = "seed-file" | "database-snapshot" | "cli-ingest";
 
-const BY_ID = new Map<string, Title>(TITLES.map((t) => [t.id, t]));
-const BY_SLUG = new Map<string, Title>(TITLES.map((t) => [t.slug, t]));
+type CatalogState = {
+  source: CatalogSource;
+  loadedAt: string;
+  titleCount: number;
+  titleRevision: number;
+  revision: number;
+  sourceVersion?: string;
+  seedFallback?: boolean;
+};
 
-// 크롤 데이터가 갱신되며 일부 작품이 빠질 수 있으므로, 존재하는 작품의 리뷰만 노출(고아 리뷰 방지)
-export const SEED_REVIEWS: SeedReview[] = RAW_REVIEWS.filter((r) => BY_ID.has(r.titleId));
+function buildByIdIndex(titles: readonly Title[]) {
+  const byId = new Map<string, Title>();
+  for (const title of titles) {
+    byId.set(title.id, title);
+    byId.set(title.slug, title);
+  }
+  return byId;
+}
+
+function normalizeCatalog(titles: unknown): Title[] {
+  if (!Array.isArray(titles)) return [];
+  return titles.filter((item): item is Title => {
+    if (!item || typeof item !== "object") return false;
+
+    const candidate = item as Partial<Title>;
+    return (
+      typeof candidate.id === "string" &&
+      candidate.id.trim().length > 0 &&
+      typeof candidate.slug === "string" &&
+      candidate.slug.trim().length > 0 &&
+      typeof candidate.title === "string" &&
+      candidate.title.trim().length > 0 &&
+      Array.isArray(candidate.availability)
+    );
+  });
+}
+
+let TITLE_REVISION_COUNTER = 1;
+let BY_ID = buildByIdIndex(SEED_TITLES);
+let TITLES_INTERNAL: Title[] = [...SEED_TITLES];
+
+let TITLES_META: CatalogState = {
+  source: "seed-file",
+  loadedAt: new Date().toISOString(),
+  titleCount: TITLES_INTERNAL.length,
+  titleRevision: TITLE_REVISION_COUNTER,
+  revision: TITLE_REVISION_COUNTER,
+  seedFallback: true,
+};
+
+export let SEED_REVIEWS: SeedReview[] = RAW_REVIEWS.filter((review) => BY_ID.has(review.titleId));
+
+function rebuildIndexes(nextTitles: readonly Title[]) {
+  BY_ID = buildByIdIndex(nextTitles);
+  SEED_REVIEWS = RAW_REVIEWS.filter((review) => BY_ID.has(review.titleId));
+}
+
+export let TITLES: Title[] = TITLES_INTERNAL;
+
+export function getCatalogState(): CatalogState {
+  return { ...TITLES_META };
+}
+
+export function replaceCatalogData(
+  incoming: unknown,
+  metadata: Partial<Pick<CatalogState, "source" | "sourceVersion">> & {
+    seedFallback?: boolean;
+  } = {}
+): Title[] {
+  const normalized = normalizeCatalog(incoming);
+  TITLES_INTERNAL = normalized.length > 0 ? normalized : [...SEED_TITLES];
+  TITLES = TITLES_INTERNAL;
+  rebuildIndexes(TITLES_INTERNAL);
+
+  TITLE_REVISION_COUNTER += 1;
+  TITLES_META = {
+    source: metadata.source ?? "cli-ingest",
+    sourceVersion: metadata.sourceVersion,
+    loadedAt: new Date().toISOString(),
+    titleCount: TITLES_INTERNAL.length,
+    titleRevision: TITLE_REVISION_COUNTER,
+    revision: TITLE_REVISION_COUNTER,
+    seedFallback: metadata.seedFallback ?? false,
+  };
+
+  return TITLES_INTERNAL;
+}
+
+export function resetCatalogToSeed(): Title[] {
+  return replaceCatalogData(SEED_TITLES, { source: "seed-file", sourceVersion: "seed", seedFallback: true });
+}
+
+export function loadCatalogSnapshot(titles: unknown, sourceVersion = "db-snapshot", seedFallback = false): Title[] {
+  return replaceCatalogData(titles, {
+    source: "database-snapshot",
+    sourceVersion,
+    seedFallback,
+  });
+}
 
 export function getTitle(idOrSlug: string): Title | undefined {
-  return BY_ID.get(idOrSlug) ?? BY_SLUG.get(idOrSlug);
+  return BY_ID.get(idOrSlug);
 }
 
 export function allTitles(): Title[] {
   return TITLES;
 }
 
-// 작품의 참여 작가(글·그림) 이름 목록 — 쉼표/슬래시 분리
 export function namesOf(t: Title): string[] {
   const raw = [t.author, t.artist].filter(Boolean).join(", ");
   return [...new Set(raw.split(/[,/]/).map((s) => s.trim()).filter((s) => s && s !== "미상"))];
 }
 
 export function authorWorks(name: string): Title[] {
-  return TITLES.filter((t) => namesOf(t).includes(name)).sort(
-    (a, b) => b.stats.views - a.stats.views
-  );
+  return TITLES.filter((t) => namesOf(t).includes(name)).sort((a, b) => b.stats.views - a.stats.views);
 }
 
 export function allAuthorNames(): string[] {
@@ -44,27 +135,23 @@ export function reviewsFor(titleId: string): SeedReview[] {
   return SEED_REVIEWS.filter((r) => r.titleId === titleId);
 }
 
-// 원작 (이 작품이 무엇을 원작으로 하는가)
 export function originalOf(t: Title): Title | undefined {
   return t.adaptedFrom ? BY_ID.get(t.adaptedFrom) : undefined;
 }
 
-// 2차 창작 (이 작품을 원작으로 하는 작품들 — 보통 웹소설 -> 웹툰)
 export function adaptationsOf(t: Title): Title[] {
   return TITLES.filter((x) => x.adaptedFrom === t.id);
 }
 
-// 작품 universe (원작 + 모든 2차창작) — 그래프 노드
 export function adaptationFamily(t: Title): Title[] {
   const root = originalOf(t) ?? t;
   return [root, ...adaptationsOf(root)];
 }
 
-// 전체 장르 (데이터에 실제 등장하는 것)
 export function activeGenres(): string[] {
   const set = new Set<string>();
   TITLES.forEach((t) => t.genres.forEach((g) => set.add(g)));
-  return Array.from(set);
+  return [...set];
 }
 
 export function activeTags(): { tag: string; count: number }[] {
@@ -75,7 +162,6 @@ export function activeTags(): { tag: string; count: number }[] {
     .sort((a, b) => b.count - a.count);
 }
 
-// 모든 리뷰 (작품 정보 조인)
 export function allReviewsJoined(): (SeedReview & { title?: Title })[] {
   return SEED_REVIEWS.map((r) => ({ ...r, title: BY_ID.get(r.titleId) }));
 }

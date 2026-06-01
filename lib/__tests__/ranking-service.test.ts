@@ -49,12 +49,12 @@ function statusFetch(status: "ongoing" | "completed" | "hiatus") {
 describe("ranking service", () => {
   it("쿼리 파라미터를 안전하게 정규화한다", () => {
     const params = normalizeRankingParams(
-      query({ axis: "bad", period: "bad", limit: "999", minRating: "9", rising: "true" })
+      query({ axis: "bad", period: "bad", limit: "9999", minRating: "9", rising: "true" })
     );
 
     expect(params.axis).toBe("popular");
     expect(params.period).toBe("weekly");
-    expect(params.limit).toBe(100);
+    expect(params.limit).toBe(1000);
     expect(params.minRating).toBe(5);
     expect(params.onlyRising).toBe(true);
   });

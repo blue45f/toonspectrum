@@ -5,12 +5,37 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
+const ARGS = new Set(process.argv.slice(2));
+const OUTPUT_JSON = ARGS.has("--json");
+const WRITE_FILE = !ARGS.has("--no-file");
+const log = (...args) => {
+  if (OUTPUT_JSON) console.error(...args);
+  else console.log(...args);
+};
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const HW = { "User-Agent": UA, Referer: "https://comic.naver.com/", Accept: "application/json" };
 const HS = { "User-Agent": UA, Referer: "https://series.naver.com/" };
-const WEBTOON_CAP = 80;
-const NOVEL_BONUS_CAP = 42;
+const parsePositiveInt = (raw) => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+};
+const parseOptionalInt = (raw) => {
+  const n = Number(raw);
+  return Number.isFinite(n) && Number.isInteger(n) && n > 0 ? n : undefined;
+};
+
+const WEBTOON_CAP = parsePositiveInt(process.env.WEBDEX_WEBTOON_CAP);
+const NOVEL_BONUS_CAP = parsePositiveInt(process.env.WEBDEX_SERIES_BONUS_CAP);
+const KAKAO_WEBTOON_CAP = parsePositiveInt(process.env.WEBDEX_KAKAO_WEBTOON_CAP);
+const WEBTOON_FINISHED_PAGES = parseOptionalInt(process.env.WEBDEX_WEBTOON_FINISHED_PAGES);
+const SERIES_PAGES_PER_GENRE = parseOptionalInt(process.env.WEBDEX_SERIES_PAGES_PER_GENRE);
+const MIN_CRAWL_DELAY_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_DELAY_MS) ?? 90;
+
+function applyLimit(items, limit) {
+  return typeof limit === "number" ? items.slice(0, limit) : items;
+}
 
 async function getJSON(url, headers = HW) {
   const c = new AbortController();
@@ -72,6 +97,44 @@ const WGENRE = {
 };
 const WEEK = { MONDAY: "월", TUESDAY: "화", WEDNESDAY: "수", THURSDAY: "목", FRIDAY: "금", SATURDAY: "토", SUNDAY: "일" };
 const NGENRE = { 201: "로맨스", 207: "로판", 202: "판타지", 208: "현판", 206: "무협", 203: "미스터리", 209: "BL" };
+const DAY_KEY = {
+  mon: "월",
+  monday: "월",
+  tue: "화",
+  tuesday: "화",
+  wed: "수",
+  wednesday: "수",
+  thu: "목",
+  thursday: "목",
+  fri: "금",
+  friday: "금",
+  sat: "토",
+  saturday: "토",
+  sun: "일",
+  sunday: "일",
+  월: "월",
+  화: "화",
+  수: "수",
+  목: "목",
+  금: "금",
+  토: "토",
+  일: "일",
+  0: "일",
+  1: "월",
+  2: "화",
+  3: "수",
+  4: "목",
+  5: "금",
+  6: "토",
+  7: "일",
+};
+function toKoreanWeek(raw) {
+  if (raw == null) return undefined;
+  const rawLower = String(raw).trim().toLowerCase();
+  if (!rawLower) return undefined;
+  const key = rawLower.replace(/요일$/, "").replace(/_/, "").replace(/-/g, "");
+  return WEEK[key.toUpperCase()] ?? DAY_KEY[key] ?? DAY_KEY[key.slice(0, 3)] ?? DAY_KEY[key.slice(0, 1)] ?? undefined;
+}
 
 function mapWGenres(codes = [], tags = []) {
   const set = new Set();
@@ -147,18 +210,21 @@ async function crawlWebtoons() {
       if (!map.has(t.titleId)) map.set(t.titleId, { ...t, _days: new Set() });
       map.get(t.titleId)._days.add(d);
     });
-    await sleep(90);
+    await sleep(MIN_CRAWL_DELAY_MS);
   }
-  for (let p = 1; p <= 4; p++) {
+  for (let p = 1; ; p++) {
+    if (WEBTOON_FINISHED_PAGES && p > WEBTOON_FINISHED_PAGES) break;
     const j = await getJSON(`https://comic.naver.com/api/webtoon/titlelist/finished?page=${p}&order=DOWNLOAD`);
-    (j?.titleList ?? []).forEach((t) => {
+    const pageItems = j?.titleList;
+    if (!Array.isArray(pageItems) || pageItems.length === 0) break;
+    pageItems.forEach((t) => {
       if (!map.has(t.titleId)) map.set(t.titleId, { ...t, _days: new Set(), finish: true });
     });
-    await sleep(90);
+    await sleep(MIN_CRAWL_DELAY_MS);
   }
   const all = [...map.values()].sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0));
-  const top = all.slice(0, WEBTOON_CAP);
-  console.log(`웹툰 수집: 전체 ${all.length}, 상세+연도 ${top.length}`);
+  const top = applyLimit(all, WEBTOON_CAP);
+  log(`웹툰 수집: 전체 ${all.length}, 상세+연도 ${top.length}`);
 
   return (
     await pMap(top, async (t) => {
@@ -167,9 +233,13 @@ async function crawlWebtoons() {
       const year = parseYear(asc?.articleList?.[0]?.serviceDateDescription);
       const genreTypes = info?.gfpAdCustomParam?.genreTypes ?? [];
       const curation = (info?.curationTagList ?? []).map((c) => c.tagName || "").filter(Boolean);
-      const wd = [...(t._days ?? [])].map((d) => WEEK[d.toUpperCase()]).filter(Boolean);
-      const pub = (info?.publishDayOfWeekList ?? []).map((d) => WEEK[d]).filter(Boolean);
-      const updateDays = (pub.length ? pub : wd).filter(Boolean);
+      const wd = [...(t._days ?? [])]
+        .map((d) => toKoreanWeek(d))
+        .filter(Boolean);
+      const pub = (info?.publishDayOfWeekList ?? [])
+        .map((d) => toKoreanWeek(d))
+        .filter(Boolean);
+      const updateDays = [...new Set((pub.length ? pub : wd).filter(Boolean))];
       const finished = !!(t.finish || info?.finished);
       const star = typeof t.starScore === "number" ? t.starScore : 0;
       const fav = info?.favoriteCount ?? 0;
@@ -221,12 +291,15 @@ async function crawlSeriesNovels() {
   const out = [];
   const seen = new Set();
   for (const [code, genre] of Object.entries(NGENRE)) {
-    for (let page = 1; page <= 3; page++) {
+    for (let page = 1; ; page++) {
+      if (SERIES_PAGES_PER_GENRE && page > SERIES_PAGES_PER_GENRE) break;
       const html = await getSeries(
         `https://series.naver.com/novel/categoryProductList.series?categoryTypeCode=genre&genreCode=${code}&page=${page}`
       );
-      if (!html) continue;
+      if (!html) break;
+      const before = out.length;
       const parts = html.split("detail.series?productNo=").slice(1);
+      if (parts.length === 0) break;
       for (const part of parts) {
         const idM = part.match(/^(\d+)/);
         if (!idM) continue;
@@ -247,11 +320,12 @@ async function crawlSeriesNovels() {
           waitFree: /ico_onlyfree|매일.*무료/.test(head),
         });
       }
-      await sleep(150);
+      await sleep(MIN_CRAWL_DELAY_MS);
+      if (out.length === before) break;
     }
   }
-  console.log(`시리즈 웹소설(보너스) 수집: ${out.length}`);
-  return out.slice(0, NOVEL_BONUS_CAP).map((n, i) => {
+  log(`시리즈 웹소설(보너스) 수집: ${out.length}`);
+  return applyLimit(out, NOVEL_BONUS_CAP).map((n, i) => {
     const ratingAvg = 4.6 - (i % 12) * 0.04;
     const views = 9_000_000 - i * 150_000 + (hashInt(n.productNo) % 700_000);
     const fav = Math.round(views * 0.05);
@@ -361,11 +435,11 @@ async function crawlKakaoWebtoon() {
           const c = card.content;
           if (c?.id && c.title && !map.has(c.id)) map.set(c.id, c);
         }
-    await sleep(90);
+    await sleep(MIN_CRAWL_DELAY_MS);
   }
   const cards = [...map.values()];
-  console.log(`카카오웹툰 수집: ${cards.length}`);
-  return cards.slice(0, 44).map((c, i) => {
+  log(`카카오웹툰 수집: ${cards.length}`);
+  return applyLimit(cards, KAKAO_WEBTOON_CAP).map((c, i) => {
     const authors = (c.authors ?? []).filter((a) => a.type === "AUTHOR").map((a) => a.name);
     const illus = (c.authors ?? []).filter((a) => a.type === "ILLUSTRATOR").map((a) => a.name);
     const kws = (c.seoKeywords ?? []).map((k) => String(k).replace(/^#/, "").trim()).filter(Boolean);
@@ -439,13 +513,14 @@ function clean(t) {
 }
 
 async function main() {
-  console.log("네이버 실데이터 크롤 시작…");
+  const startedAt = new Date().toISOString();
+  log("네이버 실데이터 크롤 시작…");
   const webtoons = await crawlWebtoons();
   let series = [];
   try {
     series = await crawlSeriesNovels();
   } catch (e) {
-    console.log("시리즈 크롤 스킵:", e.message);
+    log("시리즈 크롤 스킵:", e.message);
   }
   const originNovels = buildOriginNovels(webtoons, series);
   const linked = webtoons.filter((w) => w.adaptedFrom).length;
@@ -455,7 +530,7 @@ async function main() {
   try {
     kakao = await crawlKakaoWebtoon();
   } catch (e) {
-    console.log("카카오웹툰 크롤 스킵:", e.message);
+    log("카카오웹툰 크롤 스킵:", e.message);
   }
   // 교차 매칭: 같은 제목이면 네이버 작품에 카카오 가용성 추가(진짜 크로스플랫폼), 아니면 신규
   const naverByName = new Map(webtoons.map((w) => [norm(w.title), w]));
@@ -478,9 +553,43 @@ async function main() {
   const all = [...webtoons.map(clean), ...novels.map(clean), ...kakaoNew.map(clean)];
   pickFeatured(all);
 
-  const header = `// 자동 생성 — scripts/crawl.mjs (네이버 웹툰/시리즈 + 카카오웹툰 실데이터 벤치마킹)\n// 재생성: node scripts/crawl.mjs\n// 네이버 웹툰/시리즈: 조회·관심·별점·장르·시놉시스·연재요일·표지·연재연도 실수집. 카카오웹툰: 제목·작가·태그·표지 실수집(평점·조회는 추정). 일부 파생지표(평가수·분포·완독률)는 추정.\nimport type { Title } from "../types";\n\nexport const TITLES: Title[] = `;
-  await writeFile(path.resolve("lib/data/titles.ts"), header + JSON.stringify(all, null, 2) + ";\n", "utf8");
-  console.log(
+  const crawledAt = new Date().toISOString();
+  const sourceVersion = `crawl/${crawledAt}`;
+  const result = {
+    titles: all,
+    count: all.length,
+    sourceVersion,
+    crawledAt,
+    metadata: {
+      startedAt,
+      sources: {
+        naverWebtoon: webtoons.length,
+        naverSeries: novels.length,
+        kakaoWebtoon: kakao.length,
+        kakaoNew: kakaoNew.length,
+        kakaoCrossLinked: crossLinked,
+        adaptations: linked,
+      },
+      limits: {
+        webtoonCap: WEBTOON_CAP ?? null,
+        seriesBonusCap: NOVEL_BONUS_CAP ?? null,
+        kakaoWebtoonCap: KAKAO_WEBTOON_CAP ?? null,
+        finishedPages: WEBTOON_FINISHED_PAGES ?? null,
+        seriesPagesPerGenre: SERIES_PAGES_PER_GENRE ?? null,
+      },
+    },
+  };
+
+  if (WRITE_FILE) {
+    const header = `// 자동 생성 — scripts/crawl.mjs (네이버 웹툰/시리즈 + 카카오웹툰 실데이터 벤치마킹)\n// 재생성: node scripts/crawl.mjs\n// 네이버 웹툰/시리즈: 조회·관심·별점·장르·시놉시스·연재요일·표지·연재연도 실수집. 카카오웹툰: 제목·작가·태그·표지 실수집(평점·조회는 추정). 일부 파생지표(평가수·분포·완독률)는 추정.\nimport type { Title } from "../types";\n\nexport const TITLES: Title[] = `;
+    await writeFile(path.resolve("lib/data/titles.ts"), header + JSON.stringify(all, null, 2) + ";\n", "utf8");
+  }
+
+  if (OUTPUT_JSON) {
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  }
+
+  log(
     `완료: ${all.length}편 — 네이버웹툰 ${webtoons.length}, 웹소설 ${novels.length}, 카카오웹툰 신규 ${kakaoNew.length}(+교차연결 ${crossLinked}), 어댑테이션 ${linked}`
   );
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Headers,
   Inject,
   Get,
   Header,
@@ -43,6 +44,12 @@ interface SearchQuery {
   yearMax?: string;
   freeOnly?: string;
   adaptedOnly?: string;
+}
+
+interface CatalogIngestPayload {
+  token?: unknown;
+  requestedBy?: unknown;
+  force?: unknown;
 }
 
 @Controller()
@@ -133,6 +140,21 @@ export class CatalogController {
   @Header("Cache-Control", "no-store, max-age=0")
   async getRankingHealth() {
     return this.catalogService.getRankingHealth();
+  }
+
+  @Get("/catalog/ingest/status")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getCatalogIngestStatus() {
+    return this.catalogService.getCatalogIngestStatus();
+  }
+
+  @Post("/catalog/ingest/run")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async runCatalogIngest(
+    @Body() body: CatalogIngestPayload,
+    @Headers("x-catalog-ingest-token") token?: string
+  ) {
+    return this.catalogService.runCatalogIngest(body ?? {}, token);
   }
 
   @Get("/explore")

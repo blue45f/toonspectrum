@@ -18,6 +18,74 @@ The UI must never compute ranking order from `lib/data` directly. Client surface
 
 The Vite client reads ranking data through the Nest API proxy. The server service owns query normalization, catalog filtering, live signal matching, and reliability metadata so browser components do not duplicate ranking logic.
 
+## 서버 카탈로그 갱신 구조
+
+작품 카탈로그는 더 이상 `lib/data/titles.ts` 파일을 운영 데이터의 주 저장소로 보지 않습니다. 파일은 개발용 seed/fallback이며, 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장합니다.
+
+- 저장 테이블: `catalog_snapshot`
+  - `snapshot`: 정규화된 `Title[]` JSON
+  - `source`, `sourceVersion`, `titleCount`, `isCurrent`
+  - `metadata.runHash`, `runId`, `requestedBy`, `triggeredBy`
+- 실행 이력: `catalog_ingest_run`
+  - `running | success | failed | aborted`
+  - 실행 시간, 소요 시간, 작품 수, 에러 메시지, run hash
+- 서버 시작 흐름:
+  - `CatalogService.onModuleInit()`에서 최신 `catalog_snapshot.isCurrent=true`를 로드
+  - DB 스냅샷이 없으면 seed 파일로 폴백
+  - 라이브 랭킹 스케줄러와 카탈로그 수집 스케줄러를 분리 실행
+- 수집 흐름:
+  - `scripts/crawl.mjs --json --no-file` 실행
+  - stdout JSON을 파싱해 `Title[]` 검증
+  - 동일 hash면 새 스냅샷을 만들지 않고 메모리 카탈로그만 새로고침
+  - 변경 hash면 기존 스냅샷을 `isCurrent=false`로 내리고 새 스냅샷을 current로 저장
+- 운영 API:
+  - `GET /api/catalog/ingest/status`: current snapshot, 최근 실행 이력, 다음 실행 예정 시각
+  - `POST /api/catalog/ingest/run`: 수동 실행. `CATALOG_INGEST_TRIGGER_TOKEN`이 설정되어 있어야 하며, `x-catalog-ingest-token` 또는 body token과 일치해야 합니다.
+
+### 환경 변수
+
+- `CATALOG_INGEST_MODE` (`off` | `fixed`)  
+  기본은 `off`. 운영에서 플랫폼별 허용 범위를 확인한 뒤 `fixed`로 켭니다.
+- `CATALOG_INGEST_INTERVAL_SECONDS` (기본 `1800`, 최소 `60`)  
+  DB 카탈로그 전체 갱신 주기. 랭킹 라이브 보정 TTL과 별도입니다.
+- `CATALOG_INGEST_TIMEOUT_MS` (기본 `180000`, 최대 `600000`)  
+  한 번의 크롤 작업 제한 시간.
+- `CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB`  
+  JSON stdout 최대 버퍼.
+- `CATALOG_INGEST_TRIGGER_TOKEN`  
+  수동 실행 필수 토큰. 미설정이면 수동 실행 API는 거부됩니다.
+- `WEBDEX_CRAWL_DELAY_MS`, `WEBDEX_WEBTOON_CAP`, `WEBDEX_SERIES_BONUS_CAP`, `WEBDEX_KAKAO_WEBTOON_CAP`, `WEBDEX_WEBTOON_FINISHED_PAGES`, `WEBDEX_SERIES_PAGES_PER_GENRE`  
+  플랫폼별 호출량과 범위를 제한하는 크롤러 안전장치입니다.
+
+## 법적 리스크 완화 원칙
+
+이 문서는 법률 자문이 아닙니다. 운영 전에는 서비스 목적, 수집 범위, 플랫폼별 약관, robots 정책, 제휴 가능성을 변호사 또는 법무 담당자와 확인해야 합니다. 다만 WEBDEX 아키텍처는 아래 원칙을 기본으로 법적/운영 리스크를 낮춥니다.
+
+1. **공식/허용 소스 우선**
+   - 공개 API, 공식 랭킹/검색 페이지, 제휴 피드, 정식 데이터 제공 계약을 우선합니다.
+   - robots.txt, 이용약관, API 약관에서 금지하거나 제한한 경로는 어댑터를 `enabled=false`로 둡니다.
+   - 로그인, 성인 인증, 결제, CAPTCHA, 앱 전용 API 우회는 금지합니다.
+
+2. **저장 범위 최소화**
+   - 저장 대상은 검색/랭킹에 필요한 작품 메타데이터, 플랫폼 URL, 공개 수치, 갱신 시각, 출처 메타데이터로 제한합니다.
+   - 유료 회차 본문, 이미지 바이너리, 댓글/리뷰 원문, 회차 이미지, 개인 식별 가능 데이터는 수집/저장하지 않습니다.
+   - 표지는 바이너리 저장 대신 허용 호스트 프록시 URL만 보관하고, 원 소유자 권리를 침해하지 않도록 삭제 요청 대응 경로를 둡니다.
+
+3. **호출량 통제**
+   - `CATALOG_INGEST_MODE=off`가 기본입니다.
+   - 운영 갱신은 전체 크롤보다 증분/라이브 신호 우선으로 설계합니다.
+   - 최소 지연(`WEBDEX_CRAWL_DELAY_MS`)과 플랫폼별 cap을 두고, 장애/차단 징후가 있으면 스케줄러를 끕니다.
+
+4. **출처와 산정 방식 공개**
+   - 각 랭킹 응답은 `meta.source`, `meta.reliability`, `sourceStatuses`를 포함합니다.
+   - DB 스냅샷은 `sourceVersion`, `runHash`, `createdAt`을 보존해 어떤 데이터로 순위를 계산했는지 추적할 수 있습니다.
+   - 공개되지 않는 수치(완독률, 평가 분포 등)는 추정값으로 표시하고, 실제 공개 수치와 혼동시키지 않습니다.
+
+5. **어댑터 승인 절차**
+   - 새 플랫폼 어댑터는 `disabled` 상태로 추가합니다.
+   - robots/약관/제휴 가능성 확인, 저장 필드 검토, 호출량 제한, 에러/차단 대응 runbook 작성 후 활성화합니다.
+   - 해외 플랫폼은 각 관할권의 데이터베이스권, 저작권, 약관, 개인정보 규제를 별도 검토합니다.
+
 ## 실시간 갱신 전략 (Real-time refresh strategy)
 
 라이브 랭킹 반영은 `on-demand` + `preload`의 혼합 전략입니다.
@@ -212,6 +280,16 @@ If a future source becomes available, replace the server catalog boundary first.
 - `WEBTOON_LIVE_REFRESH_IDLE_SECONDS`
 - `WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS`
 - `WEBTOON_LIVE_DEMAND_THRESHOLD`
+- `CATALOG_INGEST_MODE`
+- `CATALOG_INGEST_INTERVAL_SECONDS`
+- `CATALOG_INGEST_TIMEOUT_MS`
+- `CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB`
+- `CATALOG_CRAWL_SCRIPT`
+- `CATALOG_INGEST_TRIGGER_TOKEN`
+- `WEBDEX_CRAWL_DELAY_MS`
+- `WEBDEX_WEBTOON_CAP`
+- `WEBDEX_SERIES_BONUS_CAP`
+- `WEBDEX_KAKAO_WEBTOON_CAP`
 
 `apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 라이브 스케줄러를 시작해 초기 요청 전 캐시 예열을 수행합니다.
 
@@ -225,6 +303,7 @@ pnpm test
 pnpm build
 curl -s 'http://localhost:4001/api/ranking?axis=popular&period=daily&limit=3'
 curl -s 'http://localhost:4001/api/ranking?axis=popular&period=daily&refresh=true&limit=3'
+curl -s 'http://localhost:4001/api/catalog/ingest/status'
 ```
 
 Manual UI checks:

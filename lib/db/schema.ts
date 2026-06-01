@@ -266,3 +266,35 @@ export const revenueLedger = sqliteTable("revenue_ledger", {
   settledAt: integer("settledAt", { mode: "timestamp_ms" }),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
 });
+
+export const catalogSnapshots = sqliteTable("catalog_snapshot", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source").notNull(), // crawl/manual/manual-file/synthetic
+  sourceVersion: text("sourceVersion"),
+  titleCount: integer("titleCount").notNull().default(0),
+  isCurrent: integer("isCurrent", { mode: "boolean" }).notNull().default(false),
+  snapshot: text("snapshot").notNull(), // JSON stringified title[] payload
+  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const catalogIngestRuns = sqliteTable("catalog_ingest_run", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source").notNull(),
+  status: text("status").notNull(), // running|success|failed|aborted
+  runHash: text("runHash"),
+  triggeredBy: text("triggeredBy"),
+  requestedBy: text("requestedBy"),
+  startedAt: integer("startedAt", { mode: "timestamp_ms" }).notNull(),
+  finishedAt: integer("finishedAt", { mode: "timestamp_ms" }),
+  durationMs: integer("durationMs"),
+  titleCount: integer("titleCount").notNull().default(0),
+  message: text("message"),
+  error: text("error"),
+  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
