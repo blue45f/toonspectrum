@@ -5,6 +5,8 @@ import {
   getLiveStatusSignals,
   getLiveRankingPlatforms,
   getLiveStatusPlatforms,
+  getLiveRefreshState,
+  markLiveRankingDemand,
   type LiveItem,
   type LiveRankingResult,
   type LiveSourceStatus,
@@ -76,6 +78,16 @@ export interface RankingStatusSignalMeta {
   sourceStatuses: LiveSourceStatus[];
 }
 
+export interface LiveRefreshPlan {
+  mode: "off" | "fixed" | "adaptive";
+  running: boolean;
+  nextRefreshAt: string | null;
+  nextRefreshInSeconds: number | null;
+  lastRefreshAt: string | null;
+  consecutiveFailures: number;
+  demandSignals: number;
+}
+
 export interface RankingReliability {
   confidence: number;
   level: "high" | "medium" | "low";
@@ -112,6 +124,7 @@ export interface RankingResponse {
     };
     statusSignals: RankingStatusSignalMeta;
     reliability: RankingReliability;
+    liveRefreshPlan: LiveRefreshPlan | null;
     source: "live-api" | "formula-api";
   };
   insights: RankingInsights;
@@ -470,6 +483,7 @@ export async function getRankingData(
   const shouldFetchLive = shouldFetchLiveSignals(params);
 
   let liveItems: LiveItem[] = [];
+  let liveRefreshState: ReturnType<typeof getLiveRefreshState> | null = null;
   let liveDay: string | null = null;
   let liveFetchedAt: string | null = null;
   let liveNextRefreshAt: string | null = null;
@@ -477,6 +491,7 @@ export async function getRankingData(
   let timeoutMs: number | null = null;
   let liveSources: LiveSourceStatus[] = [];
   if (shouldFetchLive) {
+    markLiveRankingDemand();
     const platformFilter =
       params.platform === "all" ? null : new Set<PlatformId>([params.platform]);
     const live = await fetchLive(30, platformFilter, {
@@ -495,6 +510,7 @@ export async function getRankingData(
     liveTtlSeconds = live.ttlSeconds;
     timeoutMs = live.timeoutMs;
     liveSources = live.sources;
+    liveRefreshState = getLiveRefreshState();
   }
 
   const { items, matched } = applyLiveSignals(ranked, liveItems, params.axis, params.period);
@@ -536,6 +552,17 @@ export async function getRankingData(
       },
       statusSignals: statusSignalMeta,
       reliability,
+      liveRefreshPlan: liveRefreshState
+        ? {
+            mode: liveRefreshState.mode,
+            running: liveRefreshState.running,
+            nextRefreshAt: liveRefreshState.nextRefreshAt,
+            nextRefreshInSeconds: liveRefreshState.nextRefreshInSeconds,
+            lastRefreshAt: liveRefreshState.lastRefreshAt,
+            consecutiveFailures: liveRefreshState.consecutiveFailures,
+            demandSignals: liveRefreshState.demandSignals,
+          }
+        : null,
       source: shouldFetchLive && liveItems.length > 0 ? "live-api" : "formula-api",
     },
     insights,
@@ -545,6 +572,7 @@ export async function getRankingData(
 export async function getRankingHealth(fetchLive: LiveRankingFetcher = getLiveRanking) {
   const startedAt = performance.now();
   const live = await fetchLive(30);
+  const liveRefreshPlan = getLiveRefreshState();
   const okSources = live.sources.filter((source) => source.ok).length;
   const sourceCount = live.sources.length;
   const status = okSources === sourceCount && live.items.length > 0 ? "ok" : okSources > 0 ? "degraded" : "down";
@@ -562,6 +590,15 @@ export async function getRankingHealth(fetchLive: LiveRankingFetcher = getLiveRa
       okSources,
       sourceCount,
       sources: live.sources,
+      refreshPlan: {
+        mode: liveRefreshPlan.mode,
+        running: liveRefreshPlan.running,
+        nextRefreshAt: liveRefreshPlan.nextRefreshAt,
+        nextRefreshInSeconds: liveRefreshPlan.nextRefreshInSeconds,
+        lastRefreshAt: liveRefreshPlan.lastRefreshAt,
+        consecutiveFailures: liveRefreshPlan.consecutiveFailures,
+        demandSignals: liveRefreshPlan.demandSignals,
+      },
     },
   };
 }

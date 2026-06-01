@@ -18,8 +18,8 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("", className)}>
-      <header className="mb-5 flex items-end justify-between gap-4">
+    <section className={cn(className)}>
+      <header className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           {eyebrow && <p className="eyebrow mb-1.5 text-accent">{eyebrow}</p>}
           <h2 className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
@@ -30,7 +30,7 @@ export function Section({
         {action && (
           <Link
             href={action.href}
-            className="group flex shrink-0 items-center gap-1 text-sm font-medium text-fg-2 transition-colors hover:text-accent"
+            className="group inline-flex w-fit items-center gap-1 text-sm font-medium text-fg-2 transition-colors hover:text-accent"
           >
             {action.label}
             <ArrowRight

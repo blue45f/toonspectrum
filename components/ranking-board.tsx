@@ -168,9 +168,12 @@ function confidenceTone(level?: RankingMeta["reliability"]["level"]) {
 
 function RankingSkeleton() {
   return (
-    <div className="rounded-xl border border-line bg-panel/30 p-2 sm:p-3">
+    <div className="rounded-2xl border border-line bg-panel/30 p-2 sm:p-3">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 sm:gap-4 sm:px-3">
+        <div
+          key={i}
+          className="grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 rounded-lg border-b border-line/60 px-2 py-2.5 sm:gap-4 sm:px-3"
+        >
           <span className="skeleton h-8 w-8" />
           <span className="skeleton h-12 w-10" />
           <span className="min-w-0 space-y-2">
@@ -198,13 +201,18 @@ function SignalWorkbench({
   const trustTone = confidenceTone(reliability?.level);
 
   return (
-    <section className="relative overflow-hidden rounded-xl border border-line bg-[linear-gradient(135deg,oklch(0.205_0.01_66),oklch(0.17_0.012_72))] p-4 surface-hl">
+    <section className="relative overflow-hidden rounded-2xl border border-line bg-[linear-gradient(135deg,oklch(0.205_0.01_66),oklch(0.17_0.012_72))] p-4 surface-hl">
       <div className="absolute inset-x-0 top-0 h-1" style={{ background: gradient }} />
+      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-canvas/55 px-2.5 py-1 text-xs font-medium text-fg-2">
+        <FunctionSquare size={12} className="text-accent" />
+        <span>신호 관측대</span>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-5">
         <div className="min-w-0 rounded-lg border border-line bg-canvas/35 p-3">
           <p className="eyebrow text-[0.58rem] text-fg-3">CONFIDENCE</p>
           <div className="mt-1 flex items-end gap-2">
-            <TrustIcon size={18} className={cn("mb-1 shrink-0", trustTone)} />
+            <TrustIcon size={18} className={cn("mb-0.5 shrink-0", trustTone)} />
             <p className={cn("font-display text-2xl font-bold leading-none tnum", trustTone)}>
               {reliability?.confidence ?? 0}
             </p>
@@ -254,7 +262,10 @@ function SignalWorkbench({
           <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">EVIDENCE</p>
           <div className="flex flex-wrap gap-1.5">
             {(reliability?.basis ?? ["랭킹 신호 계산 대기"]).map((item) => (
-              <span key={item} className="rounded-md border border-line bg-canvas/45 px-2 py-1 text-[0.7rem] text-fg-2">
+              <span
+                key={item}
+                className="rounded-md border border-line/80 bg-canvas/55 px-2 py-1 text-[0.7rem] text-fg-2"
+              >
                 {item}
               </span>
             ))}
@@ -302,7 +313,8 @@ function SignalWorkbench({
       <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
           <div className="flex h-2 overflow-hidden rounded-full bg-raised">
-            {(insights?.topGenres.length ? insights.topGenres : [{ name: "판타지", share: 100, count: 0 }]).map((genre) => (
+            {(insights?.topGenres.length ? insights.topGenres : [{ name: "판타지", share: 100, count: 0 }]).map(
+              (genre) => (
               <span
                 key={genre.name}
                 className="h-full"
@@ -311,7 +323,8 @@ function SignalWorkbench({
                   backgroundColor: genreColor(genre.name, 0.72),
                 }}
               />
-            ))}
+              )
+            )}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {insights?.topGenres.slice(0, 5).map((genre) => (
@@ -328,9 +341,12 @@ function SignalWorkbench({
             ))}
           </div>
         </div>
-        <div className="flex flex-wrap items-start gap-1.5 lg:justify-end">
+        <div className="mt-1 flex flex-wrap items-start gap-1.5 lg:justify-end">
           {insights?.platformMix.map((platform) => (
-            <span key={platform.id} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-canvas/50 px-2 py-1 text-[0.7rem] text-fg-2">
+            <span
+              key={platform.id}
+              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-canvas/50 px-2 py-1 text-[0.7rem] text-fg-2"
+            >
               <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
               {platform.label} {platform.share}%
             </span>
@@ -466,39 +482,58 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
   return (
     <div className="flex flex-col gap-5">
       {/* 축 선택 */}
-      <div className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4">
-        {RANK_AXES.map((a) => {
-          const active = a.key === axis;
-          const Icon = axisIcons[a.key];
-          return (
-            <button
-              key={a.key}
-              onClick={() => setAxis(a.key)}
-              className={cn(
-                "group flex min-w-36 shrink-0 items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm font-medium transition-[background,border-color,color,transform] duration-150 ease-out-expo sm:min-w-0",
-                active
-                  ? "border-accent/50 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.05)]"
-                  : "border-line bg-card text-fg-2 hover:-translate-y-0.5 hover:border-line-strong hover:text-fg"
-              )}
-            >
-              <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg border", active ? "border-accent/40 bg-canvas/50" : "border-line bg-raised/60")}>
-                <Icon size={16} />
-              </span>
-              <span className="min-w-0 leading-tight">
-                <span>{a.label}</span>
-                <span className="mt-0.5 hidden truncate text-[0.72rem] font-normal text-fg-3 sm:block">
-                  {a.desc}
+      <section className="rounded-2xl border border-line bg-panel/60 p-4 surface-hl sm:p-5">
+        <div className="mb-3 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="eyebrow mb-1.5 text-accent">RANKING AXES</p>
+            <h2 className="text-lg font-semibold text-fg">랭킹 산식 축</h2>
+            <p className="text-sm text-fg-3">축 하나가 바뀌면 전체 정렬 기준이 즉시 교체됩니다.</p>
+          </div>
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-2">
+            <span className="size-1.5 rounded-full bg-accent" />
+            현재 {axisDetail.label}
+          </span>
+        </div>
+
+        <div className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4">
+          {RANK_AXES.map((a) => {
+            const active = a.key === axis;
+            const Icon = axisIcons[a.key];
+            return (
+              <button
+                key={a.key}
+                onClick={() => setAxis(a.key)}
+                className={cn(
+                  "group flex min-w-36 shrink-0 items-center gap-3 rounded-2xl border px-3.5 py-3 text-left text-sm font-medium transition-[background,border-color,color,transform,box-shadow] duration-150 ease-out-expo sm:min-w-0",
+                  active
+                    ? "border-accent/55 bg-accent-soft text-accent shadow-[0_10px_30px_-18px_oklch(0.72_0.185_42/0.75)]"
+                    : "border-line bg-card text-fg-2 hover:-translate-y-0.5 hover:border-line-strong hover:text-fg"
+                )}
+              >
+                <span
+                  className={cn(
+                    "grid size-9 shrink-0 place-items-center rounded-xl border transition-colors duration-150",
+                    active ? "border-accent/45 bg-canvas/45" : "border-line bg-raised/60"
+                  )}
+                >
+                  <Icon size={17} />
                 </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span className="min-w-0 leading-tight">
+                  <span>{a.label}</span>
+                  <span className="mt-0.5 hidden truncate text-[0.72rem] font-normal text-fg-3 sm:block">
+                    {a.desc}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <SignalWorkbench insights={insights} meta={rankingMeta} />
 
       {/* 산식 + 기간/유형 */}
-      <div className="grid gap-3 rounded-xl border border-line bg-panel/40 p-4 surface-hl lg:grid-cols-[1fr_auto] lg:items-center">
+      <section className="grid gap-3 rounded-2xl border border-line bg-panel/40 p-4 surface-hl lg:grid-cols-[1fr_auto] lg:items-center sm:p-5">
         <div className="flex min-w-0 items-start gap-2.5">
           <FunctionSquare size={16} className="mt-0.5 shrink-0 text-accent" />
           <div className="min-w-0">
@@ -527,11 +562,17 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
             items={PERIODS.map((p) => ({ value: p.key, label: p.label }))}
           />
         </div>
-      </div>
+      </section>
 
       {/* 필터(장르·플랫폼) + 보기 방식 */}
-      <div className="grid gap-3 xl:grid-cols-[1fr_auto] xl:items-center">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <section className="grid gap-3 rounded-2xl border border-line bg-panel/40 p-4 surface-hl lg:grid-cols-[1fr_auto] lg:items-start xl:p-5">
+        <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex h-8 items-center rounded-full border border-accent/35 bg-accent-soft px-3 text-[0.7rem] font-semibold text-accent">
+              장르·운영 조건
+            </span>
+          </div>
+
           <select
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
@@ -606,10 +647,10 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
             상승작
           </button>
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
+        <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end xl:justify-end">
           <div
             className={cn(
-              "inline-flex h-10 min-w-0 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-3",
+              "inline-flex h-10 min-w-0 items-center gap-2 rounded-full border border-line bg-card/90 px-3 text-xs text-fg-3",
               state === "error" && "border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] text-bad"
             )}
           >
@@ -636,13 +677,13 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
               forceRefresh.current = true;
               setRefreshKey((current) => current + 1);
             }}
-            className="inline-flex size-10 items-center justify-center rounded-lg border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+            className="inline-flex size-10 items-center justify-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
             title="랭킹 새로고침"
             aria-label="랭킹 새로고침"
           >
             <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
           </button>
-          <span className="inline-flex h-10 items-center rounded-lg border border-line bg-card px-3 text-sm text-fg-3">
+          <span className="inline-flex h-10 items-center rounded-xl border border-line bg-card px-3 text-sm text-fg-3">
             <span className="mr-1 text-fg">다음 갱신:</span>
             <span className="numeral mr-1 text-fg">{refreshLabel}</span>
             <span>·</span>
@@ -659,7 +700,7 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
             ]}
           />
         </div>
-      </div>
+      </section>
 
       {/* 랭킹 — 3가지 표시 방식 */}
       {isLoading ? (

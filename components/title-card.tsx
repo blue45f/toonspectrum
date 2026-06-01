@@ -26,25 +26,25 @@ export function TitleCard({
   return (
     <Link
       href={`/title/${title.slug}`}
-      className={cn("group block focus-visible:outline-none", className)}
+      className={cn("group block rounded-2xl focus-visible:outline-none", className)}
     >
-      <div className="relative overflow-hidden rounded-xl">
-        <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
+      <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_270/0.4)]">
+        <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
           <TitlePoster title={title} size={size} rank={rank} />
         </div>
         {/* 호버 보더 */}
-        <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />
+        <div className="pointer-events-none absolute inset-1 rounded-[0.9rem] ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />
         <div className="absolute right-1.5 top-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
           <BookmarkButton titleId={title.id} size={14} />
         </div>
         <GenreSpectrum
           genres={title.genres}
           height={3}
-          className="absolute inset-x-0 bottom-0 rounded-none opacity-80"
+          className="absolute inset-x-1 bottom-1 rounded-xl opacity-90"
         />
       </div>
 
-      <div className="mt-2 flex flex-col gap-1">
+      <div className="mt-2 flex flex-col gap-1.5 px-1">
         <div className="flex items-center justify-between gap-2">
           <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
           <span className={cn("text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
@@ -68,7 +68,7 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
     <Link
       href={`/title/${title.slug}`}
       className={cn(
-        "group flex gap-3.5 rounded-xl border border-line bg-card p-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised",
+        "group flex gap-3.5 rounded-xl border border-line bg-card/85 p-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised",
         className
       )}
     >

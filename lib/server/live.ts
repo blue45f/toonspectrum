@@ -10,6 +10,8 @@ interface LiveFetchOptions {
   allowStale?: boolean;
 }
 
+type LiveRefreshMode = "off" | "fixed" | "adaptive";
+
 // 서버 전용 — 외부 플랫폼에서 실시간 랭킹/완결 신호를 가져온다.
 // 현재는 네이버/카카오가 실사용 상태이며, 리디·레진·봄툰·탑툰·포스타입은 어댑터 슬롯을 선등록합니다.
 // 플랫폼별 어댑터만 구현하면 라이브 보정 파이프라인은 동일하게 동작합니다.
@@ -26,9 +28,57 @@ const LIVE_REFRESH_INTERVAL_SECONDS = parseConfigNumber(
   30,
   1800
 );
+const LIVE_REFRESH_MODE = parseRefreshMode(process.env.WEBTOON_LIVE_REFRESH_MODE, "fixed");
+const LIVE_REFRESH_BURST_SECONDS = parseConfigNumber(
+  process.env.WEBTOON_LIVE_REFRESH_BURST_SECONDS,
+  Math.max(30, Math.floor(LIVE_REFRESH_INTERVAL_SECONDS * 0.5)),
+  30,
+  1800
+);
+const LIVE_REFRESH_IDLE_SECONDS = parseConfigNumber(
+  process.env.WEBTOON_LIVE_REFRESH_IDLE_SECONDS,
+  Math.min(900, Math.max(120, LIVE_REFRESH_INTERVAL_SECONDS * 4)),
+  30,
+  1800
+);
+const LIVE_REFRESH_DEMAND_WINDOW_SECONDS = parseConfigNumber(
+  process.env.WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS,
+  120,
+  30,
+  900
+);
+const LIVE_REFRESH_DEMAND_THRESHOLD = parseConfigNumber(
+  process.env.WEBTOON_LIVE_REFRESH_DEMAND_THRESHOLD,
+  4,
+  1,
+  40
+);
 const SCHEDULE_LIMIT = 30;
+const CLAMP_MIN_REFRESH_SECONDS = 30;
+const CLAMP_MAX_REFRESH_SECONDS = 1800;
 
-let liveRankingScheduler: ReturnType<typeof setInterval> | null = null;
+interface LiveSchedulerState {
+  mode: LiveRefreshMode;
+  running: boolean;
+  baseIntervalSeconds: number;
+  nextRefreshAt: number | null;
+  lastRefreshAt: number | null;
+  consecutiveFailures: number;
+  demandSignals: number;
+}
+
+let _liveRankingScheduler: ReturnType<typeof setTimeout> | null = null;
+let liveSchedulerState: LiveSchedulerState = {
+  mode: LIVE_REFRESH_MODE,
+  running: false,
+  baseIntervalSeconds: LIVE_REFRESH_INTERVAL_SECONDS,
+  nextRefreshAt: null,
+  lastRefreshAt: null,
+  consecutiveFailures: 0,
+  demandSignals: 0,
+};
+
+const liveDemandSignals: number[] = [];
 type LiveSourceName = "네이버웹툰" | "카카오웹툰" | "리디" | "레진" | "봄툰" | "탑툰" | "포스타입";
 
 function parseConfigNumber(
@@ -40,6 +90,14 @@ function parseConfigNumber(
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function parseRefreshMode(raw: string | undefined, fallback: LiveRefreshMode): LiveRefreshMode {
+  return raw === "off" || raw === "fixed" || raw === "adaptive" ? raw : fallback;
+}
+
+function clampRefreshIntervalSeconds(value: number): number {
+  return Math.max(CLAMP_MIN_REFRESH_SECONDS, Math.min(CLAMP_MAX_REFRESH_SECONDS, Math.floor(value)));
 }
 
 export interface LiveItem {
@@ -474,13 +532,101 @@ export function getLiveStatusPlatforms(): Set<PlatformId> {
   );
 }
 
-export function startLiveRankingScheduler(limit = SCHEDULE_LIMIT, intervalSeconds = LIVE_REFRESH_INTERVAL_SECONDS): void {
-  if (liveRankingScheduler) return;
-  const interval = Math.max(20, Math.min(1800, intervalSeconds));
-  liveRankingScheduler = globalThis.setInterval(() => {
-    void getLiveRanking(limit, null, { forceRefresh: true }).catch(() => {});
-  }, interval * 1000);
+function pruneDemandSignals(now: number): void {
+  const cutoff = now - LIVE_REFRESH_DEMAND_WINDOW_SECONDS * 1000;
+  while (liveDemandSignals.length && liveDemandSignals[0] < cutoff) {
+    liveDemandSignals.shift();
+  }
+  liveSchedulerState.demandSignals = liveDemandSignals.length;
+}
+
+function shouldUseAggressiveRefresh(now: number): boolean {
+  pruneDemandSignals(now);
+  return liveDemandSignals.length >= LIVE_REFRESH_DEMAND_THRESHOLD;
+}
+
+function hasRecentDemand(now: number): boolean {
+  pruneDemandSignals(now);
+  return liveDemandSignals.length > 0;
+}
+
+function calculateRefreshDelaySeconds(now: number): number {
+  if (liveSchedulerState.mode === "off") return LIVE_REFRESH_IDLE_SECONDS;
+  if (liveSchedulerState.mode === "adaptive") {
+    if (shouldUseAggressiveRefresh(now)) {
+      return clampRefreshIntervalSeconds(LIVE_REFRESH_BURST_SECONDS);
+    }
+    if (!hasRecentDemand(now)) {
+      return clampRefreshIntervalSeconds(LIVE_REFRESH_IDLE_SECONDS);
+    }
+  }
+
+  if (liveSchedulerState.consecutiveFailures > 0) {
+    const base = clampRefreshIntervalSeconds(liveSchedulerState.baseIntervalSeconds);
+    const factor = Math.min(5, liveSchedulerState.consecutiveFailures);
+    return clampRefreshIntervalSeconds(base * (1 << factor));
+  }
+
+  return clampRefreshIntervalSeconds(liveSchedulerState.baseIntervalSeconds);
+}
+
+function scheduleNextLiveRefresh(limit: number): void {
+  if (!liveSchedulerState.running) return;
+
+  const delayMs = calculateRefreshDelaySeconds(Date.now()) * 1000;
+  liveSchedulerState.nextRefreshAt = Date.now() + delayMs;
+  _liveRankingScheduler = globalThis.setTimeout(async () => {
+    _liveRankingScheduler = null;
+    try {
+      await getLiveRanking(limit, null, { forceRefresh: true });
+      liveSchedulerState.consecutiveFailures = 0;
+    } catch {
+      liveSchedulerState.consecutiveFailures += 1;
+    } finally {
+      liveSchedulerState.lastRefreshAt = Date.now();
+      scheduleNextLiveRefresh(limit);
+    }
+  }, delayMs);
+}
+
+export function markLiveRankingDemand(): void {
+  const now = Date.now();
+  liveDemandSignals.push(now);
+  pruneDemandSignals(now);
+}
+
+export function getLiveRefreshState() {
+  return {
+    mode: liveSchedulerState.mode,
+    running: liveSchedulerState.running,
+    baseIntervalSeconds: liveSchedulerState.baseIntervalSeconds,
+    nextRefreshAt: liveSchedulerState.nextRefreshAt ? new Date(liveSchedulerState.nextRefreshAt).toISOString() : null,
+    lastRefreshAt: liveSchedulerState.lastRefreshAt ? new Date(liveSchedulerState.lastRefreshAt).toISOString() : null,
+    nextRefreshInSeconds: liveSchedulerState.nextRefreshAt ? Math.max(0, Math.round((liveSchedulerState.nextRefreshAt - Date.now()) / 1000)) : null,
+    consecutiveFailures: liveSchedulerState.consecutiveFailures,
+    demandSignals: liveSchedulerState.demandSignals,
+  };
+}
+
+export function startLiveRankingScheduler(
+  limit = SCHEDULE_LIMIT,
+  intervalSeconds = LIVE_REFRESH_INTERVAL_SECONDS
+): void {
+  if (liveSchedulerState.running) return;
+  liveSchedulerState = {
+    ...liveSchedulerState,
+    mode: LIVE_REFRESH_MODE,
+    baseIntervalSeconds: clampRefreshIntervalSeconds(intervalSeconds),
+    running: true,
+  };
+
+  if (liveSchedulerState.mode === "off") {
+    liveSchedulerState.running = false;
+    return;
+  }
+
   void getLiveRanking(limit, null, { forceRefresh: true }).catch(() => {});
+  scheduleNextLiveRefresh(limit);
 }
 
 // 실시간 인기 — 등록된 활성 소스의 오늘자 인기 순서를 병합

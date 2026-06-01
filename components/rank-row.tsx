@@ -77,12 +77,17 @@ export function RankRow({
     <Link
       href={`/title/${title.slug}`}
       className={cn(
-        "group grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 rounded-xl border border-transparent px-2 py-2.5 transition-colors duration-150 hover:border-line hover:bg-card sm:gap-4 sm:px-3",
+        "group grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 rounded-xl border border-line/40 bg-card/35 px-2 py-2.5 transition-[background,border-color,transform,box-shadow] duration-150 hover:border-line hover:bg-card sm:gap-4 sm:px-3",
         className
       )}
     >
       {/* 인덱스 넘버럴 */}
-      <div className="flex flex-col items-center">
+      <div
+        className={cn(
+          "relative flex flex-col items-center rounded-xl border px-1.5 py-1 transition-colors duration-150",
+          top3 ? "border-accent/45 bg-accent/10 text-accent" : "border-line/70 bg-canvas/40 text-fg-3"
+        )}
+      >
         <span
           className={cn(
             "numeral leading-none",
@@ -92,16 +97,19 @@ export function RankRow({
           {rank}
         </span>
         <Delta delta={delta} />
+        {top3 && (
+          <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent shadow-[0_0_0_2px_oklch(0.205_0.01_66)]" />
+        )}
       </div>
 
       <MiniPoster title={title} className="w-10" />
 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="truncate font-semibold text-fg transition-colors group-hover:text-accent">
+          <h3 className="truncate text-sm font-semibold text-fg transition-colors group-hover:text-accent">
             {title.title}
           </h3>
-          <span className="shrink-0 text-[0.65rem] font-medium uppercase tracking-wide text-fg-3">
+          <span className="shrink-0 rounded-full border border-line bg-canvas/45 px-1.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-wide text-fg-3">
             {TYPE_LABEL[title.type]}
           </span>
         </div>
@@ -129,7 +137,7 @@ export function RankRow({
             <GenreChip key={g} genre={g} size="sm" />
           ))}
         </div>
-        <div className="w-16 text-right">
+        <div className="w-16 rounded-md border border-line/70 bg-canvas/30 px-2 py-1.5 text-right">
           <div className="numeral text-sm text-fg">{m ? m.value : formatCount(title.stats.views)}</div>
           <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
         </div>

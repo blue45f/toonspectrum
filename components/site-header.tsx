@@ -48,16 +48,16 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-line bg-panel/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-line/70 bg-panel/85 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_265/0.9),oklch(0.19_0.018_265/0.86))] backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           {/* 로고 */}
-          <Link href="/" className="flex items-center gap-2.5 pr-2">
+          <Link href="/" className="group flex items-center gap-2.5 pr-2">
             <span
-              className="size-7 rounded-[0.5rem] ring-1 ring-white/10"
+              className="size-7 rounded-[0.5rem] ring-1 ring-white/15 transition-transform duration-150 group-hover:scale-105"
               style={{ background: mark }}
               aria-hidden
             />
-            <span className="font-display text-lg font-bold tracking-[-0.02em] text-fg">
+            <span className="font-display text-lg font-bold tracking-[-0.02em] text-fg group-hover:text-accent">
               WEBDEX
             </span>
           </Link>
@@ -69,12 +69,13 @@ export function SiteHeader() {
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+                  "group inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-150",
                   isActive(n.href, n.exact)
-                    ? "bg-raised text-fg"
-                    : "text-fg-2 hover:bg-raised/60 hover:text-fg"
+                    ? "bg-accent-soft text-accent"
+                    : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                 )}
               >
+                <n.icon size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
                 {n.label}
               </Link>
             ))}
@@ -84,7 +85,7 @@ export function SiteHeader() {
             {/* 검색 트리거 */}
             <button
               onClick={openSearch}
-              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-sm text-fg-3 transition-colors hover:border-line-strong hover:text-fg-2 sm:w-56 sm:justify-between"
+              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-56 sm:justify-between"
             >
               <span className="flex items-center gap-2">
                 <Search size={16} />
@@ -99,13 +100,13 @@ export function SiteHeader() {
             <Link
               href="/library"
               className={cn(
-                "flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
+                "group flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
                 isActive("/library")
                   ? "bg-accent text-on-accent"
                   : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
               )}
             >
-              <Library size={16} />
+              <Library size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
               <span className="hidden lg:inline">내 서재</span>
             </Link>
             <AuthMenu />
@@ -114,8 +115,8 @@ export function SiteHeader() {
       </header>
 
       {/* 모바일 하단 탭바 */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-panel/90 backdrop-blur-xl md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-7">
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-7 pb-[env(safe-area-inset-bottom)]">
           {MOBILE_NAV.map((n) => {
             const active = isActive(n.href, n.exact);
             return (
@@ -123,10 +124,11 @@ export function SiteHeader() {
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
+                  "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
                   active ? "text-accent" : "text-fg-3"
                 )}
               >
+                {active && <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />}
                 <n.icon size={19} strokeWidth={active ? 2.4 : 1.9} />
                 {n.label}
               </Link>
