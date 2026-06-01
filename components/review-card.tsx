@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { Heart, EyeOff } from "lucide-react";
 import type { SeedReview, Title } from "@/lib/types";
 import { Stars } from "./ui/stars";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ComponentType } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import {
   RANK_AXES,
   PERIODS,

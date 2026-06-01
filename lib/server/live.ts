@@ -1,5 +1,5 @@
 // 서버 전용 — 네이버/카카오에서 런타임에 실시간 인기 랭킹을 가져온다.
-// 외부 소스 보호를 위해 fetch 레벨에서 짧은 revalidate를 두고, 상위 API는 no-store로 현재 상태를 매 요청 공개한다.
+// 외부 소스 보호를 위해 상태 신호는 짧게 메모리 캐시하고, 상위 API는 no-store로 현재 상태를 매 요청 공개한다.
 import { getTitle } from "../data";
 import type { SerialStatus } from "../types";
 import { kstDayOfWeek } from "../utils";
@@ -104,7 +104,6 @@ async function fetchNaver(day: string): Promise<LiveFetchResult> {
       `https://comic.naver.com/api/webtoon/titlelist/weekday?week=${day}&order=user`,
       {
         headers: { "User-Agent": UA, Referer: "https://comic.naver.com/" },
-        next: { revalidate: REVALIDATE },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       }
     );
@@ -156,7 +155,6 @@ async function fetchKakao(day: string): Promise<LiveFetchResult> {
       `https://gateway-kw.kakao.com/section/v2/timetables/days?placement=timetable_${day}`,
       {
         headers: { "User-Agent": UA, Referer: "https://webtoon.kakao.com/", Origin: "https://webtoon.kakao.com" },
-        next: { revalidate: REVALIDATE },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       }
     );
@@ -270,7 +268,6 @@ async function fetchNaverStatusSignals(knownKeys?: Set<string>): Promise<LiveFet
           `https://comic.naver.com/api/webtoon/titlelist/weekday?week=${day}&order=user`,
           {
             headers: { "User-Agent": UA, Referer: "https://comic.naver.com/" },
-            next: { revalidate: REVALIDATE },
             signal: AbortSignal.timeout(TIMEOUT_MS),
           }
         );
@@ -293,7 +290,6 @@ async function fetchNaverStatusSignals(knownKeys?: Set<string>): Promise<LiveFet
         `https://comic.naver.com/api/webtoon/titlelist/finished?order=USER&page=${page}`,
         {
           headers: { "User-Agent": UA, Referer: "https://comic.naver.com/webtoon/finish" },
-          next: { revalidate: REVALIDATE },
           signal: AbortSignal.timeout(TIMEOUT_MS),
         }
       );

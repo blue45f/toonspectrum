@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { AvailabilityDots } from "@/components/availability";
 import { MiniPoster } from "@/components/rank-row";
 import { Container } from "@/components/section";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
 import { TitlePoster } from "./title-poster";
 import { AvailabilityDots, PlatformTags, bestPricing } from "./availability";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { spectrumGradient } from "@/lib/genre-color";
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [

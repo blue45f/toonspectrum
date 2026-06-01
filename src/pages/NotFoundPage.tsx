@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";

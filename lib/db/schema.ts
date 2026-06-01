@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, primaryKey, unique } from "drizzle-orm/sqlite-core";
 
-// ── Auth.js (NextAuth) 표준 테이블 + 확장 컬럼 ──────────────
+// ── 인증 사용자 테이블 + 확장 컬럼 ──────────────
 export const users = sqliteTable("user", {
   id: text("id")
     .primaryKey()

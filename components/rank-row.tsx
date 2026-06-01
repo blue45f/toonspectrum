@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import type { RankedTitle } from "@/lib/ranking";
 import { cn, formatCount } from "@/lib/utils";
 import { RatingInline } from "./ui/stars";

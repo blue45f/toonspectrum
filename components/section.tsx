@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 

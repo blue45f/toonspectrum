@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { getLiveRanking, type LiveItem } from "@/lib/server/live";
 import { CoverImage } from "./cover-image";
 import { Stars } from "./ui/stars";

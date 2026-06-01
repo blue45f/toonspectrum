@@ -87,7 +87,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, {
       method: "POST",
       cache: "no-store",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-user-id": userId },
       body: JSON.stringify(body),
     });
 

@@ -2,7 +2,7 @@
 
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/src/compat/navigation";
 import type { Title } from "@/lib/types";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { RatingInline } from "./ui/stars";

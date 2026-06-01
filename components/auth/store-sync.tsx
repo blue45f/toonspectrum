@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/src/compat/auth-session";
 import { useApp, useHydrated } from "@/lib/store";
 
 // 세션 ↔ 스토어 동기화: 로그인 시 userId 설정 + DB 데이터 하이드레이션, 로그아웃 시 해제
@@ -19,6 +19,7 @@ export function StoreSync() {
     if (status === "authenticated" && uid) {
       const prev = useApp.getState().userId;
       setUserId(uid);
+      const authHeaders = { "Content-Type": "application/json", "x-user-id": uid };
 
       if (prev !== uid) {
         // 로그인 전환(게스트→계정 등): 로컬 상태를 서버로 1회 병합 후 통합 결과 하이드레이트
@@ -33,7 +34,7 @@ export function StoreSync() {
         };
         fetch("/api/me/merge", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders,
           body: JSON.stringify(local),
         })
           .then((r) => (r.ok ? r.json() : null))
@@ -43,7 +44,7 @@ export function StoreSync() {
           .catch(() => {});
       } else {
         // 이미 로그인 상태(새로고침): 서버 데이터만 하이드레이트
-        fetch("/api/me")
+        fetch("/api/me", { headers: { "x-user-id": uid } })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             if (d) hydrate(d);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
 import { TitlePoster } from "./title-poster";
 import { GenreSpectrum } from "./ui/spectrum-bar";

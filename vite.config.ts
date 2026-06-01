@@ -10,9 +10,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
-      "next/link": fileURLToPath(new URL("./src/compat/next-link.tsx", import.meta.url)),
-      "next/navigation": fileURLToPath(new URL("./src/compat/next-navigation.ts", import.meta.url)),
-      "next-auth/react": fileURLToPath(new URL("./src/compat/next-auth-react.tsx", import.meta.url)),
     },
   },
   server: {

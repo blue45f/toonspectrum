@@ -9,17 +9,14 @@ The UI must never compute ranking order from `lib/data` directly. Client surface
 
 ## Runtime contract
 
-- Route: `app/api/ranking/route.ts`
-- Runtime mode: `force-dynamic`
+- Route: `GET /api/ranking`
+- Controller: `apps/api/src/modules/catalog/catalog.controller.ts`
+- Service boundary: `apps/api/src/modules/catalog/catalog.service.ts`
 - Cache policy: `Cache-Control: no-store, max-age=0`
 - Live source adapter: `lib/server/live.ts`
 - Formula source: `lib/ranking.ts`
 
-Next 16 route-handler guidance matters here:
-
-- Route handlers are not cached by default, but explicit `no-store` keeps intent visible.
-- Server components should call server helpers directly rather than self-fetching internal APIs.
-- Client components may fetch API routes when they need polling, user-controlled filters, or no-store refresh behavior.
+The Vite client reads ranking data through the Nest API proxy. The server service owns query normalization, catalog filtering, live signal matching, and reliability metadata so browser components do not duplicate ranking logic.
 
 ## Ranking flow
 
@@ -58,7 +55,7 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 
 - `lib/data/*` is the current server catalog source.
 - `lib/server/*` is the server service boundary.
-- `app/api/*` is the external and client-facing data boundary.
+- `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
 - `components/*` must not import `TITLES` or `SEED_REVIEWS`.
 
 If a future source becomes available, replace the server catalog boundary first. Avoid pushing raw provider-specific data into client components.
@@ -68,10 +65,10 @@ If a future source becomes available, replace the server catalog boundary first.
 Run these after ranking changes:
 
 ```bash
-npm run lint
-npx tsc --noEmit
-npm run test
-curl -s 'http://localhost:3700/api/ranking?axis=popular&period=daily&limit=3'
+pnpm lint
+pnpm test
+pnpm build
+curl -s 'http://localhost:4001/api/ranking?axis=popular&period=daily&limit=3'
 ```
 
 Manual UI checks:

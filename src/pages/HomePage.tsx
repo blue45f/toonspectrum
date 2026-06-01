@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { CountUp } from "@/components/count-up";
 import { HomePersonal } from "@/components/home-personal";

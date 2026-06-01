@@ -1,11 +1,11 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { ReviewCard } from "@/components/review-card";
 import { Container } from "@/components/section";
 import { Stars } from "@/components/ui/stars";
 import { allReviewsJoined } from "@/lib/data";
 import { spectrumGradient } from "@/lib/genre-color";
-import { ReviewControls, type ReviewSort } from "@/app/reviews/_components/review-controls";
+import { ReviewControls, type ReviewSort } from "./reviews-components/review-controls";
 
 function sortedReviews(sort: ReviewSort, rows: ReturnType<typeof allReviewsJoined>) {
   const next = [...rows];

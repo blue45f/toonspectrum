@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { useApp, useHydrated } from "@/lib/store";
 import type { ReadState, Title } from "@/lib/types";
 import { UnderlineTabs, Segmented } from "./ui/segmented";

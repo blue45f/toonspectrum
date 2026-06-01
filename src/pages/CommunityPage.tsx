@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
 import { COMMUNITY_SCOPE_DESCRIPTION, COMMUNITY_SCOPE_LABEL } from "@/lib/community-ui";

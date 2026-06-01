@@ -154,6 +154,7 @@ export function FanCafePanel({
   );
 
   const canComposePost = scope !== "all" && Boolean(targetId);
+  const authHeaders = useMemo(() => (userId ? { "x-user-id": userId } : undefined), [userId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -228,7 +229,7 @@ export function FanCafePanel({
     const params = new URLSearchParams(apiQuery);
     if (queryText) params.set("q", queryText);
     params.set("limit", "20");
-    fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store", signal: controller.signal, headers: authHeaders })
       .then(async (res) => {
         const payload = await safeParseJson<unknown>(res);
         if (!res.ok) {
@@ -271,7 +272,7 @@ export function FanCafePanel({
       window.clearTimeout(resetTimer);
       controller.abort();
     };
-  }, [apiQuery, queryText, refreshTick, requestSignature, sort]);
+  }, [apiQuery, authHeaders, queryText, refreshTick, requestSignature, sort]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore || !hasMore) return;
@@ -282,7 +283,7 @@ export function FanCafePanel({
     params.set("limit", "20");
     params.set("cursor", nextCursor);
     try {
-      const res = await fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store", headers: authHeaders });
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {
         throw new Error(resolveApiError(data, `load more failed (${res.status})`));
@@ -313,7 +314,7 @@ export function FanCafePanel({
       const res = await fetch("/api/community/posts", {
         method: "POST",
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(authHeaders ?? {}) },
         body: JSON.stringify({
           scope,
           targetId,
@@ -793,7 +794,7 @@ function FanPostCard({
       const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}/replies`, {
         method: "POST",
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(userId ? { "x-user-id": userId } : {}) },
         body: JSON.stringify({
           text: draft,
           ...(parentId ? { parentId } : {}),
