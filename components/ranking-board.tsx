@@ -149,11 +149,14 @@ function metricFor(axis: RankAxis): (t: Title) => { label: string; value: string
 
 function formatUpdatedAt(value?: string) {
   if (!value) return "대기 중";
-  return new Intl.DateTimeFormat("ko-KR", {
+  return `${new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value))} ${new Intl.DateTimeFormat("ko-KR", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  }).format(new Date(value));
+  }).format(new Date(value))}`;
 }
 
 function confidenceTone(level?: RankingMeta["reliability"]["level"]) {
@@ -573,8 +576,10 @@ export function RankingBoard({ initialAxis = "popular" }: { initialAxis?: RankAx
               {state === "error"
                 ? error
                 : rankingMeta?.source === "live-api"
-                  ? `LIVE API · 신뢰 ${rankingMeta.reliability.confidence}/100 · ${rankingMeta.live.matched}/${rankingMeta.live.fetched} 매칭 · ${formatUpdatedAt(rankingMeta.generatedAt)}`
-                  : `FORMULA API · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
+                  ? `LIVE API · 신뢰 ${rankingMeta.reliability.confidence}/100 · ${rankingMeta.live.matched}/${rankingMeta.live.fetched} 매칭 · 업데이트 ${formatUpdatedAt(
+                      rankingMeta.live.fetchedAt ?? rankingMeta.generatedAt
+                    )}`
+                  : `FORMULA API · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
             </span>
           </div>
           <button
