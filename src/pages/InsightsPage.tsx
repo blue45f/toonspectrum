@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { Container } from "@/components/section";
 import { Badge } from "@/components/ui/chip";
+import { buttonClass } from "@/components/ui/button";
 import { DistributionBars, MeterBar } from "@/components/ui/spectrum-bar";
 import { AreaChart } from "./insights-components/area-chart";
 import { BarList } from "./insights-components/bar-list";
@@ -9,29 +9,44 @@ import { Donut } from "./insights-components/donut";
 import { Panel } from "./insights-components/panel";
 import { TagCloud } from "./insights-components/tag-cloud";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
-import { getInsightsData } from "@/lib/server/insights";
+import type { getInsightsData } from "@/lib/server/insights";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { formatCount, formatFull } from "@/lib/utils";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useApiResource } from "./use-api-resource";
 
 type InsightsData = Awaited<ReturnType<typeof getInsightsData>>;
 
 export function InsightsPage() {
-  const [data, setData] = useState<InsightsData | null>(null);
+  const { data, loading, error, reload } = useApiResource<InsightsData>(
+    "/api/insights",
+    "인사이트 데이터를 불러오지 못했습니다."
+  );
 
-  useEffect(() => {
-    let alive = true;
-    getInsightsData().then((payload) => {
-      if (alive) setData(payload);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  if (!data) {
+  if (loading) {
     return (
       <Container size="wide" className="py-16">
         <div className="skeleton h-40 rounded-2xl" />
+      </Container>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Container size="wide" className="py-10">
+        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+          <p className="text-sm font-medium text-fg">인사이트 데이터를 불러오지 못했습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">{error ?? "응답 데이터가 비어 있습니다."}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
+          >
+            <RefreshCw size={14} />
+            다시 시도
+          </button>
+        </div>
       </Container>
     );
   }
@@ -79,6 +94,9 @@ export function InsightsPage() {
           <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2">
             수록작 전체를 가로질러 장르·플랫폼·평점·가격·어댑테이션을 집계했습니다. 어느 플랫폼도
             보여주지 않는, 독자를 위한 트렌드 대시보드.
+          </p>
+          <p className="mt-2 max-w-xl text-xs leading-relaxed text-fg-3">
+            장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 데모용 추정값입니다.
           </p>
           <div
             className="mt-7 h-1.5 w-full max-w-xl rounded-full"
@@ -262,7 +280,7 @@ export function InsightsPage() {
             <TagCloud tags={tags.slice(0, 28)} />
           </Panel>
 
-          <Panel className="lg:col-span-3" eyebrow="TRENDING" title="급상승 신호 상위작" insight="랭킹의 급상승 축과 함께 읽으면 현재 시장의 온도를 빠르게 볼 수 있습니다.">
+          <Panel className="lg:col-span-3" eyebrow="TRENDING" title="급상승 신호 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="랭킹의 급상승 축과 함께 읽으면 현재 시장의 온도를 빠르게 볼 수 있습니다.">
             <BarList
               max={trendingTop[0]?.stats.trendingScore ?? 1}
               items={trendingTop.map((title) => ({
@@ -275,7 +293,7 @@ export function InsightsPage() {
             />
           </Panel>
 
-          <Panel className="lg:col-span-3" eyebrow="BINGE" title="완독률 상위작" insight="정주행 만족도가 높은 작품은 장기 추천에서 더 높은 가중치를 받습니다.">
+          <Panel className="lg:col-span-3" eyebrow="BINGE" title="완독률 상위작" aside={<Badge tone="neutral">추정</Badge>} insight="정주행 만족도가 높은 작품은 장기 추천에서 더 높은 가중치를 받습니다.">
             <BarList
               max={completionTop[0]?.stats.completionRate ?? 1}
               valueFormat={(value) => `${value}%`}
