@@ -221,7 +221,8 @@ function normalizeQueryMap(query: QueryMap): Record<string, string> {
   return out;
 }
 
-const COVER_ALLOWED_HOST = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net|ccdn\.lezhin\.com)$/;
+const COVER_ALLOWED_HOST =
+  /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net|ccdn\.lezhin\.com|ridicdn\.net|dn-img-page\.kakao\.com|cdn1\.munpia\.com|cf-image\.joara\.com|d3mcojo3jv0dbr\.cloudfront\.net|img\.mrblue\.com|bookimg\.bookcube\.com|img-books\.onestore\.co\.kr|image\.yes24\.com)$/;
 const COVER_OK_TYPE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i;
 const COVER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -246,6 +247,15 @@ function sniffImageType(buf: Buffer): string | null {
 }
 
 function coverRefererFor(hostname: string) {
+  if (/ridicdn/.test(hostname)) return "https://ridibooks.com/";
+  if (/munpia/.test(hostname)) return "https://www.munpia.com/";
+  if (/joara/.test(hostname)) return "https://www.joara.com/";
+  if (/cloudfront/.test(hostname)) return "https://www.postype.com/";
+  if (/mrblue/.test(hostname)) return "https://www.mrblue.com/";
+  if (/bookcube/.test(hostname)) return "https://www.bookcube.com/";
+  if (/onestore|onestory/.test(hostname)) return "https://onestory.co.kr/";
+  if (/yes24/.test(hostname)) return "https://www.yes24.com/";
   if (/lezhin/.test(hostname)) return "https://www.lezhin.com/";
+  if (/dn-img-page\.kakao/.test(hostname)) return "https://page.kakao.com/";
   return /kakao/.test(hostname) ? "https://webtoon.kakao.com/" : "https://comic.naver.com/";
 }

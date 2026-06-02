@@ -3,6 +3,28 @@
 // 웹툰: 제목·작가·별점·조회·관심·장르·시놉시스·태그·연재요일·연령등급·연재시작연도·표지썸네일 (실수집)
 // 웹소설: 웹툰 원작정보(novelOriginAuthors)로 실제 원작 엔트리+어댑테이션 연결 / 네이버 시리즈 베스트에포트 보강
 import { buildLezhinCoverImage, extractRemoteImageUrl, proxiedCoverUrl } from "./crawl-helpers.mjs";
+import { crawl as crawlRidi } from "./crawlers/ridi.mjs";
+import { crawl as crawlKakaoPage } from "./crawlers/kakao-page.mjs";
+import { crawl as crawlMunpia } from "./crawlers/munpia.mjs";
+import { crawl as crawlJoara } from "./crawlers/joara.mjs";
+import { crawl as crawlPostype } from "./crawlers/postype.mjs";
+import { crawl as crawlMrblue } from "./crawlers/mrblue.mjs";
+import { crawl as crawlBookcube } from "./crawlers/bookcube.mjs";
+import { crawl as crawlOnestory } from "./crawlers/onestory.mjs";
+import { crawl as crawlYes24 } from "./crawlers/yes24.mjs";
+
+// 중소형 플랫폼 (공개 카탈로그) 크롤러 — partner-required → crawler 승격분.
+const EXTRA_CRAWLERS = [
+  ["ridi", crawlRidi],
+  ["kakao-page", crawlKakaoPage],
+  ["munpia", crawlMunpia],
+  ["joara", crawlJoara],
+  ["postype", crawlPostype],
+  ["mrblue", crawlMrblue],
+  ["bookcube", crawlBookcube],
+  ["onestory", crawlOnestory],
+  ["yes24", crawlYes24],
+];
 
 const ARGS = new Set(process.argv.slice(2));
 const OUTPUT_JSON = ARGS.has("--json");
@@ -41,7 +63,10 @@ const LEZHIN_CAP = parsePositiveInt(process.env.WEBDEX_LEZHIN_CAP);
 const WEBTOON_FINISHED_PAGES = parseOptionalInt(process.env.WEBDEX_WEBTOON_FINISHED_PAGES);
 const SERIES_PAGES_PER_GENRE = parseOptionalInt(process.env.WEBDEX_SERIES_PAGES_PER_GENRE);
 const MIN_CRAWL_DELAY_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_DELAY_MS) ?? 90;
-const DEFAULT_SOURCE_IDS = ["naver-webtoon", "naver-series", "kakao-webtoon", "lezhin"];
+const DEFAULT_SOURCE_IDS = [
+  "naver-webtoon", "naver-series", "kakao-webtoon", "lezhin",
+  "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
+];
 const SOURCE_IDS = new Set(
   (process.env.WEBDEX_SOURCE_IDS || DEFAULT_SOURCE_IDS.join(","))
     .split(",")
@@ -714,9 +739,47 @@ async function main() {
     }
   }
 
+  // ── 중소형 플랫폼 (공개 카탈로그) — 병렬 크롤 후 제목 정규화로 교차연결/신규 분리 ──
+  const extraResults = await Promise.all(
+    EXTRA_CRAWLERS.filter(([id]) => sourceEnabled(id)).map(async ([id, fn]) => {
+      try {
+        return [id, await fn()];
+      } catch (e) {
+        log(`${id} 크롤 스킵:`, e.message);
+        return [id, []];
+      }
+    })
+  );
+  const knownAll = new Map([...webtoons, ...kakaoNew, ...lezhinNew].map((w) => [norm(w.title), w]));
+  const extraNew = [];
+  const extraCounts = {};
+  for (const [id, rows] of extraResults) {
+    extraCounts[id] = rows.length;
+    let linked = 0;
+    for (const item of rows) {
+      const match = knownAll.get(item._normTitle);
+      if (match) {
+        if (!match.availability.some((a) => a.platformId === id)) {
+          match.availability.push(item.availability[0]);
+          linked++;
+        }
+      } else {
+        knownAll.set(item._normTitle, item);
+        extraNew.push(item);
+      }
+    }
+    log(`${id} 수집: ${rows.length} (신규 ${rows.length - linked}, 교차연결 ${linked})`);
+  }
+
   // 시리즈 보너스 중 웹툰과 연결 안 된 것도 standalone 으로 포함
   const novels = [...series, ...originNovels];
-  const all = [...webtoons.map(clean), ...novels.map(clean), ...kakaoNew.map(clean), ...lezhinNew.map(clean)];
+  const all = [
+    ...webtoons.map(clean),
+    ...novels.map(clean),
+    ...kakaoNew.map(clean),
+    ...lezhinNew.map(clean),
+    ...extraNew.map(clean),
+  ];
   pickFeatured(all);
 
   const crawledAt = new Date().toISOString();
@@ -738,6 +801,7 @@ async function main() {
         lezhinNew: lezhinNew.length,
         lezhinCrossLinked,
         adaptations: linked,
+        ...extraCounts,
       },
       limits: {
         webtoonCap: WEBTOON_CAP ?? null,
@@ -757,7 +821,7 @@ async function main() {
   }
 
   log(
-    `완료: ${all.length}편 — 네이버웹툰 ${webtoons.length}, 웹소설 ${novels.length}, 카카오웹툰 신규 ${kakaoNew.length}(+교차연결 ${crossLinked}), 레진 신규 ${lezhinNew.length}(+교차연결 ${lezhinCrossLinked}), 어댑테이션 ${linked}`
+    `완료: ${all.length}편 — 네이버웹툰 ${webtoons.length}, 웹소설 ${novels.length}, 카카오웹툰 신규 ${kakaoNew.length}(+교차연결 ${crossLinked}), 레진 신규 ${lezhinNew.length}(+교차연결 ${lezhinCrossLinked}), 어댑테이션 ${linked}, 중소형 신규 ${extraNew.length} [${Object.entries(extraCounts).map(([k, v]) => `${k} ${v}`).join(", ")}]`
   );
 }
 main();

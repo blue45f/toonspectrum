@@ -249,9 +249,20 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
   },
 ];
 
+// 공개 카탈로그 크롤러가 구현된 소스(partner-required → crawler 승격). scripts/crawlers/<id>.mjs 와 일치.
+const IMPLEMENTED_CRAWLERS = new Set<PlatformId>([
+  "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
+]);
+for (const source of CATALOG_SOURCE_REGISTRY) {
+  if (IMPLEMENTED_CRAWLERS.has(source.id)) source.implementation = "crawler";
+}
+
 export function parseCatalogSourceIds(raw: string | undefined): PlatformId[] {
   const registryIds = new Set(CATALOG_SOURCE_REGISTRY.map((source) => source.id));
-  const fallback: PlatformId[] = ["naver-webtoon", "naver-series", "kakao-webtoon", "lezhin"];
+  const fallback: PlatformId[] = [
+    "naver-webtoon", "naver-series", "kakao-webtoon", "lezhin",
+    ...IMPLEMENTED_CRAWLERS,
+  ];
   if (!raw?.trim()) return fallback;
   const values = raw
     .split(",")

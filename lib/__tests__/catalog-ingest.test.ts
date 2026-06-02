@@ -43,13 +43,14 @@ describe("catalog ingest helpers", () => {
 
   it("국내 플랫폼 수집 소스를 구현 상태와 정책 상태로 분리한다", () => {
     const config = normalizeCatalogIngestConfig({
-      WEBDEX_SOURCE_IDS: "naver-webtoon,kakao-webtoon,ridi,munpia",
+      WEBDEX_SOURCE_IDS: "naver-webtoon,ridi,novelpia,kyobo",
     });
     const plan = buildCatalogSourcePlan(config.sourceIds);
 
-    expect(config.sourceIds).toEqual(["naver-webtoon", "kakao-webtoon", "ridi", "munpia"]);
-    expect(plan.enabled.map((source) => source.id)).toEqual(["naver-webtoon", "kakao-webtoon"]);
-    expect(plan.pending.map((source) => source.id)).toEqual(["ridi", "munpia"]);
+    expect(config.sourceIds).toEqual(["naver-webtoon", "ridi", "novelpia", "kyobo"]);
+    // ridi 는 공개 카탈로그 크롤러 구현 완료 → enabled. novelpia/kyobo 는 로그인/성인 게이트로 여전히 pending(정책).
+    expect(plan.enabled.map((source) => source.id)).toEqual(["naver-webtoon", "ridi"]);
+    expect(plan.pending.map((source) => source.id)).toEqual(["novelpia", "kyobo"]);
     expect(plan.coverage.domesticWebtoonSources).toBeGreaterThan(5);
     expect(plan.coverage.domesticWebnovelSources).toBeGreaterThan(5);
   });

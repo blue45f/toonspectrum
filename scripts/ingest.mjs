@@ -40,8 +40,7 @@ async function loadPayload() {
     const raw = readFileSync(path.resolve(ROOT, from), "utf8");
     return JSON.parse(raw);
   }
-  const sourceIds =
-    process.env.WEBDEX_SOURCE_IDS || "naver-webtoon,naver-series,kakao-webtoon,lezhin";
+  const sourceIds = process.env.WEBDEX_SOURCE_IDS || "all";
   console.error(`crawl 시작 (WEBDEX_SOURCE_IDS=${sourceIds}) …`);
   const { stdout } = await execFileAsync(
     process.execPath,
