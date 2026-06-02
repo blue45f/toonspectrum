@@ -100,11 +100,15 @@ export class CatalogController {
       if (!upstream) return res.status(502).send("too many redirects");
       if (!upstream.ok) return res.status(502).send("upstream error");
 
-      const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
-      if (!COVER_OK_TYPE.test(contentType)) return res.status(415).send("not an image");
-
+      const headerType = upstream.headers.get("content-type") ?? "";
       const body = Buffer.from(await upstream.arrayBuffer());
-      res.setHeader("Content-Type", contentType);
+      // 헤더가 이미지 타입이거나 매직바이트가 이미지면 통과. 일부 CDN(예: 네이버 확장자 없는 썸네일)은
+      // 실제 이미지를 application/octet-stream 으로 응답하므로 헤더만 신뢰하지 않고 바이트로 판별한다.
+      const sniffed = sniffImageType(body);
+      if (!COVER_OK_TYPE.test(headerType) && !sniffed) {
+        return res.status(415).send("not an image");
+      }
+      res.setHeader("Content-Type", sniffed ?? headerType);
       res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
       return res.status(200).send(body);
     } catch {
@@ -224,6 +228,21 @@ const COVER_USER_AGENT =
 
 function allowedCoverUrl(url: URL) {
   return url.protocol === "https:" && COVER_ALLOWED_HOST.test(url.hostname);
+}
+
+// 응답 바이트의 매직넘버로 이미지 포맷 판별 (헤더가 octet-stream/누락이어도 실제 이미지면 인식).
+// HTML 에러페이지 등 비이미지는 null → 415 유지.
+function sniffImageType(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return "image/gif";
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (buf.toString("ascii", 4, 8) === "ftyp") {
+    const brand = buf.toString("ascii", 8, 12);
+    if (brand === "avif" || brand === "avis") return "image/avif";
+  }
+  return null;
 }
 
 function coverRefererFor(hostname: string) {
