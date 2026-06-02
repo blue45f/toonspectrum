@@ -42,13 +42,14 @@ const LIVE_REFRESH_IDLE_SECONDS = parseConfigNumber(
   1800
 );
 const LIVE_REFRESH_DEMAND_WINDOW_SECONDS = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS,
+  // 정규 표기. 구 표기(WEBTOON_LIVE_DEMAND_*)도 폴백 허용 — .env 불일치로 설정이 조용히 무시되던 버그 방지
+  process.env.WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS ?? process.env.WEBTOON_LIVE_DEMAND_WINDOW_SECONDS,
   120,
   30,
   900
 );
 const LIVE_REFRESH_DEMAND_THRESHOLD = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_DEMAND_THRESHOLD,
+  process.env.WEBTOON_LIVE_REFRESH_DEMAND_THRESHOLD ?? process.env.WEBTOON_LIVE_DEMAND_THRESHOLD,
   4,
   1,
   40

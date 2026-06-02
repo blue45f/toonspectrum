@@ -21,7 +21,12 @@ export interface CatalogIngestConfig {
   scriptPath: string;
   triggerToken: string;
   sourceIds: ReturnType<typeof parseCatalogSourceIds>;
+  minRetainRatio: number;
 }
+
+// 품질 게이트 상수: 직전에 이 이상 수집되던 주요 소스가 0이 되면 '붕괴'로 간주.
+const SOURCE_PRESENT_FLOOR = 5;
+const REGRESSION_SOURCE_KEYS = ["naverWebtoon", "naverSeries", "kakaoWebtoon", "lezhin"] as const;
 
 export interface CatalogCrawlerPayload {
   titles: Title[];
@@ -67,7 +72,51 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
     scriptPath: env.CATALOG_CRAWL_SCRIPT || path.join("scripts", "crawl.mjs"),
     triggerToken: env.CATALOG_INGEST_TRIGGER_TOKEN || "",
     sourceIds: parseCatalogSourceIds(env.WEBDEX_SOURCE_IDS),
+    // 직전 스냅샷 대비 이 비율 미만으로 총건수가 급감하면(force 아니면) 승격 거부 (0<r<=1)
+    minRetainRatio: parseBoundedRatio(env.CATALOG_INGEST_MIN_RETAIN_RATIO, 0.6),
   };
+}
+
+// 직전 current 스냅샷 통계(총건수·소스별 count) vs 신규 payload 비교 — 순수 함수(테스트 용이)
+export function evaluateRegression(
+  newCount: number,
+  newSources: Record<string, number> | null,
+  current: { titleCount: number; sources: Record<string, number> | null } | null,
+  minRetainRatio: number
+): { reason: string; newCount: number; currentCount: number } | null {
+  if (!current || current.titleCount <= 0) return null; // 비교 대상 없음(첫 스냅샷)
+  if (newCount < Math.floor(current.titleCount * minRetainRatio)) {
+    return {
+      reason: `title count dropped ${newCount} < ${current.titleCount}×${minRetainRatio}`,
+      newCount,
+      currentCount: current.titleCount,
+    };
+  }
+  if (current.sources && newSources) {
+    for (const key of REGRESSION_SOURCE_KEYS) {
+      const prev = current.sources[key] ?? 0;
+      const next = newSources[key] ?? 0;
+      if (prev >= SOURCE_PRESENT_FLOOR && next === 0) {
+        return {
+          reason: `source "${key}" collapsed (prev ${prev} → 0)`,
+          newCount,
+          currentCount: current.titleCount,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+export function extractSourceCounts(metadata: unknown): Record<string, number> | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const sources = (metadata as { sources?: unknown }).sources;
+  if (!sources || typeof sources !== "object") return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(sources as Record<string, unknown>)) {
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 export function parseCrawlerJsonPayload(stdout: string): CatalogCrawlerPayload {
@@ -265,6 +314,47 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
     const runHash = hashTitles(payload.titles);
     const duplicate = await currentSnapshotHasHash(runHash);
 
+    // 품질 게이트: 신규 데이터가 아닌(중복도 아닌) 경우, 직전 current 대비 총건수 급감 또는 주요 소스
+    // 붕괴면 승격을 거부한다(낡은 데이터를 부분 데이터로 덮어쓰지 않음). 빈자리를 seed/추정으로 채우지 않음.
+    if (!duplicate && !options.force) {
+      const currentStats = await getCurrentSnapshotStats();
+      const regression = evaluateRegression(
+        payload.titles.length,
+        extractSourceCounts(payload.metadata),
+        currentStats,
+        config.minRetainRatio
+      );
+      if (regression) {
+        const finishedAt = new Date();
+        await db
+          .update(catalogIngestRuns)
+          .set({
+            status: "aborted",
+            finishedAt,
+            durationMs: finishedAt.getTime() - startedAt.getTime(),
+            titleCount: payload.titles.length,
+            message: null,
+            error: `quality gate: ${regression.reason}`,
+            metadata: { gate: regression, sourceVersion, crawledAt: payload.crawledAt ?? null },
+          })
+          .where(eq(catalogIngestRuns.id, runId));
+        return {
+          runId,
+          status: "aborted",
+          source: execSource,
+          startedAt: startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          durationMs: finishedAt.getTime() - startedAt.getTime(),
+          titleCount: payload.titles.length,
+          runHash,
+          snapshotId: null,
+          duplicate: false,
+          message: null,
+          error: `quality gate: ${regression.reason}`,
+        };
+      }
+    }
+
     let snapshotId: string | null = null;
     if (!duplicate || options.force) {
       snapshotId = await persistCatalogSnapshot({
@@ -394,6 +484,21 @@ async function currentSnapshotHasHash(runHash: string) {
     : false;
 }
 
+// 품질 게이트용: 직전 current 스냅샷의 총건수 + 소스별 count(metadata.crawler.sources) 조회
+async function getCurrentSnapshotStats(): Promise<{ titleCount: number; sources: Record<string, number> | null } | null> {
+  const [snapshot] = await db
+    .select({ titleCount: catalogSnapshots.titleCount, metadata: catalogSnapshots.metadata })
+    .from(catalogSnapshots)
+    .where(eq(catalogSnapshots.isCurrent, true))
+    .orderBy(desc(catalogSnapshots.createdAt))
+    .limit(1);
+  if (!snapshot) return null;
+  const metadata = parseMaybeJson(snapshot.metadata);
+  const crawler =
+    metadata && typeof metadata === "object" ? (metadata as { crawler?: unknown }).crawler : null;
+  return { titleCount: snapshot.titleCount ?? 0, sources: extractSourceCounts(crawler) };
+}
+
 function hashTitles(titles: Title[]) {
   return createHash("sha256").update(JSON.stringify(titles)).digest("hex");
 }
@@ -413,6 +518,12 @@ function parseBoundedInt(raw: unknown, fallback: number, min: number, max: numbe
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+function parseBoundedRatio(raw: unknown, fallback: number) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) return fallback;
+  return parsed;
 }
 
 function parseMaybeJson(value: unknown): unknown {
@@ -443,6 +554,7 @@ function withoutToken(config: CatalogIngestConfig) {
     maxOutputMb: config.maxOutputMb,
     scriptPath: config.scriptPath,
     sourceIds: config.sourceIds,
+    minRetainRatio: config.minRetainRatio,
     triggerTokenConfigured: Boolean(config.triggerToken),
   };
 }
