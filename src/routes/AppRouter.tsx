@@ -1,8 +1,37 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { HomePage } from "@/src/pages/HomePage";
 import { NotFoundPage } from "@/src/pages/NotFoundPage";
 import { ErrorBoundary } from "@/src/components/error-boundary";
+
+// 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
+// /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.
+const STATIC_TITLES: Record<string, string> = {
+  "/": "",
+  "/ranking": "통합 랭킹",
+  "/search": "검색",
+  "/recommend": "맞춤 추천",
+  "/explore": "스펙트럼 탐색",
+  "/calendar": "연재 캘린더",
+  "/reviews": "리뷰",
+  "/community": "커뮤니티",
+  "/library": "내 서재",
+  "/compare": "작품 비교",
+  "/insights": "트렌드 인사이트",
+  "/admin": "관리자 콘솔",
+};
+
+function useRouteTitle(pathname: string) {
+  useEffect(() => {
+    if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
+    let title: string | undefined;
+    if (pathname in STATIC_TITLES) title = STATIC_TITLES[pathname];
+    else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
+    else if (pathname.startsWith("/pencafe/")) title = `${decodeURIComponent(pathname.slice(9))} 펜카페`;
+    else if (pathname.startsWith("/community/")) title = "커뮤니티";
+    document.title = title ? `${title} · WEBDEX` : "WEBDEX";
+  }, [pathname]);
+}
 
 // 라우트별 코드 분할 — 랜딩(HomePage)·404는 eager, 나머지는 lazy로 초기 번들에서 분리.
 // 페이지가 named export 라 default 로 매핑한다.
@@ -40,6 +69,7 @@ function RouteFallback() {
 
 export function AppRouter() {
   const { pathname } = useLocation();
+  useRouteTitle(pathname);
   return (
     <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={<RouteFallback />}>

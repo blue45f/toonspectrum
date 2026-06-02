@@ -21,6 +21,7 @@ import { formatCount } from "@/lib/utils";
 import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
 import { ErrorState } from "@/src/components/error-state";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { useApiResource } from "./use-api-resource";
 
 interface TitleDetailResponse {
@@ -42,6 +43,7 @@ export function TitleDetailPage() {
     slug ? `/api/titles/${encodeURIComponent(slug)}` : null,
     "작품 상세 데이터를 불러오지 못했습니다."
   );
+  useDocumentTitle(data?.title?.title);
 
   if (loading) {
     return (
