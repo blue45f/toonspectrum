@@ -16,7 +16,7 @@ export function CommunityPage() {
   return (
     <Container size="wide" className="relative py-8 lg:py-10">
       <section className="relative overflow-hidden rounded-3xl border border-line bg-panel/55 p-6 text-fg md:p-10">
-        <div className="pointer-events-none absolute right-[-20%] top-[-25%] h-[450px] w-[450px] rounded-full bg-[radial-gradient(circle_at_top,_rgba(124,92,252,.2),_transparent_70%)]" />
+        <div className="pointer-events-none absolute right-[-20%] top-[-25%] h-[450px] w-[450px] rounded-full bg-[radial-gradient(circle_at_top,_oklch(0.72_0.185_42/0.22),_transparent_70%)]" />
         <div className="relative z-10">
           <p className="eyebrow flex items-center gap-1.5 text-accent">
             <Compass size={14} />

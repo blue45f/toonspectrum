@@ -48,7 +48,7 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-line/70 bg-panel/85 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_265/0.9),oklch(0.19_0.018_265/0.86))] backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-line/70 bg-panel/85 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.9),oklch(0.19_0.018_68/0.86))] backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           {/* 로고 */}
           <Link href="/" className="group flex items-center gap-2.5 pr-2">

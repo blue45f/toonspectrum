@@ -28,7 +28,7 @@ export function TitleCard({
       href={`/title/${title.slug}`}
       className={cn("group block rounded-2xl focus-visible:outline-none", className)}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_270/0.4)]">
+      <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
         <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
           <TitlePoster title={title} size={size} rank={rank} />
         </div>

@@ -26,7 +26,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_265/0.55),oklch(0.17_0.018_265/0.32))]">
+    <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">

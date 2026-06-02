@@ -274,10 +274,10 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
             />
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-line bg-card p-5">
-                  <p className="eyebrow text-fg-3">취향 유형</p>
-                  <p className="mt-2 text-2xl font-bold text-accent">
+              <div className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+                <div className="min-w-0">
+                  <p className="eyebrow text-fg-3">독자 유형</p>
+                  <p className="mt-1.5 font-serif text-2xl italic text-accent sm:text-[1.75rem]">
                     {profile.affinityType === "webtoon"
                       ? "웹툰파"
                       : profile.affinityType === "webnovel"
@@ -285,16 +285,18 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                         : "균형 잡힌 독자"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-line bg-card p-5">
-                  <p className="eyebrow text-fg-3">평가 수</p>
-                  <p className="numeral mt-2 text-2xl text-fg">{profile.ratedCount}</p>
-                </div>
-                <div className="rounded-2xl border border-line bg-card p-5">
-                  <p className="eyebrow text-fg-3">내 평균 별점</p>
-                  <p className="numeral mt-2 text-2xl text-fg">
-                    {profile.avgRating ? profile.avgRating.toFixed(1) : "-"}
-                  </p>
-                </div>
+                <dl className="flex shrink-0 divide-x divide-line border-line sm:border-l sm:pl-8">
+                  <div className="pr-6 sm:px-6 sm:first:pl-0">
+                    <dd className="numeral text-2xl text-fg">{profile.ratedCount}</dd>
+                    <dt className="mt-0.5 text-xs text-fg-3">평가한 작품</dt>
+                  </div>
+                  <div className="pl-6 sm:px-6 sm:last:pr-0">
+                    <dd className="numeral text-2xl text-fg">
+                      {profile.avgRating ? profile.avgRating.toFixed(1) : "·"}
+                    </dd>
+                    <dt className="mt-0.5 text-xs text-fg-3">내 평균 별점</dt>
+                  </div>
+                </dl>
               </div>
 
               {profile.topGenres.length > 0 && (
