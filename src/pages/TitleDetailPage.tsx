@@ -18,9 +18,9 @@ import { statsAreEstimated } from "@/lib/estimate";
 import { AGE_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
 import type { SeedReview, Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { AlertTriangle, Bookmark, Eye, Heart, Layers, MapPin, RefreshCw, Star } from "lucide-react";
+import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
-import { buttonClass } from "@/components/ui/button";
+import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "./use-api-resource";
 
 interface TitleDetailResponse {
@@ -71,19 +71,7 @@ export function TitleDetailPage() {
   if (error || !data) {
     return (
       <Container size="wide" className="py-10">
-        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
-          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-          <p className="text-sm font-medium text-fg">작품 상세를 불러오지 못했습니다.</p>
-          <p className="mt-1 text-xs text-fg-3">{error ?? "응답 데이터가 비어 있습니다."}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
-          >
-            <RefreshCw size={14} />
-            다시 시도
-          </button>
-        </div>
+        <ErrorState title="작품 상세를 불러오지 못했습니다." message={error} onRetry={reload} />
       </Container>
     );
   }

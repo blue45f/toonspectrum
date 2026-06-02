@@ -4,6 +4,7 @@ import { MiniPoster } from "@/components/rank-row";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { RatingInline } from "@/components/ui/stars";
+import { ErrorState } from "@/src/components/error-state";
 import { statsAreEstimated } from "@/lib/estimate";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import type { PlatformId, Title } from "@/lib/types";
@@ -81,17 +82,7 @@ export function CalendarPage() {
       </header>
 
       {error ? (
-        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-fg">연재 캘린더를 불러오지 못했습니다.</p>
-          <p className="mt-1 text-sm text-fg-3">{error}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
-          >
-            다시 시도
-          </button>
-        </div>
+        <ErrorState title="연재 캘린더를 불러오지 못했습니다." message={error} onRetry={reload} />
       ) : loading ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           {WEEK_DAYS.map((day) => (

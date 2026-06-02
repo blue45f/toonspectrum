@@ -2,13 +2,13 @@ import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
-import { buttonClass } from "@/components/ui/button";
+import { ErrorState } from "@/src/components/error-state";
 import { genreBorder, genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
 import type { SortKey } from "@/lib/search";
 import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
 import type { Title, WorkType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Compass, RefreshCw, RotateCcw } from "lucide-react";
+import { Compass, RefreshCw, RotateCcw } from "lucide-react";
 import { useApiResource } from "./use-api-resource";
 
 type ExploreParams = Record<string, string | undefined>;
@@ -251,18 +251,7 @@ export function ExplorePage() {
             ))}
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
-            <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-            <p className="text-sm font-medium text-fg">탐색 데이터를 불러오지 못했습니다.</p>
-            <p className="mt-1 text-xs text-fg-3">{error}</p>
-            <button
-              type="button"
-              onClick={reload}
-              className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
-            >
-              다시 시도
-            </button>
-          </div>
+          <ErrorState title="탐색 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
         ) : results.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

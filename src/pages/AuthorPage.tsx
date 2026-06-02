@@ -2,12 +2,12 @@ import { useParams } from "react-router-dom";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
-import { buttonClass } from "@/components/ui/button";
 import { GenreChip } from "@/components/ui/chip";
 import { Stars } from "@/components/ui/stars";
+import { ErrorState } from "@/src/components/error-state";
 import type { Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { AlertTriangle, PenLine, RefreshCw } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
 import { useApiResource } from "./use-api-resource";
 
@@ -82,19 +82,7 @@ export function AuthorPage() {
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
-          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-          <p className="text-sm font-medium text-fg">작가 데이터를 불러오지 못했습니다.</p>
-          <p className="mt-1 text-xs text-fg-3">{error}</p>
-          <button
-            type="button"
-            onClick={reload}
-            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
-          >
-            <RefreshCw size={14} />
-            다시 시도
-          </button>
-        </div>
+        <ErrorState title="작가 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
           {works.map((title) => (

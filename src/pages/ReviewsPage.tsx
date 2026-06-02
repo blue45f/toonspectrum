@@ -4,9 +4,10 @@ import { ReviewCard } from "@/components/review-card";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { Stars } from "@/components/ui/stars";
+import { ErrorState } from "@/src/components/error-state";
 import { spectrumGradient } from "@/lib/genre-color";
 import type { SeedReview, Title } from "@/lib/types";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { ReviewControls, type ReviewSort } from "./reviews-components/review-controls";
 import { useApiResource } from "./use-api-resource";
 
@@ -121,18 +122,7 @@ export function ReviewsPage() {
                 ))}
               </div>
             ) : error ? (
-              <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
-                <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-                <p className="text-sm font-medium text-fg">리뷰 데이터를 불러오지 못했습니다.</p>
-                <p className="mt-1 text-xs text-fg-3">{error}</p>
-                <button
-                  type="button"
-                  onClick={reload}
-                  className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
-                >
-                  다시 시도
-                </button>
-              </div>
+              <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
                 DB에 저장된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
