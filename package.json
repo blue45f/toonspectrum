@@ -16,6 +16,7 @@
     "verify": "pnpm run validate:architecture && pnpm run lint && pnpm run test && pnpm run build && pnpm run build:all"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
     "@libsql/client": "^0.17.3",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -24,8 +25,10 @@
     "motion": "^12.40.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-hook-form": "^7.76.1",
     "react-router-dom": "^7.16.0",
     "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

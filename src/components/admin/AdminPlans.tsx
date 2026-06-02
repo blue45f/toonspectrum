@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Plus, Pencil, X } from "lucide-react";
 import {
   adminFetch,
@@ -11,18 +14,19 @@ import {
 } from "./admin-client";
 import { AdminNotice, AdminSpinner, Field, adminButtonClass, adminInputClass } from "./admin-ui";
 
-interface Draft {
-  id?: string;
-  code: string;
-  name: string;
-  description: string;
-  intervalDays: string;
-  priceWon: string;
-  perks: string;
-  isActive: boolean;
-}
+const planFormSchema = z.object({
+  code: z.string().trim().min(1, "코드와 이름은 필수예요."),
+  name: z.string().trim().min(1, "코드와 이름은 필수예요."),
+  description: z.string(),
+  intervalDays: z.string(),
+  priceWon: z.string(),
+  perks: z.string(),
+  isActive: z.boolean(),
+});
 
-const emptyDraft: Draft = {
+type PlanFormValues = z.infer<typeof planFormSchema>;
+
+const emptyDraft: PlanFormValues = {
   code: "",
   name: "",
   description: "",
@@ -32,9 +36,8 @@ const emptyDraft: Draft = {
   isActive: true,
 };
 
-function toDraft(plan: Plan): Draft {
+function toDraft(plan: Plan): PlanFormValues {
   return {
-    id: plan.id,
     code: plan.code,
     name: plan.name,
     description: plan.description ?? "",
@@ -48,9 +51,18 @@ function toDraft(plan: Plan): Draft {
 export function AdminPlans({ uid }: { uid: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<PlanFormValues>({
+    resolver: zodResolver(planFormSchema),
+    defaultValues: emptyDraft,
+  });
 
   const load = useCallback(() => {
     setError(null);
@@ -64,40 +76,51 @@ export function AdminPlans({ uid }: { uid: string }) {
     load();
   }, [load]);
 
-  const submit = async () => {
-    if (!draft) return;
-    if (!draft.code.trim() || !draft.name.trim()) {
-      setFormError("코드와 이름은 필수예요.");
-      return;
-    }
-    setSaving(true);
+  const openNew = () => {
+    setFormError(null);
+    reset(emptyDraft);
+    setEditing({});
+  };
+
+  const openEdit = (plan: Plan) => {
+    setFormError(null);
+    reset(toDraft(plan));
+    setEditing({ id: plan.id });
+  };
+
+  const close = () => {
+    setEditing(null);
+    setFormError(null);
+  };
+
+  const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
       await adminFetch("/plans", uid, {
         method: "POST",
         body: JSON.stringify({
-          id: draft.id,
-          code: draft.code.trim(),
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          intervalDays: Number(draft.intervalDays) || 30,
+          id: editing?.id,
+          code: values.code.trim(),
+          name: values.name.trim(),
+          description: values.description.trim(),
+          intervalDays: Number(values.intervalDays) || 30,
           currency: "KRW",
-          priceCents: wonToCents(Number(draft.priceWon)),
-          perks: draft.perks.split(",").map((p) => p.trim()).filter(Boolean),
-          isActive: draft.isActive,
+          priceCents: wonToCents(Number(values.priceWon)),
+          perks: values.perks.split(",").map((p) => p.trim()).filter(Boolean),
+          isActive: values.isActive,
         }),
       });
-      setDraft(null);
+      setEditing(null);
       load();
     } catch (e) {
       setFormError((e as AdminApiError).message);
-    } finally {
-      setSaving(false);
     }
-  };
+  });
 
   if (error) return <AdminNotice title="플랜을 불러오지 못했어요" body={error} />;
   if (!plans) return <AdminSpinner />;
+
+  const validationError = errors.code?.message ?? errors.name?.message ?? null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,56 +128,55 @@ export function AdminPlans({ uid }: { uid: string }) {
         <p className="text-sm text-fg-3">
           구독 플랜 <span className="numeral text-fg">{formatNum(plans.length)}</span>개
         </p>
-        {!draft && (
-          <button className={adminButtonClass("accent")} onClick={() => setDraft({ ...emptyDraft })}>
+        {!editing && (
+          <button className={adminButtonClass("accent")} onClick={openNew}>
             <Plus size={15} /> 새 플랜
           </button>
         )}
       </div>
 
-      {draft && (
+      {editing && (
         <form
           className="grid grid-cols-1 gap-3 rounded-2xl border border-line-strong bg-panel p-5 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
+          onSubmit={submit}
         >
           <div className="flex items-center justify-between sm:col-span-2">
-            <h3 className="text-sm font-semibold text-fg">{draft.id ? "플랜 수정" : "새 플랜"}</h3>
-            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={() => setDraft(null)}>
+            <h3 className="text-sm font-semibold text-fg">{editing.id ? "플랜 수정" : "새 플랜"}</h3>
+            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={close}>
               <X size={16} />
             </button>
           </div>
           <Field label="코드 *">
-            <input className={adminInputClass} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
+            <input className={adminInputClass} {...register("code")} />
           </Field>
           <Field label="이름 *">
-            <input className={adminInputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <input className={adminInputClass} {...register("name")} />
           </Field>
           <Field label="설명" full>
-            <input className={adminInputClass} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+            <input className={adminInputClass} {...register("description")} />
           </Field>
           <Field label="결제 주기(일)">
-            <input type="number" min={1} className={adminInputClass} value={draft.intervalDays} onChange={(e) => setDraft({ ...draft, intervalDays: e.target.value })} />
+            <input type="number" min={1} className={adminInputClass} {...register("intervalDays")} />
           </Field>
           <Field label="가격(원)">
-            <input type="number" min={0} className={adminInputClass} value={draft.priceWon} onChange={(e) => setDraft({ ...draft, priceWon: e.target.value })} />
+            <input type="number" min={0} className={adminInputClass} {...register("priceWon")} />
           </Field>
           <Field label="혜택(쉼표로 구분)" full>
-            <input className={adminInputClass} value={draft.perks} onChange={(e) => setDraft({ ...draft, perks: e.target.value })} placeholder="광고 제거, 조기 열람, 전용 뱃지" />
+            <input className={adminInputClass} {...register("perks")} placeholder="광고 제거, 조기 열람, 전용 뱃지" />
           </Field>
           <label className="flex items-center gap-2 text-sm text-fg-2">
-            <input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} />
+            <input type="checkbox" {...register("isActive")} />
             활성화
           </label>
           <div className="flex items-center justify-end gap-2 sm:col-span-2">
-            {formError && <span className="mr-auto text-xs text-bad">{formError}</span>}
-            <button type="button" className={adminButtonClass("ghost")} onClick={() => setDraft(null)}>
+            {(validationError || formError) && (
+              <span className="mr-auto text-xs text-bad">{validationError ?? formError}</span>
+            )}
+            <button type="button" className={adminButtonClass("ghost")} onClick={close}>
               취소
             </button>
-            <button type="submit" className={adminButtonClass("accent")} disabled={saving}>
-              {saving ? "저장 중…" : "저장"}
+            <button type="submit" className={adminButtonClass("accent")} disabled={isSubmitting}>
+              {isSubmitting ? "저장 중…" : "저장"}
             </button>
           </div>
         </form>
@@ -194,7 +216,7 @@ export function AdminPlans({ uid }: { uid: string }) {
                   <span className={plan.isActive ? "text-good" : "text-fg-3"}>{plan.isActive ? "활성" : "비활성"}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button className={adminButtonClass("ghost")} onClick={() => setDraft(toDraft(plan))}>
+                  <button className={adminButtonClass("ghost")} onClick={() => openEdit(plan)}>
                     <Pencil size={13} /> 수정
                   </button>
                 </td>

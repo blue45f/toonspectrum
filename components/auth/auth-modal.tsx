@@ -1,23 +1,43 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { signIn } from "@/src/compat/auth-session";
 import { X, LogIn, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const AVATARS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
 
+const authSchema = z.object({
+  email: z.string().trim().min(1, "이메일을 입력해 주세요.").email("이메일 형식을 확인해 주세요."),
+  password: z.string().min(6, "비밀번호는 6자 이상이어야 해요."),
+  name: z.string(),
+  avatar: z.string(),
+});
+
+type AuthFormValues = z.infer<typeof authSchema>;
+
 export function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState(AVATARS[1]);
   const [oauth, setOauth] = useState<string[]>([]);
   const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm<AuthFormValues>({
+    resolver: zodResolver(authSchema),
+    defaultValues: { email: "", password: "", name: "", avatar: AVATARS[1] },
+  });
+
+  // RHF의 register ref 와 포커스용 emailRef 를 함께 연결
+  const emailField = register("email");
 
   useEffect(() => {
     fetch("/api/auth/providers")
@@ -70,9 +90,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  const submit = async () => {
+  const submit = handleSubmit(async ({ email, password, name, avatar }) => {
     setErr("");
-    setBusy(true);
     try {
       if (mode === "signup") {
         const r = await fetch("/api/auth/signup", {
@@ -82,22 +101,21 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         });
         if (!r.ok) {
           setErr((await r.json()).error ?? "가입 실패");
-          setBusy(false);
           return;
         }
       }
       const res = await signIn("credentials", { email, password, redirect: false });
       if (res?.error) {
         setErr("이메일 또는 비밀번호를 확인해 주세요.");
-        setBusy(false);
         return;
       }
       onClose();
     } catch {
       setErr("문제가 발생했어요. 다시 시도해 주세요.");
-      setBusy(false);
     }
-  };
+  });
+
+  const fieldError = errors.email?.message ?? errors.password?.message ?? null;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[12vh]">
@@ -144,59 +162,65 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          <form className="flex flex-col gap-2.5" onSubmit={submit}>
             {mode === "signup" && (
               <>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  {...register("name")}
                   placeholder="닉네임"
                   aria-label="닉네임"
                   className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
                 />
-                <div className="flex items-center gap-2 px-1">
-                  <span className="text-xs text-fg-3">아바타</span>
-                  {AVATARS.map((c, i) => (
-                    <button
-                      key={c}
-                      onClick={() => setAvatar(c)}
-                      aria-label={`아바타 색상 ${i + 1}`}
-                      aria-pressed={avatar === c}
-                      className={cn("size-6 rounded-full ring-2 transition", avatar === c ? "ring-accent" : "ring-transparent")}
-                      style={{ background: c }}
-                    />
-                  ))}
-                </div>
+                <Controller
+                  control={control}
+                  name="avatar"
+                  render={({ field }) => (
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-xs text-fg-3">아바타</span>
+                      {AVATARS.map((c, i) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => field.onChange(c)}
+                          aria-label={`아바타 색상 ${i + 1}`}
+                          aria-pressed={field.value === c}
+                          className={cn("size-6 rounded-full ring-2 transition", field.value === c ? "ring-accent" : "ring-transparent")}
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                />
               </>
             )}
             <input
-              ref={emailRef}
+              {...emailField}
+              ref={(el) => {
+                emailField.ref(el);
+                emailRef.current = el;
+              }}
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="이메일"
               aria-label="이메일"
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             <input
+              {...register("password")}
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="비밀번호 (6자 이상)"
               aria-label="비밀번호"
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
-            {err && <p className="text-xs text-bad">{err}</p>}
+            {(fieldError || err) && <p className="text-xs text-bad">{fieldError ?? err}</p>}
             <button
-              onClick={submit}
-              disabled={busy}
+              type="submit"
+              disabled={isSubmitting}
               className="mt-1 flex h-11 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
             >
               {mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />}
-              {busy ? "처리 중…" : mode === "login" ? "로그인" : "가입하고 시작"}
+              {isSubmitting ? "처리 중…" : mode === "login" ? "로그인" : "가입하고 시작"}
             </button>
-          </div>
+          </form>
 
           {oauth.length > 0 && (
             <>

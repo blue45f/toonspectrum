@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import {
   adminFetch,
@@ -11,21 +14,22 @@ import {
 } from "./admin-client";
 import { AdminNotice, AdminSpinner, Field, adminButtonClass, adminInputClass } from "./admin-ui";
 
-interface Draft {
-  id?: string;
-  creatorId: string;
-  titleId: string;
-  planId: string;
-  title: string;
-  description: string;
-  targetWon: string;
-  raisedWon: string;
-  isActive: boolean;
-  startsAt: string;
-  endsAt: string;
-}
+const campaignFormSchema = z.object({
+  creatorId: z.string().trim().min(1, "크리에이터 ID와 제목은 필수예요."),
+  titleId: z.string(),
+  planId: z.string(),
+  title: z.string().trim().min(1, "크리에이터 ID와 제목은 필수예요."),
+  description: z.string(),
+  targetWon: z.string(),
+  raisedWon: z.string(),
+  isActive: z.boolean(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+});
 
-const emptyDraft: Draft = {
+type CampaignFormValues = z.infer<typeof campaignFormSchema>;
+
+const emptyDraft: CampaignFormValues = {
   creatorId: "",
   titleId: "",
   planId: "",
@@ -40,9 +44,8 @@ const emptyDraft: Draft = {
 
 const dateInput = (value: string | null) => (value ? new Date(value).toISOString().slice(0, 10) : "");
 
-function toDraft(c: Campaign): Draft {
+function toDraft(c: Campaign): CampaignFormValues {
   return {
-    id: c.id,
     creatorId: c.creatorId,
     titleId: c.titleId ?? "",
     planId: c.planId ?? "",
@@ -59,9 +62,18 @@ function toDraft(c: Campaign): Draft {
 export function AdminCampaigns({ uid }: { uid: string }) {
   const [items, setItems] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<CampaignFormValues>({
+    resolver: zodResolver(campaignFormSchema),
+    defaultValues: emptyDraft,
+  });
 
   const load = useCallback(() => {
     setError(null);
@@ -75,39 +87,48 @@ export function AdminCampaigns({ uid }: { uid: string }) {
     load();
   }, [load]);
 
-  const submit = async () => {
-    if (!draft) return;
-    if (!draft.creatorId.trim() || !draft.title.trim()) {
-      setFormError("크리에이터 ID와 제목은 필수예요.");
-      return;
-    }
-    setSaving(true);
+  const openNew = () => {
+    setFormError(null);
+    reset(emptyDraft);
+    setEditing({});
+  };
+
+  const openEdit = (c: Campaign) => {
+    setFormError(null);
+    reset(toDraft(c));
+    setEditing({ id: c.id });
+  };
+
+  const close = () => {
+    setEditing(null);
+    setFormError(null);
+  };
+
+  const submit = handleSubmit(async (values) => {
     setFormError(null);
     try {
       await adminFetch("/campaigns", uid, {
         method: "POST",
         body: JSON.stringify({
-          id: draft.id,
-          creatorId: draft.creatorId.trim(),
-          titleId: draft.titleId.trim() || null,
-          planId: draft.planId.trim() || null,
-          title: draft.title.trim(),
-          description: draft.description.trim(),
-          targetAmountCents: wonToCents(Number(draft.targetWon)),
-          raisedAmountCents: wonToCents(Number(draft.raisedWon)),
-          isActive: draft.isActive,
-          startsAt: draft.startsAt || null,
-          endsAt: draft.endsAt || null,
+          id: editing?.id,
+          creatorId: values.creatorId.trim(),
+          titleId: values.titleId.trim() || null,
+          planId: values.planId.trim() || null,
+          title: values.title.trim(),
+          description: values.description.trim(),
+          targetAmountCents: wonToCents(Number(values.targetWon)),
+          raisedAmountCents: wonToCents(Number(values.raisedWon)),
+          isActive: values.isActive,
+          startsAt: values.startsAt || null,
+          endsAt: values.endsAt || null,
         }),
       });
-      setDraft(null);
+      setEditing(null);
       load();
     } catch (e) {
       setFormError((e as AdminApiError).message);
-    } finally {
-      setSaving(false);
     }
-  };
+  });
 
   const remove = async (c: Campaign) => {
     if (!window.confirm(`캠페인 “${c.title}”을(를) 삭제할까요?`)) return;
@@ -122,71 +143,72 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   if (error) return <AdminNotice title="캠페인을 불러오지 못했어요" body={error} />;
   if (!items) return <AdminSpinner />;
 
+  const validationError = errors.creatorId?.message ?? errors.title?.message ?? null;
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-fg-3">
           크리에이터 캠페인 <span className="numeral text-fg">{formatNum(items.length)}</span>개
         </p>
-        {!draft && (
-          <button className={adminButtonClass("accent")} onClick={() => setDraft({ ...emptyDraft })}>
+        {!editing && (
+          <button className={adminButtonClass("accent")} onClick={openNew}>
             <Plus size={15} /> 새 캠페인
           </button>
         )}
       </div>
 
-      {draft && (
+      {editing && (
         <form
           className="grid grid-cols-1 gap-3 rounded-2xl border border-line-strong bg-panel p-5 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
+          onSubmit={submit}
         >
           <div className="flex items-center justify-between sm:col-span-2">
-            <h3 className="text-sm font-semibold text-fg">{draft.id ? "캠페인 수정" : "새 캠페인"}</h3>
-            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={() => setDraft(null)}>
+            <h3 className="text-sm font-semibold text-fg">{editing.id ? "캠페인 수정" : "새 캠페인"}</h3>
+            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={close}>
               <X size={16} />
             </button>
           </div>
           <Field label="제목 *" full>
-            <input className={adminInputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+            <input className={adminInputClass} {...register("title")} />
           </Field>
           <Field label="크리에이터 ID *">
-            <input className={adminInputClass} value={draft.creatorId} onChange={(e) => setDraft({ ...draft, creatorId: e.target.value })} />
+            <input className={adminInputClass} {...register("creatorId")} />
           </Field>
           <Field label="플랜 ID (선택)">
-            <input className={adminInputClass} value={draft.planId} onChange={(e) => setDraft({ ...draft, planId: e.target.value })} />
+            <input className={adminInputClass} {...register("planId")} />
           </Field>
           <Field label="작품 ID (선택)">
-            <input className={adminInputClass} value={draft.titleId} onChange={(e) => setDraft({ ...draft, titleId: e.target.value })} placeholder="nw-..." />
+            <input className={adminInputClass} {...register("titleId")} placeholder="nw-..." />
           </Field>
           <Field label="설명" full>
-            <input className={adminInputClass} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+            <input className={adminInputClass} {...register("description")} />
           </Field>
           <Field label="목표 금액(원)">
-            <input type="number" min={0} className={adminInputClass} value={draft.targetWon} onChange={(e) => setDraft({ ...draft, targetWon: e.target.value })} />
+            <input type="number" min={0} className={adminInputClass} {...register("targetWon")} />
           </Field>
           <Field label="모금 금액(원)">
-            <input type="number" min={0} className={adminInputClass} value={draft.raisedWon} onChange={(e) => setDraft({ ...draft, raisedWon: e.target.value })} />
+            <input type="number" min={0} className={adminInputClass} {...register("raisedWon")} />
           </Field>
           <Field label="시작일">
-            <input type="date" className={adminInputClass} value={draft.startsAt} onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })} />
+            <input type="date" className={adminInputClass} {...register("startsAt")} />
           </Field>
           <Field label="종료일">
-            <input type="date" className={adminInputClass} value={draft.endsAt} onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })} />
+            <input type="date" className={adminInputClass} {...register("endsAt")} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-fg-2">
-            <input type="checkbox" checked={draft.isActive} onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })} />
+            <input type="checkbox" {...register("isActive")} />
             활성화
           </label>
           <div className="flex items-center justify-end gap-2 sm:col-span-2">
-            {formError && <span className="mr-auto text-xs text-bad">{formError}</span>}
-            <button type="button" className={adminButtonClass("ghost")} onClick={() => setDraft(null)}>
+            {(validationError || formError) && (
+              <span className="mr-auto text-xs text-bad">{validationError ?? formError}</span>
+            )}
+            <button type="button" className={adminButtonClass("ghost")} onClick={close}>
               취소
             </button>
-            <button type="submit" className={adminButtonClass("accent")} disabled={saving}>
-              {saving ? "저장 중…" : "저장"}
+            <button type="submit" className={adminButtonClass("accent")} disabled={isSubmitting}>
+              {isSubmitting ? "저장 중…" : "저장"}
             </button>
           </div>
         </form>
@@ -215,7 +237,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button className={adminButtonClass("ghost")} onClick={() => setDraft(toDraft(c))}>
+                  <button className={adminButtonClass("ghost")} onClick={() => openEdit(c)}>
                     <Pencil size={13} /> 수정
                   </button>
                   <button className={adminButtonClass("danger")} onClick={() => void remove(c)} aria-label="삭제">
