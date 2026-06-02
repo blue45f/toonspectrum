@@ -68,7 +68,9 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
     mode: env.CATALOG_INGEST_MODE === "fixed" ? "fixed" : "off",
     intervalSeconds: parseBoundedInt(env.CATALOG_INGEST_INTERVAL_SECONDS, 1_800, 60, 86_400),
     timeoutMs: parseBoundedInt(env.CATALOG_INGEST_TIMEOUT_MS, 180_000, 30_000, 600_000),
-    maxOutputMb: parseBoundedInt(env.CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB, 12, 1, 200),
+    // 기본 소스셋(네이버시리즈 등 대형 포함)의 크롤 JSON은 수십 MB라, 12MB로는 maxBuffer 초과로
+    // ingest가 실패한다. 기본값을 넉넉히 잡아 정식 파이프라인이 기본 소스셋에서도 동작하게 한다.
+    maxOutputMb: parseBoundedInt(env.CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB, 64, 1, 200),
     scriptPath: env.CATALOG_CRAWL_SCRIPT || path.join("scripts", "crawl.mjs"),
     triggerToken: env.CATALOG_INGEST_TRIGGER_TOKEN || "",
     sourceIds: parseCatalogSourceIds(env.WEBDEX_SOURCE_IDS),
