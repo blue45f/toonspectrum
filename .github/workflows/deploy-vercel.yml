@@ -4,16 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'app/**'
-      - 'pages/**'
-      - 'components/**'
-      - 'public/**'
       - 'src/**'
-      - 'styles/**'
-      - 'next.config.*'
+      - 'components/**'
+      - 'lib/**'
+      - 'public/**'
+      - 'index.html'
+      - 'vite.config.ts'
       - 'vercel.json'
       - 'package.json'
-      - 'package-lock.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/deploy-vercel.yml'
   workflow_dispatch:
@@ -46,12 +44,8 @@ jobs:
       - name: Install dependencies
         if: env.VERCEL_TOKEN != ''
         run: |
-          if [ -f pnpm-lock.yaml ]; then
-            npm install -g pnpm@11.4.0
-            pnpm install --frozen-lockfile
-          else
-            npm ci
-          fi
+          npm install -g pnpm@11.4.0
+          pnpm install --frozen-lockfile
 
       - name: Install Vercel CLI
         if: env.VERCEL_TOKEN != ''
