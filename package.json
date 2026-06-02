@@ -9,6 +9,8 @@
     "start": "vite preview --host 0.0.0.0",
     "dev:api": "pnpm --filter @webtoon-nest/api dev",
     "dev:all": "pnpm -r --parallel --include-workspace-root dev",
+    "crawl": "node scripts/crawl.mjs --json --no-file",
+    "ingest": "node scripts/ingest.mjs",
     "build:all": "pnpm -r run build",
     "lint": "eslint",
     "test": "vitest run",
