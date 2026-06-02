@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useInView } from "@/components/use-in-view";
 
 export interface AreaPoint {
   label: string | number;
@@ -9,6 +12,7 @@ export interface AreaPoint {
  * 단색 영역/라인 차트 — 순수 SVG path.
  * 시계열(연도별 추이 등)에 사용. viewBox 좌표계 기반으로 반응형.
  * 영역 채움(저채도 그라디언트) + 상단 스트로크 라인 + 데이터 도트.
+ * reveal 시 라인이 좌→우로 그려지고(node-draw) 도트가 순차로 팝인.
  */
 export function AreaChart({
   points,
@@ -26,6 +30,7 @@ export function AreaChart({
   /** 마지막 포인트(최신)를 악센트 도트로 강조 */
   highlightLast?: boolean;
 }) {
+  const [ref, inView] = useInView<HTMLDivElement>();
   const W = 320;
   const H = 100;
   const padX = 6;
@@ -46,9 +51,11 @@ export function AreaChart({
   const baseY = padTop + innerH;
   const area = `${line} L${xy[xy.length - 1].x.toFixed(1)},${baseY} L${xy[0].x.toFixed(1)},${baseY} Z`;
   const gid = `area-fill-${Math.round((xy[0]?.value ?? 0) + n * 7)}`;
+  // 라인 draw 시간(도트 stagger 와 동기). reveal 전엔 0(가려짐).
+  const lineDrawMs = 900;
 
   return (
-    <div className={cn("w-full", className)}>
+    <div ref={ref} className={cn("w-full", className)}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
@@ -71,7 +78,17 @@ export function AreaChart({
           stroke="var(--color-line)"
           strokeWidth="0.75"
         />
-        <path d={area} fill={`url(#${gid})`} />
+        {/* 영역 채움 — 라인이 다 그려질 즈음 페이드인 */}
+        <path
+          d={area}
+          fill={`url(#${gid})`}
+          style={{
+            opacity: inView ? 1 : 0,
+            transition: "opacity 600ms var(--ease-out-expo)",
+            transitionDelay: `${lineDrawMs * 0.5}ms`,
+          }}
+        />
+        {/* 라인 — pathLength 정규화 후 dashoffset 으로 좌→우 그리기 */}
         <path
           d={line}
           fill="none"
@@ -80,10 +97,18 @@ export function AreaChart({
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
+          pathLength={1}
+          style={{
+            strokeDasharray: 1,
+            strokeDashoffset: inView ? 0 : 1,
+            transition: `stroke-dashoffset ${lineDrawMs}ms var(--ease-out-quint)`,
+          }}
         />
         {showDots &&
           xy.map((p, i) => {
             const isLast = highlightLast && i === n - 1;
+            // 라인이 그 지점을 지날 때쯤 도트가 팝인 (좌→우 stagger)
+            const delay = (n <= 1 ? 0 : (i / (n - 1)) * lineDrawMs) + (isLast ? 60 : 0);
             return (
               <circle
                 key={i}
@@ -94,6 +119,13 @@ export function AreaChart({
                 stroke={color}
                 strokeWidth={isLast ? 0 : 1.4}
                 vectorEffect="non-scaling-stroke"
+                style={{
+                  transformBox: "fill-box",
+                  transformOrigin: "center",
+                  opacity: inView ? 1 : 0,
+                  transform: inView ? "scale(1)" : "scale(0.4)",
+                  transition: `opacity 240ms var(--ease-out-expo) ${delay}ms, transform 240ms var(--ease-out-quint) ${delay}ms`,
+                }}
               />
             );
           })}

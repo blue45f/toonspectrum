@@ -10,19 +10,70 @@ import { STATUS_LABEL } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 import { cn } from "@/lib/utils";
 
-// 표준 그리드 카드 — 포스터 + 메타
+// 표준 그리드 카드 — 포스터 + 메타.
+// feature: 그리드의 리드 카드(가로 에디토리얼 레이아웃, 2칸 span).
+//   균일한 카드 매트릭스를 깨는 비대칭 리듬용.
 export function TitleCard({
   title,
   rank,
   size = "md",
+  feature = false,
   className,
 }: {
   title: Title;
   rank?: number;
   size?: "sm" | "md" | "lg";
+  feature?: boolean;
   className?: string;
 }) {
   const price = bestPricing(title.availability);
+
+  if (feature) {
+    return (
+      <Link
+        href={`/title/${title.slug}`}
+        className={cn("group block rounded-2xl focus-visible:outline-none", className)}
+      >
+        <div className="relative flex gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 transition-[transform,box-shadow,border-color] duration-200 surface-hl group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
+          <div className="w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
+            <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.04]">
+              <TitlePoster title={title} size={size} rank={rank} />
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-0.5">
+            <div className="flex flex-wrap gap-1.5">
+              {title.genres.slice(0, 2).map((g) => (
+                <GenreChip key={g} genre={g} size="sm" />
+              ))}
+            </div>
+            <h3 className="text-pretty text-base font-bold leading-tight text-fg group-hover:text-accent transition-colors">
+              {title.title}
+            </h3>
+            <p className="line-clamp-3 text-xs leading-relaxed text-fg-3">{title.synopsis}</p>
+            <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+              <RatingInline
+                value={title.stats.ratingAvg}
+                estimated={statsAreEstimated(title)}
+                size="xs"
+              />
+              <span className={cn("text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
+            </div>
+            <GenreSpectrum
+              genres={title.genres}
+              height={4}
+              interactive
+              label={`${title.title} 장르`}
+              className="mt-1"
+            />
+          </div>
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+            <BookmarkButton titleId={title.id} size={14} />
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/title/${title.slug}`}

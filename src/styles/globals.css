@@ -77,6 +77,42 @@
   }
 }
 
+/* ── 시그니처 데이터 모션 ──────────────────────────────── */
+
+/* 도넛 스윕(시계방향 그리기) — conic 각도를 애니메이션. 레이아웃 무관. */
+@property --donut-sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes donut-sweep {
+  from {
+    --donut-sweep: 0deg;
+  }
+  to {
+    --donut-sweep: 360deg;
+  }
+}
+
+/* 라인 차트 노드-드로우 — stroke-dashoffset 로 좌→우 그리기. */
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 데이터 도트 팝-인 (transform/opacity 만). */
+@keyframes dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ============================================================
    Base
    ============================================================ */

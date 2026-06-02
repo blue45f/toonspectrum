@@ -1,13 +1,14 @@
 import { Container } from "@/components/section";
 import { Badge } from "@/components/ui/chip";
-import { DistributionBars, MeterBar } from "@/components/ui/spectrum-bar";
+import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
 import { AreaChart } from "./insights-components/area-chart";
 import { BarList } from "./insights-components/bar-list";
 import { CompareSplit } from "./insights-components/compare-split";
 import { Donut } from "./insights-components/donut";
 import { Panel } from "./insights-components/panel";
 import { TagCloud } from "./insights-components/tag-cloud";
-import { genreColor, spectrumGradient } from "@/lib/genre-color";
+import { genreColor } from "@/lib/genre-color";
+import { CountUp } from "@/components/count-up";
 import type { getInsightsData } from "@/lib/server/insights";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { formatCount, formatFull } from "@/lib/utils";
@@ -85,20 +86,33 @@ export function InsightsPage() {
           <p className="mt-2 max-w-xl text-xs leading-relaxed text-fg-3">
             장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 데모용 추정값입니다.
           </p>
-          <div
-            className="mt-7 h-1.5 w-full max-w-xl rounded-full"
-            style={{ background: spectrumGradient(genreRows.map((row) => row.genre)) }}
-            aria-hidden
-          />
+          {/* 시그니처 hero 스펙트럼 — reveal 채움 + 커서 스크럽으로 장르를 짚는다 */}
+          <div className="mt-7 max-w-xl">
+            <GenreSpectrum
+              genres={genreRows.map((row) => row.genre)}
+              height={10}
+              interactive
+              label={`수록작 장르 스펙트럼 (${genreRows.length}개 장르)`}
+            />
+            <p className="mt-2 text-[0.68rem] text-fg-3">
+              바 위에 커서를 올리면 그 지점의 장르가 표시됩니다.
+            </p>
+          </div>
           <dl className="mt-7 flex flex-wrap items-center gap-x-8 gap-y-3">
             {[
               { value: total, label: "수록 작품" },
               { value: genreRows.length, label: "활성 장르" },
               { value: platformTotal, label: "연재 플랫폼" },
-              { value: formatFull(distSum), label: "집계 평가 수" },
+              { value: distSum, display: formatFull(distSum), label: "집계 평가 수" },
             ].map((item) => (
               <div key={item.label} className="flex items-baseline gap-2">
-                <dd className="numeral text-2xl text-fg tabular-nums">{item.value}</dd>
+                <dd className="numeral text-2xl text-fg tabular-nums">
+                  {"display" in item && item.display ? (
+                    item.display
+                  ) : (
+                    <CountUp value={item.value} />
+                  )}
+                </dd>
                 <dt className="text-xs text-fg-3">{item.label}</dt>
               </div>
             ))}
@@ -172,7 +186,9 @@ export function InsightsPage() {
             }
           >
             <div className="flex items-end gap-3">
-              <span className="numeral text-[3.4rem] leading-none text-accent">{adaptPct.toFixed(0)}</span>
+              <span className="numeral text-[3.4rem] leading-none text-accent">
+                <CountUp value={Math.round(adaptPct)} />
+              </span>
               <span className="numeral mb-1.5 text-xl text-fg-3">%</span>
               <span className="mb-2 text-sm text-fg-3">웹툰화 비율</span>
             </div>

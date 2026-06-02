@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useInView } from "@/components/use-in-view";
 
 export interface CompareMetric {
   label: string;
@@ -33,19 +36,21 @@ export function CompareSplit({
   metrics: CompareMetric[];
   className?: string;
 }) {
+  const [ref, inView] = useInView<HTMLDivElement>();
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div ref={ref} className={cn("flex flex-col gap-4", className)}>
       {/* 헤더: 두 그룹 + 작품 수 */}
       <div className="flex items-stretch gap-2">
         <GroupHead name={aName} count={aCount} color={aColor} align="left" />
         <GroupHead name={bName} count={bCount} color={bColor} align="right" />
       </div>
-      {/* 지표별 분할 바 */}
+      {/* 지표별 분할 바 — 가운데 기준선에서 좌/우로 동시에 뻗어나간다 */}
       <div className="flex flex-col gap-3">
-        {metrics.map((m) => {
+        {metrics.map((m, i) => {
           const peak = Math.max(1, m.aRaw, m.bRaw);
           const aPct = Math.max(4, (m.aRaw / peak) * 100);
           const bPct = Math.max(4, (m.bRaw / peak) * 100);
+          const delay = `${i * 80}ms`;
           return (
             <div key={m.label} className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-xs">
@@ -56,14 +61,24 @@ export function CompareSplit({
               <div className="flex items-center gap-1">
                 <div className="flex h-2 flex-1 justify-end overflow-hidden rounded-full bg-raised">
                   <div
-                    className="h-full rounded-full"
-                    style={{ width: `${aPct}%`, backgroundColor: aColor }}
+                    className="h-full origin-right rounded-full transition-transform duration-[700ms] ease-out-quint"
+                    style={{
+                      width: `${aPct}%`,
+                      backgroundColor: aColor,
+                      transform: inView ? "scaleX(1)" : "scaleX(0)",
+                      transitionDelay: delay,
+                    }}
                   />
                 </div>
                 <div className="flex h-2 flex-1 overflow-hidden rounded-full bg-raised">
                   <div
-                    className="h-full rounded-full"
-                    style={{ width: `${bPct}%`, backgroundColor: bColor }}
+                    className="h-full origin-left rounded-full transition-transform duration-[700ms] ease-out-quint"
+                    style={{
+                      width: `${bPct}%`,
+                      backgroundColor: bColor,
+                      transform: inView ? "scaleX(1)" : "scaleX(0)",
+                      transitionDelay: delay,
+                    }}
                   />
                 </div>
               </div>

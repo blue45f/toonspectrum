@@ -11,7 +11,8 @@ import { buttonClass } from "@/components/ui/button";
 import { ErrorState } from "@/src/components/error-state";
 import { GenreChip } from "@/components/ui/chip";
 import { RatingInline } from "@/components/ui/stars";
-import { genreColor, spectrumGradient } from "@/lib/genre-color";
+import { GenreSpectrum } from "@/components/ui/spectrum-bar";
+import { genreColor } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 import type { Title } from "@/lib/types";
@@ -207,10 +208,12 @@ export function HomePage() {
           desc="장르마다 다른 색을 따라 다음 정주행작을 발견하세요."
           action={{ label: "스펙트럼 탐색", href: "/explore" }}
         >
-          <div
-            className="mb-5 h-1.5 w-full rounded-full"
-            style={{ background: spectrumGradient([...GENRES]) }}
-            aria-hidden
+          <GenreSpectrum
+            genres={[...GENRES]}
+            height={10}
+            interactive
+            label={`전체 장르 스펙트럼 (${GENRES.length}개)`}
+            className="mb-5"
           />
           <div className="flex flex-wrap gap-2">
             {GENRES.map((genre) => (
@@ -310,10 +313,20 @@ export function HomePage() {
             desc="최근 합류한 라이징 작품"
             action={{ label: "신작 랭킹", href: "/ranking?axis=rookie" }}
           >
-            <div className="grid grid-cols-3 gap-3.5 sm:grid-cols-4">
-              {newest.slice(0, 8).map((title) => (
-                <TitleCard key={title.id} title={title} size="sm" />
-              ))}
+            {/* 리드 1작은 가로 에디토리얼 카드(2칸), 나머지는 그리드 — 균일 매트릭스 탈피 */}
+            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+              {newest.slice(0, 7).map((title, i) =>
+                i === 0 ? (
+                  <TitleCard
+                    key={title.id}
+                    title={title}
+                    feature
+                    className="col-span-2"
+                  />
+                ) : (
+                  <TitleCard key={title.id} title={title} size="sm" />
+                )
+              )}
             </div>
           </Section>
         </div>

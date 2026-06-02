@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
 import { MiniPoster } from "./rank-row";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
+import { useInView } from "./use-in-view";
 import { BookOpen, Tv, Film, Gamepad2, Sparkles } from "lucide-react";
 
 const EXT_ICON: Record<string, typeof Tv> = {
@@ -20,7 +23,29 @@ const EXT_LABEL: Record<string, string> = {
   ott: "OTT 시리즈",
 };
 
-function Node({ title, role, highlight }: { title: Title; role: string; highlight?: boolean }) {
+// 노드 등장 안무용 공통 스타일. step = 체인 상의 순서(0=원작).
+function nodeReveal(inView: boolean, step: number): React.CSSProperties {
+  return {
+    opacity: inView ? 1 : 0,
+    transform: inView ? "translateY(0)" : "translateY(8px)",
+    transition: "opacity 420ms var(--ease-out-expo), transform 420ms var(--ease-out-quint)",
+    transitionDelay: `${step * 130 + 90}ms`,
+  };
+}
+
+function Node({
+  title,
+  role,
+  highlight,
+  inView,
+  step,
+}: {
+  title: Title;
+  role: string;
+  highlight?: boolean;
+  inView: boolean;
+  step: number;
+}) {
   return (
     <Link
       href={`/title/${title.slug}`}
@@ -28,6 +53,7 @@ function Node({ title, role, highlight }: { title: Title; role: string; highligh
         "group flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center",
         highlight && "scale-[1.03]"
       )}
+      style={nodeReveal(inView, step)}
     >
       <MiniPoster
         title={title}
@@ -44,11 +70,24 @@ function Node({ title, role, highlight }: { title: Title; role: string; highligh
   );
 }
 
-function Connector() {
+// 커넥터 — reveal 시 라인이 좌→우로 그려진 뒤 노드 도트가 들어온다.
+function Connector({ inView, step }: { inView: boolean; step: number }) {
+  const lineDelay = `${step * 130}ms`;
+  const dotDelay = `${step * 130 + 60}ms`;
   return (
     <div className="flex shrink-0 items-center self-start pt-7" aria-hidden>
-      <span className="h-px w-4 bg-line-strong sm:w-7" />
-      <span className="size-1.5 rounded-full bg-accent" />
+      <span
+        className="h-px w-4 origin-left bg-line-strong transition-transform duration-[360ms] ease-out-quint sm:w-7"
+        style={{ transform: inView ? "scaleX(1)" : "scaleX(0)", transitionDelay: lineDelay }}
+      />
+      <span
+        className="size-1.5 rounded-full bg-accent transition-[opacity,transform] duration-200 ease-out-expo"
+        style={{
+          opacity: inView ? 1 : 0,
+          transform: inView ? "scale(1)" : "scale(0.2)",
+          transitionDelay: dotDelay,
+        }}
+      />
     </div>
   );
 }
@@ -65,29 +104,42 @@ export function AdaptationGraph({
   currentId?: string;
   className?: string;
 }) {
+  const [ref, inView] = useInView<HTMLDivElement>();
   const ext = [
     ...(original.externalAdaptations ?? []),
     ...adaptations.flatMap((a) => a.externalAdaptations ?? []),
   ];
   return (
-    <div className={cn("flex items-start gap-1 overflow-x-auto rail pb-1", className)}>
+    <div ref={ref} className={cn("flex items-start gap-1 overflow-x-auto rail pb-1", className)}>
       <Node
         title={original}
         role={original.type === "webnovel" ? "원작 소설" : "원작"}
         highlight={original.id === currentId}
+        inView={inView}
+        step={0}
       />
-      {adaptations.map((a) => (
+      {adaptations.map((a, i) => (
         <div key={a.id} className="flex items-start gap-1">
-          <Connector />
-          <Node title={a} role={TYPE_LABEL[a.type] + "화"} highlight={a.id === currentId} />
+          <Connector inView={inView} step={i + 1} />
+          <Node
+            title={a}
+            role={TYPE_LABEL[a.type] + "화"}
+            highlight={a.id === currentId}
+            inView={inView}
+            step={i + 1}
+          />
         </div>
       ))}
       {ext.map((e, i) => {
         const Icon = EXT_ICON[e.kind] ?? BookOpen;
+        const step = adaptations.length + 1 + i;
         return (
           <div key={i} className="flex items-start gap-1">
-            <Connector />
-            <div className="flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center">
+            <Connector inView={inView} step={step} />
+            <div
+              className="flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
+              style={nodeReveal(inView, step)}
+            >
               <div className="grid aspect-[3/4] w-full place-items-center rounded-md border border-dashed border-line-strong bg-card text-fg-3">
                 <Icon size={20} />
               </div>

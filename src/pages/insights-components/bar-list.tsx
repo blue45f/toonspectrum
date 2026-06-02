@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useInView } from "@/components/use-in-view";
 
 export interface BarListItem {
   label: string;
@@ -15,6 +18,7 @@ export interface BarListItem {
  * 가로 막대 리스트 — 라벨 + 값 비율 바.
  * CSS flex 기반. 다크 배경에서 읽히도록 트랙(bg-raised) + 채움(컬러).
  * value 는 max(또는 최대값) 대비 비율로 폭 계산.
+ * reveal 시 위에서부터 순차로 좌→우 채워진다(transform scaleX, 레이아웃 무관).
  */
 export function BarList({
   items,
@@ -34,10 +38,11 @@ export function BarList({
   /** 0 이 아닌 값의 최소 표시 폭(%) */
   minPct?: number;
 }) {
+  const [ref, inView] = useInView<HTMLUListElement>();
   const peak = max ?? Math.max(1, ...items.map((i) => i.value));
   return (
-    <ul className={cn("flex flex-col gap-2.5", className)}>
-      {items.map((item) => {
+    <ul ref={ref} className={cn("flex flex-col gap-2.5", className)}>
+      {items.map((item, i) => {
         const ratio = item.value / peak;
         const pct = item.value <= 0 ? 0 : Math.max(minPct, ratio * 100);
         const color = item.color ?? "var(--color-line-strong)";
@@ -64,8 +69,16 @@ export function BarList({
               )}
             >
               <div
-                className={cn("h-full rounded-full", barClassName)}
-                style={{ width: `${pct}%`, backgroundColor: color }}
+                className={cn(
+                  "h-full origin-left rounded-full transition-transform duration-[700ms] ease-out-quint",
+                  barClassName
+                )}
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: color,
+                  transform: inView ? "scaleX(1)" : "scaleX(0)",
+                  transitionDelay: `${Math.min(i, 9) * 55}ms`,
+                }}
               />
             </div>
           </li>
