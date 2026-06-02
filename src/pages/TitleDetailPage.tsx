@@ -4,7 +4,6 @@ import { AuthorLine } from "@/components/author-line";
 import { AvailabilityRouter } from "@/components/availability";
 import { CollectionAdd } from "@/components/collection-add";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
-import { LiveReviews } from "@/components/live-reviews";
 import { ReadStateSelector } from "@/components/read-state";
 import { ReviewCard } from "@/components/review-card";
 import { ReviewForm } from "@/components/review-form";
@@ -15,28 +14,83 @@ import { TitlePoster } from "@/components/title-poster";
 import { Badge, GenreChip } from "@/components/ui/chip";
 import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
 import { Stars } from "@/components/ui/stars";
-import { adaptationsOf, allReviewsJoined, getTitle, originalOf } from "@/lib/data";
 import { statsAreEstimated } from "@/lib/estimate";
 import { AGE_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
+import type { SeedReview, Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
+import { AlertTriangle, Bookmark, Eye, Heart, Layers, MapPin, RefreshCw, Star } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
-import { similarLocalTitles } from "./page-utils";
+import { buttonClass } from "@/components/ui/button";
+import { useApiResource } from "./use-api-resource";
+
+interface TitleDetailResponse {
+  title: Title;
+  reviews: SeedReview[];
+  similar: Title[];
+  original: Title;
+  adaptations: Title[];
+  hasFamily: boolean;
+  reviewAvg: number;
+  reviewCount: number;
+  generatedAt: string;
+  source: string;
+}
 
 export function TitleDetailPage() {
   const { slug } = useParams();
-  const title = getTitle(slug ?? "");
-  if (!title) return <NotFoundPage />;
+  const { data, loading, error, notFound, reload } = useApiResource<TitleDetailResponse>(
+    slug ? `/api/titles/${encodeURIComponent(slug)}` : null,
+    "작품 상세 데이터를 불러오지 못했습니다."
+  );
 
-  const reviews = allReviewsJoined().filter((review) => review.titleId === title.id);
-  const similar = similarLocalTitles(title, 8);
-  const original = originalOf(title) ?? title;
-  const adaptations = adaptationsOf(original);
-  const hasFamily = adaptations.length > 0;
-  const reviewCount = reviews.length || title.stats.ratingCount;
-  const reviewAvg = reviews.length
-    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-    : title.stats.ratingAvg;
+  if (loading) {
+    return (
+      <Container size="wide" className="relative py-8 lg:py-10">
+        <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
+          <aside className="flex flex-col gap-4">
+            <div className="skeleton aspect-[3/4] rounded-2xl" />
+            <div className="skeleton h-12 rounded-xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+          </aside>
+          <div className="space-y-5">
+            <div className="skeleton h-8 w-40" />
+            <div className="skeleton h-12 w-3/4" />
+            <div className="skeleton h-5 w-64" />
+            <div className="skeleton h-28 rounded-2xl" />
+            <div className="skeleton h-24 rounded-2xl" />
+          </div>
+        </div>
+      </Container>
+    );
+  }
+
+  if (notFound || !data) {
+    if (!error) return <NotFoundPage />;
+  }
+
+  if (error || !data) {
+    return (
+      <Container size="wide" className="py-10">
+        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+          <p className="text-sm font-medium text-fg">작품 상세를 불러오지 못했습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">{error ?? "응답 데이터가 비어 있습니다."}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
+          >
+            <RefreshCw size={14} />
+            다시 시도
+          </button>
+        </div>
+      </Container>
+    );
+  }
+
+  const { title, reviews, similar, original, adaptations, hasFamily } = data;
+  const reviewCount = data.reviewCount || title.stats.ratingCount;
+  const reviewAvg = data.reviewCount > 0 ? data.reviewAvg : title.stats.ratingAvg;
   const estimated = statsAreEstimated(title);
   const fmtStat = (value: number) => (estimated ? `≈${formatCount(value)}` : formatCount(value));
   const stats = [
@@ -213,7 +267,6 @@ export function TitleDetailPage() {
             <ReviewForm titleId={title.id} />
           </div>
           <div className="flex flex-col gap-3">
-            <LiveReviews titleId={title.id} />
             {reviews.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
                 <p className="text-sm text-fg-2">아직 리뷰가 없어요.</p>

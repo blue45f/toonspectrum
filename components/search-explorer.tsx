@@ -9,7 +9,19 @@ import { Segmented } from "./ui/segmented";
 import { GenreChip, TagChip } from "./ui/chip";
 import { buttonClass } from "./ui/button";
 import { cn } from "@/lib/utils";
-import { Search, SlidersHorizontal, X, LayoutGrid, List, Gift, Link2, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  Search,
+  SlidersHorizontal,
+  X,
+  LayoutGrid,
+  List,
+  Gift,
+  Link2,
+  AlertTriangle,
+  RefreshCw,
+  Database,
+  Clock3,
+} from "lucide-react";
 import { TitleCard, TitleRow } from "./title-card";
 
 const SORTS: { value: SortKey; label: string }[] = [
@@ -41,6 +53,16 @@ function toggle<T>(arr: T[], value: T): T[] {
 }
 
 type FilterToken = { key: string; label: string; category: string };
+type PlatformCoverage = { id: PlatformId; count: number; share: number };
+type SearchCatalogMeta = {
+  source: string;
+  sourceVersion?: string;
+  loadedAt: string;
+  titleCount: number;
+  seedFallback?: boolean;
+  platformCoverage: PlatformCoverage[];
+  filteredPlatformCoverage: PlatformCoverage[];
+};
 
 function facetClass(active: boolean) {
   return cn(
@@ -67,6 +89,30 @@ function FacetGroup({ title, children }: { title: string; children: React.ReactN
       {children}
     </section>
   );
+}
+
+function compactNumber(value: number) {
+  return value.toLocaleString("ko-KR");
+}
+
+function relativeTime(value?: string) {
+  if (!value) return "갱신 정보 없음";
+  const elapsed = Date.now() - new Date(value).getTime();
+  if (!Number.isFinite(elapsed)) return "갱신 정보 없음";
+  const minutes = Math.max(0, Math.floor(elapsed / 60_000));
+  if (minutes < 1) return "방금 갱신";
+  if (minutes < 60) return `${minutes}분 전 갱신`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전 갱신`;
+  return `${Math.floor(hours / 24)}일 전 갱신`;
+}
+
+function platformName(id: PlatformId) {
+  return PLATFORM_LIST.find((platform) => platform.id === id)?.short ?? id;
+}
+
+function platformColor(id: PlatformId) {
+  return PLATFORM_LIST.find((platform) => platform.id === id)?.color ?? "#888";
 }
 
 export function SearchExplorer({
@@ -96,6 +142,7 @@ export function SearchExplorer({
   const [results, setResults] = useState<Title[]>([]);
   const [typeCount, setTypeCount] = useState({ webtoon: 0, webnovel: 0 });
   const [topTags, setTopTags] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<SearchCatalogMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -135,6 +182,7 @@ export function SearchExplorer({
           items: Title[];
           typeCount: { webtoon: number; webnovel: number };
           topTags: string[];
+          catalog?: SearchCatalogMeta;
         }>;
       })
       .then((data) => {
@@ -142,6 +190,7 @@ export function SearchExplorer({
         setResults(data.items);
         setTypeCount(data.typeCount);
         setTopTags(data.topTags);
+        setCatalog(data.catalog ?? null);
         setLimit(24);
       })
       .catch(() => {
@@ -149,6 +198,7 @@ export function SearchExplorer({
         setError("검색 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
         setResults([]);
         setTypeCount({ webtoon: 0, webnovel: 0 });
+        setCatalog(null);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -163,6 +213,8 @@ export function SearchExplorer({
   const shown = results.slice(0, limit);
   const hasResult = Boolean(results.length);
   const resultText = hasResult ? `${results.length.toLocaleString("ko-KR")}개의 작품` : "결과가 없습니다";
+  const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
+  const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
 
   const activeCount =
     types.length +
@@ -609,6 +661,39 @@ export function SearchExplorer({
             <span className="h-1 w-1 rounded-full bg-line-strong" />
             <span className="truncate">{loading ? "로딩 중" : typeSummary}</span>
           </div>
+
+          {catalog && (
+            <div className="mt-4 grid gap-2 border-t border-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-panel/50 px-2.5">
+                  <Database size={13} className="text-accent" />
+                  서버 색인 <strong className="numeral text-fg">{compactNumber(catalog.titleCount)}</strong>편
+                </span>
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-panel/50 px-2.5">
+                  <Clock3 size={13} className="text-fg-2" />
+                  {relativeTime(catalog.loadedAt)}
+                </span>
+                {catalog.titleCount === 0 && (
+                  <span className="inline-flex h-7 items-center rounded-full border border-warn/40 bg-[oklch(0.82_0.15_80/0.12)] px-2.5 text-warn">
+                    DB 비어 있음
+                  </span>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[0.72rem] text-fg-3 sm:justify-end">
+                {(filteredCoverage.length ? filteredCoverage : catalogCoverage).map((entry) => (
+                  <span
+                    key={entry.id}
+                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-card px-2.5"
+                    title={`${platformName(entry.id)} ${compactNumber(entry.count)}편`}
+                  >
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: platformColor(entry.id) }} />
+                    {platformName(entry.id)}
+                    <span className="numeral text-fg">{compactNumber(entry.count)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {selectedTokens.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">

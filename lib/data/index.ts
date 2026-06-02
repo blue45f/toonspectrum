@@ -1,8 +1,6 @@
 import type { SeedReview, Title, WorkType } from "../types";
-import { TITLES as SEED_TITLES } from "./titles";
-import { SEED_REVIEWS as RAW_REVIEWS } from "./reviews";
 
-export type CatalogSource = "seed-file" | "database-snapshot" | "cli-ingest";
+export type CatalogSource = "empty" | "database-snapshot" | "cli-ingest";
 
 type CatalogState = {
   source: CatalogSource;
@@ -42,23 +40,24 @@ function normalizeCatalog(titles: unknown): Title[] {
 }
 
 let TITLE_REVISION_COUNTER = 1;
-let BY_ID = buildByIdIndex(SEED_TITLES);
-let TITLES_INTERNAL: Title[] = [...SEED_TITLES];
+let BY_ID = buildByIdIndex([]);
+let TITLES_INTERNAL: Title[] = [];
 
 let TITLES_META: CatalogState = {
-  source: "seed-file",
+  source: "empty",
   loadedAt: new Date().toISOString(),
   titleCount: TITLES_INTERNAL.length,
   titleRevision: TITLE_REVISION_COUNTER,
   revision: TITLE_REVISION_COUNTER,
-  seedFallback: true,
+  sourceVersion: "empty-runtime-store",
+  seedFallback: false,
 };
 
-export let SEED_REVIEWS: SeedReview[] = RAW_REVIEWS.filter((review) => BY_ID.has(review.titleId));
+export let SEED_REVIEWS: SeedReview[] = [];
 
 function rebuildIndexes(nextTitles: readonly Title[]) {
   BY_ID = buildByIdIndex(nextTitles);
-  SEED_REVIEWS = RAW_REVIEWS.filter((review) => BY_ID.has(review.titleId));
+  SEED_REVIEWS = [];
 }
 
 export let TITLES: Title[] = TITLES_INTERNAL;
@@ -74,7 +73,7 @@ export function replaceCatalogData(
   } = {}
 ): Title[] {
   const normalized = normalizeCatalog(incoming);
-  TITLES_INTERNAL = normalized.length > 0 ? normalized : [...SEED_TITLES];
+  TITLES_INTERNAL = normalized;
   TITLES = TITLES_INTERNAL;
   rebuildIndexes(TITLES_INTERNAL);
 
@@ -86,21 +85,21 @@ export function replaceCatalogData(
     titleCount: TITLES_INTERNAL.length,
     titleRevision: TITLE_REVISION_COUNTER,
     revision: TITLE_REVISION_COUNTER,
-    seedFallback: metadata.seedFallback ?? false,
+    seedFallback: false,
   };
 
   return TITLES_INTERNAL;
 }
 
-export function resetCatalogToSeed(): Title[] {
-  return replaceCatalogData(SEED_TITLES, { source: "seed-file", sourceVersion: "seed", seedFallback: true });
+export function resetCatalogToEmpty(sourceVersion = "empty-runtime-store"): Title[] {
+  return replaceCatalogData([], { source: "empty", sourceVersion, seedFallback: false });
 }
 
-export function loadCatalogSnapshot(titles: unknown, sourceVersion = "db-snapshot", seedFallback = false): Title[] {
+export function loadCatalogSnapshot(titles: unknown, sourceVersion = "db-snapshot", _seedFallback = false): Title[] {
   return replaceCatalogData(titles, {
     source: "database-snapshot",
     sourceVersion,
-    seedFallback,
+    seedFallback: false,
   });
 }
 

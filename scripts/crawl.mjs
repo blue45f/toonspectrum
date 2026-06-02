@@ -1,13 +1,11 @@
-// WEBDEX 실데이터 크롤러 — 네이버 웹툰/시리즈 벤치마킹
-// 실행: node scripts/crawl.mjs  → lib/data/titles.ts 재생성
+// WEBDEX 실데이터 크롤러 — 네이버 웹툰/시리즈/카카오웹툰/레진 공개 카탈로그 벤치마킹
+// 운영 실행: node scripts/crawl.mjs --json --no-file → Nest CatalogService가 DB catalog_snapshot에 저장
 // 웹툰: 제목·작가·별점·조회·관심·장르·시놉시스·태그·연재요일·연령등급·연재시작연도·표지썸네일 (실수집)
 // 웹소설: 웹툰 원작정보(novelOriginAuthors)로 실제 원작 엔트리+어댑테이션 연결 / 네이버 시리즈 베스트에포트 보강
-import { writeFile } from "node:fs/promises";
-import path from "node:path";
+import { buildLezhinCoverImage, extractRemoteImageUrl, proxiedCoverUrl } from "./crawl-helpers.mjs";
 
 const ARGS = new Set(process.argv.slice(2));
 const OUTPUT_JSON = ARGS.has("--json");
-const WRITE_FILE = !ARGS.has("--no-file");
 const log = (...args) => {
   if (OUTPUT_JSON) console.error(...args);
   else console.log(...args);
@@ -190,7 +188,7 @@ function coverGradient(seed, genres) {
   const h = base[genres[0]] ?? hashInt(seed) % 360;
   return [`oklch(0.45 0.14 ${h})`, `oklch(0.28 0.1 ${(h + 40) % 360})`];
 }
-const proxied = (u) => (u ? `/api/cover?u=${encodeURIComponent(u)}` : undefined);
+const proxied = proxiedCoverUrl;
 function synthDist(avg, count) {
   const c = count || 1000;
   const w = [1, 2, 3, 4, 5].map((s) => Math.exp(-Math.pow(s - avg, 2) / 0.6));
@@ -512,6 +510,7 @@ async function crawlLezhinCatalog() {
     const status = item.contentsState === "completed" ? "completed" : "ongoing";
     const updateDays = status === "completed" ? undefined : lzUpdateDays(item.schedule?.periods ?? []);
     const releaseYear = item.publishedAt ? new Date(Number(item.publishedAt)).getFullYear() : 2024;
+    const coverRemote = extractRemoteImageUrl(item) ?? buildLezhinCoverImage(item);
     const tags = [
       "레진",
       ...genres,
@@ -531,6 +530,7 @@ async function crawlLezhinCatalog() {
       tags: [...new Set(tags)].slice(0, 6),
       synopsis: `${item.title} · 레진코믹스 공개 카탈로그 수집작.`,
       cover: coverGradient(String(item.id), genres),
+      coverImage: proxied(coverRemote),
       status,
       ageRating: "all",
       releaseYear: Number.isFinite(releaseYear) ? releaseYear : 2024,
@@ -751,11 +751,6 @@ async function main() {
       sourceIds: [...SOURCE_IDS],
     },
   };
-
-  if (WRITE_FILE) {
-    const header = `// 자동 생성 — scripts/crawl.mjs (네이버 웹툰/시리즈 + 카카오웹툰 + 레진 공개 카탈로그 벤치마킹)\n// 재생성: node scripts/crawl.mjs\n// 네이버 웹툰/시리즈: 조회·관심·별점·장르·시놉시스·연재요일·표지·연재연도 실수집. 카카오웹툰/레진: 공개 카탈로그 메타데이터 수집. 일부 파생지표(평가수·분포·완독률)는 추정.\nimport type { Title } from "../types";\n\nexport const TITLES: Title[] = `;
-    await writeFile(path.resolve("lib/data/titles.ts"), header + JSON.stringify(all, null, 2) + ";\n", "utf8");
-  }
 
   if (OUTPUT_JSON) {
     process.stdout.write(`${JSON.stringify(result)}\n`);

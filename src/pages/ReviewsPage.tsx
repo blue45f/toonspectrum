@@ -2,17 +2,26 @@ import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { ReviewCard } from "@/components/review-card";
 import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button";
 import { Stars } from "@/components/ui/stars";
-import { allReviewsJoined } from "@/lib/data";
 import { spectrumGradient } from "@/lib/genre-color";
+import type { SeedReview, Title } from "@/lib/types";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { ReviewControls, type ReviewSort } from "./reviews-components/review-controls";
+import { useApiResource } from "./use-api-resource";
 
-function sortedReviews(sort: ReviewSort, rows: ReturnType<typeof allReviewsJoined>) {
-  const next = [...rows];
-  if (sort === "likes") return next.sort((a, b) => b.likes - a.likes || b.createdAt.localeCompare(a.createdAt));
-  if (sort === "high") return next.sort((a, b) => b.rating - a.rating);
-  if (sort === "low") return next.sort((a, b) => a.rating - b.rating);
-  return next.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+interface ReviewsResponse {
+  sort: ReviewSort;
+  feed: Array<SeedReview & { title: Title }>;
+  topReviewed: { title: Title; count: number }[];
+  stats: {
+    total: number;
+    avg: number;
+    spoilerPct: number;
+    distinctTitles: number;
+  };
+  generatedAt: string;
+  source: "database";
 }
 
 export function ReviewsPage() {
@@ -20,25 +29,19 @@ export function ReviewsPage() {
   const sort = ((searchParams.get("sort") as ReviewSort | null) ?? "recent") as ReviewSort;
   const spoiler = searchParams.get("spoiler");
   const rating = searchParams.get("rating");
-  const feed = sortedReviews(
-    sort,
-    allReviewsJoined().filter((review) => {
-      if (spoiler === "hide" && review.spoiler) return false;
-      if (rating === "high" && review.rating < 4) return false;
-      if (rating === "low" && review.rating > 3) return false;
-      return true;
-    })
+  const params = new URLSearchParams({ sort });
+  if (spoiler) params.set("spoiler", spoiler);
+  if (rating) params.set("rating", rating);
+  const { data, loading, error, reload } = useApiResource<ReviewsResponse>(
+    `/api/reviews?${params.toString()}`,
+    "리뷰 데이터를 불러오지 못했습니다."
   );
-  const total = feed.length;
-  const avg = total ? feed.reduce((sum, review) => sum + review.rating, 0) / total : 0;
-  const spoilerPct = total ? Math.round((feed.filter((review) => review.spoiler).length / total) * 100) : 0;
-  const byTitle = new Map<string, number>();
-  for (const review of feed) byTitle.set(review.titleId, (byTitle.get(review.titleId) ?? 0) + 1);
-  const topReviewed = [...byTitle.entries()]
-    .map(([titleId, count]) => ({ title: feed.find((review) => review.titleId === titleId)?.title, count }))
-    .filter((entry): entry is { title: NonNullable<(typeof entry)["title"]>; count: number } => Boolean(entry.title))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+  const feed = data?.feed ?? [];
+  const topReviewed = data?.topReviewed ?? [];
+  const total = data?.stats.total ?? 0;
+  const avg = data?.stats.avg ?? 0;
+  const spoilerPct = data?.stats.spoilerPct ?? 0;
+  const distinctTitles = data?.stats.distinctTitles ?? 0;
 
   return (
     <div>
@@ -73,7 +76,7 @@ export function ReviewsPage() {
             </div>
             <div className="flex flex-col gap-1">
               <dt className="text-xs text-fg-3">리뷰된 작품</dt>
-              <dd className="numeral tnum text-2xl text-fg">{byTitle.size.toLocaleString("ko-KR")}</dd>
+              <dd className="numeral tnum text-2xl text-fg">{distinctTitles.toLocaleString("ko-KR")}</dd>
             </div>
           </dl>
         </Container>
@@ -86,13 +89,53 @@ export function ReviewsPage() {
               <ReviewControls />
             </div>
 
-            <p className="mb-4 text-sm text-fg-3">
-              <span className="numeral text-fg-2">{feed.length}</span>개의 리뷰
-            </p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-fg-3">
+                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>개의 DB 리뷰
+              </p>
+              <button
+                type="button"
+                onClick={reload}
+                className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                갱신
+              </button>
+            </div>
 
-            {feed.length === 0 ? (
+            {loading ? (
+              <div className="columns-1 gap-4 sm:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+                {Array.from({ length: 9 }).map((_, index) => (
+                  <div key={index} className="rounded-2xl border border-line bg-card p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <span className="skeleton size-9 rounded-full" />
+                      <span className="flex-1 space-y-2">
+                        <span className="skeleton block h-3 w-28" />
+                        <span className="skeleton block h-3 w-16" />
+                      </span>
+                    </div>
+                    <span className="skeleton mb-2 block h-4 w-full" />
+                    <span className="skeleton mb-2 block h-4 w-5/6" />
+                    <span className="skeleton block h-4 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+                <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+                <p className="text-sm font-medium text-fg">리뷰 데이터를 불러오지 못했습니다.</p>
+                <p className="mt-1 text-xs text-fg-3">{error}</p>
+                <button
+                  type="button"
+                  onClick={reload}
+                  className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : feed.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-                조건에 맞는 리뷰가 없어요. 필터를 조정해 보세요.
+                DB에 저장된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
               </div>
             ) : (
               <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
@@ -110,6 +153,11 @@ export function ReviewsPage() {
               <p className="mt-1 text-xs text-fg-3">독자들이 가장 많이 입을 연 다섯 작품</p>
 
               <ol className="mt-5 flex flex-col gap-1">
+                {topReviewed.length === 0 && (
+                  <li className="rounded-xl border border-dashed border-line bg-raised/30 px-3 py-5 text-center text-xs text-fg-3">
+                    아직 집계할 DB 리뷰가 없습니다.
+                  </li>
+                )}
                 {topReviewed.map((item, index) => (
                   <li key={item.title.id}>
                     <Link

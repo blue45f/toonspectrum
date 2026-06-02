@@ -20,7 +20,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 
 ## 서버 카탈로그 갱신 구조
 
-작품 카탈로그는 더 이상 `lib/data/titles.ts` 파일을 운영 데이터의 주 저장소로 보지 않습니다. 파일은 개발용 seed/fallback이며, 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장합니다.
+작품 카탈로그는 `lib/data/titles.ts` 같은 정적 파일을 운영 데이터의 주 저장소로 사용하지 않습니다. 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장하고, 런타임 카탈로그는 최신 `catalog_snapshot`에서만 채워집니다. 스냅샷이 없거나 파싱에 실패하면 빈 카탈로그로 남겨 잘못된 하드코딩 데이터가 노출되지 않게 합니다.
 
 랭킹에 없는 작품도 검색 가능해야 하므로 crawler는 두 레벨로 동작합니다.
 
@@ -37,7 +37,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
   - 실행 시간, 소요 시간, 작품 수, 에러 메시지, run hash
 - 서버 시작 흐름:
   - `CatalogService.onModuleInit()`에서 최신 `catalog_snapshot.isCurrent=true`를 로드
-  - DB 스냅샷이 없으면 seed 파일로 폴백
+  - DB 스냅샷이 없으면 빈 런타임 카탈로그로 시작
   - 라이브 랭킹 스케줄러와 카탈로그 수집 스케줄러를 분리 실행
 - 수집 흐름:
   - `scripts/crawl.mjs --json --no-file` 실행
@@ -327,7 +327,7 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 ## Data boundaries
 
 - `catalog_snapshot` is the current server catalog source in production.
-- `lib/data/*` is seed/fallback data for local development and empty DB recovery.
+- `lib/data/index.ts` is an in-memory runtime catalog store populated from DB snapshots.
 - `lib/server/*` is the server service boundary.
 - `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
 - `components/*` must not import `TITLES` or `SEED_REVIEWS`.

@@ -2,22 +2,41 @@ import { useParams } from "react-router-dom";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
+import { buttonClass } from "@/components/ui/button";
 import { GenreChip } from "@/components/ui/chip";
 import { Stars } from "@/components/ui/stars";
-import { authorWorks } from "@/lib/data";
+import type { Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { PenLine } from "lucide-react";
+import { AlertTriangle, PenLine, RefreshCw } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
+import { useApiResource } from "./use-api-resource";
+
+interface AuthorResponse {
+  author: string;
+  works: Title[];
+  totalViews: number;
+  avg: number;
+  genres: string[];
+  generatedAt: string;
+  source: string;
+}
 
 export function AuthorPage() {
   const { name } = useParams();
-  const author = decodeURIComponent(name ?? "");
-  const works = authorWorks(author);
-  if (works.length === 0) return <NotFoundPage />;
+  const authorParam = name ?? "";
+  const decodedAuthor = decodeURIComponent(authorParam);
+  const { data, loading, error, notFound, reload } = useApiResource<AuthorResponse>(
+    authorParam ? `/api/authors/${encodeURIComponent(decodedAuthor)}` : null,
+    "작가 데이터를 불러오지 못했습니다."
+  );
 
-  const totalViews = works.reduce((sum, title) => sum + title.stats.views, 0);
-  const avg = works.reduce((sum, title) => sum + title.stats.ratingAvg, 0) / works.length;
-  const genres = [...new Set(works.flatMap((title) => title.genres))].slice(0, 6);
+  if (notFound || (!loading && !error && authorParam && data === null)) return <NotFoundPage />;
+
+  const author = data?.author ?? decodedAuthor;
+  const works = data?.works ?? [];
+  const totalViews = data?.totalViews ?? 0;
+  const avg = data?.avg ?? 0;
+  const genres = data?.genres ?? [];
 
   return (
     <Container size="wide" className="py-10">
@@ -52,15 +71,43 @@ export function AuthorPage() {
         </dl>
       </header>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-        {works.map((title) => (
-          <TitleCard key={title.id} title={title} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <div key={index} className="space-y-3">
+              <span className="skeleton block aspect-[3/4] rounded-xl" />
+              <span className="skeleton block h-4 w-3/4" />
+              <span className="skeleton block h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+          <p className="text-sm font-medium text-fg">작가 데이터를 불러오지 못했습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">{error}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
+          >
+            <RefreshCw size={14} />
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+          {works.map((title) => (
+            <TitleCard key={title.id} title={title} />
+          ))}
+        </div>
+      )}
 
-      <div className="mt-12">
-        <FanCafePanel scope="author" targetId={author} targetLabel={author} compact />
-      </div>
+      {!loading && !error && works.length > 0 && (
+        <div className="mt-12">
+          <FanCafePanel scope="author" targetId={author} targetLabel={author} compact />
+        </div>
+      )}
     </Container>
   );
 }

@@ -13,6 +13,7 @@ import {
 import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
 import { GENRES } from "@/lib/taxonomy";
 import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
+import { PLATFORM_LIST } from "@/lib/platforms";
 import { RankRow, MiniPoster } from "./rank-row";
 import { TitleCard } from "./title-card";
 import { PlatformTags } from "./availability";
@@ -127,6 +128,10 @@ const axisIcons: Record<RankAxis, ComponentType<{ size?: number; className?: str
   rookie: Sprout,
 };
 const RANKING_DEFAULT_LIMIT = "200";
+const PLATFORM_FILTER_ITEMS: { value: PlatformId | "all"; label: string }[] = [
+  { value: "all", label: "전체 플랫폼" },
+  ...PLATFORM_LIST.map((platform) => ({ value: platform.id, label: platform.short })),
+];
 
 function metricFor(axis: RankAxis): (t: Title) => { label: string; value: string } {
   switch (axis) {
@@ -593,18 +598,21 @@ export function RankingBoard({
               </option>
             ))}
           </select>
-          <Segmented
-            size="sm"
-            value={platform}
-            onChange={(v) => setPlatform(v as PlatformId | "all")}
-            items={[
-              { value: "all", label: "전체" },
-              { value: "naver-webtoon", label: "네이버웹툰" },
-              { value: "kakao-webtoon", label: "카카오웹툰" },
-              { value: "naver-series", label: "시리즈" },
-              { value: "lezhin", label: "레진" },
-            ]}
-          />
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 transition-colors focus-within:border-accent/50">
+            <span className="whitespace-nowrap text-fg-3">플랫폼</span>
+            <select
+              value={platform}
+              onChange={(event) => setPlatform(event.target.value as PlatformId | "all")}
+              className="min-w-28 border-none bg-transparent text-sm font-medium text-fg outline-none"
+              aria-label="플랫폼 필터"
+            >
+              {PLATFORM_FILTER_ITEMS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Segmented
             size="sm"
             value={status}

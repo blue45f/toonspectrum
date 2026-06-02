@@ -25,8 +25,9 @@ import {
 } from "../ranking";
 import type { PlatformId, Pricing, SerialStatus, Title, WorkType } from "../types";
 
-export const DEFAULT_RANKING_LIMIT = 50;
-export const MAX_RANKING_LIMIT = 1000;
+export const DEFAULT_RANKING_LIMIT = 200;
+export const MAX_RANKING_LIMIT = 200;
+const RANKING_CANDIDATE_LIMIT = 1000;
 export const RANKING_REFRESH_SECONDS = 60;
 
 const validAxes = new Set<RankAxis>(RANK_AXES.map((a) => a.key));
@@ -142,6 +143,7 @@ function pick<T extends string>(raw: string | null, allowed: Set<T>, fallback: T
 }
 
 function pickLimit(raw: string | null): number {
+  if (raw == null || raw.trim() === "") return DEFAULT_RANKING_LIMIT;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_RANKING_LIMIT;
   return Math.max(1, Math.min(MAX_RANKING_LIMIT, Math.floor(parsed)));
@@ -478,7 +480,7 @@ export async function getRankingData(
     type: params.type,
     genre: params.genre,
     platform: params.platform,
-    limit: MAX_RANKING_LIMIT,
+    limit: RANKING_CANDIDATE_LIMIT,
   });
   const shouldFetchLive = shouldFetchLiveSignals(params);
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { desc, eq } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
-import { getCatalogState, loadCatalogSnapshot, resetCatalogToSeed } from "../data";
+import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "../data";
 import type { Title } from "../types";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
 
@@ -152,10 +152,10 @@ export async function loadLatestCatalogSnapshotFromDb() {
     .limit(1);
 
   if (!snapshot) {
-    resetCatalogToSeed();
+    resetCatalogToEmpty("no-current-db-snapshot");
     return {
       loaded: false,
-      source: "seed-file",
+      source: "empty",
       titleCount: getCatalogState().titleCount,
       generatedAt: new Date().toISOString(),
     };
@@ -174,7 +174,7 @@ export async function loadLatestCatalogSnapshotFromDb() {
       generatedAt: new Date().toISOString(),
     };
   } catch (error) {
-    resetCatalogToSeed();
+    resetCatalogToEmpty("invalid-db-snapshot");
     throw new Error(`catalog snapshot parse failed: ${error instanceof Error ? error.message : "unknown"}`);
   }
 }

@@ -2,13 +2,14 @@ import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
+import { buttonClass } from "@/components/ui/button";
 import { genreBorder, genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import { activeTags, TITLES } from "@/lib/data";
-import { searchTitles, type SortKey } from "@/lib/search";
+import type { SortKey } from "@/lib/search";
 import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
-import type { WorkType } from "@/lib/types";
+import type { Title, WorkType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Compass, RotateCcw } from "lucide-react";
+import { AlertTriangle, Compass, RefreshCw, RotateCcw } from "lucide-react";
+import { useApiResource } from "./use-api-resource";
 
 type ExploreParams = Record<string, string | undefined>;
 
@@ -35,33 +36,50 @@ function buildHref(base: ExploreParams, patch: Partial<ExploreParams>): string {
   return query ? `/explore?${query}` : "/explore";
 }
 
+interface ExploreResponse {
+  filters: {
+    genre?: string;
+    tag?: string;
+    type?: WorkType;
+    sort: SortKey;
+  };
+  current: ExploreParams;
+  results: Title[];
+  shown: Title[];
+  hasMore: boolean;
+  showCount: number;
+  pageSize: number;
+  tags: { tag: string; count: number }[];
+  genres: string[];
+  generatedAt: string;
+  source: string;
+}
+
 export function ExplorePage() {
   const [searchParams] = useSearchParams();
   const genre = searchParams.get("genre") ?? undefined;
   const tag = searchParams.get("tag") ?? undefined;
   const type = searchParams.get("type") as WorkType | undefined;
   const sort = (SORTS.find((entry) => entry.key === searchParams.get("sort"))?.key ?? "popular") as SortKey;
-  const pageSize = 40;
-  const current = {
+  const fallbackCurrent = {
     genre: genre && GENRES.includes(genre as (typeof GENRES)[number]) ? genre : undefined,
     tag,
     type: type === "webtoon" || type === "webnovel" ? type : undefined,
     sort: searchParams.get("sort") ? sort : undefined,
   };
-  const results = searchTitles(
-    TITLES,
-    {
-      genres: current.genre ? [current.genre] : undefined,
-      tags: current.tag ? [current.tag] : undefined,
-      types: current.type ? [current.type] : undefined,
-    },
-    sort
+  const query = searchParams.toString();
+  const { data, loading, error, reload } = useApiResource<ExploreResponse>(
+    query ? `/api/explore?${query}` : "/api/explore",
+    "탐색 데이터를 불러오지 못했습니다."
   );
-  const showCount = Math.min(Math.max(Number(searchParams.get("show")) || pageSize, pageSize), results.length);
-  const shown = results.slice(0, showCount);
+  const current = data?.current ?? fallbackCurrent;
+  const results = data?.results ?? [];
+  const shown = data?.shown ?? [];
+  const showCount = data?.showCount ?? 40;
+  const pageSize = data?.pageSize ?? 40;
+  const tags = data?.tags ?? [];
   const hasFilter = Boolean(current.genre || current.tag || current.type || current.sort);
   const accent = current.genre ? genreColor(current.genre, 0.84) : undefined;
-  const tags = activeTags().slice(0, 18);
 
   return (
     <div>
@@ -200,8 +218,16 @@ export function ExplorePage() {
 
           <div className="flex items-center gap-4">
             <p className="text-sm text-fg-2">
-              작품 <span className="numeral text-base text-fg">{results.length}</span>편
+              작품 <span className="numeral text-base text-fg">{results.length.toLocaleString("ko-KR")}</span>편
             </p>
+            <button
+              type="button"
+              onClick={reload}
+              className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
+            >
+              <RefreshCw size={13} className={cn(loading && "animate-spin")} />
+              갱신
+            </button>
             {hasFilter && (
               <Link
                 href="/explore"
@@ -214,7 +240,30 @@ export function ExplorePage() {
           </div>
         </div>
 
-        {results.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {Array.from({ length: 10 }).map((_, index) => (
+              <div key={index} className="space-y-3">
+                <span className="skeleton block aspect-[3/4] rounded-xl" />
+                <span className="skeleton block h-4 w-3/4" />
+                <span className="skeleton block h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+            <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+            <p className="text-sm font-medium text-fg">탐색 데이터를 불러오지 못했습니다.</p>
+            <p className="mt-1 text-xs text-fg-3">{error}</p>
+            <button
+              type="button"
+              onClick={reload}
+              className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : results.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {shown.map((title) => (

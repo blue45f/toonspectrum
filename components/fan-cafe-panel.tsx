@@ -5,6 +5,7 @@ import {
   BookOpenText,
   MessageCircle,
   Bell,
+  CornerDownRight,
   RefreshCw,
   Send,
   Tag,
@@ -825,13 +826,16 @@ function FanPostCard({
   }
 
   const replyCount = countReplies(replies);
+  const displayReplyCount = loaded ? replyCount : post.replyCount;
+  const rootDraft = getDraft("__root__");
+  const isRootSubmitting = Boolean(submittingReplies.__root__);
 
   return (
-    <article className="rounded-xl border border-line bg-card p-4">
+    <article className="group rounded-2xl border border-line bg-card p-4 transition-[border-color,background-color,transform] duration-200 hover:border-line-strong hover:bg-raised/30 sm:p-5">
       <header className="mb-3 flex items-start gap-3">
         <span
-                className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white ring-1 ring-white/10"
-                style={{ background: `linear-gradient(140deg, ${post.author.avatar}, oklch(0.3 0.05 60))` }}
+          className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-fg ring-1 ring-white/10"
+          style={{ background: `linear-gradient(140deg, ${post.author.avatar}, oklch(0.26 0.04 60))` }}
         >
           {post.author.name.charAt(0)}
         </span>
@@ -847,103 +851,132 @@ function FanPostCard({
               {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
             </p>
           ) : null}
-          <h3 className="mt-1 truncate text-sm font-bold text-fg">{post.title}</h3>
+          <h3 className="mt-1 line-clamp-2 [overflow-wrap:anywhere] text-sm font-bold leading-snug text-fg">
+            {post.title}
+          </h3>
           <p className="mt-0.5 text-xs text-fg-3">{post.author.name}</p>
         </div>
       </header>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg-2">{post.text}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{post.text}</p>
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {post.tags.map((tag) => (
-            <span key={tag} className="rounded-md bg-raised px-1.5 py-0.5 text-[0.68rem] text-fg-3">
+            <span key={tag} className="rounded-md border border-line bg-raised/70 px-1.5 py-0.5 text-[0.68rem] text-fg-3">
               #{tag}
             </span>
           ))}
         </div>
       )}
-      <div className="mt-3 border-t border-line pt-3">
-        <button
-          type="button"
-          onClick={() => {
-            const nextOpen = !open;
-            setOpen(nextOpen);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
-        >
-          <MessageCircle size={14} />
-          댓글 {loaded ? replyCount : post.replyCount}
-        </button>
+      <div className="mt-4 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => {
+              const nextOpen = !open;
+              setOpen(nextOpen);
+            }}
+            className={cn(
+              "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              open
+                ? "border-accent/45 bg-accent-soft text-accent"
+                : "border-line bg-raised/55 text-fg-2 hover:bg-canvas/55"
+            )}
+          >
+            <MessageCircle size={15} />
+            댓글 {displayReplyCount}
+          </button>
+          {loaded && displayReplyCount > 0 ? (
+            <span className="text-[0.68rem] text-fg-3">대화 {displayReplyCount}개</span>
+          ) : null}
+        </div>
         {open && (
-            <div className="mt-3 flex flex-col gap-2">
-            <div className="rounded-lg border border-line bg-canvas/30 px-3 py-2">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[0.68rem] text-fg-3">
-                <span>동기화: {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "로딩 전"}</span>
-                <div className="flex items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5">
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-[0.68rem] text-fg-3">
+              <span>동기화 {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "대기 중"}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 transition-colors hover:bg-raised/70">
                     <input
                       type="checkbox"
                       checked={replyAutoRefreshEnabled}
                       onChange={(event) => setReplyAutoRefreshEnabled(event.target.checked)}
                       className="size-3.5"
                     />
-                    실시간 답글(30초)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={refreshReplies}
-                    className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.65rem] text-fg-3"
-                    disabled={isLoadingReplies}
-                  >
-                    <RefreshCw size={12} />
-                    {isLoadingReplies ? "불러오는 중" : "답글 새로고침"}
-                  </button>
-                </div>
+                  30초 갱신
+                </label>
+                <button
+                  type="button"
+                  onClick={refreshReplies}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-line bg-raised/50 px-2 text-[0.65rem] font-medium text-fg-3 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isLoadingReplies}
+                >
+                  <RefreshCw size={12} className={cn(isLoadingReplies && "animate-spin")} />
+                  {isLoadingReplies ? "동기화 중" : "새로고침"}
+                </button>
               </div>
             </div>
-            {replies.length === 0 && loaded && (
-              <p className="rounded-lg border border-dashed border-line bg-canvas/40 px-3 py-3 text-xs text-fg-3">
-                첫 댓글을 남겨 대화를 이어가세요.
-              </p>
+            {isLoadingReplies && !loaded ? (
+              <div className="flex flex-col gap-2">
+                <div className="skeleton h-16 w-full rounded-xl" />
+                <div className="skeleton h-14 w-5/6 rounded-xl" />
+              </div>
+            ) : null}
+            {replies.length === 0 && loaded ? (
+              <div className="rounded-xl border border-dashed border-line bg-canvas/30 px-3 py-4 text-xs text-fg-3">
+                첫 댓글을 남겨 대화를 시작하세요.
+              </div>
+            ) : (
+              <ReplyThread
+                items={replies}
+                userId={userId}
+                onSubmit={submitReply}
+                onToggleComposer={toggleComposer}
+                openComposerFor={openComposerFor}
+                draftByReplyId={replyDrafts}
+                onChangeDraft={setDraft}
+                submittingReplies={submittingReplies}
+              />
             )}
-            <ReplyThread
-              items={replies}
-              userId={userId}
-              onSubmit={submitReply}
-              onToggleComposer={toggleComposer}
-              openComposerFor={openComposerFor}
-              draftByReplyId={replyDrafts}
-              onChangeDraft={setDraft}
-              submittingReplies={submittingReplies}
-            />
             {userId ? (
-              <div className="rounded-xl border border-line bg-canvas/45 p-3">
+              <div className="rounded-xl border border-line bg-canvas/35 p-3 transition-colors focus-within:border-accent/60">
                 <textarea
-                  value={getDraft("__root__")}
+                  value={rootDraft}
                   onChange={(event) => setDraft("__root__", event.target.value)}
                   maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
                   rows={2}
                   placeholder="댓글 남기기"
-                  className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
+                  className="min-h-16 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
                 />
-                <div className="mt-1 flex items-center justify-end text-[0.65rem] text-fg-3">
-                  <span>{getDraft("__root__").length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-end">
+                <div className="mt-2 flex items-center justify-between gap-2 text-[0.65rem] text-fg-3">
+                  <span>{rootDraft.length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
                   <button
                     type="button"
                     onClick={() => submitReply(null)}
-                    disabled={!getDraft("__root__").trim() || !!submittingReplies.__root__}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
+                    disabled={!rootDraft.trim() || isRootSubmitting}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Send size={13} />
-                    {submittingReplies.__root__ ? "등록 중..." : "등록"}
+                    {isRootSubmitting ? "등록 중..." : "등록"}
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-fg-3">로그인하면 댓글을 남길 수 있습니다.</p>
+              <p className="rounded-xl border border-line bg-canvas/25 px-3 py-3 text-xs text-fg-3">
+                로그인하면 댓글과 대댓글을 남길 수 있습니다.
+              </p>
             )}
-            {error && <p className="text-xs text-bad">{error}</p>}
+            {error ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={refreshReplies}
+                  className="rounded-lg border border-bad/30 px-2 py-1 font-medium"
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -982,7 +1015,7 @@ function ReplyThread({
           reply={reply}
           depth={depth}
           userId={userId}
-          canReply={depth < MAX_REPLY_DEPTH}
+          canReply={depth < MAX_REPLY_DEPTH - 1}
           onSubmit={onSubmit}
           onToggleComposer={onToggleComposer}
           openComposerFor={openComposerFor}
@@ -1025,73 +1058,90 @@ function FanPostReplyItem({
   const replyKey = reply.id;
   const draft = draftByReplyId[replyKey] ?? "";
   const children = reply.children ?? [];
+  const hasChildren = children.length > 0;
 
   return (
     <article
       className={cn(
-        "rounded-lg border border-line bg-canvas/45 p-3 transition-colors",
-        depth > 0 && "ml-4 border-l-2 border-line"
+        "relative rounded-xl border border-line bg-canvas/35 p-3 transition-colors hover:border-line-strong sm:p-3.5",
+        depth > 0 && "ml-4 sm:ml-6"
       )}
     >
-      <div className="mb-1 flex items-center gap-2 text-[0.68rem] text-fg-3">
-        <span className="font-semibold text-fg-2">{reply.author.name}</span>
+      {depth > 0 ? (
+        <span className="absolute -left-4 top-5 h-px w-3 bg-line sm:-left-5 sm:w-4" aria-hidden />
+      ) : null}
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
+        {depth > 0 ? <CornerDownRight size={12} className="text-accent/80" aria-hidden /> : null}
+        <span className="max-w-[12rem] truncate font-semibold text-fg-2">{reply.author.name}</span>
         <span>{relativeDate(reply.createdAt)}</span>
+        {hasChildren ? <span className="text-fg-3">답글 {countReplies(children)}</span> : null}
       </div>
-      <p className="text-sm leading-relaxed text-fg-2">{reply.text}</p>
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{reply.text}</p>
       {canReply && (
         <button
           type="button"
           onClick={() => onToggleComposer(reply.id)}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-3 transition-colors hover:text-fg-2"
+          aria-expanded={isOpen}
+          className={cn(
+            "mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            isOpen
+              ? "border-accent/45 bg-accent-soft text-accent"
+              : "border-line bg-raised/40 text-fg-3 hover:text-fg-2"
+          )}
         >
           <MessageCircle size={12} />
-          답글 달기
+          대댓글
         </button>
       )}
       {isOpen && (
         <div className="mt-2">
           {userId ? (
-            <div className="rounded-lg border border-line bg-canvas/35 p-2">
+            <div className="rounded-xl border border-line bg-panel/45 p-2.5 transition-colors focus-within:border-accent/60">
               <textarea
                 value={draft}
                 onChange={(event) => onChangeDraft(replyKey, event.target.value)}
                 maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
                 rows={2}
-                placeholder="답글 달기"
-                className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
+                placeholder={`${reply.author.name}에게 대댓글`}
+                className="min-h-14 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
-              <div className="mt-1 flex items-center justify-end text-[0.65rem] text-fg-3">
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[0.65rem] text-fg-3">
                 <span>{draft.length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => onToggleComposer(reply.id)}
-                  className="inline-flex items-center rounded-md border border-line px-2 py-1 text-xs text-fg-3"
-                >
-                  닫기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSubmit(reply.id)}
-                  disabled={!draft.trim() || isSubmitting}
-                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  <Send size={12} />
-                  {isSubmitting ? "저장 중..." : "저장"}
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onToggleComposer(reply.id)}
+                    className="inline-flex min-h-8 items-center rounded-lg border border-line px-2.5 text-xs text-fg-3 transition-colors hover:text-fg"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSubmit(reply.id)}
+                    disabled={!draft.trim() || isSubmitting}
+                    className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-accent px-2.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Send size={12} />
+                    {isSubmitting ? "저장 중..." : "등록"}
+                  </button>
+                </div>
               </div>
               {depth >= MAX_REPLY_DEPTH - 1 ? (
-                <p className="mt-2 text-[0.65rem] text-fg-3">최대 대댓글 깊이에 도달해 더 이상 답글을 달 수 없습니다.</p>
+                <p className="mt-2 rounded-lg bg-raised/50 px-2 py-1.5 text-[0.65rem] text-fg-3">
+                  최대 대댓글 깊이에 도달했습니다.
+                </p>
               ) : null}
             </div>
           ) : (
-            <p className="text-xs text-fg-3">로그인하면 답글을 남길 수 있습니다.</p>
+            <p className="rounded-lg border border-line bg-panel/45 px-3 py-2 text-xs text-fg-3">
+              로그인하면 대댓글을 남길 수 있습니다.
+            </p>
           )}
         </div>
       )}
       {children.length > 0 && (
-        <div className="mt-2">
+        <div className="relative mt-2">
+          <span className="absolute bottom-2 left-3 top-0 w-px bg-line/70" aria-hidden />
           <ReplyThread
             items={children}
             userId={userId}

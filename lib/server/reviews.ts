@@ -2,7 +2,6 @@ import { getTitle } from "../data";
 import { db, reviewLikes, reviews, users } from "../db";
 import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { fromDb } from "../api-helpers";
-import { SEED_REVIEWS } from "../data";
 
 export type ReviewSort = "recent" | "likes" | "high" | "low";
 
@@ -24,9 +23,9 @@ export async function getReviewGlobalStats() {
     };
   } catch {
     return {
-      total: SEED_REVIEWS.length,
-      distinctUsers: new Set(SEED_REVIEWS.map((r) => r.author)).size,
-      distinctTitles: new Set(SEED_REVIEWS.map((r) => r.titleId)).size,
+      total: 0,
+      distinctUsers: 0,
+      distinctTitles: 0,
     };
   }
 }
@@ -69,26 +68,6 @@ function sortReviews<T extends { createdAt: string; likes: number; rating: numbe
     default:
       return copy.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
-}
-
-function toSeedReview(seed: (typeof SEED_REVIEWS)[number]): ReviewWithTitle | null {
-    const title = getTitle(seed.titleId);
-    if (!title) return null;
-    return {
-      id: seed.id,
-      titleId: seed.titleId,
-      userId: seed.userId ?? "seed-user",
-      author: seed.author,
-      avatar: seed.avatar,
-      rating: seed.rating,
-      text: seed.text,
-      tags: seed.tags ?? [],
-      spoiler: seed.spoiler,
-      likes: seed.likes,
-      createdAt: new Date(seed.createdAt).toISOString(),
-      progress: "정주행중" as const,
-      title,
-    };
 }
 
 function buildReviewFeedFromRows(feedRows: ReviewWithTitle[]) {
@@ -193,17 +172,8 @@ export async function getReviewsData(opts: {
       source: "database",
     };
   } catch {
-    const feedRaw = SEED_REVIEWS.map(toSeedReview).filter((entry): entry is ReviewWithTitle => entry !== null);
-
-    const filtered = feedRaw.filter((row) => {
-      if (opts.spoiler === "hide" && row.spoiler) return false;
-      if (opts.rating === "high" && row.rating < 4) return false;
-      if (opts.rating === "low" && row.rating > 3) return false;
-      return true;
-    });
-
-    const feed = sortReviews(filtered, sort);
-    const { total, avg, spoilerPct, distinctTitles, topReviewed } = buildReviewFeedFromRows(filtered);
+    const feed: ReviewWithTitle[] = [];
+    const { total, avg, spoilerPct, distinctTitles, topReviewed } = buildReviewFeedFromRows(feed);
 
     return {
       sort,
@@ -211,7 +181,7 @@ export async function getReviewsData(opts: {
       topReviewed,
       stats: { total, avg, spoilerPct, distinctTitles },
       generatedAt: new Date().toISOString(),
-      source: "seed",
+      source: "database",
     };
   }
 }

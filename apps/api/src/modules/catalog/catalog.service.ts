@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { activeTags, getTitle, TITLES } from "../../../../../lib/data";
+import { activeTags, getCatalogState, getTitle, TITLES } from "../../../../../lib/data";
 import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
@@ -91,7 +91,7 @@ export class CatalogService implements OnModuleInit {
     try {
       await loadLatestCatalogSnapshotFromDb();
     } catch (error) {
-      console.error("catalog snapshot load failed; seed catalog is active", error);
+      console.error("catalog snapshot load failed; runtime catalog is empty until the next successful DB snapshot", error);
     }
     startLiveRankingScheduler();
     this.scheduleNextCatalogIngest();
@@ -147,6 +147,11 @@ export class CatalogService implements OnModuleInit {
       items,
       total: items.length,
       typeCount,
+      catalog: {
+        ...getCatalogState(),
+        platformCoverage: platformCoverage(TITLES),
+        filteredPlatformCoverage: platformCoverage(items),
+      },
       topTags: activeTags().slice(0, 18).map((tag) => tag.tag),
       generatedAt: new Date().toISOString(),
     };
@@ -379,6 +384,21 @@ function findTitle(identifier: string): Title | null {
 
 function bayes(title: Title) {
   return (4 * 800 + title.stats.ratingAvg * title.stats.ratingCount) / (800 + title.stats.ratingCount);
+}
+
+function platformCoverage(titles: Title[]) {
+  const counts = new Map<PlatformId, number>();
+  for (const title of titles) {
+    const ids = new Set(title.availability.map((entry) => entry.platformId));
+    ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+  }
+  return [...counts.entries()]
+    .map(([id, count]) => ({
+      id,
+      count,
+      share: titles.length ? Math.round((count / titles.length) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 function list<T extends string>(raw: string | null | undefined, allowed?: Set<T>): T[] | undefined {

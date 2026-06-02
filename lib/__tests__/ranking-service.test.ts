@@ -54,9 +54,43 @@ describe("ranking service", () => {
 
     expect(params.axis).toBe("popular");
     expect(params.period).toBe("weekly");
-    expect(params.limit).toBe(1000);
+    expect(params.limit).toBe(200);
     expect(params.minRating).toBe(5);
     expect(params.onlyRising).toBe(true);
+  });
+
+  it("limit 파라미터가 없으면 필터별 최대 노출 기준인 200건을 기본값으로 사용한다", () => {
+    const params = normalizeRankingParams(query({}));
+
+    expect(params.limit).toBe(200);
+  });
+
+  it("플랫폼 필터는 전체 상위권 후처리가 아니라 필터 후보군에서 최대 200건을 반환한다", async () => {
+    const naverTitles = Array.from({ length: 260 }, (_, index) =>
+      makeTitle({
+        id: `nw-dominant-${index}`,
+        title: `네이버 상위 ${index}`,
+        availability: [{ platformId: "naver-webtoon", pricing: "free" }],
+        stats: { views: 900_000_000 - index * 1000, likes: 8_000_000, bookmarks: 8_000_000 },
+      })
+    );
+    const lezhinTitles = Array.from({ length: 230 }, (_, index) =>
+      makeTitle({
+        id: `lz-filtered-${index}`,
+        title: `레진 후보 ${index}`,
+        availability: [{ platformId: "lezhin", pricing: "paid" }],
+        stats: { views: 20_000 + index, likes: 900 + index, bookmarks: 800 + index },
+      })
+    );
+
+    const data = await getRankingData(query({ platform: "lezhin", limit: "9999" }), {
+      catalog: [...naverTitles, ...lezhinTitles],
+      now,
+    });
+
+    expect(data.items).toHaveLength(200);
+    expect(data.meta.total).toBe(230);
+    expect(data.items.every((item) => item.title.availability.some((entry) => entry.platformId === "lezhin"))).toBe(true);
   });
 
   it("실시간 보정 대상 축만 라이브 소스를 사용한다", () => {

@@ -217,7 +217,7 @@ function normalizeQueryMap(query: QueryMap): Record<string, string> {
   return out;
 }
 
-const COVER_ALLOWED_HOST = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net)$/;
+const COVER_ALLOWED_HOST = /(^|\.)(pstatic\.net|kakaopagecdn\.com|kakaocdn\.net|ccdn\.lezhin\.com)$/;
 const COVER_OK_TYPE = /^image\/(jpeg|jpg|png|webp|avif|gif)\b/i;
 const COVER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -227,5 +227,6 @@ function allowedCoverUrl(url: URL) {
 }
 
 function coverRefererFor(hostname: string) {
+  if (/lezhin/.test(hostname)) return "https://www.lezhin.com/";
   return /kakao/.test(hostname) ? "https://webtoon.kakao.com/" : "https://comic.naver.com/";
 }

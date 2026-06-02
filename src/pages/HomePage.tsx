@@ -13,11 +13,76 @@ import { RatingInline } from "@/components/ui/stars";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
+import type { Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { ArrowRight, Layers, Search } from "lucide-react";
-import { homeSnapshot } from "./page-utils";
+import { AlertTriangle, ArrowRight, Layers, RefreshCw, Search } from "lucide-react";
+import { useApiResource } from "./use-api-resource";
+
+interface HomeResponse {
+  featured: Title[];
+  spotlight: Title | null;
+  topRated: Title[];
+  waitFree: Title[];
+  newest: Title[];
+  families: { original: Title; adaptations: Title[] }[];
+  tags: { tag: string; count: number }[];
+  todayDay: string;
+  todayReleases: Title[];
+  stats: {
+    titles: number;
+    platforms: number;
+    genres: number;
+    reviews: number;
+  };
+  generatedAt: string;
+}
 
 export function HomePage() {
+  const { data, loading, error, reload } = useApiResource<HomeResponse>("/api/home", "홈 데이터를 불러오지 못했습니다.");
+
+  if (loading) {
+    return (
+      <div>
+        <section className="border-b border-line bg-ledger">
+          <Container size="wide" className="grid items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
+            <div className="space-y-5">
+              <span className="skeleton block h-4 w-56" />
+              <span className="skeleton block h-16 w-4/5" />
+              <span className="skeleton block h-5 w-96 max-w-full" />
+              <span className="skeleton block h-11 w-64" />
+            </div>
+            <span className="skeleton block aspect-[4/3] rounded-2xl" />
+          </Container>
+        </section>
+        <Container size="wide" className="grid grid-cols-2 gap-4 py-16 sm:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <span key={index} className="skeleton block aspect-[3/4] rounded-xl" />
+          ))}
+        </Container>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Container size="wide" className="py-10">
+        <div className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+          <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+          <p className="text-sm font-medium text-fg">홈 데이터를 불러오지 못했습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">{error ?? "응답 데이터가 비어 있습니다."}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
+          >
+            <RefreshCw size={14} />
+            다시 시도
+          </button>
+        </div>
+      </Container>
+    );
+  }
+
   const {
     featured,
     spotlight,
@@ -29,7 +94,7 @@ export function HomePage() {
     todayDay,
     todayReleases,
     stats,
-  } = homeSnapshot();
+  } = data;
 
   return (
     <div>

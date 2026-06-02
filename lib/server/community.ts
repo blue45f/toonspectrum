@@ -760,6 +760,10 @@ export async function createFanPostReply(input: {
   text: string;
 }): Promise<FanCafeReply> {
   await ensureCommunityTables();
+  const [post] = await db.select({ id: fanPosts.id }).from(fanPosts).where(eq(fanPosts.id, input.postId)).limit(1);
+  if (!post) {
+    throw new Error("댓글을 달 게시글을 찾을 수 없습니다.");
+  }
   const depthCheck = await getFanPostReplyDepth(input.postId, input.parentId ?? null);
   if (!depthCheck.ok) {
     throw new Error(replyDepthErrorMessage(depthCheck.reason));
