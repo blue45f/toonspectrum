@@ -1,0 +1,234 @@
+import { inArray } from "drizzle-orm";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  getCommunityScopeTargetLink,
+  parseCommunityScope,
+  parseCommunitySort,
+  parseCommunityScopeWithAll,
+} from "../community-ui";
+import { db, dbClient, fanPostReplies, fanPosts, users } from "../db";
+import {
+  createFanPost,
+  createFanPostReply,
+  ensureCommunityTables,
+  listFanPostReplies,
+  validatePostInput,
+  validateReplyText,
+} from "../server/community";
+
+const createdUserIds = new Set<string>();
+const createdPostIds = new Set<string>();
+const createdReplyIds = new Set<string>();
+
+async function cleanupCommunityRecords() {
+  if (createdReplyIds.size > 0) {
+    await db.delete(fanPostReplies).where(inArray(fanPostReplies.id, [...createdReplyIds]));
+    createdReplyIds.clear();
+  }
+  if (createdPostIds.size > 0) {
+    await db.delete(fanPosts).where(inArray(fanPosts.id, [...createdPostIds]));
+    createdPostIds.clear();
+  }
+  if (createdUserIds.size > 0) {
+    await db.delete(users).where(inArray(users.id, [...createdUserIds]));
+    createdUserIds.clear();
+  }
+}
+
+async function ensureTestUserSchema() {
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT UNIQUE,
+      emailVerified INTEGER,
+      image TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      passwordHash TEXT,
+      avatar TEXT,
+      bio TEXT,
+      createdAt INTEGER
+    )
+  `);
+  const info = await dbClient.execute(`PRAGMA table_info("user")`);
+  const columns = new Set(
+    info.rows.map((row) => {
+      if (Array.isArray(row)) return String(row[1] ?? "");
+      return String((row as { name?: unknown }).name ?? "");
+    })
+  );
+  const migrations = [
+    ["role", `ALTER TABLE "user" ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`],
+    ["passwordHash", `ALTER TABLE "user" ADD COLUMN passwordHash TEXT`],
+    ["avatar", `ALTER TABLE "user" ADD COLUMN avatar TEXT`],
+    ["bio", `ALTER TABLE "user" ADD COLUMN bio TEXT`],
+    ["createdAt", `ALTER TABLE "user" ADD COLUMN createdAt INTEGER`],
+  ] as const;
+  for (const [column, sql] of migrations) {
+    if (!columns.has(column)) await dbClient.execute(sql);
+  }
+}
+
+async function createCommunityTestUser() {
+  await ensureCommunityTables();
+  await ensureTestUserSchema();
+  const id = `test-user-${crypto.randomUUID()}`;
+  createdUserIds.add(id);
+  await db.insert(users).values({
+    id,
+    email: `${id}@example.test`,
+    name: "테스트 독자",
+    avatar: "#2f855a",
+  });
+  return id;
+}
+
+afterEach(async () => {
+  await cleanupCommunityRecords();
+});
+
+describe("community validation", () => {
+  it("팬카페 게시글 입력을 정규화한다", () => {
+    const result = validatePostInput({
+      scope: "title",
+      targetId: "nw-183559",
+      targetLabel: "신의 탑",
+      kind: "theory",
+      title: "  세계관 해석  ",
+      text: "  좋은 글\n\n\n입니다  ",
+      tags: ["#정주행", "해석", "세계관", "긴태그".repeat(20), "", "초과"],
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value?.title).toBe("세계관 해석");
+    expect(result.value?.text).toContain("좋은 글");
+    expect(result.value?.tags).toHaveLength(5);
+    expect(result.value?.kind).toBe("theory");
+  });
+
+  it("잘못된 scope와 빈 본문을 거부한다", () => {
+    expect(validatePostInput({ scope: "bad" }).error).toBeTruthy();
+    expect(
+      validatePostInput({
+        scope: "title",
+        targetId: "t1",
+        targetLabel: "작품",
+        title: "a",
+        text: "",
+      }).error
+    ).toBeTruthy();
+  });
+
+  it("답글은 1자 이상 700자 이하만 허용한다", () => {
+    expect(validateReplyText("").error).toBeTruthy();
+    expect(validateReplyText("좋아요").text).toBe("좋아요");
+    expect(validateReplyText("x".repeat(900)).text).toHaveLength(700);
+  });
+
+  it("커뮤니티 스코프 파싱은 허용값만 통과한다", () => {
+    expect(parseCommunityScope("title")).toBe("title");
+    expect(parseCommunityScope("all")).toBeNull();
+    expect(parseCommunityScopeWithAll("all")).toBe("all");
+    expect(parseCommunityScopeWithAll("bad")).toBe("all");
+  });
+
+  it("커뮤니티 정렬 파싱은 알 수 없는 값은 인기순으로 정규화한다", () => {
+    expect(parseCommunitySort("recent")).toBe("recent");
+    expect(parseCommunitySort("popular")).toBe("popular");
+    expect(parseCommunitySort("invalid")).toBe("popular");
+  });
+
+  it("커뮤니티 스코프 상세 라우트 링크를 안전하게 생성한다", () => {
+    expect(getCommunityScopeTargetLink("title", "nw-183559", "작품명")).toBe("/title/nw-183559");
+    expect(getCommunityScopeTargetLink("author", "unused", "김초월 작가")).toBe("/author/김초월%20작가");
+    expect(getCommunityScopeTargetLink("pencafe", "unused", "번역자_카페")).toBe("/pencafe/%EB%B2%88%EC%97%AD%EC%9E%90_%EC%B9%B4%ED%8E%98");
+  });
+
+  it("게시글 댓글의 대댓글을 같은 게시글 트리 아래에 저장한다", async () => {
+    const userId = await createCommunityTestUser();
+    const post = await createFanPost(userId, {
+      scope: "title",
+      targetId: "test-title",
+      targetLabel: "테스트 작품",
+      kind: "talk",
+      title: "대댓글 테스트",
+      text: "대댓글 트리 저장을 검증합니다.",
+      tags: [],
+    });
+    createdPostIds.add(post.id);
+
+    const parent = await createFanPostReply({
+      postId: post.id,
+      userId,
+      text: "첫 댓글입니다.",
+    });
+    createdReplyIds.add(parent.id);
+
+    const child = await createFanPostReply({
+      postId: post.id,
+      parentId: parent.id,
+      userId,
+      text: "첫 댓글의 대댓글입니다.",
+    });
+    createdReplyIds.add(child.id);
+
+    const tree = await listFanPostReplies(post.id);
+
+    expect(tree).toHaveLength(1);
+    expect(tree[0].id).toBe(parent.id);
+    expect(tree[0].children?.map((reply) => reply.id)).toEqual([child.id]);
+    expect(tree[0].children?.[0].parentId).toBe(parent.id);
+  });
+
+  it("존재하지 않는 게시글에는 댓글을 만들 수 없다", async () => {
+    const userId = await createCommunityTestUser();
+
+    await expect(
+      createFanPostReply({
+        postId: `missing-post-${crypto.randomUUID()}`,
+        userId,
+        text: "고아 댓글은 생성되지 않아야 합니다.",
+      })
+    ).rejects.toThrow(/게시글/);
+  });
+
+  it("다른 게시글의 댓글을 부모로 지정한 대댓글은 거부한다", async () => {
+    const userId = await createCommunityTestUser();
+    const firstPost = await createFanPost(userId, {
+      scope: "title",
+      targetId: "first-title",
+      targetLabel: "첫 작품",
+      kind: "talk",
+      title: "첫 게시글",
+      text: "첫 게시글 본문입니다.",
+      tags: [],
+    });
+    const secondPost = await createFanPost(userId, {
+      scope: "title",
+      targetId: "second-title",
+      targetLabel: "두 번째 작품",
+      kind: "talk",
+      title: "두 번째 게시글",
+      text: "두 번째 게시글 본문입니다.",
+      tags: [],
+    });
+    createdPostIds.add(firstPost.id);
+    createdPostIds.add(secondPost.id);
+
+    const parent = await createFanPostReply({
+      postId: firstPost.id,
+      userId,
+      text: "첫 게시글의 댓글입니다.",
+    });
+    createdReplyIds.add(parent.id);
+
+    await expect(
+      createFanPostReply({
+        postId: secondPost.id,
+        parentId: parent.id,
+        userId,
+        text: "다른 게시글 댓글에 붙으면 안 됩니다.",
+      })
+    ).rejects.toThrow(/상위 항목/);
+  });
+});

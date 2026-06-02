@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 
 function Names({ raw }: { raw: string }) {
   const names = raw

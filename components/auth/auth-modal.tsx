@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn } from "@/src/compat/auth-session";
 import { X, LogIn, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { Heart, EyeOff } from "lucide-react";
 import type { SeedReview, Title } from "@/lib/types";
 import { Stars } from "./ui/stars";
 import { Badge } from "./ui/chip";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
+import { ReviewReplies } from "./review-replies";
 
 const PROGRESS_TONE: Record<string, "good" | "accent" | "neutral" | "bad"> = {
   완독: "good",
@@ -20,11 +21,13 @@ export function ReviewCard({
   review,
   title,
   showTitle,
+  enableReplies = false,
   className,
 }: {
   review: SeedReview;
   title?: Title;
   showTitle?: boolean;
+  enableReplies?: boolean;
   className?: string;
 }) {
   const [revealed, setRevealed] = useState(false);
@@ -136,6 +139,7 @@ export function ReviewCard({
           <span className="tnum">{likeCount.toLocaleString("ko-KR")}</span>
         </button>
       </footer>
+      {enableReplies && <ReviewReplies reviewId={review.id} />}
     </article>
   );
 }

@@ -40,6 +40,7 @@ export function Segmented<T extends string>({
             key={it.value}
             role="tab"
             aria-selected={active}
+            aria-label={typeof it.label === "string" ? undefined : it.hint}
             onClick={() => onChange(it.value)}
             title={it.hint}
             className={cn(

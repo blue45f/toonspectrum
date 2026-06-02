@@ -1,0 +1,166 @@
+import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  createFanPost,
+  createFanPostReply,
+  listCommunityBoards,
+  listFanPostReplies,
+  listFanPosts,
+  parseCommunityScopeFilter,
+  parsePostKindOrNull,
+  parsePostSort,
+  validatePostInput,
+  validateReplyPayload,
+  createReviewReply,
+  listReviewReplies,
+} from "../../../../../lib/server/community";
+import { getReviewsData } from "../../../../../lib/server/reviews";
+import { parseCommunitySort } from "../../../../../lib/community-ui";
+import type { FanCafeReply, ReviewReply } from "../../../../../lib/types";
+
+interface PostQuery {
+  scope?: string | null;
+  targetId?: string | null;
+  kind?: string | null;
+  sort?: string | null;
+  query?: string | null;
+  tag?: string | null;
+  cursor?: string | null;
+  limit?: number | string | null;
+  mineOnly?: boolean;
+  requesterId?: string | null;
+}
+
+interface PostPayload {
+  scope?: unknown;
+  targetId?: unknown;
+  targetLabel?: unknown;
+  kind?: unknown;
+  title?: unknown;
+  text?: unknown;
+  tags?: unknown;
+}
+
+interface ReviewPayload {
+  sort?: string | null;
+  spoiler?: string | null;
+  rating?: string | null;
+}
+
+interface ReplyPayload {
+  text?: unknown;
+  parentId?: unknown;
+  spoiler?: unknown;
+}
+
+function parseBool(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["1", "true", "on", "yes"].includes(normalized);
+  }
+  return false;
+}
+
+function parseLimit(value: number | string | null | undefined): number {
+  const raw = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(raw)) return 20;
+  return Math.max(1, Math.min(Math.floor(raw), 100));
+}
+
+@Injectable()
+export class CommunityService {
+  async boards(scopeValue: string | null, query: string | null, sortValue: string | null, limitValue: number | null) {
+    const scope = parseCommunityScopeFilter(scopeValue) ?? "all";
+    const sort = parseCommunitySort(sortValue);
+    const safeLimit = parseLimit(limitValue);
+    const boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
+    return {
+      items: boards,
+      meta: { scope, sort, limit: safeLimit, total: boards.length, generatedAt: new Date().toISOString() },
+    };
+  }
+
+  async listPosts(query: PostQuery) {
+    const scope = parseCommunityScopeFilter(query.scope ?? null) ?? "all";
+    const targetId = String(query.targetId ?? "").trim() || null;
+    const kind = parsePostKindOrNull(query.kind);
+    const sort = parsePostSort(query.sort);
+    const safeLimit = parseLimit(query.limit ?? 20);
+    const search = String(query.query ?? "").trim();
+    const tag = String(query.tag ?? "").trim();
+    const cursor = query.cursor ? String(query.cursor) : null;
+    const requesterId = parseBool(query.mineOnly) && query.requesterId ? query.requesterId : null;
+    if (query.mineOnly && !requesterId) {
+      throw new UnauthorizedException("로그인이 필요해요.");
+    }
+    if (scope !== "all" && !targetId) {
+      throw new BadRequestException("scope가 all이 아니면 targetId가 필요합니다.");
+    }
+
+    const posts = await listFanPosts(scope, targetId, kind, search, tag, sort, cursor, safeLimit, requesterId);
+    return posts;
+  }
+
+  async createPost(body: PostPayload, userId: string) {
+    const parsed = validatePostInput(body);
+    if (parsed.error || !parsed.value) {
+      throw new BadRequestException(parsed.error ?? "잘못된 요청");
+    }
+    return createFanPost(userId, parsed.value);
+  }
+
+  async listPostReplies(postId: string): Promise<FanCafeReply[]> {
+    if (!postId) throw new BadRequestException("postId 필요");
+    return listFanPostReplies(postId);
+  }
+
+  async createPostReply(postId: string, userId: string, body: ReplyPayload) {
+    const parsed = validateReplyPayload(body);
+    if (parsed.error || !parsed.text) throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    try {
+      return await createFanPostReply({
+        postId,
+        userId,
+        parentId: parsed.parentId,
+        text: parsed.text,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+      throw new BadRequestException("답글을 저장하지 못했습니다.");
+    }
+  }
+
+  async listReviewReplies(reviewId: string): Promise<ReviewReply[]> {
+    if (!reviewId) throw new BadRequestException("reviewId 필요");
+    return listReviewReplies(reviewId);
+  }
+
+  async createReviewReply(reviewId: string, userId: string, body: ReplyPayload) {
+    const parsed = validateReplyPayload(body);
+    if (parsed.error || !parsed.text) throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+    try {
+      return await createReviewReply({
+        reviewId,
+        parentId: parsed.parentId,
+        userId,
+        text: parsed.text,
+        spoiler: !!body.spoiler,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+      throw new BadRequestException("답글을 저장하지 못했습니다.");
+    }
+  }
+
+  async getReviewsData(query: ReviewPayload) {
+    return getReviewsData({
+      sort: query.sort ?? undefined,
+      spoiler: query.spoiler ?? undefined,
+      rating: query.rating ?? undefined,
+    });
+  }
+}

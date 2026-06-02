@@ -1,6 +1,7 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+import { buttonClass } from "./ui/button";
 
 export function Section({
   eyebrow,
@@ -18,25 +19,23 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("", className)}>
-      <header className="mb-5 flex items-end justify-between gap-4">
+    <section className={cn(className)}>
+      <header className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           {eyebrow && <p className="eyebrow mb-1.5 text-accent">{eyebrow}</p>}
           <h2 className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
             {title}
           </h2>
-          {desc && <p className="mt-1.5 text-sm text-fg-3">{desc}</p>}
+          {desc && <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{desc}</p>}
         </div>
         {action && (
           <Link
             href={action.href}
-            className="group flex shrink-0 items-center gap-1 text-sm font-medium text-fg-2 transition-colors hover:text-accent"
+            className={buttonClass({ size: "sm", variant: "quiet", className: "group gap-1" })}
+            aria-label={`${action.label} 바로가기`}
           >
             {action.label}
-            <ArrowRight
-              size={15}
-              className="transition-transform duration-150 group-hover:translate-x-0.5"
-            />
+            <ArrowRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />
           </Link>
         )}
       </header>

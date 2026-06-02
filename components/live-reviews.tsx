@@ -37,7 +37,7 @@ export function LiveReviews({ titleId }: { titleId: string }) {
         <span className="text-xs text-fg-3">DB에 저장된 독자 리뷰 {reviews.length}</span>
       </div>
       {reviews.map((r) => (
-        <ReviewCard key={r.id} review={r} />
+        <ReviewCard key={r.id} review={r} enableReplies />
       ))}
     </>
   );

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import { spectrumGradient } from "@/lib/genre-color";
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
@@ -26,17 +26,17 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-line bg-panel/40">
+    <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_265/0.55),oklch(0.17_0.018_265/0.32))]">
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
             <span
-              className="size-7 rounded-[0.5rem] ring-1 ring-white/10"
+              className="size-7 rounded-[0.5rem] ring-1 ring-white/15"
               style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 135) }}
             />
             <span className="font-display text-lg font-bold tracking-[-0.02em]">WEBDEX</span>
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-fg-3">
+          <p className="mt-4 text-sm leading-relaxed text-fg-2">
             네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
             왜 봐야 하는지 한 곳에서 답합니다.
           </p>
@@ -45,16 +45,20 @@ export function SiteFooter() {
             실데이터</span>입니다. 네이버의 조회·관심·별점은 실수집, 카카오웹툰의 평점·조회와 평가 수·완독률
             등 일부 지표 및 리뷰는 데모용 추정·예시입니다.
           </p>
+          <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-line/80 bg-panel/50 px-3 py-1.5 text-xs text-fg-3">
+            <span className="size-1.5 rounded-full bg-good" />
+            운영 환경: 실데이터 + 주기적 갱신
+          </p>
         </div>
 
         {COLS.map((col) => (
-          <nav key={col.title} className="flex flex-col gap-3">
+          <nav key={col.title} className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4">
             <h4 className="eyebrow text-fg-3">{col.title}</h4>
             {col.links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-sm text-fg-2 transition-colors hover:text-fg"
+                className="inline-flex items-center text-sm text-fg-2 transition-colors hover:text-accent"
               >
                 {l.label}
               </Link>
@@ -62,9 +66,9 @@ export function SiteFooter() {
           </nav>
         ))}
       </div>
-      <div className="border-t border-line">
+      <div className="border-t border-line/60">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-1 px-4 py-5 text-xs text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© 2025 WEBDEX · 포트폴리오 데모</span>
+          <span>© 2026 WEBDEX · 포트폴리오 데모</span>
           <span className="font-display tracking-wide">활자와 스펙트럼 · TYPE & SPECTRUM</span>
         </div>
       </div>

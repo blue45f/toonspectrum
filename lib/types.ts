@@ -22,7 +22,16 @@ export type PlatformId =
   | "lezhin"
   | "bomtoon"
   | "toptoon"
-  | "postype";
+  | "postype"
+  | "mrblue"
+  | "comico"
+  | "toomics"
+  | "bufftoon"
+  | "bookcube"
+  | "onestory"
+  | "peanutoon"
+  | "kyobo"
+  | "yes24";
 
 export interface Platform {
   id: PlatformId;
@@ -87,7 +96,7 @@ export interface Title {
   editorNote?: string; // 에디터 한줄평
 }
 
-// 시드 리뷰 (데모용 샘플) / DB 리뷰 공용 표시 형태
+// 리뷰 표시 모델(시드 또는 DB 리뷰 공통 형태)
 export interface SeedReview {
   id: string;
   titleId: string;
@@ -113,4 +122,65 @@ export interface UserReview {
   tags: string[];
   spoiler: boolean;
   createdAt: string;
+}
+
+export type FanCafeScope = "title" | "author" | "pencafe";
+export type FanCafeScopeFilter = FanCafeScope | "all";
+export type FanCafePostKind = "talk" | "theory" | "fanart" | "cheer";
+
+export interface CommunityAuthor {
+  id?: string;
+  name: string;
+  avatar: string;
+}
+
+export interface ReviewReply {
+  id: string;
+  reviewId: string;
+  parentId?: string | null;
+  author: CommunityAuthor;
+  text: string;
+  spoiler: boolean;
+  createdAt: string;
+  children?: ReviewReply[];
+}
+
+export interface FanCafeReply {
+  id: string;
+  postId: string;
+  author: CommunityAuthor;
+  text: string;
+  createdAt: string;
+  parentId?: string | null;
+  children?: FanCafeReply[];
+}
+
+export interface FanCafePost {
+  id: string;
+  scope: FanCafeScope;
+  targetId: string;
+  targetLabel: string;
+  kind: FanCafePostKind;
+  title: string;
+  text: string;
+  tags: string[];
+  author: CommunityAuthor;
+  createdAt: string;
+  replyCount: number;
+  replies?: FanCafeReply[];
+}
+
+export interface FanCafeBoard {
+  scope: FanCafeScope;
+  targetId: string;
+  targetLabel: string;
+  postCount: number;
+  replyCount: number;
+  latestPostAt: string;
+}
+
+export interface FanCafePostList {
+  items: FanCafePost[];
+  nextCursor: string | null;
+  hasMore: boolean;
 }

@@ -4,7 +4,7 @@ import { FunctionSquare, Info } from "lucide-react";
 // 랭킹 선정 방식 — 전 축 산식 + 보정·기간·데이터 출처를 투명 공개
 export function RankingMethod() {
   return (
-    <section className="rounded-2xl border border-line bg-panel/40 p-5 sm:p-6">
+    <section className="rounded-xl border border-line bg-panel/40 p-5 surface-hl sm:p-6">
       <div className="mb-5 flex items-center gap-2">
         <FunctionSquare size={18} className="text-accent" />
         <h2 className="text-lg font-bold tracking-tight">랭킹은 이렇게 정해집니다</h2>
@@ -12,9 +12,9 @@ export function RankingMethod() {
       </div>
 
       <p className="mb-6 max-w-2xl text-sm leading-relaxed text-fg-2">
-        WEBDEX의 순위는 사람이 손으로 매기지 않습니다. 각 작품의 지표(조회·좋아요·관심·평점·완독률 등)를
-        아래 산식에 넣어 <span className="text-fg">실시간으로 계산</span>하고 정렬합니다. 산식을 바꾸면 순위도
-        즉시 바뀝니다.
+        WEBDEX의 순위는 사람이 손으로 매기지 않습니다. 랭킹 화면은 <span className="text-fg">/api/ranking</span>에서
+        매 요청마다 산식을 계산하고, 인기·급상승 축은 네이버·카카오 실시간 소스를 함께 반영합니다.
+        외부 소스가 막히면 같은 API가 산식 기반 순위로 즉시 폴백합니다.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -44,8 +44,17 @@ export function RankingMethod() {
         <p className="flex gap-2">
           <Info size={14} className="mt-0.5 shrink-0 text-fg-2" />
           <span>
-            <span className="font-medium text-fg-2">기간(일·주·월)</span> — 본 데모에서는 실시간 수집
-            데이터 대신 작품별 결정적 가중치로 기간 변동을 시뮬레이션합니다.
+            <span className="font-medium text-fg-2">라이브 보정</span> — 일간·주간 인기/급상승 축은
+            네이버웹툰과 카카오웹툰의 현재 순위 응답을 서버에서 가져와 로컬 작품 ID와 매칭합니다. 매칭되지
+            않는 외부 작품은 별도 링크로 홈 라이브 보드에 남고, 통합 랭킹은 검증된 작품 DB 안에서만 정렬합니다.
+          </span>
+        </p>
+        <p className="flex gap-2">
+          <Info size={14} className="mt-0.5 shrink-0 text-warn/90" />
+          <span>
+            <span className="font-medium text-fg-2">신뢰도 점수</span> — 화면 상단의 confidence는
+            실시간 소스 정상 여부, 로컬 DB 매칭률, 추정 지표 비중, 폴백 여부를 합산한 해석 보조 지표입니다.
+            점수가 낮아도 순위는 표시하지만, 그 경우 화면에 폴백 이유와 소스 상태를 함께 노출합니다.
           </span>
         </p>
         <p className="flex gap-2">

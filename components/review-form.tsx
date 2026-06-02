@@ -53,7 +53,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
       text: text.trim(),
       tags,
       spoiler,
-      createdAt: new Date("2025-05-29T00:00:00Z").toISOString(),
+      createdAt: new Date().toISOString(),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);

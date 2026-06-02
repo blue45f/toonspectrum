@@ -8,7 +8,10 @@ import type { ReadState, UserReview } from "./types";
 // 로그인 시 변경을 DB API로 write-through (게스트는 localStorage만)
 function apiPost(path: string, body: unknown, method = "POST") {
   if (typeof window === "undefined") return;
-  fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const userId = useApp.getState().userId;
+  if (userId) headers["x-user-id"] = userId;
+  fetch(path, { method, headers, body: JSON.stringify(body) }).catch(() => {});
 }
 
 export interface HydratePayload {
@@ -60,15 +63,7 @@ interface AppState {
   resetAll: () => void;
 }
 
-const seedCollections: Collection[] = [
-  {
-    id: "default-binge",
-    name: "주말 정주행 리스트",
-    emoji: "🍿",
-    titleIds: [],
-    createdAt: "2025-01-04T00:00:00Z",
-  },
-];
+const seedCollections: Collection[] = [];
 
 export const useApp = create<AppState>()(
   persist(

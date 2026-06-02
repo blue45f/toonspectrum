@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
-import { suggest } from "@/lib/search";
 import { TitlePoster } from "./title-poster";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { GenreChip } from "./ui/chip";
@@ -30,18 +29,38 @@ const METRICS: Metric[] = [
 ];
 
 function Picker({
-  titles,
   value,
   onPick,
   onClear,
 }: {
-  titles: Title[];
   value: Title | null;
   onPick: (t: Title) => void;
   onClear: () => void;
 }) {
   const [q, setQ] = useState("");
-  const results = q.trim() ? suggest(titles, q, 6) : [];
+  const [results, setResults] = useState<Title[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const query = q.trim();
+    if (!query) return;
+
+    const controller = new AbortController();
+    fetch(`/api/titles?q=${encodeURIComponent(query)}&limit=6`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("search failed"))))
+      .then((data: { items?: Title[] }) => setResults(data.items ?? []))
+      .catch((error) => {
+        if ((error as Error).name !== "AbortError") setResults([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [q]);
 
   if (value) {
     return (
@@ -66,16 +85,25 @@ function Picker({
         <input
           type="search"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setQ(next);
+            if (!next.trim()) {
+              setResults([]);
+              setLoading(false);
+            } else {
+              setLoading(true);
+            }
+          }}
           placeholder="작품 검색"
           aria-label="작품 검색"
           className="h-11 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
         />
       </div>
-      <div className="max-h-72 overflow-y-auto p-1.5">
+      <div className="max-h-72 overflow-y-auto p-1.5" aria-busy={loading}>
         {results.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs text-fg-3">
-            {q.trim() ? "결과 없음" : "비교할 작품을 검색하세요"}
+            {loading ? "검색 중" : q.trim() ? "결과 없음" : "비교할 작품을 검색하세요"}
           </p>
         ) : (
           results.map((t) => (
@@ -105,27 +133,60 @@ function Picker({
 }
 
 export function CompareView({ initialA, initialB }: { initialA?: string; initialB?: string }) {
-  const [titles, setTitles] = useState<Title[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [a, setA] = useState<Title | null>(null);
   const [b, setB] = useState<Title | null>(null);
   // 비교 두 작품 중 하나라도 합성 지표(카카오웹툰·웹소설)면 우열 강조를 끈다(추정값으로 우열 판정 방지)
   const eitherEstimated = !!a && !!b && (statsAreEstimated(a) || statsAreEstimated(b));
 
   useEffect(() => {
-    let mounted = true;
-    import("@/lib/data").then((m) => {
-      if (!mounted) return;
-      setTitles(m.TITLES);
-      const pop = [...m.TITLES].sort((x, y) => y.stats.views - x.stats.views);
-      setA(m.getTitle(initialA ?? "") ?? pop[0] ?? null);
-      setB(m.getTitle(initialB ?? "") ?? pop[1] ?? null);
+    const controller = new AbortController();
+
+    async function loadInitial() {
+      const ids = [initialA, initialB].filter(Boolean).join(",");
+      const [exact, popular] = await Promise.all([
+        ids
+          ? fetch(`/api/titles?ids=${encodeURIComponent(ids)}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            }).then((res) => (res.ok ? res.json() : { items: [] }))
+          : Promise.resolve({ items: [] }),
+        fetch("/api/titles?sort=popular&limit=8", {
+          cache: "no-store",
+          signal: controller.signal,
+        }).then((res) => (res.ok ? res.json() : { items: [] })),
+      ]);
+
+      const exactItems = (exact.items ?? []) as Title[];
+      const popularItems = (popular.items ?? []) as Title[];
+      const pickExact = (value?: string) =>
+        value ? exactItems.find((t) => t.id === value || t.slug === value) ?? null : null;
+      const first = pickExact(initialA) ?? popularItems[0] ?? null;
+      const second =
+        pickExact(initialB) ??
+        popularItems.find((t) => t.id !== first?.id) ??
+        exactItems.find((t) => t.id !== first?.id) ??
+        null;
+
+      setA(first);
+      setB(second);
+      setLoading(false);
+    }
+
+    loadInitial().catch((error) => {
+      if ((error as Error).name !== "AbortError") {
+        setA(null);
+        setB(null);
+        setLoading(false);
+      }
     });
+
     return () => {
-      mounted = false;
+      controller.abort();
     };
   }, [initialA, initialB]);
 
-  if (!titles) {
+  if (loading) {
     return (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-[1fr_auto_1fr]">
         <div className="skeleton aspect-[3/4]" />
@@ -137,11 +198,11 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-6">
-        <Picker titles={titles} value={a} onPick={setA} onClear={() => setA(null)} />
+        <Picker value={a} onPick={setA} onClear={() => setA(null)} />
         <div className="mt-16 grid size-11 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent">
           <Swords size={18} />
         </div>
-        <Picker titles={titles} value={b} onPick={setB} onClear={() => setB(null)} />
+        <Picker value={b} onPick={setB} onClear={() => setB(null)} />
       </div>
 
       {a && b && (

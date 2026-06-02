@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, primaryKey, unique } from "drizzle-orm/sqlite-core";
 
-// ── Auth.js (NextAuth) 표준 테이블 + 확장 컬럼 ──────────────
+// ── 인증 사용자 테이블 + 확장 컬럼 ──────────────
 export const users = sqliteTable("user", {
   id: text("id")
     .primaryKey()
@@ -9,6 +9,7 @@ export const users = sqliteTable("user", {
   email: text("email").unique(),
   emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
   image: text("image"),
+  role: text("role").notNull().default("user"),
   // 확장: 크리덴셜 로그인·프로필
   passwordHash: text("passwordHash"),
   avatar: text("avatar"), // 아바타 컬러 hex
@@ -143,3 +144,157 @@ export const reviewLikes = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.reviewId] })]
 );
+
+export const reviewReplies = sqliteTable("review_reply", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  reviewId: text("reviewId").notNull(),
+  parentId: text("parentId"),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  spoiler: integer("spoiler", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const fanPosts = sqliteTable("fan_post", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  scope: text("scope").notNull(), // title | author
+  targetId: text("targetId").notNull(),
+  targetLabel: text("targetLabel").notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull().default("talk"), // talk | theory | fanart | cheer
+  title: text("title").notNull(),
+  text: text("text").notNull(),
+  tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const fanPostReplies = sqliteTable("fan_post_reply", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  postId: text("postId")
+    .notNull()
+    .references(() => fanPosts.id, { onDelete: "cascade" }),
+  parentId: text("parentId"),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const creatorProfiles = sqliteTable("creator_profile", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  displayName: text("displayName").notNull().default(""),
+  profile: text("profile").notNull().default(""),
+  payoutChannel: text("payoutChannel").notNull().default(""),
+  payoutHandle: text("payoutHandle").notNull().default(""),
+  isVerifiedCreator: integer("isVerifiedCreator", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const monetizationPlans = sqliteTable("monetization_plan", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  intervalDays: integer("intervalDays").notNull().default(30),
+  currency: text("currency").notNull().default("KRW"),
+  priceCents: integer("priceCents").notNull(),
+  perks: text("perks", { mode: "json" }).$type<string[]>().notNull().default([]),
+  isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const creatorCampaigns = sqliteTable("creator_campaign", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  creatorId: text("creatorId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  titleId: text("titleId"),
+  planId: text("planId").references(() => monetizationPlans.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  targetAmountCents: integer("targetAmountCents").notNull().default(0),
+  raisedAmountCents: integer("raisedAmountCents").notNull().default(0),
+  isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
+  startsAt: integer("startsAt", { mode: "timestamp_ms" }),
+  endsAt: integer("endsAt", { mode: "timestamp_ms" }),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const revenueLedger = sqliteTable("revenue_ledger", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  payerId: text("payerId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  recipientId: text("recipientId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  planId: text("planId").references(() => monetizationPlans.id, { onDelete: "set null" }),
+  campaignId: text("campaignId").references(() => creatorCampaigns.id, { onDelete: "set null" }),
+  kind: text("kind").notNull().default("plan"),
+  status: text("status").notNull().default("paid"),
+  amountCents: integer("amountCents").notNull(),
+  currency: text("currency").notNull().default("KRW"),
+  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  reviewedBy: text("reviewedBy").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: integer("reviewedAt", { mode: "timestamp_ms" }),
+  reviewNote: text("reviewNote").default(""),
+  settledAt: integer("settledAt", { mode: "timestamp_ms" }),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const catalogSnapshots = sqliteTable("catalog_snapshot", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source").notNull(), // crawl/manual/manual-file/synthetic
+  sourceVersion: text("sourceVersion"),
+  titleCount: integer("titleCount").notNull().default(0),
+  isCurrent: integer("isCurrent", { mode: "boolean" }).notNull().default(false),
+  snapshot: text("snapshot").notNull(), // JSON stringified title[] payload
+  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
+
+export const catalogIngestRuns = sqliteTable("catalog_ingest_run", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source").notNull(),
+  status: text("status").notNull(), // running|success|failed|aborted
+  runHash: text("runHash"),
+  triggeredBy: text("triggeredBy"),
+  requestedBy: text("requestedBy"),
+  startedAt: integer("startedAt", { mode: "timestamp_ms" }).notNull(),
+  finishedAt: integer("finishedAt", { mode: "timestamp_ms" }),
+  durationMs: integer("durationMs"),
+  titleCount: integer("titleCount").notNull().default(0),
+  message: text("message"),
+  error: text("error"),
+  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+});
