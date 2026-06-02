@@ -34,6 +34,8 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
   const [seedId, setSeedId] = useState<string | null>(null);
   const [data, setData] = useState<RecommendPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const requestBody = useMemo(
     () => JSON.stringify({ picked, seedId, ratings, reads }),
@@ -43,6 +45,8 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
+    setLoading(true);
+    setError(false);
     fetch("/api/recommend", {
       method: "POST",
       body: requestBody,
@@ -56,8 +60,11 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
       .then((payload) => {
         if (alive) setData(payload);
       })
-      .catch(() => {
-        if (alive) setData(null);
+      .catch((e) => {
+        if (alive && (e as Error)?.name !== "AbortError") {
+          setData(null);
+          setError(true);
+        }
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -66,7 +73,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
       alive = false;
       controller.abort();
     };
-  }, [requestBody]);
+  }, [requestBody, reloadKey]);
 
   const pickedRecs = data?.pickedRecs ?? [];
   const pickedLabelGenres = data?.pickedLabelGenres ?? picked;
@@ -78,6 +85,19 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
 
   return (
     <div className="flex flex-col gap-16">
+      {error && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warn/40 bg-[oklch(0.82_0.15_80/0.08)] p-5 text-sm text-fg-2">
+          <Sparkles size={18} className="shrink-0 text-warn" />
+          <p className="flex-1">추천을 불러오지 못했어요. 장르 선택은 그대로 두고 다시 시도할 수 있습니다.</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
       {/* 취향 픽 — 콜드스타트 친화 */}
       <section>
         <div className="mb-5 flex items-center gap-2">
