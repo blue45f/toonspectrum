@@ -93,14 +93,9 @@ export function AvailabilityRouter({
     <div className={cn("flex flex-col gap-1.5", className)}>
       {sorted.map((a) => {
         const p = PLATFORMS[a.platformId];
-        return (
-          <a
-            key={a.platformId}
-            href={a.url ?? "#"}
-            target={a.url ? "_blank" : undefined}
-            rel="noreferrer"
-            className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised"
-          >
+        const hasUrl = Boolean(a.url);
+        const inner = (
+          <>
             <span
               className="grid size-9 shrink-0 place-items-center rounded-lg font-display text-sm font-bold"
               style={{ backgroundColor: p.color, color: pickText(p.color) }}
@@ -114,11 +109,33 @@ export function AvailabilityRouter({
                 {a.isOriginal && <span className="ml-1.5 text-accent">· 독점</span>}
               </span>
             </span>
-            <span className="flex items-center gap-1 text-xs text-fg-3 transition-colors group-hover:text-fg">
-              보러가기
-              <ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-            </span>
+            {hasUrl ? (
+              <span className="flex items-center gap-1 text-xs text-fg-3 transition-colors group-hover:text-fg">
+                보러가기
+                <ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </span>
+            ) : (
+              <span className="text-xs text-fg-3">링크 준비 중</span>
+            )}
+          </>
+        );
+        return hasUrl ? (
+          <a
+            key={a.platformId}
+            href={a.url ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {inner}
           </a>
+        ) : (
+          <div
+            key={a.platformId}
+            className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-card/60 px-3.5 py-3"
+          >
+            {inner}
+          </div>
         );
       })}
     </div>

@@ -70,7 +70,11 @@ export function ReviewForm({ titleId }: { titleId: string }) {
 
       <RatingInput value={rating} onChange={setRating} />
 
+      <label htmlFor="review-text" className="sr-only">
+        리뷰 내용
+      </label>
       <textarea
+        id="review-text"
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={3}
@@ -79,15 +83,17 @@ export function ReviewForm({ titleId }: { titleId: string }) {
         className="w-full resize-none rounded-xl border border-line bg-canvas px-3.5 py-3 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/60"
       />
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="태그 선택">
         {SUGGESTED.map((t) => {
           const on = tags.includes(t);
           return (
             <button
               key={t}
+              type="button"
               onClick={() => toggleTag(t)}
+              aria-pressed={on}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 on
                   ? "border-accent/60 bg-accent-soft text-accent"
                   : "border-line bg-raised/50 text-fg-3 hover:text-fg"
@@ -101,9 +107,11 @@ export function ReviewForm({ titleId }: { titleId: string }) {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
+          type="button"
           onClick={() => setSpoiler((s) => !s)}
+          aria-pressed={spoiler}
           className={cn(
-            "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+            "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             spoiler ? "border-warn/50 bg-[oklch(0.82_0.15_80/0.12)] text-warn" : "border-line text-fg-3 hover:text-fg-2"
           )}
         >
