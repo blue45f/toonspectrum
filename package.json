@@ -27,12 +27,15 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
     "@eslint/js": "9.39.4",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "babel-plugin-react-compiler": "^1.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "tailwindcss": "^4",

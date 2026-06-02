@@ -1,12 +1,13 @@
 import { fileURLToPath, URL } from "node:url";
 
-import react from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
