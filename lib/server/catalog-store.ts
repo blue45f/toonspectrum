@@ -1,4 +1,4 @@
-import type { SeedReview, Title, WorkType } from "../types";
+import type { Title, WorkType } from "../types";
 
 export type CatalogSource = "empty" | "database-snapshot" | "cli-ingest";
 
@@ -53,11 +53,8 @@ let TITLES_META: CatalogState = {
   seedFallback: false,
 };
 
-export let SEED_REVIEWS: SeedReview[] = [];
-
 function rebuildIndexes(nextTitles: readonly Title[]) {
   BY_ID = buildByIdIndex(nextTitles);
-  SEED_REVIEWS = [];
 }
 
 export let TITLES: Title[] = TITLES_INTERNAL;
@@ -130,10 +127,6 @@ export function titlesByType(type: WorkType): Title[] {
   return TITLES.filter((t) => t.type === type);
 }
 
-export function reviewsFor(titleId: string): SeedReview[] {
-  return SEED_REVIEWS.filter((r) => r.titleId === titleId);
-}
-
 export function originalOf(t: Title): Title | undefined {
   return t.adaptedFrom ? BY_ID.get(t.adaptedFrom) : undefined;
 }
@@ -142,25 +135,10 @@ export function adaptationsOf(t: Title): Title[] {
   return TITLES.filter((x) => x.adaptedFrom === t.id);
 }
 
-export function adaptationFamily(t: Title): Title[] {
-  const root = originalOf(t) ?? t;
-  return [root, ...adaptationsOf(root)];
-}
-
-export function activeGenres(): string[] {
-  const set = new Set<string>();
-  TITLES.forEach((t) => t.genres.forEach((g) => set.add(g)));
-  return [...set];
-}
-
 export function activeTags(): { tag: string; count: number }[] {
   const map = new Map<string, number>();
   TITLES.forEach((t) => t.tags.forEach((tag) => map.set(tag, (map.get(tag) ?? 0) + 1)));
   return Array.from(map.entries())
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count);
-}
-
-export function allReviewsJoined(): (SeedReview & { title?: Title })[] {
-  return SEED_REVIEWS.map((r) => ({ ...r, title: BY_ID.get(r.titleId) }));
 }

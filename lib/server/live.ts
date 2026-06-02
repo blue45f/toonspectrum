@@ -1,4 +1,4 @@
-import { getTitle } from "../data";
+import { getTitle } from "./catalog-store";
 import type { PlatformId, SerialStatus } from "../types";
 import { PLATFORMS } from "../platforms";
 import { kstDayOfWeek } from "../utils";

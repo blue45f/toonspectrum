@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  allReviewsJoined,
   allTitles,
   getCatalogState,
   replaceCatalogData,
-  reviewsFor,
-} from "../data";
+} from "../server/catalog-store";
 
 describe("runtime catalog store", () => {
   const originalTitles = allTitles();
@@ -35,13 +33,15 @@ describe("runtime catalog store", () => {
     });
   });
 
-  it("리뷰 데이터도 파일 seed가 아니라 DB 결과만 표시되도록 빈 상태를 유지한다", () => {
+  it("리뷰 파일 seed API를 런타임 카탈로그 저장소에 노출하지 않는다", async () => {
     replaceCatalogData([], {
       source: "database-snapshot",
       sourceVersion: "empty-db-test",
     });
 
-    expect(reviewsFor("anything")).toEqual([]);
-    expect(allReviewsJoined()).toEqual([]);
+    const store = await import("../server/catalog-store");
+    expect("reviewsFor" in store).toBe(false);
+    expect("allReviewsJoined" in store).toBe(false);
+    expect("SEED_REVIEWS" in store).toBe(false);
   });
 });

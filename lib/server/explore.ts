@@ -1,4 +1,4 @@
-import { TITLES, activeTags } from "../data";
+import { TITLES, activeTags } from "./catalog-store";
 import { searchTitles, type SortKey } from "../search";
 import { GENRES } from "../taxonomy";
 import type { WorkType } from "../types";

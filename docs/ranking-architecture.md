@@ -5,7 +5,7 @@ WEBDEX ranking has two separate responsibilities:
 1. Server catalog ranking: deterministic scoring over the internal title catalog.
 2. Live signal correction: short-lived public ranking signals from external platforms.
 
-The UI must never compute ranking order from `lib/data` directly. Client surfaces should call `/api/ranking` and render the returned `items`, `meta`, and `insights`.
+The UI must never compute ranking order from a client-side catalog directly. Client surfaces should call `/api/ranking` and render the returned `items`, `meta`, and `insights`.
 
 ## Runtime contract
 
@@ -20,7 +20,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 
 ## 서버 카탈로그 갱신 구조
 
-작품 카탈로그는 `lib/data/titles.ts` 같은 정적 파일을 운영 데이터의 주 저장소로 사용하지 않습니다. 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장하고, 런타임 카탈로그는 최신 `catalog_snapshot`에서만 채워집니다. 스냅샷이 없거나 파싱에 실패하면 빈 카탈로그로 남겨 잘못된 하드코딩 데이터가 노출되지 않게 합니다.
+작품 카탈로그는 `lib/data/titles.ts` 같은 정적 파일을 운영 데이터의 주 저장소로 사용하지 않습니다. `lib/data/` seed 모듈은 제거했고, 운영 데이터는 서버가 주기적으로 수집해 DB 스냅샷으로 저장합니다. `lib/server/catalog-store.ts`의 런타임 카탈로그는 최신 `catalog_snapshot`에서만 채워집니다. 스냅샷이 없거나 파싱에 실패하면 빈 카탈로그로 남겨 잘못된 하드코딩 데이터가 노출되지 않게 합니다.
 
 랭킹에 없는 작품도 검색 가능해야 하므로 crawler는 두 레벨로 동작합니다.
 
@@ -327,10 +327,10 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 ## Data boundaries
 
 - `catalog_snapshot` is the current server catalog source in production.
-- `lib/data/index.ts` is an in-memory runtime catalog store populated from DB snapshots.
+- `lib/server/catalog-store.ts` is the server-only in-memory runtime catalog store populated from DB snapshots.
 - `lib/server/*` is the server service boundary.
 - `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
-- `components/*` must not import `TITLES` or `SEED_REVIEWS`.
+- `components/*` must not import runtime catalog globals such as `TITLES`; they must use API responses.
 
 If a future source becomes available, replace the server catalog boundary first. Avoid pushing raw provider-specific data into client components.
 

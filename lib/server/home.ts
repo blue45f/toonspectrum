@@ -1,4 +1,4 @@
-import { TITLES, adaptationsOf, activeTags } from "../data";
+import { TITLES, adaptationsOf, activeTags } from "./catalog-store";
 import { PLATFORM_LIST } from "../platforms";
 import { GENRES, WEEK_DAYS } from "../taxonomy";
 import { rankBy } from "../ranking";

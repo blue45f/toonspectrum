@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { TITLES, getTitle, originalOf, adaptationsOf } from "../data";
+import { TITLES, getTitle, originalOf, adaptationsOf } from "./catalog-store";
 import { similarTitles } from "../recommend";
 import { db, reviewLikes, reviews, users } from "../db";
 import type { SeedReview } from "../types";

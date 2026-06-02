@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { activeTags, getCatalogState, getTitle, TITLES } from "../../../../../lib/data";
+import { activeTags, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
 import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";

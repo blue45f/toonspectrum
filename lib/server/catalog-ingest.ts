@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { desc, eq } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
-import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "../data";
+import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "./catalog-store";
 import type { Title } from "../types";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
 

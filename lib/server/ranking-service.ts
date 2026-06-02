@@ -1,4 +1,4 @@
-import { TITLES } from "../data";
+import { TITLES } from "./catalog-store";
 import { statsAreEstimated } from "../estimate";
 import {
   getLiveRanking,

@@ -1,4 +1,4 @@
-import { TITLES } from "../data";
+import { TITLES } from "./catalog-store";
 import { PLATFORMS } from "../platforms";
 import { WEEK_DAYS } from "../taxonomy";
 import type { PlatformId, Title } from "../types";

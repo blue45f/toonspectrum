@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { allTitles, getCatalogState, replaceCatalogData } from "../data";
+import { allTitles, getCatalogState, replaceCatalogData } from "../server/catalog-store";
 import { getCalendarData } from "../server/calendar";
 import { makeTitle } from "./fixtures";
 

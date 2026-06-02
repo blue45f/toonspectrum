@@ -1,4 +1,4 @@
-import { TITLES, activeTags, adaptationsOf, titlesByType } from "../data";
+import { TITLES, activeTags, adaptationsOf, titlesByType } from "./catalog-store";
 import { PLATFORMS, PRICING_LABEL } from "../platforms";
 import { TYPE_LABEL } from "../taxonomy";
 import type { Pricing, Title } from "../types";

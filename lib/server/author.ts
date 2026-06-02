@@ -1,4 +1,4 @@
-import { authorWorks, allAuthorNames } from "../data";
+import { authorWorks, allAuthorNames } from "./catalog-store";
 
 export function getAuthorStaticParams() {
   return allAuthorNames().map((name) => ({ name: encodeURIComponent(name) }));

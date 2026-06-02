@@ -44,7 +44,7 @@ register: product
 
 ## Data Governance
 
-- 운영 카탈로그의 권위 소스는 서버 DB `catalog_snapshot`이다. `lib/data/titles.ts`와 `lib/data/reviews.ts` 파일 seed는 제거하고, DB 스냅샷이 없으면 빈 런타임 카탈로그로 시작한다.
+- 운영 카탈로그의 권위 소스는 서버 DB `catalog_snapshot`이다. `lib/data/` 파일 seed는 제거하고, `lib/server/catalog-store.ts` 서버 런타임 카탈로그는 DB 스냅샷에서만 채운다. DB 스냅샷이 없으면 빈 런타임 카탈로그로 시작한다.
 - 수집은 `scripts/crawl.mjs --json --no-file` → Nest `CatalogService` → DB 스냅샷 저장 → 메모리 카탈로그 갱신 순서로 흐른다.
 - 국내 전체 확장은 `lib/server/catalog-sources.ts`의 source registry가 관리한다. 현재 crawler 소스(네이버웹툰·네이버시리즈·카카오웹툰·레진)와 제휴/정책 확인이 필요한 pending 소스를 분리한다.
 - 기본 수집 모드는 `CATALOG_INGEST_MODE=off`이며, 플랫폼별 약관/robots/API 정책/제휴 가능성을 확인한 뒤 `fixed`로 전환한다.
