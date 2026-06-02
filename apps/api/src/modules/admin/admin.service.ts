@@ -1065,20 +1065,21 @@ async function countFrom(table: Table, where?: SQL) {
 }
 
 async function countDistinctActiveUsers(from: number) {
+  // from은 epoch-ms 숫자. PG timestamp 컬럼과 비교하려면 timestamp로 변환한다.
   const result = await dbClient.execute({
     sql: `
-      SELECT COUNT(DISTINCT userId) AS total
+      SELECT COUNT(DISTINCT "userId") AS total
       FROM (
-        SELECT userId FROM review WHERE createdAt >= ?
+        SELECT "userId" FROM review WHERE "createdAt" >= to_timestamp(? / 1000.0)
         UNION ALL
-        SELECT userId FROM fan_post WHERE createdAt >= ?
+        SELECT "userId" FROM fan_post WHERE "createdAt" >= to_timestamp(? / 1000.0)
         UNION ALL
-        SELECT userId FROM fan_post_reply WHERE createdAt >= ?
+        SELECT "userId" FROM fan_post_reply WHERE "createdAt" >= to_timestamp(? / 1000.0)
         UNION ALL
-        SELECT userId FROM rating WHERE updatedAt >= ?
+        SELECT "userId" FROM rating WHERE "updatedAt" >= to_timestamp(? / 1000.0)
         UNION ALL
-        SELECT userId FROM collection WHERE createdAt >= ?
-      )
+        SELECT "userId" FROM collection WHERE "createdAt" >= to_timestamp(? / 1000.0)
+      ) AS active_users
     `,
     args: [from, from, from, from, from],
   });
@@ -1089,11 +1090,15 @@ async function countDistinctActiveUsers(from: number) {
 async function ensureAdminSchema() {
   if (adminSchemaReady) return;
 
-  const userInfo = await dbClient.execute(`PRAGMA table_info("user")`);
-  const userColumnRows = userInfo.rows as Array<Record<string, unknown>>;
-  const hasRole = hasColumn(userColumnRows, "role");
+  const userInfo = await dbClient.execute({
+    sql: `SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+    args: ["user", "role"],
+  });
+  const hasRole = userInfo.rows.length > 0;
   if (!hasRole) {
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+    await dbClient.execute(
+      `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`
+    );
   }
 
   for (const sqlText of getAdminMigrationSql()) {
@@ -1105,35 +1110,42 @@ async function ensureAdminSchema() {
 }
 
 function getAdminMigrationSql() {
+  // PostgreSQL DDL — lib/db/schema.ts(pgTable)와 컬럼 타입을 일치시킨다.
+  //  camelCase 식별자는 PG에서 소문자 폴딩되므로 큰따옴표로 보존, "user"는 예약어라 항상 인용.
+  //  타입: ms 타임스탬프→timestamp, boolean INTEGER→boolean, *Cents→bigint, json TEXT→jsonb.
   return [
-    "CREATE TABLE IF NOT EXISTS creator_profile ( id TEXT PRIMARY KEY, userId TEXT NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, displayName TEXT NOT NULL DEFAULT '', profile TEXT NOT NULL DEFAULT '', payoutChannel TEXT NOT NULL DEFAULT '', payoutHandle TEXT NOT NULL DEFAULT '', isVerifiedCreator INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000), updatedAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000) )",
-    "CREATE TABLE IF NOT EXISTS monetization_plan ( id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', intervalDays INTEGER NOT NULL DEFAULT 30, currency TEXT NOT NULL DEFAULT 'KRW', priceCents INTEGER NOT NULL, perks TEXT NOT NULL DEFAULT '[]', isActive INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000), updatedAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000) )",
-    "CREATE TABLE IF NOT EXISTS creator_campaign ( id TEXT PRIMARY KEY, creatorId TEXT NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, titleId TEXT, planId TEXT REFERENCES monetization_plan(id) ON DELETE SET NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', targetAmountCents INTEGER NOT NULL DEFAULT 0, raisedAmountCents INTEGER NOT NULL DEFAULT 0, isActive INTEGER NOT NULL DEFAULT 1, startsAt INTEGER, endsAt INTEGER, createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000), updatedAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000) )",
-    "CREATE TABLE IF NOT EXISTS revenue_ledger ( id TEXT PRIMARY KEY, payerId TEXT NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, recipientId TEXT NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, planId TEXT REFERENCES monetization_plan(id) ON DELETE SET NULL, campaignId TEXT REFERENCES creator_campaign(id) ON DELETE SET NULL, kind TEXT NOT NULL DEFAULT 'plan', status TEXT NOT NULL DEFAULT 'paid', amountCents INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'KRW', metadata TEXT NOT NULL DEFAULT '{}', reviewedBy TEXT REFERENCES \"user\"(id) ON DELETE SET NULL, reviewedAt INTEGER, reviewNote TEXT DEFAULT '', settledAt INTEGER, createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now')*1000) )",
-    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_createdAt ON revenue_ledger(createdAt)",
-    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_status_createdAt ON revenue_ledger(status, createdAt)",
+    "CREATE TABLE IF NOT EXISTS creator_profile ( id text PRIMARY KEY, \"userId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"displayName\" text NOT NULL DEFAULT '', profile text NOT NULL DEFAULT '', \"payoutChannel\" text NOT NULL DEFAULT '', \"payoutHandle\" text NOT NULL DEFAULT '', \"isVerifiedCreator\" boolean NOT NULL DEFAULT false, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS monetization_plan ( id text PRIMARY KEY, code text NOT NULL UNIQUE, name text NOT NULL, description text NOT NULL DEFAULT '', \"intervalDays\" integer NOT NULL DEFAULT 30, currency text NOT NULL DEFAULT 'KRW', \"priceCents\" bigint NOT NULL, perks jsonb NOT NULL DEFAULT '[]'::jsonb, \"isActive\" boolean NOT NULL DEFAULT true, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS creator_campaign ( id text PRIMARY KEY, \"creatorId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"titleId\" text, \"planId\" text REFERENCES monetization_plan(id) ON DELETE SET NULL, title text NOT NULL, description text NOT NULL DEFAULT '', \"targetAmountCents\" bigint NOT NULL DEFAULT 0, \"raisedAmountCents\" bigint NOT NULL DEFAULT 0, \"isActive\" boolean NOT NULL DEFAULT true, \"startsAt\" timestamp, \"endsAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now(), \"updatedAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS revenue_ledger ( id text PRIMARY KEY, \"payerId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"recipientId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"planId\" text REFERENCES monetization_plan(id) ON DELETE SET NULL, \"campaignId\" text REFERENCES creator_campaign(id) ON DELETE SET NULL, kind text NOT NULL DEFAULT 'plan', status text NOT NULL DEFAULT 'paid', \"amountCents\" bigint NOT NULL, currency text NOT NULL DEFAULT 'KRW', metadata jsonb NOT NULL DEFAULT '{}'::jsonb, \"reviewedBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"reviewedAt\" timestamp, \"reviewNote\" text DEFAULT '', \"settledAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_createdAt ON revenue_ledger(\"createdAt\")",
+    "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_status_createdAt ON revenue_ledger(status, \"createdAt\")",
   ];
 }
 
 async function ensureRevenueLedgerAuditColumns() {
-  const info = await dbClient.execute(`PRAGMA table_info("revenue_ledger")`);
+  // information_schema로 컬럼 존재를 확인(PRAGMA 대체). 컬럼명은 camelCase로 인용 비교.
+  const info = await dbClient.execute({
+    sql: `SELECT column_name AS name FROM information_schema.columns WHERE table_name = ?`,
+    args: ["revenue_ledger"],
+  });
   const rows = info.rows as Array<Record<string, unknown>>;
   if (!hasColumn(rows, "reviewedBy")) {
     await dbClient.execute(
-      `ALTER TABLE revenue_ledger ADD COLUMN reviewedBy TEXT REFERENCES "user"(id) ON DELETE SET NULL`
+      `ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewedBy" text REFERENCES "user"(id) ON DELETE SET NULL`
     );
   }
   if (!hasColumn(rows, "reviewedAt")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN reviewedAt INTEGER`);
+    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewedAt" timestamp`);
   }
   if (!hasColumn(rows, "reviewNote")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN reviewNote TEXT DEFAULT ''`);
+    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "reviewNote" text DEFAULT ''`);
   }
   if (!hasColumn(rows, "settledAt")) {
-    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN settledAt INTEGER`);
+    await dbClient.execute(`ALTER TABLE revenue_ledger ADD COLUMN IF NOT EXISTS "settledAt" timestamp`);
   }
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_revenue_ledger_reviewedAt ON revenue_ledger(reviewedAt)");
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_revenue_ledger_settledAt ON revenue_ledger(settledAt)");
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_revenue_ledger_reviewedAt ON revenue_ledger("reviewedAt")`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_revenue_ledger_settledAt ON revenue_ledger("settledAt")`);
 }
 
 function hasColumn(rows: Record<string, unknown>[], columnName: string) {

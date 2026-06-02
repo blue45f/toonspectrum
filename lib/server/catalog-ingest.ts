@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, notInArray } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
 import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "./catalog-store";
 import type { Title } from "../types";
@@ -22,6 +22,10 @@ export interface CatalogIngestConfig {
   triggerToken: string;
   sourceIds: ReturnType<typeof parseCatalogSourceIds>;
   minRetainRatio: number;
+  // 폴링 핫 리로드 주기(초). 0이면 비활성(스케줄러 ingest의 in-process 갱신만).
+  refreshPollSeconds: number;
+  // 보존할 최신 스냅샷 개수(나머지 프루닝). 무한 증가(52MB/행) 방지.
+  snapshotRetention: number;
 }
 
 // 품질 게이트 상수: 직전에 이 이상 수집되던 주요 소스가 0이 되면 '붕괴'로 간주.
@@ -62,6 +66,8 @@ type EnvLike = Partial<Record<string, string | undefined>>;
 
 const execSource = "crawl.mjs";
 let schemaReady = false;
+// 현재 메모리에 로드된 current 스냅샷 id — 폴링 핫 리로드의 변경 감지 기준.
+let loadedSnapshotId: string | null = null;
 
 export function normalizeCatalogIngestConfig(env: EnvLike = process.env): CatalogIngestConfig {
   return {
@@ -76,6 +82,8 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
     sourceIds: parseCatalogSourceIds(env.WEBDEX_SOURCE_IDS),
     // 직전 스냅샷 대비 이 비율 미만으로 총건수가 급감하면(force 아니면) 승격 거부 (0<r<=1)
     minRetainRatio: parseBoundedRatio(env.CATALOG_INGEST_MIN_RETAIN_RATIO, 0.6),
+    refreshPollSeconds: parseBoundedInt(env.CATALOG_REFRESH_POLL_SECONDS, 60, 0, 3600),
+    snapshotRetention: parseBoundedInt(env.CATALOG_SNAPSHOT_RETENTION, 5, 1, 100),
   };
 }
 
@@ -158,37 +166,37 @@ export async function ensureCatalogIngestSchema() {
     CREATE TABLE IF NOT EXISTS catalog_snapshot (
       id TEXT PRIMARY KEY,
       source TEXT NOT NULL,
-      sourceVersion TEXT,
-      titleCount INTEGER NOT NULL DEFAULT 0,
-      isCurrent INTEGER NOT NULL DEFAULT 0,
+      "sourceVersion" TEXT,
+      "titleCount" INTEGER NOT NULL DEFAULT 0,
+      "isCurrent" BOOLEAN NOT NULL DEFAULT false,
       snapshot TEXT NOT NULL,
-      metadata TEXT NOT NULL DEFAULT '{}',
-      createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot(isCurrent, createdAt)");
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot(createdAt)");
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot("isCurrent", "createdAt")`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot("createdAt")`);
 
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS catalog_ingest_run (
       id TEXT PRIMARY KEY,
       source TEXT NOT NULL,
       status TEXT NOT NULL,
-      runHash TEXT,
-      triggeredBy TEXT,
-      requestedBy TEXT,
-      startedAt INTEGER NOT NULL,
-      finishedAt INTEGER,
-      durationMs INTEGER,
-      titleCount INTEGER NOT NULL DEFAULT 0,
+      "runHash" TEXT,
+      "triggeredBy" TEXT,
+      "requestedBy" TEXT,
+      "startedAt" TIMESTAMPTZ NOT NULL,
+      "finishedAt" TIMESTAMPTZ,
+      "durationMs" INTEGER,
+      "titleCount" INTEGER NOT NULL DEFAULT 0,
       message TEXT,
       error TEXT,
-      metadata TEXT NOT NULL DEFAULT '{}',
-      createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_created ON catalog_ingest_run(createdAt)");
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_status ON catalog_ingest_run(status, createdAt)");
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_created ON catalog_ingest_run("createdAt")`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_status ON catalog_ingest_run(status, "createdAt")`);
 
   schemaReady = true;
 }
@@ -204,6 +212,7 @@ export async function loadLatestCatalogSnapshotFromDb() {
 
   if (!snapshot) {
     resetCatalogToEmpty("no-current-db-snapshot");
+    loadedSnapshotId = null;
     return {
       loaded: false,
       source: "empty",
@@ -215,6 +224,7 @@ export async function loadLatestCatalogSnapshotFromDb() {
   try {
     const parsed = JSON.parse(snapshot.snapshot);
     const titles = loadCatalogSnapshot(parsed, snapshot.sourceVersion ?? snapshot.source, false);
+    loadedSnapshotId = snapshot.id;
     return {
       loaded: true,
       snapshotId: snapshot.id,
@@ -228,6 +238,37 @@ export async function loadLatestCatalogSnapshotFromDb() {
     resetCatalogToEmpty("invalid-db-snapshot");
     throw new Error(`catalog snapshot parse failed: ${error instanceof Error ? error.message : "unknown"}`);
   }
+}
+
+export function getLoadedSnapshotId() {
+  return loadedSnapshotId;
+}
+
+// DB의 현재 current 스냅샷 id (가벼운 조회 — 폴링용).
+export async function getCurrentSnapshotIdFromDb(): Promise<string | null> {
+  await ensureCatalogIngestSchema();
+  const [row] = await db
+    .select({ id: catalogSnapshots.id })
+    .from(catalogSnapshots)
+    .where(eq(catalogSnapshots.isCurrent, true))
+    .orderBy(desc(catalogSnapshots.createdAt))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+// 무중단 핫 리로드: DB current 스냅샷이 메모리에 로드된 것과 다르면 재로드.
+// 외부 프로세스(CLI/cron/다른 인스턴스)가 ingest해도 재시작 없이 수렴한다.
+export async function refreshCatalogIfChanged(): Promise<{
+  reloaded: boolean;
+  snapshotId: string | null;
+  titleCount: number;
+}> {
+  const dbId = await getCurrentSnapshotIdFromDb();
+  if (dbId === loadedSnapshotId) {
+    return { reloaded: false, snapshotId: loadedSnapshotId, titleCount: getCatalogState().titleCount };
+  }
+  const result = await loadLatestCatalogSnapshotFromDb();
+  return { reloaded: true, snapshotId: loadedSnapshotId, titleCount: result.titleCount };
 }
 
 export async function getCatalogIngestStatus(config = normalizeCatalogIngestConfig()) {
@@ -368,6 +409,7 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
         requestedBy,
         triggeredBy,
         metadata: payload.metadata,
+        retention: config.snapshotRetention,
       });
     }
 
@@ -450,6 +492,7 @@ async function persistCatalogSnapshot(input: {
   requestedBy: string;
   triggeredBy: string;
   metadata: unknown;
+  retention?: number;
 }) {
   const snapshotId = randomUUID();
   await db.transaction(async (tx) => {
@@ -470,6 +513,20 @@ async function persistCatalogSnapshot(input: {
       },
     });
   });
+  loadedSnapshotId = snapshotId;
+
+  // 보존: 최신 N개만 남기고 오래된 스냅샷 프루닝(스냅샷 1행이 수십 MB라 무한 증가 방지).
+  const retention = Math.max(1, input.retention ?? 5);
+  const keep = await db
+    .select({ id: catalogSnapshots.id })
+    .from(catalogSnapshots)
+    .orderBy(desc(catalogSnapshots.createdAt))
+    .limit(retention);
+  const keepIds = keep.map((k) => k.id);
+  if (keepIds.length) {
+    await db.delete(catalogSnapshots).where(notInArray(catalogSnapshots.id, keepIds));
+  }
+
   return snapshotId;
 }
 
@@ -557,6 +614,9 @@ function withoutToken(config: CatalogIngestConfig) {
     scriptPath: config.scriptPath,
     sourceIds: config.sourceIds,
     minRetainRatio: config.minRetainRatio,
+    refreshPollSeconds: config.refreshPollSeconds,
+    snapshotRetention: config.snapshotRetention,
+    loadedSnapshotId: getLoadedSnapshotId(),
     triggerTokenConfigured: Boolean(config.triggerToken),
   };
 }

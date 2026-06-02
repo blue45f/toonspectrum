@@ -1,23 +1,29 @@
-import { sqliteTable, text, integer, primaryKey, unique } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, bigint, timestamp, boolean, jsonb, primaryKey, unique } from "drizzle-orm/pg-core";
+
+// libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
+//  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
+//  - integer{mode:"boolean"}      → boolean
+//  - text{mode:"json"}            → jsonb
+//  - 금액(*Cents)                 → bigint({mode:"number"})  (KRW 큰 금액 int32 오버플로 방지)
 
 // ── 인증 사용자 테이블 + 확장 컬럼 ──────────────
-export const users = sqliteTable("user", {
+export const users = pgTable("user", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
   email: text("email").unique(),
-  emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
   role: text("role").notNull().default("user"),
   // 확장: 크리덴셜 로그인·프로필
   passwordHash: text("passwordHash"),
   avatar: text("avatar"), // 아바타 컬러 hex
   bio: text("bio"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const accounts = sqliteTable(
+export const accounts = pgTable(
   "account",
   {
     userId: text("userId")
@@ -37,26 +43,26 @@ export const accounts = sqliteTable(
   (a) => [primaryKey({ columns: [a.provider, a.providerAccountId] })]
 );
 
-export const sessions = sqliteTable("session", {
+export const sessions = pgTable("session", {
   sessionToken: text("sessionToken").primaryKey(),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
-export const verificationTokens = sqliteTable(
+export const verificationTokens = pgTable(
   "verificationToken",
   {
     identifier: text("identifier").notNull(),
     token: text("token").notNull(),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
   },
   (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })]
 );
 
 // ── 사용자 데이터 (localStorage → DB) ──────────────────────
-export const ratings = sqliteTable(
+export const ratings = pgTable(
   "rating",
   {
     userId: text("userId")
@@ -64,12 +70,12 @@ export const ratings = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     titleId: text("titleId").notNull(),
     value: integer("value").notNull(), // 0.5~5 → ×10 정수 저장(5~50)
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (t) => [primaryKey({ columns: [t.userId, t.titleId] })]
 );
 
-export const reviews = sqliteTable(
+export const reviews = pgTable(
   "review",
   {
     id: text("id")
@@ -81,14 +87,14 @@ export const reviews = sqliteTable(
     titleId: text("titleId").notNull(),
     rating: integer("rating").notNull(), // ×10 정수
     text: text("text").notNull().default(""),
-    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
-    spoiler: integer("spoiler", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    spoiler: boolean("spoiler").notNull().default(false),
+    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.titleId)]
 );
 
-export const reads = sqliteTable(
+export const reads = pgTable(
   "read",
   {
     userId: text("userId")
@@ -100,7 +106,7 @@ export const reads = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.titleId] })]
 );
 
-export const subscriptions = sqliteTable(
+export const subscriptions = pgTable(
   "subscription",
   {
     userId: text("userId")
@@ -111,7 +117,7 @@ export const subscriptions = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.titleId] })]
 );
 
-export const collections = sqliteTable("collection", {
+export const collections = pgTable("collection", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -120,10 +126,10 @@ export const collections = sqliteTable("collection", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   emoji: text("emoji").notNull().default("📚"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const collectionItems = sqliteTable(
+export const collectionItems = pgTable(
   "collection_item",
   {
     collectionId: text("collectionId")
@@ -134,7 +140,7 @@ export const collectionItems = sqliteTable(
   (t) => [primaryKey({ columns: [t.collectionId, t.titleId] })]
 );
 
-export const reviewLikes = sqliteTable(
+export const reviewLikes = pgTable(
   "review_like",
   {
     userId: text("userId")
@@ -145,7 +151,7 @@ export const reviewLikes = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.reviewId] })]
 );
 
-export const reviewReplies = sqliteTable("review_reply", {
+export const reviewReplies = pgTable("review_reply", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -155,11 +161,11 @@ export const reviewReplies = sqliteTable("review_reply", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   text: text("text").notNull(),
-  spoiler: integer("spoiler", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  spoiler: boolean("spoiler").notNull().default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const fanPosts = sqliteTable("fan_post", {
+export const fanPosts = pgTable("fan_post", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -172,11 +178,11 @@ export const fanPosts = sqliteTable("fan_post", {
   kind: text("kind").notNull().default("talk"), // talk | theory | fanart | cheer
   title: text("title").notNull(),
   text: text("text").notNull(),
-  tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const fanPostReplies = sqliteTable("fan_post_reply", {
+export const fanPostReplies = pgTable("fan_post_reply", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -188,10 +194,10 @@ export const fanPostReplies = sqliteTable("fan_post_reply", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   text: text("text").notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const creatorProfiles = sqliteTable("creator_profile", {
+export const creatorProfiles = pgTable("creator_profile", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -202,12 +208,12 @@ export const creatorProfiles = sqliteTable("creator_profile", {
   profile: text("profile").notNull().default(""),
   payoutChannel: text("payoutChannel").notNull().default(""),
   payoutHandle: text("payoutHandle").notNull().default(""),
-  isVerifiedCreator: integer("isVerifiedCreator", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  isVerifiedCreator: boolean("isVerifiedCreator").notNull().default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const monetizationPlans = sqliteTable("monetization_plan", {
+export const monetizationPlans = pgTable("monetization_plan", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -216,14 +222,14 @@ export const monetizationPlans = sqliteTable("monetization_plan", {
   description: text("description").notNull().default(""),
   intervalDays: integer("intervalDays").notNull().default(30),
   currency: text("currency").notNull().default("KRW"),
-  priceCents: integer("priceCents").notNull(),
-  perks: text("perks", { mode: "json" }).$type<string[]>().notNull().default([]),
-  isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  priceCents: bigint("priceCents", { mode: "number" }).notNull(),
+  perks: jsonb("perks").$type<string[]>().notNull().default([]),
+  isActive: boolean("isActive").notNull().default(true),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const creatorCampaigns = sqliteTable("creator_campaign", {
+export const creatorCampaigns = pgTable("creator_campaign", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -234,16 +240,16 @@ export const creatorCampaigns = sqliteTable("creator_campaign", {
   planId: text("planId").references(() => monetizationPlans.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
-  targetAmountCents: integer("targetAmountCents").notNull().default(0),
-  raisedAmountCents: integer("raisedAmountCents").notNull().default(0),
-  isActive: integer("isActive", { mode: "boolean" }).notNull().default(true),
-  startsAt: integer("startsAt", { mode: "timestamp_ms" }),
-  endsAt: integer("endsAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  targetAmountCents: bigint("targetAmountCents", { mode: "number" }).notNull().default(0),
+  raisedAmountCents: bigint("raisedAmountCents", { mode: "number" }).notNull().default(0),
+  isActive: boolean("isActive").notNull().default(true),
+  startsAt: timestamp("startsAt", { mode: "date" }),
+  endsAt: timestamp("endsAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const revenueLedger = sqliteTable("revenue_ledger", {
+export const revenueLedger = pgTable("revenue_ledger", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -257,30 +263,30 @@ export const revenueLedger = sqliteTable("revenue_ledger", {
   campaignId: text("campaignId").references(() => creatorCampaigns.id, { onDelete: "set null" }),
   kind: text("kind").notNull().default("plan"),
   status: text("status").notNull().default("paid"),
-  amountCents: integer("amountCents").notNull(),
+  amountCents: bigint("amountCents", { mode: "number" }).notNull(),
   currency: text("currency").notNull().default("KRW"),
-  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
+  metadata: jsonb("metadata").notNull().default({}),
   reviewedBy: text("reviewedBy").references(() => users.id, { onDelete: "set null" }),
-  reviewedAt: integer("reviewedAt", { mode: "timestamp_ms" }),
+  reviewedAt: timestamp("reviewedAt", { mode: "date" }),
   reviewNote: text("reviewNote").default(""),
-  settledAt: integer("settledAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  settledAt: timestamp("settledAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const catalogSnapshots = sqliteTable("catalog_snapshot", {
+export const catalogSnapshots = pgTable("catalog_snapshot", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   source: text("source").notNull(), // crawl/manual/manual-file/synthetic
   sourceVersion: text("sourceVersion"),
   titleCount: integer("titleCount").notNull().default(0),
-  isCurrent: integer("isCurrent", { mode: "boolean" }).notNull().default(false),
+  isCurrent: boolean("isCurrent").notNull().default(false),
   snapshot: text("snapshot").notNull(), // JSON stringified title[] payload
-  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-export const catalogIngestRuns = sqliteTable("catalog_ingest_run", {
+export const catalogIngestRuns = pgTable("catalog_ingest_run", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -289,12 +295,12 @@ export const catalogIngestRuns = sqliteTable("catalog_ingest_run", {
   runHash: text("runHash"),
   triggeredBy: text("triggeredBy"),
   requestedBy: text("requestedBy"),
-  startedAt: integer("startedAt", { mode: "timestamp_ms" }).notNull(),
-  finishedAt: integer("finishedAt", { mode: "timestamp_ms" }),
+  startedAt: timestamp("startedAt", { mode: "date" }).notNull(),
+  finishedAt: timestamp("finishedAt", { mode: "date" }),
   durationMs: integer("durationMs"),
   titleCount: integer("titleCount").notNull().default(0),
   message: text("message"),
   error: text("error"),
-  metadata: text("metadata", { mode: "json" }).notNull().default("{}"),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });

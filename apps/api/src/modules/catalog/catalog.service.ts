@@ -13,7 +13,7 @@ import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../..
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
 import { getAuthorData } from "../../../../../lib/server/author";
 import { getCalendarData } from "../../../../../lib/server/calendar";
-import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, runCatalogIngest, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
+import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
 import { getExploreData } from "../../../../../lib/server/explore";
 import { getHomeData } from "../../../../../lib/server/home";
 import { getInsightsData } from "../../../../../lib/server/insights";
@@ -86,6 +86,7 @@ export class CatalogService implements OnModuleInit {
   private ingestTimer: ReturnType<typeof setTimeout> | null = null;
   private nextCatalogIngestAt: number | null = null;
   private consecutiveIngestFailures = 0;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   async onModuleInit() {
     try {
@@ -95,6 +96,34 @@ export class CatalogService implements OnModuleInit {
     }
     startLiveRankingScheduler();
     this.scheduleNextCatalogIngest();
+    this.startCatalogRefreshPoll();
+  }
+
+  // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 스냅샷을 ingest하면
+  // 재시작 없이 메모리 카탈로그를 갱신한다. Neon 풀러는 LISTEN/NOTIFY 미지원 → 폴링이 견고.
+  private startCatalogRefreshPoll() {
+    const seconds = this.ingestConfig.refreshPollSeconds;
+    if (!seconds) return; // 0 = 비활성
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
+    this.refreshTimer = setInterval(() => {
+      if (this.ingestInProgress) return; // ingest 중엔 건너뜀(곧 in-process 갱신됨)
+      void refreshCatalogIfChanged()
+        .then((r) => {
+          if (r.reloaded) {
+            console.log(`catalog hot-reloaded: snapshot=${r.snapshotId} titles=${r.titleCount}`);
+          }
+        })
+        .catch((error) => console.error("catalog refresh poll failed", error));
+    }, seconds * 1000);
+    if (typeof this.refreshTimer.unref === "function") this.refreshTimer.unref();
+  }
+
+  // 강제 리로드(엔드포인트용) — 변경 없으면 reloaded:false. 토큰 설정 시 일치 필요(reload는 read-only).
+  async refreshCatalog(headerToken?: string) {
+    if (this.ingestConfig.triggerToken && headerToken !== this.ingestConfig.triggerToken) {
+      throw new UnauthorizedException("invalid catalog ingest token");
+    }
+    return refreshCatalogIfChanged();
   }
 
   async getHomeData() {

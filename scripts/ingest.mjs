@@ -8,15 +8,24 @@
 //   pnpm ingest                     # 기본 소스셋으로 새로 크롤 후 적재
 //   pnpm ingest --from out.json     # 미리 크롤해 둔 JSON(crawl.mjs --json) 적재(재크롤 없음)
 //   WEBDEX_SOURCE_IDS=all pnpm ingest
-import { createClient } from "@libsql/client";
+import pg from "pg";
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const ROOT = process.cwd();
+
+// 레포 루트 .env.local 로드(→ DATABASE_URL이 있으면 Neon, 없으면 로컬 docker 폴백).
+if (existsSync(path.join(ROOT, ".env.local"))) {
+  try {
+    process.loadEnvFile(path.join(ROOT, ".env.local"));
+  } catch {
+    // 무시
+  }
+}
 
 function argValue(flag) {
   const i = process.argv.indexOf(flag);
@@ -57,24 +66,26 @@ async function loadPayload() {
   return JSON.parse(stdout);
 }
 
-async function ensureSchema(db) {
-  await db.execute(`
+async function ensureSchema(client) {
+  // 컬럼명은 Drizzle pgTable과 동일한 camelCase(대소문자 보존) → 따옴표 필수.
+  // 테이블은 이미 drizzle-kit push 로 존재(IF NOT EXISTS no-op). 신규 DB 대비 타입은 schema.ts와 일치.
+  await client.query(`
     CREATE TABLE IF NOT EXISTS catalog_snapshot (
-      id TEXT PRIMARY KEY,
-      source TEXT NOT NULL,
-      sourceVersion TEXT,
-      titleCount INTEGER NOT NULL DEFAULT 0,
-      isCurrent INTEGER NOT NULL DEFAULT 0,
-      snapshot TEXT NOT NULL,
-      metadata TEXT NOT NULL DEFAULT '{}',
-      createdAt INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+      "id" text PRIMARY KEY,
+      "source" text NOT NULL,
+      "sourceVersion" text,
+      "titleCount" integer NOT NULL DEFAULT 0,
+      "isCurrent" boolean NOT NULL DEFAULT false,
+      "snapshot" text NOT NULL,
+      "metadata" jsonb NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" timestamptz NOT NULL DEFAULT now()
     )
   `);
-  await db.execute(
-    "CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot(isCurrent, createdAt)"
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot ("isCurrent", "createdAt")`
   );
-  await db.execute(
-    "CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot(createdAt)"
+  await client.query(
+    `CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot ("createdAt")`
   );
 }
 
@@ -86,45 +97,56 @@ async function main() {
     process.exit(1);
   }
 
-  const url = process.env.TURSO_DATABASE_URL ?? "file:./data/webdex.db";
-  const authToken = process.env.TURSO_AUTH_TOKEN;
-  const db = createClient({ url, ...(authToken ? { authToken } : {}) });
-
-  await ensureSchema(db);
-
-  const snapshotJson = JSON.stringify(titles);
-  const id = randomUUID();
-  const sourceVersion = payload.sourceVersion ?? `local-ingest/${new Date().toISOString()}`;
-  const runHash = createHash("sha256").update(snapshotJson).digest("hex");
-  const metadata = JSON.stringify({
-    runHash,
-    runId: id,
-    requestedBy: "local-cli",
-    triggeredBy: "ingest.mjs",
-    crawler: payload.metadata ?? null,
+  const url =
+    process.env.DATABASE_URL ?? "postgres://webdex:webdex@127.0.0.1:55432/webdex";
+  const needsSsl = /neon\.tech|sslmode=require/i.test(url);
+  const client = new pg.Client({
+    connectionString: url,
+    ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
   });
+  await client.connect();
 
-  // 원자적 승격: 직전 current 내림 → 신규 current 적재.
-  await db.batch(
-    [
-      { sql: "UPDATE catalog_snapshot SET isCurrent = 0 WHERE isCurrent = 1" },
-      {
-        sql: `INSERT INTO catalog_snapshot
-                (id, source, sourceVersion, titleCount, isCurrent, snapshot, metadata, createdAt)
-              VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
-        args: [id, "local-ingest", sourceVersion, titles.length, snapshotJson, metadata, Date.now()],
-      },
-    ],
-    "write"
-  );
+  try {
+    await ensureSchema(client);
 
-  const withCover = titles.filter((t) => t.coverImage).length;
-  const sources = payload.metadata?.sources ?? {};
-  console.error(
-    `적재 완료: ${titles.length}편 (coverImage ${withCover}) · snapshot=${id}\n` +
-      `소스: ${JSON.stringify(sources)}\n` +
-      `→ 개발 서버를 재시작하면 카탈로그에 반영됩니다 (catalog-store는 부팅 시 로드).`
-  );
+    const snapshotJson = JSON.stringify(titles);
+    const id = randomUUID();
+    const sourceVersion = payload.sourceVersion ?? `local-ingest/${new Date().toISOString()}`;
+    const runHash = createHash("sha256").update(snapshotJson).digest("hex");
+    const metadata = JSON.stringify({
+      runHash,
+      runId: id,
+      requestedBy: "local-cli",
+      triggeredBy: "ingest.mjs",
+      crawler: payload.metadata ?? null,
+    });
+
+    // 원자적 승격: 직전 current 내림 → 신규 current 적재.
+    try {
+      await client.query("BEGIN");
+      await client.query(`UPDATE catalog_snapshot SET "isCurrent" = false WHERE "isCurrent" = true`);
+      await client.query(
+        `INSERT INTO catalog_snapshot
+           ("id", "source", "sourceVersion", "titleCount", "isCurrent", "snapshot", "metadata", "createdAt")
+         VALUES ($1, $2, $3, $4, true, $5, $6::jsonb, now())`,
+        [id, "local-ingest", sourceVersion, titles.length, snapshotJson, metadata]
+      );
+      await client.query("COMMIT");
+    } catch (txError) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw txError;
+    }
+
+    const withCover = titles.filter((t) => t.coverImage).length;
+    const sources = payload.metadata?.sources ?? {};
+    console.error(
+      `적재 완료: ${titles.length}편 (coverImage ${withCover}) · snapshot=${id}\n` +
+        `소스: ${JSON.stringify(sources)}\n` +
+        `→ 개발 서버를 재시작하면 카탈로그에 반영됩니다 (catalog-store는 부팅 시 로드).`
+    );
+  } finally {
+    await client.end();
+  }
 }
 
 main().catch((error) => {

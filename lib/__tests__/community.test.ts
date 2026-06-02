@@ -41,32 +41,24 @@ async function ensureTestUserSchema() {
       id TEXT PRIMARY KEY,
       name TEXT,
       email TEXT UNIQUE,
-      emailVerified INTEGER,
+      "emailVerified" TIMESTAMPTZ,
       image TEXT,
       role TEXT NOT NULL DEFAULT 'user',
-      passwordHash TEXT,
+      "passwordHash" TEXT,
       avatar TEXT,
       bio TEXT,
-      createdAt INTEGER
+      "createdAt" TIMESTAMPTZ
     )
   `);
-  const info = await dbClient.execute(`PRAGMA table_info("user")`);
-  const columns = new Set(
-    info.rows.map((row) => {
-      if (Array.isArray(row)) return String(row[1] ?? "");
-      return String((row as { name?: unknown }).name ?? "");
-    })
-  );
+  // PostgreSQL: ADD COLUMN IF NOT EXISTS (SQLite PRAGMA 불필요). 테이블은 drizzle push로 이미 존재.
   const migrations = [
-    ["role", `ALTER TABLE "user" ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`],
-    ["passwordHash", `ALTER TABLE "user" ADD COLUMN passwordHash TEXT`],
-    ["avatar", `ALTER TABLE "user" ADD COLUMN avatar TEXT`],
-    ["bio", `ALTER TABLE "user" ADD COLUMN bio TEXT`],
-    ["createdAt", `ALTER TABLE "user" ADD COLUMN createdAt INTEGER`],
-  ] as const;
-  for (const [column, sql] of migrations) {
-    if (!columns.has(column)) await dbClient.execute(sql);
-  }
+    `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`,
+    `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT`,
+    `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS avatar TEXT`,
+    `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS bio TEXT`,
+    `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMPTZ`,
+  ];
+  for (const sql of migrations) await dbClient.execute(sql);
 }
 
 async function createCommunityTestUser() {

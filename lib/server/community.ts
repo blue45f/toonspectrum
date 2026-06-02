@@ -45,16 +45,13 @@ let ensured = false;
 
 async function ensureColumn(tableName: string, columnName: string) {
   const info = await dbClient.execute({
-    sql: `PRAGMA table_info(${tableName})`,
-    args: [],
+    sql: "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+    args: [tableName, columnName],
   });
-  const hasColumn = info.rows.some((row) => {
-    if (Array.isArray(row)) return row[1] === columnName;
-    return String((row as { name?: unknown }).name ?? "") === columnName;
-  });
+  const hasColumn = info.rows.length > 0;
   if (!hasColumn) {
     await dbClient.execute({
-      sql: `ALTER TABLE ${tableName} ADD COLUMN ${columnName} TEXT`,
+      sql: `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnName} TEXT`,
       args: [],
     });
   }
@@ -65,47 +62,47 @@ export async function ensureCommunityTables() {
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS review_reply (
       id TEXT PRIMARY KEY,
-      reviewId TEXT NOT NULL,
-      parentId TEXT,
-      userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "reviewId" TEXT NOT NULL,
+      "parentId" TEXT,
+      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       text TEXT NOT NULL,
-      spoiler INTEGER NOT NULL DEFAULT 0,
-      createdAt INTEGER NOT NULL
+      spoiler BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_review_reply_review ON review_reply(reviewId, createdAt)");
+  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_review_reply_review ON review_reply("reviewId", "createdAt")');
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS fan_post (
       id TEXT PRIMARY KEY,
       scope TEXT NOT NULL,
-      targetId TEXT NOT NULL,
-      targetLabel TEXT NOT NULL,
-      userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "targetId" TEXT NOT NULL,
+      "targetLabel" TEXT NOT NULL,
+      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       kind TEXT NOT NULL DEFAULT 'talk',
       title TEXT NOT NULL,
       text TEXT NOT NULL,
-      tags TEXT NOT NULL DEFAULT '[]',
-      createdAt INTEGER NOT NULL
+      tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_fan_post_target ON fan_post(scope, targetId, createdAt)");
+  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_fan_post_target ON fan_post(scope, "targetId", "createdAt")');
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS fan_post_reply (
       id TEXT PRIMARY KEY,
-      postId TEXT NOT NULL REFERENCES fan_post(id) ON DELETE CASCADE,
-      parentId TEXT,
-      userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      "postId" TEXT NOT NULL REFERENCES fan_post(id) ON DELETE CASCADE,
+      "parentId" TEXT,
+      "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
       text TEXT NOT NULL,
-      createdAt INTEGER NOT NULL
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  await dbClient.execute("CREATE INDEX IF NOT EXISTS idx_fan_post_reply_post ON fan_post_reply(postId, createdAt)");
+  await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_fan_post_reply_post ON fan_post_reply("postId", "createdAt")');
   await dbClient.execute(
-    "CREATE INDEX IF NOT EXISTS idx_fan_post_scope_target_kind_created ON fan_post(scope, targetId, kind, createdAt)"
+    'CREATE INDEX IF NOT EXISTS idx_fan_post_scope_target_kind_created ON fan_post(scope, "targetId", kind, "createdAt")'
   );
   await ensureColumn("fan_post_reply", "parentId");
   await dbClient.execute(
-    "CREATE INDEX IF NOT EXISTS idx_fan_post_reply_parent ON fan_post_reply(parentId, createdAt)"
+    'CREATE INDEX IF NOT EXISTS idx_fan_post_reply_parent ON fan_post_reply("parentId", "createdAt")'
   );
   ensured = true;
 }

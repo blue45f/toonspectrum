@@ -1,33 +1,40 @@
-import fs from "node:fs";
-import path from "node:path";
-import { drizzle } from "drizzle-orm/libsql";
-import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-// 로컬: file 기반 libSQL(SQLite 호환). 프로덕션: Turso/libSQL URL + 토큰(env).
-// 외부 클라우드 DB 키 없이도 로컬에서 실제 동작·테스트 가능.
-//
-// 기본 file 경로는 cwd가 아니라 레포 루트(pnpm-workspace.yaml 위치)에 고정한다. API는 apps/api에서,
-// 크롤/ingest 스크립트와 drizzle-kit은 레포 루트에서 실행되는데, cwd 상대경로(`file:./data/...`)면
-// 서로 다른 webdex.db를 가리켜(스냅샷이 한쪽에만 쌓이는 split-brain) 카탈로그가 비어 보인다.
-// apps/api 빌드가 CommonJS라 import.meta는 쓰지 않고 cwd에서 거슬러 올라가 루트를 찾는다.
-function findRepoRoot(start: string): string {
-  let dir = start;
-  for (let i = 0; i < 8; i += 1) {
-    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return start;
-}
+// PostgreSQL(Neon) — node-postgres 드라이버. 로컬 검증은 docker postgres(:55432), 운영/원격은 Neon.
+// DATABASE_URL 미설정 시 로컬 docker 컨테이너로 폴백(개발 편의). Neon은 sslmode=require.
+const connectionString =
+  process.env.DATABASE_URL ?? "postgres://webdex:webdex@127.0.0.1:55432/webdex";
+const needsSsl = /neon\.tech|sslmode=require/i.test(connectionString);
 
-const REPO_ROOT = findRepoRoot(process.cwd());
-const url = process.env.TURSO_DATABASE_URL ?? `file:${path.join(REPO_ROOT, "data", "webdex.db")}`;
-const authToken = process.env.TURSO_AUTH_TOKEN;
+const pool = new Pool({
+  connectionString,
+  ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+});
 
-const client = createClient({ url, ...(authToken ? { authToken } : {}) });
+export const db = drizzle(pool, { schema });
 
-export const db = drizzle(client, { schema });
-export const dbClient = client;
+// 기존 libSQL `dbClient.execute()` 호출부 호환 shim.
+//  - execute(sqlString) 또는 execute({ sql, args })
+//  - libSQL '?' 플레이스홀더 → pg '$1,$2,…' 변환(문자열 리터럴 내 '?'는 없다는 전제; 현 사용처 충족)
+//  - 반환 형태도 libSQL과 유사하게 { rows, rowsAffected, columns }
+type ExecuteInput = string | { sql: string; args?: unknown[] };
+
+export const dbClient = {
+  async execute(input: ExecuteInput) {
+    const text = typeof input === "string" ? input : input.sql;
+    const args = typeof input === "string" ? [] : (input.args ?? []);
+    let i = 0;
+    const pgText = text.replace(/\?/g, () => `$${(i += 1)}`);
+    const res = await pool.query(pgText, args as unknown[]);
+    return {
+      rows: res.rows as Record<string, unknown>[],
+      rowsAffected: res.rowCount ?? 0,
+      columns: res.fields?.map((f) => f.name) ?? [],
+    };
+  },
+};
+
+export const dbPool = pool;
 export * from "./schema";

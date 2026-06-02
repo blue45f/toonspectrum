@@ -161,6 +161,12 @@ export class CatalogController {
     return this.catalogService.runCatalogIngest(body ?? {}, token);
   }
 
+  @Post("/catalog/refresh")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async refreshCatalog(@Headers("x-catalog-ingest-token") token?: string) {
+    return this.catalogService.refreshCatalog(token);
+  }
+
   @Get("/explore")
   @Header("Cache-Control", "no-store")
   async getExplore(@Query() query: QueryMap) {
