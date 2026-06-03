@@ -6,6 +6,7 @@ import { appSettings, db, dbClient, users } from "../db";
 // 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
 export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
+  try {
   const [u] = await db.select({ role: users.role, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
   if (!u) return false;
   const role = String(u.role ?? "").toLowerCase();
@@ -16,6 +17,9 @@ export async function isAdminUser(userId: string | null | undefined): Promise<bo
     .map((s) => s.trim())
     .filter(Boolean);
   return whitelist.includes(String(u.email ?? "").toLowerCase());
+  } catch {
+    return false; // DB(Neon) 불가 시 관리자 아님으로 안전 폴백.
+  }
 }
 
 let ensured = false;
@@ -46,10 +50,15 @@ function sanitize(patch: Partial<AppConfig>): Partial<AppConfig> {
 }
 
 export async function getAppConfig(): Promise<AppConfig> {
-  await ensureSettingsTable();
-  const rows = await db.select().from(appSettings);
-  const raw = (rows.find((r) => r.key === CONFIG_KEY)?.value ?? {}) as Partial<AppConfig>;
-  return { ...DEFAULTS, ...sanitize(raw) };
+  try {
+    await ensureSettingsTable();
+    const rows = await db.select().from(appSettings);
+    const raw = (rows.find((r) => r.key === CONFIG_KEY)?.value ?? {}) as Partial<AppConfig>;
+    return { ...DEFAULTS, ...sanitize(raw) };
+  } catch {
+    // DB(Neon) 불가(쿼터/장애) 시 기본값(전 기능 무료·광고 없음)으로 폴백 — 설정 조회가 페이지를 깨지 않게.
+    return { ...DEFAULTS };
+  }
 }
 
 export async function setAppConfig(patch: Partial<AppConfig>): Promise<AppConfig> {
