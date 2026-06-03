@@ -823,7 +823,24 @@ async function main() {
         extraNew.push(item);
       }
     }
-    log(`${id} 수집: ${rows.length} (신규 ${rows.length - linked}, 교차연결 ${linked})`);
+    // 표지 호스트도 로깅 — /api/cover allowlist 유지보수용(특히 KR egress에서만 잡히는 comico 호스트 확인).
+    const coverHosts = [
+      ...new Set(
+        rows
+          .map((r) => {
+            try {
+              return r.coverImage ? new URL(decodeURIComponent(r.coverImage.replace("/api/cover?u=", ""))).hostname : null;
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean)
+      ),
+    ];
+    log(
+      `${id} 수집: ${rows.length} (신규 ${rows.length - linked}, 교차연결 ${linked})` +
+        (coverHosts.length ? ` · 표지호스트 ${coverHosts.join(", ")}` : "")
+    );
   }
 
   // 시리즈 보너스 중 웹툰과 연결 안 된 것도 standalone 으로 포함
