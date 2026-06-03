@@ -107,7 +107,7 @@ export function TitleFilterPanel({
               className={chip(value.savedOnly)}
             >
               <Bookmark size={12} className={value.savedOnly ? "fill-accent text-accent" : ""} />
-              내 찜만{typeof savedCount === "number" ? ` (${savedCount})` : ""}
+              내 서재만{typeof savedCount === "number" ? ` (${savedCount})` : ""}
             </button>
           </FacetRow>
         )}
