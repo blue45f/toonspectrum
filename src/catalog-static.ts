@@ -36,7 +36,9 @@ const STATIC_FILES: Record<string, string> = {
 let catalogPromise: Promise<void> | null = null;
 function ensureCatalog(origFetch: typeof fetch): Promise<void> {
   if (!catalogPromise) {
-    catalogPromise = origFetch("/data/catalog.json", { cache: "force-cache" })
+    // 표준 HTTP 캐시(max-age=600, ETag 재검증) 사용 — force-cache 는 스냅샷 갱신(신규 작품·
+    // 영상화 등)을 재방문자에게 무기한 숨기므로 쓰지 않는다. 세션 내 1회만 로드(catalogPromise 메모).
+    catalogPromise = origFetch("/data/catalog.json", { cache: "default" })
       .then((r) => {
         if (!r.ok) throw new Error(`catalog.json ${r.status}`);
         return r.json() as Promise<Title[]>;
