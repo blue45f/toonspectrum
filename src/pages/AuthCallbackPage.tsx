@@ -63,7 +63,7 @@ export function AuthCallbackPage() {
           finish(data.user, false);
           return;
         }
-        if (params.demo && (params.demo === "google" || params.demo === "kakao")) {
+        if (params.demo && (params.demo === "google" || params.demo === "kakao" || params.demo === "naver")) {
           const res = await fetch(`/api/auth/oauth/${params.demo}/demo`, { method: "POST" });
           const data = await res.json().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "demo-failed");

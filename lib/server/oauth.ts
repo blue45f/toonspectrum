@@ -2,12 +2,12 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { and, eq } from "drizzle-orm";
 import { accounts, db, users } from "../db";
 
-// ── 소셜 로그인(Google·Kakao) OAuth 2.0 인가-코드 흐름 ──
+// ── 소셜 로그인(Google·Kakao·Naver) OAuth 2.0 인가-코드 흐름 ──
 // 실제 OAuth: 환경변수(client id/secret)가 있으면 동작. 없으면 데모 폴백(명확히 [데모] 표시)으로 대체.
 // 세션은 기존 스킴(localStorage + x-user-id 헤더)과 동일하게 사용자 객체를 프론트로 핸드오프한다.
 // 주의: 이 앱의 인증은 데모 수준(쿠키/서버세션 없음)이라 보안 경계가 약하다 — 실서비스 전 세션 강화 필요.
 
-export type OAuthProviderId = "google" | "kakao";
+export type OAuthProviderId = "google" | "kakao" | "naver";
 
 export interface OAuthUser {
   id: string;
@@ -50,6 +50,20 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
       demoEmail: "demo.google@webdex.local",
     };
   }
+  if (id === "naver") {
+    return {
+      id,
+      label: "네이버",
+      clientId: env("NAVER_OAUTH_CLIENT_ID") ?? env("NAVER_CLIENT_ID"),
+      clientSecret: env("NAVER_OAUTH_CLIENT_SECRET") ?? env("NAVER_CLIENT_SECRET"),
+      authorizeUrl: "https://nid.naver.com/oauth2.0/authorize",
+      tokenUrl: "https://nid.naver.com/oauth2.0/token",
+      userInfoUrl: "https://openapi.naver.com/v1/nid/me",
+      scope: "", // 네이버는 scope 파라미터 없이 앱 설정의 동의항목(이메일·닉네임·프로필)을 사용
+      demoName: "네이버 데모 사용자",
+      demoEmail: "demo.naver@webdex.local",
+    };
+  }
   return {
     id,
     label: "카카오",
@@ -66,7 +80,7 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
 }
 
 export function isOAuthProvider(value: string): value is OAuthProviderId {
-  return value === "google" || value === "kakao";
+  return value === "google" || value === "kakao" || value === "naver";
 }
 
 export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
@@ -79,6 +93,7 @@ export function listAuthProviders() {
   return {
     google: { label: "Google", mode: providerMode("google") },
     kakao: { label: "카카오", mode: providerMode("kakao") },
+    naver: { label: "네이버", mode: providerMode("naver") },
   };
 }
 
@@ -134,7 +149,7 @@ export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | 
   u.searchParams.set("client_id", c.clientId);
   u.searchParams.set("redirect_uri", redirectUri(id));
   u.searchParams.set("response_type", "code");
-  u.searchParams.set("scope", c.scope);
+  if (c.scope) u.searchParams.set("scope", c.scope); // 네이버는 scope 없음
   u.searchParams.set("state", state);
   if (id === "google") {
     u.searchParams.set("access_type", "offline");
@@ -183,6 +198,16 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
       email: typeof raw.email === "string" ? raw.email.toLowerCase() : null,
       name: raw.name ?? raw.given_name ?? null,
       image: raw.picture ?? null,
+    };
+  }
+  if (id === "naver") {
+    // 네이버: { resultcode, message, response: { id, email, name, nickname, profile_image } }
+    const r = raw.response ?? {};
+    return {
+      providerAccountId: String(r.id),
+      email: typeof r.email === "string" ? r.email.toLowerCase() : null,
+      name: r.name ?? r.nickname ?? null,
+      image: r.profile_image ?? null,
     };
   }
   // kakao

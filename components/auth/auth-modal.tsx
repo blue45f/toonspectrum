@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { signIn } from "@/src/compat/auth-session";
-import { X, LogIn, UserPlus } from "lucide-react";
+import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const AVATARS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
+import {
+  AVATAR_PRESETS,
+  MAX_AVATAR_IMAGE_BYTES,
+  pickAvatarPreset,
+  resolveSignupAvatar,
+  resolveSignupAvatarImage,
+} from "@/lib/avatar";
+import { WebdexMark } from "../visual-marks";
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -16,7 +23,7 @@ function DemoTag({ dark }: { dark?: boolean }) {
     <span
       className={cn(
         "rounded px-1 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide",
-        dark ? "bg-black/15 text-[#191600]" : "border border-line bg-raised text-fg-3"
+        dark ? "bg-[oklch(0.2_0.02_60/0.16)] text-on-accent" : "border border-line bg-raised text-fg-3"
       )}
     >
       데모
@@ -24,11 +31,21 @@ function DemoTag({ dark }: { dark?: boolean }) {
   );
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 const authSchema = z.object({
   email: z.string().trim().min(1, "이메일을 입력해 주세요.").email("이메일 형식을 확인해 주세요."),
   password: z.string().min(6, "비밀번호는 6자 이상이어야 해요."),
   name: z.string(),
   avatar: z.string(),
+  image: z.string().nullable(),
 });
 
 type AuthFormValues = z.infer<typeof authSchema>;
@@ -37,18 +54,29 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [providers, setProviders] = useState<Record<string, { label?: string; mode?: string }>>({});
   const [err, setErr] = useState("");
+  const [imageErr, setImageErr] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     register,
     handleSubmit,
     control,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<AuthFormValues>({
     resolver: zodResolver(authSchema),
-    defaultValues: { email: "", password: "", name: "", avatar: AVATARS[1] },
+    defaultValues: { email: "", password: "", name: "", avatar: AVATAR_PRESETS[1].id, image: null },
   });
+
+  const [nameValue, emailValue, avatarValue, imageValue] = watch(["name", "email", "avatar", "image"]);
+  const selectedPreset =
+    AVATAR_PRESETS.find((preset) => preset.id === avatarValue || preset.color === avatarValue) ?? AVATAR_PRESETS[0];
+  const selectedAvatarColor = resolveSignupAvatar(avatarValue);
+  const avatarInitial = (nameValue.trim() || emailValue.trim() || "W").slice(0, 1).toUpperCase();
+  const avatarBackground = `radial-gradient(circle at 32% 24%, ${selectedPreset.accent}, transparent 35%), linear-gradient(145deg, ${selectedAvatarColor}, oklch(0.26 0.04 60))`;
 
   // RHF의 register ref 와 포커스용 emailRef 를 함께 연결
   const emailField = register("email");
@@ -104,14 +132,14 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  const submit = handleSubmit(async ({ email, password, name, avatar }) => {
+  const submit = handleSubmit(async ({ email, password, name, avatar, image }) => {
     setErr("");
     try {
       if (mode === "signup") {
         const r = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, name, avatar }),
+          body: JSON.stringify({ email, password, name, avatar, image }),
         });
         if (!r.ok) {
           setErr((await r.json()).error ?? "가입 실패");
@@ -130,21 +158,48 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   });
 
   const fieldError = errors.email?.message ?? errors.password?.message ?? null;
+  const avatarImage = resolveSignupAvatarImage(imageValue);
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[12vh]">
+  const onAvatarImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    setImageErr("");
+    if (!file) return;
+
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setImageErr("PNG, JPG, WebP 이미지만 업로드할 수 있어요.");
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_IMAGE_BYTES) {
+      setImageErr("이미지는 180KB 이하로 올려 주세요.");
+      return;
+    }
+
+    const dataUrl = await readFileAsDataUrl(file);
+    const safeImage = resolveSignupAvatarImage(dataUrl);
+    if (!safeImage) {
+      setImageErr("이미지를 읽을 수 없어요. 다른 파일을 선택해 주세요.");
+      return;
+    }
+
+    setValue("image", safeImage, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const modal = (
+    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-hidden px-4 py-4 sm:pt-[12vh] sm:pb-6">
       <button
         aria-label="닫기"
         tabIndex={-1}
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.64)] backdrop-blur-sm"
       />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={mode === "login" ? "로그인" : "회원가입"}
-        className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-black/50"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] sm:max-h-[calc(100dvh-7rem)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
         <button onClick={onClose} className="absolute right-3 top-3 text-fg-3 hover:text-fg">
@@ -152,7 +207,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         </button>
         <div className="p-6">
           <div className="mb-1 flex items-center gap-2">
-            <span className="font-display text-lg font-bold tracking-tight">WEBDEX</span>
+            <WebdexMark className="size-7 rounded-[0.55rem]" />
+            <span className="font-display text-lg font-bold">WEBDEX</span>
           </div>
           <p className="mb-5 text-sm text-fg-3">
             {mode === "login" ? "다시 오셨네요. 로그인하세요." : "계정을 만들고 취향을 기록하세요."}
@@ -189,19 +245,101 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   control={control}
                   name="avatar"
                   render={({ field }) => (
-                    <div className="flex items-center gap-2 px-1">
-                      <span className="text-xs text-fg-3">아바타</span>
-                      {AVATARS.map((c, i) => (
+                    <div className="rounded-xl border border-line bg-canvas p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold text-fg-2">아바타</span>
                         <button
-                          key={c}
                           type="button"
-                          onClick={() => field.onChange(c)}
-                          aria-label={`아바타 색상 ${i + 1}`}
-                          aria-pressed={field.value === c}
-                          className={cn("size-6 rounded-full ring-2 transition", field.value === c ? "ring-accent" : "ring-transparent")}
-                          style={{ background: c }}
+                          onClick={() => {
+                            const preset = pickAvatarPreset(nameValue, emailValue);
+                            field.onChange(preset.id);
+                          }}
+                          className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-accent/50 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                        >
+                          <Sparkles size={13} />
+                          추천
+                        </button>
+                      </div>
+                      <div className="mb-3 flex items-center gap-3">
+                        <div
+                          aria-hidden="true"
+                          className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[oklch(0.95_0.01_85/0.16)] text-xl font-bold text-fg shadow-[0_1px_0_oklch(0.95_0.01_85/0.12)_inset]"
+                          style={{ background: avatarBackground }}
+                        >
+                          {avatarImage ? (
+                            <img src={avatarImage} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            avatarInitial
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-fg">{selectedPreset.name}</p>
+                          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">{selectedPreset.tone}</p>
+                        </div>
+                      </div>
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="sr-only"
+                          onChange={onAvatarImageChange}
                         />
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                        >
+                          <ImagePlus size={13} />
+                          이미지 업로드
+                        </button>
+                        {avatarImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setValue("image", null, { shouldDirty: true, shouldValidate: true });
+                              setImageErr("");
+                            }}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-[0.72rem] font-medium text-fg-3 transition-colors hover:border-bad/60 hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                          >
+                            <Trash2 size={13} />
+                            제거
+                          </button>
+                        )}
+                        <span className="text-[0.68rem] text-fg-3">PNG/JPG/WebP · 180KB 이하</span>
+                      </div>
+                      {imageErr && <p className="mb-3 text-xs text-bad">{imageErr}</p>}
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {AVATAR_PRESETS.map((preset) => {
+                          const active = field.value === preset.id || field.value === preset.color;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => field.onChange(preset.id)}
+                              aria-label={`${preset.name} 아바타 선택`}
+                              aria-pressed={active}
+                              className={cn(
+                                "flex min-h-14 items-center gap-2 rounded-xl border bg-panel p-2 text-left transition-[border-color,background,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+                                active
+                                  ? "border-accent bg-accent-soft text-fg"
+                                  : "border-line text-fg-2 hover:border-line-strong hover:bg-raised"
+                              )}
+                            >
+                              <span
+                                className="size-7 shrink-0 rounded-lg border border-[oklch(0.95_0.01_85/0.14)]"
+                                style={{
+                                  background: `radial-gradient(circle at 32% 24%, ${preset.accent}, transparent 35%), linear-gradient(145deg, ${preset.color}, oklch(0.26 0.04 60))`,
+                                }}
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate text-xs font-semibold">{preset.name}</span>
+                                <span className="mt-0.5 block truncate text-[0.68rem] text-fg-3">{preset.tone}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 />
@@ -236,7 +374,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             </button>
           </form>
 
-          {(providers.kakao || providers.google) && (
+          {(providers.kakao || providers.google || providers.naver) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
@@ -260,8 +398,17 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                     {providers.google.mode === "demo" && <DemoTag />}
                   </button>
                 )}
+                {providers.naver && (
+                  <button
+                    onClick={() => signIn("naver")}
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#03C75A] text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    네이버로 계속하기
+                    {providers.naver.mode === "demo" && <DemoTag dark />}
+                  </button>
+                )}
               </div>
-              {(providers.kakao?.mode === "demo" || providers.google?.mode === "demo") && (
+              {(providers.kakao?.mode === "demo" || providers.google?.mode === "demo" || providers.naver?.mode === "demo") && (
                 <p className="mt-2 text-center text-[0.66rem] text-fg-3">
                   데모 표시는 실제 소셜 연동이 아직 설정되지 않아 체험용 계정으로 로그인됨을 뜻해요.
                 </p>
@@ -276,4 +423,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

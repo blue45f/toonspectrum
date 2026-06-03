@@ -75,7 +75,7 @@ export function useSession(): SessionContextValue {
 export async function signIn(provider?: string, options?: Record<string, unknown>) {
   // 소셜 로그인(Google·Kakao): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
   // 백엔드가 설정 여부에 따라 실제 제공자 또는 데모 폴백(/auth/callback#demo=)으로 분기한다.
-  if (provider === "google" || provider === "kakao") {
+  if (provider === "google" || provider === "kakao" || provider === "naver") {
     const url = `/api/auth/oauth/${provider}/start`;
     if (typeof window !== "undefined") window.location.assign(url);
     return { ok: true, error: null, status: 0, url };
