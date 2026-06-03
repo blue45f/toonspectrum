@@ -7,6 +7,9 @@ const META_IMAGE_RE =
 const META_IMAGE_REVERSED =
   /<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image|image)["'][^>]*>/i;
 const URL_RE = /https:\/\/[^\s"'<>\\]+/g;
+// naver 연령 가림막 등 placeholder 표지(실제 표지 아님) — 저장하지 않고 타이포그래픽 폴백으로.
+// 예: https://ssl.pstatic.net/static/nstore/thumb/19over_book2_79x119.gif
+const COVER_PLACEHOLDER_RE = /\/nstore\/thumb\/\d+over|19over_book/i;
 
 export function proxiedCoverUrl(url) {
   const normalized = normalizeRemoteImageUrl(url);
@@ -25,6 +28,7 @@ export function normalizeRemoteImageUrl(value) {
   }
   if (url.protocol !== "https:") return undefined;
   if (!ALLOWED_IMAGE_HOST_RE.test(url.hostname)) return undefined;
+  if (COVER_PLACEHOLDER_RE.test(url.pathname)) return undefined; // 19금 가림막 등 placeholder 제외
   if (!IMAGE_EXT_RE.test(`${url.pathname}${url.search}`)) return undefined;
   return url.toString();
 }
