@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
+import { TitleOst } from "@/components/title-ost";
 import { AuthorLine } from "@/components/author-line";
 import Link from "@/src/compat/router-link";
 import { AvailabilityRouter } from "@/components/availability";
@@ -248,6 +249,8 @@ export function TitleDetailPage() {
           </div>
         </Section>
       )}
+
+      <TitleOst title={title} original={original} />
 
       <Section
         className="mt-14"
