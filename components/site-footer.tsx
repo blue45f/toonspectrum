@@ -10,6 +10,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "연재 캘린더", href: "/calendar" },
       { label: "맞춤 추천", href: "/recommend" },
       { label: "장르 스펙트럼", href: "/explore" },
+      { label: "태그로 찾기", href: "/tags" },
     ],
   },
   {

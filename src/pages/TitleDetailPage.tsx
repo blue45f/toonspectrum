@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { AuthorLine } from "@/components/author-line";
+import Link from "@/src/compat/router-link";
 import { AvailabilityRouter } from "@/components/availability";
 import { PriceCompare } from "@/components/price-compare";
 import { CollectionAdd } from "@/components/collection-add";
@@ -172,9 +173,13 @@ export function TitleDetailPage() {
           {title.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {title.tags.map((tag) => (
-                <span key={tag} className="rounded-full border border-line bg-raised/50 px-2.5 py-1 text-xs text-fg-3">
+                <Link
+                  key={tag}
+                  href={`/explore?tags=${encodeURIComponent(tag)}`}
+                  className="rounded-full border border-line bg-raised/50 px-2.5 py-1 text-xs text-fg-3 transition-colors hover:border-accent/50 hover:text-accent"
+                >
                   #{tag}
-                </span>
+                </Link>
               ))}
             </div>
           )}

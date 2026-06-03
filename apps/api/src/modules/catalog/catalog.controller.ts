@@ -181,6 +181,12 @@ export class CatalogController {
     return this.catalogService.getExploreData(normalizeQueryMap(query));
   }
 
+  @Get("/tags")
+  @Header("Cache-Control", "no-store")
+  async getTags() {
+    return this.catalogService.getTagCloud();
+  }
+
   @Get("/search")
   @Header("Cache-Control", "no-store, max-age=0")
   async getSearch(@Query() query: SearchQuery) {

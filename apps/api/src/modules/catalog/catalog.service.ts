@@ -231,6 +231,10 @@ export class CatalogService implements OnModuleInit {
     };
   }
 
+  async getTagCloud() {
+    return { tags: activeTags() };
+  }
+
   async getTitles(query: TitleQuery) {
     const sort = SORTS.includes((query.sort as SortKey) ? (query.sort as SortKey) : "popular")
       ? (query.sort as SortKey)
