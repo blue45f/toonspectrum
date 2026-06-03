@@ -33,7 +33,7 @@ export async function loadMe(uid: string) {
   for (const it of colItems) (itemsByCol[it.collectionId] ??= []).push(it.titleId);
 
   return {
-    profile: { id: me?.id, name: me?.name, avatar: me?.avatar, email: me?.email, bio: me?.bio },
+    profile: { id: me?.id, name: me?.name, image: me?.image, avatar: me?.avatar, email: me?.email, bio: me?.bio },
     ratings: Object.fromEntries(rt.map((r) => [r.titleId, fromDb(r.value)])),
     reads: Object.fromEntries(rd.map((r) => [r.titleId, r.state])),
     subscriptions: Object.fromEntries(sub.map((s) => [s.titleId, true])),

@@ -1,5 +1,16 @@
-import { RANK_AXES } from "@/lib/ranking";
-import { FunctionSquare, Info } from "lucide-react";
+import { RANK_AXES, type RankAxis } from "@/lib/ranking";
+import { Flag, Flame, FunctionSquare, Gem, Heart, Info, Sprout, Star, TrendingUp, Waves, type LucideIcon } from "lucide-react";
+
+const AXIS_ICONS: Record<RankAxis, LucideIcon> = {
+  popular: Flame,
+  trending: TrendingUp,
+  favorites: Heart,
+  rating: Star,
+  hidden: Gem,
+  binge: Waves,
+  completed: Flag,
+  rookie: Sprout,
+};
 
 // 랭킹 선정 방식 — 전 축 산식 + 보정·기간·데이터 출처를 투명 공개
 export function RankingMethod() {
@@ -18,18 +29,23 @@ export function RankingMethod() {
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {RANK_AXES.map((a) => (
-          <div key={a.key} className="rounded-xl border border-line bg-card p-4">
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="text-base">{a.emoji}</span>
-              <span className="text-sm font-semibold text-fg">{a.label}</span>
+        {RANK_AXES.map((a) => {
+          const AxisIcon = AXIS_ICONS[a.key];
+          return (
+            <div key={a.key} className="rounded-xl border border-line bg-card p-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-lg border border-accent/30 bg-accent-soft text-accent">
+                  <AxisIcon size={15} />
+                </span>
+                <span className="text-sm font-semibold text-fg">{a.label}</span>
+              </div>
+              <p className="mb-2 text-xs text-fg-3">{a.desc}</p>
+              <code className="block rounded-md bg-canvas px-2.5 py-1.5 font-mono text-[0.72rem] leading-relaxed text-fg-2">
+                {a.formula}
+              </code>
             </div>
-            <p className="mb-2 text-xs text-fg-3">{a.desc}</p>
-            <code className="block rounded-md bg-canvas px-2.5 py-1.5 font-mono text-[0.72rem] leading-relaxed text-fg-2">
-              {a.formula}
-            </code>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-5 flex flex-col gap-2.5 border-t border-line pt-5 text-xs leading-relaxed text-fg-3">

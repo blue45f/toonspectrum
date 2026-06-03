@@ -1,5 +1,5 @@
 import { inArray } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   getCommunityScopeTargetLink,
   parseCommunityScope,
@@ -76,7 +76,20 @@ async function createCommunityTestUser() {
 }
 
 afterEach(async () => {
+  if (!dbAvailable) return;
   await cleanupCommunityRecords();
+});
+
+// DB 통합 테스트는 실제 DB(로컬 docker 또는 Neon)가 있어야 동작한다. 없으면(ECONNREFUSED 등) 건너뛴다 —
+// 순수 검증 테스트는 항상 실행되고, DB 가 있는 환경(CI 등)에서만 통합 테스트가 돈다.
+let dbAvailable = false;
+beforeAll(async () => {
+  try {
+    await dbClient.execute("SELECT 1");
+    dbAvailable = true;
+  } catch {
+    dbAvailable = false;
+  }
 });
 
 describe("community validation", () => {
@@ -136,7 +149,8 @@ describe("community validation", () => {
     expect(getCommunityScopeTargetLink("pencafe", "unused", "번역자_카페")).toBe("/pencafe/%EB%B2%88%EC%97%AD%EC%9E%90_%EC%B9%B4%ED%8E%98");
   });
 
-  it("게시글 댓글의 대댓글을 같은 게시글 트리 아래에 저장한다", async () => {
+  it("게시글 댓글의 대댓글을 같은 게시글 트리 아래에 저장한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
     const userId = await createCommunityTestUser();
     const post = await createFanPost(userId, {
       scope: "title",
@@ -172,7 +186,8 @@ describe("community validation", () => {
     expect(tree[0].children?.[0].parentId).toBe(parent.id);
   });
 
-  it("존재하지 않는 게시글에는 댓글을 만들 수 없다", async () => {
+  it("존재하지 않는 게시글에는 댓글을 만들 수 없다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
     const userId = await createCommunityTestUser();
 
     await expect(
@@ -184,7 +199,8 @@ describe("community validation", () => {
     ).rejects.toThrow(/게시글/);
   });
 
-  it("다른 게시글의 댓글을 부모로 지정한 대댓글은 거부한다", async () => {
+  it("다른 게시글의 댓글을 부모로 지정한 대댓글은 거부한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
     const userId = await createCommunityTestUser();
     const firstPost = await createFanPost(userId, {
       scope: "title",

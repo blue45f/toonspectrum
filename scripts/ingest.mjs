@@ -57,10 +57,16 @@ async function loadPayload() {
     {
       cwd: ROOT,
       encoding: "utf8",
-      timeout: 600_000,
+      timeout: 1_800_000,
       // 네이버시리즈 등 대형 소스 포함 시 출력이 수십 MB가 되므로 넉넉히 잡는다.
       maxBuffer: 256 * 1024 * 1024,
-      env: { ...process.env, TZ: process.env.TZ ?? "Asia/Seoul", WEBDEX_SOURCE_IDS: sourceIds },
+      env: {
+        ...process.env,
+        TZ: process.env.TZ ?? "Asia/Seoul",
+        WEBDEX_SOURCE_IDS: sourceIds,
+        // 하드 타임아웃 전에 그레이스풀 종료하도록 소프트 예산 주입(안전망 — 보통 자연 완료가 더 빠름).
+        WEBDEX_CRAWL_BUDGET_MS: String(1_800_000 - 30_000),
+      },
     }
   );
   return JSON.parse(stdout);

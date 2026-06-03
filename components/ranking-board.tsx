@@ -21,10 +21,11 @@ import {
 import { TitleFilterPanel } from "./title-filter-panel";
 import { GENRES } from "@/lib/taxonomy";
 import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import { PLATFORM_LIST } from "@/lib/platforms";
+import { PLATFORM_LIST, PLATFORMS } from "@/lib/platforms";
 import { RankRow, MiniPoster } from "./rank-row";
 import { TitleCard } from "./title-card";
 import { PlatformTags } from "./availability";
+import { PlatformMark } from "./visual-marks";
 import { RatingInline } from "./ui/stars";
 import { Segmented } from "./ui/segmented";
 import { statsAreEstimated } from "@/lib/estimate";
@@ -361,9 +362,9 @@ function SignalWorkbench({
           {insights?.platformMix.map((platform) => (
             <span
               key={platform.id}
-              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-canvas/50 px-2 py-1 text-[0.7rem] text-fg-2"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-canvas/50 px-2 py-1 text-[0.7rem] text-fg-2"
             >
-              <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
+              <PlatformMark platform={PLATFORMS[platform.id]} size="sm" />
               {platform.label} {platform.share}%
             </span>
           ))}

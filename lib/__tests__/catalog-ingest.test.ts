@@ -29,14 +29,14 @@ describe("catalog ingest helpers", () => {
     const config = normalizeCatalogIngestConfig({
       CATALOG_INGEST_MODE: "fixed",
       CATALOG_INGEST_INTERVAL_SECONDS: "10",
-      CATALOG_INGEST_TIMEOUT_MS: "900000",
+      CATALOG_INGEST_TIMEOUT_MS: "9000000",
       CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB: "0",
       CATALOG_CRAWL_SCRIPT: "custom/crawl.mjs",
     });
 
     expect(config.mode).toBe("fixed");
     expect(config.intervalSeconds).toBe(60);
-    expect(config.timeoutMs).toBe(600000);
+    expect(config.timeoutMs).toBe(1800000); // 30분 상한으로 클램프
     expect(config.maxOutputMb).toBe(1);
     expect(config.scriptPath).toBe("custom/crawl.mjs");
   });

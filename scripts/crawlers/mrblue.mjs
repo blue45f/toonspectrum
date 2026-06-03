@@ -168,7 +168,7 @@ export async function crawl() {
   const list = [...seen.values()];
 
   // 2) 상위 일부만 상세 보강(synopsis/장르/작가). 요청량을 아끼려 cap + sleep.
-  const ENRICH_CAP = 40;
+  const ENRICH_CAP = 80;
   const enrich = new Map();
   for (let i = 0; i < Math.min(ENRICH_CAP, list.length); i++) {
     const it = list[i];

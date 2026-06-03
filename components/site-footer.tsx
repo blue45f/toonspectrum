@@ -1,5 +1,5 @@
 import Link from "@/src/compat/router-link";
-import { spectrumGradient } from "@/lib/genre-color";
+import { WebdexMark } from "./visual-marks";
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
@@ -32,11 +32,8 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
-            <span
-              className="size-7 rounded-[0.5rem] ring-1 ring-white/15"
-              style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 135) }}
-            />
-            <span className="font-display text-lg font-bold tracking-[-0.02em]">WEBDEX</span>
+            <WebdexMark className="size-7 rounded-[0.55rem]" />
+            <span className="font-display text-lg font-bold">WEBDEX</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">
             네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,

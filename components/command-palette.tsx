@@ -9,6 +9,7 @@ import { RatingInline } from "./ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
 import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords } from "lucide-react";
 import { genreColor } from "@/lib/genre-color";
+import { MiniPoster } from "./rank-row";
 
 const QUICK = [
   { label: "통합 검색", href: "/search", icon: Search, hint: "작품·작가·태그" },
@@ -91,14 +92,14 @@ export function CommandPalette() {
       <button
         aria-label="닫기"
         onClick={() => setOpen(false)}
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.62)] backdrop-blur-sm"
         style={{ animation: "fade-up 0.18s ease-out" }}
       />
       <Command
         shouldFilter={false}
         loop
         label="통합 검색"
-        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-black/50"
+        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
         <div className="flex items-center gap-3 border-b border-line px-4">
@@ -162,12 +163,7 @@ export function CommandPalette() {
                   onSelect={() => go(`/title/${t.slug}`)}
                   className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors data-[selected=true]:bg-raised"
                 >
-                  <span
-                    className="grid size-9 shrink-0 place-items-center rounded-md font-display text-xs font-bold text-white"
-                    style={{ background: `linear-gradient(140deg, ${t.cover[0]}, ${t.cover[1]})` }}
-                  >
-                    {t.title.charAt(0)}
-                  </span>
+                  <MiniPoster title={t} className="w-9 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-fg">{t.title}</span>
                     <span className="flex items-center gap-1.5 text-xs text-fg-3">

@@ -34,8 +34,8 @@ const FALLBACK_POSTS_SITEMAPS = [
   `${ORIGIN}/sitemap/posts/posts-2022-03-18.xml`,
 ];
 
-const MAX_PAGES = 8; // 핸들당 안전 상한(소량 요청 유지). @original 은 ~6p.
-const TARGET = 160; // 목표 유니크 시리즈 수(>=120 마진). 도달하면 조기 종료.
+const MAX_PAGES = 12; // 핸들당 안전 상한(소량 요청 유지). @original 은 ~6p.
+const TARGET = 300; // 목표 유니크 시리즈 수. 도달하면 조기 종료.
 const MAX_CHANNEL_FETCHES = 140; // 채널 series 요청 상한(요청량 억제).
 const MAX_HANDLES_SCAN = 320; // 핸들 후보 스캔 상한.
 const SITEMAP_INDEX = `${ORIGIN}/sitemap.xml`;
@@ -168,7 +168,6 @@ async function discoverHandles() {
   if (postsSitemaps.length === 0) postsSitemaps = [...FALLBACK_POSTS_SITEMAPS];
 
   // 2) 핸들이 충분히 모일 때까지 posts sitemap 을 소량씩 읽는다(최대 6개).
-  let usedFallback = false;
   for (const sm of postsSitemaps.slice(0, 6)) {
     if (ordered.length >= MAX_HANDLES_SCAN) break;
     const xml = await fetchText(sm, { referer: ORIGIN + "/" });
@@ -183,8 +182,7 @@ async function discoverHandles() {
   }
 
   // 3) 인덱스 경로가 막혀 시드만 남았으면 FALLBACK sitemap 으로 한 번 더 시도.
-  if (ordered.length <= SEED_HANDLES.length && !usedFallback) {
-    usedFallback = true;
+  if (ordered.length <= SEED_HANDLES.length) {
     for (const sm of FALLBACK_POSTS_SITEMAPS) {
       if (ordered.length >= MAX_HANDLES_SCAN) break;
       const xml = await fetchText(sm, { referer: ORIGIN + "/" });

@@ -9,6 +9,10 @@ import { accounts, db, users } from "../db";
 
 export type OAuthProviderId = "google" | "kakao" | "naver";
 
+// 카카오·네이버는 일단 데모 고정(실 OAuth 연동 보류) — 키가 설정돼 있어도 데모로 라우팅한다.
+// 실연동 재개 시 이 집합에서 제거하면 됨(키 설정 시 자동 oauth). Google 은 키 있으면 실연동.
+const DEMO_ONLY_PROVIDERS = new Set<OAuthProviderId>(["kakao", "naver"]);
+
 export interface OAuthUser {
   id: string;
   name: string | null;
@@ -84,6 +88,7 @@ export function isOAuthProvider(value: string): value is OAuthProviderId {
 }
 
 export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
+  if (DEMO_ONLY_PROVIDERS.has(id)) return "demo";
   const c = providerConfig(id);
   return c.clientId && c.clientSecret ? "oauth" : "demo";
 }
@@ -143,6 +148,7 @@ export function verifyState(id: OAuthProviderId, state: string | undefined, maxA
 
 // ── authorize URL ──
 export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | null {
+  if (DEMO_ONLY_PROVIDERS.has(id)) return null; // 데모 고정 — authorize URL 미발급(시작 시 데모 핸드오프로 라우팅)
   const c = providerConfig(id);
   if (!c.clientId || !c.clientSecret) return null;
   const u = new URL(c.authorizeUrl);

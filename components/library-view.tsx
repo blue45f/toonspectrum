@@ -14,6 +14,7 @@ import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import { Sparkles, Plus, Trash2, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
+import { COLLECTION_ICON_OPTIONS, CollectionIcon } from "./visual-marks";
 
 type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
 const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
@@ -472,23 +473,24 @@ function CollectionsTab({
   onDelete: (id: string) => void;
 }) {
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("📚");
-  const EMOJIS = ["📚", "🍿", "🔥", "💔", "🌙", "⚔️", "🌸", "🏆"];
+  const [emoji, setEmoji] = useState(COLLECTION_ICON_OPTIONS[0].value);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card p-3">
         <div className="flex gap-1">
-          {EMOJIS.map((e) => (
+          {COLLECTION_ICON_OPTIONS.map((option) => (
             <button
-              key={e}
-              onClick={() => setEmoji(e)}
+              key={option.value}
+              onClick={() => setEmoji(option.value)}
+              title={option.label}
+              aria-label={`${option.label} 아이콘`}
               className={cn(
-                "grid size-9 place-items-center rounded-lg text-lg transition-colors",
-                emoji === e ? "bg-accent-soft ring-1 ring-accent/40" : "hover:bg-raised"
+                "grid size-10 place-items-center rounded-xl transition-colors",
+                emoji === option.value ? "bg-accent-soft ring-1 ring-accent/45" : "hover:bg-raised"
               )}
             >
-              {e}
+              <CollectionIcon value={option.value} active={emoji === option.value} />
             </button>
           ))}
         </div>
@@ -526,12 +528,7 @@ function CollectionsTab({
               <div key={c.id} className="rounded-2xl border border-line bg-card p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span
-                      className="grid size-10 place-items-center rounded-xl text-xl"
-                      style={{ background: spectrumGradient(["로맨스", "판타지", "액션"]) }}
-                    >
-                      {c.emoji}
-                    </span>
+                    <CollectionIcon value={c.emoji} size="lg" />
                     <div>
                       <p className="font-semibold text-fg">{c.name}</p>
                       <p className="text-xs text-fg-3">{c.titleIds.length}편</p>

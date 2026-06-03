@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { db, users } from "../../../../../lib/db";
 import { hashPassword, verifyPassword } from "../../../../../lib/auth-crypto";
+import { resolveSignupAvatar, resolveSignupAvatarImage } from "../../../../../lib/avatar";
 import {
   buildAuthorizeUrl,
   consumeHandoff,
@@ -22,11 +23,11 @@ interface AuthPayload {
   password?: unknown;
   name?: unknown;
   avatar?: unknown;
+  image?: unknown;
 }
 
 type AuthRole = "admin" | "creator" | "operator" | "user";
 
-const AVATARS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const AuthRateLimitStore: Record<string, number[]> = {};
 
@@ -98,7 +99,8 @@ export class AuthController {
     const email = normalizeEmail(body.email);
     const password = String(body.password ?? "");
     const name = String(body.name ?? "").trim() || email.split("@")[0];
-    const avatar = AVATARS.includes(String(body.avatar)) ? String(body.avatar) : AVATARS[0];
+    const avatar = resolveSignupAvatar(body.avatar);
+    const image = resolveSignupAvatarImage(body.image);
 
     if (!EMAIL_RE.test(email)) throw new BadRequestException({ error: "이메일 형식이 올바르지 않아요." });
     if (password.length < 6) throw new BadRequestException({ error: "비밀번호는 6자 이상이어야 해요." });
@@ -108,7 +110,7 @@ export class AuthController {
       throw new HttpException({ error: "이미 가입된 이메일이에요." }, HttpStatus.CONFLICT);
     }
 
-    await db.insert(users).values({ email, name, avatar, passwordHash: hashPassword(password) });
+    await db.insert(users).values({ email, name, image, avatar, passwordHash: hashPassword(password) });
     return { ok: true };
   }
 

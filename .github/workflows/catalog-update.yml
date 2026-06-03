@@ -1,0 +1,70 @@
+name: catalog-update
+
+# 주간 카탈로그 갱신 — 크롤 → gz 스냅샷 커밋 → Vercel 자동 재배포(빌드 시 public/data 재생성).
+# 수동 실행(workflow_dispatch)도 가능. 전체 데이터는 Neon 이 아니라 git 의 gz 파일이 소스다.
+#
+# ⚠️ GitHub 러너는 비(非)KR egress 라 일부 KR 지오차단 소스(comico 등)는 0건이 될 수 있다.
+#    전체 커버리지가 필요하면 로컬(KR)에서 `pnpm catalog:update` 후 커밋하면 된다.
+#    아래 FLOOR 가드로, 지오차단 등으로 결과가 비정상적으로 적으면 커밋을 건너뛴다(카탈로그 보호).
+
+on:
+  schedule:
+    - cron: "0 18 * * 0" # 매주 일요일 18:00 UTC (월요일 03:00 KST)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Crawl catalog
+        env:
+          TZ: Asia/Seoul
+          # 자연 완료(모든 루프 유한)되지만, CI 행 방지용 소프트 예산(안전망).
+          WEBDEX_CRAWL_BUDGET_MS: "900000"
+        run: node scripts/crawl.mjs --json --no-file > /tmp/catalog.json
+
+      - name: Guard — 최소 작품 수 확인 (지오차단/장애 시 카탈로그 보호)
+        id: guard
+        run: |
+          COUNT=$(node -e "const j=require('/tmp/catalog.json');console.log(Array.isArray(j.titles)?j.titles.length:0)")
+          echo "crawled=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "크롤 작품 수: $COUNT"
+          if [ "$COUNT" -lt 8000 ]; then
+            echo "::warning::작품 수 $COUNT < 8000 — 비정상(지오차단 등)으로 보고 커밋을 건너뜁니다."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write gz snapshot
+        if: steps.guard.outputs.skip != 'true'
+        run: gzip -9 -c /tmp/catalog.json > apps/api/data/catalog.json.gz
+
+      - name: Commit & push
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/api/data/catalog.json.gz
+          if git diff --staged --quiet; then
+            echo "변경 없음 — 커밋 생략."
+          else
+            git commit -m "chore(catalog): 주간 스냅샷 갱신 (${{ steps.guard.outputs.crawled }}편)"
+            git push
+          fi

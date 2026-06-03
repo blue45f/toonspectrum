@@ -126,7 +126,7 @@ function buildRow(item, fallbackGenre, rank) {
 
 export async function crawl() {
   const byWorkId = new Map();
-  const ROWS = 50; // 키워드당 한 페이지로 50건 (요청 수 절약).
+  const ROWS = 90; // 키워드당 한 페이지로 90건 (dedupe 후 커버리지 ↑).
 
   for (let i = 0; i < QUERIES.length; i++) {
     const [word, fallbackGenre] = QUERIES[i];

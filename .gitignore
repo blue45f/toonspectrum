@@ -49,6 +49,9 @@ yarn-error.log*
 /data/
 *.db
 *.db-journal
+
+# 정적 카탈로그 빌드 산출물 (git 소스는 apps/api/data/catalog.json.gz). pnpm catalog:gen 으로 생성.
+/public/data/
 *.db-wal
 *.db-shm
 

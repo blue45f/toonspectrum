@@ -17,7 +17,6 @@ export interface RankAxisMeta {
   key: RankAxis;
   label: string;
   desc: string;
-  emoji: string;
   formula: string; // 투명 산식 — 사용자에게 공개
 }
 
@@ -26,56 +25,48 @@ export const RANK_AXES: RankAxisMeta[] = [
     key: "popular",
     label: "실시간 인기",
     desc: "조회·관심·좋아요 종합 화력",
-    emoji: "🔥",
     formula: "log(조회수)×12 + log(좋아요)×6 + log(관심)×5 + 트렌드×0.2",
   },
   {
     key: "trending",
     label: "급상승",
     desc: "최근 유입이 폭발 중인 작품",
-    emoji: "🚀",
     formula: "트렌드지수 + max(0, 순위상승)×3 + log(조회수)",
   },
   {
     key: "favorites",
     label: "관심 폭발",
     desc: "독자가 가장 많이 찜한 작품",
-    emoji: "💗",
     formula: "log(관심)×14 + log(좋아요)×4 + 베이즈평점×6",
   },
   {
     key: "rating",
     label: "평점 명작",
     desc: "독자 평점이 검증한 수작",
-    emoji: "⭐",
     formula: "베이즈평점(C=4.0, m=800) ×20 + log(평가수)×2",
   },
   {
     key: "hidden",
     label: "숨은 명작",
     desc: "조회는 적어도 평점이 높은 저평가작",
-    emoji: "💎",
     formula: "베이즈평점×22 − log(조회수)×3.5 + log(평가수)×2",
   },
   {
     key: "binge",
     label: "정주행 몰입",
     desc: "한 번 잡으면 못 놓는 작품",
-    emoji: "🌀",
     formula: "몰입지수 + 완독률×0.4",
   },
   {
     key: "completed",
     label: "완결 정주행",
     desc: "정주행하기 좋은 완결작",
-    emoji: "🏁",
     formula: "완결 보너스 + 베이즈평점×12 + 완독률×0.3 (완결작만)",
   },
   {
     key: "rookie",
     label: "기대 신작",
     desc: "최근 데뷔한 라이징 작품",
-    emoji: "🌱",
     formula: "데뷔연차 가중 + 트렌드×0.6 + 베이즈평점×6 (2022~)",
   },
 ];

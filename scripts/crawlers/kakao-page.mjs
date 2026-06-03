@@ -30,7 +30,7 @@ const HOME = ORIGIN + "/";
 // 홈을 여러 번 호출하면 랭킹/지금핫한 섹션이 회전하여 더 많은 시리즈가 노출된다(서버 페이지네이션 없음).
 const HOME_FETCHES = 4;
 // 상세 페이지 보강 호출 상한(요청량 절제). 상한 초과 시 리스트 메타만으로 row 를 만든다.
-const MAX_DETAIL = 140;
+const MAX_DETAIL = 220;
 
 // 메인 4개 탭(menuUid)과 그 하위 장르/랭킹 screen 랜딩 페이지(screenUid).
 // 각 /menu/<tab>/screen/<screen> 는 SSR __NEXT_DATA__ 안에 해당 장르/랭킹의 실제 시리즈 리스트(PosterView/RankingPosterView)를 담고 있다.

@@ -21,22 +21,27 @@ export function MiniPoster({
   return (
     <span
       className={cn(
-        "relative grid aspect-[3/4] place-items-center overflow-hidden rounded-md font-display text-sm font-bold text-white/95 ring-1 ring-white/10",
+        "relative grid aspect-[3/4] place-items-center overflow-hidden rounded-md border border-[oklch(0.95_0.01_85/0.14)] font-display text-sm font-bold text-[oklch(0.97_0.012_85)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
         title.type === "webnovel" && "font-serif",
         className
       )}
-      style={{ background: `linear-gradient(145deg, ${title.cover[0]}, ${title.cover[1]})` }}
+      style={{
+        background: `linear-gradient(145deg, color-mix(in oklch, ${title.cover[0]} 88%, oklch(0.24 0.012 66)), color-mix(in oklch, ${title.cover[1]} 82%, oklch(0.15 0.008 70)))`,
+      }}
     >
       {title.coverImage ? (
         <CoverImage
           src={title.coverImage}
           alt=""
           fallback={title.title.charAt(0)}
-          className="absolute inset-0 size-full object-cover"
+          className="absolute inset-0 size-full object-cover contrast-[1.03] saturate-[1.04]"
         />
       ) : (
-        title.title.charAt(0)
+        <span className="relative">{title.title.charAt(0)}</span>
       )}
+      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,oklch(0.13_0.012_70/0.62),transparent_58%)]" />
+      <span className="pointer-events-none absolute left-0 top-0 h-full w-[2px] bg-accent/70" />
+      <span className="pointer-events-none absolute inset-x-1.5 top-1.5 h-px bg-[oklch(0.95_0.01_85/0.24)]" />
       {title.ageRating === "19" && <AdultOverlay compact />}
     </span>
   );

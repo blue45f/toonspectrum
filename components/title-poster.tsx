@@ -4,10 +4,10 @@ import { AdultOverlay } from "./adult-overlay";
 import { CoverImage } from "./cover-image";
 
 const SIZE = {
-  sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.6rem]", wm: "text-[3.5rem]" },
-  md: { pad: "p-3", title: "text-base leading-[1.12]", type: "text-[0.65rem]", wm: "text-[5rem]" },
-  lg: { pad: "p-4", title: "text-xl leading-[1.1]", type: "text-xs", wm: "text-[7rem]" },
-  hero: { pad: "p-5", title: "text-3xl leading-[1.05]", type: "text-sm", wm: "text-[10rem]" },
+  sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.58rem]", wm: "text-[3.8rem]" },
+  md: { pad: "p-3", title: "text-base leading-[1.12]", type: "text-[0.62rem]", wm: "text-[5.3rem]" },
+  lg: { pad: "p-4", title: "text-xl leading-[1.1]", type: "text-xs", wm: "text-[7.4rem]" },
+  hero: { pad: "p-5", title: "text-3xl leading-[1.05]", type: "text-sm", wm: "text-[10.5rem]" },
 } as const;
 
 // 타이포그래픽 커버 — 실제 이미지 대신 장르 그라디언트 + 활자 포스터
@@ -27,12 +27,12 @@ export function TitlePoster({
   const s = SIZE[size];
   const [from, to] = title.cover;
   const isNovel = title.type === "webnovel";
-  // 제목 첫 글자 — 워터마크 글리프
   const glyph = title.title.replace(/[^가-힣A-Za-z0-9]/g, "").charAt(0) || "W";
+  const issue = String(title.releaseYear).slice(-2);
   const glyphNode = (
     <div
       className={cn(
-        "absolute -right-2 top-1 select-none font-bold leading-none text-fg/10 mix-blend-overlay",
+        "absolute -right-3 top-1 select-none font-bold leading-none text-[oklch(0.96_0.01_85/0.14)] mix-blend-overlay",
         isNovel ? "font-serif" : "font-display",
         s.wm
       )}
@@ -45,68 +45,73 @@ export function TitlePoster({
   return (
     <div
       className={cn(
-        "relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-line",
+        "relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-[oklch(0.95_0.01_85/0.16)] bg-card shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]",
         className
       )}
-      style={{ background: `linear-gradient(145deg, ${from}, ${to})` }}
+      style={{
+        background: `linear-gradient(145deg, color-mix(in oklch, ${from} 88%, oklch(0.24 0.012 66)), color-mix(in oklch, ${to} 82%, oklch(0.15 0.008 70)))`,
+      }}
     >
-      {/* 실제 표지 이미지 (있을 때 우선, 로드 실패 시 글리프 폴백) */}
       {title.coverImage && (
         <CoverImage
           src={title.coverImage}
           alt={`${title.title} 표지`}
           fallback={glyphNode}
           priority={priority}
-          className="absolute inset-0 size-full object-cover"
+          className="absolute inset-0 size-full object-cover contrast-[1.03] saturate-[1.04]"
         />
       )}
-      {/* 상단 sheen */}
+
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "radial-gradient(120% 80% at 15% 0%, oklch(1 0 0 / 0.18), transparent 55%)",
+          background: title.coverImage
+            ? "linear-gradient(to top, oklch(0.13 0.012 70 / 0.86), oklch(0.13 0.012 70 / 0.22) 46%, oklch(0.13 0.012 70 / 0.08)), radial-gradient(120% 80% at 16% 0%, oklch(0.95 0.01 85 / 0.24), transparent 56%)"
+            : "radial-gradient(120% 80% at 15% 0%, oklch(0.98 0.01 85 / 0.2), transparent 54%), linear-gradient(to top, oklch(0.13 0.012 70 / 0.82), oklch(0.13 0.012 70 / 0.2) 48%, transparent)",
         }}
       />
-      {/* 필름 그레인 */}
       <div className="noise pointer-events-none absolute inset-0 opacity-[0.14] mix-blend-overlay" aria-hidden />
-      {/* 워터마크 글리프 (이미지 없을 때만) */}
-      {!title.coverImage && glyphNode}
-      {/* 하단 스크림 */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
 
-      {/* 타입 칩 */}
-      <div className={cn("absolute left-0 top-0 flex items-center gap-1", s.pad)}>
+      {!title.coverImage && glyphNode}
+
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-[linear-gradient(to_bottom,oklch(0.95_0.01_85/0.26),oklch(0.72_0.185_42/0.75),oklch(0.95_0.01_85/0.14))]" />
+      <div className="pointer-events-none absolute left-3 right-3 top-3 h-px bg-[oklch(0.95_0.01_85/0.28)]" />
+      <div className="pointer-events-none absolute bottom-3 right-3 h-10 w-px bg-[oklch(0.95_0.01_85/0.2)]" />
+
+      <div className={cn("absolute left-0 top-0 flex items-center gap-1.5", s.pad)}>
         <span
           className={cn(
-            "rounded-md border border-white/25 bg-black/30 px-1.5 py-0.5 font-medium uppercase tracking-wide text-white/90 backdrop-blur-sm",
+            "rounded-md border border-[oklch(0.95_0.01_85/0.28)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-0.5 font-display font-semibold uppercase text-[oklch(0.95_0.01_85/0.9)] backdrop-blur-sm",
             s.type
           )}
         >
           {isNovel ? "NOVEL" : "TOON"}
         </span>
+        {size !== "sm" && (
+          <span className={cn("font-display font-semibold text-[oklch(0.95_0.01_85/0.62)]", s.type)}>
+            IDX {issue}
+          </span>
+        )}
       </div>
 
-      {/* 랭크 넘버럴 */}
       {rank != null && (
-        <div className="absolute right-2 top-2 numeral text-2xl text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+        <div className="absolute right-2 top-2 rounded-lg border border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-1 numeral text-2xl leading-none text-[oklch(0.95_0.01_85)] shadow-[0_8px_18px_-12px_oklch(0.1_0.02_70/0.8)] backdrop-blur-sm">
           {rank}
         </div>
       )}
 
-      {/* 제목 + 작가 */}
       <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1", s.pad)}>
         <h3
           className={cn(
-            "font-bold text-white text-balance line-clamp-3 drop-shadow-[0_1px_6px_rgba(0,0,0,0.55)]",
-            isNovel ? "font-serif tracking-tight" : "tracking-[-0.01em]",
+            "text-balance line-clamp-3 font-bold text-[oklch(0.97_0.012_85)] drop-shadow-[0_1px_8px_oklch(0.1_0.02_70/0.72)]",
+            isNovel ? "font-serif" : "",
             s.title
           )}
         >
           {title.title}
         </h3>
         {size !== "sm" && (
-          <p className="truncate text-xs text-white/70">
+          <p className="truncate text-xs text-[oklch(0.92_0.01_85/0.72)]">
             {title.author}
             {title.artist && title.artist !== title.author ? ` · 그림 ${title.artist}` : ""}
           </p>

@@ -40,7 +40,7 @@ export function ReviewCard({
 
   const avatar = (
     <span
-      className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white ring-1 ring-white/10"
+      className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.14)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]"
       style={{ background: `linear-gradient(140deg, ${review.avatar}, oklch(0.3 0.05 60))` }}
     >
       {review.author.charAt(0)}

@@ -14,14 +14,14 @@ export function AdultOverlay({ compact = false }: { compact?: boolean }) {
 
   return (
     <div
-      className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 rounded-[inherit] bg-black/65 text-center backdrop-blur-xl"
+      className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 rounded-[inherit] border border-[oklch(0.95_0.01_85/0.12)] bg-[oklch(0.14_0.012_70/0.74)] text-center backdrop-blur-xl"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
       }}
     >
       <ShieldAlert className="text-bad" size={compact ? 16 : 24} />
-      {!compact && <span className="text-xs font-bold text-white/90">19세 이상</span>}
+      {!compact && <span className="text-xs font-bold text-[oklch(0.95_0.01_85/0.9)]">19세 이상</span>}
       {!compact ? (
         <button
           onClick={(e) => {
@@ -29,12 +29,12 @@ export function AdultOverlay({ compact = false }: { compact?: boolean }) {
             e.stopPropagation();
             setVerified(true);
           }}
-          className="mt-0.5 rounded-lg border border-white/30 bg-white/10 px-2.5 py-1 text-[0.7rem] font-medium text-white transition-colors hover:bg-white/20"
+          className="mt-0.5 rounded-lg border border-[oklch(0.95_0.01_85/0.24)] bg-[oklch(0.95_0.01_85/0.1)] px-2.5 py-1 text-[0.7rem] font-medium text-[oklch(0.95_0.01_85)] transition-colors hover:bg-[oklch(0.95_0.01_85/0.18)]"
         >
           성인 인증
         </button>
       ) : (
-        <span className="text-[0.55rem] font-semibold text-white/80">19+</span>
+        <span className="text-[0.55rem] font-semibold text-[oklch(0.95_0.01_85/0.8)]">19+</span>
       )}
     </div>
   );

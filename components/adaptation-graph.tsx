@@ -59,7 +59,7 @@ function Node({
         title={title}
         className={cn(
           "w-full ring-1 transition-all",
-          highlight ? "ring-accent" : "ring-white/10 group-hover:ring-line-strong"
+          highlight ? "ring-accent" : "ring-[oklch(0.95_0.01_85/0.14)] group-hover:ring-line-strong"
         )}
       />
       <span className="eyebrow text-[0.58rem] text-fg-3">{role}</span>
@@ -140,8 +140,10 @@ export function AdaptationGraph({
               className="flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
               style={nodeReveal(inView, step)}
             >
-              <div className="grid aspect-[3/4] w-full place-items-center rounded-md border border-dashed border-line-strong bg-card text-fg-3">
-                <Icon size={20} />
+              <div className="relative grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-md border border-line-strong bg-[linear-gradient(145deg,oklch(0.245_0.011_64),oklch(0.185_0.009_68))] text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.1)]">
+                <span className="absolute inset-0 bg-[radial-gradient(circle_at_28%_0%,oklch(0.72_0.185_42/0.22),transparent_58%)]" />
+                <span className="absolute left-0 top-0 h-full w-[2px] bg-accent/70" />
+                <Icon size={20} className="relative" />
               </div>
               <span className="eyebrow text-[0.58rem] text-fg-3">{EXT_LABEL[e.kind]}</span>
               <span className="line-clamp-2 text-[0.72rem] font-medium leading-tight text-fg-2">

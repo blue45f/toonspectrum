@@ -1,7 +1,8 @@
 import type { Availability } from "@/lib/types";
 import { PLATFORMS, PRICING_LABEL, PRICING_FULL } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
-import { ArrowUpRight } from "lucide-react";
+import { PlatformMark } from "./visual-marks";
+import { ArrowUpRight, Clock3, CreditCard, Gift, Ticket } from "lucide-react";
 
 const PRICING_TONE: Record<string, string> = {
   free: "text-good",
@@ -9,6 +10,13 @@ const PRICING_TONE: Record<string, string> = {
   paid: "text-fg-2",
   subscription: "text-warn",
 };
+
+const PRICING_ICON = {
+  free: Gift,
+  "wait-free": Clock3,
+  paid: CreditCard,
+  subscription: Ticket,
+} as const;
 
 // 컴팩트 — 플랫폼 브랜드 도트 (카드용)
 export function AvailabilityDots({
@@ -23,19 +31,23 @@ export function AvailabilityDots({
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
-    <span className={cn("inline-flex items-center gap-1", className)} aria-label="연재 플랫폼">
+    <span className={cn("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
       {shown.map((a) => {
         const p = PLATFORMS[a.platformId];
         return (
-          <span
+          <PlatformMark
             key={a.platformId}
+            platform={p}
+            size="sm"
             title={`${p.name} · ${PRICING_FULL[a.pricing]}`}
-            className="size-2.5 rounded-full ring-1 ring-black/20"
-            style={{ backgroundColor: p.color }}
           />
         );
       })}
-      {rest > 0 && <span className="text-[0.65rem] text-fg-3 tnum">+{rest}</span>}
+      {rest > 0 && (
+        <span className="rounded-full border border-line bg-canvas/50 px-1 text-[0.62rem] text-fg-3 tnum">
+          +{rest}
+        </span>
+      )}
     </span>
   );
 }
@@ -59,20 +71,20 @@ export function PlatformTags({
         return (
           <span
             key={a.platformId}
-            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.68rem] font-medium leading-none"
+            className="inline-flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[0.68rem] font-medium leading-none"
             style={{
               color: p.color,
-              borderColor: `color-mix(in srgb, ${p.color} 38%, transparent)`,
-              backgroundColor: `color-mix(in srgb, ${p.color} 12%, transparent)`,
+              borderColor: `color-mix(in oklch, ${p.color} 38%, transparent)`,
+              backgroundColor: `color-mix(in oklch, ${p.color} 12%, transparent)`,
             }}
             title={`${p.name} · ${PRICING_FULL[a.pricing]}`}
           >
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+            <PlatformMark platform={p} size="sm" />
             {p.short}
           </span>
         );
       })}
-      {rest > 0 && <span className="text-[0.65rem] text-fg-3 tnum">+{rest}</span>}
+      {rest > 0 && <span className="rounded-md border border-line bg-canvas/45 px-1 text-[0.65rem] text-fg-3 tnum">+{rest}</span>}
     </span>
   );
 }
@@ -94,17 +106,14 @@ export function AvailabilityRouter({
       {sorted.map((a) => {
         const p = PLATFORMS[a.platformId];
         const hasUrl = Boolean(a.url);
+        const PricingIcon = PRICING_ICON[a.pricing];
         const inner = (
           <>
-            <span
-              className="grid size-9 shrink-0 place-items-center rounded-lg font-display text-sm font-bold"
-              style={{ backgroundColor: p.color, color: pickText(p.color) }}
-            >
-              {p.short.charAt(0)}
-            </span>
+            <PlatformMark platform={p} size="lg" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium text-fg">{p.name}</span>
-              <span className={cn("text-xs font-medium", PRICING_TONE[a.pricing])}>
+              <span className={cn("mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium", PRICING_TONE[a.pricing])}>
+                <PricingIcon size={12} />
                 {PRICING_FULL[a.pricing]}
                 {a.isOriginal && <span className="ml-1.5 text-accent">· 독점</span>}
               </span>
@@ -125,7 +134,7 @@ export function AvailabilityRouter({
             href={a.url ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-[background,border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {inner}
           </a>
@@ -148,15 +157,4 @@ export function bestPricing(availability: Availability[]): { label: string; tone
   const best = [...availability].sort((a, b) => order[a.pricing] - order[b.pricing])[0];
   if (!best) return { label: "정보 없음", tone: "text-fg-3" };
   return { label: PRICING_LABEL[best.pricing], tone: PRICING_TONE[best.pricing] };
-}
-
-// 배경색 대비 텍스트 색 (간이)
-function pickText(hex: string): string {
-  const h = hex.replace("#", "");
-  if (h.length < 6) return "#000";
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#1a1207" : "#fff";
 }

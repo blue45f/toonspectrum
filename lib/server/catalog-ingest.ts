@@ -74,7 +74,10 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
   return {
     mode: env.CATALOG_INGEST_MODE === "fixed" ? "fixed" : "off",
     intervalSeconds: parseBoundedInt(env.CATALOG_INGEST_INTERVAL_SECONDS, 1_800, 60, 86_400),
-    timeoutMs: parseBoundedInt(env.CATALOG_INGEST_TIMEOUT_MS, 180_000, 30_000, 600_000),
+    // 풀 크롤은 플랫폼 병렬화로 보통 ~3분이면 끝난다. 예산이 잘려 '부분 결과'가 되지 않도록 타임아웃을
+    // 넉넉히 잡는다(기본 10분, env 로 최대 30분). 예산(timeoutMs - 버퍼)은 SIGTERM 방지용 안전망으로만 동작 —
+    // 모든 루프가 유한 캡으로 끝나므로 정상 상황에선 트리거되지 않고 전부 완주한다.
+    timeoutMs: parseBoundedInt(env.CATALOG_INGEST_TIMEOUT_MS, 600_000, 30_000, 1_800_000),
     // 기본 소스셋(네이버시리즈 등 대형 포함)의 크롤 JSON은 수십 MB라, 12MB로는 maxBuffer 초과로
     // ingest가 실패한다. 기본값을 넉넉히 잡아 정식 파이프라인이 기본 소스셋에서도 동작하게 한다.
     maxOutputMb: parseBoundedInt(env.CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB, 64, 1, 200),
@@ -490,12 +493,21 @@ function resolveCrawlScript(scriptPath: string): { script: string; base: string 
 
 async function executeCrawler(config: CatalogIngestConfig): Promise<CatalogCrawlerPayload> {
   const { script: scriptPath, base } = resolveCrawlScript(config.scriptPath);
+  // 크롤러가 하드 타임아웃(SIGTERM, 출력 유실)을 맞기 전에 스스로 루프를 정리하고 JSON 을 emit 하도록
+  // 소프트 예산을 주입한다(안전망 — 보통은 자연 완료가 더 빨라 트리거되지 않는다).
+  // 단일 fetch 타임아웃(12s) + 대용량 직렬화/flush 여유를 두고 30s 를 뺀다(최소 30s).
+  const crawlBudgetMs = Math.max(30_000, config.timeoutMs - 30_000);
   const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--json", "--no-file"], {
     cwd: base,
     encoding: "utf8",
     timeout: config.timeoutMs,
     maxBuffer: config.maxOutputMb * 1024 * 1024,
-    env: { ...process.env, TZ: process.env.TZ ?? "Asia/Seoul", WEBDEX_SOURCE_IDS: config.sourceIds.join(",") },
+    env: {
+      ...process.env,
+      TZ: process.env.TZ ?? "Asia/Seoul",
+      WEBDEX_SOURCE_IDS: config.sourceIds.join(","),
+      WEBDEX_CRAWL_BUDGET_MS: String(crawlBudgetMs),
+    },
   });
   return parseCrawlerJsonPayload(stdout);
 }

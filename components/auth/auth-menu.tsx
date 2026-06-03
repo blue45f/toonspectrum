@@ -5,6 +5,19 @@ import Link from "@/src/compat/router-link";
 import { useSession, signOut } from "@/src/compat/auth-session";
 import { AuthModal } from "./auth-modal";
 import { LogOut, Library, UserRound } from "lucide-react";
+import { resolveSignupAvatarImage } from "@/lib/avatar";
+
+function safeProfileImageSrc(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const dataImage = resolveSignupAvatarImage(value);
+  if (dataImage) return dataImage;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthMenu() {
   const { data: session, status } = useSession();
@@ -28,20 +41,21 @@ export function AuthMenu() {
 
   const u = session.user;
   const initial = (u.name ?? u.email ?? "U").charAt(0).toUpperCase();
+  const imageSrc = safeProfileImageSrc(u.image);
 
   return (
-      <div className="relative">
+    <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="grid size-10 place-items-center rounded-xl border border-line bg-accent text-sm font-bold text-on-accent transition-transform active:scale-95"
+        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent transition-transform active:scale-95"
         aria-label="계정 메뉴"
       >
-        {initial}
+        {imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : initial}
       </button>
       {open && (
         <>
           <button className="fixed inset-0 z-10" aria-label="닫기" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-line-strong bg-panel shadow-xl shadow-black/40">
+          <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-line-strong bg-panel shadow-xl shadow-[oklch(0.1_0.02_70/0.42)]">
             <div className="border-b border-line px-4 py-3">
               <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
               <p className="truncate text-xs text-fg-3">{u.email}</p>

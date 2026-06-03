@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
 import { TitlePoster } from "./title-poster";
+import { MiniPoster } from "./rank-row";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { GenreChip } from "./ui/chip";
 import { AvailabilityDots } from "./availability";
@@ -67,7 +68,7 @@ function Picker({
       <div className="relative">
         <button
           onClick={onClear}
-          className="absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-lg border border-white/20 bg-black/40 text-white/80 backdrop-blur-md transition-colors hover:text-white"
+          className="absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-lg border border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.58)] text-[oklch(0.95_0.01_85/0.82)] backdrop-blur-md transition-colors hover:text-fg"
           aria-label="교체"
         >
           <X size={14} />
@@ -112,12 +113,7 @@ function Picker({
               onClick={() => onPick(t)}
               className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-raised"
             >
-              <span
-                className="grid size-8 shrink-0 place-items-center rounded font-display text-xs font-bold text-white"
-                style={{ background: `linear-gradient(140deg, ${t.cover[0]}, ${t.cover[1]})` }}
-              >
-                {t.title.charAt(0)}
-              </span>
+              <MiniPoster title={t} className="w-8 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{t.title}</span>
                 <span className="text-xs text-fg-3">

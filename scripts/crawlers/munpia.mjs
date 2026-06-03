@@ -136,8 +136,8 @@ export async function crawl() {
 
   const items = [...byId.values()];
 
-  // 2) 표지 없는 아이템 일부만 상세에서 og:image 보강(요청량 절제: 최대 24건).
-  const DETAIL_CAP = 24;
+  // 2) 표지 없는 아이템 일부만 상세에서 og:image 보강(요청량 절제: 최대 60건).
+  const DETAIL_CAP = 60;
   let fetched = 0;
   for (const it of items) {
     if (it.cover) continue;

@@ -22,7 +22,7 @@ const PLATFORM_ID = "bookcube";
 const PLATFORM_NAME = "북큐브";
 
 // 웹소설 메인 분류(mainclass_num=00). 너무 많이 두드리지 않도록 페이지 수를 제한한다.
-const CATEGORY_PAGES = 5; // 50개 x 5 ≈ 250
+const CATEGORY_PAGES = 9; // 50개 x 9 ≈ 450 (빈 페이지면 조기 종료)
 const SLEEP_MS = 450;
 
 // 한 <li> 블록에서 제목/저자/평점 등을 추출.

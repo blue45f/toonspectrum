@@ -34,7 +34,7 @@ const CATEGORIES = [
   { code: 25, fallback: "현판" },
 ];
 
-const PAGES_PER_CATEGORY = 3; // 카테고리당 3페이지(≈60) → 중복 제거 후 적정 규모.
+const PAGES_PER_CATEGORY = 7; // 카테고리당 7페이지 → 빈 페이지면 조기 종료(아래 break).
 
 // "YYYY-MM-DD ..." → 연도(best-effort).
 function yearFrom(...dates) {

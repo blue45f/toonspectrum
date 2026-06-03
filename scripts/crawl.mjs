@@ -73,8 +73,42 @@ const NOVEL_BONUS_CAP = parsePositiveInt(process.env.WEBDEX_SERIES_BONUS_CAP);
 const KAKAO_WEBTOON_CAP = parsePositiveInt(process.env.WEBDEX_KAKAO_WEBTOON_CAP);
 const LEZHIN_CAP = parsePositiveInt(process.env.WEBDEX_LEZHIN_CAP);
 const WEBTOON_FINISHED_PAGES = parseOptionalInt(process.env.WEBDEX_WEBTOON_FINISHED_PAGES);
-const SERIES_PAGES_PER_GENRE = parseOptionalInt(process.env.WEBDEX_SERIES_PAGES_PER_GENRE);
+// 네이버 시리즈는 장르당 수천 페이지라, 캡이 없으면(과거 기본값 ∞) 한 장르에서 끝없이 페이징하다가
+// 외부 execFile 타임아웃에 SIGTERM으로 강제종료돼 stdout(JSON)을 못 쓰고 매번 실패했다.
+// 보너스 소스이므로 장르당 페이지 수를 유한 기본값으로 고정한다(env 로 상향 가능).
+const SERIES_PAGES_PER_GENRE = parseOptionalInt(process.env.WEBDEX_SERIES_PAGES_PER_GENRE) ?? 40;
 const MIN_CRAWL_DELAY_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_DELAY_MS) ?? 90;
+
+// ── 소프트 데드라인 ───────────────────────────────────────────
+// 외부 타임아웃(SIGTERM)에 걸려 출력 없이 죽는 대신, 그 전에 각 루프를 정리하고 (부분 결과라도)
+// 정상 emit 하기 위한 전역 예산(ms). 미설정=무제한(직접 실행용). catalog-ingest 가 실행 시
+// (execFile 타임아웃 - 여유)로 WEBDEX_CRAWL_BUDGET_MS 를 주입한다.
+const CRAWL_BUDGET_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_BUDGET_MS);
+const START_TS = Date.now();
+const overBudget = () => CRAWL_BUDGET_MS != null && Date.now() - START_TS >= CRAWL_BUDGET_MS;
+// 남은 예산만큼만 promise 를 기다리고, 초과하면 fallback 으로 진행한다(타이머는 unref → 종료 지연 없음).
+function raceBudget(promise, fallback, label) {
+  if (CRAWL_BUDGET_MS == null) return promise;
+  const remaining = CRAWL_BUDGET_MS - (Date.now() - START_TS);
+  if (remaining <= 0) return Promise.resolve(fallback);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (label) log(`  ⏳ ${label}: 예산 초과 — 부분 결과로 진행`);
+      resolve(fallback);
+    }, remaining);
+    if (typeof timer.unref === "function") timer.unref();
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
 const DEFAULT_SOURCE_IDS = [
   "naver-webtoon", "naver-series", "kakao-webtoon", "lezhin",
   "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
@@ -123,6 +157,7 @@ async function getSeries(url, tries = 4) {
   for (let i = 0; i < tries; i++) {
     const h = await getTEXT(url);
     if (h && h.length > 8000 && h.includes("detail.series")) return h;
+    if (overBudget()) return null;
     await sleep(250 + i * 150);
   }
   return null;
@@ -262,6 +297,7 @@ async function crawlWebtoons() {
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
   const map = new Map();
   for (const d of days) {
+    if (overBudget()) break;
     // order=user = 실제 인기(연재) 순위. 목록 내 위치(idx+1)가 실순위 신호다 — 보존한다.
     const j = await getJSON(`https://comic.naver.com/api/webtoon/titlelist/weekday?week=${d}&order=user`);
     (j?.titleList ?? []).forEach((t, idx) => {
@@ -276,6 +312,7 @@ async function crawlWebtoons() {
   let downloadPos = 0;
   for (let p = 1; ; p++) {
     if (WEBTOON_FINISHED_PAGES && p > WEBTOON_FINISHED_PAGES) break;
+    if (overBudget()) break;
     // order=DOWNLOAD = 완결작 다운로드(인기) 순위. 페이지 가로질러 전역 위치를 보존한다.
     const j = await getJSON(`https://comic.naver.com/api/webtoon/titlelist/finished?page=${p}&order=DOWNLOAD`);
     const pageItems = j?.titleList;
@@ -297,7 +334,8 @@ async function crawlWebtoons() {
 
   return (
     await pMap(top, async (t) => {
-      const shouldFetchDetail = detailIds.has(t.titleId);
+      // 예산 초과 시 상세 fetch 를 건너뛴다(작품은 기본값으로 색인 유지 — 누락보다 낫다).
+      const shouldFetchDetail = detailIds.has(t.titleId) && !overBudget();
       const info = shouldFetchDetail
         ? await getJSON(`https://comic.naver.com/api/article/list/info?titleId=${t.titleId}`)
         : null;
@@ -385,11 +423,13 @@ async function crawlSeriesNovels() {
   );
   let gi = 0;
   for (const [code, genre] of genreEntries) {
+    if (overBudget()) break;
     gi++;
     const genreStart = out.length;
     let lastPage = 0;
     for (let page = 1; ; page++) {
       if (SERIES_PAGES_PER_GENRE && page > SERIES_PAGES_PER_GENRE) break;
+      if (overBudget()) break;
       lastPage = page;
       const html = await getSeries(
         `https://series.naver.com/novel/categoryProductList.series?categoryTypeCode=genre&genreCode=${code}&page=${page}`
@@ -561,6 +601,7 @@ async function crawlLezhinCatalog() {
   const out = new Map();
   const genreScopes = ["", ...Object.keys(LZ_GENRE)];
   for (const genre of genreScopes) {
+    if (overBudget()) break;
     const page = await getJSON(
       `https://api.lezhin.com/v2/content-list/ranking?filter=all&rankType=realtime&limit=${limit}&offset=0&genres=${encodeURIComponent(genre)}`,
       HL
@@ -642,6 +683,7 @@ async function crawlKakaoWebtoon() {
   const map = new Map();
   const dayMap = new Map(); // content id → Set(한글 연재요일) — 연재 캘린더용
   for (const d of KW_DAYS) {
+    if (overBudget()) break;
     const ko = DAY_KEY[d];
     const j = await getJSON(
       `https://gateway-kw.kakao.com/section/v2/timetables/days?placement=timetable_${d}`,
@@ -765,28 +807,49 @@ function normalizeStats(t, idx) {
 
 async function main() {
   const startedAt = new Date().toISOString();
-  log("네이버 실데이터 크롤 시작…");
-  const webtoons = sourceEnabled("naver-webtoon") ? await crawlWebtoons() : [];
-  let series = [];
-  if (sourceEnabled("naver-series")) {
-    try {
-      series = await crawlSeriesNovels();
-    } catch (e) {
-      log("시리즈 크롤 스킵:", e.message);
-    }
-  }
+  log(
+    "네이버 실데이터 크롤 시작…" +
+      (CRAWL_BUDGET_MS
+        ? ` (예산 ${Math.round(CRAWL_BUDGET_MS / 1000)}s · 시리즈 ${SERIES_PAGES_PER_GENRE}p/장르)`
+        : ` (시리즈 ${SERIES_PAGES_PER_GENRE}p/장르)`)
+  );
+  // ── 전 플랫폼 동시 크롤 ───────────────────────────────────────
+  // 각 플랫폼은 서로 다른 호스트라 동시에 돌려도 호스트당 부하(내부 동시성·요청 간격)는 그대로다.
+  // 순차로 돌리면 뒤 소스(카카오·레진·중소형)가 앞 소스(웹툰·시리즈)에 예산을 다 뺏겨 굶는다 →
+  // 병렬화로 모든 플랫폼이 같은 예산 창을 공유하게 해 벽시계(합→최댓값)도 줄이고 커버리지도 키운다.
+  const guard = (id, fn) =>
+    sourceEnabled(id)
+      ? Promise.resolve()
+          .then(fn)
+          .catch((e) => {
+            log(`${id} 크롤 스킵:`, e.message);
+            return [];
+          })
+      : Promise.resolve([]);
+
+  const [webtoons, series, kakao, lezhin, extraResults] = await Promise.all([
+    guard("naver-webtoon", crawlWebtoons),
+    guard("naver-series", crawlSeriesNovels),
+    guard("kakao-webtoon", crawlKakaoWebtoon),
+    guard("lezhin", crawlLezhinCatalog),
+    Promise.all(
+      EXTRA_CRAWLERS.filter(([id]) => sourceEnabled(id)).map(async ([id, fn]) => {
+        try {
+          // 남은 예산 안에 못 끝내면 부분(빈) 결과로 넘어간다(다른 플랫폼을 막지 않음).
+          const rows = await raceBudget(fn(), [], id);
+          return [id, Array.isArray(rows) ? rows : []];
+        } catch (e) {
+          log(`${id} 크롤 스킵:`, e.message);
+          return [id, []];
+        }
+      })
+    ),
+  ]);
+
+  // ── 이후는 순수 병합(네트워크 없음) — 교차연결 우선순위: 웹툰 → 카카오 → 레진 → 중소형 ──
   const originNovels = buildOriginNovels(webtoons, series);
   const linked = webtoons.filter((w) => w.adaptedFrom).length;
 
-  // 카카오웹툰 (2번째 실 플랫폼)
-  let kakao = [];
-  if (sourceEnabled("kakao-webtoon")) {
-    try {
-      kakao = await crawlKakaoWebtoon();
-    } catch (e) {
-      log("카카오웹툰 크롤 스킵:", e.message);
-    }
-  }
   // 교차 매칭: 같은 제목이면 네이버 작품에 카카오 가용성 추가(진짜 크로스플랫폼), 아니면 신규
   const naverByName = new Map(webtoons.map((w) => [norm(w.title), w]));
   const kakaoNew = [];
@@ -803,14 +866,6 @@ async function main() {
     }
   }
 
-  let lezhin = [];
-  if (sourceEnabled("lezhin")) {
-    try {
-      lezhin = await crawlLezhinCatalog();
-    } catch (e) {
-      log("레진 크롤 스킵:", e.message);
-    }
-  }
   const knownByName = new Map([...webtoons, ...kakaoNew].map((w) => [norm(w.title), w]));
   const lezhinNew = [];
   let lezhinCrossLinked = 0;
@@ -829,17 +884,7 @@ async function main() {
     }
   }
 
-  // ── 중소형 플랫폼 (공개 카탈로그) — 병렬 크롤 후 제목 정규화로 교차연결/신규 분리 ──
-  const extraResults = await Promise.all(
-    EXTRA_CRAWLERS.filter(([id]) => sourceEnabled(id)).map(async ([id, fn]) => {
-      try {
-        return [id, await fn()];
-      } catch (e) {
-        log(`${id} 크롤 스킵:`, e.message);
-        return [id, []];
-      }
-    })
-  );
+  // ── 중소형 플랫폼: 위 병렬 크롤 결과(extraResults)를 제목 정규화로 교차연결/신규 분리 ──
   const knownAll = new Map([...webtoons, ...kakaoNew, ...lezhinNew].map((w) => [norm(w.title), w]));
   const extraNew = [];
   const extraCounts = {};
@@ -928,11 +973,20 @@ async function main() {
   };
 
   if (OUTPUT_JSON) {
-    process.stdout.write(`${JSON.stringify(result)}\n`);
+    // 대용량 JSON 백프레셔로 stdout 이 잘리지 않도록 flush 완료를 기다린 뒤 종료한다.
+    await new Promise((resolve) => process.stdout.write(`${JSON.stringify(result)}\n`, resolve));
   }
 
   log(
     `완료: ${all.length}편 — 네이버웹툰 ${webtoons.length}, 웹소설 ${novels.length}, 카카오웹툰 신규 ${kakaoNew.length}(+교차연결 ${crossLinked}), 레진 신규 ${lezhinNew.length}(+교차연결 ${lezhinCrossLinked}), 어댑테이션 ${linked}, 중소형 신규 ${extraNew.length} [${Object.entries(extraCounts).map(([k, v]) => `${k} ${v}`).join(", ")}]`
   );
+
+  // 보너스 소스의 in-flight fetch 타이머가 이벤트 루프를 붙잡아 종료가 지연(→ 외부 타임아웃)되는 것을 막는다.
+  // 결과 JSON 은 위에서 flush 완료 → 즉시 정상 종료.
+  if (OUTPUT_JSON) process.exit(0);
 }
-main();
+
+main().catch((error) => {
+  log("크롤 치명적 오류:", error?.message ?? error);
+  process.exit(1);
+});

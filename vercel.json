@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "apps/api/dist/**"
+      "includeFiles": "{apps/api/dist/**,apps/api/data/catalog.json.gz}"
     },
     "api/og.js": {
       "maxDuration": 30,

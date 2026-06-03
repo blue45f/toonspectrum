@@ -23,7 +23,12 @@ export function Stars({
     >
       <span className="inline-flex" style={{ gap: px * 0.12 }}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <Star key={i} size={px} className="text-line-strong" strokeWidth={1.5} />
+          <Star
+            key={i}
+            size={px}
+            className="text-[oklch(0.48_0.018_68)]"
+            strokeWidth={1.55}
+          />
         ))}
       </span>
       <span
@@ -34,8 +39,8 @@ export function Stars({
           <Star
             key={i}
             size={px}
-            className="shrink-0 fill-accent text-accent"
-            strokeWidth={1.5}
+            className="shrink-0 fill-accent text-accent drop-shadow-[0_0_5px_oklch(0.72_0.185_42/0.34)]"
+            strokeWidth={1.55}
           />
         ))}
       </span>

@@ -26,19 +26,21 @@ describe("OAuth signed state (CSRF 방어)", () => {
 });
 
 describe("OAuth provider 유틸", () => {
-  it("isOAuthProvider는 google/kakao만 허용", () => {
+  it("isOAuthProvider는 google/kakao/naver 허용", () => {
     expect(isOAuthProvider("google")).toBe(true);
     expect(isOAuthProvider("kakao")).toBe(true);
-    expect(isOAuthProvider("naver")).toBe(false);
+    expect(isOAuthProvider("naver")).toBe(true);
     expect(isOAuthProvider("")).toBe(false);
   });
 
-  it("client id/secret 미설정 시 demo 모드", () => {
-    // 테스트 환경엔 OAuth 환경변수가 없으므로 둘 다 demo여야 한다.
+  it("카카오·네이버는 데모 고정, 구글은 키 미설정 시 데모", () => {
+    // 카카오·네이버는 일단 데모 고정. 구글은 테스트 환경에 키가 없으므로 데모.
     expect(providerMode("google")).toBe("demo");
     expect(providerMode("kakao")).toBe("demo");
+    expect(providerMode("naver")).toBe("demo");
     const list = listAuthProviders();
     expect(list.google.mode).toBe("demo");
     expect(list.kakao.mode).toBe("demo");
+    expect(list.naver.mode).toBe("demo");
   });
 });

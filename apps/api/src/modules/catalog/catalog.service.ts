@@ -6,7 +6,8 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { activeTags, getAuthorDirectory, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
+import { activeTags, getAuthorDirectory, getCatalogState, getTitle, loadCatalogSnapshot, TITLES } from "../../../../../lib/server/catalog-store";
+import { loadCatalogTitlesFromFile } from "../../../../../lib/server/catalog-file";
 import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
@@ -88,16 +89,32 @@ export class CatalogService implements OnModuleInit {
   private nextCatalogIngestAt: number | null = null;
   private consecutiveIngestFailures = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private fileBacked = false;
 
   async onModuleInit() {
     try {
-      await loadLatestCatalogSnapshotFromDb();
+      // 카탈로그는 번들된 정적 파일(apps/api/data/catalog.json.gz)에서 로드 — Neon 전송 0.
+      // 파일이 없거나 WEBDEX_CATALOG_FORCE_DB=1 이면 기존 DB 스냅샷으로 폴백(되돌리기 가능).
+      if (process.env.WEBDEX_CATALOG_FORCE_DB === "1" || !this.loadCatalogFromFile()) {
+        await loadLatestCatalogSnapshotFromDb();
+      }
     } catch (error) {
-      console.error("catalog snapshot load failed; runtime catalog is empty until the next successful DB snapshot", error);
+      console.error("catalog load failed; runtime catalog is empty until a successful load", error);
     }
     startLiveRankingScheduler();
     this.scheduleNextCatalogIngest();
-    this.startCatalogRefreshPoll();
+    // 파일 기반이면 Neon 폴링 불필요(전송 절감). DB 기반일 때만 핫 리로드 폴링.
+    if (!this.fileBacked) this.startCatalogRefreshPoll();
+  }
+
+  private loadCatalogFromFile(): boolean {
+    const result = loadCatalogTitlesFromFile();
+    if (!result) return false;
+    const titles = loadCatalogSnapshot(result.titles, result.sourceVersion, false);
+    if (titles.length === 0) return false;
+    this.fileBacked = true;
+    console.log(`catalog loaded from file (${titles.length} titles) — Neon 전송 없음`);
+    return true;
   }
 
   // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 스냅샷을 ingest하면

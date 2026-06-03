@@ -24,6 +24,7 @@ export function CoverImage({
       alt={alt}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : undefined}
+      decoding={priority ? "sync" : "async"}
       onError={() => setFailed(true)}
       className={className}
     />

@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { FolderHeart, Check, Plus } from "lucide-react";
+import { COLLECTION_ICON_OPTIONS, CollectionIcon } from "./visual-marks";
+
+const DEFAULT_COLLECTION_ICON = COLLECTION_ICON_OPTIONS[0].value;
 
 export function CollectionAdd({ titleId }: { titleId: string }) {
   const hydrated = useHydrated();
@@ -35,7 +38,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
       {open && (
         <>
           <button className="fixed inset-0 z-10" aria-label="닫기" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-line-strong bg-panel p-2 shadow-xl shadow-black/40">
+          <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-line-strong bg-panel p-2 shadow-xl shadow-[oklch(0.1_0.02_70/0.42)]">
             <div className="max-h-52 overflow-y-auto">
               {collections.map((c) => {
                 const has = c.titleIds.includes(titleId);
@@ -45,7 +48,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
                     onClick={() => toggle(c.id, titleId)}
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-raised"
                   >
-                    <span className="text-base">{c.emoji}</span>
+                    <CollectionIcon value={c.emoji} size="sm" />
                     <span className="flex-1 truncate text-left text-fg-2">{c.name}</span>
                     {has && <Check size={15} className="text-accent" />}
                   </button>
@@ -60,7 +63,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
                 className="h-8 flex-1 rounded-lg border border-line bg-canvas px-2.5 text-sm outline-none focus:border-accent/50"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newName.trim()) {
-                    const id = create(newName.trim(), "📚");
+                    const id = create(newName.trim(), DEFAULT_COLLECTION_ICON);
                     toggle(id, titleId);
                     setNewName("");
                   }
@@ -69,7 +72,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
               <button
                 onClick={() => {
                   if (newName.trim()) {
-                    const id = create(newName.trim(), "📚");
+                    const id = create(newName.trim(), DEFAULT_COLLECTION_ICON);
                     toggle(id, titleId);
                     setNewName("");
                   }

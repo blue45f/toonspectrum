@@ -15,8 +15,8 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { spectrumGradient } from "@/lib/genre-color";
 import { AuthMenu } from "./auth/auth-menu";
+import { WebdexMark } from "./visual-marks";
 
 const NAV = [
   { label: "홈", href: "/", icon: Home, exact: true },
@@ -40,8 +40,6 @@ function useActive() {
     exact ? path === href : path === href || path.startsWith(href + "/");
 }
 
-const mark = spectrumGradient(["로맨스", "판타지", "액션", "SF"], 135);
-
 export function SiteHeader() {
   const isActive = useActive();
   const openSearch = () => window.dispatchEvent(new Event("webdex:search"));
@@ -52,12 +50,8 @@ export function SiteHeader() {
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           {/* 로고 */}
           <Link href="/" className="group flex items-center gap-2.5 pr-2">
-            <span
-              className="size-7 rounded-[0.5rem] ring-1 ring-white/15 transition-transform duration-150 group-hover:scale-105"
-              style={{ background: mark }}
-              aria-hidden
-            />
-            <span className="font-display text-lg font-bold tracking-[-0.02em] text-fg group-hover:text-accent">
+            <WebdexMark className="transition-transform duration-150 group-hover:scale-105" />
+            <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
               WEBDEX
             </span>
           </Link>
@@ -75,7 +69,16 @@ export function SiteHeader() {
                     : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                 )}
               >
-                <n.icon size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
+                <span
+                  className={cn(
+                    "grid size-6 place-items-center rounded-lg border transition-colors duration-150",
+                    isActive(n.href, n.exact)
+                      ? "border-accent/35 bg-canvas/45"
+                      : "border-transparent bg-transparent group-hover:border-line group-hover:bg-card"
+                  )}
+                >
+                  <n.icon size={15} className="text-fg-3 transition-colors group-hover:text-accent" />
+                </span>
                 {n.label}
               </Link>
             ))}

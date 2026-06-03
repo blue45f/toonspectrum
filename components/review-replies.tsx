@@ -279,7 +279,7 @@ function ReviewReplyItem({
     <article className={cn("rounded-xl border border-line bg-panel/45 p-3", depth > 0 && "ml-4 border-l-2 border-line")}>
       <div className="mb-2 flex items-center gap-2">
         <span
-          className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white ring-1 ring-white/10"
+          className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.14)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]"
           style={{ background: `linear-gradient(140deg, ${reply.author.avatar}, oklch(0.3 0.05 60))` }}
         >
           {reply.author.name.charAt(0)}

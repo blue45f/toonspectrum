@@ -33,7 +33,7 @@ export function BookmarkButton({
         "grid place-items-center rounded-lg border backdrop-blur-md transition-all duration-150 ease-out-expo active:scale-90",
         active
           ? "border-accent/40 bg-accent text-on-accent"
-          : "border-white/20 bg-black/40 text-white/85 hover:bg-black/60 hover:text-white",
+          : "border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.58)] text-[oklch(0.95_0.01_85/0.86)] hover:bg-[oklch(0.22_0.012_68/0.72)] hover:text-fg",
         className
       )}
       style={{ width: size + 16, height: size + 16 }}

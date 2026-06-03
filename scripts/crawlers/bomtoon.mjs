@@ -260,5 +260,9 @@ export async function crawl() {
   for (const it of compList) upsert(acc, it, { completed: true });
 
   // 내부용 필드(_rank) 제거 후 반환.
-  return [...acc.map.values()].map(({ _rank, ...row }) => row);
+  return [...acc.map.values()].map((entry) => {
+    const row = { ...entry };
+    delete row._rank;
+    return row;
+  });
 }
