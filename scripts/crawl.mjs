@@ -640,7 +640,9 @@ async function crawlLezhinCatalog() {
 }
 async function crawlKakaoWebtoon() {
   const map = new Map();
+  const dayMap = new Map(); // content id → Set(한글 연재요일) — 연재 캘린더용
   for (const d of KW_DAYS) {
+    const ko = DAY_KEY[d];
     const j = await getJSON(
       `https://gateway-kw.kakao.com/section/v2/timetables/days?placement=timetable_${d}`,
       KW_H
@@ -649,7 +651,13 @@ async function crawlKakaoWebtoon() {
       for (const grp of sec.cardGroups ?? [])
         for (const card of grp.cards ?? []) {
           const c = card.content;
-          if (c?.id && c.title && !map.has(c.id)) map.set(c.id, c);
+          if (!c?.id || !c.title) continue;
+          if (!map.has(c.id)) map.set(c.id, c);
+          if (ko) {
+            let ds = dayMap.get(c.id);
+            if (!ds) dayMap.set(c.id, (ds = new Set()));
+            ds.add(ko); // mon→sun 순회라 Set 삽입 순서가 곧 주간 순서
+          }
         }
     await sleep(MIN_CRAWL_DELAY_MS);
   }
@@ -660,6 +668,7 @@ async function crawlKakaoWebtoon() {
     const illus = (c.authors ?? []).filter((a) => a.type === "ILLUSTRATOR").map((a) => a.name);
     const kws = (c.seoKeywords ?? []).map((k) => String(k).replace(/^#/, "").trim()).filter(Boolean);
     const genres = kwGenres(kws);
+    const updateDays = [...(dayMap.get(c.id) ?? [])]; // 연재 캘린더용 한글 요일
     const bg = typeof c.backgroundColor === "string" && /^#/.test(c.backgroundColor) ? c.backgroundColor : null;
     const imgUrl = c.backgroundImage || c.featuredCharacterImageA; // 카카오 CDN 은 확장자 필요
     const ratingAvg = Math.round((4.3 + (hashInt(String(c.id)) % 5) * 0.1) * 10) / 10; // 추정
@@ -683,6 +692,7 @@ async function crawlKakaoWebtoon() {
       status: "ongoing",
       ageRating: c.adult ? "19" : "all",
       releaseYear: 2023,
+      updateDays: updateDays.length ? updateDays : undefined,
       availability: [
         {
           platformId: "kakao-webtoon",
