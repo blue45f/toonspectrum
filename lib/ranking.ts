@@ -101,12 +101,17 @@ function bayesRating(t: Title): number {
 
 function popularityScore(t: Title): number {
   const s = t.stats;
-  return (
+  const base =
     Math.log10(s.views + 1) * 12 +
     Math.log10(s.likes + 1) * 6 +
     Math.log10(s.bookmarks + 1) * 5 +
-    s.trendingScore * 0.2
-  );
+    s.trendingScore * 0.2;
+  // 플랫폼 실제 인기 순위(네이버 order=user 등)가 있으면 그것을 지배 신호로 써 실제 순서를 반영한다.
+  // 실순위 보유작은 항상 미보유작 위에 오고, 같은 군 안에서는 실순위가 낮을수록(=상위) 높은 점수.
+  if (s.popularityRank && s.popularityRank > 0) {
+    return 1_000_000 - s.popularityRank * 100 + base;
+  }
+  return base;
 }
 
 // 기간별 결정적 변주 — 정적 데이터에서 탭마다 다른 순위 느낌을 주기 위함
@@ -177,8 +182,10 @@ export function rankBy(
   // 숨은 명작: 평가가 너무 적은 작품은 제외(신뢰도)
   if (axis === "hidden") pool = pool.filter((t) => t.stats.ratingCount >= 300);
 
+  // popular 축은 실순위(popularityRank)를 그대로 반영해야 하므로 기간 변주(곱셈 wobble)를 끈다
+  // — wobble은 인접 순위를 뒤섞어 실제 플랫폼 순서를 깨뜨린다. 나머지 축은 기존대로 변주 적용.
   const scored = pool
-    .map((t) => ({ t, raw: rawScore(t, axis) * periodFactor(t, axis, period) }))
+    .map((t) => ({ t, raw: rawScore(t, axis) * (axis === "popular" ? 1 : periodFactor(t, axis, period)) }))
     .sort((a, b) => b.raw - a.raw);
 
   const out = scored.map((x, i) => ({

@@ -262,24 +262,35 @@ async function crawlWebtoons() {
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
   const map = new Map();
   for (const d of days) {
+    // order=user = 실제 인기(연재) 순위. 목록 내 위치(idx+1)가 실순위 신호다 — 보존한다.
     const j = await getJSON(`https://comic.naver.com/api/webtoon/titlelist/weekday?week=${d}&order=user`);
-    (j?.titleList ?? []).forEach((t) => {
+    (j?.titleList ?? []).forEach((t, idx) => {
       if (!map.has(t.titleId)) map.set(t.titleId, { ...t, _days: new Set() });
-      map.get(t.titleId)._days.add(d);
+      const entry = map.get(t.titleId);
+      entry._days.add(d);
+      const pos = idx + 1; // 요일별 인기 순위(1=최상위)
+      entry._rankUser = entry._rankUser ? Math.min(entry._rankUser, pos) : pos;
     });
     await sleep(MIN_CRAWL_DELAY_MS);
   }
+  let downloadPos = 0;
   for (let p = 1; ; p++) {
     if (WEBTOON_FINISHED_PAGES && p > WEBTOON_FINISHED_PAGES) break;
+    // order=DOWNLOAD = 완결작 다운로드(인기) 순위. 페이지 가로질러 전역 위치를 보존한다.
     const j = await getJSON(`https://comic.naver.com/api/webtoon/titlelist/finished?page=${p}&order=DOWNLOAD`);
     const pageItems = j?.titleList;
     if (!Array.isArray(pageItems) || pageItems.length === 0) break;
     pageItems.forEach((t) => {
+      downloadPos += 1;
       if (!map.has(t.titleId)) map.set(t.titleId, { ...t, _days: new Set(), finish: true });
+      const entry = map.get(t.titleId);
+      if (entry._rankDownload === undefined) entry._rankDownload = downloadPos;
     });
     await sleep(MIN_CRAWL_DELAY_MS);
   }
-  const all = [...map.values()].sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0));
+  // 실순위 우선 정렬(연재 인기 → 완결 다운로드 → 나머지). 상세+연도 보강도 실인기 상위부터.
+  const rankKey = (t) => t._rankUser ?? (t._rankDownload ? 100000 + t._rankDownload : 1e9);
+  const all = [...map.values()].sort((a, b) => rankKey(a) - rankKey(b));
   const top = applyLimit(all, WEBTOON_CAP);
   const detailIds = new Set(top.slice(0, WEBTOON_DETAIL_CAP).map((t) => t.titleId));
   log(`웹툰 수집: 전체 ${all.length}, 색인 ${top.length}, 상세+연도 ${detailIds.size}`);
@@ -305,7 +316,18 @@ async function crawlWebtoons() {
       const updateDays = [...new Set((pub.length ? pub : wd).filter(Boolean))];
       const finished = !!(t.finish || info?.finished);
       const star = typeof t.starScore === "number" ? t.starScore : 0;
-      const views = t.viewCount ?? 0;
+      // 네이버가 viewCount를 0으로 내리므로, 실순위(order=user/DOWNLOAD)에서 조회수를 역산해
+      // 인기 순서를 보존한다. rank 1 ≈ 6천만, rank 200 ≈ 약 100만(연재) — 순위 단조감소 곡선.
+      const realRank = t._rankUser; // 연재 인기 실순위(있으면 popular 신호로 사용)
+      const viewsFromRank = (rank, base) => Math.max(50_000, Math.round(base * Math.pow(rank, -0.8)));
+      const views =
+        t.viewCount > 0
+          ? t.viewCount
+          : realRank
+            ? viewsFromRank(realRank, 60_000_000)
+            : t._rankDownload
+              ? viewsFromRank(t._rankDownload, 12_000_000)
+              : 0;
       const fav = info?.favoriteCount ?? t.favoriteCount ?? Math.round(views * 0.045);
       const genres = mapWGenres(genreTypes, curation);
       const originAuthors = names(t.novelOriginAuthors);
@@ -342,7 +364,10 @@ async function crawlWebtoons() {
           trendingScore: trendScore(t),
           completionRate: finished ? 90 : Math.min(95, Math.round(58 + ratingAvg * 7)),
           bingeIndex: Math.min(98, Math.round(52 + ratingAvg * 9)),
+          popularityRank: realRank ?? undefined, // 네이버 연재 인기 실순위(1=최상위)
         },
+        // 조회수가 실수집이 아니라 실순위 역산 추정이면 ≈ 표기(순서는 실제, 숫자는 추정).
+        statsEstimated: t.viewCount > 0 ? undefined : true,
         featured: false,
         _originAuthors: originAuthors,
       };
