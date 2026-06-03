@@ -7,6 +7,7 @@ import { fromDb } from "../api-helpers";
 import type { Title } from "../types";
 
 async function getTitleDbReviews(titleId: string): Promise<SeedReview[]> {
+  try {
   const rows = await db
     .select({
       id: reviews.id,
@@ -49,6 +50,10 @@ async function getTitleDbReviews(titleId: string): Promise<SeedReview[]> {
     createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
     progress: "정주행중",
   }));
+  } catch {
+    // 리뷰 DB(Neon) 불가(쿼터/장애) 시 빈 목록으로 폴백 — 카탈로그 상세/OG 는 정상 동작.
+    return [];
+  }
 }
 
 export function findTitle(identifier: string): Title | null {

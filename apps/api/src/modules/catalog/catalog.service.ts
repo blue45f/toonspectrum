@@ -304,6 +304,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getTitleReviews(titleId: string) {
+    try {
     const rows = await db
       .select({
         id: reviews.id,
@@ -343,6 +344,10 @@ export class CatalogService implements OnModuleInit {
       likes: likesById[row.id] ?? 0,
       createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
     }));
+    } catch {
+      // 리뷰 DB(Neon) 불가(쿼터/장애) 시 빈 목록 폴백 — 상세 페이지/리뷰 탭이 깨지지 않게.
+      return [];
+    }
   }
 
   async getAuthorData(name: string) {
