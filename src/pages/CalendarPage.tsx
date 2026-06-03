@@ -5,11 +5,19 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { RatingInline } from "@/components/ui/stars";
 import { ErrorState } from "@/src/components/error-state";
+import { TitleFilterPanel } from "@/components/title-filter-panel";
 import { statsAreEstimated } from "@/lib/estimate";
+import { useSavedTitleIds } from "@/lib/store";
 import { WEEK_DAYS } from "@/lib/taxonomy";
+import {
+  EMPTY_TITLE_FILTERS,
+  applyTitleFilters,
+  countActiveTitleFilters,
+  type TitleFilterState,
+} from "@/lib/title-filters";
 import type { PlatformId, Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Database, RefreshCw } from "lucide-react";
+import { CalendarDays, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useApiResource } from "./use-api-resource";
 
@@ -41,16 +49,28 @@ export function CalendarPage() {
   const matchesFilter = (title: Title) =>
     !platformFilterActive || title.availability.some((a) => selectedPlatforms.has(a.platformId));
 
+  // 공용 작품 필터(찜·장르·가격·이용가·평점·태그). 플랫폼은 전용 셀렉터가 따로 있어 facet에서 제외.
+  const [filters, setFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const savedIds = useSavedTitleIds();
+  const titleFilterCount = countActiveTitleFilters(filters);
+  const titleFilterActive = titleFilterCount > 0;
+  const anyFilterActive = platformFilterActive || titleFilterActive;
+
   const todayIdx = data?.todayIdx ?? 0;
   const todayDay = data?.todayDay ?? WEEK_DAYS[todayIdx] ?? "월";
   const rawDays = data?.days ?? WEEK_DAYS.map((day) => ({ day, items: [] }));
-  const days = platformFilterActive
-    ? rawDays.map((d) => ({ day: d.day, items: d.items.filter(matchesFilter) }))
+  // 플랫폼 셀렉터 + 공용 필터를 둘 다 적용. 둘 다 비활성이면 원본 그대로 사용.
+  const days = anyFilterActive
+    ? rawDays.map((d) => ({
+        day: d.day,
+        items: applyTitleFilters(d.items.filter(matchesFilter), filters, savedIds),
+      }))
     : rawDays;
-  const totalScheduled = platformFilterActive
+  const totalScheduled = anyFilterActive
     ? days.reduce((n, d) => n + d.items.length, 0)
     : data?.totalScheduled ?? 0;
-  const todayCount = platformFilterActive
+  const todayCount = anyFilterActive
     ? days[todayIdx]?.items.length ?? 0
     : data?.todayCount ?? 0;
 
@@ -74,6 +94,25 @@ export function CalendarPage() {
               <Database size={14} className="text-accent" />
               전체 연재 <span className="numeral text-fg">{totalScheduled.toLocaleString("ko-KR")}</span>편
             </span>
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              aria-expanded={showFilters}
+              aria-pressed={titleFilterActive}
+              className={buttonClass({
+                size: "sm",
+                variant: titleFilterActive ? "outline" : "quiet",
+                className: "gap-1.5",
+              })}
+            >
+              <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} />
+              필터
+              {titleFilterActive && (
+                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                  {titleFilterCount}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               onClick={reload}
@@ -128,6 +167,17 @@ export function CalendarPage() {
             </div>
           </div>
         ) : null}
+
+        {showFilters && (
+          <div className="mt-4 border-t border-line pt-4">
+            <TitleFilterPanel
+              value={filters}
+              onChange={setFilters}
+              facets={["saved", "genre", "pricing", "age", "minRating", "tag"]}
+              savedCount={savedIds.size}
+            />
+          </div>
+        )}
       </header>
 
       {error ? (
@@ -210,15 +260,18 @@ export function CalendarPage() {
 
       {!loading && !error && totalScheduled === 0 && (
         <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
-          {platformFilterActive ? (
+          {anyFilterActive ? (
             <>
-              <p className="text-sm font-medium text-fg">선택한 플랫폼에 연재요일 정보가 있는 작품이 없습니다.</p>
+              <p className="text-sm font-medium text-fg">선택한 조건에 맞는 연재 작품이 없습니다.</p>
               <button
                 type="button"
-                onClick={() => setSelectedPlatforms(new Set())}
+                onClick={() => {
+                  setSelectedPlatforms(new Set());
+                  setFilters(EMPTY_TITLE_FILTERS);
+                }}
                 className="mt-1 text-xs text-accent hover:underline"
               >
-                전체 플랫폼 보기
+                필터 초기화
               </button>
             </>
           ) : (

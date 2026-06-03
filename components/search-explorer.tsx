@@ -9,6 +9,7 @@ import { Segmented } from "./ui/segmented";
 import { GenreChip, TagChip } from "./ui/chip";
 import { buttonClass } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { useSavedTitleIds } from "@/lib/store";
 import {
   Search,
   SlidersHorizontal,
@@ -21,6 +22,7 @@ import {
   RefreshCw,
   Database,
   Clock3,
+  Bookmark,
 } from "lucide-react";
 import { TitleCard, TitleRow } from "./title-card";
 
@@ -137,6 +139,7 @@ export function SearchExplorer({
   const [adaptedOnly, setAdaptedOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>(initialQuery ? "relevance" : "popular");
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [savedOnly, setSavedOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [limit, setLimit] = useState(24);
   const [results, setResults] = useState<Title[]>([]);
@@ -210,9 +213,11 @@ export function SearchExplorer({
     };
   }, [query, retryKey]);
 
-  const shown = results.slice(0, limit);
-  const hasResult = Boolean(results.length);
-  const resultText = hasResult ? `${results.length.toLocaleString("ko-KR")}개의 작품` : "결과가 없습니다";
+  const savedIds = useSavedTitleIds();
+  const visibleResults = savedOnly ? results.filter((title) => savedIds.has(title.id)) : results;
+  const shown = visibleResults.slice(0, limit);
+  const hasResult = Boolean(visibleResults.length);
+  const resultText = hasResult ? `${visibleResults.length.toLocaleString("ko-KR")}개의 작품` : "결과가 없습니다";
   const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
   const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
   // 플랫폼 필터는 카탈로그에 실제로 존재하는 플랫폼만 노출(빈 슬롯 방지). 커버리지 정보가
@@ -635,6 +640,21 @@ export function SearchExplorer({
               ))}
             </select>
 
+            <button
+              type="button"
+              onClick={() => setSavedOnly((current) => !current)}
+              aria-pressed={savedOnly}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[0.8125rem] font-medium transition-colors",
+                savedOnly
+                  ? "border-accent/55 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+              )}
+            >
+              <Bookmark size={14} className={savedOnly ? "fill-current" : ""} />
+              내 찜만
+            </button>
+
             <Segmented
               size="sm"
               value={view}
@@ -795,7 +815,7 @@ export function SearchExplorer({
               </div>
             )}
 
-            {shown.length < results.length && (
+            {shown.length < visibleResults.length && (
               <div className="mt-8 flex justify-center">
                 <button
                   type="button"
@@ -803,7 +823,7 @@ export function SearchExplorer({
                   className={buttonClass({ size: "sm", className: "gap-1.5" })}
                 >
                   더 보기
-                  <span className="text-fg-3">({(results.length - shown.length).toLocaleString("ko-KR")}개)</span>
+                  <span className="text-fg-3">({(visibleResults.length - shown.length).toLocaleString("ko-KR")}개)</span>
                 </button>
               </div>
             )}

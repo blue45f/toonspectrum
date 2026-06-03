@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useApp, useHydrated } from "@/lib/store";
+import { useApp, useHydrated, useSavedTitleIds } from "@/lib/store";
 import { GENRES } from "@/lib/taxonomy";
-import type { Title } from "@/lib/types";
+import type { PlatformId, Title } from "@/lib/types";
 import { TitleCard } from "./title-card";
 import { MiniPoster } from "./rank-row";
 import { Section, Rail } from "./section";
+import { TitleFilterPanel } from "@/components/title-filter-panel";
+import {
+  EMPTY_TITLE_FILTERS,
+  applyTitleFilters,
+  countActiveTitleFilters,
+  type TitleFilterState,
+} from "@/lib/title-filters";
 import { genreColor } from "@/lib/genre-color";
 import { cn } from "@/lib/utils";
-import { Sparkles, Wand2, Shuffle } from "lucide-react";
+import { Sparkles, Wand2, Shuffle, SlidersHorizontal } from "lucide-react";
 
 interface RecommendPayload {
   pickedRecs: Title[];
@@ -30,12 +37,16 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
   const ratings = useApp((s) => s.ratings);
   const reads = useApp((s) => s.reads);
 
+  const savedIds = useSavedTitleIds();
+
   const [picked, setPicked] = useState<string[]>(initialGenres);
   const [seedId, setSeedId] = useState<string | null>(null);
   const [data, setData] = useState<RecommendPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
 
   const requestBody = useMemo(
     () => JSON.stringify({ picked, seedId, ratings, reads }),
@@ -75,13 +86,32 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
     };
   }, [requestBody, reloadKey]);
 
-  const pickedRecs = data?.pickedRecs ?? [];
+  const pickedRecsRaw = data?.pickedRecs ?? [];
   const pickedLabelGenres = data?.pickedLabelGenres ?? picked;
-  const tasteRecs = data?.tasteRecs ?? [];
+  const tasteRecsRaw = data?.tasteRecs ?? [];
   const popular = data?.popular ?? [];
   const seed = data?.seed ?? null;
-  const similar = data?.similar ?? [];
+  const similarRaw = data?.similar ?? [];
   const hasTaste = hydrated && !!data && data.profile.ratedCount + data.profile.readCount > 0;
+
+  // 클라이언트 측 필터 적용 — 추천 결과 목록에만 반영(원작 추천 'picked' 동작은 그대로 유지).
+  // 'popular' 레일은 비슷한 작품 탐색의 시드 선택기이므로 필터하지 않는다.
+  const pickedRecs = applyTitleFilters(pickedRecsRaw, filters, savedIds);
+  const tasteRecs = tasteRecsRaw.filter((r) =>
+    applyTitleFilters([r.title], filters, savedIds).length > 0
+  );
+  const similar = applyTitleFilters(similarRaw, filters, savedIds);
+
+  // 데이터에 실제로 존재하는 플랫폼만 facet에 노출(빈 플랫폼 숨김).
+  const platformOptions = Array.from(
+    new Set(
+      [...pickedRecsRaw, ...tasteRecsRaw.map((r) => r.title), ...similarRaw, ...popular].flatMap((t) =>
+        t.availability.map((a) => a.platformId)
+      )
+    )
+  ) as PlatformId[];
+
+  const activeFilters = countActiveTitleFilters(filters);
 
   return (
     <div className="flex flex-col gap-16">
@@ -98,6 +128,49 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
           </button>
         </div>
       )}
+
+      {/* 추천 결과 필터 — '필터' 토글 뒤에 패널을 둠 */}
+      <div className="-mb-6 flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+          className={cn(
+            "inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            showFilters || activeFilters > 0
+              ? "border-accent/60 bg-accent-soft/60 text-fg"
+              : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+          )}
+        >
+          <SlidersHorizontal size={15} className="text-accent" /> 필터
+          {activeFilters > 0 && (
+            <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+              {activeFilters}
+            </span>
+          )}
+        </button>
+        {showFilters && (
+          <TitleFilterPanel
+            value={filters}
+            onChange={setFilters}
+            facets={[
+              "saved",
+              "type",
+              "genre",
+              "status",
+              "platform",
+              "age",
+              "pricing",
+              "minRating",
+              "year",
+              "tag",
+            ]}
+            platformOptions={platformOptions}
+            savedCount={savedIds.size}
+          />
+        )}
+      </div>
+
       {/* 취향 픽 — 콜드스타트 친화 */}
       <section>
         <div className="mb-5 flex items-center gap-2">

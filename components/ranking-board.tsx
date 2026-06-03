@@ -11,6 +11,14 @@ import {
   type RankPeriod,
 } from "@/lib/ranking";
 import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
+import { useSavedTitleIds } from "@/lib/store";
+import {
+  EMPTY_TITLE_FILTERS,
+  applyTitleFilters,
+  countActiveTitleFilters,
+  type TitleFilterState,
+} from "@/lib/title-filters";
+import { TitleFilterPanel } from "./title-filter-panel";
 import { GENRES } from "@/lib/taxonomy";
 import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
 import { PLATFORM_LIST } from "@/lib/platforms";
@@ -37,6 +45,7 @@ import {
   Rows3,
   ShieldAlert,
   ShieldCheck,
+  SlidersHorizontal,
   Sprout,
   Star,
   TrendingUp,
@@ -380,6 +389,9 @@ export function RankingBoard({
   const [pricing, setPricing] = useState<Pricing | "all">("all");
   const [minRating, setMinRating] = useState(0);
   const [risingOnly, setRisingOnly] = useState(false);
+  const [clientFilters, setClientFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
+  const savedIds = useSavedTitleIds();
   const [view, setView] = useState<View>("list");
   const [ranked, setRanked] = useState<RankedTitle[]>([]);
   const [rankingMeta, setRankingMeta] = useState<RankingMeta | null>(null);
@@ -491,6 +503,17 @@ export function RankingBoard({
   const isLoading = state === "loading";
   const isRefreshing = state === "refreshing";
   const refreshLabel = refreshCountdown === null ? "자동 갱신 대기" : `${refreshCountdown}초`;
+
+  // 서버가 매긴 순위/순서는 유지하고, 클라이언트 보조 필터(찜·장르·이용가)에 안 맞는 행만 숨긴다.
+  const clientFilterCount = countActiveTitleFilters(clientFilters);
+  const visibleIds = new Set(
+    applyTitleFilters(
+      ranked.map((r) => r.title),
+      clientFilters,
+      savedIds
+    ).map((t) => t.id)
+  );
+  const visibleRanked = clientFilterCount > 0 ? ranked.filter((r) => visibleIds.has(r.title.id)) : ranked;
 
   return (
     <div className="flex flex-col gap-5">
@@ -717,8 +740,28 @@ export function RankingBoard({
             <span className="mr-1 text-fg">다음 갱신:</span>
             <span className="numeral mr-1 text-fg">{refreshLabel}</span>
             <span>·</span>
-            <span className="numeral mr-1 text-fg">{ranked.length}</span>편
+            <span className="numeral mr-1 text-fg">{visibleRanked.length}</span>편
+            {clientFilterCount > 0 && <span className="ml-1 text-fg-3">/ {ranked.length}</span>}
           </span>
+          <button
+            type="button"
+            onClick={() => setShowFilters((current) => !current)}
+            aria-expanded={showFilters}
+            className={cn(
+              "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-medium transition-colors",
+              showFilters || clientFilterCount > 0
+                ? "border-accent/45 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+            )}
+          >
+            <SlidersHorizontal size={14} />
+            필터
+            {clientFilterCount > 0 && (
+              <span className="rounded-full bg-accent/20 px-1.5 text-[0.68rem] text-accent">
+                {clientFilterCount}
+              </span>
+            )}
+          </button>
           <Segmented
             size="sm"
             value={view}
@@ -732,6 +775,16 @@ export function RankingBoard({
         </div>
       </section>
 
+      {/* 보조 클라이언트 필터(내 찜·장르·이용가) — 서버 순위는 유지하고 비매칭 행만 숨김 */}
+      {showFilters && (
+        <TitleFilterPanel
+          value={clientFilters}
+          onChange={setClientFilters}
+          facets={["saved", "genre", "age"]}
+          savedCount={savedIds.size}
+        />
+      )}
+
       {/* 랭킹 — 3가지 표시 방식 */}
       {isLoading ? (
         <RankingSkeleton />
@@ -741,27 +794,29 @@ export function RankingBoard({
           <p className="text-sm font-medium text-fg">랭킹을 불러오지 못했습니다.</p>
           <p className="mt-1 text-sm text-fg-3">{error}</p>
         </div>
-      ) : ranked.length === 0 ? (
+      ) : visibleRanked.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel/30 px-5 py-14 text-center">
           <BookOpen className="mx-auto mb-3 text-fg-3" size={24} />
           <p className="text-sm font-medium text-fg">해당 조건의 작품이 없습니다.</p>
-          <p className="mt-1 text-sm text-fg-3">장르나 플랫폼 필터를 넓혀보세요.</p>
+          <p className="mt-1 text-sm text-fg-3">
+            {clientFilterCount > 0 ? "찜·장르·이용가 필터를 넓혀보세요." : "장르나 플랫폼 필터를 넓혀보세요."}
+          </p>
         </div>
       ) : view === "list" ? (
         <div className="rounded-xl border border-line bg-panel/30 p-2 sm:p-3">
-          {ranked.map((r) => (
+          {visibleRanked.map((r) => (
             <RankRow key={r.title.id} ranked={r} metric={metric} />
           ))}
         </div>
       ) : view === "poster" ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {ranked.map((r) => (
+          {visibleRanked.map((r) => (
             <TitleCard key={r.title.id} title={r.title} rank={r.rank} />
           ))}
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
-          {ranked.map((r) => {
+          {visibleRanked.map((r) => {
             const mm = metric(r.title);
             return (
               <Link
