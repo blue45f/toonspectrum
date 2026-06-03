@@ -341,9 +341,18 @@ async function crawlWebtoons() {
 async function crawlSeriesNovels() {
   const out = [];
   const seen = new Set();
-  for (const [code, genre] of Object.entries(NGENRE)) {
+  const genreEntries = Object.entries(NGENRE);
+  log(
+    `시리즈 웹소설 수집 시작: ${genreEntries.length}개 장르 × 최대 ${SERIES_PAGES_PER_GENRE || "∞"}페이지`
+  );
+  let gi = 0;
+  for (const [code, genre] of genreEntries) {
+    gi++;
+    const genreStart = out.length;
+    let lastPage = 0;
     for (let page = 1; ; page++) {
       if (SERIES_PAGES_PER_GENRE && page > SERIES_PAGES_PER_GENRE) break;
+      lastPage = page;
       const html = await getSeries(
         `https://series.naver.com/novel/categoryProductList.series?categoryTypeCode=genre&genreCode=${code}&page=${page}`
       );
@@ -371,9 +380,17 @@ async function crawlSeriesNovels() {
           waitFree: /ico_onlyfree|매일.*무료/.test(head),
         });
       }
+      if (page % 25 === 0) {
+        log(
+          `  [${gi}/${genreEntries.length}] ${genre}: ${page}p, 누적 ${out.length}건`
+        );
+      }
       await sleep(MIN_CRAWL_DELAY_MS);
       if (out.length === before) break;
     }
+    log(
+      `  [${gi}/${genreEntries.length}] ${genre} 완료: +${out.length - genreStart}건 (${lastPage}p), 누적 ${out.length}건`
+    );
   }
   log(`시리즈 웹소설(보너스) 수집: ${out.length}`);
   return applyLimit(out, NOVEL_BONUS_CAP).map((n, i) => {
