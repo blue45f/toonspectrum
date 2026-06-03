@@ -329,12 +329,18 @@ export async function handleOAuthCallback(id: OAuthProviderId, code: string): Pr
 // 데모 폴백: 실제 제공자 연동 없이 명확히 [데모] 표시된 사용자 생성/재사용.
 export async function createDemoUser(id: OAuthProviderId): Promise<OAuthUser> {
   const c = providerConfig(id);
-  return upsertOAuthUser(id, {
-    providerAccountId: `demo-${id}`,
-    email: c.demoEmail,
-    name: c.demoName,
-    image: null,
-  });
+  try {
+    return await upsertOAuthUser(id, {
+      providerAccountId: `demo-${id}`,
+      email: c.demoEmail,
+      name: c.demoName,
+      image: null,
+    });
+  } catch {
+    // DB(Neon) 불가(쿼터/장애) 시에도 데모 체험은 가능해야 한다 — 영속화 없이 합성 데모 사용자 반환.
+    // 세션은 클라이언트(localStorage)라 DB 행 없이도 로그인 체험이 동작한다.
+    return { id: `demo-${id}`, name: c.demoName, email: c.demoEmail, image: null, role: "user" };
+  }
 }
 
 // ── 핸드오프: 콜백이 발급한 1회용 토큰으로 프론트가 사용자 객체를 교환(URL에 PII 미노출) ──
