@@ -304,6 +304,8 @@ export class AdminService {
     const normalizedDays = parsePositiveInt(periodDays, 30, 1, 365);
     const activeFrom = now - normalizedDays * DAY_MS;
     const activeFrom7d = now - 7 * DAY_MS;
+    // PG의 timestamp 컬럼은 epoch-ms 숫자와 직접 비교할 수 없다(범위 초과 오류). Date로 바인딩해 비교.
+    const activeFromDate = new Date(activeFrom);
 
     const [totalUsers, adminCount, creatorCount, fanPostCount, fanReplyCount, reviewReplyCount, reviewCount] = await Promise.all([
       countFrom(users),
@@ -321,11 +323,11 @@ export class AdminService {
     ]);
 
     const [activeReviewCount, activeFanPostCount, activeFanReplyCount, activeReviewReplyCount, activeRatingCount] = await Promise.all([
-      countFrom(reviews, sql`${reviews.createdAt} >= ${activeFrom}`),
-      countFrom(fanPosts, sql`${fanPosts.createdAt} >= ${activeFrom}`),
-      countFrom(fanPostReplies, sql`${fanPostReplies.createdAt} >= ${activeFrom}`),
-      countFrom(reviewReplies, sql`${reviewReplies.createdAt} >= ${activeFrom}`),
-      countFrom(ratings, sql`${ratings.updatedAt} >= ${activeFrom}`),
+      countFrom(reviews, sql`${reviews.createdAt} >= ${activeFromDate}`),
+      countFrom(fanPosts, sql`${fanPosts.createdAt} >= ${activeFromDate}`),
+      countFrom(fanPostReplies, sql`${fanPostReplies.createdAt} >= ${activeFromDate}`),
+      countFrom(reviewReplies, sql`${reviewReplies.createdAt} >= ${activeFromDate}`),
+      countFrom(ratings, sql`${ratings.updatedAt} >= ${activeFromDate}`),
     ]);
 
     const [revenueSummaryRows, planRows, activePlanRows, campaignRows] = await Promise.all([
@@ -343,7 +345,7 @@ export class AdminService {
           revokedEvents: sql<number>`coalesce(sum(case when ${revenueLedger.status} = 'revoked' then 1 else 0 end), 0)`.as("revokedEvents"),
         })
         .from(revenueLedger)
-        .where(sql`${revenueLedger.createdAt} >= ${activeFrom}`),
+        .where(sql`${revenueLedger.createdAt} >= ${activeFromDate}`),
       countFrom(monetizationPlans),
       countFrom(monetizationPlans, eq(monetizationPlans.isActive, true)),
       countFrom(creatorCampaigns),
