@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { AppRouter } from "./routes/AppRouter";
 
 function ScrollToTop() {
@@ -31,6 +32,7 @@ export default function App() {
           </main>
           <SiteFooter />
           <CommandPalette />
+          <LanguageSwitcher className="fixed bottom-4 left-4 z-[90] max-md:bottom-20" />
         </MotionProvider>
       </AuthSessionProvider>
     </BrowserRouter>

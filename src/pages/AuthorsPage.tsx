@@ -5,6 +5,7 @@ import { ErrorState } from "@/src/components/error-state";
 import { genreTint, genreBorder, genreColor } from "@/lib/genre-color";
 import { formatCount } from "@/lib/utils";
 import { PenLine, Search } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import { useApiResource } from "./use-api-resource";
 
 interface AuthorEntry {
@@ -23,6 +24,7 @@ interface AuthorsResponse {
 }
 
 export function AuthorsPage() {
+  const t = useT();
   const { data, loading, error, reload } = useApiResource<AuthorsResponse>(
     "/api/authors",
     "작가 목록을 불러오지 못했습니다."
@@ -38,9 +40,9 @@ export function AuthorsPage() {
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <PenLine size={14} /> AUTHOR DIRECTORY
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">작가별 보기</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("authors.title")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-          작품을 많이 낸 작가 순으로 모았습니다. 작가를 누르면 그 작가의 작품·평점·펜카페를 한곳에서 봅니다.
+          {t("authors.desc")}
           {data && (
             <span className="text-fg-3">
               {" "}
@@ -54,8 +56,8 @@ export function AuthorsPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="작가 이름 검색"
-              aria-label="작가 이름 검색"
+              placeholder={t("authors.search")}
+              aria-label={t("authors.search")}
               className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
             />
           </div>
@@ -63,7 +65,7 @@ export function AuthorsPage() {
       </header>
 
       {error ? (
-        <ErrorState title="작가 목록을 불러오지 못했습니다." message={error} onRetry={reload} />
+        <ErrorState title={t("authors.error")} message={error} onRetry={reload} />
       ) : loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 12 }).map((_, i) => (
@@ -71,7 +73,7 @@ export function AuthorsPage() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-fg-3">“{q}” 와 일치하는 작가가 없습니다.</p>
+        <p className="py-16 text-center text-sm text-fg-3">“{q}”{t("authors.empty")}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((a) => (

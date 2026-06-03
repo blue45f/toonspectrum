@@ -11,8 +11,10 @@ import { ReviewCard } from "@/components/review-card";
 import { ReviewForm } from "@/components/review-form";
 import { Rail, Section, Container } from "@/components/section";
 import { SubscribeButton } from "@/components/subscribe-button";
+import { ShareButton } from "@/components/share-button";
 import { TitleCard } from "@/components/title-card";
 import { TitlePoster } from "@/components/title-poster";
+import { CoverImage } from "@/components/cover-image";
 import { Badge, GenreChip } from "@/components/ui/chip";
 import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
 import { Stars } from "@/components/ui/stars";
@@ -99,8 +101,14 @@ export function TitleDetailPage() {
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[480px] w-screen -translate-x-1/2 overflow-hidden"
         >
-          <img src={title.coverImage} alt="" className="size-full scale-110 object-cover opacity-25 blur-2xl" />
-          <div className="absolute inset-0 bg-gradient-to-b from-canvas/30 via-canvas/85 to-canvas" />
+          <CoverImage src={title.coverImage} alt="" className="size-full scale-110 object-cover opacity-25 blur-2xl" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom, oklch(0.155 0.008 70 / 0.32), oklch(0.155 0.008 70 / 0.86) 58%, oklch(0.155 0.008 70))",
+            }}
+          />
         </div>
       )}
 
@@ -112,6 +120,7 @@ export function TitleDetailPage() {
           {title.status === "ongoing" && title.updateDays && title.updateDays.length > 0 && (
             <SubscribeButton titleId={title.id} days={title.updateDays} />
           )}
+          <ShareButton title={title.title} slug={title.slug} className="self-start" />
           <div className="rounded-2xl border border-line bg-panel/50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <MapPin size={15} className="text-accent" />
