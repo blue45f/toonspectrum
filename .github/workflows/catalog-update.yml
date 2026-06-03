@@ -9,7 +9,7 @@ name: catalog-update
 
 on:
   schedule:
-    - cron: "0 18 * * 0" # 매주 일요일 18:00 UTC (월요일 03:00 KST)
+    - cron: "0 */2 * * *" # 2시간마다(실시간 대신 주기 스냅샷). 비용/정중함을 위해 필요시 간격 조정.
   workflow_dispatch: {}
 
 permissions:
@@ -41,14 +41,18 @@ jobs:
           WEBDEX_CRAWL_BUDGET_MS: "900000"
         run: node scripts/crawl.mjs --json --no-file > /tmp/catalog.json
 
-      - name: Guard — 최소 작품 수 확인 (지오차단/장애 시 카탈로그 보호)
+      - name: Guard — floor + 회귀 방지 (지오차단/장애 시 카탈로그 보호)
         id: guard
         run: |
           COUNT=$(node -e "const j=require('/tmp/catalog.json');console.log(Array.isArray(j.titles)?j.titles.length:0)")
+          PREV=$(node -e "try{const z=require('zlib'),fs=require('fs');const j=JSON.parse(z.gunzipSync(fs.readFileSync('apps/api/data/catalog.json.gz')));console.log(Array.isArray(j.titles)?j.titles.length:(Array.isArray(j)?j.length:0))}catch{console.log(0)}")
           echo "crawled=$COUNT" >> "$GITHUB_OUTPUT"
-          echo "크롤 작품 수: $COUNT"
+          echo "크롤 ${COUNT}편 (직전 ${PREV}편)"
           if [ "$COUNT" -lt 8000 ]; then
-            echo "::warning::작품 수 $COUNT < 8000 — 비정상(지오차단 등)으로 보고 커밋을 건너뜁니다."
+            echo "::warning::${COUNT} < 8000 — 비정상(지오차단 등). 커밋 스킵."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ "$PREV" -gt 0 ] && [ "$COUNT" -lt "$((PREV * 9 / 10))" ]; then
+            echo "::warning::${COUNT} < 직전 ${PREV}의 90% — 회귀로 보고 커밋 스킵(전 작품은 KR egress 로컬 크롤 권장)."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 

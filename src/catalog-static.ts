@@ -19,7 +19,6 @@ import { buildTasteProfile, recommendForTaste, similarTitles } from "@/lib/recom
 import { getExploreData } from "@/lib/server/explore";
 import { getRankingData } from "@/lib/server/ranking-service";
 import { getAuthorData } from "@/lib/server/author";
-import type { LiveRankingResult, LiveStatusResult } from "@/lib/server/live";
 
 const STATIC_MODE = (import.meta.env.VITE_CATALOG_SOURCE ?? "static") !== "api";
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -186,17 +185,8 @@ function recommendData(body: Record<string, unknown>) {
 function matchEngine(pathname: string, sp: URLSearchParams): null | ((init: RequestInit | undefined, origFetch: typeof fetch) => Promise<unknown> | unknown) {
   if (pathname === "/api/search") return () => searchData(sp);
   if (pathname === "/api/ranking")
-    return async () =>
-      getRankingData(
-        { get: (n: string) => sp.get(n) },
-        {
-          // 정적 모드: 라이브 소스(naver 등)를 브라우저에서 직접 호출하지 않는다(CORS·낭비).
-          // 빈 라이브/상태 → 투명 산식(formula) 랭킹으로 동작.
-          fetchLive: async () => ({ items: [] }) as unknown as LiveRankingResult,
-          fetchStatus: async () =>
-            ({ items: [], fetchedAt: new Date().toISOString(), ttlSeconds: 0, timeoutMs: 0, sources: [] }) as LiveStatusResult,
-        }
-      );
+    // 실시간(live) 제거 — 스냅샷 기반 산식 랭킹(naver 호출·CORS·서버리스 없음).
+    return async () => getRankingData({ get: (n: string) => sp.get(n) }, { disableLive: true });
   if (pathname === "/api/explore") return async () => getExploreData(Object.fromEntries(sp.entries()));
   if (pathname === "/api/recommend") return (init) => recommendData(parseBody(init));
   if (pathname === "/api/titles") return () => titlesData(sp);
@@ -209,6 +199,24 @@ function matchEngine(pathname: string, sp: URLSearchParams): null | ((init: Requ
     return async () => (await getAuthorData(name)) ?? NOT_FOUND;
   }
   return null;
+}
+
+// 랭킹 기본 뷰(필터 없음·주간) → 사전계산 정적 파일 경로. 그 외(필터·다른 기간)는 null → 클라 엔진.
+function precomputedRankingPath(pathname: string, sp: URLSearchParams): string | null {
+  if (pathname !== "/api/ranking") return null;
+  const isDefault =
+    (sp.get("period") ?? "weekly") === "weekly" &&
+    (sp.get("platform") ?? "all") === "all" &&
+    (sp.get("genre") ?? "all") === "all" &&
+    (sp.get("status") ?? "all") === "all" &&
+    (sp.get("pricing") ?? "all") === "all" &&
+    !sp.get("minRating") &&
+    sp.get("rising") !== "true" &&
+    sp.get("refresh") !== "true";
+  if (!isDefault) return null;
+  const axis = sp.get("axis") ?? "popular";
+  const type = sp.get("type") ?? "all";
+  return `/data/ranking/${encodeURIComponent(axis)}-${encodeURIComponent(type)}.json`;
 }
 
 function parseBody(init: RequestInit | undefined): Record<string, unknown> {
@@ -245,6 +253,12 @@ export function installStaticCatalog(): void {
     // 파라미터 없는 카탈로그 페이지 → 정적 파일
     if (STATIC_FILES[pathname] && [...sp.keys()].length === 0) {
       return origFetch(STATIC_FILES[pathname], init);
+    }
+    // 랭킹 기본 뷰 → 사전계산 정적 파일(전체 카탈로그 로드 없이 즉시). 필터/다른 기간은 아래 엔진.
+    const rankingPath = precomputedRankingPath(pathname, sp);
+    if (rankingPath) {
+      const res = await origFetch(rankingPath, init);
+      if (res.ok) return res;
     }
     // 동적 카탈로그 → 클라이언트 엔진
     const handler = matchEngine(pathname, sp);

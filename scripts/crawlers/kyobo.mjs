@@ -47,7 +47,7 @@ const QUERIES = [
   { kw: "BL소설", genre: "BL", tag: "BL" },
 ];
 
-const PAGES_PER_QUERY = 5; // 키워드당 5페이지(=최대 100건) → 빈 페이지면 조기 종료.
+const PAGES_PER_QUERY = 20; // 키워드당 20페이지 → 빈 페이지면 조기 종료(전 작품 지향).
 
 // li.prod_item 블록 경계로 분리. 각 블록에서 상품 1건의 메타를 뽑는다.
 function splitProductBlocks(html) {

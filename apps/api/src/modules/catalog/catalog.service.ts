@@ -19,7 +19,6 @@ import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatal
 import { getExploreData } from "../../../../../lib/server/explore";
 import { getHomeData } from "../../../../../lib/server/home";
 import { getInsightsData } from "../../../../../lib/server/insights";
-import { startLiveRankingScheduler } from "../../../../../lib/server/live";
 import { getRankingData, getRankingHealth } from "../../../../../lib/server/ranking-service";
 import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../../lib/types";
@@ -101,7 +100,7 @@ export class CatalogService implements OnModuleInit {
     } catch (error) {
       console.error("catalog load failed; runtime catalog is empty until a successful load", error);
     }
-    startLiveRankingScheduler();
+    // 실시간(live) 랭킹 제거 — 스냅샷 기반 운영. 스케줄러 미가동(naver 실시간 페치 없음).
     this.scheduleNextCatalogIngest();
     // 파일 기반이면 Neon 폴링 불필요(전송 절감). DB 기반일 때만 핫 리로드 폴링.
     if (!this.fileBacked) this.startCatalogRefreshPoll();
@@ -157,7 +156,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getRankingData(query: QueryRecord) {
-    return getRankingData(createQueryReader(query));
+    return getRankingData(createQueryReader(query), { disableLive: true });
   }
 
   async getRankingHealth() {

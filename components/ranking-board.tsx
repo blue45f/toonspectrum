@@ -225,7 +225,7 @@ function SignalWorkbench({
         <span>신호 관측대</span>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-4">
         <div className="min-w-0 rounded-lg border border-line bg-canvas/35 p-3">
           <p className="eyebrow text-[0.58rem] text-fg-3">CONFIDENCE</p>
           <div className="mt-1 flex items-end gap-2">
@@ -240,7 +240,7 @@ function SignalWorkbench({
         <div className="min-w-0">
           <p className="eyebrow text-[0.58rem] text-fg-3">SOURCE</p>
           <p className="mt-1 truncate text-sm font-semibold text-fg">
-            {meta?.source === "live-api" ? "Live API" : "Formula API"}
+            {meta?.source === "live-api" ? "Live API" : "스냅샷 산식"}
           </p>
           <p className="mt-0.5 text-xs text-fg-3">
             {meta?.source === "live-api"
@@ -252,13 +252,6 @@ function SignalWorkbench({
               상태 확인 {meta.statusSignals.matched}개 · 보정 {meta.statusSignals.overridden}개
             </p>
           )}
-        </div>
-        <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">COVERAGE</p>
-          <p className="mt-1 font-display text-xl font-bold text-accent tnum">
-            {insights ? `${insights.liveCoverage}%` : "0%"}
-          </p>
-          <p className="mt-0.5 text-xs text-fg-3">현재 랭킹 내 라이브 소스 비중</p>
         </div>
         <div className="min-w-0">
           <p className="eyebrow text-[0.58rem] text-fg-3">RISING</p>
@@ -722,7 +715,7 @@ export function RankingBoard({
                   ? `LIVE API · 신뢰 ${rankingMeta.reliability.confidence}/100 · ${rankingMeta.live.matched}/${rankingMeta.live.fetched} 매칭 · 업데이트 ${formatUpdatedAt(
                       rankingMeta.live.fetchedAt ?? rankingMeta.generatedAt
                     )}`
-                  : `FORMULA API · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
+                  : `스냅샷 산식 · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
             </span>
           </div>
           <button

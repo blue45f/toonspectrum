@@ -231,7 +231,7 @@ export async function crawl() {
 
   // 2) 배치(60개)로 메타 하이드레이션. 요청 수를 합리적으로 유지(<= ~10 배치).
   const BATCH = 60;
-  const MAX_BATCHES = 9; // 최대 540건 하이드레이션 → dedupe 후 충분.
+  const MAX_BATCHES = 30; // 하이드레이션 배치 상한 ↑(전 작품 지향, dedupe 후).
   for (let i = 0, b = 0; i < ids.length && b < MAX_BATCHES; i += BATCH, b++) {
     const batch = ids.slice(i, i + BATCH);
     const items = await fetchDetails(batch);

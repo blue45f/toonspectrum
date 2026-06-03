@@ -34,7 +34,7 @@ const CATEGORIES = [
   { code: 25, fallback: "현판" },
 ];
 
-const PAGES_PER_CATEGORY = 7; // 카테고리당 7페이지 → 빈 페이지면 조기 종료(아래 break).
+const PAGES_PER_CATEGORY = 30; // 카테고리당 30페이지 → 빈 페이지면 조기 종료(전 작품 지향).
 
 // "YYYY-MM-DD ..." → 연도(best-effort).
 function yearFrom(...dates) {

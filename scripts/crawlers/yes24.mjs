@@ -27,7 +27,7 @@ const CATEGORIES = [
   { num: "017001045", genre: "드라마", tags: ["소설", "eBook"] },
 ];
 
-const PAGES_PER_CATEGORY = 9;
+const PAGES_PER_CATEGORY = 30;
 const PAGE_SIZE = 24;
 
 // 한 카테고리 페이지 HTML 한 장을 받아온다.

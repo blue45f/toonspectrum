@@ -12,7 +12,7 @@ import { gunzipSync } from "node:zlib";
 
 import { GENRES, WEEK_DAYS } from "../lib/taxonomy";
 import { PLATFORM_LIST } from "../lib/platforms";
-import { rankBy } from "../lib/ranking";
+import { rankBy, RANK_AXES } from "../lib/ranking";
 import { sortTitles } from "../lib/search";
 import { kstDayOfWeek } from "../lib/utils";
 import {
@@ -24,7 +24,22 @@ import {
 } from "../lib/server/catalog-store";
 import { getCalendarData } from "../lib/server/calendar";
 import { getInsightsData } from "../lib/server/insights";
+import { getRankingData } from "../lib/server/ranking-service";
 import type { Title } from "../lib/types";
+
+const RANK_TYPES = ["all", "webtoon", "webnovel"];
+
+// 랭킹 기본 뷰(축×타입, 필터 없음) 사전계산 — live 비활성(스냅샷 산식)으로 결정적.
+// /ranking 이 17.8MB 전체 카탈로그를 클라이언트에서 로드하지 않고 작은 정적 파일로 즉시 표시한다.
+async function buildRankingFiles(writeJson: (name: string, data: unknown) => void): Promise<void> {
+  for (const axis of RANK_AXES.map((a) => a.key)) {
+    for (const type of RANK_TYPES) {
+      const reader = { get: (n: string) => (n === "axis" ? axis : n === "type" ? type : null) };
+      const data = await getRankingData(reader, { disableLive: true });
+      writeJson(`ranking/${axis}-${type}.json`, data);
+    }
+  }
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_GZ = process.env.WEBDEX_CATALOG_GZ ?? path.join(ROOT, "apps/api/data/catalog.json.gz");
@@ -106,6 +121,16 @@ async function main(): Promise<void> {
   writeJson("insights.json", await getInsightsData());
   writeJson("tags.json", { tags: activeTags() });
   writeJson("authors.json", getAuthorDirectory());
+
+  // 랭킹 기본 뷰 사전계산(축×타입). /ranking 즉시 로드.
+  let rankingCount = 0;
+  await buildRankingFiles((name, data) => {
+    const file = path.join(OUT, name);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(data));
+    rankingCount += 1;
+  });
+  console.log(`  ranking/*.json   ${String(rankingCount).padStart(5)} files (축×타입 사전계산)`);
 
   console.log("완료.");
 }

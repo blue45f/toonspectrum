@@ -430,6 +430,8 @@ export async function getRankingData(
     fetchLive?: LiveRankingFetcher;
     fetchStatus?: LiveStatusFetcher;
     now?: () => Date;
+    // 실시간(live) 신호 비활성 — 정적 스냅샷 운영(주기 크롤)에서 사용. 산식(formula)만으로 랭킹.
+    disableLive?: boolean;
   } = {}
 ): Promise<RankingResponse> {
   const params = normalizeRankingParams(q);
@@ -437,7 +439,7 @@ export async function getRankingData(
   const fetchLive = options.fetchLive ?? getLiveRanking;
   const fetchStatus = options.fetchStatus ?? getLiveStatusSignals;
   const now = options.now ?? (() => new Date());
-  const shouldFetchStatus = shouldFetchStatusSignals(params);
+  const shouldFetchStatus = !options.disableLive && shouldFetchStatusSignals(params);
   let statusSignals: LiveStatusSignal[] = [];
   let statusSignalFetchedAt: string | null = null;
   let statusSignalTtlSeconds: number | null = null;
@@ -485,7 +487,7 @@ export async function getRankingData(
     platform: params.platform,
     limit: RANKING_CANDIDATE_LIMIT,
   });
-  const shouldFetchLive = shouldFetchLiveSignals(params);
+  const shouldFetchLive = !options.disableLive && shouldFetchLiveSignals(params);
 
   let liveItems: LiveItem[] = [];
   let liveRefreshState: ReturnType<typeof getLiveRefreshState> | null = null;

@@ -34,10 +34,10 @@ const FALLBACK_POSTS_SITEMAPS = [
   `${ORIGIN}/sitemap/posts/posts-2022-03-18.xml`,
 ];
 
-const MAX_PAGES = 12; // 핸들당 안전 상한(소량 요청 유지). @original 은 ~6p.
-const TARGET = 300; // 목표 유니크 시리즈 수. 도달하면 조기 종료.
-const MAX_CHANNEL_FETCHES = 140; // 채널 series 요청 상한(요청량 억제).
-const MAX_HANDLES_SCAN = 320; // 핸들 후보 스캔 상한.
+const MAX_PAGES = 20; // 핸들당 안전 상한.
+const TARGET = 800; // 목표 유니크 시리즈 수. 도달하면 조기 종료.
+const MAX_CHANNEL_FETCHES = 400; // 채널 series 요청 상한.
+const MAX_HANDLES_SCAN = 900; // 핸들 후보 스캔 상한.
 const SITEMAP_INDEX = `${ORIGIN}/sitemap.xml`;
 
 // self.__next_f.push([1,"...escaped..."]) 문자열 페이로드를 모두 이어붙여 디코드한다.
