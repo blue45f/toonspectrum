@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { desc, eq, notInArray } from "drizzle-orm";
@@ -471,10 +472,26 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
   }
 }
 
+// 크롤 스크립트는 레포 루트의 scripts/crawl.mjs 에 있다. API 프로세스의 cwd 는
+// 레포 루트(prod) 또는 apps/api(dev: pnpm --filter) 둘 다 가능하므로, cwd 에서 위로 올라가며
+// 스크립트가 실제 존재하는 디렉터리(=레포 루트)를 찾아 절대경로로 실행한다.
+function resolveCrawlScript(scriptPath: string): { script: string; base: string } {
+  if (path.isAbsolute(scriptPath)) return { script: scriptPath, base: path.dirname(path.dirname(scriptPath)) };
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.resolve(dir, scriptPath);
+    if (existsSync(candidate)) return { script: candidate, base: dir };
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return { script: path.resolve(process.cwd(), scriptPath), base: process.cwd() };
+}
+
 async function executeCrawler(config: CatalogIngestConfig): Promise<CatalogCrawlerPayload> {
-  const scriptPath = path.resolve(process.cwd(), config.scriptPath);
+  const { script: scriptPath, base } = resolveCrawlScript(config.scriptPath);
   const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--json", "--no-file"], {
-    cwd: process.cwd(),
+    cwd: base,
     encoding: "utf8",
     timeout: config.timeoutMs,
     maxBuffer: config.maxOutputMb * 1024 * 1024,

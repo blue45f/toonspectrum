@@ -629,7 +629,8 @@ export class AdminService {
 
     const now = Date.now();
     const from = now - normalizedDays * DAY_MS;
-    const where: SQL[] = [sql`${revenueLedger.createdAt} >= ${from}`];
+    // timestamp 컬럼은 epoch-ms 숫자와 비교 불가 — Date로 바인딩(대시보드와 동일 수정).
+    const where: SQL[] = [sql`${revenueLedger.createdAt} >= ${new Date(from)}`];
     if (parsedQuery.status !== "all") where.push(eq(revenueLedger.status, parsedQuery.status));
     const whereClause = where.length === 1 ? where[0] : and(...where);
 
