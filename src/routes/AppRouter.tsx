@@ -54,6 +54,7 @@ const TitleDetailPage = lazy(() =>
 const AuthorPage = lazy(() => import("@/src/pages/AuthorPage").then((m) => ({ default: m.AuthorPage })));
 const PencafePage = lazy(() => import("@/src/pages/PencafePage").then((m) => ({ default: m.PencafePage })));
 const AdminPage = lazy(() => import("@/src/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+const FeedbackPage = lazy(() => import("@/src/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage })));
 
 function RouteFallback() {
   return (
@@ -86,6 +87,7 @@ export function AppRouter() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />

@@ -4,8 +4,9 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { MeModule } from "./modules/me/me.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { FeedbackModule } from "./modules/feedback/feedback.module";
 
 @Module({
-  imports: [AuthModule, MeModule, CommunityModule, CatalogModule, AdminModule],
+  imports: [AuthModule, MeModule, CommunityModule, CatalogModule, AdminModule, FeedbackModule],
 })
 export class AppModule {}

@@ -185,3 +185,37 @@ export interface FanCafePostList {
   nextCursor: string | null;
   hasMore: boolean;
 }
+
+// ── 사이트 Q&A·의견 게시판 ──
+export type FeedbackCategory = "question" | "idea" | "bug";
+export type FeedbackStatus = "open" | "answered";
+
+export interface FeedbackReply {
+  id: string;
+  postId: string;
+  parentId?: string | null;
+  author: CommunityAuthor;
+  text: string;
+  isOfficial: boolean; // 운영자(admin/operator) 답변
+  createdAt: string;
+  children?: FeedbackReply[];
+}
+
+export interface FeedbackPost {
+  id: string;
+  category: FeedbackCategory;
+  title: string;
+  text: string;
+  status: FeedbackStatus;
+  author: CommunityAuthor;
+  createdAt: string;
+  answeredAt: string | null;
+  replyCount: number;
+  replies?: FeedbackReply[];
+}
+
+export interface FeedbackPostList {
+  items: FeedbackPost[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}

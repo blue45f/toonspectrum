@@ -18,6 +18,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "리뷰 피드", href: "/reviews" },
       { label: "작품 비교", href: "/compare" },
       { label: "트렌드 대시보드", href: "/insights" },
+      { label: "의견 게시판", href: "/feedback" },
       { label: "내 서재", href: "/library" },
       { label: "취향 분석", href: "/library?tab=taste" },
     ],

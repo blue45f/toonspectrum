@@ -197,6 +197,38 @@ export const fanPostReplies = pgTable("fan_post_reply", {
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
+// ── 사이트 Q&A·의견 게시판 ─────────────────────────────────
+export const feedbackPosts = pgTable("feedback_post", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  category: text("category").notNull().default("question"), // question | idea | bug
+  title: text("title").notNull(),
+  text: text("text").notNull(),
+  status: text("status").notNull().default("open"), // open(답변대기) | answered(답변완료)
+  answeredAt: timestamp("answeredAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
+export const feedbackReplies = pgTable("feedback_reply", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  postId: text("postId")
+    .notNull()
+    .references(() => feedbackPosts.id, { onDelete: "cascade" }),
+  parentId: text("parentId"),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  isOfficial: boolean("isOfficial").notNull().default(false), // 운영자(admin/operator) 답변
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
 export const creatorProfiles = pgTable("creator_profile", {
   id: text("id")
     .primaryKey()
