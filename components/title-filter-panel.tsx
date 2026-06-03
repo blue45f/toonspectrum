@@ -13,7 +13,7 @@ import {
 import { PLATFORMS } from "@/lib/platforms";
 import type { PlatformId } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Bookmark, SlidersHorizontal, X } from "lucide-react";
+import { Bookmark, Check, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type FilterFacet =
@@ -63,6 +63,8 @@ export function TitleFilterPanel({
   facets = ALL_FACETS,
   platformOptions,
   savedCount,
+  remember,
+  onToggleRemember,
   className,
 }: {
   value: TitleFilterState;
@@ -70,6 +72,8 @@ export function TitleFilterPanel({
   facets?: FilterFacet[];
   platformOptions?: PlatformId[]; // 데이터 기반 노출(빈 플랫폼 숨김). 미지정 시 전체.
   savedCount?: number;
+  remember?: boolean; // "필터 기억" 상태(undefined면 토글 숨김)
+  onToggleRemember?: () => void;
   className?: string;
 }) {
   const show = (f: FilterFacet) => facets.includes(f);
@@ -88,15 +92,37 @@ export function TitleFilterPanel({
             <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">{active}</span>
           )}
         </span>
-        {active > 0 && (
-          <button
-            type="button"
-            onClick={() => onChange({ ...value, ...emptyExceptSort(value) })}
-            className="inline-flex items-center gap-1 text-[0.72rem] text-fg-3 hover:text-fg"
-          >
-            <X size={12} /> 초기화
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {onToggleRemember && (
+            <button
+              type="button"
+              onClick={onToggleRemember}
+              role="checkbox"
+              aria-checked={!!remember}
+              className="inline-flex items-center gap-1.5 text-[0.72rem] text-fg-3 hover:text-fg"
+              title="필터를 이 브라우저에 저장해 다음 방문 때 복원합니다"
+            >
+              <span
+                className={cn(
+                  "grid size-3.5 place-items-center rounded border transition-colors",
+                  remember ? "border-accent bg-accent text-on-accent" : "border-line-strong"
+                )}
+              >
+                {remember && <Check size={10} strokeWidth={3} />}
+              </span>
+              필터 기억
+            </button>
+          )}
+          {active > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...value, ...emptyExceptSort(value) })}
+              className="inline-flex items-center gap-1 text-[0.72rem] text-fg-3 hover:text-fg"
+            >
+              <X size={12} /> 초기화
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3.5 sm:grid-cols-2 md:grid-cols-3">

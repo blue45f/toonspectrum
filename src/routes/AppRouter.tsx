@@ -19,6 +19,8 @@ const STATIC_TITLES: Record<string, string> = {
   "/compare": "작품 비교",
   "/insights": "트렌드 인사이트",
   "/authors": "작가별 보기",
+  "/about": "소개",
+  "/guide": "랭킹 산정 방식",
   "/admin": "관리자 콘솔",
 };
 
@@ -58,6 +60,8 @@ const AdminPage = lazy(() => import("@/src/pages/AdminPage").then((m) => ({ defa
 const FeedbackPage = lazy(() => import("@/src/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage })));
 const TagsPage = lazy(() => import("@/src/pages/TagsPage").then((m) => ({ default: m.TagsPage })));
 const AuthorsPage = lazy(() => import("@/src/pages/AuthorsPage").then((m) => ({ default: m.AuthorsPage })));
+const AboutPage = lazy(() => import("@/src/pages/AboutPage").then((m) => ({ default: m.AboutPage })));
+const GuidePage = lazy(() => import("@/src/pages/GuidePage").then((m) => ({ default: m.GuidePage })));
 const AuthCallbackPage = lazy(() =>
   import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage }))
 );
@@ -96,6 +100,8 @@ export function AppRouter() {
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/tags" element={<TagsPage />} />
           <Route path="/authors" element={<AuthorsPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/guide" element={<GuidePage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />

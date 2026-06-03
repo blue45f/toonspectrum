@@ -12,12 +12,8 @@ import {
 } from "@/lib/ranking";
 import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
 import { useSavedTitleIds } from "@/lib/store";
-import {
-  EMPTY_TITLE_FILTERS,
-  applyTitleFilters,
-  countActiveTitleFilters,
-  type TitleFilterState,
-} from "@/lib/title-filters";
+import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
 import { TitleFilterPanel } from "./title-filter-panel";
 import { GENRES } from "@/lib/taxonomy";
 import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
@@ -35,6 +31,7 @@ import {
   BookOpen,
   Flag,
   Flame,
+  ArrowUpRight,
   FunctionSquare,
   Gem,
   Grid2X2,
@@ -383,7 +380,12 @@ export function RankingBoard({
   const [pricing, setPricing] = useState<Pricing | "all">("all");
   const [minRating, setMinRating] = useState(0);
   const [risingOnly, setRisingOnly] = useState(false);
-  const [clientFilters, setClientFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const {
+    filters: clientFilters,
+    setFilters: setClientFilters,
+    remember: rememberFilters,
+    toggleRemember: toggleRememberFilters,
+  } = useRememberedFilters("ranking");
   const [showFilters, setShowFilters] = useState(false);
   const savedIds = useSavedTitleIds();
   const [view, setView] = useState<View>("list");
@@ -572,6 +574,13 @@ export function RankingBoard({
               <span className="eyebrow mr-1.5 text-[0.6rem] text-accent">산식</span>
               {axisDetail.formula}
             </p>
+            <Link
+              href="/guide"
+              className="mt-1 inline-flex items-center gap-1 text-[0.72rem] font-medium text-accent hover:underline"
+            >
+              산정 방식 자세히 보기
+              <ArrowUpRight size={12} />
+            </Link>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
@@ -776,6 +785,8 @@ export function RankingBoard({
           onChange={setClientFilters}
           facets={["saved", "genre", "age"]}
           savedCount={savedIds.size}
+          remember={rememberFilters}
+          onToggleRemember={toggleRememberFilters}
         />
       )}
 

@@ -8,12 +8,8 @@ import { TitleCard } from "./title-card";
 import { MiniPoster } from "./rank-row";
 import { Section, Rail } from "./section";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import {
-  EMPTY_TITLE_FILTERS,
-  applyTitleFilters,
-  countActiveTitleFilters,
-  type TitleFilterState,
-} from "@/lib/title-filters";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
+import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
 import { genreColor } from "@/lib/genre-color";
 import { cn } from "@/lib/utils";
 import { Sparkles, Wand2, Shuffle, SlidersHorizontal } from "lucide-react";
@@ -45,7 +41,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [filters, setFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const { filters, setFilters, remember, toggleRemember } = useRememberedFilters("recommend");
   const [showFilters, setShowFilters] = useState(false);
 
   const requestBody = useMemo(
@@ -167,6 +163,8 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
             ]}
             platformOptions={platformOptions}
             savedCount={savedIds.size}
+            remember={remember}
+            onToggleRemember={toggleRemember}
           />
         )}
       </div>

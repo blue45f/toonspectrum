@@ -24,12 +24,21 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "취향 분석", href: "/library?tab=taste" },
     ],
   },
+  {
+    title: "WEBDEX",
+    links: [
+      { label: "서비스 소개", href: "/about" },
+      { label: "랭킹 산정 방식", href: "/guide" },
+      { label: "작가별 보기", href: "/authors" },
+      { label: "트렌드 인사이트", href: "/insights" },
+    ],
+  },
 ];
 
 export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
-      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
             <WebdexMark className="size-7 rounded-[0.55rem]" />

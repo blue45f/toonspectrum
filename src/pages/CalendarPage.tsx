@@ -6,6 +6,7 @@ import { buttonClass } from "@/components/ui/button";
 import { RatingInline } from "@/components/ui/stars";
 import { ErrorState } from "@/src/components/error-state";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
 import { statsAreEstimated } from "@/lib/estimate";
 import { useSavedTitleIds } from "@/lib/store";
 import { WEEK_DAYS } from "@/lib/taxonomy";
@@ -13,7 +14,6 @@ import {
   EMPTY_TITLE_FILTERS,
   applyTitleFilters,
   countActiveTitleFilters,
-  type TitleFilterState,
 } from "@/lib/title-filters";
 import type { PlatformId, Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ export function CalendarPage() {
     !platformFilterActive || title.availability.some((a) => selectedPlatforms.has(a.platformId));
 
   // 공용 작품 필터(찜·장르·가격·이용가·평점·태그). 플랫폼은 전용 셀렉터가 따로 있어 facet에서 제외.
-  const [filters, setFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);
+  const { filters, setFilters, remember, toggleRemember } = useRememberedFilters("calendar");
   const [showFilters, setShowFilters] = useState(false);
   const savedIds = useSavedTitleIds();
   const titleFilterCount = countActiveTitleFilters(filters);
@@ -175,6 +175,8 @@ export function CalendarPage() {
               onChange={setFilters}
               facets={["saved", "genre", "pricing", "age", "minRating", "tag"]}
               savedCount={savedIds.size}
+              remember={remember}
+              onToggleRemember={toggleRemember}
             />
           </div>
         )}

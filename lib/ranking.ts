@@ -94,7 +94,7 @@ function bayesRating(t: Title): number {
 // 플랫폼 도달 가중 — 플랫폼의 실제 트래픽 규모(도달)를 점수에 반영. 교차-플랫폼 다양성은 유지하되,
 // 메이저(네이버/카카오)와 군소 플랫폼의 격차를 '결정적으로' 벌려 #1에 초소형 플랫폼이 오지 않게 한다.
 // (과거 '네이버 절대조회수 독식' 회귀는 피하려고 백분위 기반은 유지 — reach는 곱셈 계수로만 작동.)
-const PLATFORM_REACH_WEIGHT: Partial<Record<PlatformId, number>> = {
+export const PLATFORM_REACH_WEIGHT: Partial<Record<PlatformId, number>> = {
   "naver-webtoon": 1.0,
   "kakao-webtoon": 0.9,
   "naver-series": 0.82,
