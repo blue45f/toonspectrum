@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import Link from "@/src/compat/router-link";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
@@ -44,6 +45,12 @@ export function AuthorPage() {
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-accent">
             <PenLine size={13} /> AUTHOR
+            <Link
+              href="/authors"
+              className="ml-1.5 normal-case tracking-normal text-fg-3 transition-colors hover:text-accent"
+            >
+              · 전체 작가 보기
+            </Link>
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{author}</h1>
           <div className="mt-3 flex flex-wrap gap-1.5">

@@ -164,6 +164,59 @@ export function allAuthorNames(): string[] {
   return [...set];
 }
 
+// 작가 디렉터리 — 작가별 작품 집계(브라우즈용). 작품 수 → 누적 조회 순 정렬, 상위 limit건 + 전체 작가 수.
+export function getAuthorDirectory(limit = 240): {
+  total: number;
+  authors: Array<{
+    name: string;
+    workCount: number;
+    totalViews: number;
+    avgRating: number;
+    topGenres: string[];
+    types: WorkType[];
+    cover: [string, string];
+    coverImage?: string;
+  }>;
+} {
+  const byAuthor = new Map<string, Title[]>();
+  for (const t of TITLES) {
+    for (const n of namesOf(t)) {
+      // 플랫폼 집계 플레이스홀더 제외(예: "네이버웹툰 작가", "포스타입 오리지널") — 실제 작가가 아님.
+      if (/\s(작가|오리지널)$/.test(n)) continue;
+      const arr = byAuthor.get(n);
+      if (arr) arr.push(t);
+      else byAuthor.set(n, [t]);
+    }
+  }
+  const authors = [];
+  for (const [name, works] of byAuthor) {
+    const totalViews = works.reduce((s, w) => s + (w.stats?.views ?? 0), 0);
+    const rated = works.filter((w) => (w.stats?.ratingCount ?? 0) > 0);
+    const avgRating = rated.length
+      ? rated.reduce((s, w) => s + (w.stats?.ratingAvg ?? 0), 0) / rated.length
+      : 0;
+    const genreCount = new Map<string, number>();
+    for (const w of works) for (const g of w.genres) genreCount.set(g, (genreCount.get(g) ?? 0) + 1);
+    const topGenres = [...genreCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([g]) => g);
+    const top = works.reduce((best, w) => ((w.stats?.views ?? 0) > (best.stats?.views ?? 0) ? w : best), works[0]);
+    authors.push({
+      name,
+      workCount: works.length,
+      totalViews,
+      avgRating: Math.round(avgRating * 10) / 10,
+      topGenres,
+      types: [...new Set(works.map((w) => w.type))],
+      cover: top.cover,
+      coverImage: top.coverImage,
+    });
+  }
+  authors.sort((a, b) => b.workCount - a.workCount || b.totalViews - a.totalViews);
+  return { total: byAuthor.size, authors: authors.slice(0, limit) };
+}
+
 export function titlesByType(type: WorkType): Title[] {
   return TITLES.filter((t) => t.type === type);
 }

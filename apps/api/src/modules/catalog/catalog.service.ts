@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { activeTags, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
+import { activeTags, getAuthorDirectory, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
 import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
@@ -233,6 +233,10 @@ export class CatalogService implements OnModuleInit {
 
   async getTagCloud() {
     return { tags: activeTags() };
+  }
+
+  async getAuthorDirectory() {
+    return getAuthorDirectory();
   }
 
   async getTitles(query: TitleQuery) {

@@ -187,6 +187,12 @@ export class CatalogController {
     return this.catalogService.getTagCloud();
   }
 
+  @Get("/authors")
+  @Header("Cache-Control", "no-store")
+  async getAuthors() {
+    return this.catalogService.getAuthorDirectory();
+  }
+
   @Get("/search")
   @Header("Cache-Control", "no-store, max-age=0")
   async getSearch(@Query() query: SearchQuery) {
