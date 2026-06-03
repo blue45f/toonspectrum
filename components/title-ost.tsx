@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import type { Title } from "@/lib/types";
-import { ostsForTitle, ostEmbedUrl, ostWatchUrl, OST_KIND_LABEL, type OstTrack } from "@/lib/ost-tracks";
+import {
+  ostsForTitle,
+  ostWatchUrl,
+  ostMelonUrl,
+  ostSpotifyUrl,
+  OST_KIND_LABEL,
+} from "@/lib/ost-tracks";
 import { Section } from "./section";
-import { Music, Play, ExternalLink, X } from "lucide-react";
+import { Music, ExternalLink } from "lucide-react";
 
-// 작품 OST·주제가·뮤직비디오 섹션 — 큐레이션 데이터가 있을 때만 렌더.
-// videoId 있는 곡은 섹션 상단에 인페이지 플레이어로 재생, 없는 곡은 유튜브로 이동.
+// 작품 OST·주제가 섹션 — 큐레이션 데이터가 있을 때만 렌더.
+// 저작권 안전: 음원/영상을 임베드·재생·저장하지 않고, 곡 정보(사실)만 보여준 뒤
+// 재생은 전부 공식 플랫폼(유튜브·멜론·스포티파이)으로 '링크아웃'만 한다.
 export function TitleOst({ title, original }: { title: Title; original?: Title }) {
   const tracks = ostsForTitle(title);
   const fromOriginal = original && original.id !== title.id ? ostsForTitle(original) : [];
@@ -18,63 +24,28 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
     seen.add(k);
     return true;
   });
-
-  const [active, setActive] = useState<OstTrack | null>(null);
   if (all.length === 0) return null;
-  const activeEmbed = active ? ostEmbedUrl(active) : null;
 
   return (
     <Section
       className="mt-14"
       eyebrow="SOUNDTRACK"
       title="주제가 · OST"
-      desc="작품의 애니·드라마 대표곡과 주제가입니다. ▶ 곡은 여기서 바로 재생돼요."
+      desc="작품의 애니·드라마 대표곡입니다. 공식 플랫폼에서 들어보세요."
     >
-      {activeEmbed && active && (
-        <div className="mb-4 overflow-hidden rounded-2xl border border-line bg-canvas">
-          <div className="flex items-center justify-between gap-2 px-4 py-2.5">
-            <span className="min-w-0 truncate text-sm font-semibold text-fg">
-              {active.song}
-              <span className="ml-2 font-normal text-fg-3">{active.artist}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setActive(null)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-[0.72rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-              aria-label="플레이어 닫기"
-            >
-              <X size={12} /> 닫기
-            </button>
-          </div>
-          <div className="aspect-video w-full">
-            <iframe
-              key={active.videoId}
-              src={`${activeEmbed}?autoplay=1&rel=0`}
-              title={`${active.song} - ${active.artist}`}
-              className="h-full w-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        </div>
-      )}
-
       <ul className="grid gap-2.5 sm:grid-cols-2">
-        {all.map((t, i) => {
-          const playable = Boolean(t.videoId);
-          const isActive = active?.videoId === t.videoId && playable;
-          const inner = (
-            <>
-              <span className="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(150deg,oklch(0.28_0.09_42),oklch(0.2_0.04_70))] text-accent">
-                {playable ? (
-                  <Play size={18} className="fill-current" />
-                ) : (
-                  <Music size={18} />
-                )}
+        {all.map((t, i) => (
+          <li
+            key={i}
+            className="flex flex-col gap-3 rounded-2xl border border-line bg-card/30 p-3.5 sm:flex-row sm:items-center"
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[linear-gradient(150deg,oklch(0.28_0.09_42),oklch(0.2_0.04_70))] text-accent">
+                <Music size={18} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
-                  <span className="truncate font-bold text-fg group-hover:text-accent">{t.song}</span>
+                  <span className="truncate font-bold text-fg">{t.song}</span>
                   <span className="shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[0.6rem] font-semibold text-fg-3">
                     {OST_KIND_LABEL[t.kind]}
                   </span>
@@ -84,47 +55,33 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
                   {t.context} · <span className="tnum">{t.year}</span>
                 </span>
               </span>
-            </>
-          );
-          return (
-            <li key={i} className="flex items-stretch gap-1.5">
-              {playable ? (
-                <button
-                  type="button"
-                  onClick={() => setActive(isActive ? null : t)}
-                  aria-pressed={isActive}
-                  className={`group flex flex-1 items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors ${
-                    isActive
-                      ? "border-accent/60 bg-accent-soft/40"
-                      : "border-line bg-card/30 hover:border-line-strong hover:bg-card/60"
-                  }`}
-                >
-                  {inner}
-                </button>
-              ) : (
-                <a
-                  href={ostWatchUrl(t)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex flex-1 items-center gap-3 rounded-2xl border border-line bg-card/30 p-3.5 transition-colors hover:border-line-strong hover:bg-card/60"
-                >
-                  {inner}
-                </a>
-              )}
-              <a
-                href={ostWatchUrl(t)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="유튜브에서 보기"
-                aria-label={`${t.song} 유튜브에서 보기`}
-                className="grid shrink-0 place-items-center rounded-xl border border-line px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-              >
-                <ExternalLink size={14} />
-              </a>
-            </li>
-          );
-        })}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 sm:flex-col sm:items-stretch lg:flex-row">
+              <PlatformLink href={ostWatchUrl(t)} label="YouTube" />
+              <PlatformLink href={ostMelonUrl(t)} label="멜론" />
+              <PlatformLink href={ostSpotifyUrl(t)} label="Spotify" />
+            </span>
+          </li>
+        ))}
       </ul>
+      <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
+        음원·영상의 저작권은 각 권리자에게 있습니다. WEBDEX는 음원을 저장·재생하지 않으며, 공식
+        플랫폼으로 연결만 합니다.
+      </p>
     </Section>
+  );
+}
+
+function PlatformLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center justify-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg"
+    >
+      {label}
+      <ExternalLink size={11} className="text-fg-3" />
+    </a>
   );
 }

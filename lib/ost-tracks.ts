@@ -61,6 +61,20 @@ const DATA: OstEntry[] = [
       { song: "Contradiction", artist: "KSUKE feat. Tyler Carter", year: 2020, kind: "op", context: "애니메이션", videoId: "pkw_Hl3qXCs" },
     ],
   },
+  {
+    titles: ["여신강림"],
+    tracks: [
+      { song: "Love so Fine", artist: "차은우 (ASTRO)", year: 2021, kind: "ost", context: "드라마", videoId: "uDLw2BRk3ww" },
+      { song: "오늘부터 시작인걸 (It Starts Today)", artist: "황인엽", year: 2021, kind: "ost", context: "드라마", videoId: "9LjxxZSYw0I" },
+    ],
+  },
+  {
+    titles: ["유미의 세포들"],
+    tracks: [
+      { song: "Nightfalling", artist: "존박 (John Park)", year: 2021, kind: "ost", context: "드라마", videoId: "PMqVlIdklBk" },
+      { song: "Like a Star", artist: "도영 (DOYOUNG, NCT)", year: 2021, kind: "ost", context: "드라마", videoId: "atJmeuWm4mo" },
+    ],
+  },
   // 아래는 검증된 곡이나 현재 카탈로그에 원작이 없을 수 있음(있으면 자동 노출).
   {
     titles: ["이태원 클라쓰"],
@@ -98,16 +112,24 @@ export function ostsForTitle(title: { title: string }): OstTrack[] {
   return INDEX.get(norm(title.title)) ?? [];
 }
 
-// 인페이지 임베드 URL(youtube-nocookie). videoId 없으면 null.
-export function ostEmbedUrl(track: OstTrack): string | null {
-  return track.videoId ? `https://www.youtube-nocookie.com/embed/${track.videoId}` : null;
+// 저작권 안전 설계: 음원/영상을 우리 페이지에 임베드·재생·저장하지 않는다.
+// 곡명·아티스트는 사실(저작권 대상 아님)이고, 재생은 전부 '공식 플랫폼으로 링크아웃'만 한다.
+function trackQuery(track: OstTrack): string {
+  return `${track.song} ${track.artist}`;
 }
 
-// 트랙별 유튜브 검색/시청 링크(특정 영상ID 위조 금지 — videoId 있으면 watch, 없으면 검색).
+// 유튜브: 공식 영상ID 확인된 곡은 해당 watch, 아니면 검색(둘 다 단순 링크 — 침해 아님).
 export function ostWatchUrl(track: OstTrack): string {
   if (track.videoId) return `https://www.youtube.com/watch?v=${track.videoId}`;
-  const q = `${track.song} ${track.artist}`;
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(trackQuery(track))}`;
+}
+// 멜론(국내 음원) 검색 링크.
+export function ostMelonUrl(track: OstTrack): string {
+  return `https://www.melon.com/search/total/index.htm?q=${encodeURIComponent(trackQuery(track))}`;
+}
+// 스포티파이(글로벌 음원) 검색 링크.
+export function ostSpotifyUrl(track: OstTrack): string {
+  return `https://open.spotify.com/search/${encodeURIComponent(trackQuery(track))}`;
 }
 
 export function hasOst(title: Title): boolean {
