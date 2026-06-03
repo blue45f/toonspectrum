@@ -63,6 +63,40 @@ export function getCatalogState(): CatalogState {
   return { ...TITLES_META };
 }
 
+// 교차-플랫폼 인기 백분위(0~100) — 로드 시 1회 계산(재크롤 불필요).
+// 각 플랫폼 내부에서 실순위·실관심 블렌드 신호로 정렬해 백분위를 부여하면 플랫폼 간 비교가 가능해진다.
+// (네이버 요일순위가 점수를 독식하던 문제 해소 — 카카오/레진 상위작도 공정하게 경쟁.)
+function platformPopSignal(t: Title): number {
+  const s = t.stats;
+  const likes = Math.max(0, Number(s?.likes) || 0);
+  if (s?.popularityRank && s.popularityRank > 0) {
+    // 네이버 웹툰: 실순위 위치(요일 최상위) + 실 관심수 블렌드. 관심이 높으면 하위 순위라도 끌어올려
+    // '비인기 요일 1위 > 인기 요일 2위' 부당함을 완화하고, 동순위 무더기를 연속값으로 분산한다.
+    return (250 - Math.min(250, s.popularityRank)) + Math.log10(likes + 1) * 18;
+  }
+  // 그 외 플랫폼: 크롤러가 list/rank 순서로 부여한 views(+관심)를 내부 인기 신호로 사용.
+  return Math.log10(Math.max(0, Number(s?.views) || 0) + 1) * 10 + Math.log10(likes + 1) * 4;
+}
+
+function computeCrossPlatformPopularity(titles: Title[]): void {
+  const byPlatform = new Map<string, Title[]>();
+  for (const t of titles) {
+    const pid = t.availability?.[0]?.platformId;
+    if (!pid || !t.stats) continue;
+    const arr = byPlatform.get(pid);
+    if (arr) arr.push(t);
+    else byPlatform.set(pid, [t]);
+  }
+  for (const group of byPlatform.values()) {
+    const sorted = [...group].sort((a, b) => platformPopSignal(b) - platformPopSignal(a));
+    const n = sorted.length;
+    sorted.forEach((t, i) => {
+      // 상위 → 100, 최하위 → ~0. 플랫폼 간 비교 가능한 정규화 인기.
+      t.stats.popularityPercentile = n <= 1 ? 100 : Math.round(((n - 1 - i) / (n - 1)) * 1000) / 10;
+    });
+  }
+}
+
 export function replaceCatalogData(
   incoming: unknown,
   metadata: Partial<Pick<CatalogState, "source" | "sourceVersion">> & {
@@ -70,6 +104,7 @@ export function replaceCatalogData(
   } = {}
 ): Title[] {
   const normalized = normalizeCatalog(incoming);
+  computeCrossPlatformPopularity(normalized);
   TITLES_INTERNAL = normalized;
   TITLES = TITLES_INTERNAL;
   rebuildIndexes(TITLES_INTERNAL);

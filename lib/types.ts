@@ -65,8 +65,10 @@ export interface TitleStats {
   trendingScore: number; // 급상승 점수 0~100
   completionRate: number; // 정주행 완독률 % (0~100)
   bingeIndex: number; // 정주행 몰입 지수 0~100 (한 번에 몰아보는 정도)
-  // 플랫폼 실제 인기 순위(네이버 order=user 등, 1=최상위). 있으면 popular 랭킹의 지배 신호로 사용.
+  // 플랫폼 실제 인기 순위(네이버 order=user 등, 1=최상위).
   popularityRank?: number;
+  // 교차-플랫폼 정규화 인기 백분위(0~100, 100=플랫폼 내 최상위). 카탈로그 로드 시 계산.
+  popularityPercentile?: number;
 }
 
 export interface Title {

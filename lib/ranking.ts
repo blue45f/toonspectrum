@@ -99,19 +99,42 @@ function bayesRating(t: Title): number {
   return (C * M + ratingAvg * ratingCount) / (M + ratingCount);
 }
 
+// 플랫폼 도달 가중 — 한 플랫폼이 인기 점수를 독식하지 않게(교차-플랫폼 신뢰성). 차이를 작게 둔다.
+const PLATFORM_REACH_WEIGHT: Partial<Record<PlatformId, number>> = {
+  "naver-webtoon": 1.0,
+  "kakao-webtoon": 0.95,
+  "naver-series": 0.9,
+  "kakao-page": 0.86,
+  lezhin: 0.8,
+  ridi: 0.7,
+  novelpia: 0.66,
+  munpia: 0.62,
+  joara: 0.62,
+  bomtoon: 0.62,
+  toptoon: 0.6,
+  toomics: 0.6,
+  mrblue: 0.56,
+  bookcube: 0.54,
+  onestory: 0.54,
+  kyobo: 0.56,
+  yes24: 0.56,
+  postype: 0.52,
+};
+function reachWeight(t: Title): number {
+  let w = 0;
+  for (const a of t.availability) w = Math.max(w, PLATFORM_REACH_WEIGHT[a.platformId] ?? 0.5);
+  return w || 0.5;
+}
+
 function popularityScore(t: Title): number {
   const s = t.stats;
-  const base =
-    Math.log10(s.views + 1) * 12 +
-    Math.log10(s.likes + 1) * 6 +
-    Math.log10(s.bookmarks + 1) * 5 +
-    s.trendingScore * 0.2;
-  // 플랫폼 실제 인기 순위(네이버 order=user 등)가 있으면 그것을 지배 신호로 써 실제 순서를 반영한다.
-  // 실순위 보유작은 항상 미보유작 위에 오고, 같은 군 안에서는 실순위가 낮을수록(=상위) 높은 점수.
-  if (s.popularityRank && s.popularityRank > 0) {
-    return 1_000_000 - s.popularityRank * 100 + base;
-  }
-  return base;
+  // 교차-플랫폼: 플랫폼 내부 정규화 인기 백분위(0~100)에 지수감쇠를 줘 각 플랫폼의 '최상위'만 크게
+  // 부각시킨다. 그래야 작품 수가 많은 네이버의 상위 1% 무더기에 묻히지 않고 카카오/레진 등의 1위가
+  // 상위에 끼어든다(교차-플랫폼 다양성). 도달가중으로 플랫폼 규모 차이를 약하게 반영.
+  const pct = typeof s.popularityPercentile === "number" ? s.popularityPercentile : 0;
+  const popComp = 100 * Math.exp((pct - 100) / 2.5) * reachWeight(t);
+  const ratingComp = Math.max(0, bayesRating(t) - 3.2) * 5;
+  return popComp + ratingComp;
 }
 
 // 기간별 결정적 변주 — 정적 데이터에서 탭마다 다른 순위 느낌을 주기 위함
@@ -178,7 +201,8 @@ export function rankBy(
   if (platform !== "all")
     pool = pool.filter((t) => t.availability.some((a) => a.platformId === platform));
   if (axis === "completed") pool = pool.filter((t) => t.status === "completed");
-  if (axis === "rookie") pool = pool.filter((t) => t.releaseYear >= 2022);
+  if (axis === "rookie")
+    pool = pool.filter((t) => t.releaseYear >= 2022 && t.releaseYear <= new Date().getFullYear() + 1);
   // 숨은 명작: 평가가 너무 적은 작품은 제외(신뢰도)
   if (axis === "hidden") pool = pool.filter((t) => t.stats.ratingCount >= 300);
 
