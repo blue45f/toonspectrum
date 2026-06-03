@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { AuthorLine } from "@/components/author-line";
 import { AvailabilityRouter } from "@/components/availability";
+import { PriceCompare } from "@/components/price-compare";
 import { CollectionAdd } from "@/components/collection-add";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { ReadStateSelector } from "@/components/read-state";
@@ -121,6 +122,7 @@ export function TitleDetailPage() {
               정렬했어요.
             </p>
           </div>
+          <PriceCompare availability={title.availability} />
         </aside>
 
         <div className="flex flex-col gap-6">
