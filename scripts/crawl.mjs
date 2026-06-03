@@ -2,7 +2,7 @@
 // 운영 실행: node scripts/crawl.mjs --json --no-file → Nest CatalogService가 DB catalog_snapshot에 저장
 // 웹툰: 제목·작가·별점·조회·관심·장르·시놉시스·태그·연재요일·연령등급·연재시작연도·표지썸네일 (실수집)
 // 웹소설: 웹툰 원작정보(novelOriginAuthors)로 실제 원작 엔트리+어댑테이션 연결 / 네이버 시리즈 베스트에포트 보강
-import { buildLezhinCoverImage, extractRemoteImageUrl, proxiedCoverUrl } from "./crawl-helpers.mjs";
+import { buildLezhinCoverImage, decodeHtmlEntities, extractRemoteImageUrl, proxiedCoverUrl } from "./crawl-helpers.mjs";
 import { crawl as crawlRidi } from "./crawlers/ridi.mjs";
 import { crawl as crawlKakaoPage } from "./crawlers/kakao-page.mjs";
 import { crawl as crawlMunpia } from "./crawlers/munpia.mjs";
@@ -241,7 +241,7 @@ const names = (arr) =>
     .filter(Boolean);
 const norm = (s) => String(s || "").replace(/[\s:~!?,.\-()[\]·]/g, "").toLowerCase();
 function cleanTitle(s) {
-  return String(s || "").replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
+  return decodeHtmlEntities(String(s || "")).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // ── 웹툰 ─────────────────────────────────────────────

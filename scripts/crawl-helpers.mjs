@@ -117,7 +117,7 @@ function scoreImageKey(key) {
   return 1;
 }
 
-function decodeHtmlEntities(value) {
+export function decodeHtmlEntities(value) {
   return value
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')

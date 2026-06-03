@@ -65,7 +65,7 @@ export function coverGradient(seed, genres = []) {
 export const norm = (s) => String(s || "").replace(/[\s:~!?,.\-()[\]·]/g, "").toLowerCase();
 
 export function cleanTitle(s) {
-  return String(s || "")
+  return decodeEntities(String(s || ""))
     .replace(/\s*\[[^\]]*\]\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
