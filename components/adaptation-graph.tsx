@@ -105,10 +105,17 @@ export function AdaptationGraph({
   className?: string;
 }) {
   const [ref, inView] = useInView<HTMLDivElement>();
+  // 원작·웹툰 양쪽에 같은 영상화가 태깅될 수 있어 (kind,name,year) 로 중복 제거.
+  const seenExt = new Set<string>();
   const ext = [
     ...(original.externalAdaptations ?? []),
     ...adaptations.flatMap((a) => a.externalAdaptations ?? []),
-  ];
+  ].filter((e) => {
+    const k = `${e.kind}|${e.name}|${e.year}`;
+    if (seenExt.has(k)) return false;
+    seenExt.add(k);
+    return true;
+  });
   return (
     <div ref={ref} className={cn("flex items-start gap-1 overflow-x-auto rail pb-1", className)}>
       <Node

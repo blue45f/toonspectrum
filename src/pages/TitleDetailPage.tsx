@@ -83,6 +83,11 @@ export function TitleDetailPage() {
   }
 
   const { title, reviews, similar, original, adaptations, hasFamily } = data;
+  // 웹툰화 패밀리가 없어도(독립 작품) 영상화(드라마·영화·애니·OTT)가 있으면 그래프를 노출.
+  const hasExternalMedia =
+    (original.externalAdaptations?.length ?? 0) > 0 ||
+    (title.externalAdaptations?.length ?? 0) > 0 ||
+    adaptations.some((a) => (a.externalAdaptations?.length ?? 0) > 0);
   const reviewCount = data.reviewCount || title.stats.ratingCount;
   const reviewAvg = data.reviewCount > 0 ? data.reviewAvg : title.stats.ratingAvg;
   const estimated = statsAreEstimated(title);
@@ -227,12 +232,12 @@ export function TitleDetailPage() {
         </div>
       </section>
 
-      {hasFamily && (
+      {(hasFamily || hasExternalMedia) && (
         <Section
           className="mt-14"
           eyebrow="ADAPTATION"
           title="같은 이야기, 다른 형태"
-          desc="원작부터 웹툰화까지, 하나의 우주로 연결했습니다."
+          desc="원작·웹툰부터 드라마·영화·애니메이션까지, 하나의 우주로 연결했습니다."
         >
           <div className="rounded-2xl border border-line bg-card p-5">
             <div className="mb-4 flex items-center gap-2 text-fg-3">

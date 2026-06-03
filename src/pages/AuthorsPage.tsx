@@ -39,6 +39,12 @@ export function AuthorsPage() {
       <header className="mb-7">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <PenLine size={14} /> AUTHOR DIRECTORY
+          <Link
+            href="/community/author"
+            className="ml-1.5 normal-case tracking-normal text-fg-3 transition-colors hover:text-accent"
+          >
+            · 작가 팬카페
+          </Link>
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("authors.title")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">

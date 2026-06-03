@@ -73,7 +73,13 @@ export class CommunityService {
     const scope = parseCommunityScopeFilter(scopeValue) ?? "all";
     const sort = parseCommunitySort(sortValue);
     const safeLimit = parseLimit(limitValue);
-    const boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
+    // DB(Neon) 불가 시 빈 목록으로 우아하게 폴백 — 팬카페가 500 대신 빈 디렉토리로 뜬다.
+    let boards: Awaited<ReturnType<typeof listCommunityBoards>> = [];
+    try {
+      boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
+    } catch {
+      boards = [];
+    }
     return {
       items: boards,
       meta: { scope, sort, limit: safeLimit, total: boards.length, generatedAt: new Date().toISOString() },
@@ -97,8 +103,12 @@ export class CommunityService {
       throw new BadRequestException("scope가 all이 아니면 targetId가 필요합니다.");
     }
 
-    const posts = await listFanPosts(scope, targetId, kind, search, tag, sort, cursor, safeLimit, requesterId);
-    return posts;
+    // DB(Neon) 불가 시 빈 피드로 폴백 — 검증 오류(위 throw)는 그대로 두고 DB 호출만 보호.
+    try {
+      return await listFanPosts(scope, targetId, kind, search, tag, sort, cursor, safeLimit, requesterId);
+    } catch {
+      return { items: [], hasMore: false, nextCursor: null };
+    }
   }
 
   async createPost(body: PostPayload, userId: string) {
@@ -111,7 +121,11 @@ export class CommunityService {
 
   async listPostReplies(postId: string): Promise<FanCafeReply[]> {
     if (!postId) throw new BadRequestException("postId 필요");
-    return listFanPostReplies(postId);
+    try {
+      return await listFanPostReplies(postId);
+    } catch {
+      return [];
+    }
   }
 
   async createPostReply(postId: string, userId: string, body: ReplyPayload) {
@@ -134,7 +148,11 @@ export class CommunityService {
 
   async listReviewReplies(reviewId: string): Promise<ReviewReply[]> {
     if (!reviewId) throw new BadRequestException("reviewId 필요");
-    return listReviewReplies(reviewId);
+    try {
+      return await listReviewReplies(reviewId);
+    } catch {
+      return [];
+    }
   }
 
   async createReviewReply(reviewId: string, userId: string, body: ReplyPayload) {
