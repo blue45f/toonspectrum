@@ -13,12 +13,12 @@ import { ErrorState } from "@/src/components/error-state";
 import { GenreChip } from "@/components/ui/chip";
 import { RatingInline } from "@/components/ui/stars";
 import { GenreSpectrum } from "@/components/ui/spectrum-bar";
-import { genreColor } from "@/lib/genre-color";
+import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 import type { Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { ArrowRight, Layers, Search } from "lucide-react";
+import { ArrowRight, Layers, Search, Sparkles } from "lucide-react";
 import { useApiResource } from "./use-api-resource";
 
 interface HomeResponse {
@@ -91,8 +91,16 @@ export function HomePage() {
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
         <div
-          className="pointer-events-none absolute -top-1/3 right-0 h-[60rem] w-[60rem] opacity-30 blur-3xl"
-          style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.35), transparent 60%)" }}
+          className="pointer-events-none absolute inset-x-0 top-0 h-1"
+          style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-70"
+          style={{
+            background:
+              "linear-gradient(to bottom, oklch(0.72 0.185 42 / 0.11), oklch(0.155 0.008 70 / 0))",
+          }}
           aria-hidden
         />
         <Container
@@ -115,7 +123,7 @@ export function HomePage() {
               <OpenSearchButton className={buttonClass({ size: "lg", className: "gap-2.5" })}>
                 <Search size={18} />
                 작품·작가·태그 검색
-                <kbd className="ml-1 rounded-md bg-black/15 px-1.5 py-0.5 text-[0.7rem]">⌘K</kbd>
+                <kbd className="ml-1 rounded-md bg-[oklch(0.2_0.02_60/0.18)] px-1.5 py-0.5 text-[0.7rem]">⌘K</kbd>
               </OpenSearchButton>
               <Link href="/ranking" className={buttonClass({ variant: "outline", size: "lg" })}>
                 통합 랭킹 보기
@@ -143,8 +151,8 @@ export function HomePage() {
           {spotlight && (
             <div className="relative" style={{ animation: "fade-up 0.7s var(--ease-out-expo) 0.1s both" }}>
               <div className="absolute -top-3 left-4 z-10">
-                <span className="eyebrow rounded-full border border-accent/40 bg-accent-soft px-3 py-1 text-accent">
-                  이 주의 발견
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-on-accent shadow-[0_6px_20px_-4px_oklch(0.7_0.19_45/0.55)] ring-2 ring-canvas">
+                  <Sparkles size={13} className="shrink-0" /> 이 주의 발견
                 </span>
               </div>
               <Link
