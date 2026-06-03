@@ -19,6 +19,7 @@ interface ListQuery {
   category?: string | null;
   status?: string | null;
   q?: string | null;
+  tag?: string | null;
   sort?: string | null;
   cursor?: string | null;
   limit?: number | null;

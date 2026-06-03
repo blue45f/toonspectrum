@@ -47,11 +47,19 @@ export function FeedbackPage() {
   const hydrated = useHydrated();
   const [category, setCategory] = useState<FeedbackCategory | "all">("all");
   const [status, setStatus] = useState<FeedbackStatus | "all">("all");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [composeTags, setComposeTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const addTag = () => {
+    const t = tagDraft.trim().replace(/^#/, "").slice(0, 20);
+    if (t && !composeTags.includes(t) && composeTags.length < 5) setComposeTags((p) => [...p, t]);
+    setTagDraft("");
+  };
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ComposeValues>({
     resolver: zodResolver(composeSchema),
@@ -66,6 +74,7 @@ export function FeedbackPage() {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (status !== "all") params.set("status", status);
+    if (tagFilter) params.set("tag", tagFilter);
     fetch(`/api/feedback/posts?${params.toString()}`, { cache: "no-store", signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("load_failed"))))
       .then((data: { items: FeedbackPost[] }) => {
@@ -77,17 +86,18 @@ export function FeedbackPage() {
       alive = false;
       controller.abort();
     };
-  }, [category, status, refreshTick]);
+  }, [category, status, tagFilter, refreshTick]);
 
   const onSubmit = handleSubmit(async (values) => {
     if (!userId) return;
     const res = await fetch("/api/feedback/posts", {
       method: "POST",
       headers: authHeaders(userId),
-      body: JSON.stringify(values),
+      body: JSON.stringify({ ...values, tags: composeTags }),
     });
     if (res.ok) {
       reset({ category: values.category, title: "", text: "" });
+      setComposeTags([]);
       setRefreshTick((t) => t + 1);
     } else {
       const body = await res.json().catch(() => ({}));
@@ -127,6 +137,17 @@ export function FeedbackPage() {
             </button>
           </div>
 
+          {tagFilter && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-fg-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent-soft/50 px-2.5 py-0.5 text-accent">
+                #{tagFilter}
+              </span>
+              <button type="button" onClick={() => setTagFilter(null)} className="text-fg-3 hover:text-fg">
+                태그 필터 해제 ✕
+              </button>
+            </div>
+          )}
+
           {error && <p className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
 
           {loading ? (
@@ -148,6 +169,7 @@ export function FeedbackPage() {
                   expanded={expandedId === post.id}
                   onToggle={() => setExpandedId((id) => (id === post.id ? null : post.id))}
                   userId={userId}
+                  onTagClick={(t) => setTagFilter(t)}
                 />
               ))}
             </ul>
@@ -177,6 +199,38 @@ export function FeedbackPage() {
                 <div>
                   <textarea {...register("text")} rows={5} maxLength={2000} placeholder="내용을 자세히 적어주세요." className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" />
                   {errors.text && <p className="mt-1 text-[0.7rem] text-bad">{errors.text.message}</p>}
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-fg-3">태그 (선택, 최대 5개)</label>
+                  {composeTags.length > 0 && (
+                    <div className="mb-1.5 flex flex-wrap gap-1">
+                      {composeTags.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setComposeTags((p) => p.filter((x) => x !== t))}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-accent/50 bg-accent-soft/50 px-2 py-0.5 text-[0.68rem] text-accent"
+                        >
+                          #{t} ✕
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addTag();
+                      }
+                    }}
+                    onBlur={addTag}
+                    placeholder="예: UI, 모바일 (Enter/쉼표로 추가)"
+                    maxLength={20}
+                    disabled={composeTags.length >= 5}
+                    className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
+                  />
                 </div>
                 <Button type="submit" disabled={isSubmitting} className="w-full justify-center gap-1.5">
                   <MessageSquare size={14} /> 등록
@@ -215,7 +269,7 @@ function Tabs({ value, onChange, options }: { value: string; onChange: (v: strin
   );
 }
 
-function PostCard({ post, expanded, onToggle, userId }: { post: FeedbackPost; expanded: boolean; onToggle: () => void; userId: string | null }) {
+function PostCard({ post, expanded, onToggle, userId, onTagClick }: { post: FeedbackPost; expanded: boolean; onToggle: () => void; userId: string | null; onTagClick: (tag: string) => void }) {
   return (
     <li className="rounded-xl border border-line bg-card/60 p-3.5">
       <button type="button" onClick={onToggle} className="w-full text-left">
@@ -240,6 +294,20 @@ function PostCard({ post, expanded, onToggle, userId }: { post: FeedbackPost; ex
           <span className="inline-flex items-center gap-1"><MessageSquare size={11} /> {post.replyCount}</span>
         </div>
       </button>
+      {post.tags?.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {post.tags.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onTagClick(t)}
+              className="rounded-full border border-line bg-raised/40 px-2 py-0.5 text-[0.66rem] text-fg-3 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
       {expanded && <PostThread postId={post.id} userId={userId} />}
     </li>
   );

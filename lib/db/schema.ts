@@ -208,6 +208,7 @@ export const feedbackPosts = pgTable("feedback_post", {
   category: text("category").notNull().default("question"), // question | idea | bug
   title: text("title").notNull(),
   text: text("text").notNull(),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
   status: text("status").notNull().default("open"), // open(답변대기) | answered(답변완료)
   answeredAt: timestamp("answeredAt", { mode: "date" }),
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),

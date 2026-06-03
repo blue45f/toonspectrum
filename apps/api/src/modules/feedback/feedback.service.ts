@@ -16,6 +16,7 @@ interface ListQuery {
   category?: string | null;
   status?: string | null;
   q?: string | null;
+  tag?: string | null;
   sort?: string | null;
   cursor?: string | null;
   limit?: number | string | null;
@@ -28,6 +29,7 @@ export class FeedbackService {
       category: parseFeedbackCategoryFilter(q.category),
       status: parseFeedbackStatusFilter(q.status),
       query: q.q ?? undefined,
+      tag: q.tag ?? undefined,
       sort: parseFeedbackSort(q.sort),
       cursor: q.cursor ?? null,
       limit: q.limit ? Number(q.limit) : undefined,

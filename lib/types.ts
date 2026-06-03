@@ -210,6 +210,7 @@ export interface FeedbackPost {
   category: FeedbackCategory;
   title: string;
   text: string;
+  tags: string[];
   status: FeedbackStatus;
   author: CommunityAuthor;
   createdAt: string;

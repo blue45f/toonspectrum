@@ -39,6 +39,8 @@ export async function ensureFeedbackTables() {
     )
   `);
   await dbClient.execute('CREATE INDEX IF NOT EXISTS idx_feedback_post_created ON feedback_post(category, status, "createdAt")');
+  // 기존 테이블에 tags 컬럼 보강(신규 컬럼).
+  await dbClient.execute(`ALTER TABLE feedback_post ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS feedback_reply (
       id TEXT PRIMARY KEY,
@@ -97,6 +99,34 @@ export interface ValidatedFeedbackPost {
   category: FeedbackCategory;
   title: string;
   text: string;
+  tags: string[];
+}
+function cleanTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of value) {
+    const tag = clampText(raw, 20).replace(/^#/, "");
+    const key = tag.toLowerCase();
+    if (tag && !seen.has(key)) {
+      seen.add(key);
+      out.push(tag);
+    }
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+function parseTagValue(value: unknown): string[] {
+  if (Array.isArray(value)) return cleanTags(value);
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return cleanTags(parsed);
+    } catch {
+      return cleanTags(value.split(/[,\n]/));
+    }
+  }
+  return [];
 }
 export function validateFeedbackPost(input: unknown): { value?: ValidatedFeedbackPost; error?: string } {
   const body = (input ?? {}) as Record<string, unknown>;
@@ -105,11 +135,12 @@ export function validateFeedbackPost(input: unknown): { value?: ValidatedFeedbac
   const textRaw = normalizeMultiline(body.text);
   const title = clampText(titleRaw, MAX_TITLE);
   const text = textRaw.slice(0, MAX_TEXT);
+  const tags = cleanTags(body.tags);
   if (titleRaw.length > MAX_TITLE) return { error: "제목은 100자 이하로 입력해 주세요." };
   if (textRaw.length > MAX_TEXT) return { error: "본문은 2000자 이하로 입력해 주세요." };
   if (title.length < 2) return { error: "제목은 2자 이상 입력해 주세요." };
   if (text.length < 5) return { error: "내용은 5자 이상 입력해 주세요." };
-  return { value: { category, title, text } };
+  return { value: { category, title, text, tags } };
 }
 
 export function validateFeedbackReply(input: unknown): { text?: string; parentId?: string | null; error?: string } {
@@ -177,6 +208,7 @@ export async function listFeedbackPosts(opts: {
   category?: FeedbackCategoryFilter;
   status?: FeedbackStatusFilter;
   query?: string;
+  tag?: string;
   sort?: FeedbackSort;
   cursor?: string | null;
   limit?: number;
@@ -201,6 +233,10 @@ export async function listFeedbackPosts(opts: {
       )
     );
   }
+  const tag = String(opts.tag ?? "").trim().replace(/^#/, "").toLowerCase();
+  if (tag) {
+    addWhere(sql`lower(${feedbackPosts.tags}::text) LIKE ${`%"${tag.replace(/[%_]/g, "\\$&")}"%`} ESCAPE '\\'`);
+  }
   if (cursor) {
     addWhere(
       or(
@@ -216,6 +252,7 @@ export async function listFeedbackPosts(opts: {
       category: feedbackPosts.category,
       title: feedbackPosts.title,
       text: feedbackPosts.text,
+      tags: feedbackPosts.tags,
       status: feedbackPosts.status,
       answeredAt: feedbackPosts.answeredAt,
       createdAt: feedbackPosts.createdAt,
@@ -246,6 +283,7 @@ export async function listFeedbackPosts(opts: {
     category: r.category as FeedbackCategory,
     title: r.title,
     text: r.text,
+    tags: parseTagValue(r.tags),
     status: r.status as FeedbackStatus,
     answeredAt: nullableDate(r.answeredAt),
     author: authorOf(r),
@@ -267,6 +305,7 @@ export async function createFeedbackPost(userId: string, input: ValidatedFeedbac
     category: input.category,
     title: input.title,
     text: input.text,
+    tags: input.tags,
     status: "open",
   });
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -275,6 +314,7 @@ export async function createFeedbackPost(userId: string, input: ValidatedFeedbac
     category: input.category,
     title: input.title,
     text: input.text,
+    tags: input.tags,
     status: "open",
     answeredAt: null,
     author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
