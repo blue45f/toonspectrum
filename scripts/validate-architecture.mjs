@@ -10,13 +10,14 @@ const scripts = pkg.scripts || {};
 
 const issues = [];
 
-// Required docs. WEBDEX keeps product/design/agent guides at the repo root and
+// Required docs. WEBDEX keeps product/design guides at the repo root and
 // deeper references (ranking math, competitor analysis) under docs/.
+// (AGENTS.md/CLAUDE.md are intentionally git-ignored globally — agent guides
+//  are not committed — so they are NOT validated here.)
 const requiredPaths = [
   "README.md",
   "PRODUCT.md",
   "DESIGN.md",
-  "AGENTS.md",
   "docs/ranking-architecture.md",
   "docs/competitor-analysis.md",
   "pnpm-workspace.yaml",
@@ -41,7 +42,10 @@ for (const script of requiredScripts) {
 // pnpm workspace members declared in pnpm-workspace.yaml must exist on disk.
 if (exists("pnpm-workspace.yaml")) {
   const ws = read("pnpm-workspace.yaml");
-  const globs = [...ws.matchAll(/^\s*-\s*['"]?([^'"\n]+?)['"]?\s*$/gm)].map((m) => m[1].trim());
+  // `packages:` 블록의 리스트 항목만 워크스페이스 글롭으로 본다. (다른 최상위 키,
+  // 예: onlyBuiltDependencies/minimumReleaseAgeExclude 의 `- 항목`은 패키지가 아님.)
+  const pkgBlock = ws.match(/^packages:\s*\n((?:[ \t]*-[ \t]*.*\n?)+)/m)?.[1] ?? "";
+  const globs = [...pkgBlock.matchAll(/^\s*-\s*['"]?([^'"\n]+?)['"]?\s*$/gm)].map((m) => m[1].trim());
   for (const glob of globs) {
     if (glob === ".") continue; // root package
     const base = glob.replace(/\/\*+$/, "");
