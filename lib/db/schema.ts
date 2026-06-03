@@ -245,6 +245,13 @@ export const creatorProfiles = pgTable("creator_profile", {
   updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
+// 런타임 토글/설정(key-value). 예: monetization.enabled (광고형 수익화 on/off).
+export const appSettings = pgTable("app_setting", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull().default({}),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
 export const monetizationPlans = pgTable("monetization_plan", {
   id: text("id")
     .primaryKey()

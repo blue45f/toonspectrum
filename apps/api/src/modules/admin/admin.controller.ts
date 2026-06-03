@@ -13,6 +13,10 @@ import {
 } from "@nestjs/common";
 import { AdminService } from "./admin.service";
 
+interface AppConfigPayload {
+  monetizationEnabled?: unknown;
+}
+
 interface PlanPayload {
   id?: unknown;
   code?: unknown;
@@ -67,6 +71,19 @@ export class AdminController {
   async getMe(@Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
     return this.adminService.getAdminMe(uid);
+  }
+
+  @Get("config")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getConfig(@Headers("x-user-id") userId?: string) {
+    enforceUserOrError(userId);
+    return this.adminService.getConfig();
+  }
+
+  @Post("config")
+  async setConfig(@Headers("x-user-id") userId: string | undefined, @Body() body: AppConfigPayload) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.setConfig(uid, body);
   }
 
   @Get("dashboard")

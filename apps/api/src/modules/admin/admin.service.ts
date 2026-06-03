@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { and, desc, eq, ne, sql, type SQL, type Table } from "drizzle-orm";
+import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
 import {
   creatorCampaigns,
   creatorProfiles,
@@ -128,6 +129,10 @@ function toPlainObject(value: unknown) {
   } catch {
     return {};
   }
+}
+
+interface AppConfigPayload {
+  monetizationEnabled?: unknown;
 }
 
 interface PlanPayload {
@@ -280,6 +285,15 @@ export class AdminService {
       },
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  async getConfig() {
+    return getAppConfig();
+  }
+
+  async setConfig(userId: string, body: AppConfigPayload) {
+    await requireAdminUser(userId);
+    return setAppConfig({ monetizationEnabled: !!body.monetizationEnabled });
   }
 
   async getDashboard(userId: string, periodDays: number): Promise<DashboardResponse> {

@@ -8,6 +8,7 @@ import { AdminDashboard } from "@/src/components/admin/AdminDashboard";
 import { AdminPlans } from "@/src/components/admin/AdminPlans";
 import { AdminRevenue } from "@/src/components/admin/AdminRevenue";
 import { AdminCampaigns } from "@/src/components/admin/AdminCampaigns";
+import { AdminOps } from "@/src/components/admin/AdminOps";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   { key: "plans", label: "플랜" },
   { key: "revenue", label: "정산" },
   { key: "campaigns", label: "캠페인" },
+  { key: "ops", label: "운영" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -108,6 +110,7 @@ export function AdminPage() {
           {tab === "plans" && <AdminPlans uid={uid} />}
           {tab === "revenue" && <AdminRevenue uid={uid} />}
           {tab === "campaigns" && <AdminCampaigns uid={uid} />}
+          {tab === "ops" && <AdminOps uid={uid} />}
         </div>
       )}
     </Container>

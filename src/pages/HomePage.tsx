@@ -1,5 +1,6 @@
 import Link from "@/src/compat/router-link";
 import { AdaptationGraph } from "@/components/adaptation-graph";
+import { AdSlot } from "@/components/ad-slot";
 import { CountUp } from "@/components/count-up";
 import { HomePersonal } from "@/components/home-personal";
 import { OpenSearchButton } from "@/components/open-search-button";
@@ -263,6 +264,9 @@ export function HomePage() {
             ))}
           </Rail>
         </Section>
+
+        {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 콘텐츠 레일 사이 광고 지면. */}
+        <AdSlot />
 
         <Section
           eyebrow="TOP RATED"

@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import { CatalogService } from "./catalog.service";
+import { getAppConfig } from "../../../../../lib/server/app-config";
 
 type QueryMap = Record<string, string | string[] | undefined>;
 
@@ -116,6 +117,12 @@ export class CatalogController {
     }
   }
 
+  @Get("/config")
+  @Header("Cache-Control", "no-store")
+  async getConfig() {
+    return getAppConfig();
+  }
+
   @Get("/home")
   @Header("Cache-Control", "no-store, max-age=0")
   async getHome() {
@@ -156,9 +163,10 @@ export class CatalogController {
   @Header("Cache-Control", "no-store, max-age=0")
   async runCatalogIngest(
     @Body() body: CatalogIngestPayload,
-    @Headers("x-catalog-ingest-token") token?: string
+    @Headers("x-catalog-ingest-token") token?: string,
+    @Headers("x-user-id") userId?: string
   ) {
-    return this.catalogService.runCatalogIngest(body ?? {}, token);
+    return this.catalogService.runCatalogIngest(body ?? {}, token, userId);
   }
 
   @Post("/catalog/refresh")

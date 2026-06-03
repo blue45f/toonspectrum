@@ -1,5 +1,6 @@
 import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
+import { AdSlot } from "@/components/ad-slot";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
@@ -380,6 +381,9 @@ export function ExplorePage() {
             savedCount={savedIds.size}
           />
         )}
+
+        {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 결과 그리드 위 광고 지면. */}
+        <AdSlot />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

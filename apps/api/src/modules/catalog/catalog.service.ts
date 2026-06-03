@@ -11,6 +11,7 @@ import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
+import { isAdminUser } from "../../../../../lib/server/app-config";
 import { getAuthorData } from "../../../../../lib/server/author";
 import { getCalendarData } from "../../../../../lib/server/calendar";
 import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
@@ -339,8 +340,8 @@ export class CatalogService implements OnModuleInit {
     };
   }
 
-  async runCatalogIngest(payload: IngestRunPayload, headerToken?: string) {
-    this.assertIngestAuthorized(payload, headerToken);
+  async runCatalogIngest(payload: IngestRunPayload, headerToken?: string, userId?: string) {
+    await this.assertIngestAuthorized(payload, headerToken, userId);
     return this.runCatalogIngestOnce({
       requestedBy: typeof payload.requestedBy === "string" ? payload.requestedBy : "manual",
       triggeredBy: "manual",
@@ -348,7 +349,11 @@ export class CatalogService implements OnModuleInit {
     });
   }
 
-  private assertIngestAuthorized(payload: IngestRunPayload, headerToken?: string) {
+  private async assertIngestAuthorized(payload: IngestRunPayload, headerToken?: string, userId?: string) {
+    // 관리자(x-user-id)는 ingest 토큰 없이도 수동 크롤을 트리거할 수 있다.
+    if (userId && (await isAdminUser(userId))) return;
+
+    // 토큰 인증 경로(cron·비관리자 호출). 토큰 미설정 시 토큰 인증은 사용할 수 없다.
     if (!this.ingestConfig.triggerToken) {
       throw new UnauthorizedException("catalog ingest token is not configured");
     }
