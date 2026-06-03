@@ -183,6 +183,33 @@ export interface RankedTitle {
   };
 }
 
+// 랭킹 후보 풀 필터(축/유형/장르/플랫폼). rankBy와 총개수 계산이 공유한다.
+function rankablePool(
+  all: Title[],
+  axis: RankAxis,
+  opts: { type?: WorkType | "all"; genre?: string | "all"; platform?: PlatformId | "all" }
+): Title[] {
+  const { type = "all", genre = "all", platform = "all" } = opts;
+  let pool = all;
+  if (type !== "all") pool = pool.filter((t) => t.type === type);
+  if (genre !== "all") pool = pool.filter((t) => t.genres.includes(genre));
+  if (platform !== "all") pool = pool.filter((t) => t.availability.some((a) => a.platformId === platform));
+  if (axis === "completed") pool = pool.filter((t) => t.status === "completed");
+  if (axis === "rookie")
+    pool = pool.filter((t) => t.releaseYear >= 2022 && t.releaseYear <= new Date().getFullYear() + 1);
+  if (axis === "hidden") pool = pool.filter((t) => t.stats.ratingCount >= 300);
+  return pool;
+}
+
+// 후보 풀 크기(limit 적용 전 실제 매칭 개수) — meta.total 정확도용.
+export function rankablePoolSize(
+  all: Title[],
+  axis: RankAxis,
+  opts: { type?: WorkType | "all"; genre?: string | "all"; platform?: PlatformId | "all" } = {}
+): number {
+  return rankablePool(all, axis, opts).length;
+}
+
 export function rankBy(
   all: Title[],
   axis: RankAxis,
@@ -195,16 +222,7 @@ export function rankBy(
   } = {}
 ): RankedTitle[] {
   const { period = "weekly", type = "all", genre = "all", platform = "all", limit } = opts;
-  let pool = all;
-  if (type !== "all") pool = pool.filter((t) => t.type === type);
-  if (genre !== "all") pool = pool.filter((t) => t.genres.includes(genre));
-  if (platform !== "all")
-    pool = pool.filter((t) => t.availability.some((a) => a.platformId === platform));
-  if (axis === "completed") pool = pool.filter((t) => t.status === "completed");
-  if (axis === "rookie")
-    pool = pool.filter((t) => t.releaseYear >= 2022 && t.releaseYear <= new Date().getFullYear() + 1);
-  // 숨은 명작: 평가가 너무 적은 작품은 제외(신뢰도)
-  if (axis === "hidden") pool = pool.filter((t) => t.stats.ratingCount >= 300);
+  const pool = rankablePool(all, axis, { type, genre, platform });
 
   // popular 축은 실순위(popularityRank)를 그대로 반영해야 하므로 기간 변주(곱셈 wobble)를 끈다
   // — wobble은 인접 순위를 뒤섞어 실제 플랫폼 순서를 깨뜨린다. 나머지 축은 기존대로 변주 적용.

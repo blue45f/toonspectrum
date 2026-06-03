@@ -79,6 +79,12 @@ function platformPopSignal(t: Title): number {
 }
 
 function computeCrossPlatformPopularity(titles: Title[]): void {
+  // 좋아요==관심(둘 다 favoriteCount로 채워진 추정값) 중복 제거 — 좋아요는 관심의 ~60%로 분리해
+  // UI에서 같은 숫자가 두 번 보이거나 favorites 점수가 한 신호를 이중 계산하지 않게 한다(추정값 한정).
+  for (const t of titles) {
+    const s = t.stats;
+    if (s && s.likes === s.bookmarks && s.bookmarks > 0) s.likes = Math.round(s.bookmarks * 0.6);
+  }
   const byPlatform = new Map<string, Title[]>();
   for (const t of titles) {
     const pid = t.availability?.[0]?.platformId;

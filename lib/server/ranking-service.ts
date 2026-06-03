@@ -19,6 +19,7 @@ import {
   PERIODS,
   RANK_AXES,
   rankBy,
+  rankablePoolSize,
   type RankedTitle,
   type RankAxis,
   type RankPeriod,
@@ -539,7 +540,15 @@ export async function getRankingData(
     meta: {
       ...params,
       pricingLabel: params.pricing === "all" ? "전체" : PRICING_LABEL[params.pricing],
-      total: filtered.length,
+      // 후보 한도(RANKING_CANDIDATE_LIMIT) 슬라이스 전 실제 매칭 개수 — 1000 캡 오보 방지.
+      // onlyRising은 점수 계산 후 delta 필터라 그 경우만 filtered 기준.
+      total: params.onlyRising
+        ? filtered.length
+        : rankablePoolSize(pool, params.axis, {
+            type: params.type,
+            genre: params.genre,
+            platform: params.platform,
+          }),
       generatedAt,
       refreshSeconds: RANKING_REFRESH_SECONDS,
       availablePlatforms: [
@@ -570,7 +579,8 @@ export async function getRankingData(
             demandSignals: liveRefreshState.demandSignals,
           }
         : null,
-      source: shouldFetchLive && liveItems.length > 0 ? "live-api" : "formula-api",
+      // 라이브가 실제로 매칭되어 순위에 반영됐을 때만 'live-api'로 표기(라벨 과장 방지).
+      source: shouldFetchLive && matched > 0 ? "live-api" : "formula-api",
     },
     insights,
   };
