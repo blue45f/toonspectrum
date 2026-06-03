@@ -13,6 +13,23 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # DB-backed 테스트(community 등)는 PostgreSQL을 사용한다(libSQL 파일 → Postgres 마이그레이션).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
+          POSTGRES_DB: webdex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webdex -d webdex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -24,6 +41,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run validate:architecture
       - run: pnpm run lint
+      # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
+      - run: pnpm exec drizzle-kit push --force
       - run: pnpm run test
       - run: pnpm run build
       - run: pnpm run build:all
