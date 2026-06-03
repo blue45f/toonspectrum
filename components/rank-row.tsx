@@ -136,14 +136,14 @@ export function RankRow({
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-1.5 lg:flex">
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="hidden items-center gap-1.5 md:flex">
           {title.genres.slice(0, 2).map((g) => (
-            <GenreChip key={g} genre={g} size="sm" />
+            <GenreChip key={g} genre={g} size="sm" className="hidden lg:inline-flex first:inline-flex" />
           ))}
         </div>
-        <div className="w-16 rounded-md border border-line/70 bg-canvas/30 px-2 py-1.5 text-right">
-          <div className="numeral text-sm text-fg">{m ? m.value : formatCount(title.stats.views)}</div>
+        <div className="w-[3.75rem] shrink-0 rounded-md border border-line/70 bg-canvas/30 px-2 py-1.5 text-right sm:w-16">
+          <div className="numeral tnum text-sm text-fg">{m ? m.value : formatCount(title.stats.views)}</div>
           <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
         </div>
       </div>

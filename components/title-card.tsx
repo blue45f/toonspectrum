@@ -56,7 +56,7 @@ export function TitleCard({
                 estimated={statsAreEstimated(title)}
                 size="xs"
               />
-              <span className={cn("text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
+              <span className={cn("shrink-0 text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
             </div>
             <GenreSpectrum
               genres={title.genres}
@@ -95,18 +95,20 @@ export function TitleCard({
         />
       </div>
 
-      <div className="mt-2 flex flex-col gap-1.5 px-1">
+      <div className="mt-2.5 flex flex-col gap-1.5 px-1.5">
         <div className="flex items-center justify-between gap-2">
           <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
-          <span className={cn("text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
+          <span className={cn("shrink-0 text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-fg-3">
+          <span className="min-w-0 truncate text-xs text-fg-3">
             {STATUS_LABEL[title.status]} · {title.releaseYear}
           </span>
-          <AvailabilityDots availability={title.availability} max={3} />
+          <AvailabilityDots availability={title.availability} max={3} className="shrink-0" />
         </div>
-        <p className="line-clamp-2 text-xs leading-relaxed text-fg-3">{title.synopsis}</p>
+        <p className="mt-1 line-clamp-2 border-t border-line/50 pt-2 text-xs leading-relaxed text-fg-3">
+          {title.synopsis}
+        </p>
       </div>
     </Link>
   );
@@ -128,7 +130,7 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-0.5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate text-[0.95rem] font-semibold text-fg group-hover:text-accent transition-colors">
+          <h3 className="min-w-0 truncate text-[0.95rem] font-semibold text-fg group-hover:text-accent transition-colors">
             {title.title}
           </h3>
           <span className={cn("shrink-0 text-xs font-medium", price.tone)}>{price.label}</span>
@@ -141,11 +143,11 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
             estimated={statsAreEstimated(title)}
             size="xs"
           />
-          <span className="text-line-strong">·</span>
+          <span className="hidden text-line-strong sm:inline">·</span>
           {title.genres.slice(0, 2).map((g) => (
             <GenreChip key={g} genre={g} size="sm" />
           ))}
-          <PlatformTags availability={title.availability} className="ml-auto" max={2} />
+          <PlatformTags availability={title.availability} className="ml-auto shrink-0" max={2} />
         </div>
       </div>
     </Link>

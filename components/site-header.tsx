@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "@/src/compat/router-link";
 import { usePathname } from "@/src/compat/navigation";
 import {
@@ -13,6 +14,8 @@ import {
   Sparkles,
   CalendarDays,
   MessageCircle,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AuthMenu } from "./auth/auth-menu";
@@ -29,9 +32,10 @@ const NAV = [
   { label: "인사이트", href: "/insights", icon: BarChart3 },
 ];
 
-// 모바일 하단 탭바는 핵심 4개만 (+ 서재)
-const MOBILE_NAV = NAV.filter((n) =>
-  ["/", "/ranking", "/recommend", "/explore", "/community", "/reviews"].includes(n.href)
+// 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
+// 햄버거 오버플로 메뉴로 모두 도달 가능하다.
+const MOBILE_TABS = NAV.filter((n) =>
+  ["/", "/ranking", "/recommend", "/explore", "/community"].includes(n.href)
 );
 
 function useActive() {
@@ -42,7 +46,40 @@ function useActive() {
 
 export function SiteHeader() {
   const isActive = useActive();
+  const pathname = usePathname();
   const openSearch = () => window.dispatchEvent(new Event("webdex:search"));
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // 라우트 이동 시 오버플로 메뉴 닫기
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  // 열렸을 때: Esc 닫기 + 배경 스크롤 잠금 + 첫 포커스 이동
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [menuOpen]);
+
+  // 닫힐 때 트리거로 포커스 복귀
+  const closeMenu = () => {
+    setMenuOpen(false);
+    triggerRef.current?.focus();
+  };
 
   return (
     <>
@@ -56,12 +93,13 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          {/* 데스크탑 내비 */}
-          <nav className="ml-2 hidden items-center gap-0.5 md:flex">
+          {/* 데스크탑 내비 (≥1024px) — 8개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출 */}
+          <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
             {NAV.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={isActive(n.href, n.exact) ? "page" : undefined}
                 className={cn(
                   "group inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-150",
                   isActive(n.href, n.exact)
@@ -88,6 +126,7 @@ export function SiteHeader() {
             {/* 검색 트리거 */}
             <button
               onClick={openSearch}
+              aria-label="검색 열기"
               className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-56 sm:justify-between"
             >
               <span className="flex items-center gap-2">
@@ -102,6 +141,7 @@ export function SiteHeader() {
             {/* 내 서재 */}
             <Link
               href="/library"
+              aria-current={isActive("/library") ? "page" : undefined}
               className={cn(
                 "group flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
                 isActive("/library")
@@ -113,25 +153,146 @@ export function SiteHeader() {
               <span className="hidden lg:inline">내 서재</span>
             </Link>
             <AuthMenu />
+
+            {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}
+            <button
+              ref={triggerRef}
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label="전체 메뉴"
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              aria-controls={menuId}
+              className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg lg:hidden"
+            >
+              {menuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* 모바일 하단 탭바 */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-7 pb-[env(safe-area-inset-bottom)]">
-          {MOBILE_NAV.map((n) => {
+      {/* 오버플로 메뉴 (<1024px): 8개 목적지 전부 + 내 서재 */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[60] lg:hidden">
+          {/* 백드롭 */}
+          <button
+            aria-label="메뉴 닫기"
+            onClick={closeMenu}
+            className="absolute inset-0 bg-canvas/70 backdrop-blur-sm motion-safe:animate-fade-up"
+          />
+          {/* 패널 */}
+          <div
+            ref={panelRef}
+            id={menuId}
+            role="dialog"
+            aria-modal="true"
+            aria-label="전체 메뉴"
+            className="absolute inset-x-0 top-0 border-b border-line-strong bg-panel/95 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.97),oklch(0.185_0.018_68/0.96))] shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
+          >
+            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-4 sm:px-6">
+              <span className="font-display text-sm font-semibold text-fg-2">메뉴</span>
+              <button
+                data-autofocus
+                onClick={closeMenu}
+                aria-label="메뉴 닫기"
+                className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <nav className="mx-auto max-w-[1320px] px-3 pb-4 sm:px-5">
+              <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {NAV.map((n) => {
+                  const active = isActive(n.href, n.exact);
+                  return (
+                    <li key={n.href}>
+                      <Link
+                        href={n.href}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
+                          active
+                            ? "border-accent/35 bg-accent-soft text-accent"
+                            : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
+                            active
+                              ? "border-accent/35 bg-canvas/45"
+                              : "border-line bg-canvas/40 group-hover:border-line-strong"
+                          )}
+                        >
+                          <n.icon
+                            size={16}
+                            className={cn(
+                              "transition-colors",
+                              active ? "text-accent" : "text-fg-3 group-hover:text-accent"
+                            )}
+                          />
+                        </span>
+                        {n.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+                <li className="col-span-2 sm:col-span-3">
+                  <Link
+                    href="/library"
+                    aria-current={isActive("/library") ? "page" : undefined}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
+                      isActive("/library")
+                        ? "border-accent/35 bg-accent text-on-accent"
+                        : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
+                        isActive("/library")
+                          ? "border-on-accent/25 bg-on-accent/10"
+                          : "border-line bg-canvas/40 group-hover:border-line-strong"
+                      )}
+                    >
+                      <Library
+                        size={16}
+                        className={cn(
+                          "transition-colors",
+                          isActive("/library") ? "text-on-accent" : "text-fg-3 group-hover:text-accent"
+                        )}
+                      />
+                    </span>
+                    내 서재
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* 모바일 하단 탭바 (<768px): 빠른 접근용. 전체 목적지는 상단 햄버거 메뉴 */}
+      <nav
+        aria-label="빠른 이동"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
+      >
+        <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
+          {MOBILE_TABS.map((n) => {
             const active = isActive(n.href, n.exact);
             return (
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
                   active ? "text-accent" : "text-fg-3"
                 )}
               >
-                {active && <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />}
+                {active && (
+                  <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
+                )}
                 <n.icon size={19} strokeWidth={active ? 2.4 : 1.9} />
                 {n.label}
               </Link>
@@ -139,6 +300,7 @@ export function SiteHeader() {
           })}
           <Link
             href="/library"
+            aria-current={isActive("/library") ? "page" : undefined}
             className={cn(
               "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
               isActive("/library") ? "text-accent" : "text-fg-3"

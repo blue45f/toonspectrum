@@ -39,7 +39,9 @@ interface AppState {
   reads: Record<string, ReadState>; // titleId -> 상태
   likedReviews: Record<string, boolean>; // reviewId -> liked
   subscriptions: Record<string, boolean>; // titleId -> 연재 알림 구독
-  adultVerified: boolean; // 성인(만 19세+) 자가 인증 — 19금 콘텐츠 표시
+  adultVerified: boolean; // 성인(만 19세+) — 생년월일 게이트로 설정(브라우저 저장)
+  adultBirthdate: string | null; // 입력한 생년월일(ISO). 한번 입력하면 유지.
+  ageGateOpen: boolean; // 연령 확인 모달 표시 여부
   collections: Collection[];
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
@@ -54,6 +56,9 @@ interface AppState {
   toggleLikeReview: (reviewId: string) => void;
   toggleSubscription: (titleId: string) => void;
   setAdultVerified: (v: boolean) => void;
+  verifyAdultBirthdate: (iso: string) => boolean; // ≥19세면 true + 인증 저장
+  openAgeGate: () => void;
+  closeAgeGate: () => void;
   setRatingScale: (s: RatingScale) => void;
 
   createCollection: (name: string, emoji: string) => string;
@@ -74,6 +79,8 @@ export const useApp = create<AppState>()(
       likedReviews: {},
       subscriptions: {},
       adultVerified: false,
+      adultBirthdate: null,
+      ageGateOpen: false,
       collections: seedCollections,
       ratingScale: "star",
       userId: null,
@@ -147,6 +154,20 @@ export const useApp = create<AppState>()(
         if (get().userId) apiPost("/api/me/subscription", { titleId });
       },
       setAdultVerified: (adultVerified) => set({ adultVerified }),
+      openAgeGate: () => set({ ageGateOpen: true }),
+      closeAgeGate: () => set({ ageGateOpen: false }),
+      // 스팀식 자가 연령 확인 — 생년월일로 만 나이 계산, ≥19세면 인증(브라우저 persist). 신원확인 아님.
+      verifyAdultBirthdate: (iso) => {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return false;
+        const now = new Date();
+        let age = now.getFullYear() - d.getFullYear();
+        const m = now.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+        const ok = age >= 19;
+        set((s) => ({ adultBirthdate: iso, adultVerified: ok, ageGateOpen: ok ? false : s.ageGateOpen }));
+        return ok;
+      },
       setRatingScale: (ratingScale) => set({ ratingScale }),
 
       createCollection: (name, emoji) => {

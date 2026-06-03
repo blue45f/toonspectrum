@@ -763,7 +763,7 @@ export function SearchExplorer({
         )}
 
         {loading ? (
-          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="space-y-3">
                 <div className="skeleton aspect-[3/4] rounded-xl" />
@@ -802,7 +802,7 @@ export function SearchExplorer({
         ) : (
           <>
             {view === "grid" ? (
-              <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4">
                 {shown.map((title) => (
                   <TitleCard key={title.id} title={title} />
                 ))}

@@ -292,6 +292,56 @@ function cleanTitle(s) {
   return decodeHtmlEntities(String(s || "")).replace(/\s*\[[^\]]*\]\s*/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// 교차연결(플랫폼 간 병합) 거짓양성 방지: 동명이작이 작가까지 같지 않은데 합쳐지는 일을 막는다.
+// author 는 "작가A, 작가B" 형태일 수 있어 콤마로 쪼개 정규화한 토큰 Set 으로 만든다.
+// 빈값/"미상"(어느 한쪽이라도 작가 미상이면)은 빈 Set → authorsMatch 가 false 가 되어 병합 안 함.
+function authorTokens(author) {
+  return new Set(
+    String(author || "")
+      .split(",")
+      .map((a) => norm(a))
+      .filter((a) => a && a !== norm("미상"))
+  );
+}
+// 양쪽 모두 실제 작가가 있고(빈 Set 아님), 토큰이 하나라도 겹칠 때만 같은 작가로 간주(보수적).
+function authorsMatch(a, b) {
+  const sa = authorTokens(a);
+  if (sa.size === 0) return false;
+  const sb = authorTokens(b);
+  if (sb.size === 0) return false;
+  for (const t of sa) if (sb.has(t)) return true;
+  return false;
+}
+// 제목 정규화 → 후보 배열 맵. 동명이작을 분리 보존하기 위해 단일 값이 아니라 배열로 모은다.
+function indexByNormTitle(items, key = (w) => norm(w.title)) {
+  const map = new Map();
+  for (const item of items) {
+    const k = key(item);
+    const bucket = map.get(k);
+    if (bucket) bucket.push(item);
+    else map.set(k, [item]);
+  }
+  return map;
+}
+// 제목이 같은 후보들 중 작가까지 일치하는 것을 찾는다. 없으면 undefined → 별개 작품(신규)으로.
+function findCrossMatch(map, normTitle, author) {
+  const bucket = map.get(normTitle);
+  if (!bucket) return undefined;
+  return bucket.find((cand) => authorsMatch(cand.author, author));
+}
+// buildOriginNovels 전용 매처. 시리즈 웹소설 author 는 구조적으로 "미상"(crawlSeriesNovels)이라
+// 일반 findCrossMatch(양쪽 실작가 요구)로는 절대 매칭되지 않아 원작-웹소설 연결이 죽는다.
+// 웹툰이 _originAuthors(명시 원작 작가)를 보유한 경우에 한해: ① 작가까지 일치하는 후보 우선,
+// ② 없으면 같은 제목의 '작가 미상' 후보를 택한다(명시 원작작가 + 동일 제목 = 충분한 신호).
+function findOriginSeriesMatch(map, normTitle, originAuthor) {
+  const bucket = map.get(normTitle);
+  if (!bucket) return undefined;
+  return (
+    bucket.find((cand) => authorsMatch(cand.author, originAuthor)) ||
+    bucket.find((cand) => authorTokens(cand.author).size === 0)
+  );
+}
+
 // ── 웹툰 ─────────────────────────────────────────────
 async function crawlWebtoons() {
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -502,21 +552,25 @@ async function crawlSeriesNovels() {
 
 // 웹툰의 원작 정보로 실제 웹소설 엔트리 생성 + 어댑테이션 연결
 function buildOriginNovels(webtoons, seriesNovels) {
-  const seriesByName = new Map(seriesNovels.map((n) => [n._normTitle, n]));
+  const seriesByName = indexByNormTitle(seriesNovels, (n) => n._normTitle);
   const novelByName = new Map();
   for (const w of webtoons) {
     if (!w._originAuthors?.length) continue;
     const key = norm(w.title);
-    // 시리즈에 동일 제목 웹소설이 있으면 그것과 연결 (썸네일 보유)
-    const match = seriesByName.get(key);
+    const originAuthor = w._originAuthors.join(", ");
+    // 시리즈에 동일 제목 + 작가(원작 작가) 웹소설이 있으면 그것과 연결 (썸네일 보유).
+    // 시리즈 웹소설 author 는 기본 "미상" 이므로 웹툰의 원작 작가(_originAuthors)와 대조한다.
+    // 작가 미상이라 확신할 수 없으면 동명이작일 수 있어 병합하지 않고, 파생 원작 엔트리를 만든다.
+    const match = findOriginSeriesMatch(seriesByName, key, originAuthor);
     if (match) {
-      if (match.author === "미상") match.author = w._originAuthors.join(", ");
+      if (match.author === "미상") match.author = originAuthor;
       w.adaptedFrom = match.id;
       continue;
     }
-    // 없으면 원작 엔트리 파생 생성 (실제 제목·작가)
-    if (novelByName.has(key)) {
-      w.adaptedFrom = novelByName.get(key).id;
+    // 없으면 원작 엔트리 파생 생성 (실제 제목·작가). 제목+작가가 같은 다음 웹툰만 이 엔트리에 연결.
+    const existing = novelByName.get(key);
+    if (existing && authorsMatch(existing.author, originAuthor)) {
+      w.adaptedFrom = existing.id;
       continue;
     }
     const id = `nv-${hashInt(key)}`;
@@ -850,12 +904,13 @@ async function main() {
   const originNovels = buildOriginNovels(webtoons, series);
   const linked = webtoons.filter((w) => w.adaptedFrom).length;
 
-  // 교차 매칭: 같은 제목이면 네이버 작품에 카카오 가용성 추가(진짜 크로스플랫폼), 아니면 신규
-  const naverByName = new Map(webtoons.map((w) => [norm(w.title), w]));
+  // 교차 매칭: 제목+작가가 같으면 네이버 작품에 카카오 가용성 추가(진짜 크로스플랫폼), 아니면 신규.
+  // 제목만 같고 작가가 다르거나 한쪽 작가 미상이면 동명이작으로 보고 병합하지 않는다(거짓양성 방지).
+  const naverByName = indexByNormTitle(webtoons);
   const kakaoNew = [];
   let crossLinked = 0;
   for (const k of kakao) {
-    const match = naverByName.get(k._normTitle);
+    const match = findCrossMatch(naverByName, k._normTitle, k.author);
     if (match) {
       if (!match.availability.some((a) => a.platformId === "kakao-webtoon")) {
         match.availability.push(k.availability[0]);
@@ -866,11 +921,11 @@ async function main() {
     }
   }
 
-  const knownByName = new Map([...webtoons, ...kakaoNew].map((w) => [norm(w.title), w]));
+  const knownByName = indexByNormTitle([...webtoons, ...kakaoNew]);
   const lezhinNew = [];
   let lezhinCrossLinked = 0;
   for (const item of lezhin) {
-    const match = knownByName.get(item._normTitle);
+    const match = findCrossMatch(knownByName, item._normTitle, item.author);
     if (match) {
       if (!match.availability.some((a) => a.platformId === "lezhin")) {
         match.availability.push(item.availability[0]);
@@ -884,22 +939,26 @@ async function main() {
     }
   }
 
-  // ── 중소형 플랫폼: 위 병렬 크롤 결과(extraResults)를 제목 정규화로 교차연결/신규 분리 ──
-  const knownAll = new Map([...webtoons, ...kakaoNew, ...lezhinNew].map((w) => [norm(w.title), w]));
+  // ── 중소형 플랫폼: 위 병렬 크롤 결과(extraResults)를 제목+작가로 교차연결/신규 분리 ──
+  // 제목만 같고 작가가 다르거나 한쪽 작가 미상이면 동명이작으로 보고 신규로 둔다(거짓양성 방지).
+  const knownAll = indexByNormTitle([...webtoons, ...kakaoNew, ...lezhinNew]);
   const extraNew = [];
   const extraCounts = {};
   for (const [id, rows] of extraResults) {
     extraCounts[id] = rows.length;
     let linked = 0;
     for (const item of rows) {
-      const match = knownAll.get(item._normTitle);
+      const match = findCrossMatch(knownAll, item._normTitle, item.author);
       if (match) {
         if (!match.availability.some((a) => a.platformId === id)) {
           match.availability.push(item.availability[0]);
           linked++;
         }
       } else {
-        knownAll.set(item._normTitle, item);
+        // 동명이작도 후보로 누적해, 같은 제목+작가의 다음 항목만 이 항목에 병합되게 한다.
+        const bucket = knownAll.get(item._normTitle);
+        if (bucket) bucket.push(item);
+        else knownAll.set(item._normTitle, [item]);
         extraNew.push(item);
       }
     }

@@ -18,7 +18,7 @@ import {
 import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Compass, RefreshCw, RotateCcw, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApiResource } from "./use-api-resource";
 
 type ExploreParams = Record<string, string | undefined>;
@@ -182,6 +182,25 @@ export function ExplorePage() {
   const platformOptions = data?.catalog?.platformCoverage?.map((entry) => entry.id);
   const hasFilter = sortExplicit || activeFilters > 0;
   const accent = heroGenre ? genreColor(heroGenre, 0.84) : undefined;
+
+  // 무한 스크롤 — 하단 센티넬이 보이면 자동으로 다음 페이지 로드(더보기 버튼 누를 필요 없음).
+  // useInView는 1회용이라 부적합 → 반복 트리거 IntersectionObserver를 직접 둔다. 버튼은 a11y/수동 폴백으로 유지.
+  const hasMore = results.length > shown.length;
+  const loaderRef = useRef<HTMLDivElement>(null);
+  const showMoreRef = useRef(showMore);
+  showMoreRef.current = showMore;
+  useEffect(() => {
+    const node = loaderRef.current;
+    if (!node || !hasMore || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loading) showMoreRef.current();
+      },
+      { rootMargin: "800px 0px" }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [hasMore, loading]);
 
   return (
     <div>
@@ -404,14 +423,14 @@ export function ExplorePage() {
                 <TitleCard key={title.id} title={title} />
               ))}
             </div>
-            {results.length > shown.length && (
-              <div className="mt-10 flex justify-center">
+            {hasMore && (
+              <div ref={loaderRef} className="mt-10 flex justify-center">
                 <button
                   type="button"
                   onClick={showMore}
                   className="inline-flex items-center gap-2 rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
                 >
-                  더 보기
+                  {loading ? "불러오는 중…" : "더 보기"}
                   <span className="numeral text-fg-3">
                     {shown.length} / {results.length}
                   </span>

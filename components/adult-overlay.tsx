@@ -8,7 +8,7 @@ import { useApp, useHydrated } from "@/lib/store";
 export function AdultOverlay({ compact = false }: { compact?: boolean }) {
   const hydrated = useHydrated();
   const verified = useApp((s) => s.adultVerified);
-  const setVerified = useApp((s) => s.setAdultVerified);
+  const openAgeGate = useApp((s) => s.openAgeGate);
 
   if (hydrated && verified) return null;
 
@@ -27,11 +27,11 @@ export function AdultOverlay({ compact = false }: { compact?: boolean }) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setVerified(true);
+            openAgeGate();
           }}
           className="mt-0.5 rounded-lg border border-[oklch(0.95_0.01_85/0.24)] bg-[oklch(0.95_0.01_85/0.1)] px-2.5 py-1 text-[0.7rem] font-medium text-[oklch(0.95_0.01_85)] transition-colors hover:bg-[oklch(0.95_0.01_85/0.18)]"
         >
-          성인 인증
+          연령 확인
         </button>
       ) : (
         <span className="text-[0.55rem] font-semibold text-[oklch(0.95_0.01_85/0.8)]">19+</span>

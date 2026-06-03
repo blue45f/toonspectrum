@@ -1,5 +1,6 @@
 import type { Title, WorkType, PlatformId } from "./types";
 import { seededRandom } from "./utils";
+import { statsAreEstimated } from "./estimate";
 
 export type RankAxis =
   | "popular" // 실시간 인기
@@ -25,13 +26,13 @@ export const RANK_AXES: RankAxisMeta[] = [
     key: "popular",
     label: "실시간 인기",
     desc: "조회·관심·좋아요 종합 화력",
-    formula: "log(조회수)×12 + log(좋아요)×6 + log(관심)×5 + 트렌드×0.2",
+    formula: "플랫폼 내 인기백분위(지수감쇠) × 도달가중 × 신뢰계수 + 베이즈평점 보정",
   },
   {
     key: "trending",
     label: "급상승",
     desc: "최근 유입이 폭발 중인 작품",
-    formula: "트렌드지수 + max(0, 순위상승)×3 + log(조회수)",
+    formula: "(순위상승 + 트렌드지수×0.4 + 인기백분위×0.5 + 베이즈평점 보정) × 신뢰계수",
   },
   {
     key: "favorites",
@@ -90,40 +91,55 @@ function bayesRating(t: Title): number {
   return (C * M + ratingAvg * ratingCount) / (M + ratingCount);
 }
 
-// 플랫폼 도달 가중 — 한 플랫폼이 인기 점수를 독식하지 않게(교차-플랫폼 신뢰성). 차이를 작게 둔다.
+// 플랫폼 도달 가중 — 플랫폼의 실제 트래픽 규모(도달)를 점수에 반영. 교차-플랫폼 다양성은 유지하되,
+// 메이저(네이버/카카오)와 군소 플랫폼의 격차를 '결정적으로' 벌려 #1에 초소형 플랫폼이 오지 않게 한다.
+// (과거 '네이버 절대조회수 독식' 회귀는 피하려고 백분위 기반은 유지 — reach는 곱셈 계수로만 작동.)
 const PLATFORM_REACH_WEIGHT: Partial<Record<PlatformId, number>> = {
   "naver-webtoon": 1.0,
-  "kakao-webtoon": 0.95,
-  "naver-series": 0.9,
-  "kakao-page": 0.86,
-  lezhin: 0.8,
-  ridi: 0.7,
-  novelpia: 0.66,
-  munpia: 0.62,
-  joara: 0.62,
-  bomtoon: 0.62,
-  toptoon: 0.6,
-  toomics: 0.6,
-  mrblue: 0.56,
-  bookcube: 0.54,
-  onestory: 0.54,
-  kyobo: 0.56,
-  yes24: 0.56,
-  postype: 0.52,
+  "kakao-webtoon": 0.9,
+  "naver-series": 0.82,
+  "kakao-page": 0.78,
+  lezhin: 0.62,
+  ridi: 0.55,
+  novelpia: 0.5,
+  munpia: 0.46,
+  joara: 0.46,
+  bomtoon: 0.46,
+  toptoon: 0.44,
+  toomics: 0.44,
+  mrblue: 0.4,
+  bookcube: 0.38,
+  onestory: 0.38,
+  kyobo: 0.4,
+  yes24: 0.4,
+  postype: 0.36,
 };
 function reachWeight(t: Title): number {
   let w = 0;
-  for (const a of t.availability) w = Math.max(w, PLATFORM_REACH_WEIGHT[a.platformId] ?? 0.5);
-  return w || 0.5;
+  for (const a of t.availability) w = Math.max(w, PLATFORM_REACH_WEIGHT[a.platformId] ?? 0.4);
+  return w || 0.4;
+}
+
+// 신뢰 계수 — 실수집 데이터(네이버 웹툰 실평점·실순위)는 확신 있게, 합성(추정) 지표는 약하게 감점한다.
+// 인기/급상승처럼 '얼마나 많이 본다'를 다투는 축에서, 추정값 작품이 실데이터 작품을 #1에서 밀어내지
+// 못하게 하는 결정적 장치. ratingCount(실 표본)이 클수록 추가 가산 → 검증된 대작이 더 확실히 위로.
+// 반환 0.78~1.06: 실데이터는 1.0 기준 위, 순수 추정은 0.78~0.84로 '약한 감점'(완전 배제 X → 다양성 유지).
+function confidenceFactor(t: Title): number {
+  const estimated = statsAreEstimated(t);
+  // 실 표본 신뢰 가산: 평가수 로그 스케일. 실데이터에만 의미 있게 적용(추정 평가수엔 소폭만).
+  const sampleBoost = Math.min(0.06, Math.log10(Math.max(0, t.stats.ratingCount) + 1) / 130);
+  if (estimated) return 0.78 + sampleBoost * 0.4; // 0.78~0.804: 추정은 표본 가산을 거의 안 줌
+  return 1.0 + sampleBoost; // 1.0~1.06: 실데이터 + 검증 표본 가산
 }
 
 function popularityScore(t: Title): number {
   const s = t.stats;
   // 교차-플랫폼: 플랫폼 내부 정규화 인기 백분위(0~100)에 지수감쇠를 줘 각 플랫폼의 '최상위'만 크게
-  // 부각시킨다. 그래야 작품 수가 많은 네이버의 상위 1% 무더기에 묻히지 않고 카카오/레진 등의 1위가
-  // 상위에 끼어든다(교차-플랫폼 다양성). 도달가중으로 플랫폼 규모 차이를 약하게 반영.
+  // 부각시킨다. 그래야 작품 수가 많은 네이버의 상위 1% 무더기에 묻히지 않고 카카오/레진 등의 상위작도
+  // 상위 구간에 정당히 섞인다(교차-플랫폼 다양성). 단, 도달가중×신뢰계수를 곱해 #1에는 메이저 실데이터가
+  // 오게 한다 — 군소 플랫폼의 추정 1위(pct≈100)는 reach·confidence 곱으로 분명히 뒤로 밀린다.
   const pct = typeof s.popularityPercentile === "number" ? s.popularityPercentile : 0;
-  const popComp = 100 * Math.exp((pct - 100) / 2.5) * reachWeight(t);
+  const popComp = 100 * Math.exp((pct - 100) / 2.5) * reachWeight(t) * confidenceFactor(t);
   const ratingComp = Math.max(0, bayesRating(t) - 3.2) * 5;
   return popComp + ratingComp;
 }
@@ -141,8 +157,18 @@ function rawScore(t: Title, axis: RankAxis): number {
   switch (axis) {
     case "popular":
       return popularityScore(t);
-    case "trending":
-      return s.trendingScore * 1.0 + Math.max(0, s.rankDelta) * 3 + Math.log10(s.views + 1);
+    case "trending": {
+      // 급상승은 '신뢰 가능한 신호'로만 — 실순위 상승(rankDelta)·플랫폼 내 인기백분위·베이즈평점.
+      // 합성 trendingScore와 raw log(views)는 추정 작품을 부당히 끌어올리므로 비중을 낮추고(0.4),
+      // 전체를 신뢰계수로 감쇠해 순수 추정 작품의 급상승 폭을 억제한다. seededRandom 변주는 rankBy의
+      // periodFactor가 작게(±)만 준다 → 결정적(static) 유지.
+      const pct = typeof s.popularityPercentile === "number" ? s.popularityPercentile : 0;
+      const movement = Math.max(0, s.rankDelta) * 4; // 실 주간순위 상승 = 가장 믿을 만한 급상승 신호
+      const momentum = Math.max(0, Math.min(100, s.trendingScore)) * 0.4; // 합성 트렌드는 비중 축소
+      const reachPct = pct * 0.5 * reachWeight(t); // 인기 상위 + 도달가중 → 군소 추정작 #1 방지
+      const ratingComp = Math.max(0, bayesRating(t) - 3.2) * 4;
+      return (movement + momentum + reachPct + ratingComp) * confidenceFactor(t);
+    }
     case "rating":
       return bayesRating(t) * 20 + Math.log10(s.ratingCount + 1) * 2;
     case "favorites":

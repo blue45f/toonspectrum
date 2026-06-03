@@ -46,9 +46,11 @@ function chip(active: boolean) {
   );
 }
 
-function FacetRow({ label, children }: { label: string; children: ReactNode }) {
+// wide facet(장르·태그 등 칩이 많은 그룹)은 중간폭부터 그리드 전체 폭을 차지해
+// 좁은 칸에 칩이 과하게 줄바꿈되는 것을 막는다.
+function FacetRow({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={cn("flex flex-col gap-1.5", wide && "sm:col-span-2 md:col-span-3")}>
       <span className="text-[0.68rem] font-medium uppercase tracking-wide text-fg-3">{label}</span>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
@@ -97,7 +99,7 @@ export function TitleFilterPanel({
         )}
       </div>
 
-      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3.5 sm:grid-cols-2 md:grid-cols-3">
         {show("saved") && (
           <FacetRow label="보관함">
             <button
@@ -195,7 +197,7 @@ export function TitleFilterPanel({
         )}
 
         {show("genre") && (
-          <FacetRow label="장르">
+          <FacetRow label="장르" wide>
             {GENRES.map((g) => (
               <button key={g} type="button" onClick={() => patch({ genres: toggle(value.genres, g) })} aria-pressed={value.genres.includes(g)} className={chip(value.genres.includes(g))}>
                 {g}
@@ -205,7 +207,7 @@ export function TitleFilterPanel({
         )}
 
         {show("tag") && (
-          <FacetRow label="태그">
+          <FacetRow label="태그" wide>
             {TAGS.slice(0, 18).map((t) => (
               <button key={t} type="button" onClick={() => patch({ tags: toggle(value.tags, t) })} aria-pressed={value.tags.includes(t)} className={chip(value.tags.includes(t))}>
                 #{t}

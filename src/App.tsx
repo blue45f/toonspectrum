@@ -7,6 +7,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { AgeGateModal } from "@/components/age-gate-modal";
 import { AppRouter } from "./routes/AppRouter";
 
 function ScrollToTop() {
@@ -32,6 +33,7 @@ export default function App() {
           </main>
           <SiteFooter />
           <CommandPalette />
+          <AgeGateModal />
           <LanguageSwitcher className="fixed bottom-4 left-4 z-[90] max-md:bottom-20" />
         </MotionProvider>
       </AuthSessionProvider>
