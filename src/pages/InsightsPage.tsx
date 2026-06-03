@@ -84,7 +84,7 @@ export function InsightsPage() {
             보여주지 않는, 독자를 위한 트렌드 대시보드.
           </p>
           <p className="mt-2 max-w-xl text-xs leading-relaxed text-fg-3">
-            장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 데모용 추정값입니다.
+            장르 분포·평점·플랫폼은 수집 실데이터, 트렌드 점수·완독률·몰입 지수는 추정값(≈)입니다.
           </p>
           {/* 시그니처 hero 스펙트럼 — reveal 채움 + 커서 스크럽으로 장르를 짚는다 */}
           <div className="mt-7 max-w-xl">

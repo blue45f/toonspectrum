@@ -10,7 +10,7 @@ interface AdSlotProps {
 // 토글 가능한 광고 지면. 전역 수익화(monetizationEnabled)가 켜져 있을 때만 렌더한다.
 // 기본값은 OFF라 평소엔 아무것도 노출하지 않는다(return null).
 //
-// 켜졌을 때도 실제 광고 네트워크가 아니라 포트폴리오 데모용 하우스/스폰서 지면 자리표시자다.
+// 켜졌을 때도 아직 실제 광고 네트워크 연동 전이라 하우스/스폰서 지면 자리표시자다(광고 연동 시 교체).
 // "AD · 스폰서" 배지로 광고 지면임을 분명히 표시해 콘텐츠로 위장하지 않는다(정직·비기만).
 export function AdSlot({ label = "이 자리에 스폰서 콘텐츠가 노출됩니다 · 광고 문의", className }: AdSlotProps) {
   const { monetizationEnabled } = useAppConfig();
