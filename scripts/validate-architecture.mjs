@@ -22,6 +22,9 @@ const requiredPaths = [
   "docs/competitor-analysis.md",
   "pnpm-workspace.yaml",
   "tsconfig.json",
+  "commitlint.config.cjs",
+  ".husky/pre-commit",
+  ".husky/commit-msg",
 ];
 for (const file of requiredPaths) {
   if (!exists(file)) issues.push(`missing file: ${file}`);
@@ -34,7 +37,15 @@ for (const entry of requiredEntries) {
 }
 
 // Root scripts wired into the build/lint/test chain.
-const requiredScripts = ["dev", "build", "build:all", "lint", "test", "validate:architecture"];
+const requiredScripts = [
+  "dev",
+  "build",
+  "build:all",
+  "lint",
+  "typecheck",
+  "test",
+  "validate:architecture",
+];
 for (const script of requiredScripts) {
   if (!scripts[script]) issues.push(`missing script: ${script}`);
 }
