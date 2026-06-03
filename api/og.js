@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
   try {
     const r = await fetch(`${proto}://${host}/api/titles/${encodeURIComponent(slug)}`, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(22000), // API 콜드스타트(카탈로그 적재) 여유
     });
     if (r.ok) t = (await r.json())?.title ?? null;
   } catch { /* fall back to default OG */ }
@@ -61,6 +61,7 @@ module.exports = async (req, res) => {
       .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(img)}$2`);
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=300, s-maxage=600");
+  // 성공(작품 메타 주입)한 경우만 캐시 — 콜드스타트로 메타 주입 실패한 응답이 캐시에 박히지 않게.
+  res.setHeader("Cache-Control", t ? "public, max-age=300, s-maxage=86400" : "no-store");
   return res.status(200).send(page);
 };

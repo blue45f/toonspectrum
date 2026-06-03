@@ -9,7 +9,7 @@
       "includeFiles": "apps/api/dist/**"
     },
     "api/og.js": {
-      "maxDuration": 15,
+      "maxDuration": 30,
       "includeFiles": "dist/index.html"
     }
   },
