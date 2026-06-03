@@ -24,12 +24,9 @@ export type PlatformId =
   | "toptoon"
   | "postype"
   | "mrblue"
-  | "comico"
   | "toomics"
-  | "bufftoon"
   | "bookcube"
   | "onestory"
-  | "peanutoon"
   | "kyobo"
   | "yes24";
 
@@ -92,6 +89,9 @@ export interface Title {
   adaptedFrom?: string; // 원작 작품 id (예: 웹툰의 원작 웹소설)
   externalAdaptations?: ExternalAdaptation[];
   stats: TitleStats;
+  // 조회/관심 등 핵심 지표가 합성(추정)값일 때 true. 네이버가 공개 조회수 집계를 비공개로
+  // 전환하면 viewCount가 0으로 내려오므로, 0 노출 방지용으로 보정한 작품을 추정으로 표시한다.
+  statsEstimated?: boolean;
   featured?: boolean; // 에디터 추천
   editorNote?: string; // 에디터 한줄평
 }

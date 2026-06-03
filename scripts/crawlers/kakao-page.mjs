@@ -1,8 +1,9 @@
 // kakao-page 크롤러 — 카카오페이지 공개 카탈로그(HTML __NEXT_DATA__) 수집.
-// 출처: https://page.kakao.com/ (홈, 데스크톱 UA) + /content/<seriesId> 상세 페이지.
-//   - robots.txt 는 /viewer* 만 disallow. 홈/상세 페이지는 허용. (/api, /graphql, /menu 딥라우트는 미사용)
-//   - 홈 __NEXT_DATA__ 의 배너(metaList)·랭킹(subtitleList) 리스트에서 시리즈를 모으고,
-//     각 시리즈의 /content/<id> 상세 페이지에서 실제 작가/장르/줄거리/연재상태/연령/연재요일을 보강한다.
+// 출처: https://page.kakao.com/ (홈, 데스크톱 UA) + /menu/<tab>/screen/<screen> 장르/랭킹 랜딩 + /content/<seriesId> 상세 페이지.
+//   - robots.txt 는 /viewer* 만 disallow. 홈/장르 랜딩/상세 페이지는 허용. (/api, /graphql 딥라우트는 미사용)
+//   - 홈 __NEXT_DATA__ 의 배너(metaList)·랭킹(subtitleList) 리스트 + 4개 탭(추천/웹툰/웹소설/책)의 장르·랭킹
+//     screen 랜딩 페이지(SSR __NEXT_DATA__)에서 시리즈를 모으고(seriesId 기준 dedupe),
+//     각 시리즈의 /content/<id> 상세 페이지에서 실제 작가/장르/줄거리/연재상태/연령/연재요일을 보강한다(상한 내).
 //   - 표지(dn-img-page.kakao.com, 확장자 없음)는 coverProxy 로 /api/cover 프록시 URL 화(프록시가 바이트 스니핑).
 
 import {
@@ -27,9 +28,30 @@ const ORIGIN = "https://page.kakao.com";
 const HOME = ORIGIN + "/";
 
 // 홈을 여러 번 호출하면 랭킹/지금핫한 섹션이 회전하여 더 많은 시리즈가 노출된다(서버 페이지네이션 없음).
-const HOME_FETCHES = 8;
-// 상세 페이지 보강 호출 상한(요청량 절제).
-const MAX_DETAIL = 120;
+const HOME_FETCHES = 4;
+// 상세 페이지 보강 호출 상한(요청량 절제). 상한 초과 시 리스트 메타만으로 row 를 만든다.
+const MAX_DETAIL = 140;
+
+// 메인 4개 탭(menuUid)과 그 하위 장르/랭킹 screen 랜딩 페이지(screenUid).
+// 각 /menu/<tab>/screen/<screen> 는 SSR __NEXT_DATA__ 안에 해당 장르/랭킹의 실제 시리즈 리스트(PosterView/RankingPosterView)를 담고 있다.
+// screen 타이틀 끝의 한글 키워드(로판/무협/판타지…)는 장르 힌트로 함께 매핑한다.
+const TAB_SCREENS = {
+  10000: ["46", "47", "48", "50", "81", "87", "88", "89", "102", "103"], // 추천
+  10010: ["54", "55", "56", "57", "58", "59", "60", "61", "62", "82", "83", "86", "104"], // 웹툰
+  10011: ["63", "64", "68", "70", "73", "74", "76", "84", "85", "90", "91", "92", "94", "101", "105", "181"], // 웹소설
+  10016: ["78", "79", "80"], // 책
+};
+
+// screen 메타 타이틀(예: "웹소설 - 무협", "웹툰 - 로판") 끝 토큰을 장르 힌트로. 비-장르 토큰은 버린다.
+const NON_GENRE_SCREEN_TOKENS = new Set([
+  "지금핫한", "장르전체", "분류전체", "완전판", "연재무료", "단행본", "만화",
+  "여성인기", "남성인기", "완결추천", "브랜드", "랭킹", "실시간 랭킹", "요일", "오늘신작", "TV속 작품", "만화 랭킹",
+]);
+function genreHintFromScreenTitle(title) {
+  const tail = String(title || "").split("-").pop()?.trim();
+  if (!tail || NON_GENRE_SCREEN_TOKENS.has(tail)) return undefined;
+  return tail;
+}
 
 // 홈 __NEXT_DATA__ 의 리스트 아이템(배너 metaList / 랭킹 subtitleList 모두 포함)인지 판정.
 function isListItem(o) {
@@ -90,23 +112,62 @@ function parsePubPeriod(pubPeriod) {
   return days.length ? [...new Set(days)] : undefined;
 }
 
-// 홈 페이지들을 모아 시리즈 리스트 아이템을 dedupe(seriesId 기준)하여 반환.
-async function collectHomeItems() {
-  const bySeries = new Map();
+// 한 HTML 의 __NEXT_DATA__ 에서 리스트 아이템을 모아 bySeries 맵에 누적(먼저 본 것 우선, 장르 힌트 보존).
+function accumulateItems(html, bySeries, genreHint) {
+  const data = html && extractNextData(html);
+  if (!data) return;
+  const items = deepCollect(data, isListItem);
+  for (const it of items) {
+    if (!bySeries.has(it.seriesId)) {
+      bySeries.set(it.seriesId, genreHint ? { ...it, _genreHint: genreHint } : it);
+    } else if (genreHint) {
+      const cur = bySeries.get(it.seriesId);
+      if (!cur._genreHint) cur._genreHint = genreHint;
+    }
+  }
+}
+
+// 홈을 여러 번 호출하면 랭킹/지금핫한 섹션이 회전하여 더 많은 시리즈가 노출된다(서버 페이지네이션 없음).
+async function collectHomeItems(bySeries) {
   for (let i = 0; i < HOME_FETCHES; i++) {
     const html = await fetchText(HOME + (i ? `?_=${Date.now()}${i}` : ""), {
       referer: ORIGIN,
       headers: { "Cache-Control": "no-cache" },
     });
-    const data = html && extractNextData(html);
-    if (data) {
-      const items = deepCollect(data, isListItem);
-      for (const it of items) {
-        if (!bySeries.has(it.seriesId)) bySeries.set(it.seriesId, it);
-      }
-    }
-    if (i < HOME_FETCHES - 1) await sleep(600);
+    accumulateItems(html, bySeries);
+    if (i < HOME_FETCHES - 1) await sleep(400);
   }
+}
+
+// 각 탭의 장르/랭킹 screen 랜딩 페이지(SSR __NEXT_DATA__)에서 시리즈 리스트를 모은다.
+async function collectScreenItems(bySeries) {
+  for (const [tab, screens] of Object.entries(TAB_SCREENS)) {
+    const tabRef = `${ORIGIN}/menu/${tab}`;
+    for (const screen of screens) {
+      const html = await fetchText(`${ORIGIN}/menu/${tab}/screen/${screen}`, { referer: tabRef });
+      const data = html && extractNextData(html);
+      if (data) {
+        const title = data?.props?.pageProps?.initialProps?.metaInfo?.title;
+        const items = deepCollect(data, isListItem);
+        const hint = genreHintFromScreenTitle(title);
+        for (const it of items) {
+          if (!bySeries.has(it.seriesId)) {
+            bySeries.set(it.seriesId, hint ? { ...it, _genreHint: hint } : it);
+          } else if (hint && !bySeries.get(it.seriesId)._genreHint) {
+            bySeries.get(it.seriesId)._genreHint = hint;
+          }
+        }
+      }
+      await sleep(150);
+    }
+  }
+}
+
+// 홈 + 모든 탭의 screen 랜딩에서 시리즈 리스트 아이템을 dedupe(seriesId 기준)하여 반환.
+async function collectListItems() {
+  const bySeries = new Map();
+  await collectHomeItems(bySeries);
+  await collectScreenItems(bySeries);
   return [...bySeries.values()];
 }
 
@@ -125,7 +186,7 @@ async function fetchDetailMeta(seriesId) {
 }
 
 export async function crawl() {
-  const listItems = await collectHomeItems();
+  const listItems = await collectListItems();
   if (!listItems.length) return [];
 
   const rows = [];
@@ -160,10 +221,13 @@ export async function crawl() {
       listType || (detail ? typeFromCategory(detail.categoryType, detail.category) : "webtoon");
 
     const author = (detail && String(detail.authors || "").trim()) || "미상";
-    // category(웹툰/웹소설)는 장르가 아니므로 subcategory + listGenre 만 장르 매핑에 사용.
-    const genreCandidates = [detail && detail.subcategory, listGenre, ...(metaArr || [])].filter(
-      Boolean,
-    );
+    // category(웹툰/웹소설)는 장르가 아니므로 subcategory + listGenre + screen 장르 힌트만 장르 매핑에 사용.
+    const genreCandidates = [
+      detail && detail.subcategory,
+      listGenre,
+      item._genreHint,
+      ...(metaArr || []),
+    ].filter(Boolean);
     const fallbackGenre = type === "webnovel" ? "판타지" : "드라마";
     const genres = mapGenres(genreCandidates, fallbackGenre);
 
@@ -189,8 +253,8 @@ export async function crawl() {
     const synopsisRaw = detail && detail.description ? stripTags(detail.description) : "";
     const synopsis = synopsisRaw || `${rawTitle} · ${PLATFORM_NAME} 공개 카탈로그 수집작.`;
 
-    // 태그: 카테고리/서브카테고리/메타 텍스트 중 짧은 한글 토큰.
-    const tagPool = [detail && detail.category, detail && detail.subcategory, listGenre, ...(metaArr || [])]
+    // 태그: 카테고리/서브카테고리/screen 장르 힌트/메타 텍스트 중 짧은 한글 토큰.
+    const tagPool = [detail && detail.category, detail && detail.subcategory, item._genreHint, listGenre, ...(metaArr || [])]
       .filter(Boolean)
       .map((s) => String(s).trim())
       .filter((s) => s && s.length <= 8 && !/^\d+(\.\d+)?(만|억)?$/.test(s));

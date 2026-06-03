@@ -10,6 +10,7 @@ import { WEEK_DAYS } from "@/lib/taxonomy";
 import type { PlatformId, Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CalendarDays, Database, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { useApiResource } from "./use-api-resource";
 
 interface CalendarResponse {
@@ -27,11 +28,31 @@ export function CalendarPage() {
     "/api/calendar",
     "연재 캘린더를 불러오지 못했습니다."
   );
+  // 표시할 플랫폼 선택(빈 집합 = 전체 표시). 캘린더 응답에 작품별 availability가 들어 있어 클라에서 필터.
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformId>>(new Set());
+  const platformFilterActive = selectedPlatforms.size > 0;
+  const togglePlatform = (id: PlatformId) =>
+    setSelectedPlatforms((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const matchesFilter = (title: Title) =>
+    !platformFilterActive || title.availability.some((a) => selectedPlatforms.has(a.platformId));
+
   const todayIdx = data?.todayIdx ?? 0;
   const todayDay = data?.todayDay ?? WEEK_DAYS[todayIdx] ?? "월";
-  const todayCount = data?.todayCount ?? 0;
-  const totalScheduled = data?.totalScheduled ?? 0;
-  const days = data?.days ?? WEEK_DAYS.map((day) => ({ day, items: [] }));
+  const rawDays = data?.days ?? WEEK_DAYS.map((day) => ({ day, items: [] }));
+  const days = platformFilterActive
+    ? rawDays.map((d) => ({ day: d.day, items: d.items.filter(matchesFilter) }))
+    : rawDays;
+  const totalScheduled = platformFilterActive
+    ? days.reduce((n, d) => n + d.items.length, 0)
+    : data?.totalScheduled ?? 0;
+  const todayCount = platformFilterActive
+    ? days[todayIdx]?.items.length ?? 0
+    : data?.todayCount ?? 0;
 
   return (
     <Container size="wide" className="py-10">
@@ -65,18 +86,46 @@ export function CalendarPage() {
         </div>
 
         {data?.platformCoverage.length ? (
-          <div className="mt-5 flex flex-wrap gap-1.5 border-t border-line pt-4">
-            {data.platformCoverage.slice(0, 8).map((platform) => (
-              <span
-                key={platform.id}
-                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2"
-                title={`${platform.label} ${platform.count.toLocaleString("ko-KR")}편`}
-              >
-                <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
-                {platform.label}
-                <span className="numeral text-fg">{platform.count.toLocaleString("ko-KR")}</span>
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[0.72rem] font-medium text-fg-3">
+                표시할 플랫폼{platformFilterActive ? ` · ${selectedPlatforms.size}개 선택` : " · 전체"}
               </span>
-            ))}
+              {platformFilterActive && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlatforms(new Set())}
+                  className="text-[0.72rem] text-accent hover:underline"
+                >
+                  전체 보기
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {data.platformCoverage.map((platform) => {
+                const on = selectedPlatforms.has(platform.id);
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => togglePlatform(platform.id)}
+                    aria-pressed={on}
+                    className={cn(
+                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[0.72rem] transition-colors",
+                      on
+                        ? "border-accent/60 bg-accent-soft/50 text-fg"
+                        : "border-line bg-card text-fg-2 hover:bg-raised",
+                      platformFilterActive && !on && "opacity-45"
+                    )}
+                    title={`${platform.label} ${platform.count.toLocaleString("ko-KR")}편`}
+                  >
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
+                    {platform.label}
+                    <span className="numeral text-fg-3">{platform.count.toLocaleString("ko-KR")}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : null}
       </header>
@@ -161,8 +210,23 @@ export function CalendarPage() {
 
       {!loading && !error && totalScheduled === 0 && (
         <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
-          <p className="text-sm font-medium text-fg">연재요일 정보가 있는 작품이 없습니다.</p>
-          <p className="mt-1 text-xs text-fg-3">다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.</p>
+          {platformFilterActive ? (
+            <>
+              <p className="text-sm font-medium text-fg">선택한 플랫폼에 연재요일 정보가 있는 작품이 없습니다.</p>
+              <button
+                type="button"
+                onClick={() => setSelectedPlatforms(new Set())}
+                className="mt-1 text-xs text-accent hover:underline"
+              >
+                전체 플랫폼 보기
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-fg">연재요일 정보가 있는 작품이 없습니다.</p>
+              <p className="mt-1 text-xs text-fg-3">다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.</p>
+            </>
+          )}
         </div>
       )}
     </Container>

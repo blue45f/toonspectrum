@@ -160,17 +160,6 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
     notes: "상업 플랫폼 제휴 피드 우선입니다.",
   },
   {
-    id: "comico",
-    name: "코미코",
-    workTypes: ["webtoon"],
-    implementation: "partner-required",
-    risk: "high",
-    defaultCadenceSeconds: 7200,
-    capabilities: ["catalog", "ranking", "availability"],
-    requiredReview: ["partner-feed", "terms"],
-    notes: "상업 플랫폼 제휴 피드 우선입니다.",
-  },
-  {
     id: "toomics",
     name: "투믹스",
     workTypes: ["webtoon"],
@@ -180,17 +169,6 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
     capabilities: ["catalog", "ranking", "availability"],
     requiredReview: ["partner-feed", "terms", "age-gate"],
     notes: "성인 경계와 저장 필드 검토가 필요합니다.",
-  },
-  {
-    id: "bufftoon",
-    name: "버프툰",
-    workTypes: ["webtoon", "webnovel"],
-    implementation: "partner-required",
-    risk: "high",
-    defaultCadenceSeconds: 7200,
-    capabilities: ["catalog", "availability"],
-    requiredReview: ["partner-feed", "terms"],
-    notes: "서비스 상태와 공식 제공 범위 확인 후 활성화합니다.",
   },
   {
     id: "bookcube",
@@ -213,17 +191,6 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
     capabilities: ["catalog", "ranking", "availability"],
     requiredReview: ["partner-feed", "terms"],
     notes: "앱/스토어 API 우회 없이 공식 제공 범위를 사용합니다.",
-  },
-  {
-    id: "peanutoon",
-    name: "피너툰",
-    workTypes: ["webtoon"],
-    implementation: "partner-required",
-    risk: "high",
-    defaultCadenceSeconds: 7200,
-    capabilities: ["catalog", "ranking", "availability"],
-    requiredReview: ["partner-feed", "terms", "age-gate"],
-    notes: "성인/BL 경계 검토가 필요합니다.",
   },
   {
     id: "kyobo",
@@ -252,6 +219,7 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
 // 공개 카탈로그 크롤러가 구현된 소스(partner-required → crawler 승격). scripts/crawlers/<id>.mjs 와 일치.
 const IMPLEMENTED_CRAWLERS = new Set<PlatformId>([
   "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
+  "novelpia", "bomtoon", "toptoon", "toomics", "kyobo",
 ]);
 for (const source of CATALOG_SOURCE_REGISTRY) {
   if (IMPLEMENTED_CRAWLERS.has(source.id)) source.implementation = "crawler";
