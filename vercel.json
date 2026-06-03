@@ -13,11 +13,10 @@
       "includeFiles": "dist/index.html"
     }
   },
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index" },
-    { "src": "/title/([^/]+)", "dest": "/api/og?slug=$1" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
