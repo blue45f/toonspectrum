@@ -7,10 +7,15 @@
     "api/index.js": {
       "maxDuration": 60,
       "includeFiles": "apps/api/dist/**"
+    },
+    "api/og.js": {
+      "maxDuration": 15,
+      "includeFiles": "dist/index.html"
     }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index" },
+    { "src": "/title/([^/]+)", "dest": "/api/og?slug=$1" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
