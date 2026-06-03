@@ -10,6 +10,20 @@ import { cn } from "@/lib/utils";
 
 const AVATARS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
 
+// 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
+function DemoTag({ dark }: { dark?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded px-1 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide",
+        dark ? "bg-black/15 text-[#191600]" : "border border-line bg-raised text-fg-3"
+      )}
+    >
+      데모
+    </span>
+  );
+}
+
 const authSchema = z.object({
   email: z.string().trim().min(1, "이메일을 입력해 주세요.").email("이메일 형식을 확인해 주세요."),
   password: z.string().min(6, "비밀번호는 6자 이상이어야 해요."),
@@ -21,7 +35,7 @@ type AuthFormValues = z.infer<typeof authSchema>;
 
 export function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [oauth, setOauth] = useState<string[]>([]);
+  const [providers, setProviders] = useState<Record<string, { label?: string; mode?: string }>>({});
   const [err, setErr] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
@@ -42,7 +56,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     fetch("/api/auth/providers")
       .then((r) => r.json())
-      .then((p) => setOauth(Object.keys(p).filter((k) => k === "kakao" || k === "google")))
+      .then((p) => setProviders(p && typeof p === "object" ? p : {}))
       .catch(() => {});
   }, []);
 
@@ -222,29 +236,36 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             </button>
           </form>
 
-          {oauth.length > 0 && (
+          {(providers.kakao || providers.google) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
               </div>
               <div className="flex flex-col gap-2">
-                {oauth.includes("kakao") && (
+                {providers.kakao && (
                   <button
                     onClick={() => signIn("kakao")}
-                    className="h-11 rounded-xl bg-[#FEE500] text-sm font-semibold text-[#191600] transition-opacity hover:opacity-90"
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#FEE500] text-sm font-semibold text-[#191600] transition-opacity hover:opacity-90"
                   >
                     카카오로 계속하기
+                    {providers.kakao.mode === "demo" && <DemoTag dark />}
                   </button>
                 )}
-                {oauth.includes("google") && (
+                {providers.google && (
                   <button
                     onClick={() => signIn("google")}
-                    className="h-11 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
                   >
                     Google로 계속하기
+                    {providers.google.mode === "demo" && <DemoTag />}
                   </button>
                 )}
               </div>
+              {(providers.kakao?.mode === "demo" || providers.google?.mode === "demo") && (
+                <p className="mt-2 text-center text-[0.66rem] text-fg-3">
+                  데모 표시는 실제 소셜 연동이 아직 설정되지 않아 체험용 계정으로 로그인됨을 뜻해요.
+                </p>
+              )}
             </>
           )}
           <p className="mt-4 text-[0.7rem] leading-relaxed text-fg-3">

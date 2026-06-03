@@ -73,6 +73,14 @@ export function useSession(): SessionContextValue {
 }
 
 export async function signIn(provider?: string, options?: Record<string, unknown>) {
+  // 소셜 로그인(Google·Kakao): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
+  // 백엔드가 설정 여부에 따라 실제 제공자 또는 데모 폴백(/auth/callback#demo=)으로 분기한다.
+  if (provider === "google" || provider === "kakao") {
+    const url = `/api/auth/oauth/${provider}/start`;
+    if (typeof window !== "undefined") window.location.assign(url);
+    return { ok: true, error: null, status: 0, url };
+  }
+
   if (provider !== "credentials") {
     return {
       ok: false,
@@ -115,6 +123,11 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 export async function signOut() {
   persistSession(null);
   return undefined;
+}
+
+// OAuth 콜백 페이지가 핸드오프/데모로 받은 사용자 객체로 세션을 확정할 때 사용.
+export function completeOAuthLogin(user: NonNullable<Session>["user"] | null) {
+  persistSession(user?.id ? { user } : null);
 }
 
 export function getAuthSession() {

@@ -1,8 +1,21 @@
-import { BadRequestException, Body, Controller, Get, Headers, HttpException, HttpStatus, Post, Req } from "@nestjs/common";
-import type { Request } from "express";
+import { BadRequestException, Body, Controller, Get, Headers, HttpException, HttpStatus, Param, Post, Query, Req, Res } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { db, users } from "../../../../../lib/db";
 import { hashPassword, verifyPassword } from "../../../../../lib/auth-crypto";
+import {
+  buildAuthorizeUrl,
+  consumeHandoff,
+  createDemoUser,
+  handleOAuthCallback,
+  isOAuthProvider,
+  issueHandoff,
+  issueState,
+  listAuthProviders,
+  providerMode,
+  verifyState,
+  webAppBaseUrl,
+} from "../../../../../lib/server/oauth";
 
 interface AuthPayload {
   email?: unknown;
@@ -21,7 +34,61 @@ const AuthRateLimitStore: Record<string, number[]> = {};
 export class AuthController {
   @Get("providers")
   getProviders() {
-    return {};
+    return listAuthProviders();
+  }
+
+  // 실제 OAuth 시작 — 인가 URL로 리다이렉트(설정된 제공자만). 미설정이면 데모 폴백 안내.
+  @Get("oauth/:provider/start")
+  oauthStart(@Param("provider") provider: string, @Res() res: Response) {
+    if (!isOAuthProvider(provider)) throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
+    const url = buildAuthorizeUrl(provider, issueState(provider));
+    if (!url) {
+      // client id/secret 미설정 → 데모 모드. 프론트가 데모 엔드포인트를 호출하도록 콜백으로 안내.
+      return res.redirect(`${webAppBaseUrl()}/auth/callback#demo=${provider}`);
+    }
+    return res.redirect(url);
+  }
+
+  // 제공자 콜백 — code 교환 → 사용자 upsert → 1회용 핸드오프 토큰으로 프론트 복귀.
+  @Get("oauth/:provider/callback")
+  async oauthCallback(
+    @Param("provider") provider: string,
+    @Query("code") code: string | undefined,
+    @Query("state") state: string | undefined,
+    @Query("error") error: string | undefined,
+    @Res() res: Response
+  ) {
+    const web = webAppBaseUrl();
+    if (!isOAuthProvider(provider)) return res.redirect(`${web}/auth/callback#error=unsupported`);
+    if (error) return res.redirect(`${web}/auth/callback#error=${encodeURIComponent(error)}`);
+    if (!verifyState(provider, state)) return res.redirect(`${web}/auth/callback#error=bad_state`);
+    if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
+    try {
+      const user = await handleOAuthCallback(provider, code);
+      return res.redirect(`${web}/auth/callback#t=${issueHandoff(user)}`);
+    } catch {
+      return res.redirect(`${web}/auth/callback#error=oauth_failed`);
+    }
+  }
+
+  // 핸드오프 토큰 → 사용자 객체(프론트가 세션 저장). 1회용.
+  @Post("oauth/exchange")
+  oauthExchange(@Body() body: { token?: unknown }) {
+    const user = consumeHandoff(typeof body?.token === "string" ? body.token : undefined);
+    if (!user) throw new HttpException({ error: "만료되었거나 잘못된 로그인 토큰이에요." }, HttpStatus.UNAUTHORIZED);
+    return { ok: true, user };
+  }
+
+  // 데모 폴백 로그인 — 실제 제공자 미설정 시에만 허용. 명확히 [데모] 사용자.
+  @Post("oauth/:provider/demo")
+  async oauthDemo(@Param("provider") provider: string, @Req() req: Request) {
+    if (!isOAuthProvider(provider)) throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
+    if (providerMode(provider) !== "demo") {
+      throw new HttpException({ error: "이 제공자는 실제 OAuth가 설정되어 데모를 쓸 수 없어요." }, HttpStatus.CONFLICT);
+    }
+    enforceRateLimit(`oauth-demo:${clientIp(req)}`, 20, 10 * 60_000);
+    const user = await createDemoUser(provider);
+    return { ok: true, user, demo: true };
   }
 
   @Post("signup")
