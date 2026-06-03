@@ -53,6 +53,7 @@ yarn-error.log*
 *.db-shm
 
 !.env.example
+!.env.production.example
 
 # 로컬 테스트 계정 자격증명(절대 커밋 금지)
 test-accounts.local.*

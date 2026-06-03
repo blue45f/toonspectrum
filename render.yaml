@@ -1,0 +1,53 @@
+# Render Blueprint — WEBDEX NestJS API (long-running host).
+# 카탈로그 26k건을 부팅 시 메모리에 적재·인덱싱하므로 서버리스/콜드스타트가 아닌 상시구동 호스트가 필요하다.
+# 사용법: Render 대시보드 → New → Blueprint → 이 레포 연결. sync:false 변수는 대시보드에서 입력한다.
+services:
+  - type: web
+    name: webdex-api
+    runtime: node
+    region: singapore
+    # free 플랜은 15분 무요청 시 슬립 → 재기동 시 카탈로그 재적재로 첫 응답이 느리다.
+    # 상용은 starter 이상(상시구동) 권장.
+    plan: free
+    rootDir: .
+    # API는 apps/api/dist/ 로 컴파일된다(tsconfig outDir=dist, rootDir=../.. → dist/apps/api/src/main.js).
+    # repo 루트의 dist/ 는 프론트 빌드 산출물이므로 혼동 금지.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @webtoon-nest/api build
+    startCommand: node apps/api/dist/apps/api/src/main.js
+    healthCheckPath: /api/auth/providers
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Asia/Seoul
+      # 카탈로그는 Neon의 catalog_snapshot에서 부팅 시 로드. 자동 크롤은 끄고(off) 데이터 갱신은
+      # GitHub cron(refresh-data.yml)이 /api/catalog/ingest/run 으로 트리거한다.
+      - key: CATALOG_INGEST_MODE
+        value: "off"
+      # Neon 연결 문자열(sslmode=require). 시크릿이라 대시보드에서 입력.
+      - key: DATABASE_URL
+        sync: false
+      # OAuth state 서명 키 — Render가 자동 생성.
+      - key: AUTH_STATE_SECRET
+        generateValue: true
+      # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
+      - key: CATALOG_INGEST_TRIGGER_TOKEN
+        generateValue: true
+      # 아래 4개는 프론트(Vercel) 도메인 확정 후 그 값으로 설정. 단일 오리진 유지.
+      - key: OAUTH_REDIRECT_BASE_URL
+        sync: false
+      - key: WEB_APP_BASE_URL
+        sync: false
+      # 소셜 로그인 실연동 키(미설정 시 데모 폴백으로 동작).
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: KAKAO_REST_API_KEY
+        sync: false
+      - key: KAKAO_CLIENT_SECRET
+        sync: false
+      # 관리자 이메일 화이트리스트(선택).
+      - key: ADMIN_EMAILS
+        sync: false
