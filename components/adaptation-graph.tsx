@@ -2,25 +2,18 @@
 
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
+import { type MediaAdaptation, MEDIA_KIND_LABEL, mediaThumb, mediaLink } from "@/lib/title-universe";
 import { MiniPoster } from "./rank-row";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import { useInView } from "./use-in-view";
-import { BookOpen, Tv, Film, Gamepad2, Sparkles } from "lucide-react";
+import { Tv, Film, Sparkles, Play } from "lucide-react";
 
-const EXT_ICON: Record<string, typeof Tv> = {
+const EXT_ICON: Record<MediaAdaptation["kind"], typeof Tv> = {
   drama: Tv,
   movie: Film,
   anime: Sparkles,
-  game: Gamepad2,
   ott: Tv,
-};
-const EXT_LABEL: Record<string, string> = {
-  drama: "드라마",
-  movie: "영화",
-  anime: "애니메이션",
-  game: "게임",
-  ott: "OTT 시리즈",
 };
 
 // 노드 등장 안무용 공통 스타일. step = 체인 상의 순서(0=원작).
@@ -70,6 +63,44 @@ function Node({
   );
 }
 
+// 영상화 노드 — 공식 예고편 썸네일 + 공식 시청/정보 페이지로 링크아웃.
+function MediaNode({ media, inView, step }: { media: MediaAdaptation; inView: boolean; step: number }) {
+  const Icon = EXT_ICON[media.kind] ?? Tv;
+  const thumb = mediaThumb(media);
+  return (
+    <a
+      href={mediaLink(media)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
+      style={nodeReveal(inView, step)}
+    >
+      <span className="relative grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-md border border-line-strong bg-[linear-gradient(145deg,oklch(0.245_0.011_64),oklch(0.185_0.009_68))] text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.1)] transition-all group-hover:border-accent/60">
+        {thumb ? (
+          <>
+            {/* 유튜브 공식 예고편 썸네일(16:9)을 3:4 카드에 cover */}
+            <img src={thumb} alt="" loading="lazy" className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <span className="absolute inset-0 bg-[oklch(0.14_0.02_70/0.32)] transition-colors group-hover:bg-[oklch(0.14_0.02_70/0.12)]" />
+            <span className="relative grid size-7 place-items-center rounded-full bg-[oklch(0.14_0.02_70/0.55)] text-[oklch(0.97_0.01_85)] backdrop-blur-sm">
+              <Play size={13} className="fill-current" />
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="absolute inset-0 bg-[radial-gradient(circle_at_28%_0%,oklch(0.72_0.185_42/0.22),transparent_58%)]" />
+            <Icon size={20} className="relative" />
+          </>
+        )}
+      </span>
+      <span className="eyebrow text-[0.58rem] text-fg-3">{MEDIA_KIND_LABEL[media.kind]}</span>
+      <span className="line-clamp-2 text-[0.72rem] font-medium leading-tight text-fg-2 group-hover:text-fg">
+        {media.name}
+        <span className="block text-[0.62rem] text-fg-3 tnum">{media.year}</span>
+      </span>
+    </a>
+  );
+}
+
 // 커넥터 — reveal 시 라인이 좌→우로 그려진 뒤 노드 도트가 들어온다.
 function Connector({ inView, step }: { inView: boolean; step: number }) {
   const lineDelay = `${step * 130}ms`;
@@ -96,26 +127,17 @@ function Connector({ inView, step }: { inView: boolean; step: number }) {
 export function AdaptationGraph({
   original,
   adaptations,
+  externalMedia = [],
   currentId,
   className,
 }: {
   original: Title;
   adaptations: Title[];
+  externalMedia?: MediaAdaptation[];
   currentId?: string;
   className?: string;
 }) {
   const [ref, inView] = useInView<HTMLDivElement>();
-  // 원작·웹툰 양쪽에 같은 영상화가 태깅될 수 있어 (kind,name,year) 로 중복 제거.
-  const seenExt = new Set<string>();
-  const ext = [
-    ...(original.externalAdaptations ?? []),
-    ...adaptations.flatMap((a) => a.externalAdaptations ?? []),
-  ].filter((e) => {
-    const k = `${e.kind}|${e.name}|${e.year}`;
-    if (seenExt.has(k)) return false;
-    seenExt.add(k);
-    return true;
-  });
   return (
     <div ref={ref} className={cn("flex items-start gap-1 overflow-x-auto rail pb-1", className)}>
       <Node
@@ -137,27 +159,12 @@ export function AdaptationGraph({
           />
         </div>
       ))}
-      {ext.map((e, i) => {
-        const Icon = EXT_ICON[e.kind] ?? BookOpen;
+      {externalMedia.map((e, i) => {
         const step = adaptations.length + 1 + i;
         return (
-          <div key={i} className="flex items-start gap-1">
+          <div key={`${e.kind}-${e.name}-${e.year}`} className="flex items-start gap-1">
             <Connector inView={inView} step={step} />
-            <div
-              className="flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
-              style={nodeReveal(inView, step)}
-            >
-              <div className="relative grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-md border border-line-strong bg-[linear-gradient(145deg,oklch(0.245_0.011_64),oklch(0.185_0.009_68))] text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.1)]">
-                <span className="absolute inset-0 bg-[radial-gradient(circle_at_28%_0%,oklch(0.72_0.185_42/0.22),transparent_58%)]" />
-                <span className="absolute left-0 top-0 h-full w-[2px] bg-accent/70" />
-                <Icon size={20} className="relative" />
-              </div>
-              <span className="eyebrow text-[0.58rem] text-fg-3">{EXT_LABEL[e.kind]}</span>
-              <span className="line-clamp-2 text-[0.72rem] font-medium leading-tight text-fg-2">
-                {e.name}
-                <span className="block text-[0.62rem] text-fg-3 tnum">{e.year}</span>
-              </span>
-            </div>
+            <MediaNode media={e} inView={inView} step={step} />
           </div>
         );
       })}

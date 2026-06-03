@@ -47,13 +47,6 @@ export interface Availability {
   url?: string;
 }
 
-// 외부 미디어 확장 (드라마/영화/애니/게임화)
-export interface ExternalAdaptation {
-  kind: "drama" | "movie" | "anime" | "game" | "ott";
-  name: string;
-  year: number;
-}
-
 export interface TitleStats {
   views: number; // 누적 조회수
   likes: number; // 좋아요
@@ -90,9 +83,8 @@ export interface Title {
   totalEpisodes?: number;
   updateDays?: string[]; // 연재요일 (월~일)
   availability: Availability[];
-  // 원작-2차창작 그래프
+  // 원작-2차창작 그래프 (웹툰↔원작소설). 드라마·영화·애니 등 영상화·OST는 lib/title-universe.ts 에서 관리.
   adaptedFrom?: string; // 원작 작품 id (예: 웹툰의 원작 웹소설)
-  externalAdaptations?: ExternalAdaptation[];
   stats: TitleStats;
   // 조회/관심 등 핵심 지표가 합성(추정)값일 때 true. 네이버가 공개 조회수 집계를 비공개로
   // 전환하면 viewCount가 0으로 내려오므로, 0 노출 방지용으로 보정한 작품을 추정으로 표시한다.

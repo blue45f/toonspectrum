@@ -25,7 +25,6 @@ import {
 import { getCalendarData } from "../lib/server/calendar";
 import { getInsightsData } from "../lib/server/insights";
 import { getRankingData } from "../lib/server/ranking-service";
-import { enrichExternalAdaptations } from "../lib/adaptations-media";
 import type { Title } from "../lib/types";
 
 const RANK_TYPES = ["all", "webtoon", "webnovel"];
@@ -107,10 +106,8 @@ function writeJson(name: string, data: unknown): void {
 
 async function main(): Promise<void> {
   const titles = loadTitles();
-  // 큐레이션 영상화(드라마·영화·애니·OTT) 정보 주입 — adaptation-graph 가 렌더.
-  const enriched = enrichExternalAdaptations(titles);
   replaceCatalogData(titles, { source: "cli-ingest", sourceVersion: "static-build" });
-  console.log(`정적 카탈로그 생성: ${TITLES.length}편 (영상화 ${enriched}편 매칭) → ${path.relative(ROOT, OUT)}/`);
+  console.log(`정적 카탈로그 생성: ${TITLES.length}편 → ${path.relative(ROOT, OUT)}/`);
 
   // 산출물 초기화(낡은 파일 제거) 후 재생성.
   rmSync(OUT, { recursive: true, force: true });

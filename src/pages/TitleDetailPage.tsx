@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { TitleOst } from "@/components/title-ost";
+import { mergedUniverse } from "@/lib/title-universe";
 import { AuthorLine } from "@/components/author-line";
 import Link from "@/src/compat/router-link";
 import { AvailabilityRouter } from "@/components/availability";
@@ -84,11 +85,10 @@ export function TitleDetailPage() {
   }
 
   const { title, reviews, similar, original, adaptations, hasFamily } = data;
-  // 웹툰화 패밀리가 없어도(독립 작품) 영상화(드라마·영화·애니·OTT)가 있으면 그래프를 노출.
-  const hasExternalMedia =
-    (original.externalAdaptations?.length ?? 0) > 0 ||
-    (title.externalAdaptations?.length ?? 0) > 0 ||
-    adaptations.some((a) => (a.externalAdaptations?.length ?? 0) > 0);
+  // 영상화(드라마·영화·애니·OTT)는 통합 유니버스 데이터에서 조회(원작+현재작 합산).
+  // 웹툰화 패밀리가 없어도(독립 작품) 영상화가 있으면 그래프를 노출한다.
+  const externalMedia = mergedUniverse(title, original).adaptations;
+  const hasExternalMedia = externalMedia.length > 0;
   const reviewCount = data.reviewCount || title.stats.ratingCount;
   const reviewAvg = data.reviewCount > 0 ? data.reviewAvg : title.stats.ratingAvg;
   const estimated = statsAreEstimated(title);
@@ -245,7 +245,12 @@ export function TitleDetailPage() {
               <Layers size={15} />
               <span className="eyebrow text-[0.62rem]">{original.title} 유니버스</span>
             </div>
-            <AdaptationGraph original={original} adaptations={adaptations} currentId={title.id} />
+            <AdaptationGraph
+              original={original}
+              adaptations={adaptations}
+              externalMedia={externalMedia}
+              currentId={title.id}
+            />
           </div>
         </Section>
       )}

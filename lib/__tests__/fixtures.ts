@@ -39,7 +39,6 @@ export function makeTitle(
     updateDays: p.updateDays,
     availability: p.availability ?? [{ platformId: "naver-webtoon", pricing: "free" }],
     adaptedFrom: p.adaptedFrom,
-    externalAdaptations: p.externalAdaptations,
     stats: { ...baseStats, ...(p.stats ?? {}) },
     featured: p.featured,
     editorNote: p.editorNote,
