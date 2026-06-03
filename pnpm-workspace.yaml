@@ -1,3 +1,9 @@
 packages:
   - "."
   - "apps/*"
+
+# 공급망 정책(minimumReleaseAge: 너무 최근 발행 패키지 거부)의 예외 목록.
+# pg 설치 시 따라온 transitive dep node-releases가 24h 미경과 발행이라 --frozen-lockfile에서
+# 거부됨 — caniuse/브라우저 데이터 패키지라 안전하게 제외(다른 워크스페이스와 동일 패턴).
+minimumReleaseAgeExclude:
+  - node-releases
