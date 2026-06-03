@@ -25,6 +25,7 @@
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "vite.config.ts",
+    "drizzle.config.ts",
     "eslint.config.mjs",
     "postcss.config.mjs",
     "**/*.mts"
