@@ -3,9 +3,11 @@ import { rankBy } from "../ranking";
 import { makeTitle } from "./fixtures";
 
 describe("rankBy", () => {
-  it("정렬: 인기축은 조회수 높은 작품이 위로", () => {
-    const low = makeTitle({ id: "low", stats: { views: 1_000 } });
-    const high = makeTitle({ id: "high", stats: { views: 500_000_000 } });
+  it("정렬: 인기축은 교차-플랫폼 인기 백분위가 높은 작품이 위로", () => {
+    // 인기 점수는 플랫폼별로 정규화한 인기 백분위(popularityPercentile, 카탈로그 로드 시 계산)를
+    // 지수감쇠로 반영한다 — 특정 플랫폼의 절대 조회수가 아니라 '플랫폼 내 상위권'을 본다.
+    const low = makeTitle({ id: "low", stats: { popularityPercentile: 8 } });
+    const high = makeTitle({ id: "high", stats: { popularityPercentile: 100 } });
     const ranked = rankBy([low, high], "popular", { period: "all" });
     expect(ranked[0].title.id).toBe("high");
     expect(ranked[0].rank).toBe(1);
