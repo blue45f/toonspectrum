@@ -101,15 +101,16 @@ export function SiteHeader() {
                 href={n.href}
                 aria-current={isActive(n.href, n.exact) ? "page" : undefined}
                 className={cn(
-                  "group inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-150",
+                  "group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
                   isActive(n.href, n.exact)
                     ? "bg-accent-soft text-accent"
                     : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                 )}
               >
+                {/* 아이콘 박스는 폭이 빠듯한 lg~xl 구간에선 숨겨 헤더 줄바꿈을 막고, xl+에서만 노출 */}
                 <span
                   className={cn(
-                    "grid size-6 place-items-center rounded-lg border transition-colors duration-150",
+                    "hidden size-6 place-items-center rounded-lg border transition-colors duration-150 xl:grid",
                     isActive(n.href, n.exact)
                       ? "border-accent/35 bg-canvas/45"
                       : "border-transparent bg-transparent group-hover:border-line group-hover:bg-card"
@@ -127,7 +128,7 @@ export function SiteHeader() {
             <button
               onClick={openSearch}
               aria-label="검색 열기"
-              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-56 sm:justify-between"
+              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between xl:w-56"
             >
               <span className="flex items-center gap-2">
                 <Search size={16} />
@@ -150,7 +151,7 @@ export function SiteHeader() {
               )}
             >
               <Library size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
-              <span className="hidden lg:inline">내 서재</span>
+              <span className="hidden xl:inline">내 서재</span>
             </Link>
             <AuthMenu />
 
