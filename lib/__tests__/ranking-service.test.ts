@@ -26,6 +26,15 @@ const emptyLive = async (): Promise<LiveRankingResult> => ({
   sources: [],
 });
 
+// 휴재 신호 fetch 스텁(빈 결과) — 미주입 시 getRankingData가 실 네트워크로 새서 CI에서 타임아웃.
+const emptyStatus = async () => ({
+  items: [],
+  fetchedAt: "2026-06-01T00:00:00.000Z",
+  ttlSeconds: 600,
+  timeoutMs: 3500,
+  sources: [],
+});
+
 const naverStatusSource = { name: "네이버웹툰" as const, ok: true, fetched: 1, latencyMs: 3, message: "ok" };
 
 function statusFetch(status: "ongoing" | "completed" | "hiatus") {
@@ -135,7 +144,7 @@ describe("ranking service", () => {
 
     const data = await getRankingData(
       query({ axis: "popular", period: "daily", limit: "2" }),
-      { catalog: [highViews, liveTitle], fetchLive: fakeLive, now }
+      { catalog: [highViews, liveTitle], fetchLive: fakeLive, fetchStatus: emptyStatus, now }
     );
 
     expect(data.meta.source).toBe("live-api");
@@ -228,6 +237,7 @@ describe("ranking service", () => {
       {
         catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
         fetchLive: live,
+        fetchStatus: emptyStatus,
         now: () => new Date("2026-06-01T00:00:10.000Z"),
       }
     );
@@ -255,6 +265,7 @@ describe("ranking service", () => {
       {
         catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
         fetchLive: live,
+        fetchStatus: emptyStatus,
       }
     );
 
