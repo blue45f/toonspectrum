@@ -32,8 +32,9 @@ jobs:
       DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
     steps:
       - uses: actions/checkout@v6
+      # pnpm 버전은 package.json "packageManager" 필드를 단일 소스로 사용한다.
+      # action-setup@v6는 여기에 version 입력이 함께 있으면 ERR_PNPM_BAD_PM_VERSION로 충돌한다.
       - uses: pnpm/action-setup@v6
-        with: { version: 11 }
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -41,6 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run validate:architecture
       - run: pnpm run lint
+      - run: pnpm run typecheck
       # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
       - run: pnpm exec drizzle-kit push --force
       - run: pnpm run test
