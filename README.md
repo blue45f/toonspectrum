@@ -97,7 +97,7 @@ pnpm ingest                      # 크롤 후 로컬 DB 스냅샷에 적재 → 
 pnpm ingest --from out.json      # 미리 크롤해 둔 JSON 적재(재크롤 없음)
 ```
 
-> 로컬 DB(`file:` 기본)는 cwd와 무관하게 **레포 루트의 `data/webdex.db` 하나**로 고정됩니다(`lib/db`가 `pnpm-workspace.yaml` 위치를 기준으로 해석). API는 `apps/api`에서 실행되므로, 예전처럼 cwd 상대경로였다면 `apps/api/data/webdex.db`와 루트 `data/webdex.db`가 갈려 스냅샷이 한쪽에만 쌓였습니다.
+> DB는 **PostgreSQL**입니다(`lib/db`가 `DATABASE_URL`로 연결, 미설정 시 로컬 docker `:55432` 폴백). 스키마는 `pnpm exec drizzle-kit push`로 생성하고, 스냅샷이 없으면 빈 카탈로그로 시작합니다. 설정은 아래 [실행](#실행)의 "DB 준비"를 참고하세요.
 
 - **웹툰**: 요일별/완결 목록 전체를 검색 색인으로 저장하고, 상위/설정 범위는 상세 API로 제목·작가·**별점·조회수·관심수·장르·시놉시스·태그·연재요일·연령등급·연재 시작 연도·표지 썸네일**을 보강합니다. 카카오웹툰/레진 공개 카탈로그도 추가로 정규화합니다.
 - **웹소설**: 웹툰의 원작 정보(`novelOriginAuthors`)로 실제 원작 엔트리와 **원작↔웹툰 어댑테이션 연결**을 생성하고, 네이버 시리즈 장르 랭킹으로 보강.
@@ -132,6 +132,33 @@ pnpm dev:api     # http://127.0.0.1:4001
 pnpm dev:all     # 권장: 웹앱(:5173) + Nest API(:4001) 한 번에 실행
 pnpm build && pnpm start   # 프로덕션 프리뷰
 ```
+
+### DB 준비 (PostgreSQL / Neon)
+
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `lib/db`가 `DATABASE_URL`을 읽고, 미설정 시 로컬 docker(`postgres://webdex:webdex@127.0.0.1:55432/webdex`)로 폴백합니다. 둘 중 하나를 고른 뒤 스키마를 push하고 카탈로그를 적재하세요.
+
+**A. 로컬 docker Postgres**
+
+```bash
+docker run -d --name wd-pg \
+  -e POSTGRES_USER=webdex -e POSTGRES_PASSWORD=webdex -e POSTGRES_DB=webdex \
+  -p 55432:5432 postgres:16-alpine
+pnpm exec drizzle-kit push        # 스키마 생성(20테이블). DATABASE_URL 미설정 시 위 docker 기본값 사용
+pnpm ingest                       # 전 소스 크롤 후 catalog_snapshot 적재 → dev:all 재시작 시 반영
+pnpm dev:all
+```
+
+**B. 원격 Neon** — `.env.local`에 연결 문자열만 넣으면 크롤·ingest·API가 모두 원격을 사용합니다.
+
+```bash
+# .env.local (gitignore됨)
+echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=require"' >> .env.local
+pnpm exec drizzle-kit push        # Neon에 스키마 생성
+pnpm ingest                       # Neon에 카탈로그 적재
+pnpm dev:all                      # apps/api가 부팅 시 .env.local을 먼저 로드 → 자동으로 Neon 연결
+```
+
+> 데이터 갱신: 적재 후 API는 폴링(`CATALOG_REFRESH_POLL_SECONDS`, 기본 60s)으로 새 스냅샷을 **무중단 핫 리로드**하거나, `POST /api/catalog/refresh`로 즉시 반영합니다. 전체 흐름은 [`docs/data-pipeline.md`](docs/data-pipeline.md) 참고.
 
 ## 프로젝트 구조
 
