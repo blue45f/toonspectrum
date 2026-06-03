@@ -215,6 +215,12 @@ export function SearchExplorer({
   const resultText = hasResult ? `${results.length.toLocaleString("ko-KR")}개의 작품` : "결과가 없습니다";
   const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
   const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
+  // 플랫폼 필터는 카탈로그에 실제로 존재하는 플랫폼만 노출(빈 슬롯 방지). 커버리지 정보가
+  // 아직 없으면 전체를 보여주고, 이미 선택된 플랫폼은 사라지지 않게 유지한다.
+  const presentPlatformIds = new Set((catalog?.platformCoverage ?? []).map((entry) => entry.id));
+  const platformOptions = presentPlatformIds.size
+    ? PLATFORM_LIST.filter((entry) => presentPlatformIds.has(entry.id) || platforms.includes(entry.id))
+    : PLATFORM_LIST;
 
   const activeCount =
     types.length +
@@ -455,7 +461,7 @@ export function SearchExplorer({
 
       <FacetGroup title="플랫폼">
         <div className="grid gap-1.5 sm:grid-cols-2">
-          {PLATFORM_LIST.map((entry) => (
+          {platformOptions.map((entry) => (
             <button
               type="button"
               key={entry.id}

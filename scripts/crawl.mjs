@@ -17,6 +17,7 @@ import { crawl as crawlBomtoon } from "./crawlers/bomtoon.mjs";
 import { crawl as crawlToptoon } from "./crawlers/toptoon.mjs";
 import { crawl as crawlToomics } from "./crawlers/toomics.mjs";
 import { crawl as crawlKyobo } from "./crawlers/kyobo.mjs";
+import { crawl as crawlComico } from "./crawlers/comico.mjs";
 
 // 중소형 플랫폼 (공개 카탈로그) 크롤러 — partner-required → crawler 승격분.
 const EXTRA_CRAWLERS = [
@@ -34,6 +35,7 @@ const EXTRA_CRAWLERS = [
   ["toptoon", crawlToptoon],
   ["toomics", crawlToomics],
   ["kyobo", crawlKyobo],
+  ["comico", crawlComico],
 ];
 
 const ARGS = new Set(process.argv.slice(2));
@@ -76,7 +78,7 @@ const MIN_CRAWL_DELAY_MS = parsePositiveInt(process.env.WEBDEX_CRAWL_DELAY_MS) ?
 const DEFAULT_SOURCE_IDS = [
   "naver-webtoon", "naver-series", "kakao-webtoon", "lezhin",
   "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
-  "novelpia", "bomtoon", "toptoon", "toomics", "kyobo",
+  "novelpia", "bomtoon", "toptoon", "toomics", "kyobo", "comico",
 ];
 const SOURCE_IDS = new Set(
   (process.env.WEBDEX_SOURCE_IDS || DEFAULT_SOURCE_IDS.join(","))

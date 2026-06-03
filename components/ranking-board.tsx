@@ -51,6 +51,7 @@ interface RankingMeta {
   refreshSeconds: number;
   total: number;
   source: "live-api" | "formula-api";
+  availablePlatforms?: PlatformId[];
   live: {
     enabled: boolean;
     day: string | null;
@@ -606,11 +607,24 @@ export function RankingBoard({
               className="min-w-28 border-none bg-transparent text-sm font-medium text-fg outline-none"
               aria-label="플랫폼 필터"
             >
-              {PLATFORM_FILTER_ITEMS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
+              {(() => {
+                // 카탈로그에 실존하는 플랫폼만 노출(빈 플랫폼 옵션 방지). 커버리지 미수신 시 전체 노출.
+                const present = rankingMeta?.availablePlatforms;
+                const items =
+                  present && present.length
+                    ? PLATFORM_FILTER_ITEMS.filter(
+                        (item) =>
+                          item.value === "all" ||
+                          item.value === platform ||
+                          present.includes(item.value as PlatformId)
+                      )
+                    : PLATFORM_FILTER_ITEMS;
+                return items.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ));
+              })()}
             </select>
           </label>
           <Segmented

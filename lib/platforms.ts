@@ -14,6 +14,7 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
   toptoon: { id: "toptoon", name: "탑툰", short: "탑툰", type: "webtoon", color: "#FF5A36" },
   postype: { id: "postype", name: "포스타입", short: "포스타입", type: "both", color: "#1A1A1A" },
   mrblue: { id: "mrblue", name: "미스터블루", short: "미블", type: "both", color: "#2F6BFF" },
+  comico: { id: "comico", name: "코미코", short: "코미코", type: "webtoon", color: "#E93423" },
   toomics: { id: "toomics", name: "투믹스", short: "투믹스", type: "webtoon", color: "#E60012" },
   bookcube: { id: "bookcube", name: "북큐브", short: "북큐브", type: "webnovel", color: "#2E7DD7" },
   onestory: { id: "onestory", name: "원스토리", short: "원스토리", type: "both", color: "#F04E45" },

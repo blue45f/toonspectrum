@@ -160,6 +160,17 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
     notes: "상업 플랫폼 제휴 피드 우선입니다.",
   },
   {
+    id: "comico",
+    name: "코미코",
+    workTypes: ["webtoon"],
+    implementation: "partner-required",
+    risk: "high",
+    defaultCadenceSeconds: 7200,
+    capabilities: ["catalog", "ranking", "availability"],
+    requiredReview: ["robots", "terms"],
+    notes: "공개 목록 __NEXT_DATA__ 파싱. 한국 외 IP는 방화벽 차단되므로 KR egress에서만 수집됩니다.",
+  },
+  {
     id: "toomics",
     name: "투믹스",
     workTypes: ["webtoon"],
@@ -219,7 +230,7 @@ export const CATALOG_SOURCE_REGISTRY: CatalogSourceMetadata[] = [
 // 공개 카탈로그 크롤러가 구현된 소스(partner-required → crawler 승격). scripts/crawlers/<id>.mjs 와 일치.
 const IMPLEMENTED_CRAWLERS = new Set<PlatformId>([
   "ridi", "kakao-page", "munpia", "joara", "postype", "mrblue", "bookcube", "onestory", "yes24",
-  "novelpia", "bomtoon", "toptoon", "toomics", "kyobo",
+  "novelpia", "bomtoon", "toptoon", "toomics", "kyobo", "comico",
 ]);
 for (const source of CATALOG_SOURCE_REGISTRY) {
   if (IMPLEMENTED_CRAWLERS.has(source.id)) source.implementation = "crawler";

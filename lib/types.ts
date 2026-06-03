@@ -24,6 +24,7 @@ export type PlatformId =
   | "toptoon"
   | "postype"
   | "mrblue"
+  | "comico"
   | "toomics"
   | "bookcube"
   | "onestory"

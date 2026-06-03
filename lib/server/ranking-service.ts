@@ -127,6 +127,8 @@ export interface RankingResponse {
     reliability: RankingReliability;
     liveRefreshPlan: LiveRefreshPlan | null;
     source: "live-api" | "formula-api";
+    // 카탈로그에 실제 존재하는 플랫폼(필터 UI가 빈 플랫폼을 노출하지 않도록).
+    availablePlatforms: PlatformId[];
   };
   insights: RankingInsights;
 }
@@ -540,6 +542,9 @@ export async function getRankingData(
       total: filtered.length,
       generatedAt,
       refreshSeconds: RANKING_REFRESH_SECONDS,
+      availablePlatforms: [
+        ...new Set(catalog.flatMap((title) => title.availability.map((a) => a.platformId))),
+      ],
       live: {
         enabled: shouldFetchLive,
         day: liveDay,
