@@ -13,7 +13,7 @@ import {
   MapPin,
 } from "lucide-react";
 
-// 사이트 소개·튜토리얼 페이지(/about) — 처음 온 사람에게 WEBDEX가 무엇이고 무엇을 할 수 있는지,
+// 사이트 소개·튜토리얼 페이지(/about) — 처음 온 사람에게 툰스펙트럼가 무엇이고 무엇을 할 수 있는지,
 // 어떻게 쓰는지 한 화면에서 안내한다.
 
 const FEATURES = [
@@ -98,7 +98,7 @@ export function AboutPage() {
           무엇을, 어디서, 왜 볼지 한 곳에서
         </h1>
         <p className="mt-3 text-base leading-relaxed text-fg-2">
-          WEBDEX는 작품을 직접 서비스하지 않습니다. 대신 네이버·카카오·리디를 비롯한 국내 웹툰·웹소설
+          툰스펙트럼는 작품을 직접 서비스하지 않습니다. 대신 네이버·카카오·리디를 비롯한 국내 웹툰·웹소설
           플랫폼을 가로질러, <strong className="text-fg">고르는 단계</strong>를 책임지는 통합 인덱스입니다.
           흩어진 작품을 하나로 묶고, 어디서 가장 좋게 볼 수 있는지 알려주고, 믿을 수 있는 데이터로
           순위를 매깁니다.

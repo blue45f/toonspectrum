@@ -208,7 +208,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         <div className="p-6">
           <div className="mb-1 flex items-center gap-2">
             <WebdexMark className="size-7 rounded-[0.55rem]" />
-            <span className="font-display text-lg font-bold">WEBDEX</span>
+            <span className="font-display text-lg font-bold">툰스펙트럼</span>
           </div>
           <p className="mb-5 text-sm text-fg-3">
             {mode === "login" ? "다시 오셨네요. 로그인하세요." : "계정을 만들고 취향을 기록하세요."}

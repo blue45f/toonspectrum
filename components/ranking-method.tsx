@@ -23,7 +23,7 @@ export function RankingMethod() {
       </div>
 
       <p className="mb-6 max-w-2xl text-sm leading-relaxed text-fg-2">
-        WEBDEX의 순위는 사람이 손으로 매기지 않습니다. 랭킹 화면은 <span className="text-fg">/api/ranking</span>에서
+        툰스펙트럼의 순위는 사람이 손으로 매기지 않습니다. 랭킹 화면은 <span className="text-fg">/api/ranking</span>에서
         매 요청마다 산식을 계산하고, 인기·급상승 축은 네이버·카카오 실시간 소스를 함께 반영합니다.
         외부 소스가 막히면 같은 API가 산식 기반 순위로 즉시 폴백합니다.
       </p>

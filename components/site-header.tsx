@@ -91,7 +91,7 @@ export function SiteHeader() {
           <Link href="/" className="group flex items-center gap-2.5 pr-2">
             <WebdexMark className="transition-transform duration-150 group-hover:scale-105" />
             <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
-              WEBDEX
+              툰스펙트럼
             </span>
           </Link>
 

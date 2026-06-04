@@ -34,7 +34,7 @@ function useRouteTitle(pathname: string) {
     else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
     else if (pathname.startsWith("/pencafe/")) title = `${decodeURIComponent(pathname.slice(9))} 펜카페`;
     else if (pathname.startsWith("/community/")) title = "커뮤니티";
-    document.title = title ? `${title} · WEBDEX` : "WEBDEX";
+    document.title = title ? `${title} · 툰스펙트럼` : "툰스펙트럼";
   }, [pathname]);
 }
 

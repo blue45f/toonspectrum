@@ -12,7 +12,7 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
     typeof window !== "undefined"
       ? `${window.location.origin}/title/${encodeURIComponent(slug)}`
       : `/title/${encodeURIComponent(slug)}`;
-  const shareText = `${title} · WEBDEX`;
+  const shareText = `${title} · 툰스펙트럼`;
 
   useEffect(() => {
     if (!open) return;

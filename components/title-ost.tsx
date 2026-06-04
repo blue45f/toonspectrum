@@ -73,7 +73,7 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
         })}
       </ul>
       <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
-        음원·영상의 저작권은 각 권리자에게 있습니다. WEBDEX는 음원을 저장·재생하지 않으며, 공식
+        음원·영상의 저작권은 각 권리자에게 있습니다. 툰스펙트럼는 음원을 저장·재생하지 않으며, 공식
         플랫폼으로 연결만 합니다.
       </p>
     </Section>

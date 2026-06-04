@@ -62,7 +62,7 @@ export function GuidePage() {
           랭킹은 이렇게 매겨집니다
         </h1>
         <p className="mt-3 text-base leading-relaxed text-fg-2">
-          WEBDEX의 모든 순위는 사람이 손으로 고르지 않습니다. 공개된 산식으로만 계산하고, 그 산식을
+          툰스펙트럼의 모든 순위는 사람이 손으로 고르지 않습니다. 공개된 산식으로만 계산하고, 그 산식을
           이 페이지에 그대로 적어둡니다. 어떤 작품이 왜 그 자리에 있는지 직접 검산할 수 있어야
           한다고 믿기 때문입니다.
         </p>
@@ -194,7 +194,7 @@ export function GuidePage() {
           href="/about"
           className="inline-flex items-center gap-1.5 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
         >
-          WEBDEX 소개
+          툰스펙트럼 소개
         </Link>
       </div>
     </Container>
