@@ -6,6 +6,7 @@ import { useSession, signOut } from "@/src/compat/auth-session";
 import { AuthModal } from "./auth-modal";
 import { LogOut, Library, UserRound } from "lucide-react";
 import { resolveSignupAvatarImage } from "@/lib/avatar";
+import { useT } from "@/lib/i18n";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -23,6 +24,7 @@ export function AuthMenu() {
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(false);
   const [open, setOpen] = useState(false);
+  const t = useT();
 
   if (status !== "authenticated") {
     return (
@@ -32,7 +34,7 @@ export function AuthMenu() {
           className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
         >
           <UserRound size={16} />
-          <span className="hidden sm:inline">로그인</span>
+          <span className="hidden sm:inline">{t("nav.login")}</span>
         </button>
         {modal && <AuthModal onClose={() => setModal(false)} />}
       </>

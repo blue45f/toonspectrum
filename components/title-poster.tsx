@@ -121,8 +121,10 @@ export function TitlePoster({
         )}
       </div>
 
-      {/* 19금 성인 인증 게이트 */}
-      {title.ageRating === "19" && <AdultOverlay compact={size === "sm"} />}
+      {/* 19금 성인 인증 게이트 — 실제 표지 있을 때만 연령 확인 버튼(타이포 표지는 가릴 게 없어 표시만) */}
+      {title.ageRating === "19" && (
+        <AdultOverlay compact={size === "sm"} hasCover={Boolean(title.coverImage)} />
+      )}
     </div>
   );
 }

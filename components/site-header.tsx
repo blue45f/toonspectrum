@@ -18,18 +18,19 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 import { AuthMenu } from "./auth/auth-menu";
 import { WebdexMark } from "./visual-marks";
 
 const NAV = [
-  { label: "홈", href: "/", icon: Home, exact: true },
-  { label: "랭킹", href: "/ranking", icon: TrendingUp },
-  { label: "연재", href: "/calendar", icon: CalendarDays },
-  { label: "추천", href: "/recommend", icon: Sparkles },
-  { label: "탐색", href: "/explore", icon: Compass },
-  { label: "리뷰", href: "/reviews", icon: MessageSquareQuote },
-  { label: "커뮤니티", href: "/community", icon: MessageCircle },
-  { label: "인사이트", href: "/insights", icon: BarChart3 },
+  { label: "홈", i18n: "nav.home", href: "/", icon: Home, exact: true },
+  { label: "랭킹", i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
+  { label: "연재", i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
+  { label: "추천", i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
+  { label: "탐색", i18n: "nav.explore", href: "/explore", icon: Compass },
+  { label: "리뷰", i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
+  { label: "커뮤니티", i18n: "nav.community", href: "/community", icon: MessageCircle },
+  { label: "인사이트", i18n: "nav.insights", href: "/insights", icon: BarChart3 },
 ];
 
 // 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
@@ -47,6 +48,7 @@ function useActive() {
 export function SiteHeader() {
   const isActive = useActive();
   const pathname = usePathname();
+  const t = useT();
   const openSearch = () => window.dispatchEvent(new Event("webdex:search"));
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,7 +120,7 @@ export function SiteHeader() {
                 >
                   <n.icon size={15} className="text-fg-3 transition-colors group-hover:text-accent" />
                 </span>
-                {n.label}
+                {t(n.i18n)}
               </Link>
             ))}
           </nav>
@@ -127,12 +129,12 @@ export function SiteHeader() {
             {/* 검색 트리거 */}
             <button
               onClick={openSearch}
-              aria-label="작품·작가·태그 검색 열기"
+              aria-label={t("nav.searchOpen")}
               className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between xl:w-56"
             >
               <span className="flex items-center gap-2">
                 <Search size={16} />
-                <span className="hidden sm:inline">작품·작가·태그 검색</span>
+                <span className="hidden sm:inline">{t("nav.search")}</span>
               </span>
               <kbd
                 aria-hidden="true"
@@ -154,7 +156,7 @@ export function SiteHeader() {
               )}
             >
               <Library size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
-              <span className="hidden xl:inline">내 서재</span>
+              <span className="hidden xl:inline">{t("nav.library")}</span>
             </Link>
             <AuthMenu />
 
@@ -162,7 +164,7 @@ export function SiteHeader() {
             <button
               ref={triggerRef}
               onClick={() => setMenuOpen((o) => !o)}
-              aria-label="전체 메뉴"
+              aria-label={t("nav.allMenu")}
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
@@ -189,11 +191,11 @@ export function SiteHeader() {
             id={menuId}
             role="dialog"
             aria-modal="true"
-            aria-label="전체 메뉴"
+            aria-label={t("nav.allMenu")}
             className="absolute inset-x-0 top-0 border-b border-line-strong bg-panel/95 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.97),oklch(0.185_0.018_68/0.96))] shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
           >
             <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-4 sm:px-6">
-              <span className="font-display text-sm font-semibold text-fg-2">메뉴</span>
+              <span className="font-display text-sm font-semibold text-fg-2">{t("nav.menu")}</span>
               <button
                 data-autofocus
                 onClick={closeMenu}
@@ -235,7 +237,7 @@ export function SiteHeader() {
                             )}
                           />
                         </span>
-                        {n.label}
+                        {t(n.i18n)}
                       </Link>
                     </li>
                   );
@@ -267,7 +269,7 @@ export function SiteHeader() {
                         )}
                       />
                     </span>
-                    내 서재
+                    {t("nav.library")}
                   </Link>
                 </li>
               </ul>
@@ -298,7 +300,7 @@ export function SiteHeader() {
                   <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
                 )}
                 <n.icon size={19} strokeWidth={active ? 2.4 : 1.9} />
-                {n.label}
+                {t(n.i18n)}
               </Link>
             );
           })}

@@ -108,7 +108,7 @@ export function HomePage() {
           className="relative grid items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20"
         >
           <div style={{ animation: "fade-up 0.6s var(--ease-out-expo) both" }}>
-            <p className="eyebrow text-accent">WEBTOON × WEBNOVEL · Vite React</p>
+            <p className="eyebrow text-accent">WEBTOON × WEBNOVEL</p>
             <h1 className="mt-4 text-pretty text-4xl font-bold leading-[1.08] sm:text-5xl lg:text-[3.6rem]">
               흩어진 이야기를,
               <br />
