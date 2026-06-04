@@ -25,7 +25,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
     ],
   },
   {
-    title: "WEBDEX",
+    title: "툰스펙트럼",
     links: [
       { label: "웹툰·웹소설 소식", href: "/news" },
       { label: "서비스 소개", href: "/about" },
@@ -42,7 +42,7 @@ export function SiteFooter() {
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
             <WebdexMark className="size-7 rounded-[0.55rem]" />
-            <span className="font-display text-lg font-bold">WEBDEX</span>
+            <span className="font-display text-lg font-bold">툰스펙트럼</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">
             네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
@@ -73,7 +73,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-line/60">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-1 px-4 py-5 text-xs text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© 2026 WEBDEX</span>
+          <span>© 2026 툰스펙트럼</span>
         </div>
       </div>
     </footer>
