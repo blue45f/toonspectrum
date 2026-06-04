@@ -42,8 +42,8 @@ module.exports = async (req, res) => {
 
   let page = template();
   if (t) {
-    const titleText = `${t.title} · WEBDEX`;
-    const desc = (t.synopsis || "").replace(/\s+/g, " ").trim().slice(0, 160) || `${t.title} — WEBDEX에서 평점·플랫폼·가격을 한눈에.`;
+    const titleText = `${t.title} · 툰스펙트럼`;
+    const desc = (t.synopsis || "").replace(/\s+/g, " ").trim().slice(0, 160) || `${t.title} — 툰스펙트럼에서 평점·플랫폼·가격을 한눈에.`;
     const img = t.coverImage
       ? (t.coverImage.startsWith("http") ? t.coverImage : `${proto}://${host}${t.coverImage.startsWith("/") ? "" : "/"}${t.coverImage}`)
       : `${proto}://${host}/og.png`;

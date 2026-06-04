@@ -363,23 +363,36 @@ export function PlatformMark({
   );
 }
 
-export function WebdexMark({ className }: { className?: string }) {
+export function ToonSpectrumMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.13)] bg-card shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
+        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.14)] bg-[linear-gradient(145deg,#201a14,#17130f)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
         className
       )}
       aria-hidden
     >
-      <span className="absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,oklch(0.72_0.185_42/0.38),transparent_56%)]" />
-      <span className="relative flex h-4.5 w-5.5 items-end gap-0.5">
-        <span className="h-full w-1 rounded-full bg-accent" />
-        <span className="h-[78%] w-1 rounded-full bg-[oklch(0.8_0.15_80)]" />
-        <span className="h-[92%] w-1 rounded-full bg-[oklch(0.8_0.15_150)]" />
-        <span className="h-[64%] w-1 rounded-full bg-[oklch(0.8_0.11_232)]" />
-      </span>
-      <span className="absolute bottom-1.5 left-1.5 right-1.5 h-px bg-[oklch(0.95_0.01_85/0.32)]" />
+      <span className="absolute inset-0 bg-[radial-gradient(circle_at_20%_5%,oklch(0.72_0.185_42/0.28),transparent_48%),radial-gradient(circle_at_82%_90%,oklch(0.8_0.11_232/0.18),transparent_42%)]" />
+      <svg className="relative size-full" viewBox="0 0 32 32" fill="none" focusable="false">
+        <path
+          d="M7.1 6.7h17.8c1.3 0 2.3 1 2.3 2.3v11.3c0 1.3-1 2.3-2.3 2.3h-8.3l-5 3.9c-.6.5-1.5 0-1.3-.8l.6-3.1H7.1c-1.3 0-2.3-1-2.3-2.3V9c0-1.3 1-2.3 2.3-2.3Z"
+          fill="#f8f0df"
+        />
+        <path
+          d="M7.1 6.7h17.8c1.3 0 2.3 1 2.3 2.3v11.3c0 1.3-1 2.3-2.3 2.3h-8.3l-5 3.9c-.6.5-1.5 0-1.3-.8l.6-3.1H7.1c-1.3 0-2.3-1-2.3-2.3V9c0-1.3 1-2.3 2.3-2.3Z"
+          stroke="#fff8ea"
+          strokeWidth="0.9"
+          opacity="0.45"
+        />
+        <path d="M7.1 16h6.2" stroke="#e06b3a" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M17.1 15.8C20 13 22.1 11.6 25.4 10.7" stroke="#e85d3f" strokeWidth="2.1" strokeLinecap="round" />
+        <path d="M17.3 15.9h8.5" stroke="#e4bd55" strokeWidth="2.1" strokeLinecap="round" />
+        <path d="M17.1 16.1C20.1 18.1 22.3 19.2 25.6 20.4" stroke="#54c87a" strokeWidth="2.1" strokeLinecap="round" />
+        <path d="M16.5 16.5C19.1 20.1 21.3 22 24.7 23.5" stroke="#5aa8dc" strokeWidth="2.1" strokeLinecap="round" />
+        <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" fill="#201a14" />
+        <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" stroke="#fff8ea" strokeWidth="0.75" opacity="0.42" />
+        <path d="M13.9 13.2 17.4 16l-3.5 2.8Z" fill="#f8f0df" opacity="0.12" />
+      </svg>
     </span>
   );
 }

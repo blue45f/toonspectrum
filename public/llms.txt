@@ -1,4 +1,4 @@
-# WEBDEX
+# 툰스펙트럼
 
 > 네이버 웹툰·시리즈, 카카오웹툰·페이지, 리디 등 국내 18개 웹툰·웹소설 플랫폼을 가로지르는 통합 인덱스. 작품을 직접 서비스하지 않고, 무엇을·어디서·왜 볼지를 투명한 데이터로 답하는 큐레이터형 디스커버리 레이어입니다.
 
@@ -11,7 +11,7 @@
 - [연재 캘린더](https://webtoon-index.vercel.app/calendar): 요일별 연재작
 - [스펙트럼 탐색](https://webtoon-index.vercel.app/explore): 18색 장르 스펙트럼 탐색
 - [트렌드 인사이트](https://webtoon-index.vercel.app/insights): 플랫폼·장르 트렌드 대시보드
-- [서비스 소개](https://webtoon-index.vercel.app/about): WEBDEX 소개와 사용법
+- [서비스 소개](https://webtoon-index.vercel.app/about): 툰스펙트럼 소개와 사용법
 
 ## 데이터 정책
 

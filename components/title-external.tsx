@@ -48,7 +48,7 @@ export function TitleExternal({ title }: { title: Title }) {
       className="mt-14"
       eyebrow="MORE"
       title="관련 정보 더 보기"
-      desc="상세 줄거리·뉴스·작가 인터뷰는 원 출처에서 확인하세요. 툰스펙트럼는 연결만 합니다."
+      desc="상세 줄거리·뉴스·작가 인터뷰는 원 출처에서 확인하세요. 툰스펙트럼은 연결만 합니다."
     >
       <ul className="grid gap-2.5 sm:grid-cols-2">
         {items.map((it) => (

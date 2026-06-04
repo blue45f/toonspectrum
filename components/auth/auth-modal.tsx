@@ -15,7 +15,7 @@ import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
-import { WebdexMark } from "../visual-marks";
+import { ToonSpectrumMark } from "../visual-marks";
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -207,7 +207,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         </button>
         <div className="p-6">
           <div className="mb-1 flex items-center gap-2">
-            <WebdexMark className="size-7 rounded-[0.55rem]" />
+            <ToonSpectrumMark className="size-7 rounded-[0.55rem]" />
             <span className="font-display text-lg font-bold">툰스펙트럼</span>
           </div>
           <p className="mb-5 text-sm text-fg-3">

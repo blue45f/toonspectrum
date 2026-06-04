@@ -1,5 +1,5 @@
 import Link from "@/src/compat/router-link";
-import { WebdexMark } from "./visual-marks";
+import { ToonSpectrumMark } from "./visual-marks";
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
@@ -41,7 +41,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
-            <WebdexMark className="size-7 rounded-[0.55rem]" />
+            <ToonSpectrumMark className="size-7 rounded-[0.55rem]" />
             <span className="font-display text-lg font-bold">툰스펙트럼</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">

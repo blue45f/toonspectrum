@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { AuthMenu } from "./auth/auth-menu";
-import { WebdexMark } from "./visual-marks";
+import { ToonSpectrumMark } from "./visual-marks";
 
 const NAV = [
   { label: "홈", i18n: "nav.home", href: "/", icon: Home, exact: true },
@@ -88,8 +88,8 @@ export function SiteHeader() {
       <header className="sticky top-0 z-50 border-b border-line/70 bg-panel/85 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.9),oklch(0.19_0.018_68/0.86))] backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           {/* 로고 */}
-          <Link href="/" className="group flex items-center gap-2.5 pr-2">
-            <WebdexMark className="transition-transform duration-150 group-hover:scale-105" />
+          <Link href="/" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap pr-2">
+            <ToonSpectrumMark className="transition-transform duration-150 group-hover:scale-105" />
             <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
               툰스펙트럼
             </span>
