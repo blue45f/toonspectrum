@@ -92,7 +92,7 @@ export function ReviewsPage() {
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-fg-3">
-                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>개의 DB 리뷰
+                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>개의 리뷰
               </p>
               <button
                 type="button"
@@ -145,7 +145,7 @@ export function ReviewsPage() {
               <ol className="mt-5 flex flex-col gap-1">
                 {topReviewed.length === 0 && (
                   <li className="rounded-xl border border-dashed border-line bg-raised/30 px-3 py-5 text-center text-xs text-fg-3">
-                    아직 집계할 DB 리뷰가 없습니다.
+                    아직 집계된 리뷰가 없습니다.
                   </li>
                 )}
                 {topReviewed.map((item, index) => (
