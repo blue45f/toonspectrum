@@ -9,6 +9,7 @@ import {
   Circle,
   Eraser,
   Image as ImageIcon,
+  Download,
   ImagePlus,
   LayoutTemplate,
   Loader2,
@@ -1054,6 +1055,20 @@ export function StudioPage() {
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
+  async function handleDownload() {
+    setSelectedId(null);
+    await new Promise((r) => setTimeout(r, 60));
+    const stage = stageRef.current;
+    if (!stage) return;
+    const full = stage.toDataURL({ pixelRatio: 1 / scale });
+    const link = document.createElement("a");
+    link.href = full;
+    link.download = `${title.trim() || "toonspectrum-comic"}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   return (
     <Container size="wide" className="py-6">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -1065,6 +1080,9 @@ export function StudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button type="button" onClick={handleDownload} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}>
+            <Download size={14} /> 다운로드
+          </button>
           <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet" })}>
             임시저장
           </button>
