@@ -12,18 +12,20 @@ import { AvailabilityDots } from "./availability";
 import { statsAreEstimated } from "@/lib/estimate";
 import { formatCount } from "@/lib/utils";
 import { genreColor } from "@/lib/genre-color";
-import { Sparkles, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, ArrowRight, Pause, Play } from "lucide-react";
 
 const AUTOPLAY_MS = 5500;
 
 // 홈 '이 주의 발견' 배너 — embla 캐러셀(경량). 표지를 무대 삼은 시네마틱 배경(표지가 주인공) +
 // 에디토리얼 정보(장르 스펙트럼·serif 한 줄·어디서 봐·평점) + 자동회전 진행바. 드래그/화살표/닷.
+// 접근성: prefers-reduced-motion 시 자동회전 OFF, 포커스 진입 시 일시정지, 명시적 재생/정지 토글(WCAG 2.2.2).
 export function HeroBanner({ items }: { items: Title[] }) {
   const slides = items.slice(0, 6);
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: "start", duration: 30 }, [
     Autoplay({ delay: AUTOPLAY_MS, stopOnInteraction: false, stopOnMouseEnter: true }),
   ]);
   const [selected, setSelected] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
 
   const onSelect = useCallback(() => {
     if (emblaApi) setSelected(emblaApi.selectedScrollSnap());
@@ -38,14 +40,52 @@ export function HeroBanner({ items }: { items: Title[] }) {
     };
   }, [emblaApi, onSelect]);
 
+  // 동작 최소화 선호 시 자동회전을 멈춰 둔다(WCAG 2.3 / 모션 민감 사용자 배려).
+  useEffect(() => {
+    if (!emblaApi || typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      emblaApi.plugins().autoplay?.stop();
+      setIsPlaying(false);
+    }
+  }, [emblaApi]);
+
+  // 명시적 재생/정지 토글 — 움직이는 콘텐츠를 멈출 수단 제공(WCAG 2.2.2).
+  const toggleAutoplay = useCallback(() => {
+    const autoplay = emblaApi?.plugins().autoplay;
+    if (!autoplay) return;
+    if (autoplay.isPlaying()) {
+      autoplay.stop();
+      setIsPlaying(false);
+    } else {
+      autoplay.play();
+      setIsPlaying(true);
+    }
+  }, [emblaApi]);
+
+  // 키보드 포커스가 배너에 들어오면 자동회전 일시정지(마우스 호버와 동일한 배려).
+  const onFocusEnter = useCallback(() => {
+    emblaApi?.plugins().autoplay?.stop();
+  }, [emblaApi]);
+  const onFocusLeave = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      if (isPlaying && !e.currentTarget.contains(e.relatedTarget)) {
+        emblaApi?.plugins().autoplay?.play();
+      }
+    },
+    [emblaApi, isPlaying]
+  );
+
   if (slides.length === 0) return null;
 
   return (
     <div
       className="group relative"
       style={{ animation: "fade-up 0.7s var(--ease-out-expo) 0.1s both" }}
+      role="group"
       aria-roledescription="carousel"
       aria-label="이 주의 추천 작품"
+      onFocus={onFocusEnter}
+      onBlur={onFocusLeave}
     >
       <div className="absolute -top-3 left-4 z-20">
         <span className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-on-accent shadow-[0_6px_20px_-4px_oklch(0.7_0.19_45/0.55)] ring-2 ring-canvas">
@@ -143,13 +183,14 @@ export function HeroBanner({ items }: { items: Title[] }) {
           >
             <ChevronRight size={18} />
           </button>
-          {/* 자동회전 진행바 — 슬라이드 전환마다 재시작, 호버 시 일시정지(autoplay 동기). */}
+          {/* 자동회전 진행바 — 슬라이드 전환마다 재시작, 호버 시 일시정지(autoplay 동기). 정지 시 멈춤. */}
           <span
             key={selected}
             aria-hidden
+            style={{ animationPlayState: isPlaying ? undefined : "paused" }}
             className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left rounded-full bg-accent/75 [animation:hero-progress_5500ms_linear] group-hover:[animation-play-state:paused]"
           />
-          <div className="mt-3 flex items-center justify-center gap-1.5">
+          <div className="relative mt-3 flex items-center justify-center gap-1.5">
             {slides.map((t, i) => (
               <button
                 key={t.id}
@@ -162,6 +203,15 @@ export function HeroBanner({ items }: { items: Title[] }) {
                 }`}
               />
             ))}
+            <button
+              type="button"
+              onClick={toggleAutoplay}
+              aria-label={isPlaying ? "자동 재생 멈춤" : "자동 재생 시작"}
+              aria-pressed={!isPlaying}
+              className="absolute right-0 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg focus-visible:text-fg"
+            >
+              {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            </button>
           </div>
         </>
       )}

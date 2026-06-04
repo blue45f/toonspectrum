@@ -156,6 +156,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
                   onChange={(event) => setDraft(ROOT_REPLY, event.target.value)}
                   maxLength={MAX_REPLY_LENGTH}
                   rows={2}
+                  aria-label="리뷰에 답글 남기기"
                   placeholder="리뷰에 답글 남기기"
                   className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
                 />
@@ -329,6 +330,7 @@ function ReviewReplyItem({
                 onChange={(event) => onChangeDraft(reply.id, event.target.value)}
                 maxLength={MAX_REPLY_LENGTH}
                 rows={2}
+                aria-label="답글 달기"
                 placeholder="답글 달기"
                 className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />

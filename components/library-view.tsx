@@ -497,6 +497,7 @@ function CollectionsTab({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
+          aria-label="새 컬렉션 이름"
           placeholder="새 컬렉션 이름"
           className="h-10 min-w-40 flex-1 rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/50"
         />

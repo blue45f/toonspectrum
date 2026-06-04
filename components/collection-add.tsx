@@ -59,6 +59,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                aria-label="새 컬렉션 이름"
                 placeholder="새 컬렉션"
                 className="h-8 flex-1 rounded-lg border border-line bg-canvas px-2.5 text-sm outline-none focus:border-accent/50"
                 onKeyDown={(e) => {
