@@ -1,10 +1,21 @@
-import { useEffect, useRef, useState, type ChangeEvent, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
-import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sparkles, Upload, UserRound, WandSparkles, X } from "lucide-react";
+import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
+import {
+  deleteStoredVrmModel,
+  getStoredVrmModel,
+  listVrmLibraryEntries,
+  SAMPLE_VRM_ID,
+  SAMPLE_VRM_LIBRARY_ENTRY,
+  SAMPLE_VRM_URL,
+  saveUploadedVrm,
+  saveVrmThumbnail,
+  type VrmLibraryEntry,
+} from "./vrm-library";
 
 type StudioVrmPoserProps = {
   open: boolean;
@@ -13,6 +24,7 @@ type StudioVrmPoserProps = {
 };
 
 type LoadStatus = "empty" | "loading" | "ready" | "error";
+type LibraryStatus = "loading" | "ready" | "error";
 type Vec3 = readonly [number, number, number];
 type BoneRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
 type CaptureState = {
@@ -33,6 +45,7 @@ type ExpressionAction = {
   id: string;
   label: string;
   name: string | null;
+  tone: string;
 };
 
 type CameraPreset = {
@@ -43,10 +56,11 @@ type CameraPreset = {
   fov: number;
 };
 
-const SAMPLE_VRM_URL = "/vrm/sample.vrm";
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
 const FALLBACK_EXPORT_WIDTH = 360;
+const THUMBNAIL_WIDTH = 72;
+const THUMBNAIL_HEIGHT = 96;
 const d = THREE.MathUtils.degToRad;
 
 const CONTROL_BUTTON =
@@ -54,17 +68,45 @@ const CONTROL_BUTTON =
 const ICON_BUTTON =
   "inline-grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-const EXPRESSION_ACTIONS: ExpressionAction[] = [
-  { id: "neutral", label: "무표정", name: null },
-  { id: "happy", label: "행복", name: "happy" },
-  { id: "angry", label: "화남", name: "angry" },
-  { id: "sad", label: "슬픔", name: "sad" },
-  { id: "relaxed", label: "편안", name: "relaxed" },
-  { id: "surprised", label: "놀람", name: "surprised" },
-  { id: "blink", label: "눈감음", name: "blink" },
+const NEUTRAL_EXPRESSION_ACTION: ExpressionAction = { id: "neutral", label: "초기화", name: null, tone: "리셋" };
+const EXPRESSION_LABELS: Record<string, string> = {
+  happy: "행복",
+  angry: "화남",
+  sad: "슬픔",
+  relaxed: "편안",
+  surprised: "놀람",
+  blink: "눈감음",
+  blinkLeft: "왼쪽 눈",
+  blinkRight: "오른쪽 눈",
+  aa: "입모양 A",
+  ih: "입모양 I",
+  ou: "입모양 U",
+  ee: "입모양 E",
+  oh: "입모양 O",
+  lookUp: "시선 위",
+  lookDown: "시선 아래",
+  lookLeft: "시선 왼쪽",
+  lookRight: "시선 오른쪽",
+};
+const EXPRESSION_ORDER = [
+  "happy",
+  "angry",
+  "sad",
+  "relaxed",
+  "surprised",
+  "blink",
+  "blinkLeft",
+  "blinkRight",
+  "aa",
+  "ih",
+  "ou",
+  "ee",
+  "oh",
+  "lookUp",
+  "lookDown",
+  "lookLeft",
+  "lookRight",
 ];
-
-const EXPRESSION_NAMES_TO_CLEAR = EXPRESSION_ACTIONS.map((action) => action.name).filter((name): name is string => name !== null);
 
 const POSE_PRESETS: PosePreset[] = [
   {
@@ -166,7 +208,7 @@ const POSE_PRESETS: PosePreset[] = [
   },
   {
     id: "sit",
-    label: "앉기-approx",
+    label: "앉기",
     tone: "패널 배치용",
     yOffset: -0.38,
     bones: {
@@ -184,6 +226,144 @@ const POSE_PRESETS: PosePreset[] = [
       rightLowerLeg: [d(86), 0, 0],
       leftFoot: [d(-12), 0, d(4)],
       rightFoot: [d(-12), 0, d(-4)],
+    },
+  },
+  {
+    id: "run",
+    label: "달리기",
+    tone: "액션 컷",
+    yOffset: -0.02,
+    bones: {
+      hips: [d(-8), d(-10), d(2)],
+      spine: [d(12), d(4), d(-3)],
+      chest: [d(-4), d(8), d(2)],
+      neck: [d(-2), d(-4), d(-1)],
+      head: [d(-4), d(-5), 0],
+      leftUpperArm: [d(28), d(12), d(82)],
+      leftLowerArm: [d(-20), d(8), d(-82)],
+      rightUpperArm: [d(-34), d(-14), d(-88)],
+      rightLowerArm: [d(-18), d(-6), d(74)],
+      leftUpperLeg: [d(-52), d(0), d(7)],
+      leftLowerLeg: [d(82), 0, d(-2)],
+      leftFoot: [d(-22), 0, d(6)],
+      rightUpperLeg: [d(34), d(0), d(-6)],
+      rightLowerLeg: [d(26), 0, d(2)],
+      rightFoot: [d(-10), 0, d(-4)],
+    },
+  },
+  {
+    id: "point2",
+    label: "포인트2",
+    tone: "양손 강조",
+    bones: {
+      hips: [0, d(8), 0],
+      spine: [d(-3), d(-8), d(1)],
+      chest: [d(4), d(-12), d(-2)],
+      head: [d(-2), d(9), d(1)],
+      leftUpperArm: [d(-6), d(44), d(86)],
+      leftLowerArm: [0, d(4), d(-12)],
+      leftHand: [d(0), d(4), d(6)],
+      rightUpperArm: [d(-8), d(-54), d(-88)],
+      rightLowerArm: [0, d(-6), d(8)],
+      rightHand: [0, d(-4), d(-6)],
+      leftThumbProximal: [d(16), d(8), d(-16)],
+      leftIndexProximal: [d(-6), 0, 0],
+      leftMiddleProximal: [d(56), 0, 0],
+      leftRingProximal: [d(58), 0, 0],
+      leftLittleProximal: [d(60), 0, 0],
+      rightThumbProximal: [d(16), d(-8), d(16)],
+      rightIndexProximal: [d(-6), 0, 0],
+      rightMiddleProximal: [d(56), 0, 0],
+      rightRingProximal: [d(58), 0, 0],
+      rightLittleProximal: [d(60), 0, 0],
+    },
+  },
+  {
+    id: "support",
+    label: "응원",
+    tone: "스포츠/아이돌",
+    bones: {
+      hips: [d(-4), d(-4), 0],
+      spine: [d(-9), d(2), d(2)],
+      chest: [d(10), d(4), d(-2)],
+      neck: [d(-2), d(-3), 0],
+      head: [d(-7), d(-3), 0],
+      leftUpperArm: [d(-22), d(22), d(132)],
+      leftLowerArm: [d(-18), 0, d(58)],
+      leftHand: [d(7), 0, d(12)],
+      rightUpperArm: [d(-22), d(-22), d(-132)],
+      rightLowerArm: [d(-18), 0, d(-58)],
+      rightHand: [d(7), 0, d(-12)],
+      leftUpperLeg: [d(-8), 0, d(8)],
+      rightUpperLeg: [d(8), 0, d(-8)],
+    },
+  },
+  {
+    id: "despair",
+    label: "낙담",
+    tone: "감정 저점",
+    yOffset: -0.04,
+    bones: {
+      hips: [d(8), 0, 0],
+      spine: [d(18), 0, d(-2)],
+      chest: [d(12), 0, d(2)],
+      neck: [d(18), 0, 0],
+      head: [d(24), 0, 0],
+      leftUpperArm: [d(18), d(8), d(54)],
+      leftLowerArm: [d(8), 0, d(-18)],
+      leftHand: [d(18), 0, d(8)],
+      rightUpperArm: [d(18), d(-8), d(-54)],
+      rightLowerArm: [d(8), 0, d(18)],
+      rightHand: [d(18), 0, d(-8)],
+      leftUpperLeg: [d(4), 0, d(4)],
+      rightUpperLeg: [d(4), 0, d(-4)],
+    },
+  },
+  {
+    id: "attack",
+    label: "공격자세",
+    tone: "판타지 전투",
+    yOffset: -0.05,
+    bones: {
+      hips: [d(-12), d(-16), d(3)],
+      spine: [d(10), d(12), d(-2)],
+      chest: [d(-4), d(16), d(4)],
+      neck: [d(-3), d(-10), 0],
+      head: [d(-6), d(-12), 0],
+      leftUpperArm: [d(18), d(20), d(84)],
+      leftLowerArm: [d(-12), d(4), d(-60)],
+      leftHand: [d(8), 0, d(12)],
+      rightUpperArm: [d(-24), d(-42), d(-116)],
+      rightLowerArm: [d(-10), d(-8), d(-36)],
+      rightHand: [d(10), d(-4), d(-22)],
+      leftUpperLeg: [d(-38), d(0), d(12)],
+      leftLowerLeg: [d(52), 0, d(-4)],
+      rightUpperLeg: [d(24), d(0), d(-14)],
+      rightLowerLeg: [d(30), 0, d(4)],
+      rightFoot: [d(-12), 0, d(-10)],
+    },
+  },
+  {
+    id: "defense",
+    label: "방어",
+    tone: "긴장/대치",
+    yOffset: -0.03,
+    bones: {
+      hips: [d(-6), d(10), 0],
+      spine: [d(6), d(-8), d(2)],
+      chest: [d(4), d(-12), d(-2)],
+      neck: [d(-2), d(8), 0],
+      head: [d(-4), d(10), 0],
+      leftUpperArm: [d(-10), d(30), d(96)],
+      leftLowerArm: [d(-18), d(4), d(-86)],
+      leftHand: [d(12), d(6), d(24)],
+      rightUpperArm: [d(-10), d(-34), d(-96)],
+      rightLowerArm: [d(-18), d(-4), d(86)],
+      rightHand: [d(12), d(-6), d(-24)],
+      leftUpperLeg: [d(-18), 0, d(14)],
+      leftLowerLeg: [d(34), 0, d(-4)],
+      rightUpperLeg: [d(-10), 0, d(-14)],
+      rightLowerLeg: [d(28), 0, d(4)],
     },
   },
 ];
@@ -274,11 +454,7 @@ function applyExpressionToVrm(vrm: VRM, action: ExpressionAction) {
   const expressionManager = vrm.expressionManager;
   if (!expressionManager) return false;
 
-  EXPRESSION_NAMES_TO_CLEAR.forEach((name) => {
-    if (expressionManager.getExpression(name)) {
-      expressionManager.setValue(name, 0);
-    }
-  });
+  expressionManager.resetValues();
 
   if (action.name && expressionManager.getExpression(action.name)) {
     expressionManager.setValue(action.name, 1);
@@ -289,14 +465,44 @@ function applyExpressionToVrm(vrm: VRM, action: ExpressionAction) {
   return true;
 }
 
+function getExpressionTone(name: string, vrm: VRM) {
+  const expressionManager = vrm.expressionManager;
+  if (!expressionManager) return "표정";
+  if (expressionManager.mouthExpressionNames.includes(name)) return "입모양";
+  if (expressionManager.blinkExpressionNames.includes(name)) return "눈";
+  if (name.startsWith("look")) return "시선";
+  return EXPRESSION_LABELS[name] ? "기본" : "커스텀";
+}
+
+function formatExpressionLabel(name: string) {
+  return EXPRESSION_LABELS[name] ?? name.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function getAvailableExpressionActions(vrm: VRM | null) {
   const expressionManager = vrm?.expressionManager;
   if (!expressionManager) return [];
 
-  return EXPRESSION_ACTIONS.filter((action) => {
-    if (!action.name) return true;
-    return expressionManager.getExpression(action.name) !== null;
-  });
+  const expressionNames = expressionManager.expressions
+    .map((expression) => expression.expressionName)
+    .filter((name) => name !== "neutral")
+    .sort((a, b) => {
+      const aIndex = EXPRESSION_ORDER.indexOf(a);
+      const bIndex = EXPRESSION_ORDER.indexOf(b);
+      if (aIndex !== -1 || bIndex !== -1) {
+        return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
+      }
+      return a.localeCompare(b);
+    });
+
+  return [
+    NEUTRAL_EXPRESSION_ACTION,
+    ...expressionNames.map<ExpressionAction>((name) => ({
+      id: name,
+      label: formatExpressionLabel(name),
+      name,
+      tone: getExpressionTone(name, vrm),
+    })),
+  ];
 }
 
 function getModelTitle(vrm: VRM | null, fallbackName: string) {
@@ -314,6 +520,29 @@ function roundExportSize(canvas: HTMLCanvasElement) {
 
   const aspect = canvas.width / canvas.height;
   return { width: Math.round(EXPORT_HEIGHT * aspect), height: EXPORT_HEIGHT };
+}
+
+function createCharacterThumbnail(canvas: HTMLCanvasElement) {
+  const thumbnailCanvas = document.createElement("canvas");
+  thumbnailCanvas.width = THUMBNAIL_WIDTH;
+  thumbnailCanvas.height = THUMBNAIL_HEIGHT;
+
+  const context = thumbnailCanvas.getContext("2d");
+  if (!context || canvas.width <= 0 || canvas.height <= 0) return null;
+
+  const scale = Math.min(THUMBNAIL_WIDTH / canvas.width, THUMBNAIL_HEIGHT / canvas.height);
+  const drawWidth = Math.round(canvas.width * scale);
+  const drawHeight = Math.round(canvas.height * scale);
+  const drawX = Math.round((THUMBNAIL_WIDTH - drawWidth) / 2);
+  const drawY = Math.round((THUMBNAIL_HEIGHT - drawHeight) / 2);
+
+  context.clearRect(0, 0, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+  context.drawImage(canvas, drawX, drawY, drawWidth, drawHeight);
+  return thumbnailCanvas.toDataURL("image/png");
+}
+
+function getErrorMessage(caughtError: unknown, fallback: string) {
+  return caughtError instanceof Error ? caughtError.message : fallback;
 }
 
 function CaptureBridge({ captureRef }: { captureRef: MutableRefObject<CaptureState> }) {
@@ -390,12 +619,21 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [bodyRotation, setBodyRotation] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>([SAMPLE_VRM_LIBRARY_ENTRY]);
+  const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
+  const [libraryError, setLibraryError] = useState("");
+  const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
+  const thumbnailRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const activeCamera = findCameraPreset(activeCameraId);
   const availableExpressionActions = getAvailableExpressionActions(vrm);
+  const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
+  const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = getModelTitle(vrm, modelName);
 
   useEffect(() => {
@@ -408,6 +646,77 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     };
   }, []);
 
+  useEffect(() => {
+    if (open) return;
+    loadRequestRef.current += 1;
+    thumbnailRequestRef.current += 1;
+    clearCurrentVrm();
+    captureRef.current = { camera: null, gl: null, scene: null };
+    setStatus("empty");
+    setError("");
+    setIsCapturing(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setLibraryStatus("loading");
+    setLibraryError("");
+
+    listVrmLibraryEntries()
+      .then((entries) => {
+        if (cancelled) return;
+        const nextEntries = entries.length > 0 ? entries : [SAMPLE_VRM_LIBRARY_ENTRY];
+        setLibraryEntries(nextEntries);
+        setLibraryStatus("ready");
+        loadModelFromLibraryEntry(nextEntries.find((entry) => entry.id === activeModelId) ?? nextEntries[0]);
+      })
+      .catch((caughtError: unknown) => {
+        if (cancelled) return;
+        setLibraryEntries([SAMPLE_VRM_LIBRARY_ENTRY]);
+        setLibraryStatus("error");
+        setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
+        loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || status !== "ready" || !vrm || !activeLibraryEntry || activeLibraryEntry.thumbnail) return;
+
+    const requestId = thumbnailRequestRef.current + 1;
+    thumbnailRequestRef.current = requestId;
+    let secondFrame: number | null = null;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        if (requestId !== thumbnailRequestRef.current) return;
+
+        const currentCapture = captureRef.current;
+        if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera) return;
+
+        currentCapture.gl.render(currentCapture.scene, currentCapture.camera);
+        const thumbnail = createCharacterThumbnail(currentCapture.gl.domElement);
+        if (!thumbnail) return;
+
+        setLibraryEntries((entries) => entries.map((entry) => (entry.id === activeLibraryEntry.id ? { ...entry, thumbnail } : entry)));
+        saveVrmThumbnail(activeLibraryEntry.id, thumbnail).catch((caughtError: unknown) => {
+          setLibraryError(getErrorMessage(caughtError, "썸네일을 저장하지 못했습니다."));
+        });
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame !== null) {
+        cancelAnimationFrame(secondFrame);
+      }
+    };
+  }, [activeLibraryEntry, open, status, vrm]);
+
   function clearCurrentVrm() {
     if (vrmRef.current) {
       disposeVrm(vrmRef.current);
@@ -416,25 +725,39 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setVrm(null);
   }
 
-  function installVrm(nextVrm: VRM, nextModelName: string) {
+  function installVrm(nextVrm: VRM, nextModelName: string, nextModelId: string) {
     clearCurrentVrm();
     vrmRef.current = nextVrm;
     setVrm(nextVrm);
     setModelName(nextModelName);
+    setActiveModelId(nextModelId);
     setActivePoseId("default");
     setActiveExpressionId("neutral");
     setBodyRotation(0);
     applyPoseToVrm(nextVrm, POSE_PRESETS[0]);
-    applyExpressionToVrm(nextVrm, EXPRESSION_ACTIONS[0]);
+    applyExpressionToVrm(nextVrm, NEUTRAL_EXPRESSION_ACTION);
     setStatus("ready");
   }
 
-  function loadModelFromUrl(url: string, nextModelName: string, revokeUrl: boolean) {
+  function beginModelLoad(nextModelId: string) {
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
+    thumbnailRequestRef.current += 1;
+    setActiveModelId(nextModelId);
     setStatus("loading");
     setError("");
     clearCurrentVrm();
+    return requestId;
+  }
+
+  function handleLoadFailure(requestId: number, caughtError: unknown) {
+    if (requestId !== loadRequestRef.current) return;
+    setError(getErrorMessage(caughtError, "VRM을 불러오지 못했습니다."));
+    setStatus("error");
+  }
+
+  function loadModelFromUrl(url: string, nextModelName: string, revokeUrl: boolean, nextModelId = SAMPLE_VRM_ID) {
+    const requestId = beginModelLoad(nextModelId);
 
     loadVrmAsset(url)
       .then((loadedVrm) => {
@@ -442,13 +765,10 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
           disposeVrm(loadedVrm);
           return;
         }
-        installVrm(loadedVrm, nextModelName);
+        installVrm(loadedVrm, nextModelName, nextModelId);
       })
       .catch((caughtError: unknown) => {
-        if (requestId !== loadRequestRef.current) return;
-        const message = caughtError instanceof Error ? caughtError.message : "VRM을 불러오지 못했습니다.";
-        setError(message);
-        setStatus("error");
+        handleLoadFailure(requestId, caughtError);
       })
       .finally(() => {
         if (revokeUrl) {
@@ -457,17 +777,90 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       });
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
+  function loadModelFromLibraryEntry(entry: VrmLibraryEntry) {
+    if (entry.source === "sample") {
+      loadModelFromUrl(SAMPLE_VRM_URL, entry.name, false, entry.id);
+      return;
+    }
 
-    const objectUrl = URL.createObjectURL(file);
-    loadModelFromUrl(objectUrl, file.name.replace(/\.vrm$/i, ""), true);
+    const requestId = beginModelLoad(entry.id);
+
+    void (async () => {
+      try {
+        const storedModel = await getStoredVrmModel(entry.id);
+        if (requestId !== loadRequestRef.current) return;
+        if (!storedModel) {
+          throw new Error("저장된 VRM 파일을 찾지 못했습니다.");
+        }
+
+        const objectUrl = URL.createObjectURL(storedModel.blob);
+        try {
+          const loadedVrm = await loadVrmAsset(objectUrl);
+          if (requestId !== loadRequestRef.current) {
+            disposeVrm(loadedVrm);
+            return;
+          }
+          installVrm(loadedVrm, storedModel.name, storedModel.id);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } catch (caughtError: unknown) {
+        handleLoadFailure(requestId, caughtError);
+      }
+    })();
+  }
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files ?? []).filter((file) => /\.vrm$/i.test(file.name));
+    event.currentTarget.value = "";
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    setLibraryError("");
+
+    try {
+      const savedModels = await Promise.all(files.map((file) => saveUploadedVrm(file)));
+      const nextEntries = await listVrmLibraryEntries();
+      setLibraryEntries(nextEntries);
+      setLibraryStatus("ready");
+
+      const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
+      if (firstUploadedEntry) {
+        loadModelFromLibraryEntry(firstUploadedEntry);
+      }
+    } catch (caughtError: unknown) {
+      setLibraryStatus("error");
+      setLibraryError(getErrorMessage(caughtError, "VRM 파일을 라이브러리에 저장하지 못했습니다."));
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   function handleSampleLoad() {
-    loadModelFromUrl(SAMPLE_VRM_URL, "sample.vrm", false);
+    loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+  }
+
+  async function handleDeleteEntry(event: MouseEvent<HTMLButtonElement>, entry: VrmLibraryEntry) {
+    event.stopPropagation();
+    if (entry.source !== "indexed-db") return;
+
+    setDeletingModelId(entry.id);
+    setLibraryError("");
+
+    try {
+      await deleteStoredVrmModel(entry.id);
+      const nextEntries = await listVrmLibraryEntries();
+      setLibraryEntries(nextEntries);
+      setLibraryStatus("ready");
+      if (activeModelId === entry.id) {
+        loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+      }
+    } catch (caughtError: unknown) {
+      setLibraryStatus("error");
+      setLibraryError(getErrorMessage(caughtError, "VRM을 삭제하지 못했습니다."));
+    } finally {
+      setDeletingModelId(null);
+    }
   }
 
   function handlePoseSelect(poseId: string) {
@@ -573,22 +966,45 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
                 {status === "empty" ? (
                   <div className="absolute inset-0 grid place-items-center bg-card/50 p-6 text-center backdrop-blur-[1px]">
-                    <div className="max-w-[18rem]">
+                    <div className="max-w-[22rem]">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Sparkles size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">VRM 파일을 올려 시작하세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">장르별 VRM 캐릭터를 올려 시작하세요.</p>
                       <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                        VRoid Studio에서 무료로 캐릭터를 만들고 .vrm으로 내보낸 뒤 업로드할 수 있습니다.
+                        VRoid Studio에서 무료 애니메이션풍 캐릭터를 직접 만들고, 로맨스·판타지·액션 등 다양한 장르 캐릭터를 .vrm으로 업로드할 수 있습니다.
                       </p>
                       <div className="mt-4 flex justify-center gap-2">
                         <button type="button" className={cx(CONTROL_BUTTON, "border-accent/50 bg-accent text-on-accent")} onClick={() => fileInputRef.current?.click()}>
                           <Upload size={14} aria-hidden />
-                          업로드
+                          VRM 업로드
                         </button>
                         <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")} onClick={handleSampleLoad}>
-                          샘플
+                          기본 샘플
                         </button>
+                      </div>
+                      <div className="mt-5 space-y-1.5 rounded-xl border border-line bg-panel p-3 text-left text-xs shadow-sm">
+                        <p className="font-semibold text-fg">VRM 캐릭터 만들기</p>
+                        <ul className="list-disc list-inside text-fg-2 space-y-1 font-medium">
+                          <li>
+                            <a href="https://vroid.com/studio" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                              VRoid Studio (무료)
+                            </a>
+                            <span className="text-fg-3 font-normal"> - 3D 아바타 직접 디자인</span>
+                          </li>
+                          <li>
+                            <a href="https://hub.vroid.com/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                              VRoid Hub
+                            </a>
+                            <span className="text-fg-3 font-normal"> - 무료 공유 모델 다운로드</span>
+                          </li>
+                          <li>
+                            <a href="https://booth.pm/ko/search/VRM" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                              Booth (부스)
+                            </a>
+                            <span className="text-fg-3 font-normal"> - 하이퀄리티 만화/웹툰 에셋</span>
+                          </li>
+                        </ul>
                       </div>
                     </div>
                   </div>
@@ -624,20 +1040,91 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <Upload size={15} className="text-accent" aria-hidden />
-                    모델
+                    캐릭터 라이브러리
                   </h3>
-                  {status === "ready" ? <span className="max-w-36 truncate text-[0.68rem] text-fg-3">{displayModelName}</span> : null}
+                  <span className="text-[0.68rem] text-fg-3">{libraryEntries.length}명</span>
                 </div>
-                <input ref={fileInputRef} accept=".vrm" className="sr-only" type="file" onChange={handleFileChange} />
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" className={cx(CONTROL_BUTTON, "border-accent/50 bg-accent text-on-accent hover:bg-accent/90")} onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={14} aria-hidden />
-                    VRM 업로드
-                  </button>
-                  <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-accent-soft hover:text-accent")} onClick={handleSampleLoad}>
-                    <WandSparkles size={14} aria-hidden />
-                    샘플 불러오기
-                  </button>
+                <input ref={fileInputRef} accept=".vrm" className="sr-only" multiple type="file" onChange={handleFileChange} />
+                <button
+                  type="button"
+                  className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploading ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+                  VRM 업로드
+                </button>
+                <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
+                  여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
+                </p>
+
+                {libraryStatus === "error" && libraryError ? (
+                  <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
+                    <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
+                    {libraryError}
+                  </p>
+                ) : null}
+
+                {!hasUploadedModels ? (
+                  <div className="mt-3 rounded-xl border border-dashed border-line bg-card/45 px-3 py-3 text-xs leading-relaxed text-fg-3">
+                    업로드한 캐릭터가 아직 없습니다. 기본 샘플로 바로 테스트하거나, 다양한 장르 캐릭터를 만들어 업로드하세요.
+                  </div>
+                ) : null}
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {libraryStatus === "loading" ? (
+                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 캐릭터를 불러오는 중입니다.</div>
+                  ) : null}
+
+                  {libraryEntries.map((entry) => {
+                    const isActive = entry.id === activeModelId;
+                    const isDeleting = deletingModelId === entry.id;
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className={cx(
+                          "relative overflow-hidden rounded-xl border transition-colors",
+                          isActive ? "border-accent/60 bg-accent-soft" : "border-line bg-card hover:bg-raised"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          className="grid min-h-[6.25rem] w-full grid-rows-[4.5rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                          disabled={status === "loading" && isActive}
+                          onClick={() => loadModelFromLibraryEntry(entry)}
+                        >
+                          <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
+                            {entry.thumbnail ? (
+                              <img alt="" className="h-full w-full object-contain" src={entry.thumbnail} />
+                            ) : (
+                              <span className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3">
+                                {entry.source === "sample" ? <WandSparkles size={17} aria-hidden /> : <UserRound size={17} aria-hidden />}
+                              </span>
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
+                            <span className={cx("mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold", isActive ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>
+                              {entry.source === "sample" ? "기본 샘플" : "업로드"}
+                            </span>
+                          </span>
+                        </button>
+
+                        {entry.source === "indexed-db" ? (
+                          <button
+                            type="button"
+                            aria-label={`${entry.name} 삭제`}
+                            className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
+                            disabled={isDeleting}
+                            onClick={(event) => handleDeleteEntry(event, entry)}
+                          >
+                            {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -647,20 +1134,22 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                   표정
                 </h3>
                 {availableExpressionActions.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {availableExpressionActions.map((action) => (
                       <button
                         key={action.id}
                         type="button"
                         className={cx(
-                          CONTROL_BUTTON,
+                          "min-h-[3rem] rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
                           activeExpressionId === action.id
                             ? "border-accent/55 bg-accent-soft text-accent"
                             : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
                         )}
+                        disabled={!vrm}
                         onClick={() => handleExpressionSelect(action)}
                       >
-                        {action.label}
+                        <span className="block truncate text-xs font-bold">{action.label}</span>
+                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{action.tone}</span>
                       </button>
                     ))}
                   </div>

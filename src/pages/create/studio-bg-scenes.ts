@@ -6,7 +6,8 @@ export interface BgScene {
   id: string;
   label: string;
   genre: string;
-  svg: string;
+  svg?: string;
+  imgSrc?: string;
 }
 
 // 공통 viewBox. 모든 씬은 720×1080 풀캔버스 기준.
@@ -537,6 +538,9 @@ const sGoldenCity = (() => {
 })();
 
 export const BG_SCENES: BgScene[] = [
+  { id: "webtoon-classroom", label: "웹툰 교실 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_classroom.png" },
+  { id: "webtoon-street", label: "웹툰 노을 거리 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_street.png" },
+  { id: "webtoon-bedroom", label: "웹툰 방 야경 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_bedroom.png" },
   { id: "fantasy-forest", label: "판타지 숲", genre: "fantasy", svg: sFantasyForest },
   { id: "magic-castle", label: "마법 성", genre: "fantasy", svg: sMagicCastle },
   { id: "bright-sky", label: "환한 하늘", genre: "daily", svg: sBrightSky },

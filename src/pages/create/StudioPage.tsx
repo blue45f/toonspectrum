@@ -5,6 +5,7 @@ import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, 
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  Image as ImageIcon,
   ImagePlus,
   Box,
   LayoutTemplate,
@@ -36,6 +37,8 @@ import {
 } from "./studio-assets";
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
+import { BG_SCENES } from "./studio-bg-scenes";
+import { FX_OVERLAYS } from "./studio-fx-assets";
 
 const Studio3DPoser = lazy(() => import("./Studio3DPoser").then((mod) => ({ default: mod.Studio3DPoser })));
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
@@ -219,12 +222,13 @@ export function StudioPage() {
   const elements = history[hi];
   const [bg, setBg] = useState("#ffffff");
   const [canvasH, setCanvasH] = useState(1080);
+  const [webtoonTheme, setWebtoonTheme] = useState<"classic" | "naver" | "kakao">("naver");
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [color, setColor] = useState("#7c5cfc");
   const [strokeWidth, setStrokeWidth] = useState(6);
-  const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char">(null);
+  const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char" | "bgScene">(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poser3dOpen, setPoser3dOpen] = useState(false);
@@ -268,11 +272,12 @@ export function StudioPage() {
         setTitle(w.title);
         setDescription(w.description);
         setTagsText((w.tags ?? []).join(", "));
-        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number };
+        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number; webtoonTheme?: "classic" | "naver" | "kakao" };
         if (doc?.elements) setHistory([doc.elements]);
         if (doc?.bg) setBg(doc.bg);
         if (doc?.bgGrad) setBgGrad(doc.bgGrad);
         if (doc?.height) setCanvasH(doc.height);
+        if (doc?.webtoonTheme) setWebtoonTheme(doc.webtoonTheme);
         setHi(0);
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : "불러오기 실패"));
@@ -398,6 +403,37 @@ export function StudioPage() {
       })
     );
   }
+  function addBgScene(bg: typeof BG_SCENES[number]) {
+    setMenu(null);
+    const src = bg.imgSrc || svgToDataUrl(bg.svg || "");
+    const el = createCanvasImageElement({
+      id: uid(),
+      src,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      sourceWidth: 720,
+      sourceHeight: 1080,
+      horizontalInset: 0,
+      minY: 0,
+    });
+    commit([el, ...elements]);
+    setSelectedId(el.id);
+    setTool("select");
+  }
+  function addFxOverlay(svgMarkup: string, w: number, h: number) {
+    setMenu(null);
+    addEl(
+      createCanvasImageElement({
+        id: uid(),
+        src: svgToDataUrl(svgMarkup),
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: w,
+        sourceHeight: h,
+        horizontalInset: 100,
+      })
+    );
+  }
   function applyTemplate(tpl: TemplateSpec) {
     setMenu(null);
     if (elements.length > 0 && !window.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
@@ -509,7 +545,7 @@ export function StudioPage() {
         titleId: linkedTitleId ?? undefined,
         cover,
         pages: [full],
-        doc: { width: CANVAS_W, height: canvasH, bg, bgGrad, elements } as Record<string, unknown>,
+        doc: { width: CANVAS_W, height: canvasH, bg, bgGrad, elements, webtoonTheme } as Record<string, unknown>,
         status,
       };
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
@@ -634,6 +670,32 @@ export function StudioPage() {
         <button type="button" onClick={() => setPoserVrmOpen(true)} className={toolBtn(false)}>
           <Sparkles size={14} /> VRM 캐릭터 (고화질)
         </button>
+        <div className="relative">
+          <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} className={toolBtn(menu === "bgScene")}>
+            <ImageIcon size={14} /> 배경 씬
+          </button>
+          {menu === "bgScene" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
+              <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-1">
+                {BG_SCENES.map((bg) => (
+                  <button
+                    key={bg.id}
+                    type="button"
+                    title={bg.label}
+                    onClick={() => addBgScene(bg)}
+                    className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                  >
+                    <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                      <img src={bg.imgSrc || svgToDataUrl(bg.svg || "")} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    </div>
+                    <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -677,10 +739,27 @@ export function StudioPage() {
                 ))}
               </div>
               <p className="mb-1 text-[0.66rem] font-medium text-fg-3">스티커</p>
-              <div className="grid grid-cols-8 gap-1">
+              <div className="grid grid-cols-8 gap-1 mb-2">
                 {EFFECT_EMOJIS.map((em) => (
                   <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
                     {em}
+                  </button>
+                ))}
+              </div>
+              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
+              <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
+                {FX_OVERLAYS.map((fx) => (
+                  <button
+                    key={fx.id}
+                    type="button"
+                    title={fx.label}
+                    onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
+                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                  >
+                    <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
+                      <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                    </div>
+                    <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
                   </button>
                 ))}
               </div>
@@ -756,7 +835,29 @@ export function StudioPage() {
                       onChange={(patch) => patchEl(el.id, patch)}
                     />
                   );
-                if (el.type === "frame")
+                if (el.type === "frame") {
+                  let fStroke = "#16100c";
+                  let fStrokeW = 3;
+                  let fRadius = 4;
+                  let fShadowColor = undefined;
+                  let fShadowBlur = 0;
+                  let fShadowOpacity = 0;
+                  let fShadowOffset = undefined;
+
+                  if (webtoonTheme === "naver") {
+                    fStroke = "#222222";
+                    fStrokeW = 1.8;
+                    fRadius = 0;
+                  } else if (webtoonTheme === "kakao") {
+                    fStroke = "#3a3a3a";
+                    fStrokeW = 1.2;
+                    fRadius = 6;
+                    fShadowColor = "black";
+                    fShadowBlur = 5;
+                    fShadowOpacity = 0.08;
+                    fShadowOffset = { x: 1, y: 2 };
+                  }
+
                   return (
                     <Rect
                       key={el.id}
@@ -766,9 +867,13 @@ export function StudioPage() {
                       width={el.width}
                       height={el.height}
                       fill="#ffffff"
-                      stroke="#16100c"
-                      strokeWidth={3}
-                      cornerRadius={4}
+                      stroke={fStroke}
+                      strokeWidth={fStrokeW}
+                      cornerRadius={fRadius}
+                      shadowColor={fShadowColor}
+                      shadowBlur={fShadowBlur}
+                      shadowOpacity={fShadowOpacity}
+                      shadowOffset={fShadowOffset}
                       draggable={draggable}
                       onMouseDown={onSelect}
                       onTap={onSelect}
@@ -783,6 +888,7 @@ export function StudioPage() {
                       }}
                     />
                   );
+                }
                 if (el.type === "draw")
                   return (
                     <Line
@@ -855,6 +961,31 @@ export function StudioPage() {
                     />
                   );
                 // bubble
+                let bStroke = "#16100c";
+                let bStrokeW = 3;
+                let bRadius = 18;
+                let bShadowColor = undefined;
+                let bShadowBlur = 0;
+                let bShadowOpacity = 0;
+                let bShadowOffset = undefined;
+                let bTailPoints = [el.width * 0.3, el.height - 3, el.width * 0.22, el.height + 30, el.width * 0.47, el.height - 3];
+
+                if (webtoonTheme === "naver") {
+                  bStroke = "#2d2d2d";
+                  bStrokeW = 1.8;
+                  bRadius = 24;
+                  bTailPoints = [el.width * 0.4, el.height - 2, el.width * 0.35, el.height + 20, el.width * 0.52, el.height - 2];
+                } else if (webtoonTheme === "kakao") {
+                  bStroke = "#444444";
+                  bStrokeW = 1.0;
+                  bRadius = Math.min(el.width, el.height) / 2;
+                  bShadowColor = "black";
+                  bShadowBlur = 8;
+                  bShadowOpacity = 0.12;
+                  bShadowOffset = { x: 2, y: 3 };
+                  bTailPoints = [el.width * 0.45, el.height - 2, el.width * 0.45, el.height + 16, el.width * 0.55, el.height - 2];
+                }
+
                 return (
                   <Group
                     key={el.id}
@@ -863,6 +994,10 @@ export function StudioPage() {
                     y={el.y}
                     rotation={el.rotation}
                     draggable={draggable}
+                    shadowColor={bShadowColor}
+                    shadowBlur={bShadowBlur}
+                    shadowOpacity={bShadowOpacity}
+                    shadowOffset={bShadowOffset}
                     onMouseDown={onSelect}
                     onTap={onSelect}
                     onDblClick={() => startEditText(el.id)}
@@ -887,8 +1022,8 @@ export function StudioPage() {
                         scaleX={el.width / 124}
                         scaleY={el.height / 124}
                         fill={el.fill}
-                        stroke="#16100c"
-                        strokeWidth={3}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
                       />
                     ) : el.variant === "thought" ? (
                       <>
@@ -897,23 +1032,23 @@ export function StudioPage() {
                           height={el.height}
                           fill={el.fill}
                           cornerRadius={Math.min(el.width, el.height) / 2}
-                          stroke="#16100c"
-                          strokeWidth={3}
+                          stroke={bStroke}
+                          strokeWidth={bStrokeW}
                         />
-                        <Ellipse x={el.width * 0.26} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke="#16100c" strokeWidth={3} />
-                        <Ellipse x={el.width * 0.16} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke="#16100c" strokeWidth={3} />
+                        <Ellipse x={el.width * 0.26} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        <Ellipse x={el.width * 0.16} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
                       </>
                     ) : el.variant === "box" ? (
-                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke="#16100c" strokeWidth={3} />
+                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
                     ) : (
                       <>
-                        <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={18} stroke="#16100c" strokeWidth={3} />
+                        <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={bRadius} stroke={bStroke} strokeWidth={bStrokeW} />
                         <Line
-                          points={[el.width * 0.3, el.height - 3, el.width * 0.22, el.height + 30, el.width * 0.47, el.height - 3]}
+                          points={bTailPoints}
                           closed
                           fill={el.fill}
-                          stroke="#16100c"
-                          strokeWidth={3}
+                          stroke={bStroke}
+                          strokeWidth={bStrokeW}
                         />
                       </>
                     )}
@@ -1006,6 +1141,26 @@ export function StudioPage() {
                 </button>
               </span>
             </label>
+            <div className="mt-3 border-t border-line pt-3">
+              <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
+              <div className="grid grid-cols-3 gap-1 bg-card rounded-lg p-0.5 border border-line">
+                {(["classic", "naver", "kakao"] as const).map((style) => (
+                  <button
+                    key={style}
+                    type="button"
+                    onClick={() => setWebtoonTheme(style)}
+                    className={cn(
+                      "rounded py-1 text-[0.6rem] font-semibold transition-colors",
+                      webtoonTheme === style
+                        ? "bg-accent text-on-accent"
+                        : "text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    {style === "classic" ? "출판만화" : style === "naver" ? "네이버" : "카카오"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {selected && (
