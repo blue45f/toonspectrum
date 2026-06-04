@@ -39,13 +39,15 @@ const EYE_HIGHLIGHT = "#fffef9";
 const TEAR_BLUE = "#7bbff7";
 const HAT_DARK = "#33251f";
 const INK_OUTLINE = "#16100c";
-const INK_OUTLINE_SCALE = 1.052;
 const INK_OUTLINE_USER_DATA_KEY = "studio3dInkOutline";
+const INK_OUTLINE_MIN_THICKNESS = 0.01;
+const INK_OUTLINE_MAX_THICKNESS = 0.038;
+const INK_OUTLINE_RADIUS_FACTOR = 0.075;
 
 function createToonGradientMap() {
   const gradient = new Uint8Array([
-    120, 120, 120, 255,
-    206, 206, 206, 255,
+    58, 58, 58, 255,
+    156, 156, 156, 255,
     255, 255, 255, 255,
   ]);
   const texture = new THREE.DataTexture(gradient, 3, 1, THREE.RGBAFormat);
@@ -57,11 +59,39 @@ function createToonGradientMap() {
 }
 
 const TOON_GRADIENT_MAP = createToonGradientMap();
-const INK_OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({
-  color: INK_OUTLINE,
-  side: THREE.BackSide,
-  toneMapped: false,
-});
+const INK_OUTLINE_VERTEX_SHADER = `
+  uniform float uThickness;
+
+  void main() {
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vec3 viewNormal = normalize(normalMatrix * normal);
+    mvPosition.xyz += viewNormal * uThickness;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+const INK_OUTLINE_FRAGMENT_SHADER = `
+  uniform vec3 uColor;
+
+  void main() {
+    gl_FragColor = vec4(uColor, 1.0);
+  }
+`;
+const INK_OUTLINE_COLOR = new THREE.Color(INK_OUTLINE);
+
+function createInkOutlineMaterial(thickness: number) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: INK_OUTLINE_COLOR },
+      uThickness: { value: thickness },
+    },
+    vertexShader: INK_OUTLINE_VERTEX_SHADER,
+    fragmentShader: INK_OUTLINE_FRAGMENT_SHADER,
+    side: THREE.BackSide,
+    depthTest: true,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
 
 const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" ");
 
@@ -73,16 +103,39 @@ function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return (object as THREE.Mesh).isMesh === true;
 }
 
+function getInkOutlineThickness(mesh: THREE.Mesh) {
+  if (!mesh.geometry.boundingSphere) {
+    mesh.geometry.computeBoundingSphere();
+  }
+
+  const radius = mesh.geometry.boundingSphere?.radius ?? 0.24;
+  const largestLocalScale = Math.max(Math.abs(mesh.scale.x), Math.abs(mesh.scale.y), Math.abs(mesh.scale.z), 1);
+  return THREE.MathUtils.clamp(
+    radius * largestLocalScale * INK_OUTLINE_RADIUS_FACTOR,
+    INK_OUTLINE_MIN_THICKNESS,
+    INK_OUTLINE_MAX_THICKNESS
+  );
+}
+
 function addInkOutline(mesh: THREE.Mesh) {
-  const outline = new THREE.Mesh(mesh.geometry, INK_OUTLINE_MATERIAL);
+  const outline = new THREE.Mesh(mesh.geometry, createInkOutlineMaterial(getInkOutlineThickness(mesh)));
   outline.name = `${mesh.name || "characterMesh"}InkOutline`;
   outline.userData[INK_OUTLINE_USER_DATA_KEY] = true;
   outline.castShadow = false;
   outline.receiveShadow = false;
-  outline.frustumCulled = mesh.frustumCulled;
-  outline.scale.setScalar(INK_OUTLINE_SCALE);
+  outline.frustumCulled = false;
+  outline.renderOrder = 1;
   mesh.add(outline);
   return outline;
+}
+
+function disposeOutline(outline: THREE.Mesh) {
+  outline.parent?.remove(outline);
+  if (Array.isArray(outline.material)) {
+    outline.material.forEach((material) => material.dispose());
+  } else {
+    outline.material.dispose();
+  }
 }
 
 function CharacterInkOutlines({ rootRef }: { rootRef: MutableRefObject<THREE.Group | null> }) {
@@ -98,7 +151,7 @@ function CharacterInkOutlines({ rootRef }: { rootRef: MutableRefObject<THREE.Gro
 
     return () => {
       outlines.forEach((outline) => {
-        outline.parent?.remove(outline);
+        disposeOutline(outline);
       });
     };
   });
@@ -201,6 +254,7 @@ function ChibiCharacter({
 
           <Arm side="left" rotation={pose.leftArm} character={character} />
           <Arm side="right" rotation={pose.rightArm} character={character} />
+          <HeldPoseProp pose={pose} character={character} />
 
           <group position={[0, 2.02, 0.05]} rotation={pose.head}>
             <Sphere args={[0.7, 24, 16]} scale={[1, 0.95, 0.98]} castShadow receiveShadow>
@@ -250,6 +304,27 @@ function Leg({ side, rotation, character }: { side: "left" | "right"; rotation: 
       <RoundedBox args={[0.27, 0.14, 0.32]} radius={0.06} smoothness={5} position={[0, -0.72, 0.09]} castShadow receiveShadow>
         <meshToonMaterial {...materialProps(character.shoe, 0.78)} />
       </RoundedBox>
+    </group>
+  );
+}
+
+function HeldPoseProp({ pose, character }: { pose: PosePreset; character: CharacterPreset }) {
+  if (pose.heldProp !== "sword") return null;
+
+  return (
+    <group position={[0.58, 1.18, 0.43]} rotation={[0.18, -0.22, -0.72]}>
+      <Capsule args={[0.033, 0.86, 5, 14]} position={[0, 0.34, 0]} castShadow receiveShadow>
+        <meshToonMaterial {...materialProps("#dfe8ef", 0.4)} />
+      </Capsule>
+      <Capsule args={[0.042, 0.26, 5, 10]} position={[0, -0.16, 0.01]} castShadow receiveShadow>
+        <meshToonMaterial {...materialProps(character.shoe, 0.58)} />
+      </Capsule>
+      <Capsule args={[0.022, 0.32, 4, 8]} position={[0, -0.03, 0.02]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+        <meshToonMaterial {...materialProps(character.outfitTrim, 0.5)} />
+      </Capsule>
+      <Sphere args={[0.045, 10, 7]} position={[0, -0.31, 0.01]} castShadow receiveShadow>
+        <meshToonMaterial {...materialProps(character.outfitTrim, 0.48)} />
+      </Sphere>
     </group>
   );
 }
@@ -533,6 +608,10 @@ function ExpressionFace({ expression, blush, eyeColor }: { expression: Expressio
       {expression === "surprised" && <SurprisedFace eyeColor={eyeColor} />}
       {expression === "love" && <LoveFace />}
       {expression === "neutral" && <NeutralFace eyeColor={eyeColor} />}
+      {expression === "wink" && <WinkFace eyeColor={eyeColor} />}
+      {expression === "excited" && <ExcitedFace />}
+      {expression === "chic" && <ChicFace eyeColor={eyeColor} />}
+      {expression === "blank" && <BlankFace />}
     </group>
   );
 }
@@ -628,6 +707,27 @@ function MouthFlat({ y = -0.27 }: { y?: number }) {
   );
 }
 
+function MouthOpenSmile({ y = -0.27, scale = 1 }: { y?: number; scale?: number }) {
+  return (
+    <group>
+      <Sphere args={[0.084, 16, 10]} position={[0, y, 0.735]} scale={[0.86 * scale, 1.12 * scale, 0.2]}>
+        <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
+      </Sphere>
+      <Sphere args={[0.034, 12, 7]} position={[0.006, y - 0.036 * scale, 0.762]} scale={[1.28 * scale, 0.62 * scale, 0.16]}>
+        <meshToonMaterial {...materialProps(FACE_SOFT, 0.68)} />
+      </Sphere>
+    </group>
+  );
+}
+
+function MouthSmirk() {
+  return (
+    <Torus args={[0.09, 0.012, 6, 20, Math.PI * 0.72]} position={[0.04, -0.28, 0.735]} rotation={[0, 0, Math.PI * 1.08]} scale={[1.15, 0.45, 1]}>
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
+    </Torus>
+  );
+}
+
 function HappyFace() {
   return (
     <group>
@@ -720,6 +820,64 @@ function NeutralFace({ eyeColor }: { eyeColor: string }) {
       <AnimeEye x={-0.24} color={eyeColor} />
       <AnimeEye x={0.24} color={eyeColor} />
       <MouthFlat />
+    </group>
+  );
+}
+
+function WinkFace({ eyeColor }: { eyeColor: string }) {
+  return (
+    <group>
+      <Eyebrow x={-0.25} y={0.24} rotation={0.16} />
+      <Eyebrow x={0.25} y={0.22} rotation={-0.32} />
+      <AnimeEye x={-0.24} color={eyeColor} shape="wide" />
+      <EyeSmile x={0.24} />
+      <MouthSmile y={-0.27} scale={0.9} />
+    </group>
+  );
+}
+
+function ExcitedFace() {
+  return (
+    <group>
+      <Eyebrow x={-0.25} y={0.27} rotation={0.24} />
+      <Eyebrow x={0.25} y={0.27} rotation={-0.24} />
+      <EyeSmile x={-0.24} />
+      <EyeSmile x={0.24} />
+      <MouthOpenSmile y={-0.28} scale={1.08} />
+    </group>
+  );
+}
+
+function ChicFace({ eyeColor }: { eyeColor: string }) {
+  return (
+    <group>
+      <Eyebrow x={-0.25} y={0.24} rotation={-0.08} />
+      <Eyebrow x={0.25} y={0.27} rotation={0.18} />
+      <AnimeEye x={-0.24} color={eyeColor} shape="narrow" rotation={0.03} irisOffsetY={-0.004} />
+      <AnimeEye x={0.24} color={eyeColor} shape="narrow" rotation={-0.03} irisOffsetY={-0.004} />
+      <MouthSmirk />
+    </group>
+  );
+}
+
+function BlankEye({ x }: { x: number }) {
+  return (
+    <Sphere args={[0.032, 10, 6]} position={[x, 0.04, 0.735]} scale={[1, 1, 0.18]}>
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
+    </Sphere>
+  );
+}
+
+function BlankFace() {
+  return (
+    <group>
+      <Eyebrow x={-0.25} y={0.22} rotation={0.02} />
+      <Eyebrow x={0.25} y={0.22} rotation={-0.02} />
+      <BlankEye x={-0.24} />
+      <BlankEye x={0.24} />
+      <Torus args={[0.048, 0.013, 7, 20]} position={[0, -0.27, 0.735]} scale={[0.78, 1.05, 1]}>
+        <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
+      </Torus>
     </group>
   );
 }
@@ -916,8 +1074,8 @@ function PoserScene({
     <>
       <CaptureBridge captureRef={captureRef} />
       <CameraDirector presetId={cameraPreset} />
-      <ambientLight intensity={2.25} color="#fff8ef" />
-      <directionalLight position={[-3.2, 4.8, 4.2]} intensity={0.95} color="#fff0d9" castShadow shadow-mapSize={[1024, 1024]} />
+      <ambientLight intensity={0.72} color="#fff8ef" />
+      <directionalLight position={[-3.2, 4.8, 4.2]} intensity={3.35} color="#fff0d9" castShadow shadow-mapSize={[1024, 1024]} />
       <Bounds fit clip observe margin={1.18} maxDuration={0.45}>
         <ChibiCharacter character={character} expression={expression} pose={pose} bodyRotation={THREE.MathUtils.degToRad(rotationDeg)} />
       </Bounds>

@@ -16,8 +16,18 @@ export type CharacterArchetype =
   | "ninja"
   | "princess"
   | "robot";
-export type ExpressionId = "happy" | "sad" | "angry" | "surprised" | "love" | "neutral";
-export type PoseId = "idle" | "wave" | "point" | "cheer" | "think" | "sit";
+export type ExpressionId =
+  | "happy"
+  | "sad"
+  | "angry"
+  | "surprised"
+  | "love"
+  | "neutral"
+  | "wink"
+  | "excited"
+  | "chic"
+  | "blank";
+export type PoseId = "idle" | "wave" | "point" | "cheer" | "think" | "sit" | "sword" | "bow" | "clap" | "crouch" | "crossed" | "run";
 export type CameraPresetId = "front" | "quarter" | "low";
 
 export type CharacterPreset = {
@@ -50,6 +60,7 @@ export type PosePreset = {
   body: Vec3;
   head: Vec3;
   lift: number;
+  heldProp?: "sword";
 };
 
 export type CameraPreset = {
@@ -280,11 +291,15 @@ export const CHARACTER_PRESETS: CharacterPreset[] = [
 
 export const EXPRESSIONS: { id: ExpressionId; label: string }[] = [
   { id: "happy", label: "활짝" },
-  { id: "sad", label: "시무룩" },
+  { id: "sad", label: "울음" },
   { id: "angry", label: "발끈" },
   { id: "surprised", label: "깜짝" },
   { id: "love", label: "두근" },
   { id: "neutral", label: "담백" },
+  { id: "wink", label: "윙크" },
+  { id: "excited", label: "환호" },
+  { id: "chic", label: "시크" },
+  { id: "blank", label: "멍함" },
 ];
 
 export const POSE_PRESETS: PosePreset[] = [
@@ -359,6 +374,79 @@ export const POSE_PRESETS: PosePreset[] = [
     body: [0.18, 0, 0],
     head: [-0.08, 0, 0],
     lift: -0.2,
+  },
+  {
+    id: "sword",
+    label: "검 겨누기",
+    hint: "무기를 앞으로 든 액션 포즈",
+    leftArm: [-0.18, 0, -0.56],
+    rightArm: [-1.28, -0.16, 1.12],
+    leftLeg: [0.04, 0, -0.2],
+    rightLeg: [-0.1, 0, 0.24],
+    body: [0.02, -0.18, 0.04],
+    head: [0.02, -0.26, 0.02],
+    lift: 0,
+    heldProp: "sword",
+  },
+  {
+    id: "bow",
+    label: "정중히 인사",
+    hint: "상체를 숙인 공손한 포즈",
+    leftArm: [0.2, 0, -0.28],
+    rightArm: [0.2, 0, 0.28],
+    leftLeg: [0, 0, -0.06],
+    rightLeg: [0, 0, 0.06],
+    body: [0.62, 0, 0],
+    head: [0.28, 0, 0],
+    lift: -0.04,
+  },
+  {
+    id: "clap",
+    label: "박수",
+    hint: "두 손을 모아 기뻐하는 포즈",
+    leftArm: [-0.8, 0.08, 1.04],
+    rightArm: [-0.8, -0.08, -1.04],
+    leftLeg: [0, 0, -0.08],
+    rightLeg: [0, 0, 0.1],
+    body: [0, 0.04, 0],
+    head: [0, 0.08, 0.04],
+    lift: 0,
+  },
+  {
+    id: "crouch",
+    label: "웅크림",
+    hint: "슬픈 장면에 맞는 낮은 포즈",
+    leftArm: [-0.72, 0, 0.78],
+    rightArm: [-0.72, 0, -0.78],
+    leftLeg: [-1.42, 0, -0.42],
+    rightLeg: [-1.42, 0, 0.42],
+    body: [0.42, 0, 0],
+    head: [0.2, 0, -0.06],
+    lift: -0.36,
+  },
+  {
+    id: "crossed",
+    label: "팔짱",
+    hint: "화난 대사에 어울리는 포즈",
+    leftArm: [-0.46, 0, 1.3],
+    rightArm: [-0.46, 0, -1.3],
+    leftLeg: [0, 0, -0.12],
+    rightLeg: [0, 0, 0.1],
+    body: [0.02, -0.08, -0.02],
+    head: [0.02, -0.16, -0.06],
+    lift: 0,
+  },
+  {
+    id: "run",
+    label: "뛰기",
+    hint: "속도감 있는 이동 포즈",
+    leftArm: [-0.74, 0, -1.12],
+    rightArm: [0.48, 0, 1.16],
+    leftLeg: [0.74, 0, -0.48],
+    rightLeg: [-0.82, 0, 0.42],
+    body: [0.16, -0.14, -0.08],
+    head: [-0.04, -0.16, 0.04],
+    lift: 0.12,
   },
 ];
 
