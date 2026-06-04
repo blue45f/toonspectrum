@@ -31,6 +31,30 @@ interface CalendarResponse {
   generatedAt: string;
 }
 
+// 캘린더 작품 행 — 데스크톱 7열 컬럼과 모바일 요일 목록에서 공용.
+function CalItem({ title, className }: { title: Title; className?: string }) {
+  return (
+    <Link
+      href={`/title/${title.slug}`}
+      className={cn(
+        "group flex gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-raised",
+        className
+      )}
+    >
+      <MiniPoster title={title} className="w-10 shrink-0" />
+      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+        <span className="line-clamp-2 text-xs font-medium leading-tight text-fg group-hover:text-accent">
+          {title.title}
+        </span>
+        <span className="flex items-center justify-between gap-1">
+          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
+          <AvailabilityDots availability={title.availability} max={2} />
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export function CalendarPage() {
   const { data, loading, error, reload } = useApiResource<CalendarResponse>(
     "/api/calendar",
@@ -52,6 +76,8 @@ export function CalendarPage() {
   // 공용 작품 필터(찜·장르·가격·이용가·평점·태그). 플랫폼은 전용 셀렉터가 따로 있어 facet에서 제외.
   const { filters, setFilters, remember, toggleRemember } = useRememberedFilters("calendar");
   const [showFilters, setShowFilters] = useState(false);
+  // 모바일: 요일 탭으로 하루씩 본다(null = 오늘). 데스크톱(xl)은 7열 그리드 유지.
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
   const savedIds = useSavedTitleIds();
   const titleFilterCount = countActiveTitleFilters(filters);
   const titleFilterActive = titleFilterCount > 0;
@@ -73,6 +99,8 @@ export function CalendarPage() {
   const todayCount = anyFilterActive
     ? days[todayIdx]?.items.length ?? 0
     : data?.todayCount ?? 0;
+  const selDay = Math.min(selectedDayIdx ?? todayIdx, Math.max(0, days.length - 1));
+  const selItems = days[selDay]?.items ?? [];
 
   return (
     <Container size="wide" className="py-10">
@@ -84,7 +112,7 @@ export function CalendarPage() {
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
             <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              서버 DB 스냅샷의 연재요일 메타데이터가 있는 작품을 요일별로 모두 표시합니다. 오늘은{" "}
+              연재요일 정보가 있는 작품을 요일별로 모두 표시합니다. 오늘은{" "}
               <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가 올라오는 작품이{" "}
               <span className="numeral text-fg">{todayCount.toLocaleString("ko-KR")}</span>편입니다.
             </p>
@@ -207,57 +235,91 @@ export function CalendarPage() {
           ))}
         </div>
       ) : (
-        <div className="rail -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0 xl:grid xl:grid-cols-7 xl:overflow-visible">
-          {days.map(({ day, items }, index) => {
-            const isToday = index === todayIdx;
-            return (
-              <section
-                key={day}
-                className={cn(
-                  "flex w-[220px] shrink-0 flex-col rounded-2xl border sm:w-[240px] xl:w-auto",
-                  isToday ? "border-accent/50 bg-accent-soft/40" : "border-line bg-panel/30"
-                )}
-              >
-                <header
+        <>
+          {/* 모바일·태블릿: 요일 탭 + 선택한 하루 목록 (가로 스크롤 컬럼 대신 세로 1일) */}
+          <div className="xl:hidden">
+            <div
+              role="tablist"
+              aria-label="요일 선택"
+              className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1"
+            >
+              {days.map(({ day, items }, index) => {
+                const on = index === selDay;
+                const isToday = index === todayIdx;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setSelectedDayIdx(index)}
+                    className={cn(
+                      "inline-flex shrink-0 flex-col items-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
+                      on
+                        ? "border-accent/60 bg-accent-soft/55 text-fg"
+                        : "border-line bg-panel/30 text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    <span className={cn("font-display text-sm font-bold", isToday && !on && "text-accent")}>
+                      {day}
+                      {isToday && <span className="ml-1 text-[0.55rem] align-top">●</span>}
+                    </span>
+                    <span className="numeral text-[0.66rem] text-fg-3">{items.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3">
+              {selItems.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-line bg-card/40 px-4 py-10 text-center text-xs text-fg-3">
+                  {days[selDay]?.day}요일 연재 없음
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {selItems.map((title) => (
+                    <CalItem key={title.id} title={title} className="border border-line bg-panel/30 p-2" />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 데스크톱(xl+): 7열 그리드 */}
+          <div className="hidden gap-3 xl:grid xl:grid-cols-7">
+            {days.map(({ day, items }, index) => {
+              const isToday = index === todayIdx;
+              return (
+                <section
+                  key={day}
                   className={cn(
-                    "flex items-center justify-between rounded-t-2xl border-b px-3.5 py-2.5",
-                    isToday ? "border-accent/30" : "border-line"
+                    "flex flex-col rounded-2xl border",
+                    isToday ? "border-accent/50 bg-accent-soft/40" : "border-line bg-panel/30"
                   )}
                 >
-                  <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
-                    {day}
-                    {isToday && <span className="ml-1.5 text-[0.6rem] font-medium">오늘</span>}
-                  </span>
-                  <span className="numeral text-xs text-fg-3">{items.length}</span>
-                </header>
-                <div className="flex flex-col gap-2.5 p-2.5">
-                  {items.length === 0 ? (
-                    <p className="px-1 py-6 text-center text-xs text-fg-3">연재 없음</p>
-                  ) : (
-                    items.map((title) => (
-                      <Link
-                        key={title.id}
-                        href={`/title/${title.slug}`}
-                        className="group flex gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-raised"
-                      >
-                        <MiniPoster title={title} className="w-10 shrink-0" />
-                        <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-                          <span className="line-clamp-2 text-xs font-medium leading-tight text-fg group-hover:text-accent">
-                            {title.title}
-                          </span>
-                          <span className="flex items-center justify-between gap-1">
-                            <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
-                            <AvailabilityDots availability={title.availability} max={2} />
-                          </span>
-                        </span>
-                      </Link>
-                    ))
-                  )}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+                  <header
+                    className={cn(
+                      "flex items-center justify-between rounded-t-2xl border-b px-3.5 py-2.5",
+                      isToday ? "border-accent/30" : "border-line"
+                    )}
+                  >
+                    <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
+                      {day}
+                      {isToday && <span className="ml-1.5 text-[0.6rem] font-medium">오늘</span>}
+                    </span>
+                    <span className="numeral text-xs text-fg-3">{items.length}</span>
+                  </header>
+                  <div className="flex flex-col gap-2.5 p-2.5">
+                    {items.length === 0 ? (
+                      <p className="px-1 py-6 text-center text-xs text-fg-3">연재 없음</p>
+                    ) : (
+                      items.map((title) => <CalItem key={title.id} title={title} />)
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {!loading && !error && totalScheduled === 0 && (
