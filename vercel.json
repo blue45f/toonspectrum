@@ -14,8 +14,9 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/api/cover", "destination": "/api/index" },
     { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
+    { "source": "/api/:path*", "destination": "https://132.145.82.3.nip.io/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
