@@ -1,4 +1,9 @@
-import Link from "@/src/compat/router-link";
+import { ArrowUpRight } from "lucide-react";
+
+// 작가명 클릭 → 관련 작가 사이트(웹 검색 게이트웨이: 나무위키·SNS·인터뷰 등)로 새 탭 이동.
+function authorSearchUrl(name: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(`${name} 작가`)}`;
+}
 
 function Names({ raw }: { raw: string }) {
   const names = raw
@@ -13,12 +18,16 @@ function Names({ raw }: { raw: string }) {
           {n === "미상" ? (
             <span>{n}</span>
           ) : (
-            <Link
-              href={`/author/${encodeURIComponent(n)}`}
-              className="underline-offset-2 transition-colors hover:text-accent hover:underline"
+            <a
+              href={authorSearchUrl(n)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-0.5 underline-offset-2 transition-colors hover:text-accent hover:underline"
+              title={`${n} 관련 정보 검색`}
             >
               {n}
-            </Link>
+              <ArrowUpRight size={12} className="text-fg-3" />
+            </a>
           )}
         </span>
       ))}
