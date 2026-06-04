@@ -784,6 +784,14 @@ export function StudioPage() {
     setSelectedId(copy.id);
     setTool("select");
   }
+  function nudgeSelected(dx: number, dy: number) {
+    if (!selected) return;
+    if (selected.type === "draw") {
+      patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
+    } else {
+      patchEl(selected.id, { x: selected.x + dx, y: selected.y + dy } as Partial<El>);
+    }
+  }
   function reorder(dir: "front" | "back") {
     if (!selectedId) return;
     const idx = elements.findIndex((e) => e.id === selectedId);
@@ -821,6 +829,14 @@ export function StudioPage() {
         removeSelected();
       } else if (e.key === "Escape") {
         setSelectedId(null);
+      } else if (selectedId && e.key.startsWith("Arrow")) {
+        // 방향키 미세이동: 1px, Shift 동반 시 10px.
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        if (e.key === "ArrowLeft") nudgeSelected(-step, 0);
+        else if (e.key === "ArrowRight") nudgeSelected(step, 0);
+        else if (e.key === "ArrowUp") nudgeSelected(0, -step);
+        else if (e.key === "ArrowDown") nudgeSelected(0, step);
       }
     };
   });
