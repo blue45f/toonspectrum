@@ -16,6 +16,7 @@ import { ReviewForm } from "@/components/review-form";
 import { Rail, Section, Container } from "@/components/section";
 import { SubscribeButton } from "@/components/subscribe-button";
 import { ShareButton } from "@/components/share-button";
+import { TitleFanWorks } from "@/components/title-fan-works";
 import { TitleCard } from "@/components/title-card";
 import { TitlePoster } from "@/components/title-poster";
 import { CoverImage } from "@/components/cover-image";
@@ -271,6 +272,8 @@ export function TitleDetailPage() {
       >
         <FanCafePanel scope="title" targetId={title.id} targetLabel={title.title} />
       </Section>
+
+      <TitleFanWorks titleId={title.id} />
 
       <Section
         className="mt-14"
