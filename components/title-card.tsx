@@ -34,7 +34,7 @@ export function TitleCard({
         href={`/title/${title.slug}`}
         className={cn("group block rounded-2xl focus-visible:outline-none", className)}
       >
-        <div className="relative flex gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 transition-[transform,box-shadow,border-color] duration-200 surface-hl group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
+        <div className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[transform,box-shadow,border-color] duration-200 surface-hl group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
           <div className="w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
             <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.04]">
               <TitlePoster title={title} size={size} rank={rank} />
@@ -79,7 +79,7 @@ export function TitleCard({
       href={`/title/${title.slug}`}
       className={cn("group block rounded-2xl focus-visible:outline-none", className)}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
+      <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
         <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
           <TitlePoster title={title} size={size} rank={rank} />
         </div>
