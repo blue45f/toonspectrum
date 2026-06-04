@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "@/src/compat/router-link";
 import { useSession, signOut } from "@/src/compat/auth-session";
 import { AuthModal } from "./auth-modal";
-import { LogOut, Library, UserRound, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { resolveSignupAvatarImage } from "@/lib/avatar";
+import { adminFetch, type AdminMe } from "@/src/components/admin/admin-client";
 import { useT } from "@/lib/i18n";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
@@ -24,7 +25,29 @@ export function AuthMenu() {
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(false);
   const [open, setOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const t = useT();
+  const uid = session?.user?.id;
+
+  // 관리자 콘솔 링크 노출 — 세션 role 은 화이트리스트(ADMIN_EMAILS) 승격을 반영 못 하므로
+  // /api/admin/me 프로브로 실제 권한을 확인(성공=관리자)해 게이트한다.
+  useEffect(() => {
+    if (status !== "authenticated" || !uid) {
+      setIsAdmin(false);
+      return;
+    }
+    let alive = true;
+    adminFetch<AdminMe>("/me", uid)
+      .then(() => {
+        if (alive) setIsAdmin(true);
+      })
+      .catch(() => {
+        if (alive) setIsAdmin(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [status, uid]);
 
   if (status !== "authenticated") {
     return (
@@ -62,13 +85,13 @@ export function AuthMenu() {
               <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
               <p className="truncate text-xs text-fg-3">{u.email}</p>
             </div>
-            {((u.role ?? "") === "admin" || (u.role ?? "") === "operator") && (
+            {((u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin) && (
               <Link
                 href="/admin"
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
               >
-                관리자 콘솔
+                <Shield size={15} /> 관리자 콘솔
               </Link>
             )}
             <Link

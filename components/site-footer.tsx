@@ -33,12 +33,21 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "설정", href: "/settings" },
     ],
   },
+  {
+    title: "이용 안내",
+    links: [
+      { label: "이용약관", href: "/terms" },
+      { label: "개인정보처리방침", href: "/privacy" },
+      { label: "저작권·콘텐츠 안내", href: "/copyright" },
+      { label: "광고·제휴 문의", href: "/contact" },
+    ],
+  },
 ];
 
 export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
-      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
         <div className="max-w-sm">
           <div className="flex items-center gap-2.5">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem]" />

@@ -24,6 +24,10 @@ const STATIC_TITLES: Record<string, string> = {
   "/guide": "랭킹 산정 방식",
   "/settings": "설정",
   "/admin": "관리자 콘솔",
+  "/terms": "이용약관",
+  "/privacy": "개인정보처리방침",
+  "/copyright": "저작권·콘텐츠 안내",
+  "/contact": "광고·제휴 문의",
 };
 
 function useRouteTitle(pathname: string) {
@@ -66,6 +70,10 @@ const NewsPage = lazy(() => import("@/src/pages/NewsPage").then((m) => ({ defaul
 const SettingsPage = lazy(() => import("@/src/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const AboutPage = lazy(() => import("@/src/pages/AboutPage").then((m) => ({ default: m.AboutPage })));
 const GuidePage = lazy(() => import("@/src/pages/GuidePage").then((m) => ({ default: m.GuidePage })));
+const TermsPage = lazy(() => import("@/src/pages/legal/TermsPage").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("@/src/pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
+const CopyrightPage = lazy(() => import("@/src/pages/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })));
+const ContactPage = lazy(() => import("@/src/pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const AuthCallbackPage = lazy(() =>
   import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage }))
 );
@@ -108,6 +116,10 @@ export function AppRouter() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/guide" element={<GuidePage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/copyright" element={<CopyrightPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />
