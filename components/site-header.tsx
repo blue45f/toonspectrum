@@ -134,7 +134,10 @@ export function SiteHeader() {
                 <Search size={16} />
                 <span className="hidden sm:inline">작품·작가·태그 검색</span>
               </span>
-              <kbd className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[0.65rem] sm:flex">
+              <kbd
+                aria-hidden="true"
+                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[0.65rem] sm:flex"
+              >
                 ⌘K
               </kbd>
             </button>

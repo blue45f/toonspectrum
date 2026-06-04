@@ -186,6 +186,73 @@ function rawScore(t: Title, axis: RankAxis): number {
   }
 }
 
+// "왜 이 순위인가" — 각 축의 점수에 기여한 핵심 요인을 사람이 읽을 수 있게 분해한다.
+// rawScore 와 같은 신호를 사용(단일 출처). UI(랭킹 행 펼침)·투명성 공개에 쓴다.
+export interface ScoreFactor {
+  label: string;
+  value: string;
+}
+export function explainScore(t: Title, axis: RankAxis): ScoreFactor[] {
+  const s = t.stats;
+  const bayes = bayesRating(t).toFixed(2);
+  const pct = Math.round(typeof s.popularityPercentile === "number" ? s.popularityPercentile : 0);
+  const reach = reachWeight(t).toFixed(2);
+  const conf = confidenceFactor(t);
+  const confLabel = statsAreEstimated(t) ? `추정 ×${conf.toFixed(2)}` : `실데이터 ×${conf.toFixed(2)}`;
+  const n = (v: number) => Math.round(v).toLocaleString("ko-KR");
+  switch (axis) {
+    case "popular":
+      return [
+        { label: "플랫폼 내 인기 백분위", value: `${pct}%` },
+        { label: "플랫폼 도달 가중", value: `×${reach}` },
+        { label: "데이터 신뢰", value: confLabel },
+        { label: "베이즈 평점", value: `${bayes} (평가 ${n(s.ratingCount)})` },
+      ];
+    case "trending":
+      return [
+        { label: "실 순위 상승", value: s.rankDelta > 0 ? `+${s.rankDelta}` : "변동 없음" },
+        { label: "트렌드 지수", value: `${Math.round(s.trendingScore)}` },
+        { label: "인기 백분위", value: `${pct}%` },
+        { label: "데이터 신뢰", value: confLabel },
+        { label: "베이즈 평점", value: bayes },
+      ];
+    case "rating":
+      return [
+        { label: "베이즈 평점", value: bayes },
+        { label: "평가 수", value: n(s.ratingCount) },
+      ];
+    case "favorites":
+      return [
+        { label: "관심(북마크)", value: n(s.bookmarks) },
+        { label: "좋아요", value: n(s.likes) },
+        { label: "베이즈 평점", value: bayes },
+      ];
+    case "hidden":
+      return [
+        { label: "베이즈 평점", value: bayes },
+        { label: "낮은 조회수 (역가중)", value: n(s.views) },
+        { label: "평가 수", value: n(s.ratingCount) },
+      ];
+    case "binge":
+      return [
+        { label: "몰입 지수", value: `${Math.round(s.bingeIndex)}` },
+        { label: "완독률", value: `${Math.round(s.completionRate)}%` },
+      ];
+    case "completed":
+      return [
+        { label: "완결 여부", value: t.status === "completed" ? "완결 보너스" : "연재중" },
+        { label: "베이즈 평점", value: bayes },
+        { label: "완독률", value: `${Math.round(s.completionRate)}%` },
+      ];
+    case "rookie":
+      return [
+        { label: "데뷔 연차", value: `${t.releaseYear}년` },
+        { label: "트렌드 지수", value: `${Math.round(s.trendingScore)}` },
+        { label: "베이즈 평점", value: bayes },
+      ];
+  }
+}
+
 export interface RankedTitle {
   title: Title;
   rank: number;

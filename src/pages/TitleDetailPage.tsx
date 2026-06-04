@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { TitleOst } from "@/components/title-ost";
+import { ScoreBreakdown } from "@/components/score-breakdown";
 import { mergedUniverse } from "@/lib/title-universe";
 import { AuthorLine } from "@/components/author-line";
 import Link from "@/src/compat/router-link";
@@ -232,6 +233,8 @@ export function TitleDetailPage() {
           </div>
         </div>
       </section>
+
+      <ScoreBreakdown title={title} className="mt-14" />
 
       {(hasFamily || hasExternalMedia) && (
         <Section
