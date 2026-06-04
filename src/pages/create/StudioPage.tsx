@@ -5,17 +5,24 @@ import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, 
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  ChevronDown,
+  Circle,
+  Eraser,
   Image as ImageIcon,
   ImagePlus,
   LayoutTemplate,
   Loader2,
   MessageCircle,
+  Minus,
   MousePointer2,
+  PaintBucket,
   Pencil,
   Plus,
   Redo2,
+  SlidersHorizontal,
   Smile,
   Sparkles,
+  Square,
   Trash2,
   Type as TypeIcon,
   Undo2,
@@ -38,11 +45,13 @@ import {
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES } from "./studio-bg-scenes";
-import { FX_OVERLAYS } from "./studio-fx-assets";
+import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
 
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
 type Tool = "select" | "draw";
+type DrawMode = "pen" | "eraser" | "shape";
+type DrawShapeKind = "line" | "rect" | "ellipse";
 
 interface ImageEl {
   id: string;
@@ -101,13 +110,97 @@ interface StickerEl {
 interface DrawEl {
   id: string;
   type: "draw";
+  kind?: "freehand" | DrawShapeKind;
+  mode?: "pen" | "eraser";
   points: number[];
   stroke: string;
   strokeWidth: number;
+  opacity?: number;
+  fill?: string;
 }
 type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
 
 const uid = () => crypto.randomUUID();
+const BRUSH_WIDTH_PRESETS = [2, 6, 12, 24, 36];
+const DRAW_COLOR_SWATCHES = ["#16100c", "#f8f2df", "#f45d48", "#ff9f1c", "#ffd84d", "#56c271", "#2f9bff", "#7c5cfc", "#ff6fb1", "#8a5a44"];
+
+function drawBounds(points: number[]) {
+  const [x1 = 0, y1 = 0, x2 = x1, y2 = y1] = points;
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1),
+  };
+}
+
+function isCompleteDrawOp(el: DrawEl) {
+  const kind = el.kind ?? "freehand";
+  if (kind === "freehand") return el.points.length >= 4;
+  const box = drawBounds(el.points);
+  if (kind === "line") return Math.hypot((el.points[2] ?? 0) - (el.points[0] ?? 0), (el.points[3] ?? 0) - (el.points[1] ?? 0)) >= 3;
+  return box.width >= 3 && box.height >= 3;
+}
+
+function StudioDrawNode({ el }: { el: DrawEl }) {
+  const kind = el.kind ?? "freehand";
+  const composite = el.mode === "eraser" ? "destination-out" : "source-over";
+  const opacity = el.opacity ?? 1;
+  const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
+  const strokeWidth = Math.max(1, el.strokeWidth);
+
+  if (kind === "rect") {
+    const box = drawBounds(el.points);
+    return (
+      <Rect
+        x={box.x}
+        y={box.y}
+        width={Math.max(0.1, box.width)}
+        height={Math.max(0.1, box.height)}
+        fill={el.fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        opacity={opacity}
+        cornerRadius={3}
+        lineJoin="round"
+        globalCompositeOperation={composite}
+        listening={false}
+      />
+    );
+  }
+
+  if (kind === "ellipse") {
+    const box = drawBounds(el.points);
+    return (
+      <Ellipse
+        x={box.x + box.width / 2}
+        y={box.y + box.height / 2}
+        radiusX={Math.max(0.1, box.width / 2)}
+        radiusY={Math.max(0.1, box.height / 2)}
+        fill={el.fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        opacity={opacity}
+        globalCompositeOperation={composite}
+        listening={false}
+      />
+    );
+  }
+
+  return (
+    <Line
+      points={el.points}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      opacity={opacity}
+      lineCap="round"
+      lineJoin="round"
+      tension={kind === "freehand" ? 0.4 : 0}
+      globalCompositeOperation={composite}
+      listening={false}
+    />
+  );
+}
 
 function PoserLoadingOverlay() {
   return (
@@ -355,6 +448,11 @@ export function StudioPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [color, setColor] = useState("#7c5cfc");
   const [strokeWidth, setStrokeWidth] = useState(6);
+  const [drawMode, setDrawMode] = useState<DrawMode>("pen");
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
+  const [shapeFill, setShapeFill] = useState(false);
+  const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char" | "bgScene">(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
@@ -625,14 +723,36 @@ export function StudioPage() {
     }
   }
 
-  // 펜(자유 드로잉) — 진행 중 선은 draft 로만 렌더, 끝나면 히스토리에 커밋.
+  // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (tool === "draw") {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
-      const line: DrawEl = { id: uid(), type: "draw", points: [pos.x, pos.y], stroke: color, strokeWidth };
-      drawingRef.current = line;
-      setDraft(line);
+      setSelectedId(null);
+      const common = {
+        id: uid(),
+        type: "draw" as const,
+        stroke: color,
+        strokeWidth,
+        opacity: brushOpacity,
+      };
+      const next: DrawEl =
+        drawMode === "shape"
+          ? {
+              ...common,
+              kind: drawShape,
+              mode: "pen",
+              points: [pos.x, pos.y, pos.x, pos.y],
+              fill: shapeFill && drawShape !== "line" ? color : undefined,
+            }
+          : {
+              ...common,
+              kind: "freehand",
+              mode: drawMode,
+              points: [pos.x, pos.y],
+            };
+      drawingRef.current = next;
+      setDraft(next);
       return;
     }
     // 선택 모드: 빈 영역 클릭 시 선택 해제.
@@ -642,12 +762,16 @@ export function StudioPage() {
     if (tool !== "draw" || !drawingRef.current) return;
     const pos = e.target.getStage()?.getRelativePointerPosition();
     if (!pos) return;
-    const next = { ...drawingRef.current, points: [...drawingRef.current.points, pos.x, pos.y] };
+    const current = drawingRef.current;
+    const next =
+      (current.kind ?? "freehand") === "freehand"
+        ? { ...current, points: [...current.points, pos.x, pos.y] }
+        : { ...current, points: [current.points[0] ?? pos.x, current.points[1] ?? pos.y, pos.x, pos.y] };
     drawingRef.current = next;
     setDraft(next);
   }
   function onStageUp() {
-    if (drawingRef.current && drawingRef.current.points.length >= 4) {
+    if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
       commit([...elements, drawingRef.current]);
     }
     drawingRef.current = null;
@@ -772,8 +896,29 @@ export function StudioPage() {
         <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
           <MousePointer2 size={14} /> 선택
         </button>
-        <button type="button" onClick={() => setTool("draw")} className={toolBtn(tool === "draw")} aria-pressed={tool === "draw"}>
+        <button
+          type="button"
+          onClick={() => {
+            setTool("draw");
+            setDrawMode("pen");
+            setMenu(null);
+          }}
+          className={toolBtn(tool === "draw" && drawMode === "pen")}
+          aria-pressed={tool === "draw" && drawMode === "pen"}
+        >
           <Pencil size={14} /> 펜
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTool("draw");
+            setDrawMode("eraser");
+            setMenu(null);
+          }}
+          className={toolBtn(tool === "draw" && drawMode === "eraser")}
+          aria-pressed={tool === "draw" && drawMode === "eraser"}
+        >
+          <Eraser size={14} /> 지우개
         </button>
         <span className="mx-0.5 h-5 w-px bg-line" />
         <div className="relative">
@@ -878,7 +1023,7 @@ export function StudioPage() {
             <Sparkles size={14} /> 효과
           </button>
           {menu === "sticker" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
               <div className="mb-2 flex flex-wrap gap-1">
                 {SFX_PRESETS.map((s) => (
@@ -892,11 +1037,28 @@ export function StudioPage() {
                   </button>
                 ))}
               </div>
-              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">스티커</p>
+              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
               <div className="grid grid-cols-8 gap-1 mb-2">
                 {EFFECT_EMOJIS.map((em) => (
                   <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
                     {em}
+                  </button>
+                ))}
+              </div>
+              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
+              <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                {COMIC_VECTOR_STICKERS.map((sticker) => (
+                  <button
+                    key={sticker.id}
+                    type="button"
+                    title={sticker.label}
+                    onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
+                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                  >
+                    <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+                      <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                    </div>
+                    <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
                   </button>
                 ))}
               </div>
@@ -930,10 +1092,118 @@ export function StudioPage() {
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
         </label>
         {tool === "draw" && (
-          <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
-            굵기
-            <input type="range" min={1} max={40} value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="w-20" />
-          </label>
+          <div className="flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-line/70 bg-card/65 px-2 py-1">
+            {drawMode !== "eraser" && (
+              <div className="flex items-center gap-1" aria-label="빠른 색상">
+                {DRAW_COLOR_SWATCHES.map((swatch) => (
+                  <button
+                    key={swatch}
+                    type="button"
+                    onClick={() => setColor(swatch)}
+                    title={swatch}
+                    aria-label={`색상 ${swatch}`}
+                    className={cn(
+                      "size-6 rounded-md border transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      color.toLowerCase() === swatch.toLowerCase() ? "border-accent ring-2 ring-accent/35" : "border-line"
+                    )}
+                    style={{ background: swatch }}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="mx-0.5 h-5 w-px bg-line" />
+            <div className="flex items-center gap-1" aria-label="브러시 굵기 프리셋">
+              {BRUSH_WIDTH_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setStrokeWidth(preset)}
+                  title={`굵기 ${preset}px`}
+                  aria-label={`굵기 ${preset}px`}
+                  className={cn(
+                    "grid size-7 place-items-center rounded-md border text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                    strokeWidth === preset ? "border-accent/60 bg-accent-soft text-fg" : "border-line"
+                  )}
+                >
+                  <span className="block w-4 rounded-full bg-current" style={{ height: Math.max(2, Math.min(9, preset / 4)) }} />
+                </button>
+              ))}
+            </div>
+            <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
+              <span className="numeral w-8 text-right text-[0.66rem] text-fg-2">{strokeWidth}px</span>
+              <input type="range" min={1} max={48} value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="w-24" />
+            </label>
+            <button
+              type="button"
+              onClick={() => setDrawAdvancedOpen((open) => !open)}
+              className={cn(toolBtn(drawAdvancedOpen || drawMode === "shape"), "h-8 px-2")}
+              aria-expanded={drawAdvancedOpen}
+            >
+              <SlidersHorizontal size={14} /> 고급
+              <ChevronDown size={13} className={cn("transition-transform", drawAdvancedOpen && "rotate-180")} />
+            </button>
+            {drawAdvancedOpen && (
+              <div className="flex basis-full flex-wrap items-center gap-2 border-t border-line/70 pt-1.5">
+                <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
+                  불투명도
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={Math.round(brushOpacity * 100)}
+                    onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                    className="w-24"
+                  />
+                  <span className="numeral w-8 text-right text-[0.66rem] text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+                </label>
+                <div className="mx-0.5 h-5 w-px bg-line" />
+                <span className="text-xs text-fg-3">도형</span>
+                {([
+                  { kind: "line" as const, label: "선", icon: Minus },
+                  { kind: "rect" as const, label: "사각형", icon: Square },
+                  { kind: "ellipse" as const, label: "타원", icon: Circle },
+                ]).map((item) => {
+                  const Icon = item.icon;
+                  const active = tool === "draw" && drawMode === "shape" && drawShape === item.kind;
+                  return (
+                    <button
+                      key={item.kind}
+                      type="button"
+                      onClick={() => {
+                        setTool("draw");
+                        setDrawMode("shape");
+                        setDrawShape(item.kind);
+                        setMenu(null);
+                      }}
+                      className={cn(toolBtn(active), "h-8 px-2")}
+                      aria-pressed={active}
+                      title={item.label}
+                    >
+                      <Icon size={14} />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+                <label
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
+                    drawShape === "line" ? "border-line bg-card text-fg-3 opacity-55" : shapeFill ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={shapeFill}
+                    disabled={drawShape === "line"}
+                    onChange={(e) => setShapeFill(e.target.checked)}
+                    className="size-3 accent-[var(--color-accent)]"
+                  />
+                  <PaintBucket size={13} aria-hidden />
+                  채우기
+                </label>
+              </div>
+            )}
+          </div>
         )}
         <span className="mx-0.5 h-5 w-px bg-line" />
         <button type="button" onClick={undo} disabled={hi === 0} className={cn(toolBtn(false), "disabled:opacity-40")} title="실행취소">
@@ -1003,18 +1273,7 @@ export function StudioPage() {
                   );
                 }
                 if (el.type === "draw")
-                  return (
-                    <Line
-                      key={el.id}
-                      points={el.points}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth}
-                      lineCap="round"
-                      lineJoin="round"
-                      tension={0.4}
-                      listening={false}
-                    />
-                  );
+                  return <StudioDrawNode key={el.id} el={el} />;
                 if (el.type === "text")
                   return (
                     <KText
@@ -1224,9 +1483,7 @@ export function StudioPage() {
                   </Group>
                 );
               })}
-              {draft && (
-                <Line points={draft.points} stroke={draft.stroke} strokeWidth={draft.strokeWidth} lineCap="round" lineJoin="round" tension={0.4} listening={false} />
-              )}
+              {draft && <StudioDrawNode el={draft} />}
               <Transformer
                 ref={trRef}
                 rotateEnabled

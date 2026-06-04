@@ -10,6 +10,14 @@ export interface FxOverlay {
   height: number;
 }
 
+export interface ComicVectorSticker {
+  id: string;
+  label: string;
+  svg: string;
+  width: number;
+  height: number;
+}
+
 const INK = "#16100c"; // 굵은 잉크 라인 색
 
 // 내부 유틸: 자체 완결형 svg 문자열 래퍼.
@@ -401,6 +409,187 @@ function flameBurst(): string {
     `C120 318 102 290 102 240 C102 206 122 184 140 132 Z" fill="#ffd24a"/>`;
   return svg(W, H, outer + inner);
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// 만화 벡터 스티커 — 작게 붙여 쓰는 아이콘형 감정/상태 스티커.
+// ──────────────────────────────────────────────────────────────────────────
+function stickerSweatDrops(): string {
+  const W = 240;
+  const H = 220;
+  const drop = (x: number, y: number, s: number, rot: number) =>
+    `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">` +
+    `<path d="M0 -52 C18 -20 42 -2 42 28 C42 58 22 78 0 78 C-22 78 -42 58 -42 28 C-42 -2 -18 -20 0 -52 Z" fill="#9fe4ff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>` +
+    `<ellipse cx="-14" cy="24" rx="8" ry="15" fill="#fff8ef" opacity="0.92"/></g>`;
+  return svg(W, H, drop(76, 88, 0.78, -12) + drop(152, 108, 1.0, 10) + drop(105, 156, 0.55, -4));
+}
+
+function stickerAngerPop(): string {
+  const W = 240;
+  const H = 240;
+  const arm = (rot: number) =>
+    `<g transform="rotate(${rot} 120 120)">` +
+    `<path d="M120 70 L120 34 L84 34" fill="none" stroke="${INK}" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="M120 70 L120 34 L84 34" fill="none" stroke="#ff5147" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="M132 78 L170 40" fill="none" stroke="${INK}" stroke-width="18" stroke-linecap="round"/>` +
+    `<path d="M132 78 L170 40" fill="none" stroke="#ff5147" stroke-width="10" stroke-linecap="round"/></g>`;
+  return svg(W, H, [0, 90, 180, 270].map(arm).join("") + `<path d="M120 94 L146 120 L120 146 L94 120 Z" fill="#fff0a8" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>`);
+}
+
+function stickerHeart(): string {
+  const W = 240;
+  const H = 220;
+  const heart =
+    `<path d="M120 196 C120 196 30 132 30 72 C30 34 54 20 82 20 C104 20 118 36 120 56 C122 36 136 20 158 20 C186 20 210 34 210 72 C210 132 120 196 120 196 Z" fill="#ff6f91" stroke="${INK}" stroke-width="9" stroke-linejoin="round"/>`;
+  const hi = `<path d="M70 56 C82 42 100 42 108 58" fill="none" stroke="#fff8ef" stroke-width="9" stroke-linecap="round"/>`;
+  return svg(W, H, heart + hi);
+}
+
+function stickerStar(): string {
+  const W = 240;
+  const H = 240;
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? 98 : 43;
+    pts.push(`${(120 + Math.cos(a) * r).toFixed(1)},${(122 + Math.sin(a) * r).toFixed(1)}`);
+  }
+  return svg(
+    W,
+    H,
+    `<polygon points="${pts.join(" ")}" fill="#ffd84d" stroke="${INK}" stroke-width="9" stroke-linejoin="round"/>` +
+      `<path d="M84 70 L106 92" stroke="#fff8ef" stroke-width="9" stroke-linecap="round"/>`,
+  );
+}
+
+function stickerMusicNotes(): string {
+  const W = 260;
+  const H = 240;
+  const note = (x: number, y: number, s: number, color: string, rot: number) =>
+    `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">` +
+    `<ellipse cx="0" cy="78" rx="23" ry="16" fill="${color}" stroke="${INK}" stroke-width="7" transform="rotate(-18 0 78)"/>` +
+    `<path d="M20 75 L20 0" fill="none" stroke="${INK}" stroke-width="11" stroke-linecap="round"/>` +
+    `<path d="M20 0 C58 8 64 38 48 58" fill="none" stroke="${INK}" stroke-width="11" stroke-linecap="round"/></g>`;
+  return svg(W, H, note(76, 64, 0.92, "#74d7ff", -8) + note(174, 36, 0.72, "#ff8ac8", 7) + `<path d="M126 84 L186 96" stroke="${INK}" stroke-width="10" stroke-linecap="round"/>`);
+}
+
+function stickerIdeaBulb(): string {
+  const W = 240;
+  const H = 260;
+  const rays = [0, 45, 90, 135, 180].map((rot) => `<path d="M120 24 L120 4" transform="rotate(${rot} 120 110)" stroke="#ffd84d" stroke-width="9" stroke-linecap="round"/>`).join("");
+  const bulb =
+    `<path d="M76 106 C76 64 100 42 120 42 C140 42 164 64 164 106 C164 130 150 144 140 158 L100 158 C90 144 76 130 76 106 Z" fill="#fff2a8" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>` +
+    `<path d="M100 160 L140 160 L136 190 L104 190 Z" fill="#b7c1cc" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>` +
+    `<path d="M102 174 L138 174" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>` +
+    `<path d="M108 96 C116 84 126 84 134 96" fill="none" stroke="#fff8ef" stroke-width="8" stroke-linecap="round"/>`;
+  return svg(W, H, rays + bulb);
+}
+
+function stickerQuestionPop(): string {
+  const W = 210;
+  const H = 260;
+  const hook =
+    `<path d="M52 76 C52 34 90 20 118 20 C154 20 176 42 176 74 C176 114 122 116 120 154 L120 174" fill="none" stroke="${INK}" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="M52 76 C52 34 90 20 118 20 C154 20 176 42 176 74 C176 114 122 116 120 154 L120 174" fill="none" stroke="#7fd8ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return svg(W, H, hook + `<circle cx="120" cy="224" r="22" fill="${INK}"/><circle cx="120" cy="224" r="12" fill="#7fd8ff"/>`);
+}
+
+function stickerExclaimPop(): string {
+  const W = 170;
+  const H = 260;
+  return svg(
+    W,
+    H,
+    `<path d="M60 22 L112 22 L100 172 L72 172 Z" fill="${INK}"/>` +
+      `<path d="M74 34 L99 34 L92 158 L79 158 Z" fill="#ff5d4d"/>` +
+      `<circle cx="86" cy="218" r="27" fill="${INK}"/><circle cx="86" cy="218" r="16" fill="#ff5d4d"/>`,
+  );
+}
+
+function stickerShockLines(): string {
+  const W = 280;
+  const H = 220;
+  const rays = [
+    "M28 110 L108 110",
+    "M42 42 L116 88",
+    "M42 178 L116 132",
+    "M252 110 L172 110",
+    "M238 42 L164 88",
+    "M238 178 L164 132",
+  ]
+    .map((d) => `<path d="${d}" stroke="${INK}" stroke-width="13" stroke-linecap="round"/>`)
+    .join("");
+  return svg(W, H, rays + `<path d="M140 60 L166 110 L140 160 L114 110 Z" fill="#fff8ef" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>`);
+}
+
+function stickerSleepyZzz(): string {
+  const W = 260;
+  const H = 240;
+  const z = (x: number, y: number, s: number) =>
+    `<path d="M${x} ${y} L${x + 58 * s} ${y} L${x} ${y + 58 * s} L${x + 58 * s} ${y + 58 * s}" fill="none" stroke="${INK}" stroke-width="${(12 * s).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const bubbles = `<circle cx="58" cy="178" r="13" fill="#d8f4ff" stroke="${INK}" stroke-width="5"/><circle cx="94" cy="202" r="8" fill="#d8f4ff" stroke="${INK}" stroke-width="4"/>`;
+  return svg(W, H, bubbles + z(38, 78, 1.35) + z(142, 50, 0.95) + z(188, 122, 0.68));
+}
+
+function stickerTwinkle(): string {
+  const W = 240;
+  const H = 240;
+  const star = (x: number, y: number, r: number, color: string) => {
+    const w = r * 0.22;
+    const pts = `${x},${y - r} ${x + w},${y - w} ${x + r},${y} ${x + w},${y + w} ${x},${y + r} ${x - w},${y + w} ${x - r},${y} ${x - w},${y - w}`;
+    return `<polygon points="${pts}" fill="${color}" stroke="${INK}" stroke-width="${Math.max(4, r * 0.11)}" stroke-linejoin="round"/>`;
+  };
+  return svg(W, H, star(124, 104, 58, "#fff2a8") + star(62, 64, 28, "#fff8ef") + star(184, 64, 34, "#ffd84d") + star(178, 170, 24, "#fff8ef"));
+}
+
+function stickerAngryVein(): string {
+  const W = 240;
+  const H = 220;
+  const vein =
+    `<path d="M52 126 C86 98 84 64 118 56 C138 52 150 66 142 84 C166 72 190 78 198 100 C206 122 188 138 164 134 C174 158 164 182 140 188 C112 194 104 166 114 144 C88 154 62 150 52 126 Z" fill="#ff6b5d" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>` +
+    `<path d="M82 124 C110 118 124 100 120 72 M126 118 C148 100 164 98 188 104 M122 130 C118 154 126 170 142 180" fill="none" stroke="${INK}" stroke-width="7" stroke-linecap="round"/>`;
+  return svg(W, H, vein);
+}
+
+function stickerEmbarrassedSweat(): string {
+  const W = 260;
+  const H = 220;
+  const marks =
+    `<path d="M54 64 L90 46 M42 112 L84 112 M58 158 L94 176" stroke="${INK}" stroke-width="9" stroke-linecap="round"/>` +
+    `<path d="M150 48 C166 82 196 100 196 134 C196 170 176 194 150 194 C124 194 104 170 104 134 C104 100 134 82 150 48 Z" fill="#aeeaff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>` +
+    `<ellipse cx="132" cy="134" rx="10" ry="17" fill="#fff8ef" opacity="0.9"/>` +
+    `<path d="M206 62 L224 42 M216 98 L244 92" stroke="#ff8aa3" stroke-width="8" stroke-linecap="round"/>`;
+  return svg(W, H, marks);
+}
+
+function stickerFocusMark(): string {
+  const W = 260;
+  const H = 260;
+  const corners = [
+    "M70 34 L34 34 L34 70",
+    "M190 34 L226 34 L226 70",
+    "M34 190 L34 226 L70 226",
+    "M226 190 L226 226 L190 226",
+  ].map((d) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+  const rays = [0, 60, 120, 180, 240, 300].map((rot) => `<path d="M130 62 L130 26" transform="rotate(${rot} 130 130)" stroke="#ffcf3d" stroke-width="7" stroke-linecap="round"/>`).join("");
+  return svg(W, H, rays + corners + `<circle cx="130" cy="130" r="30" fill="none" stroke="${INK}" stroke-width="8"/><circle cx="130" cy="130" r="7" fill="${INK}"/>`);
+}
+
+export const COMIC_VECTOR_STICKERS: ComicVectorSticker[] = [
+  { id: "sweat-beads", label: "땀방울", svg: stickerSweatDrops(), width: 240, height: 220 },
+  { id: "anger-pop", label: "분노마크", svg: stickerAngerPop(), width: 240, height: 240 },
+  { id: "heart-sticker", label: "하트", svg: stickerHeart(), width: 240, height: 220 },
+  { id: "star-sticker", label: "별", svg: stickerStar(), width: 240, height: 240 },
+  { id: "music-notes-sticker", label: "음표", svg: stickerMusicNotes(), width: 260, height: 240 },
+  { id: "idea-bulb", label: "전구", svg: stickerIdeaBulb(), width: 240, height: 260 },
+  { id: "question-pop", label: "물음표", svg: stickerQuestionPop(), width: 210, height: 260 },
+  { id: "exclaim-pop", label: "느낌표", svg: stickerExclaimPop(), width: 170, height: 260 },
+  { id: "shock-lines-sticker", label: "충격선", svg: stickerShockLines(), width: 280, height: 220 },
+  { id: "sleepy-zzz-sticker", label: "졸음 zzz", svg: stickerSleepyZzz(), width: 260, height: 240 },
+  { id: "twinkle-sticker", label: "반짝", svg: stickerTwinkle(), width: 240, height: 240 },
+  { id: "angry-vein", label: "혈관", svg: stickerAngryVein(), width: 240, height: 220 },
+  { id: "embarrassed-sweat", label: "당황 식은땀", svg: stickerEmbarrassedSweat(), width: 260, height: 220 },
+  { id: "focus-mark", label: "집중", svg: stickerFocusMark(), width: 260, height: 260 },
+];
 
 // 공개 목록(>= 14개). 라벨은 한글, id는 영문.
 export const FX_OVERLAYS: FxOverlay[] = [
