@@ -2,23 +2,18 @@ import Link from "@/src/compat/router-link";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { AdSlot } from "@/components/ad-slot";
 import { CountUp } from "@/components/count-up";
+import { HeroBanner } from "@/components/hero-banner";
 import { HomePersonal } from "@/components/home-personal";
 import { OpenSearchButton } from "@/components/open-search-button";
 import { Rail, Section, Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
-import { TitlePoster } from "@/components/title-poster";
-import { AvailabilityDots } from "@/components/availability";
 import { buttonClass } from "@/components/ui/button";
 import { ErrorState } from "@/src/components/error-state";
-import { GenreChip } from "@/components/ui/chip";
-import { RatingInline } from "@/components/ui/stars";
 import { GenreSpectrum } from "@/components/ui/spectrum-bar";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
-import { statsAreEstimated } from "@/lib/estimate";
 import type { Title } from "@/lib/types";
-import { formatCount } from "@/lib/utils";
-import { ArrowRight, Layers, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Layers, Search } from "lucide-react";
 import { useApiResource } from "./use-api-resource";
 
 interface HomeResponse {
@@ -87,6 +82,11 @@ export function HomePage() {
     stats,
   } = data;
 
+  // 추천 배너 캐러셀 항목 — 스포트라이트를 선두로 추천작을 회전 노출.
+  const bannerItems = spotlight
+    ? [spotlight, ...featured.filter((f) => f.id !== spotlight.id)]
+    : featured;
+
   return (
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
@@ -148,48 +148,7 @@ export function HomePage() {
             </dl>
           </div>
 
-          {spotlight && (
-            <div className="relative" style={{ animation: "fade-up 0.7s var(--ease-out-expo) 0.1s both" }}>
-              <div className="absolute -top-3 left-4 z-10">
-                <span className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-on-accent shadow-[0_6px_20px_-4px_oklch(0.7_0.19_45/0.55)] ring-2 ring-canvas">
-                  <Sparkles size={13} className="shrink-0" /> 이 주의 발견
-                </span>
-              </div>
-              <Link
-                href={`/title/${spotlight.slug}`}
-                className="group block overflow-hidden rounded-2xl border border-line bg-card surface-hl"
-              >
-                <div className="grid grid-cols-[1.1fr_1fr]">
-                  <div className="transition-transform duration-500 ease-out-expo group-hover:scale-[1.03]">
-                    <TitlePoster title={spotlight} size="lg" className="rounded-none border-0" priority titleAs="div" />
-                  </div>
-                  <div className="flex flex-col gap-3 p-5">
-                    <div className="flex flex-wrap gap-1.5">
-                      {spotlight.genres.slice(0, 2).map((genre) => (
-                        <GenreChip key={genre} genre={genre} size="sm" />
-                      ))}
-                    </div>
-                    <h2 className="text-pretty text-xl font-bold leading-tight">{spotlight.title}</h2>
-                    <RatingInline
-                      value={spotlight.stats.ratingAvg}
-                      count={spotlight.stats.ratingCount}
-                      estimated={statsAreEstimated(spotlight)}
-                      size="sm"
-                    />
-                    <p className="font-serif text-sm italic leading-relaxed text-fg-2">
-                      {spotlight.editorNote ?? spotlight.synopsis}
-                    </p>
-                    <div className="mt-auto flex items-center justify-between border-t border-line pt-3">
-                      <AvailabilityDots availability={spotlight.availability} max={4} />
-                      <span className="text-xs font-medium text-accent">
-                        {formatCount(spotlight.stats.views)} 조회
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          )}
+          {bannerItems.length > 0 && <HeroBanner items={bannerItems} />}
         </Container>
       </section>
 
