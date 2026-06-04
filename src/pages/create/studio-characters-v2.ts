@@ -141,6 +141,14 @@ const CHARS: Char[] = [
   { id: "minho", label: "민호", emoji: "🎧", genre: "slice", style: "short",
     skin: "#f1cda7", skinSh: "#ddaf83", hair: "#2c3a4a", hairSh: "#19232f", hairHi: "#54677a",
     iris: "#3a4a5e", irisRim: "#1f2a38", outfit: "#e0a93b", outfitSh: "#c38f22", accent: "#fff", collar: "#fff8ec", eyeScale: 0.96 },
+  // 로판 (북부대공 스타일 백발 적안)
+  { id: "baekhan", label: "백한", emoji: "❄️", genre: "fantasy", style: "spiky",
+    skin: "#f2f7fc", skinSh: "#d5e2f0", hair: "#ffffff", hairSh: "#d2dbe6", hairHi: "#eef5ff",
+    iris: "#4ea3d7", irisRim: "#20679c", outfit: "#202e4d", outfitSh: "#111b30", accent: "#d4af37", collar: "#ffffff", eyeScale: 0.95 },
+  // 무협 (흑발 장발 서생/검사 스타일)
+  { id: "dowon", label: "도원", emoji: "🌙", genre: "wuxia", style: "flow",
+    skin: "#ffece0", skinSh: "#f3ccb5", hair: "#2b2724", hairSh: "#14110f", hairHi: "#5a5047",
+    iris: "#54463a", irisRim: "#2d221b", outfit: "#efeff4", outfitSh: "#cfcfda", accent: "#4a3b32", collar: "#3b3630", eyeScale: 0.98 },
 ];
 
 // ─────────────────────────────────────────────────────────

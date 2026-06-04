@@ -55,11 +55,13 @@ export const TEMPLATES: TemplateSpec[] = [
   { id: "single", label: "한 컷", hint: "일러스트·표지", canvasH: 900, frames: stack(1, 900) },
 ];
 
-export type BubbleVariant = "speech" | "thought" | "shout" | "box";
+export type BubbleVariant = "speech" | "thought" | "shout" | "box" | "whisper" | "scared";
 export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; sample: string }[] = [
   { id: "speech", label: "말하기", sample: "💬" },
   { id: "thought", label: "생각", sample: "💭" },
   { id: "shout", label: "외침", sample: "📢" },
+  { id: "whisper", label: "속삭임", sample: "🤫" },
+  { id: "scared", label: "소심/공포", sample: "😰" },
   { id: "box", label: "내레이션", sample: "▭" },
 ];
 

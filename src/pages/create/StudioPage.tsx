@@ -222,7 +222,7 @@ export function StudioPage() {
   const elements = history[hi];
   const [bg, setBg] = useState("#ffffff");
   const [canvasH, setCanvasH] = useState(1080);
-  const [webtoonTheme, setWebtoonTheme] = useState<"classic" | "naver" | "kakao">("naver");
+  const [webtoonTheme, setWebtoonTheme] = useState<"classic" | "soft" | "vivid">("soft");
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -272,7 +272,7 @@ export function StudioPage() {
         setTitle(w.title);
         setDescription(w.description);
         setTagsText((w.tags ?? []).join(", "));
-        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number; webtoonTheme?: "classic" | "naver" | "kakao" };
+        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number; webtoonTheme?: "classic" | "soft" | "vivid" };
         if (doc?.elements) setHistory([doc.elements]);
         if (doc?.bg) setBg(doc.bg);
         if (doc?.bgGrad) setBgGrad(doc.bgGrad);
@@ -364,7 +364,7 @@ export function StudioPage() {
       y: canvasH / 2 - 70,
       width: 260,
       height: 140,
-      fill: variant === "shout" ? "#fff6d6" : "#ffffff",
+      fill: variant === "shout" ? "#fff6d6" : variant === "scared" ? "#f5f3ff" : "#ffffff",
       textFill: "#111111",
       rotation: 0,
     });
@@ -844,11 +844,11 @@ export function StudioPage() {
                   let fShadowOpacity = 0;
                   let fShadowOffset = undefined;
 
-                  if (webtoonTheme === "naver") {
+                  if (webtoonTheme === "soft") {
                     fStroke = "#222222";
                     fStrokeW = 1.8;
                     fRadius = 0;
-                  } else if (webtoonTheme === "kakao") {
+                  } else if (webtoonTheme === "vivid") {
                     fStroke = "#3a3a3a";
                     fStrokeW = 1.2;
                     fRadius = 6;
@@ -970,12 +970,12 @@ export function StudioPage() {
                 let bShadowOffset = undefined;
                 let bTailPoints = [el.width * 0.3, el.height - 3, el.width * 0.22, el.height + 30, el.width * 0.47, el.height - 3];
 
-                if (webtoonTheme === "naver") {
+                if (webtoonTheme === "soft") {
                   bStroke = "#2d2d2d";
                   bStrokeW = 1.8;
                   bRadius = 24;
                   bTailPoints = [el.width * 0.4, el.height - 2, el.width * 0.35, el.height + 20, el.width * 0.52, el.height - 2];
-                } else if (webtoonTheme === "kakao") {
+                } else if (webtoonTheme === "vivid") {
                   bStroke = "#444444";
                   bStrokeW = 1.0;
                   bRadius = Math.min(el.width, el.height) / 2;
@@ -1037,6 +1037,51 @@ export function StudioPage() {
                         />
                         <Ellipse x={el.width * 0.26} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
                         <Ellipse x={el.width * 0.16} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                      </>
+                    ) : el.variant === "whisper" ? (
+                      <>
+                        <Rect
+                          width={el.width}
+                          height={el.height}
+                          fill={el.fill}
+                          cornerRadius={bRadius}
+                          stroke={bStroke}
+                          strokeWidth={bStrokeW}
+                          dash={[8, 5]}
+                        />
+                        <Line
+                          points={bTailPoints}
+                          closed
+                          fill={el.fill}
+                          stroke={bStroke}
+                          strokeWidth={bStrokeW}
+                          dash={[8, 5]}
+                        />
+                      </>
+                    ) : el.variant === "scared" ? (
+                      <>
+                        <Rect
+                          width={el.width}
+                          height={el.height}
+                          fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
+                          cornerRadius={14}
+                          stroke="#7c3aed"
+                          strokeWidth={2}
+                          shadowColor="#7c3aed"
+                          shadowBlur={6}
+                          shadowOpacity={0.16}
+                        />
+                        <Line
+                          points={[
+                            el.width * 0.32, el.height - 2,
+                            el.width * 0.26, el.height + 22,
+                            el.width * 0.45, el.height - 2
+                          ]}
+                          closed
+                          fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
+                          stroke="#7c3aed"
+                          strokeWidth={2}
+                        />
                       </>
                     ) : el.variant === "box" ? (
                       <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
@@ -1144,7 +1189,7 @@ export function StudioPage() {
             <div className="mt-3 border-t border-line pt-3">
               <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
               <div className="grid grid-cols-3 gap-1 bg-card rounded-lg p-0.5 border border-line">
-                {(["classic", "naver", "kakao"] as const).map((style) => (
+                {(["classic", "soft", "vivid"] as const).map((style) => (
                   <button
                     key={style}
                     type="button"
@@ -1156,7 +1201,7 @@ export function StudioPage() {
                         : "text-fg-2 hover:bg-raised"
                     )}
                   >
-                    {style === "classic" ? "출판만화" : style === "naver" ? "네이버" : "카카오"}
+                    {style === "classic" ? "출판만화" : style === "soft" ? "소프트" : "비비드"}
                   </button>
                 ))}
               </div>
