@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bounds, Capsule, Cone, ContactShadows, Cylinder, OrbitControls, RoundedBox, Sphere, Torus } from "@react-three/drei";
 import { Camera, Check, Glasses, Heart, Rotate3D, Sparkles, UserRound, WandSparkles, X } from "lucide-react";
@@ -38,11 +38,72 @@ const EYE_WHITE = "#fff8ef";
 const EYE_HIGHLIGHT = "#fffef9";
 const TEAR_BLUE = "#7bbff7";
 const HAT_DARK = "#33251f";
+const INK_OUTLINE = "#16100c";
+const INK_OUTLINE_SCALE = 1.052;
+const INK_OUTLINE_USER_DATA_KEY = "studio3dInkOutline";
+
+function createToonGradientMap() {
+  const gradient = new Uint8Array([
+    120, 120, 120, 255,
+    206, 206, 206, 255,
+    255, 255, 255, 255,
+  ]);
+  const texture = new THREE.DataTexture(gradient, 3, 1, THREE.RGBAFormat);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+const TOON_GRADIENT_MAP = createToonGradientMap();
+const INK_OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({
+  color: INK_OUTLINE,
+  side: THREE.BackSide,
+  toneMapped: false,
+});
 
 const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" ");
 
-function materialProps(color: string, roughness = 0.72) {
-  return { color, roughness, metalness: 0.02 };
+function materialProps(color: string, _flatness = 0.72) {
+  return { color, gradientMap: TOON_GRADIENT_MAP };
+}
+
+function isMesh(object: THREE.Object3D): object is THREE.Mesh {
+  return (object as THREE.Mesh).isMesh === true;
+}
+
+function addInkOutline(mesh: THREE.Mesh) {
+  const outline = new THREE.Mesh(mesh.geometry, INK_OUTLINE_MATERIAL);
+  outline.name = `${mesh.name || "characterMesh"}InkOutline`;
+  outline.userData[INK_OUTLINE_USER_DATA_KEY] = true;
+  outline.castShadow = false;
+  outline.receiveShadow = false;
+  outline.frustumCulled = mesh.frustumCulled;
+  outline.scale.setScalar(INK_OUTLINE_SCALE);
+  mesh.add(outline);
+  return outline;
+}
+
+function CharacterInkOutlines({ rootRef }: { rootRef: MutableRefObject<THREE.Group | null> }) {
+  // Character branches swap meshes for expressions and accessories, so refresh outlines after each commit.
+  useLayoutEffect(() => {
+    if (!rootRef.current) return undefined;
+
+    const outlines: THREE.Mesh[] = [];
+    rootRef.current.traverse((object) => {
+      if (!isMesh(object) || object.userData[INK_OUTLINE_USER_DATA_KEY] === true) return;
+      outlines.push(addInkOutline(object));
+    });
+
+    return () => {
+      outlines.forEach((outline) => {
+        outline.parent?.remove(outline);
+      });
+    };
+  });
+
+  return null;
 }
 
 function findCharacter(id: string) {
@@ -117,9 +178,11 @@ function ChibiCharacter({
   pose: PosePreset;
   bodyRotation: number;
 }) {
+  const characterRootRef = useRef<THREE.Group>(null);
+
   return (
     <BreathingRoot lift={pose.lift}>
-      <group rotation={[0, bodyRotation, 0]}>
+      <group ref={characterRootRef} rotation={[0, bodyRotation, 0]}>
         <group rotation={pose.body}>
           <BackPropView character={character} />
 
@@ -127,13 +190,13 @@ function ChibiCharacter({
           <Leg side="right" rotation={pose.rightLeg} character={character} />
 
           <Capsule args={[0.42, 0.46, 8, 18]} position={[0, 1.12, 0]} scale={[1, 1.08, 0.84]} castShadow receiveShadow>
-            <meshStandardMaterial {...materialProps(character.outfit)} />
+            <meshToonMaterial {...materialProps(character.outfit)} />
           </Capsule>
           <RoundedBox args={[0.58, 0.18, 0.42]} radius={0.07} smoothness={5} position={[0, 1.37, 0.23]} castShadow receiveShadow>
-            <meshStandardMaterial {...materialProps(character.outfitTrim, 0.66)} />
+            <meshToonMaterial {...materialProps(character.outfitTrim, 0.66)} />
           </RoundedBox>
           <Sphere args={[0.18, 16, 10]} position={[0, 1.56, 0.01]} scale={[0.8, 0.55, 0.8]} castShadow receiveShadow>
-            <meshStandardMaterial {...materialProps(character.skin)} />
+            <meshToonMaterial {...materialProps(character.skin)} />
           </Sphere>
 
           <Arm side="left" rotation={pose.leftArm} character={character} />
@@ -141,7 +204,7 @@ function ChibiCharacter({
 
           <group position={[0, 2.02, 0.05]} rotation={pose.head}>
             <Sphere args={[0.7, 24, 16]} scale={[1, 0.95, 0.98]} castShadow receiveShadow>
-              <meshStandardMaterial {...materialProps(character.skin)} />
+              <meshToonMaterial {...materialProps(character.skin)} />
             </Sphere>
             <Hair style={character.hairStyle} fringe={character.fringe} color={character.hair} />
             <HeadPropView character={character} />
@@ -149,6 +212,7 @@ function ChibiCharacter({
             <AccessoryView character={character} />
           </group>
         </group>
+        <CharacterInkOutlines rootRef={characterRootRef} />
       </group>
     </BreathingRoot>
   );
@@ -160,13 +224,13 @@ function Arm({ side, rotation, character }: { side: "left" | "right"; rotation: 
   return (
     <group position={[x, 1.43, 0.04]} rotation={rotation}>
       <Capsule args={[0.105, 0.26, 6, 12]} position={[0, -0.2, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.outfit)} />
+        <meshToonMaterial {...materialProps(character.outfit)} />
       </Capsule>
       <Capsule args={[0.09, 0.22, 6, 12]} position={[0, -0.45, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.skin)} />
+        <meshToonMaterial {...materialProps(character.skin)} />
       </Capsule>
       <Sphere args={[0.12, 14, 10]} position={[0, -0.66, 0.02]} scale={[1, 0.92, 1]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.skin)} />
+        <meshToonMaterial {...materialProps(character.skin)} />
       </Sphere>
     </group>
   );
@@ -178,13 +242,13 @@ function Leg({ side, rotation, character }: { side: "left" | "right"; rotation: 
   return (
     <group position={[x, 0.82, 0.02]} rotation={rotation}>
       <Capsule args={[0.13, 0.38, 6, 12]} position={[0, -0.28, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.outfitTrim, 0.68)} />
+        <meshToonMaterial {...materialProps(character.outfitTrim, 0.68)} />
       </Capsule>
       <Capsule args={[0.105, 0.18, 6, 12]} position={[0, -0.56, 0.01]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.skin)} />
+        <meshToonMaterial {...materialProps(character.skin)} />
       </Capsule>
       <RoundedBox args={[0.27, 0.14, 0.32]} radius={0.06} smoothness={5} position={[0, -0.72, 0.09]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(character.shoe, 0.78)} />
+        <meshToonMaterial {...materialProps(character.shoe, 0.78)} />
       </RoundedBox>
     </group>
   );
@@ -195,10 +259,10 @@ function BackPropView({ character }: { character: CharacterPreset }) {
     return (
       <group position={[0, 1.06, -0.23]} rotation={[0.05, 0, 0]}>
         <Sphere args={[0.44, 18, 10]} scale={[1.12, 1.32, 0.16]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.accessoryColor, 0.7)} />
+          <meshToonMaterial {...materialProps(character.accessoryColor, 0.7)} />
         </Sphere>
         <RoundedBox args={[0.76, 0.08, 0.08]} radius={0.035} smoothness={5} position={[0, 0.42, 0.05]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.outfitTrim, 0.62)} />
+          <meshToonMaterial {...materialProps(character.outfitTrim, 0.62)} />
         </RoundedBox>
       </group>
     );
@@ -208,13 +272,13 @@ function BackPropView({ character }: { character: CharacterPreset }) {
     return (
       <group position={[0.27, 1.22, -0.35]} rotation={[0, 0, -0.64]}>
         <Capsule args={[0.035, 0.96, 5, 12]} position={[0, 0, 0]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps("#cbd4dd", 0.42)} />
+          <meshToonMaterial {...materialProps("#cbd4dd", 0.42)} />
         </Capsule>
         <Capsule args={[0.045, 0.24, 5, 10]} position={[0, 0.58, 0.02]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.shoe, 0.66)} />
+          <meshToonMaterial {...materialProps(character.shoe, 0.66)} />
         </Capsule>
         <Capsule args={[0.024, 0.22, 4, 8]} position={[0, 0.43, 0.03]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.outfitTrim, 0.58)} />
+          <meshToonMaterial {...materialProps(character.outfitTrim, 0.58)} />
         </Capsule>
       </group>
     );
@@ -228,13 +292,13 @@ function HeadPropView({ character }: { character: CharacterPreset }) {
     return (
       <group position={[0.02, 0.7, -0.02]} rotation={[0.02, 0, -0.14]}>
         <Cylinder args={[0.48, 0.56, 0.06, 28]} position={[0, -0.09, 0.08]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.outfitTrim, 0.64)} />
+          <meshToonMaterial {...materialProps(character.outfitTrim, 0.64)} />
         </Cylinder>
         <Cone args={[0.34, 0.76, 26]} position={[0, 0.26, 0.02]} rotation={[0.1, 0, 0.1]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.accessoryColor, 0.58)} />
+          <meshToonMaterial {...materialProps(character.accessoryColor, 0.58)} />
         </Cone>
         <Capsule args={[0.018, 0.32, 4, 8]} position={[0.02, 0.03, 0.34]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.outfitTrim, 0.54)} />
+          <meshToonMaterial {...materialProps(character.outfitTrim, 0.54)} />
         </Capsule>
       </group>
     );
@@ -244,10 +308,10 @@ function HeadPropView({ character }: { character: CharacterPreset }) {
     return (
       <group position={[0, 0.33, 0.64]}>
         <Capsule args={[0.027, 0.82, 4, 14]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.accessoryColor, 0.58)} />
+          <meshToonMaterial {...materialProps(character.accessoryColor, 0.58)} />
         </Capsule>
         <Capsule args={[0.02, 0.24, 4, 8]} position={[0.47, -0.04, -0.02]} rotation={[0, 0, -0.36]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(character.accessoryColor, 0.58)} />
+          <meshToonMaterial {...materialProps(character.accessoryColor, 0.58)} />
         </Capsule>
       </group>
     );
@@ -260,7 +324,7 @@ function Hair({ style, fringe, color }: { style: HairStyle; fringe: FringeStyle;
   return (
     <group>
       <Sphere args={[0.69, 20, 12]} position={[0, 0.28, -0.16]} scale={[1.04, 0.58, 0.92]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Sphere>
       <Fringe style={fringe} color={color} />
 
@@ -300,7 +364,7 @@ function Fringe({ style, color }: { style: FringeStyle; color: string }) {
         <FringeLock x={-0.23} y={0.3} z={0.58} scale={[1.22, 0.44, 0.22]} rotation={-0.18} color={color} />
         <FringeLock x={0.24} y={0.3} z={0.58} scale={[1.2, 0.42, 0.22]} rotation={0.18} color={color} />
         <Sphere args={[0.025, 8, 6]} position={[0, 0.34, 0.6]} scale={[0.7, 1.2, 0.2]}>
-          <meshStandardMaterial {...materialProps(characterBandColor(color), 0.68)} />
+          <meshToonMaterial {...materialProps(characterBandColor(color), 0.68)} />
         </Sphere>
       </group>
     );
@@ -320,7 +384,7 @@ function Fringe({ style, color }: { style: FringeStyle; color: string }) {
     return (
       <group>
         <RoundedBox args={[0.92, 0.18, 0.18]} radius={0.08} smoothness={7} position={[0, 0.27, 0.57]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(color, 0.6)} />
+          <meshToonMaterial {...materialProps(color, 0.6)} />
         </RoundedBox>
         <FringeLock x={-0.47} y={0.24} z={0.55} scale={[0.44, 0.32, 0.17]} rotation={0.12} color={color} />
         <FringeLock x={0.47} y={0.24} z={0.55} scale={[0.44, 0.32, 0.17]} rotation={-0.12} color={color} />
@@ -353,7 +417,7 @@ function FringeLock({
 }) {
   return (
     <Sphere args={[0.22, 18, 10]} position={[x, y, z]} rotation={[0, 0, rotation]} scale={scale} castShadow receiveShadow>
-      <meshStandardMaterial {...materialProps(color, 0.6)} />
+      <meshToonMaterial {...materialProps(color, 0.6)} />
     </Sphere>
   );
 }
@@ -362,13 +426,13 @@ function BobHair({ color }: { color: string }) {
   return (
     <group>
       <Capsule args={[0.15, 0.42, 6, 12]} position={[-0.58, -0.12, 0.02]} rotation={[0, 0, -0.08]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Capsule>
       <Capsule args={[0.15, 0.42, 6, 12]} position={[0.58, -0.12, 0.02]} rotation={[0, 0, 0.08]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Capsule>
       <RoundedBox args={[0.82, 0.34, 0.42]} radius={0.13} smoothness={6} position={[0, -0.18, -0.33]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.64)} />
+        <meshToonMaterial {...materialProps(color, 0.64)} />
       </RoundedBox>
     </group>
   );
@@ -378,10 +442,10 @@ function ShortHair({ color }: { color: string }) {
   return (
     <group>
       <Capsule args={[0.11, 0.32, 5, 10]} position={[-0.56, 0.02, 0.08]} rotation={[0, 0, -0.25]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Capsule>
       <Capsule args={[0.1, 0.28, 5, 10]} position={[0.55, 0.05, 0.04]} rotation={[0, 0, 0.25]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Capsule>
     </group>
   );
@@ -391,16 +455,16 @@ function TwinHair({ color }: { color: string }) {
   return (
     <group>
       <Sphere args={[0.26, 16, 10]} position={[-0.82, 0.0, -0.02]} scale={[0.86, 1.15, 0.84]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Sphere>
       <Sphere args={[0.26, 16, 10]} position={[0.82, 0.0, -0.02]} scale={[0.86, 1.15, 0.84]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Sphere>
       <Capsule args={[0.06, 0.18, 5, 10]} position={[-0.58, 0.08, 0.0]} rotation={[0, 0, 1.2]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps("#f4efe4", 0.68)} />
+        <meshToonMaterial {...materialProps("#f4efe4", 0.68)} />
       </Capsule>
       <Capsule args={[0.06, 0.18, 5, 10]} position={[0.58, 0.08, 0.0]} rotation={[0, 0, -1.2]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps("#f4efe4", 0.68)} />
+        <meshToonMaterial {...materialProps("#f4efe4", 0.68)} />
       </Capsule>
     </group>
   );
@@ -420,7 +484,7 @@ function CurlyHair({ color }: { color: string }) {
     <group>
       {curls.map(([x, y, z]) => (
         <Sphere key={`${x}-${y}-${z}`} args={[0.15, 12, 8]} position={[x, y, z]} scale={[1, 0.92, 0.82]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(color, 0.58)} />
+          <meshToonMaterial {...materialProps(color, 0.58)} />
         </Sphere>
       ))}
     </group>
@@ -431,10 +495,10 @@ function SideHair({ color }: { color: string }) {
   return (
     <group>
       <Capsule args={[0.18, 0.58, 7, 12]} position={[0.78, -0.08, -0.1]} rotation={[0, 0, -0.38]} scale={[1, 1, 0.86]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Capsule>
       <Sphere args={[0.18, 14, 9]} position={[0.84, -0.42, -0.05]} scale={[0.82, 1, 0.8]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Sphere>
     </group>
   );
@@ -444,13 +508,13 @@ function SpikyHair({ color }: { color: string }) {
   return (
     <group>
       <Cone args={[0.15, 0.38, 5]} position={[-0.32, 0.66, -0.08]} rotation={[0, 0, -0.32]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.58)} />
+        <meshToonMaterial {...materialProps(color, 0.58)} />
       </Cone>
       <Cone args={[0.17, 0.46, 5]} position={[0, 0.72, -0.06]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.58)} />
+        <meshToonMaterial {...materialProps(color, 0.58)} />
       </Cone>
       <Cone args={[0.15, 0.36, 5]} position={[0.32, 0.64, -0.08]} rotation={[0, 0, 0.28]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.58)} />
+        <meshToonMaterial {...materialProps(color, 0.58)} />
       </Cone>
     </group>
   );
@@ -476,7 +540,7 @@ function ExpressionFace({ expression, blush, eyeColor }: { expression: Expressio
 function Cheek({ x, color }: { x: number; color: string }) {
   return (
     <Sphere args={[0.055, 12, 8]} position={[x, -0.15, 0.705]} scale={[1.45, 0.72, 0.18]}>
-      <meshStandardMaterial color={color} roughness={0.86} metalness={0} transparent opacity={0.78} />
+      <meshToonMaterial {...materialProps(color)} transparent opacity={0.78} />
     </Sphere>
   );
 }
@@ -504,21 +568,21 @@ function AnimeEye({
   return (
     <group position={[x, config.y, 0.708]} rotation={[0, 0, rotation]}>
       <Sphere args={[0.115, 20, 12]} scale={config.scale}>
-        <meshStandardMaterial color={EYE_WHITE} roughness={0.58} metalness={0} />
+        <meshToonMaterial {...materialProps(EYE_WHITE)} />
       </Sphere>
       {shape === "narrow" && (
         <Capsule args={[0.01, 0.2, 4, 8]} position={[0, 0.066, 0.018]} rotation={[0, 0, Math.PI / 2]} scale={[1, 1, 0.18]}>
-          <meshStandardMaterial {...materialProps(FACE_DARK, 0.76)} />
+          <meshToonMaterial {...materialProps(FACE_DARK, 0.76)} />
         </Capsule>
       )}
       <Sphere args={[0.061, 18, 10]} position={[0, irisOffsetY, 0.026]} scale={config.irisScale}>
-        <meshStandardMaterial color={color} roughness={0.44} metalness={0.01} />
+        <meshToonMaterial {...materialProps(color)} />
       </Sphere>
       <Sphere args={[0.032, 14, 8]} position={[0, irisOffsetY - 0.003, 0.049]} scale={[1, 1, 0.2]}>
-        <meshStandardMaterial {...materialProps(FACE_DARK, 0.68)} />
+        <meshToonMaterial {...materialProps(FACE_DARK, 0.68)} />
       </Sphere>
       <Sphere args={[0.014, 10, 6]} position={[-0.022, irisOffsetY + 0.028, 0.068]} scale={[1, 1, 0.18]}>
-        <meshStandardMaterial color={EYE_HIGHLIGHT} roughness={0.34} metalness={0} />
+        <meshToonMaterial {...materialProps(EYE_HIGHLIGHT)} />
       </Sphere>
     </group>
   );
@@ -527,7 +591,7 @@ function AnimeEye({
 function EyeSmile({ x }: { x: number }) {
   return (
     <Torus args={[0.1, 0.013, 7, 24, Math.PI]} position={[x, 0.06, 0.735]} rotation={[0, 0, Math.PI]} scale={[1.12, 0.56, 1]}>
-      <meshStandardMaterial {...materialProps(FACE_DARK, 0.78)} />
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
     </Torus>
   );
 }
@@ -535,7 +599,7 @@ function EyeSmile({ x }: { x: number }) {
 function Eyebrow({ x, y = 0.22, rotation = 0 }: { x: number; y?: number; rotation?: number }) {
   return (
     <Capsule args={[0.012, 0.15, 4, 8]} position={[x, y, 0.738]} rotation={[0, 0, rotation]}>
-      <meshStandardMaterial {...materialProps(FACE_DARK, 0.76)} />
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.76)} />
     </Capsule>
   );
 }
@@ -543,7 +607,7 @@ function Eyebrow({ x, y = 0.22, rotation = 0 }: { x: number; y?: number; rotatio
 function MouthSmile({ y = -0.25, scale = 1 }: { y?: number; scale?: number }) {
   return (
     <Torus args={[0.13 * scale, 0.014, 6, 24, Math.PI]} position={[0, y, 0.735]} rotation={[0, 0, Math.PI]} scale={[1, 0.55, 1]}>
-      <meshStandardMaterial {...materialProps(FACE_DARK, 0.78)} />
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
     </Torus>
   );
 }
@@ -551,7 +615,7 @@ function MouthSmile({ y = -0.25, scale = 1 }: { y?: number; scale?: number }) {
 function MouthSad() {
   return (
     <Torus args={[0.12, 0.014, 6, 22, Math.PI]} position={[0, -0.27, 0.735]} scale={[1, 0.5, 1]}>
-      <meshStandardMaterial {...materialProps(FACE_DARK, 0.78)} />
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
     </Torus>
   );
 }
@@ -559,7 +623,7 @@ function MouthSad() {
 function MouthFlat({ y = -0.27 }: { y?: number }) {
   return (
     <Capsule args={[0.014, 0.14, 4, 8]} position={[0, y, 0.735]} rotation={[0, 0, Math.PI / 2]}>
-      <meshStandardMaterial {...materialProps(FACE_DARK, 0.78)} />
+      <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
     </Capsule>
   );
 }
@@ -585,7 +649,7 @@ function SadFace({ eyeColor }: { eyeColor: string }) {
       <AnimeEye x={0.24} color={eyeColor} shape="droopy" rotation={0.05} irisOffsetY={-0.012} />
       <MouthSad />
       <Sphere args={[0.035, 10, 7]} position={[0.36, -0.02, 0.748]} scale={[0.65, 1.2, 0.2]}>
-        <meshStandardMaterial color={TEAR_BLUE} roughness={0.5} metalness={0} />
+        <meshToonMaterial {...materialProps(TEAR_BLUE)} />
       </Sphere>
     </group>
   );
@@ -611,7 +675,7 @@ function SurprisedFace({ eyeColor }: { eyeColor: string }) {
       <AnimeEye x={-0.24} color={eyeColor} shape="wide" irisOffsetY={0.002} />
       <AnimeEye x={0.24} color={eyeColor} shape="wide" irisOffsetY={0.002} />
       <Torus args={[0.075, 0.018, 8, 24]} position={[0, -0.26, 0.735]} scale={[0.78, 1.05, 1]}>
-        <meshStandardMaterial {...materialProps(FACE_DARK, 0.78)} />
+        <meshToonMaterial {...materialProps(FACE_DARK, 0.78)} />
       </Torus>
     </group>
   );
@@ -633,16 +697,16 @@ function HeartEye({ x }: { x: number }) {
   return (
     <group position={[x, 0.05, 0.728]}>
       <Sphere args={[0.045, 10, 7]} position={[-0.035, 0.035, 0]} scale={[1, 1, 0.18]}>
-        <meshStandardMaterial {...materialProps(HEART_RED, 0.62)} />
+        <meshToonMaterial {...materialProps(HEART_RED, 0.62)} />
       </Sphere>
       <Sphere args={[0.045, 10, 7]} position={[0.035, 0.035, 0]} scale={[1, 1, 0.18]}>
-        <meshStandardMaterial {...materialProps(HEART_RED, 0.62)} />
+        <meshToonMaterial {...materialProps(HEART_RED, 0.62)} />
       </Sphere>
       <Cone args={[0.066, 0.11, 3]} position={[0, -0.02, 0]} rotation={[0, 0, Math.PI]} scale={[1, 1, 0.2]}>
-        <meshStandardMaterial {...materialProps(HEART_RED, 0.62)} />
+        <meshToonMaterial {...materialProps(HEART_RED, 0.62)} />
       </Cone>
       <Sphere args={[0.012, 8, 5]} position={[-0.026, 0.06, 0.035]} scale={[1, 1, 0.16]}>
-        <meshStandardMaterial color={EYE_HIGHLIGHT} roughness={0.34} metalness={0} />
+        <meshToonMaterial {...materialProps(EYE_HIGHLIGHT)} />
       </Sphere>
     </group>
   );
@@ -682,13 +746,13 @@ function GlassesAccessory({ color }: { color: string }) {
   return (
     <group>
       <Torus args={[0.15, 0.012, 8, 28]} position={[-0.24, 0.05, 0.72]} scale={[1, 0.82, 1]}>
-        <meshStandardMaterial {...materialProps(color, 0.7)} />
+        <meshToonMaterial {...materialProps(color, 0.7)} />
       </Torus>
       <Torus args={[0.15, 0.012, 8, 28]} position={[0.24, 0.05, 0.72]} scale={[1, 0.82, 1]}>
-        <meshStandardMaterial {...materialProps(color, 0.7)} />
+        <meshToonMaterial {...materialProps(color, 0.7)} />
       </Torus>
       <Capsule args={[0.01, 0.14, 4, 8]} position={[0, 0.05, 0.72]} rotation={[0, 0, Math.PI / 2]}>
-        <meshStandardMaterial {...materialProps(color, 0.7)} />
+        <meshToonMaterial {...materialProps(color, 0.7)} />
       </Capsule>
     </group>
   );
@@ -698,13 +762,13 @@ function RibbonAccessory({ color }: { color: string }) {
   return (
     <group position={[0.38, 0.63, 0.12]} rotation={[0, 0, -0.2]}>
       <Sphere args={[0.14, 14, 8]} position={[-0.11, 0, 0]} scale={[1.35, 0.76, 0.36]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.55)} />
+        <meshToonMaterial {...materialProps(color, 0.55)} />
       </Sphere>
       <Sphere args={[0.14, 14, 8]} position={[0.11, 0, 0]} scale={[1.35, 0.76, 0.36]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.55)} />
+        <meshToonMaterial {...materialProps(color, 0.55)} />
       </Sphere>
       <Sphere args={[0.055, 10, 6]} position={[0, 0, 0.03]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps("#ffd1df", 0.6)} />
+        <meshToonMaterial {...materialProps("#ffd1df", 0.6)} />
       </Sphere>
     </group>
   );
@@ -714,16 +778,16 @@ function CatEarsAccessory({ color }: { color: string }) {
   return (
     <group>
       <Cone args={[0.18, 0.38, 4]} position={[-0.38, 0.68, -0.03]} rotation={[0, 0, 0.26]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.58)} />
+        <meshToonMaterial {...materialProps(color, 0.58)} />
       </Cone>
       <Cone args={[0.18, 0.38, 4]} position={[0.38, 0.68, -0.03]} rotation={[0, 0, -0.26]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.58)} />
+        <meshToonMaterial {...materialProps(color, 0.58)} />
       </Cone>
       <Cone args={[0.09, 0.19, 4]} position={[-0.38, 0.69, 0.02]} rotation={[0, 0, 0.26]} scale={[0.72, 0.72, 0.72]}>
-        <meshStandardMaterial {...materialProps(FACE_SOFT, 0.68)} />
+        <meshToonMaterial {...materialProps(FACE_SOFT, 0.68)} />
       </Cone>
       <Cone args={[0.09, 0.19, 4]} position={[0.38, 0.69, 0.02]} rotation={[0, 0, -0.26]} scale={[0.72, 0.72, 0.72]}>
-        <meshStandardMaterial {...materialProps(FACE_SOFT, 0.68)} />
+        <meshToonMaterial {...materialProps(FACE_SOFT, 0.68)} />
       </Cone>
     </group>
   );
@@ -733,13 +797,13 @@ function HatAccessory({ color }: { color: string }) {
   return (
     <group position={[0, 0.55, 0.02]} rotation={[0.02, 0, -0.12]}>
       <Cylinder args={[0.58, 0.58, 0.055, 28]} position={[0, 0, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(HAT_DARK, 0.68)} />
+        <meshToonMaterial {...materialProps(HAT_DARK, 0.68)} />
       </Cylinder>
       <Cylinder args={[0.38, 0.44, 0.25, 24]} position={[0, 0.13, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.62)} />
+        <meshToonMaterial {...materialProps(color, 0.62)} />
       </Cylinder>
       <Capsule args={[0.018, 0.42, 4, 10]} position={[0, 0.02, 0.2]} rotation={[0, 0, Math.PI / 2]}>
-        <meshStandardMaterial {...materialProps(characterBandColor(color), 0.6)} />
+        <meshToonMaterial {...materialProps(characterBandColor(color), 0.6)} />
       </Capsule>
     </group>
   );
@@ -763,11 +827,11 @@ function FlowerAccessory({ color }: { color: string }) {
     <group position={[-0.43, 0.45, 0.48]} rotation={[0, 0, -0.2]}>
       {petals.map(([x, y]) => (
         <Sphere key={`${x}-${y}`} args={[0.055, 10, 6]} position={[x, y, 0]} scale={[1, 0.72, 0.22]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(color, 0.58)} />
+          <meshToonMaterial {...materialProps(color, 0.58)} />
         </Sphere>
       ))}
       <Sphere args={[0.04, 10, 6]} position={[0, 0, 0.03]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps("#ffd86b", 0.55)} />
+        <meshToonMaterial {...materialProps("#ffd86b", 0.55)} />
       </Sphere>
     </group>
   );
@@ -777,10 +841,10 @@ function HornsAccessory({ color }: { color: string }) {
   return (
     <group>
       <Cone args={[0.12, 0.3, 5]} position={[-0.34, 0.66, -0.04]} rotation={[0, 0, 0.42]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.56)} />
+        <meshToonMaterial {...materialProps(color, 0.56)} />
       </Cone>
       <Cone args={[0.12, 0.3, 5]} position={[0.34, 0.66, -0.04]} rotation={[0, 0, -0.42]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.56)} />
+        <meshToonMaterial {...materialProps(color, 0.56)} />
       </Cone>
     </group>
   );
@@ -790,13 +854,13 @@ function MaidHeadbandAccessory({ color }: { color: string }) {
   return (
     <group position={[0, 0.55, 0.3]} rotation={[0.08, 0, 0]}>
       <Capsule args={[0.035, 0.56, 5, 12]} rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.72)} />
+        <meshToonMaterial {...materialProps(color, 0.72)} />
       </Capsule>
       <Sphere args={[0.055, 10, 6]} position={[-0.2, 0.035, 0.02]} scale={[1.1, 0.7, 0.22]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.72)} />
+        <meshToonMaterial {...materialProps(color, 0.72)} />
       </Sphere>
       <Sphere args={[0.055, 10, 6]} position={[0.2, 0.035, 0.02]} scale={[1.1, 0.7, 0.22]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.72)} />
+        <meshToonMaterial {...materialProps(color, 0.72)} />
       </Sphere>
     </group>
   );
@@ -806,15 +870,15 @@ function CrownAccessory({ color }: { color: string }) {
   return (
     <group position={[0, 0.67, 0.03]} rotation={[0, 0, -0.04]}>
       <Cylinder args={[0.24, 0.28, 0.08, 18]} position={[0, 0, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps(color, 0.42)} />
+        <meshToonMaterial {...materialProps(color, 0.42)} />
       </Cylinder>
       {[-0.14, 0, 0.14].map((x) => (
         <Cone key={x} args={[0.07, 0.16, 5]} position={[x, 0.11, 0]} castShadow receiveShadow>
-          <meshStandardMaterial {...materialProps(color, 0.4)} />
+          <meshToonMaterial {...materialProps(color, 0.4)} />
         </Cone>
       ))}
       <Sphere args={[0.024, 8, 5]} position={[0, 0.2, 0.03]} scale={[1, 1, 0.24]}>
-        <meshStandardMaterial {...materialProps("#fff0a8", 0.38)} />
+        <meshToonMaterial {...materialProps("#fff0a8", 0.38)} />
       </Sphere>
     </group>
   );
@@ -824,10 +888,10 @@ function AntennaAccessory({ color }: { color: string }) {
   return (
     <group position={[0.28, 0.68, 0.03]} rotation={[0, 0, -0.22]}>
       <Capsule args={[0.018, 0.28, 4, 8]} position={[0, 0.1, 0]} castShadow receiveShadow>
-        <meshStandardMaterial {...materialProps("#637180", 0.48)} />
+        <meshToonMaterial {...materialProps("#637180", 0.48)} />
       </Capsule>
       <Sphere args={[0.055, 12, 7]} position={[0, 0.28, 0.02]} scale={[1, 1, 0.8]} castShadow receiveShadow>
-        <meshStandardMaterial color={color} roughness={0.38} metalness={0.08} emissive={color} emissiveIntensity={0.18} />
+        <meshToonMaterial {...materialProps(color)} emissive={color} emissiveIntensity={0.08} />
       </Sphere>
     </group>
   );
@@ -852,14 +916,12 @@ function PoserScene({
     <>
       <CaptureBridge captureRef={captureRef} />
       <CameraDirector presetId={cameraPreset} />
-      <ambientLight intensity={1.4} />
-      <directionalLight position={[-3.5, 5.2, 4.6]} intensity={2.1} color="#ffe9d0" castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[3.8, 3.2, -3.8]} intensity={1.1} color="#d8efff" />
-      <directionalLight position={[0, 2.6, -4.2]} intensity={1.35} color="#fff1d2" />
+      <ambientLight intensity={2.25} color="#fff8ef" />
+      <directionalLight position={[-3.2, 4.8, 4.2]} intensity={0.95} color="#fff0d9" castShadow shadow-mapSize={[1024, 1024]} />
       <Bounds fit clip observe margin={1.18} maxDuration={0.45}>
         <ChibiCharacter character={character} expression={expression} pose={pose} bodyRotation={THREE.MathUtils.degToRad(rotationDeg)} />
       </Bounds>
-      <ContactShadows position={[0, 0.02, 0]} scale={3.2} blur={2.8} opacity={0.25} far={2.8} color="#261d18" />
+      <ContactShadows position={[0, 0.02, 0]} scale={3.2} blur={3.4} opacity={0.16} far={2.8} color="#261d18" />
       <OrbitControls
         makeDefault
         enableDamping

@@ -1,207 +1,203 @@
-// 캐릭터 라이브러리 — "내(메인) 후보" 파라메트릭 플랫 벡터 캐릭터(버스트 초상).
-// Codex 후보(studio-character-library.codex.ts)와 품질 비교 후 더 나은 쪽을 채택한다.
-// 이모지 아님 — 순수 SVG path/ellipse/gradient.
+// 2D 웹툰 캐릭터 라이브러리 — "라인아트 외곽선 + 플랫 셀 컬러 + 큰 애니 눈"의 웹툰 그림체.
+// 버스트(상반신) 초상. 순수 SVG path/ellipse + 일관된 잉크 라인으로 "웹툰 컷" 느낌을 낸다.
+// (3D 셀툰 포저는 Studio3DPoser.tsx, 이건 2D 「캐릭터」 피커용)
 import type { CharacterAsset } from "./studio-characters";
 
 const W = 360;
 const H = 480;
+const INK = "#2b2330"; // 라인아트 잉크색
+const LW = 4; // 외곽선 두께
 
-interface ExprSpec {
+const cx = 180;
+const headY = 210;
+const headRx = 95;
+const headRy = 102;
+
+interface Expr {
   id: string;
   label: string;
-  eyes: "open" | "happy" | "sad" | "angry" | "wide" | "love";
+  eye: "open" | "smile" | "wink" | "sad" | "angry" | "wide" | "love";
   brow: "neutral" | "up" | "down" | "worry";
-  mouth: "smile" | "grin" | "frown" | "open" | "flat" | "pout";
+  mouth: "smile" | "grin" | "flat" | "frown" | "open" | "pout";
   blush?: boolean;
   tears?: boolean;
-  sweat?: boolean;
   anger?: boolean;
   sparkle?: boolean;
 }
 
-const EXPRESSIONS: ExprSpec[] = [
-  { id: "happy", label: "기쁨", eyes: "happy", brow: "up", mouth: "smile", blush: true },
-  { id: "laugh", label: "웃음", eyes: "happy", brow: "up", mouth: "grin", blush: true },
-  { id: "neutral", label: "무표정", eyes: "open", brow: "neutral", mouth: "flat" },
-  { id: "sad", label: "슬픔", eyes: "sad", brow: "worry", mouth: "frown", tears: true },
-  { id: "angry", label: "분노", eyes: "angry", brow: "down", mouth: "pout", anger: true },
-  { id: "surprised", label: "놀람", eyes: "wide", brow: "up", mouth: "open", sweat: true },
-  { id: "love", label: "사랑", eyes: "love", brow: "up", mouth: "smile", blush: true, sparkle: true },
+const EXPRS: Expr[] = [
+  { id: "happy", label: "기쁨", eye: "smile", brow: "up", mouth: "smile", blush: true },
+  { id: "laugh", label: "웃음", eye: "smile", brow: "up", mouth: "grin", blush: true },
+  { id: "neutral", label: "무표정", eye: "open", brow: "neutral", mouth: "flat" },
+  { id: "sad", label: "슬픔", eye: "sad", brow: "worry", mouth: "frown", tears: true },
+  { id: "angry", label: "분노", eye: "angry", brow: "down", mouth: "pout", anger: true },
+  { id: "surprised", label: "놀람", eye: "wide", brow: "up", mouth: "open" },
+  { id: "love", label: "사랑", eye: "love", brow: "up", mouth: "smile", blush: true, sparkle: true },
 ];
 
-interface CharSpec {
+interface Char {
   id: string;
   label: string;
   emoji: string;
   skin: string;
-  skinShade: string;
+  skinSh: string;
   hair: string;
-  hairShade: string;
-  hairStyle: "short" | "bob" | "long" | "ponytail" | "spiky" | "twin";
+  hairSh: string;
+  hairHi: string;
+  iris: string;
   outfit: string;
-  outfitShade: string;
+  outfitSh: string;
+  collar: string;
+  style: "bob" | "long" | "short" | "twin" | "ponytail" | "wavy" | "bun" | "spiky";
 }
 
-const CHARS: CharSpec[] = [
-  { id: "haru", label: "하루", emoji: "🙂", skin: "#ffe0c4", skinShade: "#f6c9a4", hair: "#3a2a24", hairShade: "#271c18", hairStyle: "short", outfit: "#5b8def", outfitShade: "#3f6fd1" },
-  { id: "mina", label: "미나", emoji: "🙂", skin: "#ffe3cf", skinShade: "#f7caae", hair: "#7b4a2e", hairShade: "#5d3722", hairStyle: "twin", outfit: "#ef6f9b", outfitShade: "#d4517e", },
-  { id: "yuki", label: "유키", emoji: "🙂", skin: "#ffe7d6", skinShade: "#f9d0b8", hair: "#caa64a", hairShade: "#a9863a", hairStyle: "ponytail", outfit: "#36c08f", outfitShade: "#27a077" },
-  { id: "rei", label: "레이", emoji: "🙂", skin: "#f3d2b3", skinShade: "#e3b892", hair: "#2b2f3a", hairShade: "#1c1f27", hairStyle: "long", outfit: "#8a6df0", outfitShade: "#6f4fd6" },
-  { id: "tao", label: "타오", emoji: "🙂", skin: "#e9c19a", skinShade: "#d6a578", hair: "#1f1a17", hairShade: "#120f0d", hairStyle: "spiky", outfit: "#f0a93b", outfitShade: "#d4901f" },
-  { id: "sora", label: "소라", emoji: "🙂", skin: "#ffe0c4", skinShade: "#f6c9a4", hair: "#5b6b8c", hairShade: "#445273", hairStyle: "bob", outfit: "#4fb6e0", outfitShade: "#2f97c4" },
+const CHARS: Char[] = [
+  { id: "yuna", label: "유나", emoji: "🙆‍♀️", skin: "#ffe1c6", skinSh: "#f3c39e", hair: "#3c2a26", hairSh: "#281a16", hairHi: "#6a4a3e", iris: "#7a4a2c", outfit: "#5b8def", outfitSh: "#3f6fd1", collar: "#ffffff", style: "bob" },
+  { id: "haru", label: "하루", emoji: "🧑", skin: "#ffe4cf", skinSh: "#f5c9ad", hair: "#1f1c2b", hairSh: "#12101a", hairHi: "#4a4660", iris: "#3a4a6a", outfit: "#ef6f9b", outfitSh: "#d4517e", collar: "#fff0f5", style: "short" },
+  { id: "sora", label: "소라", emoji: "👧", skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#caa64a", hairSh: "#a9863a", hairHi: "#ecd28a", iris: "#caa24a", outfit: "#36c08f", outfitSh: "#27a077", collar: "#eafff6", style: "twin" },
+  { id: "rin", label: "린", emoji: "👩", skin: "#f3d2b3", skinSh: "#e2b690", hair: "#7c4bd0", hairSh: "#5a32a0", hairHi: "#b79bee", iris: "#8a5cf0", outfit: "#8a6df0", outfitSh: "#6f4fd6", collar: "#f1ecff", style: "long" },
+  { id: "tae", label: "태오", emoji: "🧑‍🎤", skin: "#e9c19a", skinSh: "#d4a276", hair: "#16130f", hairSh: "#0a0805", hairHi: "#3a342a", iris: "#2a2018", outfit: "#f0a93b", outfitSh: "#d4901f", collar: "#fff6e6", style: "spiky" },
+  { id: "mina", label: "미나", emoji: "💁‍♀️", skin: "#ffe1c6", skinSh: "#f3c39e", hair: "#d44a6a", hairSh: "#b0335020", hairHi: "#ff90a8", iris: "#d44a6a", outfit: "#4fb6e0", outfitSh: "#2f97c4", collar: "#eaf9ff", style: "wavy" },
+  { id: "yeon", label: "연우", emoji: "🙋‍♀️", skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#2b3a5a", hairSh: "#1c2740", hairHi: "#5a6f9a", iris: "#3a5a8a", outfit: "#ef5d73", outfitSh: "#d23f57", collar: "#fff", style: "ponytail" },
+  { id: "bom", label: "봄", emoji: "👩‍🦰", skin: "#ffe4cf", skinSh: "#f5c9ad", hair: "#b5552a", hairSh: "#8c3f1e", hairHi: "#e0905a", iris: "#a85a2c", outfit: "#7bc043", outfitSh: "#5fa030", collar: "#f3ffe6", style: "bun" },
 ];
 
-const cx = 180;
-const headY = 196;
-const headRx = 96;
-const headRy = 104;
-
-function eyeMarkup(e: ExprSpec["eyes"], x: number, mirror: boolean): string {
-  const s = mirror ? -1 : 1;
-  const t = (dx: number) => x + s * dx;
-  switch (e) {
-    case "happy":
-    case "love": {
-      const eye =
-        e === "love"
-          ? `<path d="M ${t(-16)} ${headY + 8} q 16 -22 32 0 q -8 14 -16 14 q -8 0 -16 -14 z" fill="#e0567f"/>`
-          : `<path d="M ${t(-15)} ${headY + 6} q 15 -18 30 0" fill="none" stroke="#2a2330" stroke-width="6" stroke-linecap="round"/>`;
-      return eye;
-    }
-    case "sad":
-      return `<g>
-        <ellipse cx="${x}" cy="${headY + 6}" rx="13" ry="15" fill="#fff"/>
-        <circle cx="${x}" cy="${headY + 11}" r="8" fill="#3a2c44"/>
-        <circle cx="${t(-3)}" cy="${headY + 8}" r="2.6" fill="#fff"/>
-        <path d="M ${t(-15)} ${headY - 6} q 15 -6 30 2" fill="none" stroke="#2a2330" stroke-width="5" stroke-linecap="round"/>
-      </g>`;
-    case "angry":
-      return `<g>
-        <ellipse cx="${x}" cy="${headY + 7}" rx="13" ry="13" fill="#fff"/>
-        <circle cx="${x}" cy="${headY + 8}" r="8" fill="#3a2c44"/>
-        <circle cx="${t(3)}" cy="${headY + 5}" r="2.4" fill="#fff"/>
-      </g>`;
-    case "wide":
-      return `<g>
-        <ellipse cx="${x}" cy="${headY + 6}" rx="15" ry="17" fill="#fff"/>
-        <circle cx="${x}" cy="${headY + 7}" r="7" fill="#3a2c44"/>
-        <circle cx="${t(-3)}" cy="${headY + 3}" r="2.6" fill="#fff"/>
-      </g>`;
-    case "open":
-    default:
-      return `<g>
-        <ellipse cx="${x}" cy="${headY + 6}" rx="13" ry="16" fill="#fff"/>
-        <circle cx="${x}" cy="${headY + 8}" r="8.5" fill="#3a2c44"/>
-        <circle cx="${x}" cy="${headY + 8}" r="4" fill="#120f1a"/>
-        <circle cx="${t(-3.5)}" cy="${headY + 3.5}" r="3" fill="#fff"/>
-      </g>`;
+// ── 눈/눈썹/입 (라인아트) ──────────────────────────────
+function eye(e: Expr["eye"], x: number, mir: boolean, iris: string): string {
+  const s = mir ? -1 : 1;
+  const X = (d: number) => x + s * d;
+  const y = headY + 8;
+  if (e === "smile" || e === "love") {
+    if (e === "love")
+      return `<path d="M ${X(-17)} ${y} q 17 -24 34 0 q -9 16 -17 16 q -8 0 -17 -16 z" fill="#e8557e"/><circle cx="${X(-4)}" cy="${y - 2}" r="4" fill="#fff" opacity="0.9"/>`;
+    return `<path d="M ${X(-17)} ${y + 4} q 17 -20 34 0" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`;
   }
+  // 흰자 + 홍채 + 동공 + 하이라이트 + 윗눈꺼풀 라인
+  const ry = e === "wide" ? 21 : e === "angry" ? 14 : e === "sad" ? 17 : 19;
+  const rx = 15;
+  const lid =
+    e === "angry"
+      ? `<path d="M ${X(-rx - 1)} ${y - 8} q ${s * (rx + 1)} -2 ${s * (2 * rx + 2)} 6" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`
+      : e === "sad"
+        ? `<path d="M ${X(-rx)} ${y - 6} q ${s * rx} 4 ${s * 2 * rx} -2" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`
+        : `<path d="M ${X(-rx)} ${y - ry + 4} q ${s * rx} -7 ${s * 2 * rx} 0" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`;
+  return `
+    <ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#ffffff" stroke="${INK}" stroke-width="3"/>
+    <circle cx="${x}" cy="${y + 1}" r="${Math.min(rx - 1, ry - 3)}" fill="${iris}"/>
+    <circle cx="${x}" cy="${y + 1}" r="6" fill="#1a1018"/>
+    <circle cx="${X(-4)}" cy="${y - 5}" r="4.5" fill="#fff"/>
+    ${lid}`;
 }
 
-function browMarkup(b: ExprSpec["brow"], x: number, mirror: boolean): string {
-  const s = mirror ? -1 : 1;
-  const t = (dx: number) => x + s * dx;
+function brow(b: Expr["brow"], x: number, mir: boolean): string {
+  const s = mir ? -1 : 1;
+  const X = (d: number) => x + s * d;
   const y = headY - 26;
-  switch (b) {
-    case "up":
-      return `<path d="M ${t(-14)} ${y + 2} q 14 -8 28 -1" fill="none" stroke="#2a2330" stroke-width="5" stroke-linecap="round"/>`;
-    case "down":
-      return `<path d="M ${t(-14)} ${y - 3} q 14 6 28 5" fill="none" stroke="#2a2330" stroke-width="6" stroke-linecap="round"/>`;
-    case "worry":
-      return `<path d="M ${t(-13)} ${y + 4} q 13 -3 27 3" fill="none" stroke="#2a2330" stroke-width="5" stroke-linecap="round"/>`;
-    case "neutral":
-    default:
-      return `<path d="M ${t(-13)} ${y} q 13 -4 27 0" fill="none" stroke="#2a2330" stroke-width="5" stroke-linecap="round"/>`;
-  }
+  const d =
+    b === "up"
+      ? `M ${X(-14)} ${y + 3} q 14 -9 28 -2`
+      : b === "down"
+        ? `M ${X(-14)} ${y - 4} q 14 7 28 6`
+        : b === "worry"
+          ? `M ${X(-13)} ${y + 5} q 13 -4 27 4`
+          : `M ${X(-13)} ${y} q 13 -5 27 0`;
+  return `<path d="${d}" fill="none" stroke="${INK}" stroke-width="5.5" stroke-linecap="round"/>`;
 }
 
-function mouthMarkup(m: ExprSpec["mouth"]): string {
-  const y = headY + 52;
+function mouth(m: Expr["mouth"]): string {
+  const y = headY + 56;
   switch (m) {
     case "grin":
-      return `<path d="M ${cx - 26} ${y - 4} q 26 30 52 0 q -26 8 -52 0 z" fill="#7a2f3a"/><path d="M ${cx - 22} ${y - 2} q 22 6 44 0" fill="#fff"/>`;
+      return `<path d="M ${cx - 24} ${y - 3} q 24 30 48 0 q -24 6 -48 0 z" fill="#9a3346" stroke="${INK}" stroke-width="3"/><path d="M ${cx - 18} ${y - 1} q 18 5 36 0" fill="#fff"/>`;
     case "smile":
-      return `<path d="M ${cx - 20} ${y} q 20 20 40 0" fill="none" stroke="#7a2f3a" stroke-width="5" stroke-linecap="round"/>`;
+      return `<path d="M ${cx - 19} ${y} q 19 18 38 0" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
     case "frown":
-      return `<path d="M ${cx - 18} ${y + 8} q 18 -16 36 0" fill="none" stroke="#7a2f3a" stroke-width="5" stroke-linecap="round"/>`;
+      return `<path d="M ${cx - 16} ${y + 7} q 16 -15 32 0" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
     case "open":
-      return `<ellipse cx="${cx}" cy="${y + 4}" rx="14" ry="18" fill="#7a2f3a"/><ellipse cx="${cx}" cy="${y + 10}" rx="8" ry="7" fill="#e2607a"/>`;
+      return `<ellipse cx="${cx}" cy="${y + 3}" rx="12" ry="16" fill="#9a3346" stroke="${INK}" stroke-width="3"/>`;
     case "pout":
-      return `<path d="M ${cx - 14} ${y + 2} q 14 -10 28 0" fill="none" stroke="#7a2f3a" stroke-width="5" stroke-linecap="round"/>`;
-    case "flat":
+      return `<path d="M ${cx - 12} ${y + 2} q 12 -9 24 0" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
     default:
-      return `<path d="M ${cx - 16} ${y + 2} h 32" fill="none" stroke="#7a2f3a" stroke-width="5" stroke-linecap="round"/>`;
+      return `<path d="M ${cx - 14} ${y + 2} q 14 4 28 0" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/>`;
   }
 }
 
-function hairBack(c: CharSpec): string {
-  const { hair, hairShade, hairStyle } = c;
-  switch (hairStyle) {
+// ── 헤어 (라인아트 + 하이라이트) ─────────────────────────
+function hairBack(c: Char): string {
+  const { hair, hairSh, style } = c;
+  const st = `stroke="${INK}" stroke-width="${LW}"`;
+  switch (style) {
     case "long":
-      return `<path d="M ${cx - 110} ${headY - 20} q -14 150 22 210 l 196 0 q 36 -60 22 -210 q -120 -120 -240 0 z" fill="${hairShade}"/>`;
+    case "wavy":
+      return `<path d="M ${cx - 104} ${headY - 18} q -18 160 18 224 q 14 24 40 22 l 96 0 q 26 2 40 -22 q 36 -64 18 -224 z" fill="${hairSh}" ${st}/>`;
     case "twin":
-      return `<g fill="${hairShade}"><ellipse cx="${cx - 96}" cy="${headY + 70}" rx="34" ry="60"/><ellipse cx="${cx + 96}" cy="${headY + 70}" rx="34" ry="60"/></g>`;
+      return `<g fill="${hairSh}" ${st}><ellipse cx="${cx - 100}" cy="${headY + 78}" rx="32" ry="58"/><ellipse cx="${cx + 100}" cy="${headY + 78}" rx="32" ry="58"/></g>`;
     case "ponytail":
-      return `<path d="M ${cx + 80} ${headY - 30} q 80 40 50 150 q -10 40 -44 30 q 26 -80 -20 -160 z" fill="${hairShade}"/>`;
+      return `<path d="M ${cx + 70} ${headY - 34} q 92 36 60 168 q -10 42 -48 30 q 30 -86 -18 -176 z" fill="${hairSh}" ${st}/>`;
+    case "bun":
+      return `<circle cx="${cx}" cy="${headY - 96}" r="30" fill="${hairSh}" ${st}/>`;
     default:
       return "";
   }
 }
 
-function hairFront(c: CharSpec): string {
-  const { hair, hairShade, hairStyle } = c;
-  const sheen = `<path d="M ${cx - 60} ${headY - 78} q 50 -26 110 6 q -40 -8 -110 18 z" fill="#ffffff" opacity="0.18"/>`;
-  let crown = "";
-  switch (hairStyle) {
+function hairFront(c: Char): string {
+  const { hair, hairHi, style } = c;
+  const st = `stroke="${INK}" stroke-width="${LW}" stroke-linejoin="round"`;
+  let crown: string;
+  switch (style) {
     case "spiky":
-      crown = `<path d="M ${cx - 100} ${headY - 30} l 18 -56 l 18 40 l 20 -64 l 22 56 l 20 -52 l 22 62 l 22 -44 l 14 60 q -96 -34 -176 0 z" fill="${hair}"/>`;
-      break;
-    case "bob":
-      crown = `<path d="M ${cx - 104} ${headY + 20} q -16 -150 104 -150 q 120 0 104 150 q -30 -70 -104 -64 q -74 -6 -104 64 z" fill="${hair}"/>`;
+      crown = `<path d="M ${cx - 98} ${headY - 18} l 20 -60 l 18 42 l 22 -66 l 22 60 l 22 -54 l 22 64 l 20 -44 l 14 58 q -98 -34 -180 0 z" fill="${hair}" ${st}/>`;
       break;
     case "short":
-      crown = `<path d="M ${cx - 100} ${headY - 8} q -10 -120 100 -120 q 110 0 100 120 q -30 -64 -100 -58 q -70 -6 -100 58 z" fill="${hair}"/>`;
+      crown = `<path d="M ${cx - 100} ${headY + 2} q -12 -120 100 -120 q 112 0 100 120 q -28 -58 -64 -64 q -10 40 -36 44 q -8 -34 -28 -30 q -42 4 -72 50 z" fill="${hair}" ${st}/>`;
+      break;
+    case "twin":
+    case "ponytail":
+      crown = `<path d="M ${cx - 100} ${headY - 2} q -10 -126 100 -126 q 110 0 100 126 q -34 -64 -84 -64 q -16 36 -44 40 q -38 0 -72 88 z" fill="${hair}" ${st}/>`;
       break;
     default:
-      crown = `<path d="M ${cx - 100} ${headY - 6} q -8 -130 100 -130 q 108 0 100 130 q -34 -70 -100 -62 q -66 -8 -100 62 z" fill="${hair}"/>`;
+      crown = `<path d="M ${cx - 102} ${headY + 6} q -10 -132 102 -132 q 112 0 102 132 q -30 -66 -70 -68 q -14 40 -46 46 q -10 -8 -18 -2 q -36 6 -70 24 z" fill="${hair}" ${st}/>`;
   }
-  return `${crown}<path d="M ${cx - 96} ${headY - 40} q 30 -40 96 -34 q -50 6 -78 44 z" fill="${hairShade}" opacity="0.5"/>${sheen}`;
+  // 하이라이트 밴드 + 잔머리 결
+  const hi = `<path d="M ${cx - 56} ${headY - 86} q 54 -24 112 4" fill="none" stroke="${hairHi}" stroke-width="9" stroke-linecap="round" opacity="0.85"/>`;
+  return `${crown}${hi}`;
 }
 
-function extras(e: ExprSpec): string {
+function extras(e: Expr): string {
   let s = "";
   if (e.blush)
-    s += `<ellipse cx="${cx - 56}" cy="${headY + 30}" rx="16" ry="9" fill="#ff9aa6" opacity="0.55"/><ellipse cx="${cx + 56}" cy="${headY + 30}" rx="16" ry="9" fill="#ff9aa6" opacity="0.55"/>`;
+    s += `<ellipse cx="${cx - 58}" cy="${headY + 34}" rx="15" ry="8" fill="#ff9aa6" opacity="0.6"/><ellipse cx="${cx + 58}" cy="${headY + 34}" rx="15" ry="8" fill="#ff9aa6" opacity="0.6"/>`;
   if (e.tears)
-    s += `<path d="M ${cx - 60} ${headY + 18} q -4 26 6 40 q 10 -14 6 -40 z" fill="#8fd3ff" opacity="0.85"/>`;
-  if (e.sweat)
-    s += `<path d="M ${cx + 78} ${headY - 30} q -14 18 0 30 q 14 -12 0 -30 z" fill="#8fd3ff" opacity="0.9"/>`;
+    s += `<path d="M ${cx - 62} ${headY + 22} q -5 28 5 42 q 10 -14 6 -42 z" fill="#8fd3ff" stroke="${INK}" stroke-width="2"/>`;
   if (e.anger)
-    s += `<g stroke="#e23b4e" stroke-width="5" stroke-linecap="round"><path d="M ${cx + 56} ${headY - 50} h 22"/><path d="M ${cx + 67} ${headY - 61} v 22"/><path d="M ${cx + 60} ${headY - 58} l 14 14"/><path d="M ${cx + 74} ${headY - 58} l -14 14"/></g>`;
+    s += `<g stroke="#e23b4e" stroke-width="5" stroke-linecap="round"><path d="M ${cx + 54} ${headY - 52} h 22"/><path d="M ${cx + 65} ${headY - 63} v 22"/><path d="M ${cx + 58} ${headY - 60} l 14 14"/><path d="M ${cx + 72} ${headY - 60} l -14 14"/></g>`;
   if (e.sparkle)
-    s += `<g fill="#ffd76a"><path d="M ${cx - 86} ${headY - 70} l 4 10 l 10 4 l -10 4 l -4 10 l -4 -10 l -10 -4 l 10 -4 z"/><path d="M ${cx + 92} ${headY + 6} l 3 8 l 8 3 l -8 3 l -3 8 l -3 -8 l -8 -3 l 8 -3 z"/></g>`;
+    s += `<g fill="#ffd76a" stroke="${INK}" stroke-width="1.5"><path d="M ${cx - 92} ${headY - 64} l 5 11 l 11 5 l -11 5 l -5 11 l -5 -11 l -11 -5 l 11 -5 z"/><path d="M ${cx + 96} ${headY + 2} l 4 9 l 9 4 l -9 4 l -4 9 l -4 -9 l -9 -4 l 9 -4 z"/></g>`;
   return s;
 }
 
-function buildCharacterSvg(c: CharSpec, e: ExprSpec): string {
-  const gid = `g_${c.id}`;
+function build(c: Char, e: Expr): string {
+  const g = `g_${c.id}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">
 <defs>
-  <linearGradient id="${gid}_o" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.outfit}"/><stop offset="1" stop-color="${c.outfitShade}"/></linearGradient>
-  <radialGradient id="${gid}_s" cx="0.5" cy="0.42" r="0.62"><stop offset="0.7" stop-color="${c.skin}"/><stop offset="1" stop-color="${c.skinShade}"/></radialGradient>
+  <linearGradient id="${g}_o" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.outfit}"/><stop offset="1" stop-color="${c.outfitSh}"/></linearGradient>
 </defs>
-<path d="M ${cx - 120} ${H} q 12 -110 120 -132 q 108 22 120 132 z" fill="url(#${gid}_o)"/>
-<path d="M ${cx - 34} ${headY + 92} h 68 v 30 q -34 18 -68 0 z" fill="url(#${gid}_s)"/>
+<path d="M ${cx - 124} ${H} q 10 -116 124 -138 q 114 22 124 138 z" fill="url(#${g}_o)" stroke="${INK}" stroke-width="${LW}"/>
+<path d="M ${cx - 40} ${headY + 96} q 40 26 80 0 l 0 26 q -40 22 -80 0 z" fill="${c.collar}" stroke="${INK}" stroke-width="3"/>
+<path d="M ${cx - 30} ${headY + 86} h 60 v 22 q -30 16 -60 0 z" fill="${c.skin}" stroke="${INK}" stroke-width="3"/>
 ${hairBack(c)}
-<ellipse cx="${cx - headRx}" cy="${headY + 14}" rx="14" ry="20" fill="url(#${gid}_s)"/>
-<ellipse cx="${cx + headRx}" cy="${headY + 14}" rx="14" ry="20" fill="url(#${gid}_s)"/>
-<ellipse cx="${cx}" cy="${headY}" rx="${headRx}" ry="${headRy}" fill="url(#${gid}_s)"/>
+<ellipse cx="${cx - headRx + 4}" cy="${headY + 16}" rx="13" ry="18" fill="${c.skin}" stroke="${INK}" stroke-width="3"/>
+<ellipse cx="${cx + headRx - 4}" cy="${headY + 16}" rx="13" ry="18" fill="${c.skin}" stroke="${INK}" stroke-width="3"/>
+<ellipse cx="${cx}" cy="${headY}" rx="${headRx}" ry="${headRy}" fill="${c.skin}" stroke="${INK}" stroke-width="${LW}"/>
+<path d="M ${cx - headRx + 8} ${headY - 30} q 30 56 ${headRx - 8} 64 q -50 -2 -78 -30 z" fill="${c.skinSh}" opacity="0.35"/>
 ${extras(e)}
-${eyeMarkup(e.eyes, cx - 44, false)}
-${eyeMarkup(e.eyes, cx + 44, true)}
-${browMarkup(e.brow, cx - 44, false)}
-${browMarkup(e.brow, cx + 44, true)}
-${mouthMarkup(e.mouth)}
+${eye(e.eye, cx - 42, false, c.iris)}
+${eye(e.eye, cx + 42, true, c.iris)}
+${brow(e.brow, cx - 42, false)}
+${brow(e.brow, cx + 42, true)}
+<path d="M ${cx - 3} ${headY + 30} q 3 6 6 0" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+${mouth(e.mouth)}
 ${hairFront(c)}
 </svg>`;
 }
@@ -212,5 +208,5 @@ export const CHARACTER_LIBRARY: CharacterAsset[] = CHARS.map((c) => ({
   emoji: c.emoji,
   width: 240,
   height: 320,
-  expressions: EXPRESSIONS.map((e) => ({ id: e.id, label: e.label, svg: buildCharacterSvg(c, e) })),
+  expressions: EXPRS.map((e) => ({ id: e.id, label: e.label, svg: build(c, e) })),
 }));
