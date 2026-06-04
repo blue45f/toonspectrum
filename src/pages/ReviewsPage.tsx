@@ -1,6 +1,7 @@
 import Link from "@/src/compat/router-link";
 import { useSearchParams } from "react-router-dom";
 import { ReviewCard } from "@/components/review-card";
+import { CoverImage } from "@/components/cover-image";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { Stars } from "@/components/ui/stars";
@@ -157,11 +158,27 @@ export function ReviewsPage() {
                       <span className="numeral w-5 shrink-0 text-center text-lg text-fg-3 group-hover:text-accent">
                         {index + 1}
                       </span>
-                      <span
-                        className="size-9 shrink-0 rounded-lg ring-1 ring-line"
-                        style={{ background: `linear-gradient(140deg, ${item.title.cover[0]}, ${item.title.cover[1]})` }}
-                        aria-hidden
-                      />
+                      <span className="size-9 shrink-0 overflow-hidden rounded-lg ring-1 ring-line">
+                        {item.title.coverImage ? (
+                          <CoverImage
+                            src={item.title.coverImage}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            fallback={
+                              <span
+                                className="block h-full w-full"
+                                style={{ background: `linear-gradient(140deg, ${item.title.cover[0]}, ${item.title.cover[1]})` }}
+                              />
+                            }
+                          />
+                        ) : (
+                          <span
+                            className="block h-full w-full"
+                            style={{ background: `linear-gradient(140deg, ${item.title.cover[0]}, ${item.title.cover[1]})` }}
+                            aria-hidden
+                          />
+                        )}
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-fg-2 transition-colors group-hover:text-fg">
                           {item.title.title}
