@@ -7,12 +7,12 @@ import {
   ArrowUpToLine,
   Image as ImageIcon,
   ImagePlus,
-  Box,
   LayoutTemplate,
   Loader2,
   MessageCircle,
   MousePointer2,
   Pencil,
+  Plus,
   Redo2,
   Smile,
   Sparkles,
@@ -40,7 +40,6 @@ import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { FX_OVERLAYS } from "./studio-fx-assets";
 
-const Studio3DPoser = lazy(() => import("./Studio3DPoser").then((mod) => ({ default: mod.Studio3DPoser })));
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
 type Tool = "select" | "draw";
@@ -88,6 +87,7 @@ interface FrameEl {
   y: number;
   width: number;
   height: number;
+  bg?: string;
 }
 interface StickerEl {
   id: string;
@@ -160,6 +160,21 @@ function downscaleDataUrl(dataUrl: string, maxW: number, quality = 0.72) {
   });
 }
 
+function coverFitRect(containerW: number, containerH: number, imageW: number, imageH: number) {
+  if (imageW <= 0 || imageH <= 0) {
+    return { x: 0, y: 0, width: containerW, height: containerH };
+  }
+  const scale = Math.max(containerW / imageW, containerH / imageH);
+  const width = imageW * scale;
+  const height = imageH * scale;
+  return {
+    x: (containerW - width) / 2,
+    y: (containerH - height) / 2,
+    width,
+    height,
+  };
+}
+
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
 function UrlImage({
   el,
@@ -209,6 +224,118 @@ function UrlImage({
   );
 }
 
+function FramePanel({
+  el,
+  theme,
+  draggable,
+  innerRef,
+  onSelect,
+  onChange,
+}: {
+  el: FrameEl;
+  theme: "classic" | "soft" | "vivid";
+  draggable: boolean;
+  innerRef: (n: Konva.Node | null) => void;
+  onSelect: () => void;
+  onChange: (patch: Partial<FrameEl>) => void;
+}) {
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (!el.bg) {
+      setImg(null);
+      return;
+    }
+    let alive = true;
+    const im = new window.Image();
+    im.onload = () => {
+      if (alive) setImg(im);
+    };
+    im.onerror = () => {
+      if (alive) setImg(null);
+    };
+    im.src = el.bg;
+    return () => {
+      alive = false;
+      im.onload = null;
+      im.onerror = null;
+    };
+  }, [el.bg]);
+
+  let fStroke = "#16100c";
+  let fStrokeW = 3;
+  let fRadius = 4;
+  let fShadowColor = undefined;
+  let fShadowBlur = 0;
+  let fShadowOpacity = 0;
+  let fShadowOffset = undefined;
+
+  if (theme === "soft") {
+    fStroke = "#222222";
+    fStrokeW = 1.8;
+    fRadius = 0;
+  } else if (theme === "vivid") {
+    fStroke = "#3a3a3a";
+    fStrokeW = 1.2;
+    fRadius = 6;
+    fShadowColor = "black";
+    fShadowBlur = 5;
+    fShadowOpacity = 0.08;
+    fShadowOffset = { x: 1, y: 2 };
+  }
+
+  const fit = img ? coverFitRect(el.width, el.height, img.naturalWidth || img.width, img.naturalHeight || img.height) : null;
+  const borderInset = fStrokeW / 2;
+
+  return (
+    <Group
+      ref={innerRef}
+      x={el.x}
+      y={el.y}
+      clipX={0}
+      clipY={0}
+      clipWidth={el.width}
+      clipHeight={el.height}
+      draggable={draggable}
+      onMouseDown={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onTransformEnd={(e) => {
+        const node = e.target as Konva.Group;
+        const w = Math.max(40, el.width * node.scaleX());
+        const h = Math.max(40, el.height * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({ x: node.x(), y: node.y(), width: w, height: h });
+      }}
+    >
+      <Rect width={el.width} height={el.height} fill="#ffffff" />
+      {img && fit ? (
+        <KImage
+          image={img}
+          x={fit.x}
+          y={fit.y}
+          width={fit.width}
+          height={fit.height}
+        />
+      ) : null}
+      <Rect
+        x={borderInset}
+        y={borderInset}
+        width={Math.max(0, el.width - fStrokeW)}
+        height={Math.max(0, el.height - fStrokeW)}
+        stroke={fStroke}
+        strokeWidth={fStrokeW}
+        cornerRadius={Math.max(0, fRadius - borderInset)}
+        shadowColor={fShadowColor}
+        shadowBlur={fShadowBlur}
+        shadowOpacity={fShadowOpacity}
+        shadowOffset={fShadowOffset}
+      />
+    </Group>
+  );
+}
+
 export function StudioPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -231,7 +358,6 @@ export function StudioPage() {
   const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char" | "bgScene">(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
-  const [poser3dOpen, setPoser3dOpen] = useState(false);
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -406,6 +532,11 @@ export function StudioPage() {
   function addBgScene(bg: typeof BG_SCENES[number]) {
     setMenu(null);
     const src = bg.imgSrc || svgToDataUrl(bg.svg || "");
+    if (selected?.type === "frame") {
+      patchEl(selected.id, { bg: src } as Partial<El>);
+      setTool("select");
+      return;
+    }
     const el = createCanvasImageElement({
       id: uid(),
       src,
@@ -419,6 +550,26 @@ export function StudioPage() {
     commit([el, ...elements]);
     setSelectedId(el.id);
     setTool("select");
+  }
+  function addFrame() {
+    const margin = 24;
+    const frames = elements.filter((e): e is FrameEl => e.type === "frame");
+    const bottomFrame = frames.reduce<FrameEl | null>(
+      (best, frame) => (!best || frame.y + frame.height > best.y + best.height ? frame : best),
+      null
+    );
+    const height = Math.min(480, Math.max(220, Math.round(bottomFrame?.height ?? 360)));
+    const y = bottomFrame ? bottomFrame.y + bottomFrame.height + margin : margin;
+    const frame: FrameEl = {
+      id: uid(),
+      type: "frame",
+      x: margin,
+      y,
+      width: CANVAS_W - margin * 2,
+      height,
+    };
+    setCanvasH((h) => Math.max(h, y + height + margin));
+    addEl(frame);
   }
   function addFxOverlay(svgMarkup: string, w: number, h: number) {
     setMenu(null);
@@ -614,6 +765,9 @@ export function StudioPage() {
             </div>
           )}
         </div>
+        <button type="button" onClick={addFrame} className={toolBtn(false)}>
+          <Plus size={14} /> + 패널 추가
+        </button>
         <span className="mx-0.5 h-5 w-px bg-line" />
         <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
           <MousePointer2 size={14} /> 선택
@@ -664,11 +818,8 @@ export function StudioPage() {
             </div>
           )}
         </div>
-        <button type="button" onClick={() => setPoser3dOpen(true)} className={toolBtn(false)}>
-          <Box size={14} /> 3D 캐릭터
-        </button>
         <button type="button" onClick={() => setPoserVrmOpen(true)} className={toolBtn(false)}>
-          <Sparkles size={14} /> VRM 캐릭터 (고화질)
+          <Sparkles size={14} /> VRM 3D 캐릭터 (고화질)
         </button>
         <div className="relative">
           <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} className={toolBtn(menu === "bgScene")}>
@@ -677,6 +828,9 @@ export function StudioPage() {
           {menu === "bgScene" && (
             <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
+              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                패널을 선택하고 배경을 누르면 그 컷 안에 들어갑니다.
+              </p>
               <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-1">
                 {BG_SCENES.map((bg) => (
                   <button
@@ -836,56 +990,15 @@ export function StudioPage() {
                     />
                   );
                 if (el.type === "frame") {
-                  let fStroke = "#16100c";
-                  let fStrokeW = 3;
-                  let fRadius = 4;
-                  let fShadowColor = undefined;
-                  let fShadowBlur = 0;
-                  let fShadowOpacity = 0;
-                  let fShadowOffset = undefined;
-
-                  if (webtoonTheme === "soft") {
-                    fStroke = "#222222";
-                    fStrokeW = 1.8;
-                    fRadius = 0;
-                  } else if (webtoonTheme === "vivid") {
-                    fStroke = "#3a3a3a";
-                    fStrokeW = 1.2;
-                    fRadius = 6;
-                    fShadowColor = "black";
-                    fShadowBlur = 5;
-                    fShadowOpacity = 0.08;
-                    fShadowOffset = { x: 1, y: 2 };
-                  }
-
                   return (
-                    <Rect
+                    <FramePanel
                       key={el.id}
-                      ref={setRef}
-                      x={el.x}
-                      y={el.y}
-                      width={el.width}
-                      height={el.height}
-                      fill="#ffffff"
-                      stroke={fStroke}
-                      strokeWidth={fStrokeW}
-                      cornerRadius={fRadius}
-                      shadowColor={fShadowColor}
-                      shadowBlur={fShadowBlur}
-                      shadowOpacity={fShadowOpacity}
-                      shadowOffset={fShadowOffset}
+                      el={el}
+                      theme={webtoonTheme}
                       draggable={draggable}
-                      onMouseDown={onSelect}
-                      onTap={onSelect}
-                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
-                      onTransformEnd={(e) => {
-                        const node = e.target;
-                        const w = Math.max(40, node.width() * node.scaleX());
-                        const h = Math.max(40, node.height() * node.scaleY());
-                        node.scaleX(1);
-                        node.scaleY(1);
-                        patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h });
-                      }}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onChange={(patch) => patchEl(el.id, patch as Partial<El>)}
                     />
                   );
                 }
@@ -1274,14 +1387,6 @@ export function StudioPage() {
       </div>
 
       <Suspense fallback={<PoserLoadingOverlay />}>
-        {poser3dOpen ? (
-          <Studio3DPoser
-            open
-            onClose={() => setPoser3dOpen(false)}
-            onInsert={addRenderedImage}
-          />
-        ) : null}
-
         {poserVrmOpen ? (
           <StudioVrmPoser
             open

@@ -22,7 +22,6 @@ export function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-// 라이브러리(아트)는 별도 파일. v2(Codex, 더 고품질) 채택 + v1을 추가 다양성으로 합침.
-import { CHARACTER_LIBRARY } from "./studio-character-library";
+// 라이브러리(아트)는 별도 파일. 고품질 v2 단독 채택(저품질 v1 제거).
 import { CHARACTER_LIBRARY_V2 } from "./studio-characters-v2";
-export const CHARACTERS: CharacterAsset[] = [...CHARACTER_LIBRARY_V2, ...CHARACTER_LIBRARY];
+export const CHARACTERS: CharacterAsset[] = CHARACTER_LIBRARY_V2;

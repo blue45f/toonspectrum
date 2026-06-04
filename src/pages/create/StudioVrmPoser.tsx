@@ -10,8 +10,8 @@ import {
   getStoredVrmModel,
   listVrmLibraryEntries,
   SAMPLE_VRM_ID,
-  SAMPLE_VRM_LIBRARY_ENTRY,
-  SAMPLE_VRM_URL,
+  SAMPLE_VRM_ENTRIES,
+  sampleVrmUrl,
   saveUploadedVrm,
   saveVrmThumbnail,
   type VrmLibraryEntry,
@@ -619,7 +619,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [bodyRotation, setBodyRotation] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>([SAMPLE_VRM_LIBRARY_ENTRY]);
+  const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
@@ -667,17 +667,17 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     listVrmLibraryEntries()
       .then((entries) => {
         if (cancelled) return;
-        const nextEntries = entries.length > 0 ? entries : [SAMPLE_VRM_LIBRARY_ENTRY];
+        const nextEntries = [...SAMPLE_VRM_ENTRIES, ...entries];
         setLibraryEntries(nextEntries);
         setLibraryStatus("ready");
         loadModelFromLibraryEntry(nextEntries.find((entry) => entry.id === activeModelId) ?? nextEntries[0]);
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return;
-        setLibraryEntries([SAMPLE_VRM_LIBRARY_ENTRY]);
+        setLibraryEntries(SAMPLE_VRM_ENTRIES);
         setLibraryStatus("error");
         setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
-        loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+        loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
       });
 
     return () => {
@@ -779,7 +779,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   function loadModelFromLibraryEntry(entry: VrmLibraryEntry) {
     if (entry.source === "sample") {
-      loadModelFromUrl(SAMPLE_VRM_URL, entry.name, false, entry.id);
+      loadModelFromUrl(sampleVrmUrl(entry.id), entry.name, false, entry.id);
       return;
     }
 
@@ -837,7 +837,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   }
 
   function handleSampleLoad() {
-    loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+    loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
   }
 
   async function handleDeleteEntry(event: MouseEvent<HTMLButtonElement>, entry: VrmLibraryEntry) {
@@ -853,7 +853,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       setLibraryEntries(nextEntries);
       setLibraryStatus("ready");
       if (activeModelId === entry.id) {
-        loadModelFromLibraryEntry(SAMPLE_VRM_LIBRARY_ENTRY);
+        loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
       }
     } catch (caughtError: unknown) {
       setLibraryStatus("error");

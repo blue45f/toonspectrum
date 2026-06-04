@@ -30,10 +30,27 @@ function stack(count: number, canvasH: number): FrameSpec[] {
   }));
 }
 
+function grid(cols: number, rows: number, canvasH: number): FrameSpec[] {
+  const w = (CANVAS_W - M * (cols + 1)) / cols;
+  const h = (canvasH - M * (rows + 1)) / rows;
+  return Array.from({ length: rows * cols }, (_, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return {
+      x: M + col * (w + M),
+      y: M + row * (h + M),
+      width: w,
+      height: h,
+    };
+  });
+}
+
 export const TEMPLATES: TemplateSpec[] = [
   { id: "blank", label: "빈 캔버스", hint: "처음부터 자유롭게", canvasH: 1080, frames: [] },
   { id: "webtoon3", label: "세로 웹툰 · 3컷", hint: "스크롤 웹툰 기본", canvasH: 1620, frames: stack(3, 1620) },
   { id: "webtoon4", label: "세로 웹툰 · 4컷", hint: "긴 호흡", canvasH: 1920, frames: stack(4, 1920) },
+  { id: "webtoon5", label: "세로 웹툰 · 5컷", hint: "긴 스크롤", canvasH: 2400, frames: stack(5, 2400) },
+  { id: "webtoon6", label: "세로 웹툰 · 6컷", hint: "연재형 구성", canvasH: 2880, frames: stack(6, 2880) },
   { id: "strip4", label: "4컷 만화", hint: "기승전결", canvasH: 1680, frames: stack(4, 1680) },
   {
     id: "grid4",
@@ -52,6 +69,8 @@ export const TEMPLATES: TemplateSpec[] = [
       },
     ],
   },
+  { id: "grid6", label: "6컷 그리드(2x3)", hint: "2열 3행", canvasH: 1440, frames: grid(2, 3, 1440) },
+  { id: "grid8", label: "8컷(2x4)", hint: "2열 4행", canvasH: 1680, frames: grid(2, 4, 1680) },
   { id: "single", label: "한 컷", hint: "일러스트·표지", canvasH: 900, frames: stack(1, 900) },
 ];
 
