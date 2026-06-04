@@ -252,14 +252,17 @@ export function installStaticCatalog(): void {
     }
     if (!pathname.startsWith("/api/")) return origFetch(input, init);
 
-    // 파라미터 없는 카탈로그 페이지 → 정적 파일
+    // 파라미터 없는 카탈로그 페이지 → 정적 파일.
+    // 정적 스냅샷은 CDN 캐시(ETag·max-age=600·SWR)를 그대로 활용한다. 호출부(use-api-resource)는
+    // 동적 API용으로 cache:"no-store" 를 보내는데, 그대로 통과시키면 브라우저가 매번 전체를 다시
+    // 받는다(304/디스크 캐시 무력화). 정적 파일에 한해 cache:"default" 로 덮어써 재검증을 살린다.
     if (STATIC_FILES[pathname] && [...sp.keys()].length === 0) {
-      return origFetch(STATIC_FILES[pathname], init);
+      return origFetch(STATIC_FILES[pathname], { ...init, cache: "default" });
     }
     // 랭킹 기본 뷰 → 사전계산 정적 파일(전체 카탈로그 로드 없이 즉시). 필터/다른 기간은 아래 엔진.
     const rankingPath = precomputedRankingPath(pathname, sp);
     if (rankingPath) {
-      const res = await origFetch(rankingPath, init);
+      const res = await origFetch(rankingPath, { ...init, cache: "default" });
       if (res.ok) return res;
     }
     // 동적 카탈로그 → 클라이언트 엔진
