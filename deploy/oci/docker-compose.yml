@@ -12,6 +12,28 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    # ARM/소용량 VM(≈6GB) 대상 튜닝. 정적 카탈로그는 Vercel CDN 담당이라 DB 부하는 리뷰·커뮤니티·
+    # 인증 위주로 가볍다. 인스턴스 리사이즈 시 .env 로 상향(PG_SHARED_BUFFERS 등).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE:-3GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - max_connections=${PG_MAX_CONN:-50}
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - wal_compression=on
+      - -c
+      - jit=off
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-webdex}
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"

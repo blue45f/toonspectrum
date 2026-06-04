@@ -76,13 +76,22 @@ crontab -e
 30 18 * * * bash /opt/webdex/deploy/oci/backup-db.sh >> /var/log/webdex-backup.log 2>&1
 ```
 
-## 8. Vercel을 OCI API로 전환
-`vercel.json` 의 `/api` rewrite를 OCI로 변경(브라우저는 동일 출처 유지 → CORS 불필요):
+## 8. Vercel을 OCI API로 전환 (선택적 rewrite — OCI-fit)
+**고볼륨·캐시 가능한 엔드포인트는 Vercel 엣지에 남기고, DB가 필요한 동적 엔드포인트만 OCI로** 보낸다.
+`/api/cover`(표지 프록시, `<img>`로 매 표지 호출 → 엣지 30일 캐시)와 `/title/:slug`→`/api/og`(공유 미리보기)를
+전부 OCI로 보내면 CDN 엣지 캐시를 잃어 성능·대역폭이 나빠진다. 순서가 중요(구체 규칙 먼저):
 ```jsonc
-// 기존:  { "source": "/api/(.*)", "destination": "/api/index" }
-// 변경:  { "source": "/api/(.*)", "destination": "https://api.example.com/api/$1" }
+"rewrites": [
+  { "source": "/api/cover", "destination": "/api/index" },                  // Vercel 유지(엣지 캐시 이미지 프록시)
+  { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },        // Vercel 유지(OG HTML)
+  { "source": "/api/(.*)", "destination": "https://api.example.com/api/$1" },// OCI(리뷰·커뮤니티·피드백·인증 등 DB 동적)
+  { "source": "/(.*)", "destination": "/index.html" }                       // SPA
+]
 ```
-커밋 → Vercel 재배포. 그 뒤 **인증 콜백 동작 확인**(Google/Kakao OAuth redirect/callback이 Vercel 도메인 기준으로 정상인지 — 필요 시 각 콘솔의 redirect URI 점검). `api/index.js` 서버리스 함수와 `apps/api` includeFiles는 폴백으로 남겨도 되고, 안정화 후 제거 가능.
+참고: home·calendar·search·ranking 등은 클라이언트(catalog-static.ts)가 가로채 네트워크를 안 타므로 어디로
+rewrite 하든 무관하다. 실제 네트워크를 타는 동적 fetch(리뷰·커뮤니티·인증)만 OCI로 가면 된다.
+커밋 → Vercel 재배포. 그 뒤 **인증 콜백 동작 확인**(Google/Kakao OAuth redirect/callback이 Vercel 도메인
+기준으로 정상인지 — 필요 시 각 콘솔의 redirect URI 점검). `api/index.js`는 cover/og 처리로 계속 사용된다.
 
 ## 9. 컷오버 / 롤백
 - 컷오버: §8 적용 후 리뷰 작성·로그인·커뮤니티 글쓰기 E2E 확인.
