@@ -11,7 +11,7 @@ const variants: Record<Variant, string> = {
   solid:
     "bg-accent text-on-accent shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset] before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_50%_120%,oklch(1_0_0/0.2),transparent_62%)] before:opacity-0 before:transition-opacity before:duration-150 hover:before:opacity-100 hover:bg-accent-2 hover:shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset,0_8px_24px_-8px_oklch(0.72_0.185_42/0.55)]",
   outline:
-    "border border-line-strong/90 text-fg hover:border-accent/80 hover:bg-accent-soft/60 hover:text-accent active:text-on-accent active:bg-accent",
+    "border border-line-strong/90 text-fg hover:border-accent/70 hover:bg-accent-soft/80 hover:text-accent active:text-on-accent active:bg-accent",
   ghost: "text-fg hover:bg-raised hover:text-fg",
   quiet:
     "text-fg-2 hover:text-fg hover:bg-raised/60 focus-visible:bg-raised/60",

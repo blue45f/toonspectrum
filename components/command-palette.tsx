@@ -92,7 +92,7 @@ export function CommandPalette() {
       <button
         aria-label="닫기"
         onClick={() => setOpen(false)}
-        className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.62)] backdrop-blur-sm"
+        className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm"
         style={{ animation: "fade-up 0.18s ease-out" }}
       />
       <Command

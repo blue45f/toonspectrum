@@ -75,7 +75,7 @@ function MediaNode({ media, inView, step }: { media: MediaAdaptation; inView: bo
       className="group flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center"
       style={nodeReveal(inView, step)}
     >
-      <span className="relative grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-md border border-line-strong bg-[linear-gradient(145deg,oklch(0.245_0.011_64),oklch(0.185_0.009_68))] text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.1)] transition-all group-hover:border-accent/60">
+      <span className="relative grid aspect-[3/4] w-full place-items-center overflow-hidden rounded-md border border-line-strong bg-[linear-gradient(145deg,oklch(0.245_0.011_64),oklch(0.185_0.009_68))] text-accent shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] transition-all group-hover:border-accent/60">
         {thumb ? (
           <>
             {/* 유튜브 공식 예고편 썸네일(16:9)을 3:4 카드에 cover */}

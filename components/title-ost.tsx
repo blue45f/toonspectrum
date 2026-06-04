@@ -39,7 +39,7 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
                   href={ostWatchUrl(t)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(150deg,oklch(0.28_0.09_42),oklch(0.2_0.04_70))] text-accent"
+                  className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(150deg,oklch(0.25_0.011_66),oklch(0.19_0.009_68))] text-accent"
                   aria-label={`${t.song} 유튜브에서 보기`}
                 >
                   {thumb ? (

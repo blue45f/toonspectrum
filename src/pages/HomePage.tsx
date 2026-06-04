@@ -123,7 +123,7 @@ export function HomePage() {
               <OpenSearchButton className={buttonClass({ size: "lg", className: "gap-2.5" })}>
                 <Search size={18} />
                 작품·작가·태그 검색
-                <kbd className="ml-1 rounded-md bg-[oklch(0.2_0.02_60/0.18)] px-1.5 py-0.5 text-[0.7rem]">⌘K</kbd>
+                <kbd className="ml-1 rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem]">⌘K</kbd>
               </OpenSearchButton>
               <Link href="/ranking" className={buttonClass({ variant: "outline", size: "lg" })}>
                 통합 랭킹 보기
@@ -268,7 +268,7 @@ export function HomePage() {
                 <Link
                   key={tag}
                   href={`/explore?tag=${encodeURIComponent(tag)}`}
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-sm text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-sm text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
                 >
                   <span className="text-fg-3 group-hover:text-accent">#</span>
                   {tag}

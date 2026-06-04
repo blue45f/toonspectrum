@@ -98,7 +98,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
             type="button"
             aria-label="이전 추천작"
             onClick={() => emblaApi?.scrollPrev()}
-            className="absolute left-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line bg-panel/80 p-1.5 text-fg-2 backdrop-blur transition-colors hover:bg-panel hover:text-fg sm:grid"
+            className="absolute left-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 transition-colors hover:bg-raised hover:text-fg sm:grid"
           >
             <ChevronLeft size={18} />
           </button>
@@ -106,7 +106,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
             type="button"
             aria-label="다음 추천작"
             onClick={() => emblaApi?.scrollNext()}
-            className="absolute right-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line bg-panel/80 p-1.5 text-fg-2 backdrop-blur transition-colors hover:bg-panel hover:text-fg sm:grid"
+            className="absolute right-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 transition-colors hover:bg-raised hover:text-fg sm:grid"
           >
             <ChevronRight size={18} />
           </button>
@@ -120,7 +120,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
                 aria-current={i === selected}
                 onClick={() => emblaApi?.scrollTo(i)}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === selected ? "w-5 bg-accent" : "w-1.5 bg-line-strong hover:bg-fg-3"
+                  i === selected ? "w-5 bg-accent" : "w-1.5 bg-line hover:bg-line-strong"
                 }`}
               />
             ))}

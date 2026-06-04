@@ -108,7 +108,7 @@ export function TitleFilterPanel({
                   remember ? "border-accent bg-accent text-on-accent" : "border-line-strong"
                 )}
               >
-                {remember && <Check size={10} strokeWidth={3} />}
+                {remember && <Check size={10} strokeWidth={3} aria-hidden="true" />}
               </span>
               필터 기억
             </button>

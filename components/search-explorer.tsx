@@ -114,7 +114,7 @@ function platformName(id: PlatformId) {
 }
 
 function platformColor(id: PlatformId) {
-  return PLATFORM_LIST.find((platform) => platform.id === id)?.color ?? "#888";
+  return PLATFORM_LIST.find((platform) => platform.id === id)?.color ?? "oklch(0.305 0.012 64)";
 }
 
 export function SearchExplorer({
@@ -691,16 +691,16 @@ export function SearchExplorer({
           {catalog && (
             <div className="mt-4 grid gap-2 border-t border-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
-                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-panel/50 px-2.5">
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
                   <Database size={13} className="text-accent" />
                   서버 색인 <strong className="numeral text-fg">{compactNumber(catalog.titleCount)}</strong>편
                 </span>
-                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-panel/50 px-2.5">
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
                   <Clock3 size={13} className="text-fg-2" />
                   {relativeTime(catalog.loadedAt)}
                 </span>
                 {catalog.titleCount === 0 && (
-                  <span className="inline-flex h-7 items-center rounded-full border border-warn/40 bg-[oklch(0.82_0.15_80/0.12)] px-2.5 text-warn">
+                  <span className="inline-flex h-7 items-center rounded-lg border border-warn/40 bg-[oklch(0.82_0.15_80/0.12)] px-2.5 text-warn">
                     DB 비어 있음
                   </span>
                 )}
@@ -709,7 +709,7 @@ export function SearchExplorer({
                 {(filteredCoverage.length ? filteredCoverage : catalogCoverage).map((entry) => (
                   <span
                     key={entry.id}
-                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-card px-2.5"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5"
                     title={`${platformName(entry.id)} ${compactNumber(entry.count)}편`}
                   >
                     <span className="size-1.5 rounded-full" style={{ backgroundColor: platformColor(entry.id) }} />

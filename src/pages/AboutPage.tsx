@@ -135,7 +135,7 @@ export function AboutPage() {
         <ol className="mt-5 flex flex-col gap-3">
           {STEPS.map((s) => (
             <li key={s.n} className="flex gap-4 rounded-2xl border border-line bg-card/30 p-5">
-              <span className="numeral text-2xl font-bold text-accent/80">{s.n}</span>
+              <span className="numeral text-2xl font-bold text-accent">{s.n}</span>
               <div className="min-w-0">
                 <h3 className="font-bold text-fg">{s.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-fg-2">{s.body}</p>
