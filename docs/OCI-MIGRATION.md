@@ -66,7 +66,7 @@ pg_restore --no-owner --no-privileges -d "$OCI_DATABASE_URL" webdex-neon.dump
 # git push용 deploy key(쓰기 권한) 생성 후 GitHub repo → Deploy keys 등록(Allow write)
 ssh-keygen -t ed25519 -f ~/.ssh/webdex_deploy -N ""
 cat ~/.ssh/webdex_deploy.pub   # → GitHub Deploy keys 에 추가(write)
-git -C /opt/webdex remote set-url origin git@github.com:blue45f/webtoon-index.git
+git -C /opt/webdex remote set-url origin git@github.com:blue45f/toonspectrum.git
 git -C /opt/webdex config user.name "webdex-oci"; git -C /opt/webdex config user.email "oci@webdex"
 
 crontab -e

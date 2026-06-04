@@ -38,7 +38,7 @@ runcmd:
   # 방화벽
   - bash /etc/webdex-firewall.sh
   # 레포 클론 + deps (공개 repo)
-  - git clone https://github.com/blue45f/webtoon-index.git /opt/webdex
+  - git clone https://github.com/blue45f/toonspectrum.git /opt/webdex
   - cd /opt/webdex && pnpm install --frozen-lockfile
   - chmod +x /opt/webdex/deploy/oci/*.sh || true
 
