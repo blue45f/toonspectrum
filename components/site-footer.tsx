@@ -27,10 +27,10 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "WEBDEX",
     links: [
+      { label: "웹툰·웹소설 소식", href: "/news" },
       { label: "서비스 소개", href: "/about" },
       { label: "랭킹 산정 방식", href: "/guide" },
       { label: "작가별 보기", href: "/authors" },
-      { label: "트렌드 인사이트", href: "/insights" },
     ],
   },
 ];

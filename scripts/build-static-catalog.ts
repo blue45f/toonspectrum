@@ -133,8 +133,52 @@ async function main(): Promise<void> {
   console.log(`  ranking/*.json   ${String(rankingCount).padStart(5)} files (축×타입 사전계산)`);
 
   writeSitemap();
+  await writeNews();
 
   console.log("완료.");
+}
+
+// 웹툰·웹소설 뉴스 — Google News RSS(공개)에서 헤드라인을 받아 정적 JSON 으로 저장.
+// 저작권 안전: 헤드라인(사실) + 출처·날짜만 저장하고 본문은 담지 않으며, 링크는 발행처로 보낸다.
+// 실패(네트워크/지역차단)해도 빌드는 계속(빈 목록 폴백). 갱신은 catalog:gen 마다(크론 푸시→배포).
+async function writeNews(): Promise<void> {
+  const out = path.join(OUT, "news.json");
+  const decode = (s: string) =>
+    s
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&amp;/g, "&")
+      .replace(/<[^>]+>/g, "").trim();
+  try {
+    const url =
+      "https://news.google.com/rss/search?q=" +
+      encodeURIComponent("웹툰 OR 웹소설") +
+      "&hl=ko&gl=KR&ceid=KR:ko";
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`news rss ${res.status}`);
+    const xml = await res.text();
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
+      .map((m) => {
+        const b = m[1];
+        const rawTitle = decode((b.match(/<title>([\s\S]*?)<\/title>/) || [])[1] ?? "");
+        const source = decode((b.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] ?? "");
+        // Google News 제목은 "헤드라인 - 출처" 형태 → 출처 접미사 제거.
+        const title = source && rawTitle.endsWith(` - ${source}`) ? rawTitle.slice(0, -(source.length + 3)) : rawTitle;
+        return {
+          title,
+          source,
+          url: decode((b.match(/<link>([\s\S]*?)<\/link>/) || [])[1] ?? ""),
+          date: ((b.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] ?? "").trim(),
+        };
+      })
+      .filter((it) => it.title && it.url)
+      .slice(0, 40);
+    writeFileSync(out, JSON.stringify({ items, generatedAt: new Date().toISOString() }));
+    console.log(`  news.json        ${(statSync(out).size / 1024).toFixed(0).padStart(5)} KB (${items.length} items)`);
+  } catch (e) {
+    writeFileSync(out, JSON.stringify({ items: [], generatedAt: new Date().toISOString() }));
+    console.log(`  news.json        (수집 실패 — 빈 목록 폴백: ${(e as Error)?.message ?? e})`);
+  }
 }
 
 // SEO 사이트맵 — 정적 라우트 + 인기 상위 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
@@ -144,7 +188,7 @@ function writeSitemap(): void {
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
     "/reviews", "/community", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/guide",
+    "/about", "/guide", "/news",
   ];
   // 인기 상위 작품만(전 3만편 색인은 과해 thin-content 위험) — 조회수 상위 5000편.
   const topTitles = [...TITLES]
