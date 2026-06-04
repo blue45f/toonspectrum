@@ -132,7 +132,36 @@ async function main(): Promise<void> {
   });
   console.log(`  ranking/*.json   ${String(rankingCount).padStart(5)} files (축×타입 사전계산)`);
 
+  writeSitemap();
+
   console.log("완료.");
+}
+
+// SEO 사이트맵 — 정적 라우트 + 인기 상위 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
+// (public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
+function writeSitemap(): void {
+  const BASE = "https://webtoon-index.vercel.app";
+  const STATIC_ROUTES = [
+    "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
+    "/reviews", "/community", "/insights", "/authors", "/tags", "/compare",
+    "/about", "/guide",
+  ];
+  // 인기 상위 작품만(전 3만편 색인은 과해 thin-content 위험) — 조회수 상위 5000편.
+  const topTitles = [...TITLES]
+    .sort((a, b) => b.stats.views - a.stats.views)
+    .slice(0, 5000);
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const urls = [
+    ...STATIC_ROUTES.map((r) => `${BASE}${r}`),
+    ...topTitles.map((t) => `${BASE}/title/${encodeURIComponent(t.slug)}`),
+  ];
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join("\n") +
+    `\n</urlset>\n`;
+  const file = path.join(ROOT, "public", "sitemap.xml");
+  writeFileSync(file, xml);
+  console.log(`  sitemap.xml      ${(statSync(file).size / 1024).toFixed(0).padStart(5)} KB (${urls.length} URLs)`);
 }
 
 main().catch((error) => {

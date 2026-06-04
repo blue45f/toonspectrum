@@ -161,7 +161,7 @@ export function HomePage() {
               >
                 <div className="grid grid-cols-[1.1fr_1fr]">
                   <div className="transition-transform duration-500 ease-out-expo group-hover:scale-[1.03]">
-                    <TitlePoster title={spotlight} size="lg" className="rounded-none border-0" priority />
+                    <TitlePoster title={spotlight} size="lg" className="rounded-none border-0" priority titleAs="div" />
                   </div>
                   <div className="flex flex-col gap-3 p-5">
                     <div className="flex flex-wrap gap-1.5">
@@ -169,7 +169,7 @@ export function HomePage() {
                         <GenreChip key={genre} genre={genre} size="sm" />
                       ))}
                     </div>
-                    <h3 className="text-pretty text-xl font-bold leading-tight">{spotlight.title}</h3>
+                    <h2 className="text-pretty text-xl font-bold leading-tight">{spotlight.title}</h2>
                     <RatingInline
                       value={spotlight.stats.ratingAvg}
                       count={spotlight.stats.ratingCount}

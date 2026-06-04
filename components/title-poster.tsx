@@ -17,12 +17,15 @@ export function TitlePoster({
   className,
   rank,
   priority,
+  titleAs: TitleTag = "h3",
 }: {
   title: Title;
   size?: keyof typeof SIZE;
   className?: string;
   rank?: number;
   priority?: boolean;
+  // 표지 오버레이 제목의 시맨틱 태그. 상위 카드가 별도 제목을 가질 땐 "div"로 내려 heading 중복/순서 위반 방지.
+  titleAs?: "h2" | "h3" | "div";
 }) {
   const s = SIZE[size];
   const [from, to] = title.cover;
@@ -101,7 +104,7 @@ export function TitlePoster({
       )}
 
       <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1", s.pad)}>
-        <h3
+        <TitleTag
           className={cn(
             "text-balance line-clamp-3 font-bold text-[oklch(0.97_0.012_85)] drop-shadow-[0_1px_8px_oklch(0.1_0.02_70/0.72)]",
             isNovel ? "font-serif" : "",
@@ -109,7 +112,7 @@ export function TitlePoster({
           )}
         >
           {title.title}
-        </h3>
+        </TitleTag>
         {size !== "sm" && (
           <p className="truncate text-xs text-[oklch(0.92_0.01_85/0.72)]">
             {title.author}

@@ -32,7 +32,8 @@ export function Section({
           <Link
             href={action.href}
             className={buttonClass({ size: "sm", variant: "quiet", className: "group gap-1" })}
-            aria-label={`${action.label} 바로가기`}
+            // 링크 접근명에 섹션 제목을 포함해 "전체 보기" 같은 모호한 링크텍스트 문제 방지(문자열 제목 한정).
+            aria-label={typeof title === "string" ? `${title} ${action.label}` : `${action.label} 바로가기`}
           >
             {action.label}
             <ArrowRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />

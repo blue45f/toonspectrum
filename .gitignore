@@ -60,3 +60,4 @@ yarn-error.log*
 
 # 로컬 테스트 계정 자격증명(절대 커밋 금지)
 test-accounts.local.*
+/public/sitemap.xml

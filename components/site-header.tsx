@@ -127,7 +127,7 @@ export function SiteHeader() {
             {/* 검색 트리거 */}
             <button
               onClick={openSearch}
-              aria-label="검색 열기"
+              aria-label="작품·작가·태그 검색 열기"
               className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between xl:w-56"
             >
               <span className="flex items-center gap-2">

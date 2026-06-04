@@ -1,0 +1,21 @@
+# WEBDEX
+
+> 네이버 웹툰·시리즈, 카카오웹툰·페이지, 리디 등 국내 18개 웹툰·웹소설 플랫폼을 가로지르는 통합 인덱스. 작품을 직접 서비스하지 않고, 무엇을·어디서·왜 볼지를 투명한 데이터로 답하는 큐레이터형 디스커버리 레이어입니다.
+
+## 핵심 페이지
+
+- [통합 검색](https://webtoon-index.vercel.app/search): 전 플랫폼 작품을 한 번에 검색
+- [통합 랭킹](https://webtoon-index.vercel.app/ranking): 공개 산식 기반 8축 랭킹(인기·급상승·평점·숨은명작 등)
+- [랭킹 산정 방식](https://webtoon-index.vercel.app/guide): 베이즈 평점·도달가중·신뢰계수 등 산식 전면 공개
+- [맞춤 추천](https://webtoon-index.vercel.app/recommend): 크로스플랫폼 취향 기반 추천
+- [연재 캘린더](https://webtoon-index.vercel.app/calendar): 요일별 연재작
+- [스펙트럼 탐색](https://webtoon-index.vercel.app/explore): 18색 장르 스펙트럼 탐색
+- [트렌드 인사이트](https://webtoon-index.vercel.app/insights): 플랫폼·장르 트렌드 대시보드
+- [서비스 소개](https://webtoon-index.vercel.app/about): WEBDEX 소개와 사용법
+
+## 데이터 정책
+
+- 작품 메타데이터·표지는 각 플랫폼 공개 카탈로그에서 수집한 실데이터입니다.
+- 네이버 웹툰 별점은 실수집값이며, 조회·관심 등 일부 보조 지표는 추정값(≈)으로 분명히 구분해 표기합니다.
+- 가격·조회수를 과장하지 않으며, 순위는 공개된 산식으로만 계산합니다.
+- 드라마·영화·애니 영상화와 OST는 공식 플랫폼으로 링크아웃만 하며, 음원·영상을 저장·재생하지 않습니다.
