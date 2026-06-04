@@ -125,7 +125,7 @@ export function ReviewsPage() {
               <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-                DB에 저장된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
+                아직 등록된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
               </div>
             ) : (
               <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
