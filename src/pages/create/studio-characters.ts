@@ -22,6 +22,7 @@ export function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-// 라이브러리(아트)는 별도 파일. Codex 가 ComiPo 급으로 확장.
+// 라이브러리(아트)는 별도 파일. v2(Codex, 더 고품질) 채택 + v1을 추가 다양성으로 합침.
 import { CHARACTER_LIBRARY } from "./studio-character-library";
-export const CHARACTERS: CharacterAsset[] = CHARACTER_LIBRARY;
+import { CHARACTER_LIBRARY_V2 } from "./studio-characters-v2";
+export const CHARACTERS: CharacterAsset[] = [...CHARACTER_LIBRARY_V2, ...CHARACTER_LIBRARY];

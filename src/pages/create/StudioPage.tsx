@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Transformer } from "react-konva";
@@ -35,7 +35,10 @@ import {
   type TemplateSpec,
 } from "./studio-assets";
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
-import { Studio3DPoser } from "./Studio3DPoser";
+import { createCanvasImageElement } from "./studio-image-placement";
+
+const Studio3DPoser = lazy(() => import("./Studio3DPoser").then((mod) => ({ default: mod.Studio3DPoser })));
+const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
 type Tool = "select" | "draw";
 
@@ -102,6 +105,17 @@ interface DrawEl {
 type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
 
 const uid = () => crypto.randomUUID();
+
+function PoserLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>포저를 여는 중</span>
+      </div>
+    </div>
+  );
+}
 
 // data-URL 이미지를 maxDim 이하로 축소해 전송 크기를 제한한다.
 function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
@@ -214,6 +228,7 @@ export function StudioPage() {
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poser3dOpen, setPoser3dOpen] = useState(false);
+  const [poserVrmOpen, setPoserVrmOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -290,6 +305,18 @@ export function StudioPage() {
     setSelectedId(el.id);
     setTool("select");
   }
+  function addRenderedImage(src: string, width: number, height: number) {
+    addEl(
+      createCanvasImageElement({
+        id: uid(),
+        src,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: width,
+        sourceHeight: height,
+      })
+    );
+  }
   function removeSelected() {
     if (!selectedId) return;
     commit(elements.filter((e) => e.id !== selectedId));
@@ -359,17 +386,17 @@ export function StudioPage() {
   }
   function addCharacter(svg: string, w: number, h: number) {
     setMenu(null);
-    const fit = Math.min(1, (CANVAS_W - 140) / w);
-    addEl({
-      id: uid(),
-      type: "image",
-      src: svgToDataUrl(svg),
-      x: (CANVAS_W - w * fit) / 2,
-      y: Math.max(40, canvasH / 2 - (h * fit) / 2),
-      width: Math.round(w * fit),
-      height: Math.round(h * fit),
-      rotation: 0,
-    });
+    addEl(
+      createCanvasImageElement({
+        id: uid(),
+        src: svgToDataUrl(svg),
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: w,
+        sourceHeight: h,
+        horizontalInset: 140,
+      })
+    );
   }
   function applyTemplate(tpl: TemplateSpec) {
     setMenu(null);
@@ -603,6 +630,9 @@ export function StudioPage() {
         </div>
         <button type="button" onClick={() => setPoser3dOpen(true)} className={toolBtn(false)}>
           <Box size={14} /> 3D 캐릭터
+        </button>
+        <button type="button" onClick={() => setPoserVrmOpen(true)} className={toolBtn(false)}>
+          <Sparkles size={14} /> VRM 캐릭터 (고화질)
         </button>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
@@ -1043,23 +1073,23 @@ export function StudioPage() {
         </aside>
       </div>
 
-      <Studio3DPoser
-        open={poser3dOpen}
-        onClose={() => setPoser3dOpen(false)}
-        onInsert={(png, w, h) => {
-          const fit = Math.min(1, (CANVAS_W - 120) / w);
-          addEl({
-            id: uid(),
-            type: "image",
-            src: png,
-            x: (CANVAS_W - w * fit) / 2,
-            y: Math.max(40, canvasH / 2 - (h * fit) / 2),
-            width: Math.round(w * fit),
-            height: Math.round(h * fit),
-            rotation: 0,
-          });
-        }}
-      />
+      <Suspense fallback={<PoserLoadingOverlay />}>
+        {poser3dOpen ? (
+          <Studio3DPoser
+            open
+            onClose={() => setPoser3dOpen(false)}
+            onInsert={addRenderedImage}
+          />
+        ) : null}
+
+        {poserVrmOpen ? (
+          <StudioVrmPoser
+            open
+            onClose={() => setPoserVrmOpen(false)}
+            onInsert={addRenderedImage}
+          />
+        ) : null}
+      </Suspense>
     </Container>
   );
 }
