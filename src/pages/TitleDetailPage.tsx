@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { TitleOst } from "@/components/title-ost";
+import { TitleExternal } from "@/components/title-external";
 import { ScoreBreakdown } from "@/components/score-breakdown";
 import { mergedUniverse } from "@/lib/title-universe";
 import { AuthorLine } from "@/components/author-line";
@@ -259,6 +260,8 @@ export function TitleDetailPage() {
       )}
 
       <TitleOst title={title} original={original} />
+
+      <TitleExternal title={title} />
 
       <Section
         className="mt-14"
