@@ -103,10 +103,7 @@ export function HomePage() {
           }}
           aria-hidden
         />
-        <Container
-          size="wide"
-          className="relative grid items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20"
-        >
+        <Container size="wide" className="relative py-14 lg:py-20">
           <div style={{ animation: "fade-up 0.6s var(--ease-out-expo) both" }}>
             <p className="eyebrow text-accent">WEBTOON × WEBNOVEL</p>
             <h1 className="mt-4 text-pretty text-4xl font-bold leading-[1.08] sm:text-5xl lg:text-[3.6rem]">
@@ -147,12 +144,12 @@ export function HomePage() {
               ))}
             </dl>
           </div>
-
-          {bannerItems.length > 0 && <HeroBanner items={bannerItems} />}
         </Container>
       </section>
 
       <Container size="wide" className="reveal-children flex flex-col gap-20 py-16">
+        {bannerItems.length > 0 && <HeroBanner items={bannerItems} />}
+
         <HomePersonal />
 
         {todayReleases.length > 0 && (
