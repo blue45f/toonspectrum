@@ -94,6 +94,8 @@ interface BubbleEl {
   textFill: string;
   rotation: number;
   tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
+  font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
+  fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
 }
 interface FrameEl {
   id: string;
@@ -1773,7 +1775,8 @@ export function StudioPage() {
                       height={el.height - 24}
                       x={18}
                       y={12}
-                      fontSize={24}
+                      fontSize={el.fontSize ?? 24}
+                      fontFamily={el.font ?? "Pretendard, sans-serif"}
                       fill={el.textFill}
                       align="center"
                       verticalAlign="middle"
@@ -1944,32 +1947,56 @@ export function StudioPage() {
                   </div>
                 </div>
               )}
-              {selected.type === "text" && (
-                <div className="mt-2">
-                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">글꼴</p>
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      { label: "고딕", v: "Pretendard, sans-serif" },
-                      { label: "명조", v: "'Nanum Myeongjo', serif" },
-                      { label: "손글씨", v: "'Gaegu', cursive" },
-                    ].map((f) => (
-                      <button
-                        key={f.label}
-                        type="button"
-                        onClick={() => patchEl(selected.id, { font: f.v } as Partial<El>)}
-                        style={{ fontFamily: f.v }}
-                        className={cn(
-                          "rounded-md border px-2 py-1 text-xs",
-                          (selected.font ?? "Pretendard, sans-serif") === f.v
-                            ? "border-accent/60 bg-accent-soft/50 text-fg"
-                            : "border-line text-fg-2 hover:bg-raised"
-                        )}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
+              {(selected.type === "text" || selected.type === "bubble") && (
+                <>
+                  <div className="mt-2">
+                    <p className="mb-1 text-[0.66rem] font-medium text-fg-3">글꼴</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: "고딕", v: "Pretendard, sans-serif" },
+                        { label: "명조", v: "'Nanum Myeongjo', serif" },
+                        { label: "손글씨", v: "'Gaegu', cursive" },
+                      ].map((f) => (
+                        <button
+                          key={f.label}
+                          type="button"
+                          onClick={() => patchEl(selected.id, { font: f.v } as Partial<El>)}
+                          style={{ fontFamily: f.v }}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-xs",
+                            (selected.font ?? "Pretendard, sans-serif") === f.v
+                              ? "border-accent/60 bg-accent-soft/50 text-fg"
+                              : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                    글자 크기
+                    <div className="flex items-center gap-1">
+                      {[-4, 4].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          aria-label={d < 0 ? "글자 작게" : "글자 크게"}
+                          onClick={() => {
+                            const cur = selected.type === "text" ? selected.fontSize : selected.fontSize ?? 24;
+                            patchEl(selected.id, { fontSize: Math.max(12, Math.min(96, cur + d)) } as Partial<El>);
+                          }}
+                          className="grid size-7 place-items-center rounded-md border border-line text-fg-2 hover:bg-raised"
+                        >
+                          {d < 0 ? "−" : "+"}
+                        </button>
+                      ))}
+                      <span className="w-7 text-center text-xs tabular-nums text-fg-3">
+                        {selected.type === "text" ? selected.fontSize : selected.fontSize ?? 24}
+                      </span>
+                    </div>
+                  </div>
+                </>
               )}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
