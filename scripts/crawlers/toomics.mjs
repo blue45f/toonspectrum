@@ -50,6 +50,9 @@ const GENRES = [
 // 기간/랭킹 타입 그리드.
 const RANK_TYPES = ["famous", "monthly", "newest", "weekly"];
 
+// /webtoon/weekly/dow/<1..7> → 한글 연재요일 (dow/1=월 … dow/7=일, 페이지 타이틀로 확인).
+const DOW_KR = ["월", "화", "수", "목", "금", "토", "일"];
+
 // 카드 블록: <a href="/webtoon/bridge/type/2/toon/<id>" class="toon ...> ... </a>.
 const CARD_RE =
   /<a\s+href="\/webtoon\/bridge\/type\/2\/toon\/(\d+)"[^>]*class="toon\b[\s\S]*?<\/a>/g;
@@ -188,22 +191,36 @@ export async function crawl() {
   for (const t of RANK_TYPES) {
     requests.push([`${ORIGIN}/webtoon/top100/type/${t}`, ""]);
   }
+  // 요일별 연재 그리드 — 카드에 연재요일을 부여해 연재 캘린더 커버리지 확보.
   for (let d = 1; d <= 7; d++) {
-    requests.push([`${ORIGIN}/webtoon/weekly/dow/${d}`, ""]);
+    requests.push([`${ORIGIN}/webtoon/weekly/dow/${d}`, "", DOW_KR[d - 1]]);
   }
   requests.push([`${ORIGIN}/webtoon/toon_list/display/G2`, ""]);
   requests.push([`${ORIGIN}/webtoon/toon_list/display/G2/page/2`, ""]);
   requests.push([`${ORIGIN}/webtoon/finish/all`, ""]);
 
   for (let i = 0; i < requests.length; i++) {
-    const [url, fb] = requests[i];
+    const [url, fb, weekday] = requests[i];
     const html = await fetchText(url, { referer: `${ORIGIN}/webtoon/weekly` });
     if (html) {
       for (const card of parseCards(html)) {
-        if (!card.workId || byWorkId.has(card.workId)) continue; // dedupe by workId
+        if (!card.workId) continue;
+        const existing = byWorkId.get(card.workId);
+        if (existing) {
+          // 요일 그리드에서 재발견 시 연재요일 누적(연재중 한정).
+          if (weekday && existing.status !== "completed") {
+            const days = new Set(existing.updateDays || []);
+            days.add(weekday);
+            existing.updateDays = [...days];
+          }
+          continue;
+        }
         const rank = byWorkId.size + 1; // 발견 순서 기반 랭크 시드.
         const row = buildRow(card, fb, rank);
-        if (row) byWorkId.set(card.workId, row);
+        if (row) {
+          if (weekday && row.status !== "completed") row.updateDays = [weekday];
+          byWorkId.set(card.workId, row);
+        }
       }
     }
     if (i < requests.length - 1) await sleep(350); // 짧은 간격 + 합리적 요청 수(<40).

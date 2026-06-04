@@ -654,20 +654,25 @@ async function crawlLezhinCatalog() {
   const limit = 100;
   const out = new Map();
   const genreScopes = ["", ...Object.keys(LZ_GENRE)];
-  for (const genre of genreScopes) {
-    if (overBudget()) break;
-    const page = await getJSON(
-      `https://api.lezhin.com/v2/content-list/ranking?filter=all&rankType=realtime&limit=${limit}&offset=0&genres=${encodeURIComponent(genre)}`,
-      HL
-    );
-    const items = page?.data;
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        if (item?.id && !out.has(item.id)) out.set(item.id, item);
+  // filter=all(완결 포함 전체 랭킹) + filter=publishing(연재중 — 연재요일 schedule 이 풍부).
+  // realtime 랭킹은 완결작 비중이 커 연재 캘린더 커버리지가 낮아, publishing 패스로 연재중 작품을 보강한다.
+  const filters = ["all", "publishing"];
+  outer: for (const filter of filters) {
+    for (const genre of genreScopes) {
+      if (overBudget()) break outer;
+      const page = await getJSON(
+        `https://api.lezhin.com/v2/content-list/ranking?filter=${filter}&rankType=realtime&limit=${limit}&offset=0&genres=${encodeURIComponent(genre)}`,
+        HL
+      );
+      const items = page?.data;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item?.id && !out.has(item.id)) out.set(item.id, item);
+        }
       }
+      if (LEZHIN_CAP && out.size >= LEZHIN_CAP) break outer;
+      await sleep(MIN_CRAWL_DELAY_MS);
     }
-    if (LEZHIN_CAP && out.size >= LEZHIN_CAP) break;
-    await sleep(MIN_CRAWL_DELAY_MS);
   }
 
   const rows = applyLimit([...out.values()], LEZHIN_CAP);
