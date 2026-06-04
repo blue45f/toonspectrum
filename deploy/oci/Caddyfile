@@ -1,0 +1,16 @@
+# Caddy — 자동 HTTPS(Let's Encrypt) 리버스 프록시. {$DOMAIN} 으로 들어온 트래픽을 api:4001 로.
+# Vercel rewrites 가 /api/* 를 https://{$DOMAIN}/api/* 로 보내므로, 이 서버는 /api 만 처리하면 된다.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:4001
+	header -Server
+	# 헬스/디버그용 기본 보안 헤더(앱 측 헤더와 중복돼도 무해).
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

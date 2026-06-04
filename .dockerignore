@@ -1,0 +1,16 @@
+# Docker 빌드 컨텍스트 제외 — 빌드는 컨테이너 안에서 pnpm install + tsc 로 수행한다.
+node_modules
+**/node_modules
+dist
+**/dist
+apps/api/dist
+public/data
+.git
+.github
+*.log
+.env
+.env.*
+!.env.example
+.vercel
+coverage
+.DS_Store
