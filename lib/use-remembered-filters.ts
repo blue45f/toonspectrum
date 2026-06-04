@@ -28,6 +28,31 @@ function readSaved(scope: string): TitleFilterState | null {
   }
 }
 
+// 설정 페이지용 전역 헬퍼 — "필터 기억" 선호값 읽기/쓰기 + 저장된 필터 전체 초기화.
+export function getRememberFlag(): boolean {
+  return readFlag();
+}
+export function setRememberFlag(on: boolean): void {
+  try {
+    localStorage.setItem(FLAG_KEY, on ? "1" : "0");
+    if (!on) clearAllRememberedFilters(false);
+  } catch {
+    /* 무시 */
+  }
+}
+// 저장된 모든 페이지의 필터 값 제거(선택적으로 기억 플래그도 끔).
+export function clearAllRememberedFilters(alsoFlag = true): void {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("webdex-filters:")) localStorage.removeItem(k);
+    }
+    if (alsoFlag) localStorage.setItem(FLAG_KEY, "0");
+  } catch {
+    /* 무시 */
+  }
+}
+
 export function useRememberedFilters(scope: string) {
   const [remember, setRemember] = useState(false);
   const [filters, setFilters] = useState<TitleFilterState>(EMPTY_TITLE_FILTERS);

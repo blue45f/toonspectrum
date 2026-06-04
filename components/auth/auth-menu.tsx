@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "@/src/compat/router-link";
 import { useSession, signOut } from "@/src/compat/auth-session";
 import { AuthModal } from "./auth-modal";
-import { LogOut, Library, UserRound } from "lucide-react";
+import { LogOut, Library, UserRound, Settings as SettingsIcon } from "lucide-react";
 import { resolveSignupAvatarImage } from "@/lib/avatar";
 import { useT } from "@/lib/i18n";
 
@@ -76,7 +76,14 @@ export function AuthMenu() {
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg"
             >
-              <Library size={15} /> 내 서재
+              <Library size={15} /> {t("nav.library")}
+            </Link>
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+            >
+              <SettingsIcon size={15} /> 설정
             </Link>
             <button
               onClick={() => signOut()}
