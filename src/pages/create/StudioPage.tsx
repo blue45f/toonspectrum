@@ -76,6 +76,7 @@ interface TextEl {
   fontSize: number;
   fill: string;
   rotation: number;
+  font?: string; // 글꼴(웹툰 대사용)
   stroke?: string; // 효과음(SFX) 외곽선
   strokeWidth?: number;
 }
@@ -1525,6 +1526,7 @@ export function StudioPage() {
                       fillAfterStrokeEnabled
                       lineJoin="round"
                       rotation={el.rotation}
+                      fontFamily={el.font ?? "Pretendard, sans-serif"}
                       fontStyle="bold"
                       draggable={draggable}
                       onMouseDown={onSelect}
@@ -1854,6 +1856,33 @@ export function StudioPage() {
                   말풍선색
                   <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
                 </label>
+              )}
+              {selected.type === "text" && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">글꼴</p>
+                  <div className="flex flex-wrap gap-1">
+                    {[
+                      { label: "고딕", v: "Pretendard, sans-serif" },
+                      { label: "명조", v: "'Nanum Myeongjo', serif" },
+                      { label: "손글씨", v: "'Gaegu', cursive" },
+                    ].map((f) => (
+                      <button
+                        key={f.label}
+                        type="button"
+                        onClick={() => patchEl(selected.id, { font: f.v } as Partial<El>)}
+                        style={{ fontFamily: f.v }}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs",
+                          (selected.font ?? "Pretendard, sans-serif") === f.v
+                            ? "border-accent/60 bg-accent-soft/50 text-fg"
+                            : "border-line text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
