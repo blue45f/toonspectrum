@@ -31,7 +31,7 @@ export const useTheme = create<ThemeState>()(
       },
     }),
     {
-      name: "webdex-theme",
+      name: "toonspectrum-theme",
       onRehydrateStorage: () => (state) => {
         if (state) applyTheme(state.theme);
       },

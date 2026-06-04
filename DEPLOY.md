@@ -1,4 +1,4 @@
-# WEBDEX 배포 가이드 (상용)
+# ToonSpectrum 배포 가이드 (상용)
 
 웹 + API + DB를 분리 배포하는 3-tier 구성이다.
 

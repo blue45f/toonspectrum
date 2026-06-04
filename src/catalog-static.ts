@@ -237,7 +237,7 @@ function toUrl(input: RequestInfo | URL): string {
 }
 
 export function installStaticCatalog(): void {
-  if (!STATIC_MODE || typeof window === "undefined" || (window.fetch as { __webdexStatic?: boolean }).__webdexStatic) return;
+  if (!STATIC_MODE || typeof window === "undefined" || (window.fetch as { __toonspectrumStatic?: boolean }).__toonspectrumStatic) return;
   const origFetch = window.fetch.bind(window);
 
   const patched: typeof fetch = async (input, init) => {
@@ -279,6 +279,6 @@ export function installStaticCatalog(): void {
     }
   };
 
-  (patched as { __webdexStatic?: boolean }).__webdexStatic = true;
+  (patched as { __toonspectrumStatic?: boolean }).__toonspectrumStatic = true;
   window.fetch = patched;
 }

@@ -1,4 +1,4 @@
-# WEBDEX NestJS API — OCI Always-Free ARM(Ampere A1, arm64) 컨테이너.
+# ToonSpectrum NestJS API — OCI Always-Free ARM(Ampere A1, arm64) 컨테이너.
 # node:22 는 arm64 멀티아치라 Ampere A1 에서 그대로 동작한다. 모노레포 루트가 빌드 컨텍스트:
 #   docker build -f deploy/oci/Dockerfile -t webdex-api .
 # (apps/api 는 tsc rootDir=레포루트 라 루트 lib/ 까지 컴파일 → 빌드 컨텍스트는 반드시 레포 루트)

@@ -31,10 +31,10 @@ export function SearchPage() {
 
         <div className="mt-6 flex flex-wrap gap-2">
           <a
-            href="#webdex-search-explorer-top"
+            href="#toonspectrum-search-explorer-top"
             onClick={(event) => {
               event.preventDefault();
-              document.getElementById("webdex-search-explorer-top")?.scrollIntoView({ behavior: "smooth" });
+              document.getElementById("toonspectrum-search-explorer-top")?.scrollIntoView({ behavior: "smooth" });
             }}
             className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
           >
@@ -56,7 +56,7 @@ export function SearchPage() {
         </p>
       </header>
 
-      <div id="webdex-search-explorer-top" />
+      <div id="toonspectrum-search-explorer-top" />
       <SearchExplorer initialQuery={initialQuery} initialFree={initialFree} initialPlatforms={initialPlatforms} />
     </Container>
   );

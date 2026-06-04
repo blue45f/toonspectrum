@@ -184,7 +184,7 @@ async function writeNews(): Promise<void> {
 // SEO 사이트맵 — 정적 라우트 + 인기 상위 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
 // (public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
 function writeSitemap(): void {
-  const BASE = "https://webtoon-index.vercel.app";
+  const BASE = "https://toonspectrum.vercel.app";
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
     "/reviews", "/community", "/insights", "/authors", "/tags", "/compare",

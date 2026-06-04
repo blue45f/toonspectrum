@@ -98,7 +98,7 @@ export const useI18n = create<I18nState>()(
       },
     }),
     {
-      name: "webdex-lang",
+      name: "toonspectrum-lang",
       onRehydrateStorage: () => (state) => {
         if (state) applyHtmlLang(state.lang);
       },

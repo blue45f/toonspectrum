@@ -4,14 +4,14 @@
 
 ## 핵심 페이지
 
-- [통합 검색](https://webtoon-index.vercel.app/search): 전 플랫폼 작품을 한 번에 검색
-- [통합 랭킹](https://webtoon-index.vercel.app/ranking): 공개 산식 기반 8축 랭킹(인기·급상승·평점·숨은명작 등)
-- [랭킹 산정 방식](https://webtoon-index.vercel.app/guide): 베이즈 평점·도달가중·신뢰계수 등 산식 전면 공개
-- [맞춤 추천](https://webtoon-index.vercel.app/recommend): 크로스플랫폼 취향 기반 추천
-- [연재 캘린더](https://webtoon-index.vercel.app/calendar): 요일별 연재작
-- [스펙트럼 탐색](https://webtoon-index.vercel.app/explore): 18색 장르 스펙트럼 탐색
-- [트렌드 인사이트](https://webtoon-index.vercel.app/insights): 플랫폼·장르 트렌드 대시보드
-- [서비스 소개](https://webtoon-index.vercel.app/about): 툰스펙트럼 소개와 사용법
+- [통합 검색](https://toonspectrum.vercel.app/search): 전 플랫폼 작품을 한 번에 검색
+- [통합 랭킹](https://toonspectrum.vercel.app/ranking): 공개 산식 기반 8축 랭킹(인기·급상승·평점·숨은명작 등)
+- [랭킹 산정 방식](https://toonspectrum.vercel.app/guide): 베이즈 평점·도달가중·신뢰계수 등 산식 전면 공개
+- [맞춤 추천](https://toonspectrum.vercel.app/recommend): 크로스플랫폼 취향 기반 추천
+- [연재 캘린더](https://toonspectrum.vercel.app/calendar): 요일별 연재작
+- [스펙트럼 탐색](https://toonspectrum.vercel.app/explore): 18색 장르 스펙트럼 탐색
+- [트렌드 인사이트](https://toonspectrum.vercel.app/insights): 플랫폼·장르 트렌드 대시보드
+- [서비스 소개](https://toonspectrum.vercel.app/about): 툰스펙트럼 소개와 사용법
 
 ## 데이터 정책
 

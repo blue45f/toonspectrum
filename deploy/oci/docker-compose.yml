@@ -1,4 +1,4 @@
-# WEBDEX 백엔드 스택 — OCI Always-Free ARM VM 한 대에 API + Postgres + Caddy(자동 HTTPS).
+# ToonSpectrum 백엔드 스택 — OCI Always-Free ARM VM 한 대에 API + Postgres + Caddy(자동 HTTPS).
 # 프론트엔드는 Vercel 유지(무료 글로벌 CDN). Vercel rewrites 가 /api/* 를 이 서버로 프록시 →
 # 브라우저는 동일 출처라 CORS 불필요.
 #

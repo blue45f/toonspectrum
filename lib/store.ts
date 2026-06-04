@@ -212,7 +212,7 @@ export const useApp = create<AppState>()(
         }),
     }),
     {
-      name: "webdex-store",
+      name: "toonspectrum-store",
       storage: createJSONStorage(() => localStorage),
       version: 1,
     }

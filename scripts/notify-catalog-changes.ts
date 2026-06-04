@@ -17,7 +17,7 @@ import { gunzipSync } from "node:zlib";
 import { universeFor } from "../lib/title-universe";
 import type { Title } from "../lib/types";
 
-const SITE = process.env.WEBDEX_SITE_URL ?? "https://webtoon-index.vercel.app";
+const SITE = process.env.WEBDEX_SITE_URL ?? "https://toonspectrum.vercel.app";
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL ?? "";
 const MAX_LIST = 15; // 임베드당 최대 표기 항목
 const PERSIMMON = 0xe8743b;
@@ -117,7 +117,7 @@ async function main() {
   const alert = arg("alert");
   if (alert) {
     await postDiscord({
-      username: "WEBDEX",
+      username: "ToonSpectrum",
       embeds: [{ title: "⚠️ 카탈로그 파이프라인 알림", description: alert.slice(0, 4000), color: BAD }],
     });
     return;
@@ -198,8 +198,8 @@ async function main() {
     embeds.push({ title: `📺 새 영상화 ${newAdaptations.length}건`, description: clampList(lines).slice(0, 4000), color: COOL });
   }
 
-  const content = `📚 WEBDEX 카탈로그 업데이트 · 신작 ${newTitles.length}편${newAdaptations.length ? ` · 새 영상화 ${newAdaptations.length}건` : ""}`;
-  await postDiscord({ username: "WEBDEX", content, embeds });
+  const content = `📚 ToonSpectrum 카탈로그 업데이트 · 신작 ${newTitles.length}편${newAdaptations.length ? ` · 새 영상화 ${newAdaptations.length}건` : ""}`;
+  await postDiscord({ username: "ToonSpectrum", content, embeds });
 }
 
 main().catch((e) => {

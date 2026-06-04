@@ -7,8 +7,8 @@ import { EMPTY_TITLE_FILTERS, type TitleFilterState } from "./title-filters";
 // "필터 기억"이 켜져 있으면 현재 필터를 localStorage 에 저장하고 다음 방문 때 복원한다.
 // 끄면 저장분을 지우고 매 방문 빈 필터로 시작(기존 동작). 기억 여부는 전역 1개 선호값,
 // 필터 값은 페이지(scope)별로 분리 저장한다(랭킹·추천·캘린더가 서로 안 섞이게).
-const FLAG_KEY = "webdex-filters-remember";
-const dataKey = (scope: string) => `webdex-filters:${scope}`;
+const FLAG_KEY = "toonspectrum-filters-remember";
+const dataKey = (scope: string) => `toonspectrum-filters:${scope}`;
 
 function readFlag(): boolean {
   try {
@@ -45,7 +45,7 @@ export function clearAllRememberedFilters(alsoFlag = true): void {
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && k.startsWith("webdex-filters:")) localStorage.removeItem(k);
+      if (k && k.startsWith("toonspectrum-filters:")) localStorage.removeItem(k);
     }
     if (alsoFlag) localStorage.setItem(FLAG_KEY, "0");
   } catch {

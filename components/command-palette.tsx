@@ -37,10 +37,10 @@ export function CommandPalette() {
     };
     const onOpen = () => setOpen(true);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("webdex:search", onOpen);
+    window.addEventListener("toonspectrum:search", onOpen);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("webdex:search", onOpen);
+      window.removeEventListener("toonspectrum:search", onOpen);
     };
   }, []);
 

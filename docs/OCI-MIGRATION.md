@@ -1,4 +1,4 @@
-# WEBDEX — Oracle Cloud(OCI) 백엔드 이전 런북
+# ToonSpectrum — Oracle Cloud(OCI) 백엔드 이전 런북
 
 프론트엔드는 **Vercel 유지**(무료 글로벌 CDN). **API(NestJS) + Postgres + KR 크롤 cron** 을 OCI
 **Always-Free ARM(Ampere A1, 최대 4 OCPU / 24GB RAM, 영구 무료)** VM 한 대로 옮긴다. 비용 $0.

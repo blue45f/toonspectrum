@@ -11,11 +11,11 @@
       content="웹툰·웹소설 통합 인덱스. 플랫폼을 가로질러 무엇을, 어디서, 왜 봐야 하는지 찾습니다."
     />
     <title>툰스펙트럼 · 웹툰·웹소설 통합 인덱스</title>
-    <link rel="canonical" href="https://webtoon-index.vercel.app/" />
+    <link rel="canonical" href="https://toonspectrum.vercel.app/" />
     <meta name="theme-color" content="#1a1410" />
     <script>
       try {
-        var s = localStorage.getItem("webdex-theme");
+        var s = localStorage.getItem("toonspectrum-theme") || localStorage.getItem("webdex-theme");
         if (s) {
           var t = JSON.parse(s).state.theme;
           if (t) document.documentElement.setAttribute("data-theme", t);
@@ -31,8 +31,8 @@
       property="og:description"
       content="네이버·카카오·리디·레진 등 국내 웹툰·웹소설을 가로질러 — 무엇을, 어디서, 왜 봐야 하는지 한 곳에서. 통합 랭킹·연재 캘린더·가격비교·작가별 보기."
     />
-    <meta property="og:url" content="https://webtoon-index.vercel.app/" />
-    <meta property="og:image" content="https://webtoon-index.vercel.app/og.png" />
+    <meta property="og:url" content="https://toonspectrum.vercel.app/" />
+    <meta property="og:image" content="https://toonspectrum.vercel.app/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="툰스펙트럼 — 웹툰·웹소설 통합 인덱스" />
@@ -45,7 +45,7 @@
       name="twitter:description"
       content="네이버·카카오·리디·레진 등 국내 웹툰·웹소설을 가로질러 한 곳에서. 통합 랭킹·연재 캘린더·가격비교·작가별 보기."
     />
-    <meta name="twitter:image" content="https://webtoon-index.vercel.app/og.png" />
+    <meta name="twitter:image" content="https://toonspectrum.vercel.app/og.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Pretendard(주 한국어 UI 폰트)는 jsDelivr에서 옴 — 렌더 임계 경로라 연결을 미리 warm -->

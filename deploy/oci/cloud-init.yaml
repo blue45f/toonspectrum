@@ -42,4 +42,4 @@ runcmd:
   - cd /opt/webdex && pnpm install --frozen-lockfile
   - chmod +x /opt/webdex/deploy/oci/*.sh || true
 
-final_message: "WEBDEX VM 준비 완료. SSH 접속 후 docs/OCI-MIGRATION.md 의 §4~§7(.env 작성·compose up·cron) 진행."
+final_message: "ToonSpectrum VM 준비 완료. SSH 접속 후 docs/OCI-MIGRATION.md 의 §4~§7(.env 작성·compose up·cron) 진행."

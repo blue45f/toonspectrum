@@ -22,7 +22,7 @@ type SessionContextValue =
       update: () => Promise<null>;
     };
 
-const SESSION_KEY = "webdex-auth-session";
+const SESSION_KEY = "toonspectrum-auth-session";
 
 const SessionContext = createContext<SessionContextValue>({
   data: null,

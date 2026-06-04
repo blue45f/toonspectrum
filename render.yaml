@@ -1,4 +1,4 @@
-# Render Blueprint — WEBDEX NestJS API (long-running host).
+# Render Blueprint — ToonSpectrum NestJS API (long-running host).
 # 카탈로그 26k건을 부팅 시 메모리에 적재·인덱싱하므로 서버리스/콜드스타트가 아닌 상시구동 호스트가 필요하다.
 # 사용법: Render 대시보드 → New → Blueprint → 이 레포 연결. sync:false 변수는 대시보드에서 입력한다.
 services:

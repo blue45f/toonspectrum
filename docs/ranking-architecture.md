@@ -1,6 +1,6 @@
 # Ranking architecture
 
-WEBDEX ranking has two separate responsibilities:
+ToonSpectrum ranking has two separate responsibilities:
 
 1. Server catalog ranking: deterministic scoring over the internal title catalog.
 2. Live signal correction: short-lived public ranking signals from external platforms.
@@ -107,7 +107,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 2. **데이터 범위 확인**
    - 작품명, 작가명, 공개 랭킹/평점/조회 수치, 공개 플랫폼 URL, 연재 상태, 연재요일, 공개 태그 등 검색과 랭킹에 필요한 최소 메타데이터만 저장합니다.
    - 본문, 회차 이미지 바이너리, 댓글/리뷰 원문, 개인 식별 가능 데이터, 비공개 유료 수치는 저장하지 않습니다.
-   - 외부 리뷰 데이터는 공식 제공 또는 사용자가 WEBDEX에 직접 작성한 데이터만 운영 저장소에 넣습니다.
+   - 외부 리뷰 데이터는 공식 제공 또는 사용자가 ToonSpectrum에 직접 작성한 데이터만 운영 저장소에 넣습니다.
 
 3. **호출량/장애 대응**
    - 플랫폼별 지연, cap, timeout을 환경변수로 둡니다.
@@ -121,7 +121,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 
 ## 법적 리스크 완화 원칙
 
-이 문서는 법률 자문이 아닙니다. 운영 전에는 서비스 목적, 수집 범위, 플랫폼별 약관, robots 정책, 제휴 가능성을 변호사 또는 법무 담당자와 확인해야 합니다. 다만 WEBDEX 아키텍처는 아래 원칙을 기본으로 법적/운영 리스크를 낮춥니다.
+이 문서는 법률 자문이 아닙니다. 운영 전에는 서비스 목적, 수집 범위, 플랫폼별 약관, robots 정책, 제휴 가능성을 변호사 또는 법무 담당자와 확인해야 합니다. 다만 ToonSpectrum 아키텍처는 아래 원칙을 기본으로 법적/운영 리스크를 낮춥니다.
 
 1. **공식/허용 소스 우선**
    - 공개 API, 공식 랭킹/검색 페이지, 제휴 피드, 정식 데이터 제공 계약을 우선합니다.
@@ -289,7 +289,7 @@ The Vite client reads ranking data through the Nest API proxy. The server servic
 6. Add live boost only to matched local titles.
 7. Return ranked items with evidence metadata.
 
-Unmatched external live items do not enter the unified ranking because WEBDEX cannot show full metadata, reviews, platform routing, or detail pages for them. This protects ranking integrity.
+Unmatched external live items do not enter the unified ranking because ToonSpectrum cannot show full metadata, reviews, platform routing, or detail pages for them. This protects ranking integrity.
 
 ## Reliability model
 

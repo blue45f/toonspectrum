@@ -1,4 +1,4 @@
-# WEBDEX 수익화 전략 — '고르는 단계'를 소유한 디스커버리 레이어의 머니타이제이션 설계
+# ToonSpectrum 수익화 전략 — '고르는 단계'를 소유한 디스커버리 레이어의 머니타이제이션 설계
 
 ## 0. 출발점 — 우리가 이미 가진 것 (코드 기준)
 
@@ -66,7 +66,7 @@
 
 ---
 
-## 3. 프리미엄 구독 (WEBDEX+) — `monetization_plan` 활용
+## 3. 프리미엄 구독 (ToonSpectrum+) — `monetization_plan` 활용
 
 ### 적합성 (★★★★☆)
 `monetization_plan` 테이블(perks[], priceCents)이 이미 구독을 전제로 설계돼 있다. 우리 데이터 자산(다축 트렌드·취향 프로필·어댑테이션 그래프·알림)은 **헤비 독자에게 유료화 여지가 명확**하다. AniList/Letterboxd Pro 모델.

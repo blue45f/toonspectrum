@@ -10,7 +10,7 @@ const scripts = pkg.scripts || {};
 
 const issues = [];
 
-// Required docs. WEBDEX keeps product/design guides at the repo root and
+// Required docs. ToonSpectrum keeps product/design guides at the repo root and
 // deeper references (ranking math, competitor analysis) under docs/.
 // (AGENTS.md/CLAUDE.md are intentionally git-ignored globally — agent guides
 //  are not committed — so they are NOT validated here.)

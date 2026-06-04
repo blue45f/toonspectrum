@@ -49,7 +49,7 @@ export function SiteHeader() {
   const isActive = useActive();
   const pathname = usePathname();
   const t = useT();
-  const openSearch = () => window.dispatchEvent(new Event("webdex:search"));
+  const openSearch = () => window.dispatchEvent(new Event("toonspectrum:search"));
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();

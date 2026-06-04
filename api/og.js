@@ -21,7 +21,7 @@ const BOT_RE = /bot|crawl|spider|facebookexternalhit|kakaotalk|slack|twitter|dis
 
 module.exports = async (req, res) => {
   const proto = (req.headers["x-forwarded-proto"] || "https").toString().split(",")[0];
-  const host = (req.headers["x-forwarded-host"] || req.headers.host || "webtoon-index.vercel.app").toString();
+  const host = (req.headers["x-forwarded-host"] || req.headers.host || "toonspectrum.vercel.app").toString();
   const slug = decodeURIComponent((req.query?.slug || "").toString());
   const ua = (req.headers["user-agent"] || "").toString();
 
