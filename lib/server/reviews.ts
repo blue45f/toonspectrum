@@ -92,6 +92,7 @@ export async function getReviewsData(opts: {
   sort?: string;
   spoiler?: string;
   rating?: string;
+  includeHidden?: boolean;
 }) {
   const sort = normalizeReviewSort(opts.sort);
 
@@ -99,6 +100,7 @@ export async function getReviewsData(opts: {
   if (opts.spoiler === "hide") conditions.push(eq(reviews.spoiler, false));
   if (opts.rating === "high") conditions.push(gte(reviews.rating, 40));
   else if (opts.rating === "low") conditions.push(lte(reviews.rating, 30));
+  if (!opts.includeHidden) conditions.push(eq(reviews.hidden, false)); // 비노출 리뷰 제외(관리자 제외)
 
   try {
     let query = db

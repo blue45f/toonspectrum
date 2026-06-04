@@ -8,6 +8,7 @@ import {
   dbClient,
   fanPostReplies,
   fanPosts,
+  feedbackPosts,
   monetizationPlans,
   ratings,
   reviewReplies,
@@ -300,6 +301,23 @@ export class AdminService {
     if ("authKakao" in body) patch.authKakao = !!body.authKakao;
     if ("authNaver" in body) patch.authNaver = !!body.authNaver;
     return setAppConfig(patch);
+  }
+
+  // 게시물 노출 on/off — 리뷰·팬포스트·피드백 비노출 토글(삭제가 아니라 숨김).
+  async setContentVisibility(userId: string, type: string, id: string, hidden: boolean) {
+    await requireAdminUser(userId);
+    let rows: { id: string }[];
+    if (type === "review") {
+      rows = await db.update(reviews).set({ hidden }).where(eq(reviews.id, id)).returning({ id: reviews.id });
+    } else if (type === "fan_post") {
+      rows = await db.update(fanPosts).set({ hidden }).where(eq(fanPosts.id, id)).returning({ id: fanPosts.id });
+    } else if (type === "feedback_post") {
+      rows = await db.update(feedbackPosts).set({ hidden }).where(eq(feedbackPosts.id, id)).returning({ id: feedbackPosts.id });
+    } else {
+      throw new BadRequestException({ error: "지원하지 않는 콘텐츠 타입이에요." });
+    }
+    if (!rows.length) throw new BadRequestException({ error: "대상 게시물을 찾을 수 없어요." });
+    return { ok: true, id, hidden };
   }
 
   async getDashboard(userId: string, periodDays: number): Promise<DashboardResponse> {

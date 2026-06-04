@@ -86,6 +86,18 @@ export class AdminController {
     return this.adminService.setConfig(uid, body);
   }
 
+  // 게시물 노출 on/off (type: review | fan_post | feedback_post)
+  @Post("content/:type/:id/visibility")
+  async setContentVisibility(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @Body() body: { hidden?: unknown }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.setContentVisibility(uid, type, id, !!body.hidden);
+  }
+
   @Get("dashboard")
   @Header("Cache-Control", "no-store, max-age=0")
   async getDashboard(

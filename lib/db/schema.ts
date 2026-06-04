@@ -89,6 +89,7 @@ export const reviews = pgTable(
     text: text("text").notNull().default(""),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     spoiler: boolean("spoiler").notNull().default(false),
+    hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (t) => [unique().on(t.userId, t.titleId)]
@@ -179,6 +180,7 @@ export const fanPosts = pgTable("fan_post", {
   title: text("title").notNull(),
   text: text("text").notNull(),
   tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
@@ -211,6 +213,7 @@ export const feedbackPosts = pgTable("feedback_post", {
   tags: jsonb("tags").$type<string[]>().notNull().default([]),
   status: text("status").notNull().default("open"), // open(답변대기) | answered(답변완료)
   answeredAt: timestamp("answeredAt", { mode: "date" }),
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 

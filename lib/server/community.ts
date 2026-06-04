@@ -460,6 +460,7 @@ export async function listFanPosts(
     if (targetId) addWhere(eq(fanPosts.targetId, targetId));
   }
   if (authorId) addWhere(eq(fanPosts.userId, authorId));
+  addWhere(eq(fanPosts.hidden, false)); // 비노출 처리 글은 공개 목록에서 제외
 
   if (kind) addWhere(eq(fanPosts.kind, kind));
 

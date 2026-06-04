@@ -223,6 +223,7 @@ export async function listFeedbackPosts(opts: {
   };
   if (opts.category && opts.category !== "all") addWhere(eq(feedbackPosts.category, opts.category));
   if (opts.status && opts.status !== "all") addWhere(eq(feedbackPosts.status, opts.status));
+  addWhere(eq(feedbackPosts.hidden, false)); // 비노출 처리 글 제외
   const search = String(opts.query ?? "").trim().toLowerCase();
   if (search) {
     const pattern = `%${escapeLike(search)}%`;
