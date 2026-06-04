@@ -30,6 +30,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/contact": "광고·제휴 문의",
   "/create": "창작 게시판",
   "/studio": "창작 스튜디오",
+  "/me": "내 정보",
 };
 
 function useRouteTitle(pathname: string) {
@@ -84,6 +85,7 @@ const CreateWorkPage = lazy(() =>
   import("@/src/pages/create/CreateWorkPage").then((m) => ({ default: m.CreateWorkPage }))
 );
 const StudioPage = lazy(() => import("@/src/pages/create/StudioPage").then((m) => ({ default: m.StudioPage })));
+const AccountPage = lazy(() => import("@/src/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
 const AuthCallbackPage = lazy(() =>
   import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage }))
 );
@@ -133,6 +135,7 @@ export function AppRouter() {
           <Route path="/create" element={<CreateGalleryPage />} />
           <Route path="/create/:id" element={<CreateWorkPage />} />
           <Route path="/studio" element={<StudioPage />} />
+          <Route path="/me" element={<AccountPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />

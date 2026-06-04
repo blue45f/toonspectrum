@@ -64,3 +64,68 @@ export async function loadMe(uid: string) {
     return { profile: { id: uid }, ratings: {}, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
   }
 }
+
+// 업로드 아바타(dataURL)는 users.image 에 저장한다. 너무 크면 거부(DB 부하·요청 한도 보호).
+export const MAX_PROFILE_IMAGE_BYTES = 400 * 1024;
+const PROFILE_IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
+
+export interface UpdateProfileInput {
+  name?: string;
+  bio?: string;
+  image?: string | null; // dataURL 또는 빈 문자열/ null(제거)
+}
+
+export interface ProfileUpdateError {
+  error: string;
+}
+
+// dataURL 크기 검증(서버측). 유효하면 그대로, 비우면 null, 잘못된 형식이면 에러.
+function validateProfileImage(value: string): string | null | ProfileUpdateError {
+  const raw = value.trim();
+  if (!raw) return null;
+  const match = PROFILE_IMAGE_RE.exec(raw);
+  if (!match) return { error: "지원하지 않는 이미지 형식이에요." };
+  // 인코딩 헤더 제외한 실제 바이트가 한도를 넘으면 거부.
+  if (raw.length > MAX_PROFILE_IMAGE_BYTES) return { error: "이미지가 너무 커요. (최대 400KB)" };
+  return raw;
+}
+
+// 프로필(name·bio·image) 갱신. image 가 dataURL 이면 검증 후 users.image 에 저장.
+// 반환은 갱신 후 프로필. 형식 오류 시 ProfileUpdateError 를 반환(컨트롤러가 400 매핑).
+export async function updateProfile(
+  uid: string,
+  input: UpdateProfileInput
+): Promise<{ profile: { id: string; name: string | null; image: string | null; avatar: string | null; email: string | null; bio: string | null } } | ProfileUpdateError> {
+  const patch: { name?: string | null; bio?: string | null; image?: string | null } = {};
+
+  if (typeof input.name === "string") {
+    const name = input.name.trim().slice(0, 60);
+    if (!name) return { error: "이름을 입력해 주세요." };
+    patch.name = name;
+  }
+  if (typeof input.bio === "string") {
+    patch.bio = input.bio.trim().slice(0, 280) || null;
+  }
+  if (input.image !== undefined) {
+    if (input.image === null || (typeof input.image === "string" && input.image.trim() === "")) {
+      patch.image = null;
+    } else if (typeof input.image === "string") {
+      const checked = validateProfileImage(input.image);
+      if (checked && typeof checked === "object" && "error" in checked) return checked;
+      patch.image = checked;
+    }
+  }
+
+  if (Object.keys(patch).length === 0) return { error: "변경할 내용이 없어요." };
+
+  const [row] = await db.update(users).set(patch).where(eq(users.id, uid)).returning({
+    id: users.id,
+    name: users.name,
+    image: users.image,
+    avatar: users.avatar,
+    email: users.email,
+    bio: users.bio,
+  });
+  if (!row) return { error: "사용자를 찾을 수 없어요." };
+  return { profile: row };
+}

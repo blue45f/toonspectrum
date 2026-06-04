@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { db, collections, collectionItems, ratings, reviews, reviewLikes, reads, subscriptions } from "../../../../../lib/db";
-import { loadMe } from "../../../../../lib/server/me";
+import { loadMe, updateProfile, type UpdateProfileInput } from "../../../../../lib/server/me";
 
 type MergeMapValue = Record<string, unknown>;
 
@@ -29,6 +29,12 @@ interface ReadPayload {
 
 interface SubscriptionPayload {
   titleId?: unknown;
+}
+
+interface ProfilePayload {
+  name?: unknown;
+  bio?: unknown;
+  image?: unknown;
 }
 
 interface CollectionPayload {
@@ -91,6 +97,18 @@ const toDb = (v: number) => Math.round(v * 10);
 export class MeService {
   async getMe(uid: string) {
     return loadMe(uid);
+  }
+
+  async updateProfile(uid: string, payload: ProfilePayload) {
+    const input: UpdateProfileInput = {};
+    if (typeof payload.name === "string") input.name = payload.name;
+    if (typeof payload.bio === "string") input.bio = payload.bio;
+    if (payload.image !== undefined) {
+      input.image = payload.image === null ? null : String(payload.image ?? "");
+    }
+    const result = await updateProfile(uid, input);
+    if ("error" in result) throw new BadRequestException(result.error);
+    return result;
   }
 
   async upsertReview(uid: string, payload: ReviewPayload) {

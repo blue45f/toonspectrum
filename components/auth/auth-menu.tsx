@@ -95,6 +95,13 @@ export function AuthMenu() {
               </Link>
             )}
             <Link
+              href="/me"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
+            >
+              <UserRound size={15} /> 내 정보
+            </Link>
+            <Link
               href="/library"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"

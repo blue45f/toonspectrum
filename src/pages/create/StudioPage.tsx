@@ -6,6 +6,7 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   ImagePlus,
+  Box,
   LayoutTemplate,
   Loader2,
   MessageCircle,
@@ -34,6 +35,7 @@ import {
   type TemplateSpec,
 } from "./studio-assets";
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
+import { Studio3DPoser } from "./Studio3DPoser";
 
 type Tool = "select" | "draw";
 
@@ -211,6 +213,7 @@ export function StudioPage() {
   const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char">(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
+  const [poser3dOpen, setPoser3dOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -598,6 +601,9 @@ export function StudioPage() {
             </div>
           )}
         </div>
+        <button type="button" onClick={() => setPoser3dOpen(true)} className={toolBtn(false)}>
+          <Box size={14} /> 3D 캐릭터
+        </button>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -1036,6 +1042,24 @@ export function StudioPage() {
           </div>
         </aside>
       </div>
+
+      <Studio3DPoser
+        open={poser3dOpen}
+        onClose={() => setPoser3dOpen(false)}
+        onInsert={(png, w, h) => {
+          const fit = Math.min(1, (CANVAS_W - 120) / w);
+          addEl({
+            id: uid(),
+            type: "image",
+            src: png,
+            x: (CANVAS_W - w * fit) / 2,
+            y: Math.max(40, canvasH / 2 - (h * fit) / 2),
+            width: Math.round(w * fit),
+            height: Math.round(h * fit),
+            rotation: 0,
+          });
+        }}
+      />
     </Container>
   );
 }

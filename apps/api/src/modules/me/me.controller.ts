@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Inject, Post, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Inject, Patch, Post, UnauthorizedException } from "@nestjs/common";
 import { MeService } from "./me.service";
 
 interface ReviewPayload {
@@ -35,6 +35,12 @@ interface CollectionPayload {
   emoji?: unknown;
 }
 
+interface ProfilePayload {
+  name?: unknown;
+  bio?: unknown;
+  image?: unknown;
+}
+
 interface MergePayload {
   ratings?: Record<string, unknown>;
   reads?: Record<string, unknown>;
@@ -57,6 +63,12 @@ export class MeController {
   async getMe(@Headers("x-user-id") userId?: string) {
     const uid = this.userIdFromHeader(userId);
     return this.meService.getMe(uid);
+  }
+
+  @Patch("profile")
+  async updateProfile(@Headers("x-user-id") userId: string | undefined, @Body() body: ProfilePayload) {
+    const uid = this.userIdFromHeader(userId);
+    return this.meService.updateProfile(uid, body);
   }
 
   @Post("review")
