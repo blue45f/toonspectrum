@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
-import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Transformer } from "react-konva";
 import {
   ArrowDownToLine,
   ArrowUpToLine,
   ImagePlus,
+  LayoutTemplate,
   Loader2,
   MessageCircle,
   MousePointer2,
   Pencil,
   Redo2,
   Smile,
+  Sparkles,
   Trash2,
   Type as TypeIcon,
   Undo2,
@@ -20,10 +22,18 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createWork, getWork, getCurrentUserId, updateWork } from "@/src/lib/creator-client";
-
-// 캔버스: 세로 스크롤 웹툰 비율(고정 폭 720, 높이 가변).
-const CANVAS_W = 720;
-const EMOJIS = ["😀", "😂", "😍", "😭", "😱", "😡", "👍", "🔥", "💜", "✨", "💥", "❤️", "⭐", "🎉", "👏", "💧"];
+import {
+  BG_PRESETS,
+  BUBBLE_VARIANTS,
+  CANVAS_W,
+  EFFECT_EMOJIS,
+  SFX_PRESETS,
+  TEMPLATES,
+  type BgPreset,
+  type BubbleVariant,
+  type TemplateSpec,
+} from "./studio-assets";
+import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 
 type Tool = "select" | "draw";
 
@@ -47,10 +57,13 @@ interface TextEl {
   fontSize: number;
   fill: string;
   rotation: number;
+  stroke?: string; // 효과음(SFX) 외곽선
+  strokeWidth?: number;
 }
 interface BubbleEl {
   id: string;
   type: "bubble";
+  variant: BubbleVariant; // speech | thought | shout | box
   text: string;
   x: number;
   y: number;
@@ -59,6 +72,14 @@ interface BubbleEl {
   fill: string;
   textFill: string;
   rotation: number;
+}
+interface FrameEl {
+  id: string;
+  type: "frame";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 interface StickerEl {
   id: string;
@@ -76,7 +97,7 @@ interface DrawEl {
   stroke: string;
   strokeWidth: number;
 }
-type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl;
+type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
 
 const uid = () => crypto.randomUUID();
 
@@ -187,7 +208,9 @@ export function StudioPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [color, setColor] = useState("#7c5cfc");
   const [strokeWidth, setStrokeWidth] = useState(6);
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char">(null);
+  const [bgGrad, setBgGrad] = useState<string[] | null>(null);
+  const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -227,9 +250,10 @@ export function StudioPage() {
         setTitle(w.title);
         setDescription(w.description);
         setTagsText((w.tags ?? []).join(", "));
-        const doc = w.doc as { elements?: El[]; bg?: string; height?: number };
+        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number };
         if (doc?.elements) setHistory([doc.elements]);
         if (doc?.bg) setBg(doc.bg);
+        if (doc?.bgGrad) setBgGrad(doc.bgGrad);
         if (doc?.height) setCanvasH(doc.height);
         setHi(0);
       })
@@ -294,23 +318,73 @@ export function StudioPage() {
       rotation: 0,
     });
   }
-  function addBubble() {
+  function addBubble(variant: BubbleVariant) {
+    setMenu(null);
     addEl({
       id: uid(),
       type: "bubble",
-      text: "대사를 입력하세요",
+      variant,
+      text: variant === "box" ? "내레이션" : variant === "shout" ? "!!" : "대사를 입력",
       x: CANVAS_W / 2 - 130,
       y: canvasH / 2 - 70,
       width: 260,
       height: 140,
-      fill: "#ffffff",
+      fill: variant === "shout" ? "#fff6d6" : "#ffffff",
       textFill: "#111111",
       rotation: 0,
     });
   }
   function addSticker(emoji: string) {
-    setEmojiOpen(false);
+    setMenu(null);
     addEl({ id: uid(), type: "sticker", text: emoji, x: CANVAS_W / 2 - 40, y: canvasH / 2 - 40, fontSize: 96, rotation: 0 });
+  }
+  function addSfx(text: string, fill: string) {
+    setMenu(null);
+    addEl({
+      id: uid(),
+      type: "text",
+      text,
+      x: CANVAS_W / 2 - 80,
+      y: canvasH / 2 - 50,
+      width: 220,
+      fontSize: 88,
+      fill,
+      stroke: "#16100c",
+      strokeWidth: 7,
+      rotation: -6,
+    });
+  }
+  function addCharacter(svg: string, w: number, h: number) {
+    setMenu(null);
+    const fit = Math.min(1, (CANVAS_W - 140) / w);
+    addEl({
+      id: uid(),
+      type: "image",
+      src: svgToDataUrl(svg),
+      x: (CANVAS_W - w * fit) / 2,
+      y: Math.max(40, canvasH / 2 - (h * fit) / 2),
+      width: Math.round(w * fit),
+      height: Math.round(h * fit),
+      rotation: 0,
+    });
+  }
+  function applyTemplate(tpl: TemplateSpec) {
+    setMenu(null);
+    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
+    setCanvasH(tpl.canvasH);
+    setBg("#ffffff");
+    setBgGrad(null);
+    commit(
+      tpl.frames.map((f) => ({ id: uid(), type: "frame" as const, x: f.x, y: f.y, width: f.width, height: f.height }))
+    );
+    setSelectedId(null);
+  }
+  function applyBgPreset(p: BgPreset) {
+    if (p.grad) setBgGrad(p.grad);
+    else if (p.fill) {
+      setBg(p.fill);
+      setBgGrad(null);
+    }
   }
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -405,7 +479,7 @@ export function StudioPage() {
         titleId: linkedTitleId ?? undefined,
         cover,
         pages: [full],
-        doc: { width: CANVAS_W, height: canvasH, bg, elements } as Record<string, unknown>,
+        doc: { width: CANVAS_W, height: canvasH, bg, bgGrad, elements } as Record<string, unknown>,
         status,
       };
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
@@ -454,6 +528,27 @@ export function StudioPage() {
 
       {/* 툴바 */}
       <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
+        <div className="relative">
+          <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} className={toolBtn(menu === "template")}>
+            <LayoutTemplate size={14} /> 템플릿
+          </button>
+          {menu === "template" && (
+            <div className="absolute left-0 top-full z-30 mt-1 grid w-64 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t)}
+                  className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                >
+                  <span className="font-medium text-fg">{t.label}</span>
+                  <span className="text-fg-3">{t.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <span className="mx-0.5 h-5 w-px bg-line" />
         <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
           <MousePointer2 size={14} /> 선택
         </button>
@@ -461,23 +556,98 @@ export function StudioPage() {
           <Pencil size={14} /> 펜
         </button>
         <span className="mx-0.5 h-5 w-px bg-line" />
+        <div className="relative">
+          <button type="button" onClick={() => setMenu(menu === "char" ? null : "char")} className={toolBtn(menu === "char")}>
+            <Smile size={14} /> 캐릭터
+          </button>
+          {menu === "char" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <div className="mb-2 flex flex-wrap gap-1">
+                {CHARACTERS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCharPick(c.id)}
+                    className={cn(
+                      "rounded-lg border px-2 py-1 text-xs",
+                      charPick === c.id ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {(() => {
+                  const c = CHARACTERS.find((x) => x.id === charPick) ?? CHARACTERS[0];
+                  if (!c) return null;
+                  return c.expressions.map((ex) => (
+                    <button
+                      key={ex.id}
+                      type="button"
+                      title={ex.label}
+                      onClick={() => addCharacter(ex.svg, c.width, c.height)}
+                      className="overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                    >
+                      <img src={svgToDataUrl(ex.svg)} alt={ex.label} className="h-14 w-full object-contain" />
+                      <span className="block text-center text-[0.6rem] text-fg-3">{ex.label}</span>
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
-        <button type="button" onClick={addBubble} className={toolBtn(false)}>
-          <MessageCircle size={14} /> 말풍선
-        </button>
         <div className="relative">
-          <button type="button" onClick={() => setEmojiOpen((v) => !v)} className={toolBtn(emojiOpen)}>
-            <Smile size={14} /> 스티커
+          <button type="button" onClick={() => setMenu(menu === "bubble" ? null : "bubble")} className={toolBtn(menu === "bubble")}>
+            <MessageCircle size={14} /> 말풍선
           </button>
-          {emojiOpen && (
-            <div className="absolute left-0 top-full z-30 mt-1 grid w-56 grid-cols-8 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
-              {EMOJIS.map((em) => (
-                <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
-                  {em}
+          {menu === "bubble" && (
+            <div className="absolute left-0 top-full z-30 mt-1 grid w-44 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              {BUBBLE_VARIANTS.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => addBubble(v.id)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                >
+                  <span className="text-base">{v.sample}</span>
+                  <span className="font-medium text-fg">{v.label}</span>
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+        <div className="relative">
+          <button type="button" onClick={() => setMenu(menu === "sticker" ? null : "sticker")} className={toolBtn(menu === "sticker")}>
+            <Sparkles size={14} /> 효과
+          </button>
+          {menu === "sticker" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
+              <div className="mb-2 flex flex-wrap gap-1">
+                {SFX_PRESETS.map((s) => (
+                  <button
+                    key={s.text}
+                    type="button"
+                    onClick={() => addSfx(s.text, s.fill)}
+                    className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
+                  >
+                    {s.text}
+                  </button>
+                ))}
+              </div>
+              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">스티커</p>
+              <div className="grid grid-cols-8 gap-1">
+                {EFFECT_EMOJIS.map((em) => (
+                  <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
+                    {em}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -522,7 +692,17 @@ export function StudioPage() {
             onTouchEnd={onStageUp}
           >
             <Layer>
-              <Rect name="bg" x={0} y={0} width={CANVAS_W} height={canvasH} fill={bg} />
+              <Rect
+                name="bg"
+                x={0}
+                y={0}
+                width={CANVAS_W}
+                height={canvasH}
+                fill={bgGrad ? undefined : bg}
+                fillLinearGradientStartPoint={bgGrad ? { x: 0, y: 0 } : undefined}
+                fillLinearGradientEndPoint={bgGrad ? { x: 0, y: canvasH } : undefined}
+                fillLinearGradientColorStops={bgGrad ? [0, bgGrad[0], 1, bgGrad[1]] : undefined}
+              />
               {elements.map((el) => {
                 const draggable = tool === "select";
                 const onSelect = () => tool === "select" && setSelectedId(el.id);
@@ -538,6 +718,33 @@ export function StudioPage() {
                       innerRef={setRef}
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch)}
+                    />
+                  );
+                if (el.type === "frame")
+                  return (
+                    <Rect
+                      key={el.id}
+                      ref={setRef}
+                      x={el.x}
+                      y={el.y}
+                      width={el.width}
+                      height={el.height}
+                      fill="#ffffff"
+                      stroke="#16100c"
+                      strokeWidth={3}
+                      cornerRadius={4}
+                      draggable={draggable}
+                      onMouseDown={onSelect}
+                      onTap={onSelect}
+                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      onTransformEnd={(e) => {
+                        const node = e.target;
+                        const w = Math.max(40, node.width() * node.scaleX());
+                        const h = Math.max(40, node.height() * node.scaleY());
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h });
+                      }}
                     />
                   );
                 if (el.type === "draw")
@@ -564,6 +771,10 @@ export function StudioPage() {
                       width={el.width}
                       fontSize={el.fontSize}
                       fill={el.fill}
+                      stroke={el.stroke}
+                      strokeWidth={el.strokeWidth ?? 0}
+                      fillAfterStrokeEnabled
+                      lineJoin="round"
                       rotation={el.rotation}
                       fontStyle="bold"
                       draggable={draggable}
@@ -630,12 +841,51 @@ export function StudioPage() {
                       patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
                     }}
                   >
-                    <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={18} stroke="#111111" strokeWidth={3} />
+                    {el.variant === "shout" ? (
+                      <Star
+                        x={el.width / 2}
+                        y={el.height / 2}
+                        numPoints={18}
+                        innerRadius={44}
+                        outerRadius={62}
+                        scaleX={el.width / 124}
+                        scaleY={el.height / 124}
+                        fill={el.fill}
+                        stroke="#16100c"
+                        strokeWidth={3}
+                      />
+                    ) : el.variant === "thought" ? (
+                      <>
+                        <Rect
+                          width={el.width}
+                          height={el.height}
+                          fill={el.fill}
+                          cornerRadius={Math.min(el.width, el.height) / 2}
+                          stroke="#16100c"
+                          strokeWidth={3}
+                        />
+                        <Ellipse x={el.width * 0.26} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke="#16100c" strokeWidth={3} />
+                        <Ellipse x={el.width * 0.16} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke="#16100c" strokeWidth={3} />
+                      </>
+                    ) : el.variant === "box" ? (
+                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke="#16100c" strokeWidth={3} />
+                    ) : (
+                      <>
+                        <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={18} stroke="#16100c" strokeWidth={3} />
+                        <Line
+                          points={[el.width * 0.3, el.height - 3, el.width * 0.22, el.height + 30, el.width * 0.47, el.height - 3]}
+                          closed
+                          fill={el.fill}
+                          stroke="#16100c"
+                          strokeWidth={3}
+                        />
+                      </>
+                    )}
                     <KText
                       text={el.text}
-                      width={el.width - 28}
+                      width={el.width - 36}
                       height={el.height - 24}
-                      x={14}
+                      x={18}
                       y={12}
                       fontSize={24}
                       fill={el.textFill}
@@ -695,7 +945,20 @@ export function StudioPage() {
               배경색
               <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
             </label>
-            <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {BG_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyBgPreset(p)}
+                  title={p.label}
+                  aria-label={`배경 ${p.label}`}
+                  className="h-6 w-6 rounded-md border border-line"
+                  style={{ background: p.grad ? `linear-gradient(${p.grad[0]}, ${p.grad[1]})` : p.fill }}
+                />
+              ))}
+            </div>
+            <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               높이
               <span className="flex items-center gap-1">
                 <button type="button" onClick={() => setCanvasH((h) => Math.max(480, h - 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
