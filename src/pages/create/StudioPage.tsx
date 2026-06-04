@@ -19,6 +19,7 @@ import {
   Pencil,
   Plus,
   Redo2,
+  Send,
   SlidersHorizontal,
   Smile,
   Sparkles,
@@ -26,6 +27,7 @@ import {
   Trash2,
   Type as TypeIcon,
   Undo2,
+  X,
 } from "lucide-react";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
@@ -119,10 +121,144 @@ interface DrawEl {
   fill?: string;
 }
 type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
 const BRUSH_WIDTH_PRESETS = [2, 6, 12, 24, 36];
 const DRAW_COLOR_SWATCHES = ["#16100c", "#f8f2df", "#f45d48", "#ff9f1c", "#ffd84d", "#56c271", "#2f9bff", "#7c5cfc", "#ff6fb1", "#8a5a44"];
+const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
+const QUICK_SAMPLE_CANVAS_H = 1120;
+const QUICK_SAMPLE_MARGIN = 24;
+
+function readQuickStartDismissed() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(QUICK_START_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeQuickStartDismissed() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(QUICK_START_DISMISSED_KEY, "1");
+  } catch {
+    // localStorage may be unavailable in private or embedded browser contexts.
+  }
+}
+
+function createQuickSampleFrames(): FrameEl[] {
+  const height = Math.round((QUICK_SAMPLE_CANVAS_H - QUICK_SAMPLE_MARGIN * 3) / 2);
+  return [0, 1].map((idx) => ({
+    id: uid(),
+    type: "frame" as const,
+    x: QUICK_SAMPLE_MARGIN,
+    y: QUICK_SAMPLE_MARGIN + idx * (height + QUICK_SAMPLE_MARGIN),
+    width: CANVAS_W - QUICK_SAMPLE_MARGIN * 2,
+    height,
+  }));
+}
+
+function QuickStartPanel({
+  onDismiss,
+  onExample,
+  onOpenTemplate,
+  onOpenCharacter,
+  onOpenBubble,
+  onOpenPublish,
+}: {
+  onDismiss: () => void;
+  onExample: () => void;
+  onOpenTemplate: () => void;
+  onOpenCharacter: () => void;
+  onOpenBubble: () => void;
+  onOpenPublish: () => void;
+}) {
+  const steps = [
+    {
+      label: "① 템플릿 고르기",
+      hint: "컷 모양부터 잡으면 시작이 쉬워요.",
+      icon: LayoutTemplate,
+      onClick: onOpenTemplate,
+    },
+    {
+      label: "② 캐릭터 넣기",
+      hint: "2D 캐릭터를 바로 넣고, VRM도 쓸 수 있어요.",
+      icon: Smile,
+      onClick: onOpenCharacter,
+    },
+    {
+      label: "③ 말풍선·대사",
+      hint: "대사는 더블클릭해서 바꿔요.",
+      icon: MessageCircle,
+      onClick: onOpenBubble,
+    },
+    {
+      label: "④ 게시하기",
+      hint: "제목을 적고 작품으로 올려요.",
+      icon: Send,
+      onClick: onOpenPublish,
+    },
+  ];
+
+  return (
+    <div className="absolute inset-x-2 top-2 z-20 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold">빠른 시작</p>
+          <p className="mt-1 max-w-[46ch] text-xs leading-relaxed text-fg-3">처음이라면 예시를 불러오거나, 아래 순서대로 하나씩 눌러보세요.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="grid size-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          aria-label="빠른 시작 닫기"
+          title="닫기"
+        >
+          <X size={15} aria-hidden />
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={onExample}
+          className={cn(
+            buttonClass({ size: "sm", variant: "solid" }),
+            "min-h-10 justify-center gap-1.5 px-3 text-sm sm:min-w-36"
+          )}
+        >
+          <Sparkles size={15} aria-hidden />
+          예시로 시작
+        </button>
+        <p className="text-xs leading-relaxed text-fg-3">2컷 템플릿, 캐릭터, 말풍선을 한 번에 넣어요.</p>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {steps.map((step) => {
+          const Icon = step.icon;
+          return (
+            <button
+              key={step.label}
+              type="button"
+              onClick={step.onClick}
+              className="group flex min-h-[4.75rem] items-center gap-3 rounded-xl border border-line bg-card px-3 py-3 text-left transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                <Icon size={18} aria-hidden />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-fg">{step.label}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-fg-3">{step.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function drawBounds(points: number[]) {
   const [x1 = 0, y1 = 0, x2 = x1, y2 = y1] = points;
@@ -453,16 +589,19 @@ export function StudioPage() {
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
-  const [menu, setMenu] = useState<null | "template" | "bubble" | "sticker" | "char" | "bgScene">(null);
+  const [menu, setMenu] = useState<null | StudioMenu>(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
+  const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
+  const [quickStartOpen, setQuickStartOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workHydrated, setWorkHydrated] = useState(!workId);
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -480,15 +619,22 @@ export function StudioPage() {
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
+  const publishRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
+  const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
 
   // 기존 작품 로드(편집 모드).
   useEffect(() => {
-    if (!workId) return;
+    if (!workId) {
+      setWorkHydrated(true);
+      return;
+    }
+    setWorkHydrated(false);
     let alive = true;
     getWork(workId)
       .then((w) => {
@@ -504,7 +650,10 @@ export function StudioPage() {
         if (doc?.webtoonTheme) setWebtoonTheme(doc.webtoonTheme);
         setHi(0);
       })
-      .catch((e) => alive && setError(e instanceof Error ? e.message : "불러오기 실패"));
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "불러오기 실패"))
+      .finally(() => {
+        if (alive) setWorkHydrated(true);
+      });
     return () => {
       alive = false;
     };
@@ -545,6 +694,74 @@ export function StudioPage() {
         sourceHeight: height,
       })
     );
+  }
+  function dismissQuickStart() {
+    setQuickStartOpen(false);
+    setQuickStartDismissed(true);
+    storeQuickStartDismissed();
+  }
+  function openQuickStartMenu(nextMenu: Extract<StudioMenu, "template" | "char" | "bubble">) {
+    setTool("select");
+    setSelectedId(null);
+    setMenu(nextMenu);
+    dismissQuickStart();
+  }
+  function openPublishStep() {
+    setTool("select");
+    setMenu(null);
+    dismissQuickStart();
+    window.requestAnimationFrame(() => {
+      publishRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      titleInputRef.current?.focus({ preventScroll: true });
+    });
+  }
+  function startFromExample() {
+    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
+
+    const frames = createQuickSampleFrames();
+    const firstFrame = frames[0];
+    const character = CHARACTERS[0];
+    const expression = character?.expressions.find((ex) => ex.id === "happy") ?? character?.expressions[0];
+    const sample: El[] = [...frames];
+
+    if (firstFrame && character && expression) {
+      const scaleToFrame = Math.min(1.18, (firstFrame.width * 0.4) / character.width, (firstFrame.height - 72) / character.height);
+      const width = Math.round(character.width * scaleToFrame);
+      const height = Math.round(character.height * scaleToFrame);
+      sample.push({
+        id: uid(),
+        type: "image",
+        src: svgToDataUrl(expression.svg),
+        x: firstFrame.x + 70,
+        y: firstFrame.y + firstFrame.height - height - 26,
+        width,
+        height,
+        rotation: 0,
+      });
+      sample.push({
+        id: uid(),
+        type: "bubble",
+        variant: "speech",
+        text: "오늘은 여기서 시작해요.",
+        x: firstFrame.x + firstFrame.width - 314,
+        y: firstFrame.y + 58,
+        width: 270,
+        height: 118,
+        fill: "#ffffff",
+        textFill: "#111111",
+        rotation: 0,
+      });
+    }
+
+    setCanvasH(QUICK_SAMPLE_CANVAS_H);
+    setBg("#ffffff");
+    setBgGrad(null);
+    setWebtoonTheme("soft");
+    setTool("select");
+    setMenu(null);
+    setSelectedId(null);
+    commit(sample);
+    dismissQuickStart();
   }
   function removeSelected() {
     if (!selectedId) return;
@@ -1498,6 +1715,28 @@ export function StudioPage() {
             </Layer>
           </Stage>
 
+          {showQuickStart && (
+            <QuickStartPanel
+              onDismiss={dismissQuickStart}
+              onExample={startFromExample}
+              onOpenTemplate={() => openQuickStartMenu("template")}
+              onOpenCharacter={() => openQuickStartMenu("char")}
+              onOpenBubble={() => openQuickStartMenu("bubble")}
+              onOpenPublish={openPublishStep}
+            />
+          )}
+
+          <button
+            type="button"
+            onClick={() => setQuickStartOpen(true)}
+            className="absolute bottom-3 right-3 z-30 grid size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            aria-label="빠른 시작 도움말 열기"
+            aria-expanded={showQuickStart}
+            title="빠른 시작"
+          >
+            ?
+          </button>
+
           {/* 텍스트 인라인 편집 오버레이 */}
           {editing && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
@@ -1617,9 +1856,10 @@ export function StudioPage() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+          <div ref={publishRef} className="rounded-2xl border border-line bg-panel/40 p-3">
             <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
             <input
+              ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="제목 *"
