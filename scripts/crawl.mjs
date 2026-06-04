@@ -18,6 +18,7 @@ import { crawl as crawlToptoon } from "./crawlers/toptoon.mjs";
 import { crawl as crawlToomics } from "./crawlers/toomics.mjs";
 import { crawl as crawlKyobo } from "./crawlers/kyobo.mjs";
 import { crawl as crawlComico } from "./crawlers/comico.mjs";
+import { readFileSync } from "node:fs";
 
 // 중소형 플랫폼 (공개 카탈로그) 크롤러 — partner-required → crawler 승격분.
 const EXTRA_CRAWLERS = [
@@ -47,8 +48,26 @@ const log = (...args) => {
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const HW = { "User-Agent": UA, Referer: "https://comic.naver.com/", Accept: "application/json" };
-const HS = { "User-Agent": UA, Referer: "https://series.naver.com/" };
+// 선택적 네이버 인증 쿠키(.env.local 의 NAVER_COOKIE="NID_AUT=...; NID_SES=...").
+// 설정 시 시리즈/웹툰 요청에 Cookie 를 붙여, 비로그인 가림막(19over placeholder) 대신 실제 19금 표지를 받는다.
+// 절대 커밋/로그 출력 금지(.env.local 은 gitignore). 미설정 시 기존 익명 크롤과 동일.
+function readEnvLocalValue(key) {
+  for (const rel of ["../.env.local", "../../.env.local"]) {
+    try {
+      const txt = readFileSync(new URL(rel, import.meta.url), "utf8");
+      const m = txt.match(new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, "m"));
+      if (m) return m[1].replace(/^['"]|['"]$/g, "").trim();
+    } catch {
+      /* 파일 없음 — 다음 후보 */
+    }
+  }
+  return undefined;
+}
+const NAVER_COOKIE = process.env.NAVER_COOKIE || readEnvLocalValue("NAVER_COOKIE");
+const naverCookieHdr = NAVER_COOKIE ? { Cookie: NAVER_COOKIE } : {};
+const HW = { "User-Agent": UA, Referer: "https://comic.naver.com/", Accept: "application/json", ...naverCookieHdr };
+const HS = { "User-Agent": UA, Referer: "https://series.naver.com/", ...naverCookieHdr };
+if (NAVER_COOKIE) log("네이버 인증 쿠키 적용 — 19금 표지 포함 인증 크롤 모드");
 const HL = {
   "User-Agent": UA,
   Referer: "https://www.lezhin.com/ko/ranking",
