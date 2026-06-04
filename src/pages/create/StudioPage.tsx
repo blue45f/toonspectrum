@@ -92,6 +92,7 @@ interface BubbleEl {
   fill: string;
   textFill: string;
   rotation: number;
+  tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
 }
 interface FrameEl {
   id: string;
@@ -1595,6 +1596,16 @@ export function StudioPage() {
                   bTailPoints = [el.width * 0.45, el.height - 2, el.width * 0.45, el.height + 16, el.width * 0.55, el.height - 2];
                 }
 
+                // 말풍선 꼬리 방향: 기본 왼쪽, "right"는 x를 좌우 반전, "none"은 숨김.
+                const tailDir = el.tail ?? "left";
+                const showTail = tailDir !== "none";
+                const flipTailX = (pts: number[]) =>
+                  tailDir === "right" ? pts.map((v, i) => (i % 2 === 0 ? el.width - v : v)) : pts;
+                const speechTailPts = flipTailX(bTailPoints);
+                const scaredTailPts = flipTailX([el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2]);
+                const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
+                const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
+
                 return (
                   <Group
                     key={el.id}
@@ -1644,8 +1655,12 @@ export function StudioPage() {
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
                         />
-                        <Ellipse x={el.width * 0.26} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Ellipse x={el.width * 0.16} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        {showTail && (
+                          <>
+                            <Ellipse x={thoughtBigX} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                            <Ellipse x={thoughtSmallX} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                          </>
+                        )}
                       </>
                     ) : el.variant === "whisper" ? (
                       <>
@@ -1658,14 +1673,16 @@ export function StudioPage() {
                           strokeWidth={bStrokeW}
                           dash={[8, 5]}
                         />
-                        <Line
-                          points={bTailPoints}
-                          closed
-                          fill={el.fill}
-                          stroke={bStroke}
-                          strokeWidth={bStrokeW}
-                          dash={[8, 5]}
-                        />
+                        {showTail && (
+                          <Line
+                            points={speechTailPts}
+                            closed
+                            fill={el.fill}
+                            stroke={bStroke}
+                            strokeWidth={bStrokeW}
+                            dash={[8, 5]}
+                          />
+                        )}
                       </>
                     ) : el.variant === "scared" ? (
                       <>
@@ -1680,30 +1697,30 @@ export function StudioPage() {
                           shadowBlur={6}
                           shadowOpacity={0.16}
                         />
-                        <Line
-                          points={[
-                            el.width * 0.32, el.height - 2,
-                            el.width * 0.26, el.height + 22,
-                            el.width * 0.45, el.height - 2
-                          ]}
-                          closed
-                          fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
-                          stroke="#7c3aed"
-                          strokeWidth={2}
-                        />
+                        {showTail && (
+                          <Line
+                            points={scaredTailPts}
+                            closed
+                            fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
+                            stroke="#7c3aed"
+                            strokeWidth={2}
+                          />
+                        )}
                       </>
                     ) : el.variant === "box" ? (
                       <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
                     ) : (
                       <>
                         <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={bRadius} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Line
-                          points={bTailPoints}
-                          closed
-                          fill={el.fill}
-                          stroke={bStroke}
-                          strokeWidth={bStrokeW}
-                        />
+                        {showTail && (
+                          <Line
+                            points={speechTailPts}
+                            closed
+                            fill={el.fill}
+                            stroke={bStroke}
+                            strokeWidth={bStrokeW}
+                          />
+                        )}
                       </>
                     )}
                     <KText
@@ -1856,6 +1873,32 @@ export function StudioPage() {
                   말풍선색
                   <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
                 </label>
+              )}
+              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">꼬리 방향</p>
+                  <div className="flex gap-1">
+                    {[
+                      { label: "왼쪽", v: "left" },
+                      { label: "오른쪽", v: "right" },
+                      { label: "없음", v: "none" },
+                    ].map((t) => (
+                      <button
+                        key={t.v}
+                        type="button"
+                        onClick={() => patchEl(selected.id, { tail: t.v } as Partial<El>)}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs",
+                          (selected.tail ?? "left") === t.v
+                            ? "border-accent/60 bg-accent-soft/50 text-fg"
+                            : "border-line text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               {selected.type === "text" && (
                 <div className="mt-2">
