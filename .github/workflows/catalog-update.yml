@@ -1,19 +1,29 @@
 name: catalog-update
 
-# 주간 카탈로그 갱신 — 크롤 → gz 스냅샷 커밋 → Vercel 자동 재배포(빌드 시 public/data 재생성).
-# 수동 실행(workflow_dispatch)도 가능. 전체 데이터는 Neon 이 아니라 git 의 gz 파일이 소스다.
+# 카탈로그 갱신 파이프라인 — 크롤 → 검증 게이트 → gz 스냅샷 커밋 → 배포 트리거 → 변경 알림.
+# 전체 데이터는 Neon 이 아니라 git 의 gz 파일이 소스다(빌드 시 public/data 재생성).
 #
-# ⚠️ GitHub 러너는 비(非)KR egress 라 일부 KR 지오차단 소스(comico 등)는 0건이 될 수 있다.
-#    전체 커버리지가 필요하면 로컬(KR)에서 `pnpm catalog:update` 후 커밋하면 된다.
-#    아래 FLOOR 가드로, 지오차단 등으로 결과가 비정상적으로 적으면 커밋을 건너뛴다(카탈로그 보호).
+# 게이트(scripts/validate-catalog.mjs): 전체 바닥값 + 직전 대비 회귀 + "플랫폼 단위 급락"을 본다.
+#   합계로는 -5%라 통과하는 플랫폼 붕괴(예: bookcube 1545→50)도 잡아, 망가진 스냅샷이 라이브로
+#   새는 걸 막는다. 실패 시 커밋/배포를 건너뛰고 Discord 로 알린다(원본 카탈로그 보존).
+# 알림(scripts/notify-catalog-changes.ts): 통과 시 신작 + 새 영상화(드라마·영화·애니·OTT)를 Discord 로.
+#
+# ⚠️ GitHub 러너는 비(非)KR egress 라 일부 KR 소스 수확량이 로컬보다 낮을 수 있다. 게이트는 그
+#    변동을 어느 정도 허용하되 붕괴는 막는다. 게이트가 만성적으로 막으면 로컬(KR)에서
+#    `pnpm catalog:update` 후 커밋하거나 임계값(validate-catalog.mjs 상단 노브)을 조정한다.
+#
+# 선택 Secrets (미설정 시 안전하게 skip/notice):
+#   DISCORD_WEBHOOK_URL      신작·영상화 다이제스트 + 검증 실패 알림 대상
+#   VERCEL_DEPLOY_HOOK_URL   검증 통과 커밋 후 배포 트리거(Vercel Git 자동배포가 켜져 있으면 설정하지 말 것 — 중복배포)
 
 on:
   schedule:
-    - cron: "0 */2 * * *" # 2시간마다(실시간 대신 주기 스냅샷). 비용/정중함을 위해 필요시 간격 조정.
+    - cron: "0 */2 * * *" # 2시간마다. 비용/정중함 위해 필요시 간격 조정.
   workflow_dispatch: {}
 
 permissions:
   contents: write
+  actions: write # deploy-vercel.yml 디스패치용
 
 concurrency:
   group: catalog-update
@@ -22,6 +32,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -34,6 +45,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Snapshot previous catalog (diff 기준)
+        run: cp apps/api/data/catalog.json.gz /tmp/prev-catalog.json.gz
+
       - name: Crawl catalog
         env:
           TZ: Asia/Seoul
@@ -41,34 +55,66 @@ jobs:
           WEBDEX_CRAWL_BUDGET_MS: "900000"
         run: node scripts/crawl.mjs --json --no-file > /tmp/catalog.json
 
-      - name: Guard — floor + 회귀 방지 (지오차단/장애 시 카탈로그 보호)
-        id: guard
+      - name: Validate (coverage gate)
+        id: validate
+        # 비정상이면 비0 종료 → || true 로 스텝은 통과시키고, 결과는 outputs.ok 로 분기.
+        run: node scripts/validate-catalog.mjs /tmp/catalog.json /tmp/prev-catalog.json.gz || true
+
+      - name: Alert on validation failure
+        if: steps.validate.outputs.ok != 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          REASONS: ${{ steps.validate.outputs.reasons }}
+          TOTAL: ${{ steps.validate.outputs.total }}
         run: |
-          COUNT=$(node -e "const j=require('/tmp/catalog.json');console.log(Array.isArray(j.titles)?j.titles.length:0)")
-          PREV=$(node -e "try{const z=require('zlib'),fs=require('fs');const j=JSON.parse(z.gunzipSync(fs.readFileSync('apps/api/data/catalog.json.gz')));console.log(Array.isArray(j.titles)?j.titles.length:(Array.isArray(j)?j.length:0))}catch{console.log(0)}")
-          echo "crawled=$COUNT" >> "$GITHUB_OUTPUT"
-          echo "크롤 ${COUNT}편 (직전 ${PREV}편)"
-          if [ "$COUNT" -lt 8000 ]; then
-            echo "::warning::${COUNT} < 8000 — 비정상(지오차단 등). 커밋 스킵."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          elif [ "$PREV" -gt 0 ] && [ "$COUNT" -lt "$((PREV * 9 / 10))" ]; then
-            echo "::warning::${COUNT} < 직전 ${PREV}의 90% — 회귀로 보고 커밋 스킵(전 작품은 KR egress 로컬 크롤 권장)."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
+          pnpm exec tsx scripts/notify-catalog-changes.ts --alert "크롤 검증 실패 — 배포 스킵. 사유: ${REASONS} (전체 ${TOTAL}편)"
+          echo "::warning::검증 실패로 커밋/배포 스킵 — ${REASONS}"
 
       - name: Write gz snapshot
-        if: steps.guard.outputs.skip != 'true'
+        if: steps.validate.outputs.ok == 'true'
         run: gzip -9 -c /tmp/catalog.json > apps/api/data/catalog.json.gz
 
+      - name: Notify changes (신작 + 영상화)
+        if: steps.validate.outputs.ok == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: >-
+          pnpm exec tsx scripts/notify-catalog-changes.ts
+          --new /tmp/catalog.json
+          --prev /tmp/prev-catalog.json.gz
+          --manifest apps/api/data/adaptation-seen.json
+
       - name: Commit & push
-        if: steps.guard.outputs.skip != 'true'
+        id: commit
+        if: steps.validate.outputs.ok == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/api/data/catalog.json.gz
+          [ -f apps/api/data/adaptation-seen.json ] && git add apps/api/data/adaptation-seen.json
           if git diff --staged --quiet; then
             echo "변경 없음 — 커밋 생략."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "chore(catalog): 주간 스냅샷 갱신 (${{ steps.guard.outputs.crawled }}편)"
+            git commit -m "chore(catalog): 스냅샷 갱신 (${{ steps.validate.outputs.total }}편)"
             git push
+            echo "committed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger production deploy
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 카탈로그 전용 커밋은 deploy-vercel.yml 의 paths 필터에 안 걸리고, bot 의 GITHUB_TOKEN
+          # 푸시는 워크플로를 재트리거하지 못한다 → 배포를 명시적으로 트리거한다:
+          #   1) VERCEL_DEPLOY_HOOK_URL 있으면 훅 호출(가장 간단)
+          #   2) 없으면 deploy-vercel.yml(Vercel CLI) 디스패치 — 단 VERCEL_TOKEN 시크릿 필요
+          if [ -n "${HOOK:-}" ]; then
+            curl -fsS -X POST "$HOOK" >/dev/null && echo "Vercel 배포 훅 트리거됨"
+          else
+            echo "::notice::VERCEL_DEPLOY_HOOK_URL 미설정 — deploy-vercel.yml 디스패치(Vercel CLI, VERCEL_TOKEN 필요)"
+            gh workflow run deploy-vercel.yml \
+              || echo "::warning::배포 트리거 실패 — 새 카탈로그가 라이브에 반영되려면 VERCEL_DEPLOY_HOOK_URL 또는 VERCEL_TOKEN 시크릿을 설정하세요."
           fi
