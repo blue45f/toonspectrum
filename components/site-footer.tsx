@@ -54,10 +54,6 @@ export function SiteFooter() {
             비공개로 전환해 추정값(≈)으로 표기합니다. 그 외 플랫폼의 평점·조회·평가 수·완독률 등 일부 지표는
             추정값(≈)으로 표기합니다.
           </p>
-          <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-line/80 bg-panel/50 px-3 py-1.5 text-xs text-fg-3">
-            <span className="size-1.5 rounded-full bg-good" />
-            운영 환경: 실데이터 + 주기적 갱신
-          </p>
         </div>
 
         {COLS.map((col) => (
@@ -78,7 +74,6 @@ export function SiteFooter() {
       <div className="border-t border-line/60">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-1 px-4 py-5 text-xs text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>© 2026 WEBDEX</span>
-          <span className="font-display tracking-wide">활자와 스펙트럼 · TYPE & SPECTRUM</span>
         </div>
       </div>
     </footer>
