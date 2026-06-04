@@ -8,9 +8,11 @@ name: catalog-update
 #   새는 걸 막는다. 실패 시 커밋/배포를 건너뛰고 Discord 로 알린다(원본 카탈로그 보존).
 # 알림(scripts/notify-catalog-changes.ts): 통과 시 신작 + 새 영상화(드라마·영화·애니·OTT)를 Discord 로.
 #
-# ⚠️ GitHub 러너는 비(非)KR egress 라 일부 KR 소스 수확량이 로컬보다 낮을 수 있다. 게이트는 그
-#    변동을 어느 정도 허용하되 붕괴는 막는다. 게이트가 만성적으로 막으면 로컬(KR)에서
-#    `pnpm catalog:update` 후 커밋하거나 임계값(validate-catalog.mjs 상단 노브)을 조정한다.
+# ⚠️ 실측(2026-06): GitHub 러너 크롤은 ~23.4k(예: novelpia 0)로 로컬 KR 크롤 ~30.4k 에 못 미쳐
+#    92% 게이트에서 거의 항상 거부된다 → 이 워크플로는 사실상 모니터/게이트/알림 역할이고,
+#    실제 갱신은 로컬(KR)에서 `pnpm catalog:update` 후 커밋한다. 그래서 일 1회로만 돈다(러너/요청
+#    낭비·알림 스팸 방지). 러너 egress가 좋아지거나 임계값(validate-catalog.mjs 노브)을 낮추면
+#    cron 이 자동으로 커밋·배포까지 이어간다.
 #
 # 선택 Secrets (미설정 시 안전하게 skip/notice):
 #   DISCORD_WEBHOOK_URL      신작·영상화 다이제스트 + 검증 실패 알림 대상
@@ -18,7 +20,7 @@ name: catalog-update
 
 on:
   schedule:
-    - cron: "0 */2 * * *" # 2시간마다. 비용/정중함 위해 필요시 간격 조정.
+    - cron: "0 19 * * *" # 매일 1회(04:00 KST). 러너 크롤은 대개 게이트에서 거부되므로 잦을 이유 없음.
   workflow_dispatch: {}
 
 permissions:
