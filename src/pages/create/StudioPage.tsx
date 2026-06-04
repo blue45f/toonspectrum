@@ -1998,6 +1998,41 @@ export function StudioPage() {
                   </div>
                 </>
               )}
+              {selected.type === "text" && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">외곽선</p>
+                  <div className="flex gap-1">
+                    {[
+                      { label: "없음", v: null },
+                      { label: "흰색", v: "#ffffff" },
+                      { label: "검정", v: "#16100c" },
+                    ].map((o) => {
+                      const hasOutline = !!selected.stroke && !!selected.strokeWidth;
+                      const active = o.v === null ? !hasOutline : hasOutline && selected.stroke === o.v;
+                      return (
+                        <button
+                          key={o.label}
+                          type="button"
+                          onClick={() =>
+                            patchEl(
+                              selected.id,
+                              (o.v === null
+                                ? { stroke: undefined, strokeWidth: 0 }
+                                : { stroke: o.v, strokeWidth: Math.max(3, Math.round(selected.fontSize * 0.08)) }) as Partial<El>
+                            )
+                          }
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-xs",
+                            active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
                   <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
