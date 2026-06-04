@@ -89,9 +89,9 @@ export function HeroBanner({ items }: { items: Title[] }) {
                           <GenreChip key={genre} genre={genre} size="sm" />
                         ))}
                       </div>
-                      <h2 className="text-pretty text-xl font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
+                      <div className="text-pretty text-xl font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
                         {t.title}
-                      </h2>
+                      </div>
                       <p className="truncate text-xs text-fg-3">
                         {t.author}
                         {t.artist && t.artist !== t.author ? ` · 그림 ${t.artist}` : ""}

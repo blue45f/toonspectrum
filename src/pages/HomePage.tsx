@@ -42,14 +42,14 @@ export function HomePage() {
     return (
       <div>
         <section className="border-b border-line bg-ledger">
-          <Container size="wide" className="grid items-center gap-12 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
+          <Container size="wide" className="flex flex-col gap-12 pt-12 pb-14 lg:gap-14 lg:pb-16">
+            <span className="skeleton block h-44 rounded-2xl sm:h-52" />
             <div className="space-y-5">
               <span className="skeleton block h-4 w-56" />
               <span className="skeleton block h-16 w-4/5" />
               <span className="skeleton block h-5 w-96 max-w-full" />
               <span className="skeleton block h-11 w-64" />
             </div>
-            <span className="skeleton block aspect-[4/3] rounded-2xl" />
           </Container>
         </section>
         <Container size="wide" className="grid grid-cols-2 gap-4 py-16 sm:grid-cols-4">
@@ -103,8 +103,10 @@ export function HomePage() {
           }}
           aria-hidden
         />
-        <Container size="wide" className="relative py-14 lg:py-20">
-          <div style={{ animation: "fade-up 0.6s var(--ease-out-expo) both" }}>
+        <Container size="wide" className="relative flex flex-col gap-12 pt-12 pb-14 lg:gap-14 lg:pb-16">
+          {bannerItems.length > 0 && <HeroBanner items={bannerItems} />}
+
+          <div style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.05s both" }}>
             <p className="eyebrow text-accent">WEBTOON × WEBNOVEL</p>
             <h1 className="mt-4 text-pretty text-4xl font-bold leading-[1.08] sm:text-5xl lg:text-[3.6rem]">
               흩어진 이야기를,
@@ -148,8 +150,6 @@ export function HomePage() {
       </section>
 
       <Container size="wide" className="reveal-children flex flex-col gap-20 py-16">
-        {bannerItems.length > 0 && <HeroBanner items={bannerItems} />}
-
         <HomePersonal />
 
         {todayReleases.length > 0 && (
