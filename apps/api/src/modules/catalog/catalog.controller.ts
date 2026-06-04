@@ -110,7 +110,9 @@ export class CatalogController {
         return res.status(415).send("not an image");
       }
       res.setHeader("Content-Type", sniffed ?? headerType);
-      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
+      // 표지 URL은 내용 주소(u=업스트림 고유 URL)라 바뀌면 URL도 바뀐다 → 길게 캐시(브라우저 30일,
+      // 엣지 30일, immutable). 가장 많이 요청되는 리소스라 재방문/재렌더 트래픽을 크게 줄인다.
+      res.setHeader("Cache-Control", "public, max-age=2592000, s-maxage=2592000, immutable");
       return res.status(200).send(body);
     } catch {
       return res.status(502).send("fetch failed");
