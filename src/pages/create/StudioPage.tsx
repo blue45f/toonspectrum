@@ -7,6 +7,7 @@ import {
   ArrowUpToLine,
   ChevronDown,
   Circle,
+  Copy,
   Eraser,
   Image as ImageIcon,
   Download,
@@ -771,6 +772,16 @@ export function StudioPage() {
     commit(elements.filter((e) => e.id !== selectedId));
     setSelectedId(null);
   }
+  function duplicateSelected() {
+    if (!selected) return;
+    const copy: El =
+      selected.type === "draw"
+        ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16) }
+        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16 } as El);
+    commit([...elements, copy]);
+    setSelectedId(copy.id);
+    setTool("select");
+  }
   function reorder(dir: "front" | "back") {
     if (!selectedId) return;
     const idx = elements.findIndex((e) => e.id === selectedId);
@@ -783,6 +794,39 @@ export function StudioPage() {
   }
   const undo = () => setHi((i) => Math.max(0, i - 1));
   const redo = () => setHi((i) => Math.min(history.length - 1, i + 1));
+
+  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 선택해제.
+  // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
+  const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    shortcutRef.current = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (typing || editing) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (mod && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        redo();
+      } else if (mod && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        duplicateSelected();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+        e.preventDefault();
+        removeSelected();
+      } else if (e.key === "Escape") {
+        setSelectedId(null);
+      }
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   function addText() {
     addEl({
@@ -1939,7 +1983,10 @@ export function StudioPage() {
                 <button type="button" onClick={() => reorder("back")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 뒤로">
                   <ArrowDownToLine size={14} />
                 </button>
-                <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })}>
+                <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘D)">
+                  <Copy size={14} />
+                </button>
+                <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })} title="삭제 (Delete)">
                   <Trash2 size={14} /> 삭제
                 </button>
               </div>
