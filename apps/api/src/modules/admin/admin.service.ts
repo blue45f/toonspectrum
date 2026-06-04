@@ -4,6 +4,8 @@ import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config
 import {
   creatorCampaigns,
   creatorProfiles,
+  creatorWorkComments,
+  creatorWorks,
   db,
   dbClient,
   fanPostReplies,
@@ -313,6 +315,14 @@ export class AdminService {
       rows = await db.update(fanPosts).set({ hidden }).where(eq(fanPosts.id, id)).returning({ id: fanPosts.id });
     } else if (type === "feedback_post") {
       rows = await db.update(feedbackPosts).set({ hidden }).where(eq(feedbackPosts.id, id)).returning({ id: feedbackPosts.id });
+    } else if (type === "creator_work") {
+      rows = await db.update(creatorWorks).set({ hidden }).where(eq(creatorWorks.id, id)).returning({ id: creatorWorks.id });
+    } else if (type === "creator_work_comment") {
+      rows = await db
+        .update(creatorWorkComments)
+        .set({ hidden })
+        .where(eq(creatorWorkComments.id, id))
+        .returning({ id: creatorWorkComments.id });
     } else {
       throw new BadRequestException({ error: "지원하지 않는 콘텐츠 타입이에요." });
     }

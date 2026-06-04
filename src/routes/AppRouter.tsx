@@ -28,11 +28,14 @@ const STATIC_TITLES: Record<string, string> = {
   "/privacy": "개인정보처리방침",
   "/copyright": "저작권·콘텐츠 안내",
   "/contact": "광고·제휴 문의",
+  "/create": "창작 게시판",
+  "/studio": "창작 스튜디오",
 };
 
 function useRouteTitle(pathname: string) {
   useEffect(() => {
     if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
+    if (pathname.startsWith("/create/")) return; // 창작물 상세는 페이지가 직접 설정
     let title: string | undefined;
     if (pathname in STATIC_TITLES) title = STATIC_TITLES[pathname];
     else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
@@ -74,6 +77,13 @@ const TermsPage = lazy(() => import("@/src/pages/legal/TermsPage").then((m) => (
 const PrivacyPage = lazy(() => import("@/src/pages/legal/PrivacyPage").then((m) => ({ default: m.PrivacyPage })));
 const CopyrightPage = lazy(() => import("@/src/pages/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })));
 const ContactPage = lazy(() => import("@/src/pages/ContactPage").then((m) => ({ default: m.ContactPage })));
+const CreateGalleryPage = lazy(() =>
+  import("@/src/pages/create/CreateGalleryPage").then((m) => ({ default: m.CreateGalleryPage }))
+);
+const CreateWorkPage = lazy(() =>
+  import("@/src/pages/create/CreateWorkPage").then((m) => ({ default: m.CreateWorkPage }))
+);
+const StudioPage = lazy(() => import("@/src/pages/create/StudioPage").then((m) => ({ default: m.StudioPage })));
 const AuthCallbackPage = lazy(() =>
   import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage }))
 );
@@ -120,6 +130,9 @@ export function AppRouter() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/copyright" element={<CopyrightPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/create" element={<CreateGalleryPage />} />
+          <Route path="/create/:id" element={<CreateWorkPage />} />
+          <Route path="/studio" element={<StudioPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />

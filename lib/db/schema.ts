@@ -249,6 +249,58 @@ export const creatorProfiles = pgTable("creator_profile", {
   updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
+// ── 창작 스튜디오: 사용자 제작 웹툰/컷툰 + 창작 게시판 ──────────────
+// 툰스푼/포마코 스타일의 브라우저 제작 도구(Konva) 결과물을 올리는 UGC 보드.
+export const creatorWorks = pgTable("creator_work", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  titleId: text("titleId"), // 설정 시 특정 웹툰의 "팬 창작물"로 연결(미설정 = 독립 오리지널)
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  cover: text("cover").notNull().default(""), // 대표 썸네일(데이터 URL 또는 외부 URL)
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  format: text("format").notNull().default("cuttoon"), // cuttoon(스튜디오 제작) | upload(이미지 업로드)
+  pages: jsonb("pages").$type<string[]>().notNull().default([]), // 렌더된 페이지(세로 스크롤 순서)
+  doc: jsonb("doc").notNull().default({}), // 재편집용 스튜디오 문서(Konva JSON)
+  status: text("status").notNull().default("published"), // draft | published
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
+  views: integer("views").notNull().default(0),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
+export const creatorWorkLikes = pgTable(
+  "creator_work_like",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.workId] })]
+);
+
+export const creatorWorkComments = pgTable("creator_work_comment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  workId: text("workId")
+    .notNull()
+    .references(() => creatorWorks.id, { onDelete: "cascade" }),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
 // 런타임 토글/설정(key-value). 예: monetization.enabled (광고형 수익화 on/off).
 export const appSettings = pgTable("app_setting", {
   key: text("key").primaryKey(),

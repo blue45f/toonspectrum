@@ -33,14 +33,18 @@ describe("OAuth provider 유틸", () => {
     expect(isOAuthProvider("")).toBe(false);
   });
 
-  it("카카오·네이버는 데모 고정, 구글은 키 미설정 시 데모", () => {
-    // 카카오·네이버는 일단 데모 고정. 구글은 테스트 환경에 키가 없으므로 데모.
+  it("구글은 항상 노출(키 미설정 시 데모), 카카오·네이버는 기본 비노출", () => {
+    // 카카오·네이버는 데모 모드지만 관리자 토글 기본 off라 목록엔 구글만.
     expect(providerMode("google")).toBe("demo");
     expect(providerMode("kakao")).toBe("demo");
     expect(providerMode("naver")).toBe("demo");
     const list = listAuthProviders();
     expect(list.google.mode).toBe("demo");
-    expect(list.kakao.mode).toBe("demo");
-    expect(list.naver.mode).toBe("demo");
+    expect(list.kakao).toBeUndefined();
+    expect(list.naver).toBeUndefined();
+    // 관리자에서 켜면 노출(데모)
+    const enabled = listAuthProviders({ kakao: true, naver: true });
+    expect(enabled.kakao?.mode).toBe("demo");
+    expect(enabled.naver?.mode).toBe("demo");
   });
 });

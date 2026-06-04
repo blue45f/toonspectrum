@@ -1,0 +1,778 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Konva from "konva";
+import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Transformer } from "react-konva";
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  ImagePlus,
+  Loader2,
+  MessageCircle,
+  MousePointer2,
+  Pencil,
+  Redo2,
+  Smile,
+  Trash2,
+  Type as TypeIcon,
+  Undo2,
+} from "lucide-react";
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { createWork, getWork, getCurrentUserId, updateWork } from "@/src/lib/creator-client";
+
+// 캔버스: 세로 스크롤 웹툰 비율(고정 폭 720, 높이 가변).
+const CANVAS_W = 720;
+const EMOJIS = ["😀", "😂", "😍", "😭", "😱", "😡", "👍", "🔥", "💜", "✨", "💥", "❤️", "⭐", "🎉", "👏", "💧"];
+
+type Tool = "select" | "draw";
+
+interface ImageEl {
+  id: string;
+  type: "image";
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+interface TextEl {
+  id: string;
+  type: "text";
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fill: string;
+  rotation: number;
+}
+interface BubbleEl {
+  id: string;
+  type: "bubble";
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  textFill: string;
+  rotation: number;
+}
+interface StickerEl {
+  id: string;
+  type: "sticker";
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  rotation: number;
+}
+interface DrawEl {
+  id: string;
+  type: "draw";
+  points: number[];
+  stroke: string;
+  strokeWidth: number;
+}
+type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl;
+
+const uid = () => crypto.randomUUID();
+
+// data-URL 이미지를 maxDim 이하로 축소해 전송 크기를 제한한다.
+function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
+  return new Promise<{ src: string; width: number; height: number }>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const width = Math.round(img.width * scale);
+        const height = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+        resolve({ src: canvas.toDataURL("image/webp", quality), width, height });
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function downscaleDataUrl(dataUrl: string, maxW: number, quality = 0.72) {
+  return new Promise<string>((resolve) => {
+    const img = new window.Image();
+    img.onerror = () => resolve(dataUrl);
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/webp", quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+// 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
+function UrlImage({
+  el,
+  draggable,
+  innerRef,
+  onSelect,
+  onChange,
+}: {
+  el: ImageEl;
+  draggable: boolean;
+  innerRef: (n: Konva.Image | null) => void;
+  onSelect: () => void;
+  onChange: (patch: Partial<ImageEl>) => void;
+}) {
+  const [img, setImg] = useState<HTMLImageElement>();
+  useEffect(() => {
+    const im = new window.Image();
+    im.src = el.src;
+    im.onload = () => setImg(im);
+    return () => {
+      im.onload = null;
+    };
+  }, [el.src]);
+  if (!img) return null;
+  return (
+    <KImage
+      ref={innerRef}
+      image={img}
+      x={el.x}
+      y={el.y}
+      width={el.width}
+      height={el.height}
+      rotation={el.rotation}
+      draggable={draggable}
+      onMouseDown={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        const w = Math.max(20, node.width() * node.scaleX());
+        const h = Math.max(20, node.height() * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
+      }}
+    />
+  );
+}
+
+export function StudioPage() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const workId = params.get("id");
+  const linkedTitleId = params.get("titleId");
+  const loggedIn = !!getCurrentUserId();
+
+  // 편집 문서 상태(요소 배열은 히스토리로 관리해 실행취소/다시실행 지원).
+  const [history, setHistory] = useState<El[][]>([[]]);
+  const [hi, setHi] = useState(0);
+  const elements = history[hi];
+  const [bg, setBg] = useState("#ffffff");
+  const [canvasH, setCanvasH] = useState(1080);
+
+  const [tool, setTool] = useState<Tool>("select");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [color, setColor] = useState("#7c5cfc");
+  const [strokeWidth, setStrokeWidth] = useState(6);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 표시용 스케일(컨테이너 폭에 맞춤).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const measure = () => {
+      const w = wrapRef.current?.clientWidth ?? CANVAS_W;
+      setScale(Math.min(1, w / CANVAS_W));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const stageRef = useRef<Konva.Stage>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+  const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
+  const drawingRef = useRef<DrawEl | null>(null);
+  const [draft, setDraft] = useState<DrawEl | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+
+  const selected = elements.find((e) => e.id === selectedId) ?? null;
+
+  // 기존 작품 로드(편집 모드).
+  useEffect(() => {
+    if (!workId) return;
+    let alive = true;
+    getWork(workId)
+      .then((w) => {
+        if (!alive) return;
+        setTitle(w.title);
+        setDescription(w.description);
+        setTagsText((w.tags ?? []).join(", "));
+        const doc = w.doc as { elements?: El[]; bg?: string; height?: number };
+        if (doc?.elements) setHistory([doc.elements]);
+        if (doc?.bg) setBg(doc.bg);
+        if (doc?.height) setCanvasH(doc.height);
+        setHi(0);
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "불러오기 실패"));
+    return () => {
+      alive = false;
+    };
+  }, [workId]);
+
+  // 트랜스포머를 선택 노드에 부착.
+  useEffect(() => {
+    const tr = trRef.current;
+    if (!tr) return;
+    const node = selectedId && tool === "select" ? nodeRefs.current[selectedId] : null;
+    tr.nodes(node ? [node] : []);
+    tr.getLayer()?.batchDraw();
+  }, [selectedId, tool, elements]);
+
+  // 요소 변경을 히스토리에 커밋.
+  function commit(next: El[]) {
+    const h = history.slice(0, hi + 1);
+    h.push(next);
+    setHistory(h);
+    setHi(h.length - 1);
+  }
+  function patchEl(id: string, patch: Partial<El>) {
+    commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+  }
+  function addEl(el: El) {
+    commit([...elements, el]);
+    setSelectedId(el.id);
+    setTool("select");
+  }
+  function removeSelected() {
+    if (!selectedId) return;
+    commit(elements.filter((e) => e.id !== selectedId));
+    setSelectedId(null);
+  }
+  function reorder(dir: "front" | "back") {
+    if (!selectedId) return;
+    const idx = elements.findIndex((e) => e.id === selectedId);
+    if (idx < 0) return;
+    const next = [...elements];
+    const [el] = next.splice(idx, 1);
+    if (dir === "front") next.push(el);
+    else next.unshift(el);
+    commit(next);
+  }
+  const undo = () => setHi((i) => Math.max(0, i - 1));
+  const redo = () => setHi((i) => Math.min(history.length - 1, i + 1));
+
+  function addText() {
+    addEl({
+      id: uid(),
+      type: "text",
+      text: "텍스트",
+      x: CANVAS_W / 2 - 110,
+      y: canvasH / 2 - 24,
+      width: 220,
+      fontSize: 40,
+      fill: color,
+      rotation: 0,
+    });
+  }
+  function addBubble() {
+    addEl({
+      id: uid(),
+      type: "bubble",
+      text: "대사를 입력하세요",
+      x: CANVAS_W / 2 - 130,
+      y: canvasH / 2 - 70,
+      width: 260,
+      height: 140,
+      fill: "#ffffff",
+      textFill: "#111111",
+      rotation: 0,
+    });
+  }
+  function addSticker(emoji: string) {
+    setEmojiOpen(false);
+    addEl({ id: uid(), type: "sticker", text: emoji, x: CANVAS_W / 2 - 40, y: canvasH / 2 - 40, fontSize: 96, rotation: 0 });
+  }
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const { src, width, height } = await downscaleImageFile(file);
+      const fit = Math.min(1, (CANVAS_W - 80) / width);
+      addEl({
+        id: uid(),
+        type: "image",
+        src,
+        x: (CANVAS_W - width * fit) / 2,
+        y: 80,
+        width: Math.round(width * fit),
+        height: Math.round(height * fit),
+        rotation: 0,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이미지 추가 실패");
+    }
+  }
+
+  // 펜(자유 드로잉) — 진행 중 선은 draft 로만 렌더, 끝나면 히스토리에 커밋.
+  function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    if (tool === "draw") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const line: DrawEl = { id: uid(), type: "draw", points: [pos.x, pos.y], stroke: color, strokeWidth };
+      drawingRef.current = line;
+      setDraft(line);
+      return;
+    }
+    // 선택 모드: 빈 영역 클릭 시 선택 해제.
+    if (e.target === e.target.getStage() || e.target.name() === "bg") setSelectedId(null);
+  }
+  function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    if (tool !== "draw" || !drawingRef.current) return;
+    const pos = e.target.getStage()?.getRelativePointerPosition();
+    if (!pos) return;
+    const next = { ...drawingRef.current, points: [...drawingRef.current.points, pos.x, pos.y] };
+    drawingRef.current = next;
+    setDraft(next);
+  }
+  function onStageUp() {
+    if (drawingRef.current && drawingRef.current.points.length >= 4) {
+      commit([...elements, drawingRef.current]);
+    }
+    drawingRef.current = null;
+    setDraft(null);
+  }
+
+  function startEditText(id: string) {
+    const el = elements.find((e) => e.id === id);
+    if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
+    setEditing({ id, value: el.text });
+  }
+  function commitEditText() {
+    if (editing) patchEl(editing.id, { text: editing.value } as Partial<El>);
+    setEditing(null);
+  }
+
+  async function handleSave(status: "published" | "draft") {
+    if (!loggedIn) {
+      setError("로그인 후 게시할 수 있어요.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("제목을 입력해주세요.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSelectedId(null);
+    // 트랜스포머가 캡처되지 않도록 한 프레임 양보.
+    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const stage = stageRef.current;
+      if (!stage) throw new Error("캔버스를 찾을 수 없어요.");
+      const full = stage.toDataURL({ pixelRatio: 1 / scale });
+      const cover = await downscaleDataUrl(full, 480);
+      const tags = tagsText
+        .split(/[,\s]+/)
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean)
+        .slice(0, 8);
+      const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        tags,
+        format: "cuttoon" as const,
+        titleId: linkedTitleId ?? undefined,
+        cover,
+        pages: [full],
+        doc: { width: CANVAS_W, height: canvasH, bg, elements } as Record<string, unknown>,
+        status,
+      };
+      const work = workId ? await updateWork(workId, payload) : await createWork(payload);
+      navigate(`/create/${work.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장에 실패했어요.");
+      setSaving(false);
+    }
+  }
+
+  const toolBtn = (active: boolean) =>
+    cn(
+      "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors",
+      active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+    );
+
+  return (
+    <Container size="wide" className="py-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">창작 스튜디오</h1>
+          <p className="mt-1 text-sm text-fg-3">
+            이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
+            {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet" })}>
+            임시저장
+          </button>
+          <button type="button" onClick={() => handleSave("published")} disabled={saving} className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {workId ? "수정 게시" : "게시하기"}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
+      )}
+      {!loggedIn && (
+        <div className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
+          만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
+        </div>
+      )}
+
+      {/* 툴바 */}
+      <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
+        <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
+          <MousePointer2 size={14} /> 선택
+        </button>
+        <button type="button" onClick={() => setTool("draw")} className={toolBtn(tool === "draw")} aria-pressed={tool === "draw"}>
+          <Pencil size={14} /> 펜
+        </button>
+        <span className="mx-0.5 h-5 w-px bg-line" />
+        <button type="button" onClick={addText} className={toolBtn(false)}>
+          <TypeIcon size={14} /> 텍스트
+        </button>
+        <button type="button" onClick={addBubble} className={toolBtn(false)}>
+          <MessageCircle size={14} /> 말풍선
+        </button>
+        <div className="relative">
+          <button type="button" onClick={() => setEmojiOpen((v) => !v)} className={toolBtn(emojiOpen)}>
+            <Smile size={14} /> 스티커
+          </button>
+          {emojiOpen && (
+            <div className="absolute left-0 top-full z-30 mt-1 grid w-56 grid-cols-8 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              {EMOJIS.map((em) => (
+                <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
+                  {em}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <label className={cn(toolBtn(false), "cursor-pointer")}>
+          <ImagePlus size={14} /> 이미지
+          <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+        </label>
+        <span className="mx-0.5 h-5 w-px bg-line" />
+        <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
+          색
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
+        </label>
+        {tool === "draw" && (
+          <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
+            굵기
+            <input type="range" min={1} max={40} value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="w-20" />
+          </label>
+        )}
+        <span className="mx-0.5 h-5 w-px bg-line" />
+        <button type="button" onClick={undo} disabled={hi === 0} className={cn(toolBtn(false), "disabled:opacity-40")} title="실행취소">
+          <Undo2 size={14} />
+        </button>
+        <button type="button" onClick={redo} disabled={hi >= history.length - 1} className={cn(toolBtn(false), "disabled:opacity-40")} title="다시실행">
+          <Redo2 size={14} />
+        </button>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+        {/* 캔버스 */}
+        <div ref={wrapRef} className="relative overflow-hidden rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px]">
+          <Stage
+            ref={stageRef}
+            width={CANVAS_W * scale}
+            height={canvasH * scale}
+            scaleX={scale}
+            scaleY={scale}
+            onMouseDown={onStageDown}
+            onMouseMove={onStageMove}
+            onMouseUp={onStageUp}
+            onTouchStart={onStageDown}
+            onTouchMove={onStageMove}
+            onTouchEnd={onStageUp}
+          >
+            <Layer>
+              <Rect name="bg" x={0} y={0} width={CANVAS_W} height={canvasH} fill={bg} />
+              {elements.map((el) => {
+                const draggable = tool === "select";
+                const onSelect = () => tool === "select" && setSelectedId(el.id);
+                const setRef = (n: Konva.Node | null) => {
+                  nodeRefs.current[el.id] = n;
+                };
+                if (el.type === "image")
+                  return (
+                    <UrlImage
+                      key={el.id}
+                      el={el}
+                      draggable={draggable}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onChange={(patch) => patchEl(el.id, patch)}
+                    />
+                  );
+                if (el.type === "draw")
+                  return (
+                    <Line
+                      key={el.id}
+                      points={el.points}
+                      stroke={el.stroke}
+                      strokeWidth={el.strokeWidth}
+                      lineCap="round"
+                      lineJoin="round"
+                      tension={0.4}
+                      listening={false}
+                    />
+                  );
+                if (el.type === "text")
+                  return (
+                    <KText
+                      key={el.id}
+                      ref={setRef}
+                      text={el.text}
+                      x={el.x}
+                      y={el.y}
+                      width={el.width}
+                      fontSize={el.fontSize}
+                      fill={el.fill}
+                      rotation={el.rotation}
+                      fontStyle="bold"
+                      draggable={draggable}
+                      onMouseDown={onSelect}
+                      onTap={onSelect}
+                      onDblClick={() => startEditText(el.id)}
+                      onDblTap={() => startEditText(el.id)}
+                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      onTransformEnd={(e) => {
+                        const node = e.target as Konva.Text;
+                        const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
+                        const w = Math.max(40, node.width() * node.scaleX());
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, width: w, rotation: node.rotation() });
+                      }}
+                    />
+                  );
+                if (el.type === "sticker")
+                  return (
+                    <KText
+                      key={el.id}
+                      ref={setRef}
+                      text={el.text}
+                      x={el.x}
+                      y={el.y}
+                      fontSize={el.fontSize}
+                      rotation={el.rotation}
+                      draggable={draggable}
+                      onMouseDown={onSelect}
+                      onTap={onSelect}
+                      onDblClick={() => startEditText(el.id)}
+                      onDblTap={() => startEditText(el.id)}
+                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      onTransformEnd={(e) => {
+                        const node = e.target as Konva.Text;
+                        const fs = Math.max(16, Math.round(el.fontSize * node.scaleX()));
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                      }}
+                    />
+                  );
+                // bubble
+                return (
+                  <Group
+                    key={el.id}
+                    ref={setRef}
+                    x={el.x}
+                    y={el.y}
+                    rotation={el.rotation}
+                    draggable={draggable}
+                    onMouseDown={onSelect}
+                    onTap={onSelect}
+                    onDblClick={() => startEditText(el.id)}
+                    onDblTap={() => startEditText(el.id)}
+                    onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                    onTransformEnd={(e) => {
+                      const node = e.target as Konva.Group;
+                      const w = Math.max(60, el.width * node.scaleX());
+                      const h = Math.max(50, el.height * node.scaleY());
+                      node.scaleX(1);
+                      node.scaleY(1);
+                      patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
+                    }}
+                  >
+                    <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={18} stroke="#111111" strokeWidth={3} />
+                    <KText
+                      text={el.text}
+                      width={el.width - 28}
+                      height={el.height - 24}
+                      x={14}
+                      y={12}
+                      fontSize={24}
+                      fill={el.textFill}
+                      align="center"
+                      verticalAlign="middle"
+                    />
+                  </Group>
+                );
+              })}
+              {draft && (
+                <Line points={draft.points} stroke={draft.stroke} strokeWidth={draft.strokeWidth} lineCap="round" lineJoin="round" tension={0.4} listening={false} />
+              )}
+              <Transformer
+                ref={trRef}
+                rotateEnabled
+                keepRatio={selected?.type === "text" || selected?.type === "sticker"}
+                enabledAnchors={
+                  selected?.type === "text" || selected?.type === "sticker"
+                    ? ["top-left", "top-right", "bottom-left", "bottom-right"]
+                    : ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right", "top-center", "bottom-center"]
+                }
+                boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
+              />
+            </Layer>
+          </Stage>
+
+          {/* 텍스트 인라인 편집 오버레이 */}
+          {editing && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
+              <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4">
+                <p className="mb-2 text-sm font-medium text-fg">텍스트 편집</p>
+                <textarea
+                  autoFocus
+                  value={editing.value}
+                  onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-line bg-card p-2 text-sm text-fg outline-none focus:border-accent"
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button type="button" onClick={() => setEditing(null)} className={buttonClass({ size: "sm", variant: "quiet" })}>
+                    취소
+                  </button>
+                  <button type="button" onClick={commitEditText} className={buttonClass({ size: "sm", variant: "solid" })}>
+                    적용
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 사이드: 속성 + 게시 정보 */}
+        <aside className="flex flex-col gap-4">
+          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
+            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+              배경색
+              <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
+            </label>
+            <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+              높이
+              <span className="flex items-center gap-1">
+                <button type="button" onClick={() => setCanvasH((h) => Math.max(480, h - 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                  −
+                </button>
+                <span className="numeral w-12 text-center text-xs">{canvasH}</span>
+                <button type="button" onClick={() => setCanvasH((h) => Math.min(6000, h + 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                  +
+                </button>
+              </span>
+            </label>
+          </div>
+
+          {selected && (
+            <div className="rounded-2xl border border-line bg-panel/40 p-3">
+              <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
+              {(selected.type === "text" || selected.type === "bubble") && (
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  글자색
+                  <input
+                    type="color"
+                    value={selected.type === "text" ? selected.fill : selected.textFill}
+                    onChange={(e) => patchEl(selected.id, (selected.type === "text" ? { fill: e.target.value } : { textFill: e.target.value }) as Partial<El>)}
+                    className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                  />
+                </label>
+              )}
+              {selected.type === "bubble" && (
+                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                  말풍선색
+                  <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
+                </label>
+              )}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
+                  <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
+                    글자 편집
+                  </button>
+                )}
+                <button type="button" onClick={() => reorder("front")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 앞으로">
+                  <ArrowUpToLine size={14} />
+                </button>
+                <button type="button" onClick={() => reorder("back")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 뒤로">
+                  <ArrowDownToLine size={14} />
+                </button>
+                <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })}>
+                  <Trash2 size={14} /> 삭제
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="제목 *"
+              maxLength={80}
+              className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+            />
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="설명 (선택)"
+              rows={2}
+              className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+            />
+            <input
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="태그 (쉼표로 구분)"
+              className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+            />
+          </div>
+        </aside>
+      </div>
+    </Container>
+  );
+}
