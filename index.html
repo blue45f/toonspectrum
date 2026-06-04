@@ -13,6 +13,15 @@
     <title>툰스펙트럼 · 웹툰·웹소설 통합 인덱스</title>
     <link rel="canonical" href="https://webtoon-index.vercel.app/" />
     <meta name="theme-color" content="#1a1410" />
+    <script>
+      try {
+        var s = localStorage.getItem("webdex-theme");
+        if (s) {
+          var t = JSON.parse(s).state.theme;
+          if (t) document.documentElement.setAttribute("data-theme", t);
+        }
+      } catch (e) {}
+    </script>
 
     <!-- Open Graph (Kakao·Facebook·Instagram 등 SNS 공유 미리보기) -->
     <meta property="og:type" content="website" />

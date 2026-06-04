@@ -7,6 +7,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AgeGateModal } from "@/components/age-gate-modal";
 import { AppRouter } from "./routes/AppRouter";
 
@@ -48,7 +49,10 @@ export default function App() {
           <SiteFooter />
           <CommandPalette />
           <AgeGateModal />
-          <LanguageSwitcher className="fixed bottom-4 left-4 z-[90] max-md:bottom-20" />
+          <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
+            <ThemeSwitcher />
+            <LanguageSwitcher />
+          </div>
         </MotionProvider>
       </AuthSessionProvider>
     </BrowserRouter>

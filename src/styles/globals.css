@@ -49,6 +49,28 @@
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
 }
 
+/* ── 주간(light) 테마 — 따뜻한 종이 위 잉크. persimmon 악센트·온도(hue~70) 유지. ── */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-canvas: oklch(0.972 0.008 85);
+  --color-panel: oklch(0.992 0.006 85);
+  --color-card: oklch(0.998 0.004 85);
+  --color-raised: oklch(0.945 0.009 82);
+  --color-line: oklch(0.88 0.012 80);
+  --color-line-strong: oklch(0.78 0.014 78);
+  --color-fg: oklch(0.26 0.02 60);
+  --color-fg-2: oklch(0.42 0.018 66);
+  --color-fg-3: oklch(0.52 0.016 70); /* light card 에서 WCAG AA 통과 */
+  --color-accent: oklch(0.6 0.2 40); /* 흰 글자 대비 위해 약간 진하게 */
+  --color-accent-2: oklch(0.55 0.21 36);
+  --color-accent-soft: oklch(0.62 0.2 40 / 0.12);
+  --color-on-accent: oklch(0.99 0.01 85);
+  --color-cool: oklch(0.52 0.13 232);
+  --color-good: oklch(0.5 0.15 150);
+  --color-warn: oklch(0.55 0.15 80);
+  --color-bad: oklch(0.55 0.21 25);
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
