@@ -133,6 +133,8 @@ function toPlainObject(value: unknown) {
 
 interface AppConfigPayload {
   monetizationEnabled?: unknown;
+  authKakao?: unknown;
+  authNaver?: unknown;
 }
 
 interface PlanPayload {
@@ -293,7 +295,11 @@ export class AdminService {
 
   async setConfig(userId: string, body: AppConfigPayload) {
     await requireAdminUser(userId);
-    return setAppConfig({ monetizationEnabled: !!body.monetizationEnabled });
+    const patch: { monetizationEnabled?: boolean; authKakao?: boolean; authNaver?: boolean } = {};
+    if ("monetizationEnabled" in body) patch.monetizationEnabled = !!body.monetizationEnabled;
+    if ("authKakao" in body) patch.authKakao = !!body.authKakao;
+    if ("authNaver" in body) patch.authNaver = !!body.authNaver;
+    return setAppConfig(patch);
   }
 
   async getDashboard(userId: string, periodDays: number): Promise<DashboardResponse> {

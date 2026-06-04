@@ -94,12 +94,14 @@ export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
 }
 
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
-export function listAuthProviders() {
-  return {
+// 제공자 노출 — google 은 항상, kakao/naver 는 관리자 설정(앱 config)으로 켜야 노출(기본 off).
+export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
+  const out: Record<string, { label: string; mode: "oauth" | "demo" }> = {
     google: { label: "Google", mode: providerMode("google") },
-    kakao: { label: "카카오", mode: providerMode("kakao") },
-    naver: { label: "네이버", mode: providerMode("naver") },
   };
+  if (opts?.kakao) out.kakao = { label: "카카오", mode: providerMode("kakao") };
+  if (opts?.naver) out.naver = { label: "네이버", mode: providerMode("naver") };
+  return out;
 }
 
 // ── 콜백/리다이렉트 베이스 ──

@@ -17,6 +17,7 @@ import {
   verifyState,
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
+import { getAppConfig } from "../../../../../lib/server/app-config";
 
 interface AuthPayload {
   email?: unknown;
@@ -34,8 +35,9 @@ const AuthRateLimitStore: Record<string, number[]> = {};
 @Controller("auth")
 export class AuthController {
   @Get("providers")
-  getProviders() {
-    return listAuthProviders();
+  async getProviders() {
+    const config = await getAppConfig();
+    return listAuthProviders({ kakao: config.authKakao, naver: config.authNaver });
   }
 
   // 실제 OAuth 시작 — 인가 URL로 리다이렉트(설정된 제공자만). 미설정이면 데모 폴백 안내.

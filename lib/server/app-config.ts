@@ -38,14 +38,19 @@ async function ensureSettingsTable() {
 export interface AppConfig {
   // 광고형 수익화(제휴 링크·스폰서 슬롯) 전역 스위치. 기본 false = 전 기능 무료·광고 없음.
   monetizationEnabled: boolean;
+  // 카카오/네이버 로그인 노출. 기본 false(off) — 관리자가 켜야 로그인 모달에 표시된다.
+  authKakao: boolean;
+  authNaver: boolean;
 }
 
-const DEFAULTS: AppConfig = { monetizationEnabled: false };
+const DEFAULTS: AppConfig = { monetizationEnabled: false, authKakao: false, authNaver: false };
 const CONFIG_KEY = "config";
 
 function sanitize(patch: Partial<AppConfig>): Partial<AppConfig> {
   const out: Partial<AppConfig> = {};
   if (typeof patch.monetizationEnabled === "boolean") out.monetizationEnabled = patch.monetizationEnabled;
+  if (typeof patch.authKakao === "boolean") out.authKakao = patch.authKakao;
+  if (typeof patch.authNaver === "boolean") out.authNaver = patch.authNaver;
   return out;
 }
 
