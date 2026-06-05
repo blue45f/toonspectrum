@@ -1061,6 +1061,13 @@ export function StudioPage() {
       setTool("select");
       return;
     }
+    // 패널이 있으면 한 번 클릭으로 모든 패널에 배경을 깔아 바로 웹툰 느낌(쉽게). 개별 변경은 패널 선택 후.
+    const frames = elements.filter((e) => e.type === "frame");
+    if (frames.length > 0) {
+      commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: src } as El) : e)));
+      setTool("select");
+      return;
+    }
     const el = createCanvasImageElement({
       id: uid(),
       src,
