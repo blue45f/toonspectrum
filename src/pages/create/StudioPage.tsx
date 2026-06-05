@@ -897,6 +897,8 @@ export function StudioPage() {
   const drawingRef = useRef<DrawEl | null>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+  // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
+  const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
   const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
@@ -1523,6 +1525,69 @@ export function StudioPage() {
     }
     drawingRef.current = null;
     setDraft(null);
+  }
+
+  // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
+  // 같은 기준선에 끌어붙이고, 맞은 기준선을 가이드로 그린다. (Stage로 버블된 단일 핸들러)
+  function onStageDragMove(e: Konva.KonvaEventObject<DragEvent>) {
+    const node = e.target;
+    const stage = node.getStage();
+    if (!node || node === stage) return;
+    if (node.getParent() instanceof Konva.Transformer) return; // 트랜스포머 앵커(리사이즈)는 제외
+    const layer = node.getLayer();
+    if (!layer) return;
+    const box = node.getClientRect({ relativeTo: layer });
+    const snap = 8 / effScale; // 화면상 ~8px
+
+    // 스냅 기준선: 캔버스 가장자리·중앙 + (있으면)들어있는 패널 가장자리·중앙
+    const vLines = [0, CANVAS_W / 2, CANVAS_W];
+    const hLines = [0, canvasH / 2, canvasH];
+    const panel = elements.find(
+      (p): p is FrameEl =>
+        p.type === "frame" &&
+        !p.hidden &&
+        box.x + box.width / 2 >= p.x &&
+        box.x + box.width / 2 <= p.x + p.width &&
+        box.y + box.height / 2 >= p.y &&
+        box.y + box.height / 2 <= p.y + p.height,
+    );
+    if (panel) {
+      vLines.push(panel.x, panel.x + panel.width / 2, panel.x + panel.width);
+      hLines.push(panel.y, panel.y + panel.height / 2, panel.y + panel.height);
+    }
+
+    const edgesX = [box.x, box.x + box.width / 2, box.x + box.width];
+    const edgesY = [box.y, box.y + box.height / 2, box.y + box.height];
+    let dx = 0;
+    let gx: number | null = null;
+    let bestX = snap;
+    for (const line of vLines)
+      for (const edge of edgesX) {
+        const dist = Math.abs(line - edge);
+        if (dist < bestX) {
+          bestX = dist;
+          dx = line - edge;
+          gx = line;
+        }
+      }
+    let dy = 0;
+    let gy: number | null = null;
+    let bestY = snap;
+    for (const line of hLines)
+      for (const edge of edgesY) {
+        const dist = Math.abs(line - edge);
+        if (dist < bestY) {
+          bestY = dist;
+          dy = line - edge;
+          gy = line;
+        }
+      }
+    if (dx !== 0) node.x(node.x() + dx);
+    if (dy !== 0) node.y(node.y() + dy);
+    setGuides({ x: gx != null ? [gx] : [], y: gy != null ? [gy] : [] });
+  }
+  function onStageDragEnd() {
+    setGuides({ x: [], y: [] });
   }
 
   function startEditText(id: string) {
@@ -2188,6 +2253,8 @@ export function StudioPage() {
             onTouchStart={onStageDown}
             onTouchMove={onStageMove}
             onTouchEnd={onStageUp}
+            onDragMove={onStageDragMove}
+            onDragEnd={onStageDragEnd}
           >
             <Layer>
               <Rect
@@ -2562,6 +2629,28 @@ export function StudioPage() {
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
             </Layer>
+            {(guides.x.length > 0 || guides.y.length > 0) && (
+              <Layer listening={false}>
+                {guides.x.map((gx) => (
+                  <Line
+                    key={`gx-${gx}`}
+                    points={[gx, 0, gx, canvasH]}
+                    stroke="#f43f5e"
+                    strokeWidth={1 / effScale}
+                    dash={[5 / effScale, 4 / effScale]}
+                  />
+                ))}
+                {guides.y.map((gy) => (
+                  <Line
+                    key={`gy-${gy}`}
+                    points={[0, gy, CANVAS_W, gy]}
+                    stroke="#f43f5e"
+                    strokeWidth={1 / effScale}
+                    dash={[5 / effScale, 4 / effScale]}
+                  />
+                ))}
+              </Layer>
+            )}
           </Stage>
           </div>
 
