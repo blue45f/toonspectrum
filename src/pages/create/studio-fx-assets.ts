@@ -589,7 +589,89 @@ export const COMIC_VECTOR_STICKERS: ComicVectorSticker[] = [
   { id: "angry-vein", label: "혈관", svg: stickerAngryVein(), width: 240, height: 220 },
   { id: "embarrassed-sweat", label: "당황 식은땀", svg: stickerEmbarrassedSweat(), width: 260, height: 220 },
   { id: "focus-mark", label: "집중", svg: stickerFocusMark(), width: 260, height: 260 },
+  { id: "glowing-crystal", label: "마법 마석", svg: stickerGlowingCrystal(), width: 240, height: 260 },
+  { id: "cat-ears", label: "고양이 귀", svg: stickerCatEars(), width: 260, height: 160 },
 ];
+
+function stickerGlowingCrystal(): string {
+  const W = 240;
+  const H = 260;
+  return svg(W, H, `
+    <defs>
+      <linearGradient id="crys-g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#22d3ee"/>
+        <stop offset="60%" stop-color="#8b5cf6"/>
+        <stop offset="100%" stop-color="#d946ef"/>
+      </linearGradient>
+    </defs>
+    <path d="M120 20 L200 110 L120 240 L40 110 Z" fill="none" stroke="#22d3ee" stroke-width="12" stroke-linejoin="round" opacity="0.45"/>
+    <path d="M120 25 L190 110 L120 230 L50 110 Z" fill="url(#crys-g)" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <line x1="120" y1="25" x2="120" y2="230" stroke="${INK}" stroke-width="4"/>
+    <line x1="50" y1="110" x2="190" y2="110" stroke="${INK}" stroke-width="4"/>
+    <line x1="120" y1="110" x2="50" y2="110" stroke="${INK}" stroke-width="4"/>
+    <line x1="120" y1="110" x2="190" y2="110" stroke="${INK}" stroke-width="4"/>
+    <polygon points="120,40 145,110 120,100" fill="#ffffff" opacity="0.6"/>
+    <polygon points="120,110 170,110 120,180" fill="#ffffff" opacity="0.3"/>
+    <circle cx="120" cy="110" r="16" fill="#ffffff" opacity="0.3"/>
+  `);
+}
+
+function stickerCatEars(): string {
+  const W = 260;
+  const H = 160;
+  return svg(W, H, `
+    <path d="M70 130 C40 80, 20 40, 25 24 C40 20, 80 50, 110 100 Z" fill="#2d2d2d" stroke="${INK}" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M60 115 C45 85, 38 60, 42 54 C52 52, 70 70, 85 100 Z" fill="#ffaabf"/>
+    <path d="M190 130 C220 80, 240 40, 235 24 C220 20, 180 50, 150 100 Z" fill="#2d2d2d" stroke="${INK}" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M200 115 C215 85, 222 60, 218 54 C208 52, 190 70, 175 100 Z" fill="#ffaabf"/>
+    <path d="M48 120 Q52 110 50 104" fill="none" stroke="${INK}" stroke-width="3"/>
+    <path d="M212 120 Q208 110 210 104" fill="none" stroke="${INK}" stroke-width="3"/>
+  `);
+}
+
+function rosePetalsFalling(): string {
+  const W = 480;
+  const H = 480;
+  return svg(W, H, `
+    <path d="M120 80 C100 60, 85 80, 110 100 C135 80, 140 60, 120 80 Z" fill="#f43f5e" stroke="${INK}" stroke-width="3"/>
+    <path d="M380 140 C360 120, 345 140, 370 160 C395 140, 400 120, 380 140 Z" fill="#fb7185" stroke="${INK}" stroke-width="2.5" transform="rotate(30 380 140)"/>
+    <path d="M80 320 C60 300, 45 320, 70 340 C95 320, 100 300, 80 320 Z" fill="#be123c" stroke="${INK}" stroke-width="3.5" transform="rotate(-25 80 320)"/>
+    <path d="M410 380 C390 360, 375 380, 400 400 C425 380, 430 360, 410 380 Z" fill="#f43f5e" stroke="${INK}" stroke-width="3" transform="rotate(15 410 380)"/>
+    <path d="M250 220 C235 205, 222 220, 242 235 C262 220, 265 205, 250 220 Z" fill="#fda4af" stroke="${INK}" stroke-width="2" transform="rotate(80 250 220) scale(0.7)"/>
+    <circle cx="160" cy="180" r="3.5" fill="#f43f5e"/>
+    <circle cx="320" cy="280" r="4.5" fill="#fb7185"/>
+    <circle cx="200" cy="380" r="3" fill="#be123c"/>
+  `);
+}
+
+function matrixCode(): string {
+  const W = 480;
+  const H = 480;
+  return svg(W, H, `
+    <defs>
+      <linearGradient id="mtx-cyan" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#00ffff" stop-opacity="0.1"/>
+        <stop offset="80%" stop-color="#00ffff" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="1"/>
+      </linearGradient>
+      <linearGradient id="mtx-pink" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ff007f" stop-opacity="0.1"/>
+        <stop offset="80%" stop-color="#ff007f" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <rect x="40" y="20" width="12" height="340" fill="url(#mtx-cyan)" rx="4"/>
+    <rect x="140" y="100" width="8" height="280" fill="url(#mtx-pink)" rx="3"/>
+    <rect x="240" y="40" width="10" height="400" fill="url(#mtx-cyan)" rx="4"/>
+    <rect x="340" y="120" width="12" height="300" fill="url(#mtx-pink)" rx="4"/>
+    <rect x="420" y="80" width="8" height="340" fill="url(#mtx-cyan)" rx="3"/>
+    <circle cx="46" cy="370" r="8" fill="#ffffff" stroke="${INK}" stroke-width="3"/>
+    <circle cx="144" cy="390" r="6" fill="#ffffff" stroke="${INK}" stroke-width="2.5"/>
+    <circle cx="245" cy="450" r="9" fill="#ffffff" stroke="${INK}" stroke-width="3.5"/>
+    <circle cx="346" cy="430" r="7" fill="#ffffff" stroke="${INK}" stroke-width="3"/>
+    <circle cx="424" cy="430" r="6" fill="#ffffff" stroke="${INK}" stroke-width="2.5"/>
+  `);
+}
 
 // 공개 목록(>= 14개). 라벨은 한글, id는 영문.
 export const FX_OVERLAYS: FxOverlay[] = [
@@ -611,4 +693,6 @@ export const FX_OVERLAYS: FxOverlay[] = [
   { id: "sleepy-z", label: "졸음 (zzz)", svg: sleepyZ(), width: 260, height: 280 },
   { id: "music-notes", label: "음표", svg: musicNotes(), width: 300, height: 280 },
   { id: "flame-burst", label: "화염", svg: flameBurst(), width: 280, height: 360 },
+  { id: "rose-petals-falling", label: "흩날리는 장미꽃잎", svg: rosePetalsFalling(), width: 480, height: 480 },
+  { id: "matrix-code", label: "디지털 매트릭스", svg: matrixCode(), width: 480, height: 480 },
 ];

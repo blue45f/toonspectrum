@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
-import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Path, Transformer } from "react-konva";
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -902,17 +902,51 @@ export function StudioPage() {
   }
   function addBubble(variant: BubbleVariant) {
     setMenu(null);
+    let fill = "#ffffff";
+    let textFill = "#111111";
+    let text = "대사를 입력";
+    let width = 260;
+    let height = 140;
+
+    if (variant === "shout") {
+      fill = "#fff6d6";
+      text = "!!";
+    } else if (variant === "scared") {
+      fill = "#f5f3ff";
+    } else if (variant === "box") {
+      text = "내레이션";
+    } else if (variant === "system") {
+      fill = "#0a0f24";
+      textFill = "#38bdf8";
+      text = "[ SYSTEM ]\n상태가 업데이트 되었습니다.";
+      width = 280;
+      height = 150;
+    } else if (variant === "angry") {
+      fill = "#1f0305";
+      textFill = "#ef4444";
+      text = "크아아악!!";
+    } else if (variant === "phone") {
+      fill = "#fee500";
+      textFill = "#1c1c1c";
+    } else if (variant === "heart") {
+      fill = "#fff1f2";
+      textFill = "#e11d48";
+      text = "두근..🩷";
+      width = 200;
+      height = 180;
+    }
+
     addEl({
       id: uid(),
       type: "bubble",
       variant,
-      text: variant === "box" ? "내레이션" : variant === "shout" ? "!!" : "대사를 입력",
-      x: CANVAS_W / 2 - 130,
-      y: canvasH / 2 - 70,
-      width: 260,
-      height: 140,
-      fill: variant === "shout" ? "#fff6d6" : variant === "scared" ? "#f5f3ff" : "#ffffff",
-      textFill: "#111111",
+      text,
+      x: CANVAS_W / 2 - width / 2,
+      y: canvasH / 2 - height / 2,
+      width,
+      height,
+      fill,
+      textFill,
       rotation: 0,
     });
   }
@@ -1811,6 +1845,78 @@ export function StudioPage() {
                           />
                         )}
                       </>
+                    ) : el.variant === "system" ? (
+                      <>
+                        <Rect
+                          width={el.width}
+                          height={el.height}
+                          fill="#0a0f24"
+                          opacity={0.88}
+                          cornerRadius={4}
+                          stroke="#0ea5e9"
+                          strokeWidth={2.5}
+                          shadowColor="#0ea5e9"
+                          shadowBlur={8}
+                          shadowOpacity={0.4}
+                        />
+                        <Rect
+                          x={4}
+                          y={4}
+                          width={el.width - 8}
+                          height={el.height - 8}
+                          fill="transparent"
+                          cornerRadius={2}
+                          stroke="#38bdf8"
+                          strokeWidth={1}
+                          opacity={0.5}
+                        />
+                      </>
+                    ) : el.variant === "angry" ? (
+                      <Star
+                        x={el.width / 2}
+                        y={el.height / 2}
+                        numPoints={14}
+                        innerRadius={36}
+                        outerRadius={58}
+                        scaleX={el.width / 116}
+                        scaleY={el.height / 116}
+                        fill={el.fill}
+                        stroke="#dc2626"
+                        strokeWidth={3.5}
+                      />
+                    ) : el.variant === "phone" ? (
+                      <>
+                        <Rect
+                          width={el.width}
+                          height={el.height}
+                          fill={el.fill}
+                          cornerRadius={12}
+                          stroke={bStroke}
+                          strokeWidth={bStrokeW}
+                        />
+                        {showTail && (
+                          <Line
+                            points={
+                              tailDir === "right"
+                                ? [el.width - 1, 14, el.width + 10, 20, el.width - 1, 26]
+                                : [1, 14, -10, 20, 1, 26]
+                            }
+                            closed
+                            fill={el.fill}
+                            stroke={bStroke}
+                            strokeWidth={bStrokeW}
+                          />
+                        )}
+                      </>
+                    ) : el.variant === "heart" ? (
+                      <Path
+                        data="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                        fill={el.fill}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        scaleX={el.width / 24}
+                        scaleY={el.height / 24}
+                      />
                     ) : el.variant === "box" ? (
                       <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
                     ) : (

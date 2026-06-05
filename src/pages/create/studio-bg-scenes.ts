@@ -537,6 +537,151 @@ const sGoldenCity = (() => {
   return scene(defs, body);
 })();
 
+// 15) 판타지 게이트/포탈 (던전 입구)
+const sFantasyPortal = (() => {
+  const defs =
+    vGrad("fp-sky", [["0", "#09061c"], ["0.5", "#020108"], ["1", "#0f081c"]]) +
+    rGrad("fp-glow", 360, 480, 420, [["0", "#ec4899", "0.7"], ["0.5", "#8b5cf6", "0.4"], ["1", "#020108", "0"]]) +
+    rGrad("fp-core", 360, 480, 240, [["0", "#38bdf8", "1"], ["0.6", "#6366f1", "0.85"], ["1", "#8b5cf6", "0"]]);
+  
+  // 포탈 회오리 이펙트 (여러 겹의 대각선 궤도선)
+  let swirls = "";
+  const r = rng(777);
+  for (let i = 0; i < 18; i++) {
+    const rx = 160 + r() * 120;
+    const ry = 60 + r() * 50;
+    const rot = i * 20 + r() * 15;
+    const op = (0.3 + r() * 0.5).toFixed(2);
+    const col = r() < 0.5 ? "#38bdf8" : "#ec4899";
+    swirls += `<ellipse cx="360" cy="480" rx="${rx}" ry="${ry}" fill="none" stroke="${col}" stroke-width="${(2.5 + r() * 3.5).toFixed(1)}" opacity="${op}" transform="rotate(${rot} 360 480)"/>`;
+  }
+
+  // 마법진 기호들 (대칭 다각형 및 동심원)
+  const magicCircle = 
+    `<circle cx="360" cy="480" r="160" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.65"/>` +
+    `<circle cx="360" cy="480" r="176" fill="none" stroke="#8b5cf6" stroke-width="1.2" stroke-dasharray="10 6" opacity="0.8"/>` +
+    `<polygon points="360,304 455,480 265,480" fill="none" stroke="#ec4899" stroke-width="1.8" opacity="0.5" transform="rotate(30 360 480)"/>` +
+    `<polygon points="360,656 455,480 265,480" fill="none" stroke="#ec4899" stroke-width="1.8" opacity="0.5" transform="rotate(-30 360 480)"/>`;
+
+  const body =
+    `<rect width="${W}" height="${H}" fill="url(#fp-sky)"/>` +
+    `<rect width="${W}" height="${H}" fill="url(#fp-glow)"/>` +
+    `<rect width="${W}" height="${H}" fill="url(#fp-core)"/>` +
+    `<g>${swirls}</g>` +
+    `<g>${magicCircle}</g>` +
+    stars(120, 99, 0, 0, 720, 1080, 0.6, 2.2, "#a5f3fc");
+  return scene(defs, body);
+})();
+
+// 16) 사이버펑크 네온 그리드 / 홀로그램
+const sCyberpunkHologram = (() => {
+  const defs =
+    vGrad("cp-sky", [["0", "#04020a"], ["0.6", "#0c0314"], ["1", "#1b0324"]]) +
+    rGrad("cp-glow", 360, 540, 500, [["0", "#ff007f", "0.35"], ["0.6", "#00ffff", "0.2"], ["1", "#04020a", "0"]]);
+
+  // 원근감 있는 네온 가로/세로 그리드 바닥
+  let gridLines = "";
+  const floorY = 720;
+  // 바닥 가로 그리드선
+  for (let y = floorY; y <= H; y += 36) {
+    const ratio = (y - floorY) / (H - floorY);
+    const strokeW = (1 + ratio * 2.8).toFixed(1);
+    const op = (0.2 + ratio * 0.75).toFixed(2);
+    gridLines += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="#00ffff" stroke-width="${strokeW}" opacity="${op}"/>`;
+  }
+  // 소실점으로 모이는 세로 바닥선
+  const vanishX = 360;
+  const vanishY = 660;
+  for (let x = -360; x <= W + 360; x += 90) {
+    gridLines += `<line x1="${vanishX}" y1="${vanishY}" x2="${x}" y2="${H}" stroke="#00ffff" stroke-width="1.8" opacity="0.4"/>`;
+  }
+
+  // 뒷배경 홀로그램 빌딩 실루엣 (디지털 눈금선 표시)
+  let holoBlds = "";
+  const r = rng(45);
+  for (let i = 0; i < 12; i++) {
+    const bw = 60 + r() * 90;
+    const bh = 300 + r() * 450;
+    const bx = i * 72 - 30;
+    holoBlds += 
+      `<rect x="${bx}" y="${floorY - bh}" width="${bw}" height="${bh}" fill="none" stroke="#ff007f" stroke-width="1" opacity="0.32"/>` +
+      `<line x1="${bx}" y1="${floorY - bh + 24}" x2="${bx + bw}" y2="${floorY - bh + 24}" stroke="#ff007f" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>` +
+      `<line x1="${bx}" y1="${floorY - bh + 48}" x2="${bx + bw}" y2="${floorY - bh + 48}" stroke="#ff007f" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>` +
+      `<rect x="${bx + bw * 0.25}" y="${floorY - bh + 80}" width="${bw * 0.5}" height="${bh * 0.4}" fill="none" stroke="#00ffff" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.25"/>`;
+  }
+
+  const body =
+    `<rect width="${W}" height="${H}" fill="url(#cp-sky)"/>` +
+    `<rect width="${W}" height="${H}" fill="url(#cp-glow)"/>` +
+    `<g>${holoBlds}</g>` +
+    `<g>${gridLines}</g>` +
+    // 사이버 글리치 입자
+    stars(60, 888, 0, 0, 720, 720, 1.5, 4.5, "#00ffff") +
+    stars(40, 999, 0, 0, 720, 720, 1.5, 4.5, "#ff007f");
+  return scene(defs, body);
+})();
+
+// 17) 로맨스 샤방샤방 장미 꽃밭 프레임
+const sRomanceBloomingRoses = (() => {
+  const defs =
+    vGrad("rr-sky", [["0", "#fff2e6"], ["0.6", "#ffe0e6"], ["1", "#fff0f5"]]) +
+    rGrad("rr-sun", 360, 480, 400, [["0", "#ffffff", "0.95"], ["0.5", "#ffe0ee", "0.45"], ["1", "#ffe0ee", "0"]]);
+
+  // 장미 한 송이 그리는 벡터 path 함수
+  const drawRose = (cx: number, cy: number, scale: number, rot: number, op: number) => {
+    return `<g transform="translate(${cx} ${cy}) rotate(${rot}) scale(${scale})" opacity="${op}">
+      <!-- 잎파리 -->
+      <path d="M-22 -4 Q-36 10 -40 -8 Q-22 -14 -22 -4 Z" fill="#6b8e23" stroke="#4a6318" stroke-width="1.5"/>
+      <path d="M22 6 Q36 20 40 2 Q22 -4 22 6 Z" fill="#6b8e23" stroke="#4a6318" stroke-width="1.5"/>
+      <!-- 꽃잎 레이어 -->
+      <circle cx="0" cy="0" r="26" fill="#f43f5e" stroke="#16100c" stroke-width="2.5"/>
+      <path d="M-18 -10 Q-32 -26 0 -26 Q32 -26 18 -10 Q28 6 0 16 Q-28 6 -18 -10 Z" fill="#fda4af" stroke="#16100c" stroke-width="2"/>
+      <path d="M-10 -6 Q-18 -18 0 -18 Q18 -18 10 -6 Q14 4 0 10 Q-14 4 -10 -6 Z" fill="#e11d48" stroke="#16100c" stroke-width="1.5"/>
+      <circle cx="0" cy="-2" r="6" fill="#be123c"/>
+    </g>`;
+  };
+
+  let frameRoses = "";
+  const r = rng(2026);
+  // 양옆 아래에 풍성하게 장미들을 뿌려 프레임 느낌 형성
+  const positions = [
+    [50, 1020, 0.95, -15, 0.95],
+    [130, 1040, 0.85, 20, 0.9],
+    [670, 1030, 0.92, 10, 0.95],
+    [590, 1050, 0.8, -30, 0.9],
+    [40, 880, 0.72, 45, 0.85],
+    [680, 890, 0.75, -40, 0.85],
+    [100, 930, 0.65, -10, 0.8],
+    [620, 940, 0.68, 15, 0.8]
+  ];
+  for (const [x, y, s, rot, op] of positions) {
+    frameRoses += drawRose(x, y, s, rot, op);
+  }
+
+  // 샤방샤방 보케 및 반짝임
+  let sparkles = "";
+  for (let i = 0; i < 22; i++) {
+    const sx = (r() * W).toFixed(0);
+    const sy = (r() * H).toFixed(0);
+    const rad = (6 + r() * 16).toFixed(0);
+    const op = (0.25 + r() * 0.45).toFixed(2);
+    // 십자 반짝임
+    sparkles += `<g opacity="${op}" stroke="#ffffff" stroke-width="1.5">
+      <line x1="${sx}" y1="${Number(sy) - 15}" x2="${sx}" y2="${Number(sy) + 15}"/>
+      <line x1="${Number(sx) - 15}" y1="${sy}" x2="${Number(sx) + 15}" y2="${sy}"/>
+      <circle cx="${sx}" cy="${sy}" r="${rad}" fill="#ffffff" stroke="none" opacity="0.4"/>
+    </g>`;
+  }
+
+  const body =
+    `<rect width="${W}" height="${H}" fill="url(#rr-sky)"/>` +
+    `<rect width="${W}" height="${H}" fill="url(#rr-sun)"/>` +
+    bokeh(16, 12, "#ffffff") +
+    sparkles +
+    frameRoses;
+  return scene(defs, body);
+})();
+
 export const BG_SCENES: BgScene[] = [
   { id: "webtoon-classroom", label: "웹툰 교실 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_classroom.png" },
   { id: "webtoon-street", label: "웹툰 노을 거리 (일러스트)", genre: "daily", imgSrc: "/assets/studio/backgrounds/webtoon_street.png" },
@@ -559,4 +704,7 @@ export const BG_SCENES: BgScene[] = [
   { id: "romance-bokeh", label: "핑크 로맨스 보케", genre: "romance", svg: sRomanceBokeh },
   { id: "speed-lines", label: "집중선 배경", genre: "daily", svg: sSpeedLines },
   { id: "golden-city", label: "석양 도시", genre: "romance", svg: sGoldenCity },
+  { id: "fantasy-portal", label: "마법 게이트", genre: "fantasy", svg: sFantasyPortal },
+  { id: "cyberpunk-hologram", label: "사이버네온 홀로그램", genre: "sf", svg: sCyberpunkHologram },
+  { id: "romance-blooming-roses", label: "장미빛 로맨스", genre: "romance", svg: sRomanceBloomingRoses },
 ];

@@ -24,27 +24,24 @@ export type VrmLibraryEntry = {
   updatedAt: number;
 };
 
+export type SampleVrm = {
+  id: string;
+  name: string;
+  url: string;
+};
+
 type VrmThumbnailRecord = {
   id: string;
   thumbnail: string;
   updatedAt: number;
 };
 
-export const SAMPLE_VRM_LIBRARY_ENTRY: VrmLibraryEntry = {
-  id: SAMPLE_VRM_ID,
-  name: "샘플 캐릭터",
-  source: "sample",
-  thumbnail: null,
-  createdAt: 0,
-  updatedAt: 0,
-};
-
 // 기본 번들 VRM 캐릭터(전부 라이선스 OK: pixiv 샘플 + VRoid CC0 AvatarSample A/B/C).
-export const SAMPLE_VRMS: { id: string; name: string; url: string }[] = [
+export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "샘플 캐릭터", url: SAMPLE_VRM_URL },
-  { id: "avatar-a", name: "아바타 A", url: "/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "아바타 B", url: "/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "아바타 C", url: "/vrm/AvatarSample_C.vrm" },
+  { id: "avatar-a", name: "VRoid 학원 캐릭터", url: "/vrm/AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "VRoid 판타지 캐릭터", url: "/vrm/AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "VRoid 액션 캐릭터", url: "/vrm/AvatarSample_C.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,
@@ -54,8 +51,14 @@ export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   createdAt: 0,
   updatedAt: 0,
 }));
+export const SAMPLE_VRM_LIBRARY_ENTRY: VrmLibraryEntry = SAMPLE_VRM_ENTRIES[0];
+
 export function sampleVrmUrl(id: string): string {
   return SAMPLE_VRMS.find((s) => s.id === id)?.url ?? SAMPLE_VRM_URL;
+}
+
+function isSampleVrmId(id: string) {
+  return SAMPLE_VRMS.some((sample) => sample.id === id);
 }
 
 function createModelId() {
@@ -136,7 +139,11 @@ export function createUploadedVrmRecord(file: File, id = createModelId(), now = 
   };
 }
 
-export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sampleThumbnail: string | null = null): VrmLibraryEntry[] {
+export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sampleThumbnails: Partial<Record<string, string | null>> = {}): VrmLibraryEntry[] {
+  const sampleEntries = SAMPLE_VRM_ENTRIES.map((entry) => ({
+    ...entry,
+    thumbnail: sampleThumbnails[entry.id] ?? entry.thumbnail,
+  }));
   const uploadedEntries = storedModels
     .slice()
     .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -149,7 +156,7 @@ export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sample
       updatedAt: model.updatedAt,
     }));
 
-  return [{ ...SAMPLE_VRM_LIBRARY_ENTRY, thumbnail: sampleThumbnail }, ...uploadedEntries];
+  return [...sampleEntries, ...uploadedEntries];
 }
 
 export function getDeletableModelIds(entries: VrmLibraryEntry[]) {
@@ -190,8 +197,11 @@ export async function getCachedVrmThumbnail(id: string) {
 }
 
 export async function listVrmLibraryEntries() {
-  const [storedModels, sampleThumbnail] = await Promise.all([listStoredVrmModels(), getCachedVrmThumbnail(SAMPLE_VRM_ID)]);
-  return withDefaultVrmEntry(storedModels, sampleThumbnail);
+  const [storedModels, cachedSampleThumbnails] = await Promise.all([
+    listStoredVrmModels(),
+    Promise.all(SAMPLE_VRM_ENTRIES.map(async (entry) => [entry.id, await getCachedVrmThumbnail(entry.id)] as const)),
+  ]);
+  return withDefaultVrmEntry(storedModels, Object.fromEntries(cachedSampleThumbnails));
 }
 
 export async function saveUploadedVrm(file: File) {
@@ -224,7 +234,7 @@ export async function saveVrmThumbnail(id: string, thumbnail: string) {
 }
 
 export async function deleteStoredVrmModel(id: string) {
-  if (id === SAMPLE_VRM_ID) return;
+  if (isSampleVrmId(id)) return;
 
   return withDatabase(async (db) => {
     const transaction = db.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
