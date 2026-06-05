@@ -102,6 +102,8 @@ interface TextEl {
   font?: string; // 글꼴(웹툰 대사용)
   stroke?: string; // 효과음(SFX) 외곽선
   strokeWidth?: number;
+  letterSpacing?: number; // 자간(px)
+  lineHeight?: number; // 행간(배수)
 }
 interface BubbleEl {
   id: string;
@@ -118,6 +120,7 @@ interface BubbleEl {
   tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
   font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
   fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
+  lineHeight?: number; // 행간(배수, 미설정 시 1.1)
 }
 interface FrameEl {
   id: string;
@@ -1641,6 +1644,7 @@ export function StudioPage() {
           fontSize: el.fontSize ?? 24,
           fontFamily: el.font ?? "Pretendard, sans-serif",
           align: "center",
+          lineHeight: el.lineHeight ?? 1.1,
         });
         height = Math.max(el.height, Math.ceil(measure.height()) + 28);
         measure.destroy();
@@ -2364,6 +2368,8 @@ export function StudioPage() {
                       opacity={el.opacity ?? 1}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
                       fontStyle="bold"
+                      letterSpacing={el.letterSpacing ?? 0}
+                      lineHeight={el.lineHeight ?? 1}
                       draggable={draggable}
                       onMouseDown={onSelect}
                       onTap={onSelect}
@@ -2644,6 +2650,7 @@ export function StudioPage() {
                       fill={el.textFill}
                       align="center"
                       verticalAlign="middle"
+                      lineHeight={el.lineHeight ?? 1.1}
                     />
                   </Group>
                 );
@@ -2962,6 +2969,40 @@ export function StudioPage() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+              {selected.type === "text" && (
+                <div className="mt-3 space-y-2">
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    자간
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={-2}
+                        max={12}
+                        step={0.5}
+                        value={selected.letterSpacing ?? 0}
+                        onChange={(e) => patchEl(selected.id, { letterSpacing: Number(e.target.value) } as Partial<El>)}
+                        className="w-20 accent-accent cursor-pointer sm:w-24"
+                      />
+                      <span className="w-7 text-right text-xs tabular-nums text-fg-3">{selected.letterSpacing ?? 0}</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    행간
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0.8}
+                        max={2}
+                        step={0.1}
+                        value={selected.lineHeight ?? 1}
+                        onChange={(e) => patchEl(selected.id, { lineHeight: Number(e.target.value) } as Partial<El>)}
+                        className="w-20 accent-accent cursor-pointer sm:w-24"
+                      />
+                      <span className="w-7 text-right text-xs tabular-nums text-fg-3">{(selected.lineHeight ?? 1).toFixed(1)}</span>
+                    </span>
+                  </label>
                 </div>
               )}
               {selected.type !== "frame" && containingPanel(selected, elements) && (
