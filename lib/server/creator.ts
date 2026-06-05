@@ -164,9 +164,13 @@ export async function listWorks(opts: {
       if (!c) return;
       where = where ? and(where, c) : c;
     };
-    // 공개(published) + 비노출 제외(관리자 includeHidden 제외)
-    addWhere(eq(creatorWorks.status, "published"));
-    if (!opts.includeHidden) addWhere(eq(creatorWorks.hidden, false));
+    // 소유자가 본인 목록을 조회하면(viewerId === userId) 초안·비공개까지 포함(내 게시물 관리용).
+    // 그 외에는 공개(published) + 비노출 제외(관리자 includeHidden 제외).
+    const ownerView = !!opts.userId && !!opts.viewerId && opts.viewerId === opts.userId;
+    if (!ownerView) {
+      addWhere(eq(creatorWorks.status, "published"));
+      if (!opts.includeHidden) addWhere(eq(creatorWorks.hidden, false));
+    }
     if (opts.titleId) addWhere(eq(creatorWorks.titleId, opts.titleId));
     if (opts.userId) addWhere(eq(creatorWorks.userId, opts.userId));
     const tag = String(opts.tag ?? "").trim().replace(/^#/, "").toLowerCase();

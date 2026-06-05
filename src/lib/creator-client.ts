@@ -108,6 +108,7 @@ export async function listWorks(
   const qs = search.toString();
   const res = await fetch(`${BASE}/works${qs ? `?${qs}` : ""}`, {
     cache: "no-store",
+    headers: authHeaders(false), // x-user-id 전송 → 본인 목록일 때 초안·비공개도 표시
     signal,
   });
   const data = await readOrThrow<unknown>(res, "창작물 목록을 불러오지 못했습니다.");
