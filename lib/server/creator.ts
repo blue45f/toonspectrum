@@ -535,12 +535,42 @@ function clampDim(value: unknown): number {
   return Math.max(1, Math.min(4096, n));
 }
 
+// creator_asset 테이블 자가생성(멱등) — 서버리스/무료DB 환경에서 drizzle push 없이도 첫 호출 시 보장.
+// 운영 DB 접속문자열이 비공개(Vercel Sensitive)라 외부에서 push 불가 → 런타임 DATABASE_URL로 생성.
+let assetTableReady: Promise<void> | null = null;
+function ensureAssetTable(): Promise<void> {
+  if (!assetTableReady) {
+    assetTableReady = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "creator_asset" (
+          "id" text PRIMARY KEY NOT NULL,
+          "userId" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+          "name" text NOT NULL,
+          "dataUrl" text NOT NULL,
+          "width" integer NOT NULL,
+          "height" integer NOT NULL,
+          "kind" text NOT NULL DEFAULT 'image',
+          "hidden" boolean NOT NULL DEFAULT false,
+          "downloads" integer NOT NULL DEFAULT 0,
+          "createdAt" timestamp
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS "creator_asset_created_idx" ON "creator_asset" ("createdAt")`);
+    })().catch((error) => {
+      assetTableReady = null; // 실패 시 다음 호출에서 재시도
+      throw error;
+    });
+  }
+  return assetTableReady;
+}
+
 export async function listSharedAssets(opts: {
   limit?: number;
   offset?: number;
   mineUserId?: string; // 지정 시 해당 회원이 올린 것만(내 공유 목록)
   viewerId?: string;
 } = {}): Promise<CreatorSharedAsset[]> {
+  await ensureAssetTable();
   const limit = Math.max(1, Math.min(120, opts.limit ?? 60));
   const offset = Math.max(0, opts.offset ?? 0);
   const wheres: SQL[] = [eq(creatorAssets.hidden, false)];
@@ -583,6 +613,7 @@ export async function publishAsset(
   userId: string,
   input: { name?: unknown; dataUrl?: unknown; width?: unknown; height?: unknown; kind?: unknown }
 ): Promise<CreatorSharedAsset> {
+  await ensureAssetTable();
   const name = clampText(input.name, MAX_ASSET_NAME) || "내 에셋";
   const dataUrl = String(input.dataUrl ?? "");
   if (!/^data:image\//.test(dataUrl)) throw new Error("이미지 데이터가 올바르지 않습니다.");
@@ -616,6 +647,7 @@ export async function publishAsset(
 }
 
 export async function deleteSharedAsset(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
+  await ensureAssetTable();
   const [existing] = await db
     .select({ id: creatorAssets.id, ownerId: creatorAssets.userId })
     .from(creatorAssets)
@@ -628,6 +660,7 @@ export async function deleteSharedAsset(userId: string, id: string, isAdmin: boo
 }
 
 export async function bumpAssetDownloads(id: string): Promise<void> {
+  await ensureAssetTable();
   await db
     .update(creatorAssets)
     .set({ downloads: sql`${creatorAssets.downloads} + 1` })
