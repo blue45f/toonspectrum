@@ -923,6 +923,12 @@ export function StudioPage() {
       } else if (mod && (e.key === "d" || e.key === "D")) {
         e.preventDefault();
         duplicateSelected();
+      } else if (mod && e.key === "]") {
+        e.preventDefault();
+        reorder("front");
+      } else if (mod && e.key === "[") {
+        e.preventDefault();
+        reorder("back");
       } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
         removeSelected();
