@@ -16,7 +16,7 @@
   "rewrites": [
     { "source": "/api/cover", "destination": "/api/index" },
     { "source": "/title/:slug", "destination": "/api/og?slug=:slug" },
-    { "source": "/api/:path*", "destination": "https://132.145.82.3.nip.io/api/:path*" },
+    { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
