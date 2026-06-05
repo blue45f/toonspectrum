@@ -676,5 +676,20 @@ export const CHARACTER_LIBRARY_V2: CharacterAsset[] = CHARS.map((c) => ({
   emoji: c.emoji,
   width: 240,
   height: 320,
-  expressions: EXPRS.map((e) => ({ id: e.id, label: e.label, svg: build(c, e) })),
+  expressions: EXPRS.map((e) => ({
+    id: e.id,
+    label: e.label,
+    svg: build(c, e),
+    imgSrc: (c.id === "yuna" && e.id === "neutral")
+      ? "/assets/studio/characters/yuna_neutral.png"
+      : (c.id === "kang" && e.id === "neutral")
+        ? "/assets/studio/characters/kang_neutral.png"
+        : (c.id === "seyeon" && e.id === "neutral")
+          ? "/assets/studio/characters/seyeon_neutral.png"
+          : (c.id === "dani" && e.id === "neutral")
+            ? "/assets/studio/characters/dani_neutral.png"
+            : (c.id === "haeun" && e.id === "neutral")
+              ? "/assets/studio/characters/haeun_neutral.png"
+              : undefined,
+  })),
 }));

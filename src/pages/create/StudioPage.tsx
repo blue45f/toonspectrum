@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Path, Transformer } from "react-konva";
@@ -132,10 +132,47 @@ interface DrawEl {
   fill?: string;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean };
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
+
+// 요소의 대략적 바운딩 박스(중심·크기 판정용).
+function elBounds(el: El): { x: number; y: number; w: number; h: number } {
+  if (el.type === "draw") {
+    const xs = el.points.filter((_, i) => i % 2 === 0);
+    const ys = el.points.filter((_, i) => i % 2 === 1);
+    if (!xs.length) return { x: 0, y: 0, w: 0, h: 0 };
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return { x: minX, y: minY, w: Math.max(...xs) - minX, h: Math.max(...ys) - minY };
+  }
+  if (el.type === "text") return { x: el.x, y: el.y, w: el.width, h: el.fontSize * 1.4 };
+  if (el.type === "sticker") return { x: el.x, y: el.y, w: el.fontSize, h: el.fontSize };
+  return { x: el.x, y: el.y, w: el.width, h: el.height }; // image · bubble · frame
+}
+
+// 요소가 "들어가야 할" 패널(중심이 패널 안 + 패널보다 크게 넘치지 않음). 없으면 null.
+// 전체 배경처럼 패널보다 훨씬 큰 요소는 제외해 백드롭이 한 칸에 갇히지 않게 한다.
+function containingPanel(el: El, all: El[]): FrameEl | null {
+  if (el.type === "frame") return null;
+  const b = elBounds(el);
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  let best: FrameEl | null = null;
+  let bestArea = Infinity;
+  for (const f of all) {
+    if (f.type !== "frame" || f.hidden) continue;
+    if (cx < f.x || cx > f.x + f.width || cy < f.y || cy > f.y + f.height) continue;
+    if (b.w > f.width * 1.4 || b.h > f.height * 1.4) continue;
+    const area = f.width * f.height;
+    if (area < bestArea) {
+      bestArea = area;
+      best = f;
+    }
+  }
+  return best;
+}
 
 // 레이어 목록용 라벨(아이콘 + 이름).
 function elementLabel(el: El): string {
@@ -970,12 +1007,15 @@ export function StudioPage() {
       rotation: -6,
     });
   }
-  function addCharacter(svg: string, w: number, h: number) {
+  function addCharacter(svgOrSrc: string, w: number, h: number) {
     setMenu(null);
+    const src = svgOrSrc.startsWith("/assets/") || svgOrSrc.includes(".png")
+      ? svgOrSrc
+      : svgToDataUrl(svgOrSrc);
     addEl(
       createCanvasImageElement({
         id: uid(),
-        src: svgToDataUrl(svg),
+        src,
         canvasWidth: CANVAS_W,
         canvasHeight: canvasH,
         sourceWidth: w,
@@ -1325,10 +1365,10 @@ export function StudioPage() {
                       key={ex.id}
                       type="button"
                       title={ex.label}
-                      onClick={() => addCharacter(ex.svg, c.width, c.height)}
+                      onClick={() => addCharacter(ex.imgSrc || ex.svg, c.width, c.height)}
                       className="overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
                     >
-                      <img src={svgToDataUrl(ex.svg)} alt={ex.label} className="h-14 w-full object-contain" />
+                      <img src={ex.imgSrc || svgToDataUrl(ex.svg)} alt={ex.label} className="h-14 w-full object-contain" />
                       <span className="block text-center text-[0.6rem] text-fg-3">{ex.label}</span>
                     </button>
                   ));
@@ -1623,8 +1663,18 @@ export function StudioPage() {
                 const setRef = (n: Konva.Node | null) => {
                   nodeRefs.current[el.id] = n;
                 };
+                // 패널 내부 콘텐츠 클리핑: 들어간 패널 영역으로 잘라낸다(noClip이면 해제).
+                const clipFrame = el.noClip ? null : containingPanel(el, elements);
+                const wrapClip = (node: ReactNode) =>
+                  clipFrame ? (
+                    <Group key={el.id} clipX={clipFrame.x} clipY={clipFrame.y} clipWidth={clipFrame.width} clipHeight={clipFrame.height}>
+                      {node}
+                    </Group>
+                  ) : (
+                    node
+                  );
                 if (el.type === "image")
-                  return (
+                  return wrapClip(
                     <UrlImage
                       key={el.id}
                       el={el}
@@ -1648,9 +1698,9 @@ export function StudioPage() {
                   );
                 }
                 if (el.type === "draw")
-                  return <StudioDrawNode key={el.id} el={el} />;
+                  return wrapClip(<StudioDrawNode key={el.id} el={el} />);
                 if (el.type === "text")
-                  return (
+                  return wrapClip(
                     <KText
                       key={el.id}
                       ref={setRef}
@@ -1744,7 +1794,7 @@ export function StudioPage() {
                 const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
                 const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
 
-                return (
+                return wrapClip(
                   <Group
                     key={el.id}
                     ref={setRef}
@@ -2196,6 +2246,17 @@ export function StudioPage() {
                     })}
                   </div>
                 </div>
+              )}
+              {selected.type !== "frame" && containingPanel(selected, elements) && (
+                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                  패널 안에 가두기
+                  <input
+                    type="checkbox"
+                    checked={!selected.noClip}
+                    onChange={(e) => patchEl(selected.id, { noClip: !e.target.checked } as Partial<El>)}
+                    className="size-4 accent-accent"
+                  />
+                </label>
               )}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (

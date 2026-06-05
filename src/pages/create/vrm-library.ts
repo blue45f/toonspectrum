@@ -38,10 +38,10 @@ type VrmThumbnailRecord = {
 
 // 기본 번들 VRM 캐릭터(전부 라이선스 OK: pixiv 샘플 + VRoid CC0 AvatarSample A/B/C).
 export const SAMPLE_VRMS: SampleVrm[] = [
-  { id: SAMPLE_VRM_ID, name: "샘플 캐릭터", url: SAMPLE_VRM_URL },
-  { id: "avatar-a", name: "VRoid 학원 캐릭터", url: "/vrm/AvatarSample_A.vrm" },
-  { id: "avatar-b", name: "VRoid 판타지 캐릭터", url: "/vrm/AvatarSample_B.vrm" },
-  { id: "avatar-c", name: "VRoid 액션 캐릭터", url: "/vrm/AvatarSample_C.vrm" },
+  { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
+  { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
+  { id: "avatar-b", name: "세라", url: "/vrm/AvatarSample_B.vrm" },
+  { id: "avatar-c", name: "유나", url: "/vrm/AvatarSample_C.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

@@ -6,6 +6,7 @@ export interface CharacterExpression {
   id: string; // "happy" | "sad" | ...
   label: string; // "기쁨"
   svg: string; // 독립 실행 가능한 <svg ...>...</svg> 마크업(외부 참조 없음)
+  imgSrc?: string; // (선택사항) 웹툰 일러스트 이미지 경로
 }
 
 export interface CharacterAsset {

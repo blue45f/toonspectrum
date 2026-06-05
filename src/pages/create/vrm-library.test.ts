@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, withDefaultVrmEntry } from "./vrm-library";
 
 describe("VRM library helpers", () => {
+  it("uses polished character names for bundled VRMs", () => {
+    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name)).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
+  });
+
   it("keeps every bundled sample before uploaded library entries", () => {
     const entries = withDefaultVrmEntry([
       {
