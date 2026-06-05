@@ -276,20 +276,28 @@ interface CampaignResponseRow {
 @Injectable()
 export class AdminService {
   async getAdminMe(userId: string) {
-    await ensureAdminSchema();
-    const admin = await requireAdminUser(userId);
-    return {
-      id: admin.id,
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-      permissions: {
-        scope: "full",
-        canManageMonetization: true,
-        canManageCommunity: true,
-      },
-      generatedAt: new Date().toISOString(),
-    };
+    try {
+      await ensureAdminSchema();
+      const admin = await requireAdminUser(userId);
+      return {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        permissions: {
+          scope: "full",
+          canManageMonetization: true,
+          canManageCommunity: true,
+        },
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+      // DB 일시 장애(예: 무료 DB 데이터전송 쿼터 초과)면 관리자 확인 불가 → 500 대신 403(관리자 아님)으로
+      // 안전 처리. 프론트(auth-menu)는 비-2xx를 "관리자 아님"으로 우아하게 처리하므로 콘솔 500이 사라진다.
+      console.error(`[admin/me] check failed, treating as non-admin: ${(error as Error)?.message ?? error}`);
+      throw new ForbiddenException("관리자 권한을 확인할 수 없습니다.");
+    }
   }
 
   async getConfig() {
