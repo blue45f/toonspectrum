@@ -19,8 +19,14 @@ export interface CharacterAsset {
 }
 
 // SVG 문자열 → data URL (Konva Image/내보내기/직렬화에 그대로 사용).
+// 크로스 브라우저 호환성(특히 Safari/Firefox/Chrome 최신버전) 및 보안 제약을 해결하기 위해 Base64로 인코딩하여 반환합니다.
 export function svgToDataUrl(svg: string): string {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  try {
+    const base64 = btoa(unescape(encodeURIComponent(svg)));
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch (e) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
 }
 
 // 라이브러리(아트)는 별도 파일. 고품질 v2 단독 채택(저품질 v1 제거).
