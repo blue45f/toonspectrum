@@ -6,6 +6,7 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   ChevronDown,
+  ChevronUp,
   Circle,
   Copy,
   Eraser,
@@ -130,6 +131,28 @@ type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
+
+// 레이어 목록용 라벨(아이콘 + 이름).
+function elementLabel(el: El): string {
+  switch (el.type) {
+    case "text":
+      return `T ${el.text.slice(0, 14).trim() || "텍스트"}`;
+    case "bubble": {
+      const v = BUBBLE_VARIANTS.find((b) => b.id === el.variant);
+      return `${v?.sample ?? "💬"} ${v?.label ?? "말풍선"}`;
+    }
+    case "sticker":
+      return `${el.text} 스티커`;
+    case "draw":
+      return "✏️ 그림";
+    case "frame":
+      return "▢ 패널";
+    case "image":
+      return "🖼️ 이미지";
+    default:
+      return "요소";
+  }
+}
 const BRUSH_WIDTH_PRESETS = [2, 6, 12, 24, 36];
 const DRAW_COLOR_SWATCHES = ["#16100c", "#f8f2df", "#f45d48", "#ff9f1c", "#ffd84d", "#56c271", "#2f9bff", "#7c5cfc", "#ff6fb1", "#8a5a44"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -769,10 +792,22 @@ export function StudioPage() {
     commit(sample);
     dismissQuickStart();
   }
+  function removeById(id: string) {
+    commit(elements.filter((e) => e.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  }
   function removeSelected() {
     if (!selectedId) return;
-    commit(elements.filter((e) => e.id !== selectedId));
-    setSelectedId(null);
+    removeById(selectedId);
+  }
+  function moveLayer(id: string, dir: "up" | "down") {
+    const idx = elements.findIndex((e) => e.id === id);
+    if (idx < 0) return;
+    const swap = dir === "up" ? idx + 1 : idx - 1; // up = 앞으로(위 레이어)
+    if (swap < 0 || swap >= elements.length) return;
+    const next = [...elements];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    commit(next);
   }
   function duplicateSelected() {
     if (!selected) return;
@@ -2068,6 +2103,68 @@ export function StudioPage() {
                   <Trash2 size={14} /> 삭제
                 </button>
               </div>
+            </div>
+          )}
+
+          {elements.length > 0 && (
+            <div className="rounded-2xl border border-line bg-panel/40 p-3">
+              <p className="mb-2 text-xs font-semibold text-fg-3">레이어 ({elements.length})</p>
+              <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-1">
+                {elements.map((_, ri) => {
+                  const i = elements.length - 1 - ri; // 위(앞) 레이어부터 표시
+                  const el = elements[i];
+                  return (
+                    <li
+                      key={el.id}
+                      className={cn(
+                        "flex items-center gap-1 rounded-lg border px-1.5 py-1",
+                        el.id === selectedId ? "border-accent/60 bg-accent-soft/40" : "border-line"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTool("select");
+                          setSelectedId(el.id);
+                        }}
+                        className="min-w-0 flex-1 truncate text-left text-xs text-fg-2"
+                        title={elementLabel(el)}
+                      >
+                        {elementLabel(el)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveLayer(el.id, "up")}
+                        disabled={i === elements.length - 1}
+                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+                        aria-label="위로"
+                        title="위로"
+                      >
+                        <ChevronUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveLayer(el.id, "down")}
+                        disabled={i === 0}
+                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+                        aria-label="아래로"
+                        title="아래로"
+                      >
+                        <ChevronDown size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeById(el.id)}
+                        className="grid size-6 place-items-center rounded text-bad hover:bg-raised"
+                        aria-label="레이어 삭제"
+                        title="삭제"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 
