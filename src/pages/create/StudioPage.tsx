@@ -1292,7 +1292,8 @@ export function StudioPage() {
     await new Promise((r) => setTimeout(r, 60));
     const stage = stageRef.current;
     if (!stage) return;
-    const full = stage.toDataURL({ pixelRatio: 1 / scale });
+    // 2× 해상도로 내보내 더 선명한 웹툰 출력(720→1440px 폭).
+    const full = stage.toDataURL({ pixelRatio: 2 / scale });
     const link = document.createElement("a");
     link.href = full;
     link.download = `${title.trim() || "toonspectrum-comic"}.png`;
