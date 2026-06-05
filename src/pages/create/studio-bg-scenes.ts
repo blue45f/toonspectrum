@@ -702,3 +702,56 @@ export const BG_SCENES: BgScene[] = [
   { id: "cyberpunk-hologram", label: "사이버네온 홀로그램", genre: "sf", svg: sCyberpunkHologram },
   { id: "romance-blooming-roses", label: "장미빛 로맨스", genre: "romance", svg: sRomanceBloomingRoses },
 ];
+
+// ── 장르 분류 통일 + 표시 우선순위 ──────────────────────────
+// BG_SCENES(영문 genre)와 BG_SCENES_EXTRA(한글 genre) 표기를 한 체계로 정규화하고
+// 배경 메뉴에서 장르별로 묶어 일관된 순서로 보여주기 위한 헬퍼.
+const BG_GENRE_MAP: Record<string, string> = {
+  daily: "일상·학원", 일상: "일상·학원", 학원: "일상·학원",
+  romance: "로맨스", 로맨스: "로맨스",
+  fantasy: "판타지", 판타지: "판타지",
+  wuxia: "무협·사극", 무협: "무협·사극", 사극: "무협·사극",
+  sf: "SF·사이버펑크", SF: "SF·사이버펑크", 사이버펑크: "SF·사이버펑크",
+  드라마: "드라마",
+  모험: "모험·액션", 액션: "모험·액션",
+  공포: "공포·스릴러", 스릴러: "공포·스릴러",
+};
+
+// 메뉴에 노출할 장르 순서(우선순위). 매핑되지 않은 건 "기타"로 맨 뒤.
+export const BG_GENRE_ORDER = [
+  "일상·학원",
+  "로맨스",
+  "판타지",
+  "무협·사극",
+  "SF·사이버펑크",
+  "드라마",
+  "모험·액션",
+  "공포·스릴러",
+  "기타",
+] as const;
+
+export function bgGenreOf(scene: BgScene): string {
+  return BG_GENRE_MAP[scene.genre] ?? "기타";
+}
+
+// 모든 배경을 장르별로 묶어 우선순위 순서로 정렬한 그룹 배열을 반환.
+// 각 그룹 안에서는 고품질 일러스트(imgSrc)를 앞에, 그다음 벡터 순.
+export function groupBgScenes(scenes: BgScene[]): { genre: string; scenes: BgScene[] }[] {
+  const buckets = new Map<string, BgScene[]>();
+  for (const scene of scenes) {
+    const genre = bgGenreOf(scene);
+    const list = buckets.get(genre) ?? [];
+    list.push(scene);
+    buckets.set(genre, list);
+  }
+  const order = (g: string) => {
+    const i = BG_GENRE_ORDER.indexOf(g as (typeof BG_GENRE_ORDER)[number]);
+    return i === -1 ? BG_GENRE_ORDER.length : i;
+  };
+  return [...buckets.entries()]
+    .map(([genre, list]) => ({
+      genre,
+      scenes: list.slice().sort((a, b) => (a.imgSrc ? 0 : 1) - (b.imgSrc ? 0 : 1)),
+    }))
+    .sort((a, b) => order(a.genre) - order(b.genre));
+}

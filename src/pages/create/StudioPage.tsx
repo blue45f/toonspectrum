@@ -55,7 +55,7 @@ import {
 } from "./studio-assets";
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
-import { BG_SCENES } from "./studio-bg-scenes";
+import { BG_SCENES, groupBgScenes } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
 import { CREATURE_STICKERS } from "./studio-creature-stickers";
@@ -1440,22 +1440,29 @@ export function StudioPage() {
             <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                패널을 선택하고 배경을 누르면 그 컷 안에 들어갑니다.
+                배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
               </p>
-              <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-1">
-                {[...BG_SCENES, ...BG_SCENES_EXTRA].map((bg) => (
-                  <button
-                    key={bg.id}
-                    type="button"
-                    title={bg.label}
-                    onClick={() => addBgScene(bg)}
-                    className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
-                  >
-                    <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                      <img src={bg.imgSrc || svgToDataUrl(bg.svg || "")} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+              <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                {groupBgScenes([...BG_SCENES, ...BG_SCENES_EXTRA]).map((group) => (
+                  <div key={group.genre}>
+                    <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {group.scenes.map((bg) => (
+                        <button
+                          key={bg.id}
+                          type="button"
+                          title={bg.label}
+                          onClick={() => addBgScene(bg)}
+                          className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                        >
+                          <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                            <img src={bg.imgSrc || svgToDataUrl(bg.svg || "")} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                          </div>
+                          <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                        </button>
+                      ))}
                     </div>
-                    <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
