@@ -755,3 +755,11 @@ export function groupBgScenes(scenes: BgScene[]): { genre: string; scenes: BgSce
     }))
     .sort((a, b) => order(a.genre) - order(b.genre));
 }
+
+// 메뉴 섹션: 고품질 일러스트(imgSrc)를 "추천"으로 맨 위에 모으고,
+// 나머지 벡터 씬은 장르별 그룹으로 보여줘 우선순위를 명확히 한다.
+export function bgSceneSections(scenes: BgScene[]): { genre: string; scenes: BgScene[] }[] {
+  const featured = scenes.filter((s) => s.imgSrc);
+  const rest = scenes.filter((s) => !s.imgSrc);
+  return [...(featured.length ? [{ genre: "추천", scenes: featured }] : []), ...groupBgScenes(rest)];
+}

@@ -56,7 +56,7 @@ import {
 } from "./studio-assets";
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
-import { BG_SCENES, groupBgScenes } from "./studio-bg-scenes";
+import { BG_SCENES, bgSceneSections } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
 import { CREATURE_STICKERS } from "./studio-creature-stickers";
@@ -1450,7 +1450,7 @@ export function StudioPage() {
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
               </p>
               <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {groupBgScenes([...BG_SCENES, ...BG_SCENES_EXTRA]).map((group) => (
+                {bgSceneSections([...BG_SCENES, ...BG_SCENES_EXTRA]).map((group) => (
                   <div key={group.genre}>
                     <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
                     <div className="grid grid-cols-3 gap-1.5">
