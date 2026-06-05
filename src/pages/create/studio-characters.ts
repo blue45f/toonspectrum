@@ -29,8 +29,5 @@ export function svgToDataUrl(svg: string): string {
   }
 }
 
-// 라이브러리(아트)는 별도 파일. 고품질 v2 + 데모그래픽(아기~노인) + 장르/의상(중세·한복·무협·판타지).
-import { CHARACTER_LIBRARY_V2 } from "./studio-characters-v2";
-import { DEMOGRAPHIC_CHARACTERS } from "./studio-characters-demographics";
-import { GENRE_CHARACTERS } from "./studio-characters-genre";
-export const CHARACTERS: CharacterAsset[] = [...CHARACTER_LIBRARY_V2, ...DEMOGRAPHIC_CHARACTERS, ...GENRE_CHARACTERS];
+// 2D 캐릭터 비활성화 (3D VRM 전용 스튜디오로 전환)
+export const CHARACTERS: CharacterAsset[] = [];

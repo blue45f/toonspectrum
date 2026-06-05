@@ -790,6 +790,102 @@ function matrixCode(): string {
   `);
 }
 
+function sparkImpact(): string {
+  const W = 480;
+  const H = 480;
+  return svg(W, H, `
+    <g stroke="#f59e0b" stroke-width="4" stroke-linecap="round" fill="none">
+      <path d="M 240 240 L 120 180 M 240 240 L 360 300 M 240 240 L 160 320 M 240 240 L 320 160" stroke="#fbbf24" stroke-width="6"/>
+      <path d="M 240 240 L 220 80 M 240 240 L 260 400 M 240 240 L 60 260 M 240 240 L 420 220" />
+      <path d="M 120 180 L 100 190 M 360 300 L 380 290 M 160 320 L 150 340 M 320 160 L 330 140" stroke="#ffffff" stroke-width="3"/>
+      <circle cx="240" cy="240" r="18" fill="#ffffff" filter="url(#glow-local)"/>
+    </g>
+    <defs>
+      <filter id="glow-local" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+  `);
+}
+
+function dazzlingAura(): string {
+  const W = 480;
+  const H = 480;
+  return svg(W, H, `
+    <g fill="#fef08a" opacity="0.8">
+      <path d="M 240 40 Q 240 240 440 240 Q 240 240 240 440 Q 240 240 40 240 Q 240 240 240 40 Z" fill="url(#gold-grad)"/>
+      <circle cx="120" cy="120" r="8" fill="#ffffff"/>
+      <circle cx="360" cy="120" r="12" fill="#ffffff"/>
+      <circle cx="100" cy="340" r="14" fill="#ffffff"/>
+      <circle cx="380" cy="360" r="8" fill="#ffffff"/>
+    </g>
+    <defs>
+      <radialGradient id="gold-grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="40%" stop-color="#fef08a" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#ca8a04" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+  `);
+}
+
+function gloomyRaincloud(): string {
+  const W = 480;
+  const H = 320;
+  return svg(W, H, `
+    <g fill="#475569" stroke="${INK}" stroke-width="4" stroke-linejoin="round">
+      <path d="M 120 180 A 40 40 0 0 1 180 120 A 60 60 0 0 1 300 100 A 50 50 0 0 1 380 140 A 40 40 0 0 1 400 180 L 120 180 Z" fill="#334155"/>
+      <g stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round" fill="none">
+        <path d="M 160 210 L 150 250" />
+        <path d="M 220 220 L 210 260" />
+        <path d="M 280 215 L 270 255" />
+        <path d="M 340 220 L 330 260" />
+        <path d="M 190 240 L 180 280" opacity="0.6"/>
+        <path d="M 250 245 L 240 285" opacity="0.6"/>
+        <path d="M 310 240 L 300 280" opacity="0.6"/>
+      </g>
+    </g>
+  `);
+}
+
+function shockStressLines(): string {
+  const W = 320;
+  const H = 460;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M 80 40 L 140 100 L 100 180 L 180 240 L 120 340 L 220 420" />
+      <path d="M 240 60 L 200 140 L 260 220 L 180 320 L 240 400" stroke-width="3.5"/>
+      <path d="M 50 120 L 70 170 L 40 230 L 90 290" stroke-width="3"/>
+    </g>
+  `);
+}
+
+function cyberNeonGrid(): string {
+  const W = 480;
+  const H = 480;
+  return svg(W, H, `
+    <g stroke="#06b6d4" stroke-width="2" opacity="0.75" fill="none">
+      <line x1="240" y1="120" x2="-40" y2="480" />
+      <line x1="240" y1="120" x2="60" y2="480" />
+      <line x1="240" y1="120" x2="160" y2="480" />
+      <line x1="240" y1="120" x2="240" y2="480" stroke-width="3"/>
+      <line x1="240" y1="120" x2="320" y2="480" />
+      <line x1="240" y1="120" x2="420" y2="480" />
+      <line x1="240" y1="120" x2="520" y2="480" />
+      <line x1="0" y1="440" x2="480" y2="440" stroke-width="3"/>
+      <line x1="40" y1="380" x2="440" y2="380" />
+      <line x1="80" y1="320" x2="400" y2="320" />
+      <line x1="120" y1="260" x2="360" y2="260" />
+      <line x1="150" y1="200" x2="330" y2="200" />
+      <line x1="180" y1="160" x2="300" y2="160" />
+    </g>
+  `);
+}
+
 // 공개 목록(>= 14개). 라벨은 한글, id는 영문.
 export const FX_OVERLAYS: FxOverlay[] = [
   { id: "radial-focus", label: "집중선", svg: radialFocus(), width: 480, height: 480 },
@@ -812,4 +908,9 @@ export const FX_OVERLAYS: FxOverlay[] = [
   { id: "flame-burst", label: "화염", svg: flameBurst(), width: 280, height: 360 },
   { id: "rose-petals-falling", label: "흩날리는 장미꽃잎", svg: rosePetalsFalling(), width: 480, height: 480 },
   { id: "matrix-code", label: "디지털 매트릭스", svg: matrixCode(), width: 480, height: 480 },
+  { id: "spark-impact", label: "스파크 임팩트", svg: sparkImpact(), width: 480, height: 480 },
+  { id: "dazzling-aura", label: "눈부신 오라", svg: dazzlingAura(), width: 480, height: 480 },
+  { id: "gloomy-raincloud", label: "우울한 먹구름", svg: gloomyRaincloud(), width: 480, height: 320 },
+  { id: "shock-stress-lines", label: "당황 번개선", svg: shockStressLines(), width: 320, height: 460 },
+  { id: "cyber-neon-grid", label: "사이버 네온그리드", svg: cyberNeonGrid(), width: 480, height: 480 },
 ];

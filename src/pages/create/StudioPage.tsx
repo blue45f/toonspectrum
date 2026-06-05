@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Path, Transformer, Shape } from "react-konva";
@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal2,
+  FlipVertical2,
   Folder,
   Image as ImageIcon,
   Download,
@@ -41,6 +42,8 @@ import {
   Trash2,
   Type as TypeIcon,
   Undo2,
+  Search,
+  Check,
   X,
 } from "lucide-react";
 import { Container } from "@/components/section";
@@ -69,8 +72,9 @@ import {
   type BgPreset,
   type BubbleVariant,
   type TemplateSpec,
+  type FrameSpec,
 } from "./studio-assets";
-import { CHARACTERS, svgToDataUrl } from "./studio-characters";
+import { svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES, bgSceneSections } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
@@ -81,6 +85,7 @@ import {
   saveAsset,
   listAssets,
   deleteAsset,
+  renameAsset,
   type StudioAsset,
 } from "./studio-asset-library";
 
@@ -101,6 +106,12 @@ interface ImageEl {
   rotation: number;
   opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
   flipped?: boolean; // 좌우 반전(캐릭터 미러링).
+  flippedY?: boolean; // 상하 반전
+  blur?: number;
+  brightness?: number;
+  contrast?: number;
+  grayscale?: boolean;
+  sepia?: boolean;
 }
 interface TextEl {
   id: string;
@@ -652,8 +663,9 @@ function UrlImage({
   onChange: (patch: Partial<ImageEl>) => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
-  // flip은 노드 scaleX 대신 거울 비트맵으로 처리(트랜스포머/좌표 영향 없음).
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
+  const imageRef = useRef<Konva.Image | null>(null);
+
   useEffect(() => {
     const im = new window.Image();
     im.src = el.src;
@@ -663,12 +675,15 @@ function UrlImage({
       im.onerror = null;
     };
   }, [el.src]);
+
   useEffect(() => {
     if (!img) {
       setDisplayImg(undefined);
       return;
     }
-    if (!el.flipped) {
+    const scaleX = el.flipped ? -1 : 1;
+    const scaleY = el.flippedY ? -1 : 1;
+    if (scaleX === 1 && scaleY === 1) {
       setDisplayImg(img);
       return;
     }
@@ -679,18 +694,44 @@ function UrlImage({
     c.height = h;
     const cx = c.getContext("2d");
     if (cx) {
-      cx.translate(w, 0);
-      cx.scale(-1, 1);
+      cx.translate(scaleX === -1 ? w : 0, scaleY === -1 ? h : 0);
+      cx.scale(scaleX, scaleY);
       cx.drawImage(img, 0, 0);
       setDisplayImg(c);
     } else {
       setDisplayImg(img);
     }
-  }, [img, el.flipped]);
+  }, [img, el.flipped, el.flippedY]);
+
+  const hasFilters = !!(el.blur || el.brightness || el.contrast || el.grayscale || el.sepia);
+
+  useEffect(() => {
+    const node = imageRef.current;
+    if (!node) return;
+    if (displayImg) {
+      node.clearCache();
+      if (hasFilters) {
+        node.cache();
+      }
+      node.getLayer()?.batchDraw();
+    }
+  }, [displayImg, el.width, el.height, el.blur, el.brightness, el.contrast, el.grayscale, el.sepia, hasFilters]);
+
   if (!displayImg) return null;
+
+  const filters: any[] = [];
+  if (el.blur) filters.push(Konva.Filters.Blur);
+  if (el.brightness) filters.push(Konva.Filters.Brighten);
+  if (el.contrast) filters.push(Konva.Filters.Contrast);
+  if (el.grayscale) filters.push(Konva.Filters.Grayscale);
+  if (el.sepia) filters.push(Konva.Filters.Sepia);
+
   return (
     <KImage
-      ref={innerRef}
+      ref={(n) => {
+        imageRef.current = n;
+        innerRef(n);
+      }}
       image={displayImg}
       x={el.x}
       y={el.y}
@@ -698,6 +739,10 @@ function UrlImage({
       height={el.height}
       rotation={el.rotation}
       opacity={el.opacity ?? 1}
+      filters={filters}
+      blurRadius={el.blur ?? 0}
+      brightness={el.brightness ?? 0}
+      contrast={el.contrast ?? 0}
       draggable={draggable}
       onMouseDown={onSelect}
       onTap={onSelect}
@@ -827,10 +872,18 @@ function FramePanel({
 }
 
 // 캔버스 줌 한계와 클램프(0.05 단위 반올림으로 깔끔한 퍼센트 유지).
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 3;
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 5;
 function clampZoom(z: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
+}
+
+interface PageState {
+  id: string;
+  elements: El[];
+  bg: string;
+  bgGrad: string[] | null;
+  canvasH: number;
 }
 
 export function StudioPage() {
@@ -840,18 +893,93 @@ export function StudioPage() {
   const linkedTitleId = params.get("titleId");
   const loggedIn = !!getCurrentUserId();
 
-  // 편집 문서 상태(요소 배열은 히스토리로 관리해 실행취소/다시실행 지원).
-  const [history, setHistory] = useState<El[][]>([[]]);
-  const [hi, setHi] = useState(0);
-  const elements = history[hi];
+  // 편집 문서 상태(페이지 리스트를 히스토리로 관리하여 페이지 생성/삭제/이동도 undo/redo 지원)
+  const [pagesHistory, setPagesHistory] = useState<PageState[][]>([
+    [
+      {
+        id: uid(),
+        elements: [],
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: 1080,
+      },
+    ],
+  ]);
+  const [pagesHi, setPagesHi] = useState(0);
+  const pages = pagesHistory[pagesHi];
+
+  const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
+  const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
+  const activePage = pages[activePageIndex] || pages[0] || {
+    id: currentPageId,
+    elements: [],
+    bg: "#ffffff",
+    bgGrad: null,
+    canvasH: 1080,
+  };
+
+  const elements = activePage.elements;
+  const bg = activePage.bg;
+  const bgGrad = activePage.bgGrad;
+  const canvasH = activePage.canvasH;
+
+  const hi = pagesHi;
+  const history = pagesHistory;
+
   // 연속 동작(방향키 미세이동 등)을 한 번의 실행취소로 합치기 위한 키.
   const coalesceKeyRef = useRef<string | null>(null);
-  const [bg, setBg] = useState("#ffffff");
-  const [canvasH, setCanvasH] = useState(1080);
   const [webtoonTheme, setWebtoonTheme] = useState<"classic" | "soft" | "vivid">("soft");
+
+  // 페이지 단위 백그라운드 및 크기 수정 헬퍼
+  const setBg = (newBg: string | ((prev: string) => string)) => {
+    const val = typeof newBg === "function" ? newBg(activePage.bg) : newBg;
+    updateActivePage({ bg: val });
+  };
+  const setBgGrad = (newGrad: string[] | null | ((prev: string[] | null) => string[] | null)) => {
+    const val = typeof newGrad === "function" ? newGrad(activePage.bgGrad) : newGrad;
+    updateActivePage({ bgGrad: val });
+  };
+  const setCanvasH = (newH: number | ((prev: number) => number)) => {
+    const val = typeof newH === "function" ? newH(activePage.canvasH) : newH;
+    updateActivePage({ canvasH: val });
+  };
+
+  function updateActivePage(patch: Partial<Omit<PageState, "id">>) {
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...patch } : p));
+    commitPages(nextPages);
+  }
+
+  // 줌/팬 드래그 상태
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ scrollLeft: 0, scrollTop: 0, clientX: 0, clientY: 0 });
+
+  // 그리드 스냅 상태
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const [gridSize, setGridSize] = useState(40);
+
+  // 템플릿 및 여백 관리 상태
+  const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
+  const [panelGutter, setPanelGutter] = useState(24);
+
+  // 우클릭 컨텍스트 메뉴 상태
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    elId: string | null;
+  }>({ visible: false, x: 0, y: 0, elId: null });
+
+  // 미니맵 스크롤 정보 상태
+  const [scrollPos, setScrollPos] = useState({ left: 0, top: 0, width: 0, height: 0, scrollWidth: 0, scrollHeight: 0 });
+
+  // 임시저장 복구 여부 상태
+  const [hasAutosave, setHasAutosave] = useState(false);
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [color, setColor] = useState("#7c5cfc");
   const [strokeWidth, setStrokeWidth] = useState(6);
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
@@ -869,8 +997,6 @@ export function StudioPage() {
   const [sharedLoading, setSharedLoading] = useState(false);
   const [sharedError, setSharedError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
-  const [bgGrad, setBgGrad] = useState<string[] | null>(null);
-  const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
@@ -911,6 +1037,223 @@ export function StudioPage() {
     return () => node.removeEventListener("wheel", onWheel);
   }, []);
 
+  // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (typing || editing) return;
+      if (e.code === "Space" && !isSpacePressed) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+        setIsPanning(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [isSpacePressed, editing]);
+
+  // 미니맵용 스크롤 좌표 추적 리스너
+  const updateScrollPos = () => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    setScrollPos({
+      left: wrap.scrollLeft,
+      top: wrap.scrollTop,
+      width: wrap.clientWidth,
+      height: wrap.clientHeight,
+      scrollWidth: wrap.scrollWidth,
+      scrollHeight: wrap.scrollHeight,
+    });
+  };
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    wrap.addEventListener("scroll", updateScrollPos);
+    window.addEventListener("resize", updateScrollPos);
+    const timer = setTimeout(updateScrollPos, 150);
+    return () => {
+      wrap.removeEventListener("scroll", updateScrollPos);
+      window.removeEventListener("resize", updateScrollPos);
+      clearTimeout(timer);
+    };
+  }, [elements, canvasH, scale, zoom]);
+
+  // 오토세이브 임시저장 리스너 (디바운스 1.5초)
+  useEffect(() => {
+    if (!workHydrated) return;
+    const timer = setTimeout(() => {
+      try {
+        const payload = {
+          pagesList: pages,
+          title,
+          description,
+          tagsText,
+          webtoonTheme,
+          panelGutter,
+        };
+        localStorage.setItem("toonspectrum-studio-autosave", JSON.stringify(payload));
+      } catch (e) {
+        console.error("Auto-save failed:", e);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated]);
+
+  // 로드 시 임시저장 확인 리스너
+  useEffect(() => {
+    if (!workId) {
+      try {
+        const saved = localStorage.getItem("toonspectrum-studio-autosave");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.pagesList && parsed.pagesList.length > 0) {
+            setHasAutosave(true);
+          }
+        }
+      } catch {
+        // 무시
+      }
+    }
+  }, [workId]);
+
+  function restoreAutosave() {
+    try {
+      const saved = localStorage.getItem("toonspectrum-studio-autosave");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.pagesList && parsed.pagesList.length > 0) {
+          setPagesHistory([parsed.pagesList]);
+          setPagesHi(0);
+          setCurrentPageId(parsed.pagesList[0].id);
+        }
+        if (parsed.title) setTitle(parsed.title);
+        if (parsed.description) setDescription(parsed.description);
+        if (parsed.tagsText) setTagsText(parsed.tagsText);
+        if (parsed.webtoonTheme) setWebtoonTheme(parsed.webtoonTheme);
+        if (parsed.panelGutter) setPanelGutter(parsed.panelGutter);
+        setHasAutosave(false);
+      }
+    } catch {
+      setError("임시저장 복구에 실패했어요.");
+    }
+  }
+
+  function clearAutosave() {
+    try {
+      localStorage.removeItem("toonspectrum-studio-autosave");
+      setHasAutosave(false);
+    } catch {
+      // 무시
+    }
+  }
+
+  // 화면 드래그 스크롤 핸들러 (Space + Drag)
+  const onWrapMouseDown = (e: React.MouseEvent) => {
+    if (!isSpacePressed) return;
+    setIsPanning(true);
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    panStartRef.current = {
+      scrollLeft: wrap.scrollLeft,
+      scrollTop: wrap.scrollTop,
+      clientX: e.clientX,
+      clientY: e.clientY,
+    };
+  };
+
+  const onWrapMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const dx = e.clientX - panStartRef.current.clientX;
+    const dy = e.clientY - panStartRef.current.clientY;
+    wrap.scrollLeft = panStartRef.current.scrollLeft - dx;
+    wrap.scrollTop = panStartRef.current.scrollTop - dy;
+  };
+
+  const onWrapMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  const onMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const mWidth = rect.width;
+    const mHeight = rect.height;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const targetX = (mx / mWidth) * (CANVAS_W * effScale) - wrap.clientWidth / 2;
+    const targetY = (my / mHeight) * (canvasH * effScale) - wrap.clientHeight / 2;
+    wrap.scrollLeft = targetX;
+    wrap.scrollTop = targetY;
+    updateScrollPos();
+  };
+
+  const onWrapDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onWrapDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    try {
+      const data = e.dataTransfer.getData("application/json-asset");
+      if (!data) return;
+      const { src, width, height } = JSON.parse(data);
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+
+      const rect = wrap.getBoundingClientRect();
+      const clientX = e.clientX - rect.left;
+      const clientY = e.clientY - rect.top;
+
+      const scrollLeft = wrap.scrollLeft;
+      const scrollTop = wrap.scrollTop;
+
+      const x = (clientX + scrollLeft) / effScale;
+      const y = (clientY + scrollTop) / effScale;
+
+      const fit = Math.min(1, (CANVAS_W - 80) / width);
+      const targetW = Math.round(width * fit);
+      const targetH = Math.round(height * fit);
+
+      addEl({
+        id: uid(),
+        type: "image",
+        src,
+        x: x - targetW / 2,
+        y: y - targetH / 2,
+        width: targetW,
+        height: targetH,
+        rotation: 0,
+      });
+    } catch (err) {
+      console.error("Drop asset failed:", err);
+    }
+  };
+
+  // 우클릭 컨텍스트 메뉴 바깥 클릭시 닫기
+  useEffect(() => {
+    const handleCloseMenu = () => {
+      if (contextMenu.visible) {
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+      }
+    };
+    window.addEventListener("click", handleCloseMenu);
+    return () => window.removeEventListener("click", handleCloseMenu);
+  }, [contextMenu.visible]);
+
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
@@ -918,7 +1261,6 @@ export function StudioPage() {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
-  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
 
@@ -947,13 +1289,34 @@ export function StudioPage() {
         setTitle(w.title);
         setDescription(w.description);
         setTagsText((w.tags ?? []).join(", "));
-        const doc = w.doc as { elements?: El[]; bg?: string; bgGrad?: string[] | null; height?: number; webtoonTheme?: "classic" | "soft" | "vivid" };
-        if (doc?.elements) setHistory([doc.elements]);
-        if (doc?.bg) setBg(doc.bg);
-        if (doc?.bgGrad) setBgGrad(doc.bgGrad);
-        if (doc?.height) setCanvasH(doc.height);
+        const doc = w.doc as {
+          elements?: El[];
+          bg?: string;
+          bgGrad?: string[] | null;
+          height?: number;
+          webtoonTheme?: "classic" | "soft" | "vivid";
+          pagesList?: PageState[];
+          currentPageId?: string;
+          panelGutter?: number;
+        };
+        if (doc?.pagesList && doc.pagesList.length > 0) {
+          setPagesHistory([doc.pagesList]);
+          setPagesHi(0);
+          setCurrentPageId(doc.currentPageId || doc.pagesList[0].id);
+        } else {
+          const legacyPage: PageState = {
+            id: uid(),
+            elements: doc?.elements || [],
+            bg: doc?.bg || "#ffffff",
+            bgGrad: doc?.bgGrad || null,
+            canvasH: doc?.height || 1080,
+          };
+          setPagesHistory([[legacyPage]]);
+          setPagesHi(0);
+          setCurrentPageId(legacyPage.id);
+        }
         if (doc?.webtoonTheme) setWebtoonTheme(doc.webtoonTheme);
-        setHi(0);
+        if (doc?.panelGutter) setPanelGutter(doc.panelGutter);
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : "불러오기 실패"))
       .finally(() => {
@@ -1006,6 +1369,55 @@ export function StudioPage() {
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
     }
   }
+
+  // 에셋 라이브러리 고도화 상태 및 함수
+  const [assetSearchQuery, setAssetSearchQuery] = useState("");
+  const [assetSortOrder, setAssetSortOrder] = useState<"newest" | "name" | "size">("newest");
+  const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null);
+  const [renamingAssetName, setRenamingAssetName] = useState("");
+
+  async function handleRenameAsset(id: string) {
+    if (!renamingAssetName.trim()) return;
+    try {
+      await renameAsset(id, renamingAssetName);
+      setRenamingAssetId(null);
+      await loadAssetsList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "에셋 이름 변경 실패");
+    }
+  }
+
+  const filteredAssets = useMemo(() => {
+    let list = [...assets];
+    if (assetSearchQuery.trim()) {
+      const query = assetSearchQuery.toLowerCase();
+      list = list.filter((asset) => asset.name.toLowerCase().includes(query));
+    }
+    if (assetSortOrder === "newest") {
+      list.sort((a, b) => b.createdAt - a.createdAt);
+    } else if (assetSortOrder === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
+    } else if (assetSortOrder === "size") {
+      list.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    }
+    return list;
+  }, [assets, assetSearchQuery, assetSortOrder]);
+
+  const filteredShared = useMemo(() => {
+    let list = [...shared];
+    if (assetSearchQuery.trim()) {
+      const query = assetSearchQuery.toLowerCase();
+      list = list.filter((asset) => asset.name.toLowerCase().includes(query));
+    }
+    if (assetSortOrder === "newest") {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (assetSortOrder === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
+    } else if (assetSortOrder === "size") {
+      list.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    }
+    return list;
+  }, [shared, assetSearchQuery, assetSortOrder]);
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -1065,33 +1477,47 @@ export function StudioPage() {
     if (!tr) return;
     const selLocked = elements.find((e) => e.id === selectedId)?.locked;
     const node = selectedId && tool === "select" && !selLocked ? nodeRefs.current[selectedId] : null;
-    tr.nodes(node ? [node] : []);
+    if (node) {
+      tr.nodes([node]);
+    } else {
+      tr.nodes([]);
+    }
     tr.getLayer()?.batchDraw();
   }, [selectedId, tool, elements]);
 
   // 요소 변경을 히스토리에 커밋.
-  function commit(next: El[]) {
+  function commit(nextElements: El[]) {
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    const h = history.slice(0, hi + 1);
-    h.push(next);
-    setHistory(h);
-    setHi(h.length - 1);
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
+    const h = pagesHistory.slice(0, pagesHi + 1);
+    h.push(nextPages);
+    setPagesHistory(h);
+    setPagesHi(h.length - 1);
   }
   // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
-  function commitCoalesced(next: El[], key: string) {
-    if (coalesceKeyRef.current === key && hi === history.length - 1) {
-      setHistory((h) => {
+  function commitCoalesced(nextElements: El[], key: string) {
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
+    if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
+      setPagesHistory((h) => {
         const c = h.slice();
-        c[hi] = next;
+        c[pagesHi] = nextPages;
         return c;
       });
     } else {
-      const h = history.slice(0, hi + 1);
-      h.push(next);
-      setHistory(h);
-      setHi(h.length - 1);
+      const h = pagesHistory.slice(0, pagesHi + 1);
+      h.push(nextPages);
+      setPagesHistory(h);
+      setPagesHi(h.length - 1);
       coalesceKeyRef.current = key;
     }
+  }
+  // 전체 페이지 상태를 직접 커밋하는 헬퍼 (페이지 추가/삭제/이동용)
+  function commitPages(nextPages: PageState[]) {
+    coalesceKeyRef.current = null;
+    const h = pagesHistory.slice(0, pagesHi + 1);
+    h.push(nextPages);
+    setPagesHistory(h);
+    setPagesHi(h.length - 1);
   }
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
@@ -1100,6 +1526,62 @@ export function StudioPage() {
     commit([...elements, el]);
     setSelectedId(el.id);
     setTool("select");
+  }
+
+  // ── 페이지 관련 명령 조작 ──────────────────────────────────────────────
+  function addPage() {
+    const newPage: PageState = {
+      id: uid(),
+      elements: [],
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1080,
+    };
+    const nextPages = [...pages, newPage];
+    commitPages(nextPages);
+    setCurrentPageId(newPage.id);
+  }
+  function duplicatePage(pageId: string) {
+    const pageToDup = pages.find((p) => p.id === pageId);
+    if (!pageToDup) return;
+    const newPage: PageState = {
+      ...pageToDup,
+      id: uid(),
+      elements: pageToDup.elements.map((el) => ({ ...el, id: uid() })),
+    };
+    const idx = pages.findIndex((p) => p.id === pageId);
+    const nextPages = [...pages];
+    nextPages.splice(idx + 1, 0, newPage);
+    commitPages(nextPages);
+    setCurrentPageId(newPage.id);
+  }
+  function deletePage(pageId: string) {
+    if (pages.length <= 1) return;
+    const nextPages = pages.filter((p) => p.id !== pageId);
+    commitPages(nextPages);
+    if (currentPageId === pageId) {
+      const idx = pages.findIndex((p) => p.id === pageId);
+      const nextActive = pages[idx - 1] || pages[idx + 1] || pages[0];
+      setCurrentPageId(nextActive.id);
+    }
+  }
+  function movePageUp(pageId: string) {
+    const idx = pages.findIndex((p) => p.id === pageId);
+    if (idx <= 0) return;
+    const nextPages = [...pages];
+    const temp = nextPages[idx];
+    nextPages[idx] = nextPages[idx - 1];
+    nextPages[idx - 1] = temp;
+    commitPages(nextPages);
+  }
+  function movePageDown(pageId: string) {
+    const idx = pages.findIndex((p) => p.id === pageId);
+    if (idx === -1 || idx >= pages.length - 1) return;
+    const nextPages = [...pages];
+    const temp = nextPages[idx];
+    nextPages[idx] = nextPages[idx + 1];
+    nextPages[idx + 1] = temp;
+    commitPages(nextPages);
   }
   function addRenderedImage(src: string, width: number, height: number) {
     addEl(
@@ -1138,33 +1620,18 @@ export function StudioPage() {
 
     const frames = createQuickSampleFrames();
     const firstFrame = frames[0];
-    const character = CHARACTERS[0];
-    const expression = character?.expressions.find((ex) => ex.id === "happy") ?? character?.expressions[0];
     const sample: El[] = [...frames];
 
-    if (firstFrame && character && expression) {
-      const scaleToFrame = Math.min(1.18, (firstFrame.width * 0.4) / character.width, (firstFrame.height - 72) / character.height);
-      const width = Math.round(character.width * scaleToFrame);
-      const height = Math.round(character.height * scaleToFrame);
-      sample.push({
-        id: uid(),
-        type: "image",
-        src: svgToDataUrl(expression.svg),
-        x: firstFrame.x + 70,
-        y: firstFrame.y + firstFrame.height - height - 26,
-        width,
-        height,
-        rotation: 0,
-      });
+    if (firstFrame) {
       sample.push({
         id: uid(),
         type: "bubble",
         variant: "speech",
-        text: "오늘은 여기서 시작해요.",
-        x: firstFrame.x + firstFrame.width - 314,
-        y: firstFrame.y + 58,
-        width: 270,
-        height: 118,
+        text: "상단의 '3D 캐릭터' 버튼을 눌러 다양한 3D 모델을 추가하고 포즈를 취해보세요!",
+        x: firstFrame.x + 30,
+        y: firstFrame.y + 40,
+        width: 300,
+        height: 120,
         fill: "#ffffff",
         textFill: "#111111",
         rotation: 0,
@@ -1239,18 +1706,25 @@ export function StudioPage() {
       patchEl(selected.id, (axis === "h" ? { x: targetX } : { y: targetY }) as Partial<El>);
     }
   }
-  function reorder(dir: "front" | "back") {
+  function reorder(dir: "front" | "back" | "forward" | "backward") {
     if (!selectedId) return;
     const idx = elements.findIndex((e) => e.id === selectedId);
     if (idx < 0) return;
     const next = [...elements];
     const [el] = next.splice(idx, 1);
     if (dir === "front") next.push(el);
-    else next.unshift(el);
+    else if (dir === "back") next.unshift(el);
+    else if (dir === "forward") {
+      const targetIdx = Math.min(next.length, idx + 1);
+      next.splice(targetIdx, 0, el);
+    } else if (dir === "backward") {
+      const targetIdx = Math.max(0, idx - 1);
+      next.splice(targetIdx, 0, el);
+    }
     commit(next);
   }
-  const undo = () => setHi((i) => Math.max(0, i - 1));
-  const redo = () => setHi((i) => Math.min(history.length - 1, i + 1));
+  const undo = () => setPagesHi((i) => Math.max(0, i - 1));
+  const redo = () => setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
 
   // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
@@ -1434,23 +1908,6 @@ export function StudioPage() {
       rotation: -6,
     });
   }
-  function addCharacter(svgOrSrc: string, w: number, h: number) {
-    setMenu(null);
-    const src = svgOrSrc.startsWith("/assets/") || svgOrSrc.includes(".png")
-      ? svgOrSrc
-      : svgToDataUrl(svgOrSrc);
-    addEl(
-      createCanvasImageElement({
-        id: uid(),
-        src,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-        sourceWidth: w,
-        sourceHeight: h,
-        horizontalInset: 140,
-      })
-    );
-  }
   function addBgScene(bg: typeof BG_SCENES[number]) {
     setMenu(null);
     const src = bg.imgSrc || svgToDataUrl(bg.svg || "");
@@ -1514,15 +1971,69 @@ export function StudioPage() {
       })
     );
   }
+  function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
+    let nextFrames: FrameSpec[] = [];
+    if (tpl.id === "blank") {
+      nextFrames = [];
+    } else if (tpl.id === "grid4") {
+      nextFrames = [
+        { x: gutter, y: gutter, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
+        { x: gutter * 2 + (CANVAS_W - gutter * 3) / 2, y: gutter, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
+        { x: gutter, y: gutter * 2 + (1080 - gutter * 3) / 2, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
+        { x: gutter * 2 + (CANVAS_W - gutter * 3) / 2, y: gutter * 2 + (1080 - gutter * 3) / 2, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
+      ];
+    } else {
+      const isStack = tpl.id.startsWith("webtoon") || tpl.id === "strip4" || tpl.id === "single";
+      const isGrid = tpl.id.startsWith("grid");
+      if (isStack) {
+        const count = tpl.frames.length || 1;
+        const h = Math.round((tpl.canvasH - gutter * (count + 1)) / count);
+        nextFrames = Array.from({ length: count }, (_, i) => ({
+          x: gutter,
+          y: gutter + i * (h + gutter),
+          width: CANVAS_W - gutter * 2,
+          height: h,
+        }));
+      } else if (isGrid) {
+        const cols = 2;
+        const rows = tpl.id === "grid6" ? 3 : 4;
+        const w = (CANVAS_W - gutter * (cols + 1)) / cols;
+        const h = (tpl.canvasH - gutter * (rows + 1)) / rows;
+        nextFrames = Array.from({ length: rows * cols }, (_, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          return {
+            x: gutter + col * (w + gutter),
+            y: gutter + row * (h + gutter),
+            width: w,
+            height: h,
+          };
+        });
+      }
+    }
+
+    const nonFrames = currentEls.filter((el) => el.type !== "frame");
+    const newFrames = nextFrames.map((f) => ({
+      id: uid(),
+      type: "frame" as const,
+      x: f.x,
+      y: f.y,
+      width: f.width,
+      height: f.height,
+    }));
+
+    return [...newFrames, ...nonFrames];
+  }
+
   function applyTemplate(tpl: TemplateSpec) {
     setMenu(null);
     if (elements.length > 0 && !window.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
-    commit(
-      tpl.frames.map((f) => ({ id: uid(), type: "frame" as const, x: f.x, y: f.y, width: f.width, height: f.height }))
-    );
+    setCurrentTemplate(tpl);
+    const nextEls = regenerateTemplate(tpl, panelGutter, []);
+    commit(nextEls);
     setSelectedId(null);
   }
   function applyBgPreset(p: BgPreset) {
@@ -1644,12 +2155,27 @@ export function StudioPage() {
     if (node.getParent() instanceof Konva.Transformer) return; // 트랜스포머 앵커(리사이즈)는 제외
     const layer = node.getLayer();
     if (!layer) return;
+
+    if (!snapEnabled) {
+      setGuides({ x: [], y: [] });
+      return;
+    }
+
     const box = node.getClientRect({ relativeTo: layer });
     const snap = 8 / effScale; // 화면상 ~8px
 
     // 스냅 기준선: 캔버스 가장자리·중앙 + (있으면)들어있는 패널 가장자리·중앙
     const vLines = [0, CANVAS_W / 2, CANVAS_W];
     const hLines = [0, canvasH / 2, canvasH];
+
+    if (showGrid) {
+      for (let x = gridSize; x < CANVAS_W; x += gridSize) {
+        if (Math.abs(x - CANVAS_W / 2) > 1) vLines.push(x);
+      }
+      for (let y = gridSize; y < canvasH; y += gridSize) {
+        if (Math.abs(y - canvasH / 2) > 1) hLines.push(y);
+      }
+    }
     const panel = elements.find(
       (p): p is FrameEl =>
         p.type === "frame" &&
@@ -1742,8 +2268,23 @@ export function StudioPage() {
     try {
       const stage = stageRef.current;
       if (!stage) throw new Error("캔버스를 찾을 수 없어요.");
-      const full = stage.toDataURL({ pixelRatio: 1 / effScale });
-      const cover = await downscaleDataUrl(full, 480);
+
+      const pageImages: string[] = [];
+      const originalPageId = currentPageId;
+
+      for (const page of pages) {
+        setCurrentPageId(page.id);
+        // React-Konva의 상태 반영 및 렌더링 주기를 대기
+        await new Promise((r) => setTimeout(r, 120));
+        const dataUrl = stage.toDataURL({ pixelRatio: 1 / effScale });
+        pageImages.push(dataUrl);
+      }
+
+      // 복구
+      setCurrentPageId(originalPageId);
+      await new Promise((r) => setTimeout(r, 60));
+
+      const cover = await downscaleDataUrl(pageImages[0] || "", 480);
       const tags = tagsText
         .split(/[,\s]+/)
         .map((t) => t.trim().replace(/^#/, ""))
@@ -1756,11 +2297,24 @@ export function StudioPage() {
         format: "cuttoon" as const,
         titleId: linkedTitleId ?? undefined,
         cover,
-        pages: [full],
-        doc: { width: CANVAS_W, height: canvasH, bg, bgGrad, elements, webtoonTheme } as Record<string, unknown>,
+        pages: pageImages,
+        doc: {
+          width: CANVAS_W,
+          pagesList: pages,
+          currentPageId,
+          webtoonTheme,
+          panelGutter,
+        } as Record<string, unknown>,
         status,
       };
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
+      
+      try {
+        localStorage.removeItem("toonspectrum-studio-autosave");
+      } catch {
+        // 무시
+      }
+
       setSaving(false);
       navigate(`/create/${work.id}`);
     } catch (err) {
@@ -1895,50 +2449,13 @@ export function StudioPage() {
           <Eraser size={14} /> 지우개
         </button>
         <span className="mx-0.5 h-5 w-px bg-line" />
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "char" ? null : "char")} className={toolBtn(menu === "char")}>
-            <Smile size={14} /> 캐릭터
-          </button>
-          {menu === "char" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-line bg-panel p-2 shadow-lg">
-              <div className="mb-2 flex flex-wrap gap-1">
-                {CHARACTERS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCharPick(c.id)}
-                    className={cn(
-                      "rounded-lg border px-2 py-1 text-xs",
-                      charPick === c.id ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line text-fg-2 hover:bg-raised"
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                {(() => {
-                  const c = CHARACTERS.find((x) => x.id === charPick) ?? CHARACTERS[0];
-                  if (!c) return null;
-                  return c.expressions.map((ex) => (
-                    <button
-                      key={ex.id}
-                      type="button"
-                      title={ex.label}
-                      onClick={() => addCharacter(ex.imgSrc || ex.svg, c.width, c.height)}
-                      className="overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                    >
-                      <img src={ex.imgSrc || svgToDataUrl(ex.svg)} alt={ex.label} className="h-14 w-full object-contain" />
-                      <span className="block text-center text-[0.6rem] text-fg-3">{ex.label}</span>
-                    </button>
-                  ));
-                })()}
-              </div>
-            </div>
-          )}
-        </div>
-        <button type="button" onClick={() => setPoserVrmOpen(true)} className={toolBtn(false)}>
-          <Sparkles size={14} /> VRM 3D 캐릭터 (고화질)
+        <button
+          type="button"
+          onClick={() => setPoserVrmOpen(true)}
+          className={cn(toolBtn(poserVrmOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          title="3D 캐릭터 생성 및 포즈 설정"
+        >
+          <Sparkles size={14} /> 3D 캐릭터
         </button>
         <div className="relative">
           <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} className={toolBtn(menu === "bgScene")}>
@@ -2134,6 +2651,38 @@ export function StudioPage() {
                 )}
               </div>
 
+              {/* 검색 및 정렬 필터 */}
+              <div className="mb-2 flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                  <input
+                    type="text"
+                    placeholder="에셋 검색..."
+                    value={assetSearchQuery}
+                    onChange={(e) => setAssetSearchQuery(e.target.value)}
+                    className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                  />
+                  {assetSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setAssetSearchQuery("")}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={assetSortOrder}
+                  onChange={(e) => setAssetSortOrder(e.target.value as any)}
+                  className="rounded-lg border border-line bg-card px-1.5 py-1 text-[0.65rem] text-fg-2 outline-none focus:border-accent transition-colors cursor-pointer"
+                >
+                  <option value="newest">최신순</option>
+                  <option value="name">이름순</option>
+                  <option value="size">크기순</option>
+                </select>
+              </div>
+
               {assetTab === "mine" ? (
                 assetsLoading ? (
                   <div className="flex h-32 items-center justify-center text-fg-3">
@@ -2144,12 +2693,24 @@ export function StudioPage() {
                     <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
                     <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
                   </div>
+                ) : filteredAssets.length === 0 ? (
+                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {assets.map((asset) => (
+                    {filteredAssets.map((asset) => (
                       <div
                         key={asset.id}
-                        className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50"
+                        className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50 cursor-grab active:cursor-grabbing"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(
+                            "application/json-asset",
+                            JSON.stringify({ src: asset.dataUrl, width: asset.width, height: asset.height })
+                          );
+                        }}
                       >
                         <button
                           type="button"
@@ -2162,10 +2723,63 @@ export function StudioPage() {
                         >
                           <img src={asset.dataUrl} alt={asset.name} className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
                         </button>
-                        <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
-                          {asset.name}
-                        </span>
+                        {renamingAssetId === asset.id ? (
+                          <div className="mt-1 flex w-full items-center gap-0.5">
+                            <input
+                              type="text"
+                              value={renamingAssetName}
+                              onChange={(e) => setRenamingAssetName(e.target.value)}
+                              className="w-full min-w-0 rounded border border-accent bg-panel px-1 py-0.5 text-[0.55rem] text-fg-1 outline-none"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleRenameAsset(asset.id);
+                                } else if (e.key === "Escape") {
+                                  setRenamingAssetId(null);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRenameAsset(asset.id)}
+                              className="rounded bg-accent p-0.5 text-white hover:bg-accent/90 shrink-0"
+                              title="확인"
+                            >
+                              <Check size={8} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRenamingAssetId(null)}
+                              className="rounded bg-line p-0.5 text-fg-3 hover:bg-raised shrink-0"
+                              title="취소"
+                            >
+                              <X size={8} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2 cursor-text"
+                            title={asset.name}
+                            onDoubleClick={() => {
+                              setRenamingAssetId(asset.id);
+                              setRenamingAssetName(asset.name);
+                            }}
+                          >
+                            {asset.name}
+                          </span>
+                        )}
                         <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenamingAssetId(asset.id);
+                              setRenamingAssetName(asset.name);
+                            }}
+                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-accent"
+                            title="이름 변경"
+                          >
+                            <Pencil size={10} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => onShareAsset(asset)}
@@ -2204,12 +2818,24 @@ export function StudioPage() {
                   <p className="text-xs text-fg-3">아직 공유된 에셋이 없어요.</p>
                   <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
                 </div>
+              ) : filteredShared.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                  <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {shared.map((asset) => (
+                  {filteredShared.map((asset) => (
                     <div
                       key={asset.id}
-                      className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50"
+                      className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50 cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "application/json-asset",
+                          JSON.stringify({ src: asset.dataUrl, width: asset.width, height: asset.height })
+                        );
+                      }}
                     >
                       <button
                         type="button"
@@ -2435,15 +3061,211 @@ export function StudioPage() {
         <button type="button" onClick={redo} disabled={hi >= history.length - 1} className={cn(toolBtn(false), "disabled:opacity-40")} title="다시실행">
           <Redo2 size={14} />
         </button>
+        <span className="mx-0.5 h-5 w-px bg-line" />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => clampZoom(z - 0.1))}
+            disabled={zoom <= ZOOM_MIN}
+            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+            title="축소"
+          >
+            <Minus size={12} />
+          </button>
+          <span className="text-[10px] font-bold text-fg-3 w-10 text-center tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => clampZoom(z + 0.1))}
+            disabled={zoom >= ZOOM_MAX}
+            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+            title="확대"
+          >
+            <Plus size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScale(1);
+              setZoom(1);
+            }}
+            className={cn(toolBtn(false), "h-8 text-[10px] font-semibold px-2")}
+            title="화면 100% 맞춤"
+          >
+            100%
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const wrap = wrapRef.current;
+              if (wrap) {
+                const w = wrap.clientWidth;
+                setScale(Math.min(1, w / CANVAS_W));
+                setZoom(1);
+              }
+            }}
+            className={cn(toolBtn(false), "h-8 text-[10px] font-semibold px-2")}
+            title="너비에 맞춤"
+          >
+            맞춤
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        {/* 캔버스 */}
-        <div className="relative min-w-0">
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* 왼쪽: 페이지 목록 사이드바 */}
+        <div className="w-full lg:w-44 flex-shrink-0 flex flex-col gap-2 rounded-2xl border border-line bg-panel/20 p-3">
+          <div className="flex items-center justify-between border-b border-line/50 pb-2">
+            <span className="text-xs font-bold text-fg-2">페이지 목록</span>
+            <button
+              type="button"
+              onClick={addPage}
+              className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[10px] font-semibold text-on-accent hover:bg-accent-hover"
+            >
+              <Plus size={10} /> 추가
+            </button>
+          </div>
+          <div className="flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-y-auto max-h-[80px] lg:max-h-[calc(100dvh-24rem)] pr-1">
+            {pages.map((p, idx) => {
+              const isActive = p.id === currentPageId;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => setCurrentPageId(p.id)}
+                  className={cn(
+                    "flex min-w-[100px] lg:min-w-0 lg:w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
+                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-bold text-fg-2">{idx + 1}페이지</span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageUp(p.id);
+                        }}
+                        disabled={idx === 0}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="위로 이동"
+                      >
+                        <ChevronUp size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageDown(p.id);
+                        }}
+                        disabled={idx === pages.length - 1}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="아래로 이동"
+                      >
+                        <ChevronDown size={10} />
+                      </button>
+                    </div>
+                  </div>
+                  {/* 미니 미리보기 박스 */}
+                  <div
+                    style={{
+                      height: "48px",
+                      background: p.bgGrad ? `linear-gradient(${p.bgGrad[0]}, ${p.bgGrad[1]})` : p.bg,
+                    }}
+                    className="relative rounded border border-line/60 overflow-hidden"
+                  >
+                    {/* Render panels in thumbnail */}
+                    {p.elements.filter(el => el.type === "frame").map((el) => {
+                      const bounds = elBounds(el);
+                      return (
+                        <div
+                          key={`thumb-frame-${el.id}`}
+                          className="absolute border border-red-500/30 bg-red-500/5 pointer-events-none"
+                          style={{
+                            left: `${(bounds.x / CANVAS_W) * 100}%`,
+                            top: `${(bounds.y / p.canvasH) * 100}%`,
+                            width: `${(bounds.w / CANVAS_W) * 100}%`,
+                            height: `${(bounds.h / p.canvasH) * 100}%`,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicatePage(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="페이지 복제"
+                    >
+                      <Copy size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (pages.length <= 1) return;
+                        if (window.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
+                          deletePage(p.id);
+                        }
+                      }}
+                      disabled={pages.length <= 1}
+                      className="rounded p-0.5 text-bad hover:bg-bad-soft/20 disabled:opacity-30"
+                      title="페이지 삭제"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 중앙: 캔버스 영역 */}
+        <div className="flex-1 min-w-0">
+          {/* 임시저장 복구 배너 */}
+          {hasAutosave && (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
+              <span className="flex items-center gap-1.5 font-medium">
+                ⚠️ 이전에 작성 중이던 임시저장 데이터가 있습니다.
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={restoreAutosave}
+                  className="rounded bg-accent/20 px-2 py-1 font-bold text-accent hover:bg-accent/30"
+                >
+                  복구하기
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAutosave}
+                  className="rounded bg-line px-2 py-1 font-medium text-fg-3 hover:bg-raised"
+                >
+                  비우기
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
           <div
             ref={wrapRef}
-            className="max-h-[calc(100dvh-21rem)] min-h-[20rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px]"
+            onMouseDown={onWrapMouseDown}
+            onMouseMove={onWrapMouseMove}
+            onMouseUp={onWrapMouseUp}
+            onMouseLeave={onWrapMouseUp}
+            onDragOver={onWrapDragOver}
+            onDrop={onWrapDrop}
+            className={cn(
+              "max-h-[calc(100dvh-21rem)] min-h-[20rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] transition-all",
+              isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
+            )}
           >
           <Stage
             ref={stageRef}
@@ -2459,6 +3281,33 @@ export function StudioPage() {
             onTouchEnd={onStageUp}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
+            onContextMenu={(e) => {
+              e.evt.preventDefault();
+              const stage = stageRef.current;
+              if (!stage) return;
+              const pointerPos = stage.getPointerPosition();
+              let clickedElId: string | null = null;
+              if (pointerPos) {
+                const shape = stage.getIntersection(pointerPos);
+                if (shape) {
+                  const elId = Object.keys(nodeRefs.current).find((key) => {
+                    const node = nodeRefs.current[key];
+                    return node && (node === shape || shape.isAncestorOf(node));
+                  });
+                  if (elId) {
+                    clickedElId = elId;
+                    setSelectedId(elId);
+                    setTool("select");
+                  }
+                }
+              }
+              setContextMenu({
+                visible: true,
+                x: e.evt.clientX,
+                y: e.evt.clientY,
+                elId: clickedElId,
+              });
+            }}
           >
             <Layer>
               <Rect
@@ -2472,6 +3321,26 @@ export function StudioPage() {
                 fillLinearGradientEndPoint={bgGrad ? { x: 0, y: canvasH } : undefined}
                 fillLinearGradientColorStops={bgGrad ? [0, bgGrad[0], 1, bgGrad[1]] : undefined}
               />
+              {showGrid && (
+                <Group listening={false}>
+                  {Array.from({ length: Math.ceil(CANVAS_W / gridSize) }).map((_, i) => (
+                    <Line
+                      key={`grid-v-${i}`}
+                      points={[i * gridSize, 0, i * gridSize, canvasH]}
+                      stroke="rgba(124, 92, 252, 0.12)"
+                      strokeWidth={1 / effScale}
+                    />
+                  ))}
+                  {Array.from({ length: Math.ceil(canvasH / gridSize) }).map((_, i) => (
+                    <Line
+                      key={`grid-h-${i}`}
+                      points={[0, i * gridSize, CANVAS_W, i * gridSize]}
+                      stroke="rgba(124, 92, 252, 0.12)"
+                      strokeWidth={1 / effScale}
+                    />
+                  ))}
+                </Group>
+              )}
               {elements.map((el) => {
                 if (el.hidden) return null; // 숨긴 레이어는 렌더/내보내기에서 제외
                 const draggable = tool === "select" && !el.locked;
@@ -2866,7 +3735,10 @@ export function StudioPage() {
               onDismiss={dismissQuickStart}
               onExample={startFromExample}
               onOpenTemplate={() => openQuickStartMenu("template")}
-              onOpenCharacter={() => openQuickStartMenu("char")}
+              onOpenCharacter={() => {
+                dismissQuickStart();
+                setPoserVrmOpen(true);
+              }}
               onOpenBubble={() => openQuickStartMenu("bubble")}
               onOpenPublish={openPublishStep}
             />
@@ -2983,6 +3855,62 @@ export function StudioPage() {
                 </button>
               </span>
             </label>
+            <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
+              패널 여백 (Gutter)
+              <span className="flex items-center gap-1.5">
+                <input
+                  type="range"
+                  min={8}
+                  max={48}
+                  step={2}
+                  value={panelGutter}
+                  onChange={(e) => {
+                    const nextGutter = Number(e.target.value);
+                    setPanelGutter(nextGutter);
+                    if (currentTemplate) {
+                      const nextEls = regenerateTemplate(currentTemplate, nextGutter);
+                      commit(nextEls);
+                    }
+                  }}
+                  className="w-24 accent-accent cursor-pointer"
+                  disabled={!currentTemplate || currentTemplate.id === "blank"}
+                />
+                <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
+              </span>
+            </label>
+            <div className="mt-3 border-t border-line/50 pt-2 space-y-2">
+              <label className="flex items-center justify-between text-xs text-fg-2">
+                정렬 가이드 (스냅)
+                <input
+                  type="checkbox"
+                  checked={snapEnabled}
+                  onChange={(e) => setSnapEnabled(e.target.checked)}
+                  className="size-3.5 accent-accent"
+                />
+              </label>
+              <label className="flex items-center justify-between text-xs text-fg-2">
+                그리드 격자 표시
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                    className="size-3.5 accent-accent"
+                  />
+                  {showGrid && (
+                    <select
+                      value={gridSize}
+                      onChange={(e) => setGridSize(Number(e.target.value))}
+                      className="rounded border border-line bg-card px-1 py-0.5 text-[10px]"
+                    >
+                      {[20, 30, 40, 50, 60, 80].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </label>
+            </div>
             <div className="mt-3 border-t border-line pt-3">
               <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
               <div className="grid grid-cols-3 gap-1 bg-card rounded-lg p-0.5 border border-line">
@@ -3182,7 +4110,7 @@ export function StudioPage() {
                   />
                 </label>
               )}
-              {(selected.type === "image" || selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
+              {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                   불투명도
                   <span className="flex items-center gap-2">
@@ -3192,27 +4120,180 @@ export function StudioPage() {
                       max={100}
                       value={Math.round((selected.opacity ?? 1) * 100)}
                       onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) / 100 } as Partial<El>)}
-                      className="w-28 accent-accent"
+                      className="w-28 accent-accent cursor-pointer"
                     />
                     <span className="w-9 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
                   </span>
                 </label>
               )}
-              <div className="mt-3 flex flex-wrap gap-1.5">
+
+              {/* 직접 좌표 및 크기 조정 (코미포 스타일) */}
+              {selected.type !== "draw" && (
+                <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">위치 및 크기</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-[0.6rem] text-fg-3">가로 위치 (X)</span>
+                      <input
+                        type="number"
+                        value={Math.round(selected.x)}
+                        onChange={(e) => patchEl(selected.id, { x: Number(e.target.value) } as Partial<El>)}
+                        className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-0.5">
+                      <span className="text-[0.6rem] text-fg-3">세로 위치 (Y)</span>
+                      <input
+                        type="number"
+                        value={Math.round(selected.y)}
+                        onChange={(e) => patchEl(selected.id, { y: Number(e.target.value) } as Partial<El>)}
+                        className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                      />
+                    </label>
+                    {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame" || selected.type === "text") && (
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-fg-3">너비 (Width)</span>
+                        <input
+                          type="number"
+                          value={Math.round(selected.type === "text" ? selected.width : selected.width)}
+                          onChange={(e) => patchEl(selected.id, { width: Math.max(10, Number(e.target.value)) } as Partial<El>)}
+                          className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </label>
+                    )}
+                    {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame") && (
+                      <label className="flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-fg-3">높이 (Height)</span>
+                        <input
+                          type="number"
+                          value={Math.round(selected.height)}
+                          onChange={(e) => patchEl(selected.id, { height: Math.max(10, Number(e.target.value)) } as Partial<El>)}
+                          className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </label>
+                    )}
+                    {(selected.type === "image" || selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
+                      <label className="flex flex-col gap-0.5 col-span-2">
+                        <span className="text-[0.6rem] text-fg-3">회전 (Rotation)</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={-180}
+                            max={180}
+                            value={Math.round(selected.rotation ?? 0)}
+                            onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
+                            className="flex-1 accent-accent"
+                          />
+                          <input
+                            type="number"
+                            value={Math.round(selected.rotation ?? 0)}
+                            onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
+                            className="w-14 rounded border border-line bg-background/50 px-1 py-0.5 text-center text-xs text-fg focus:border-accent focus:outline-none"
+                          />
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 이미지 필터 효과 (코미포 스타일) */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">이미지 필터 효과</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                      블러 (흐림)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={30}
+                          value={selected.blur ?? 0}
+                          onChange={(e) => patchEl(selected.id, { blur: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{selected.blur ?? 0}</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                      밝기 (Bright)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={-0.8}
+                          max={0.8}
+                          step={0.05}
+                          value={selected.brightness ?? 0}
+                          onChange={(e) => patchEl(selected.id, { brightness: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{Math.round((selected.brightness ?? 0) * 100)}</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                      대비 (Contrast)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={-80}
+                          max={80}
+                          value={selected.contrast ?? 0}
+                          onChange={(e) => patchEl(selected.id, { contrast: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{selected.contrast ?? 0}</span>
+                      </span>
+                    </label>
+                    <div className="flex gap-4 pt-1">
+                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!selected.grayscale}
+                          onChange={(e) => patchEl(selected.id, { grayscale: e.target.checked } as Partial<El>)}
+                          className="size-3.5 accent-accent"
+                        />
+                        흑백
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!selected.sepia}
+                          onChange={(e) => patchEl(selected.id, { sepia: e.target.checked } as Partial<El>)}
+                          className="size-3.5 accent-accent"
+                        />
+                        세피아
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
                   <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
                     글자 편집
                   </button>
                 )}
                 {selected.type === "image" && (
-                  <button
-                    type="button"
-                    onClick={() => patchEl(selected.id, { flipped: !selected.flipped } as Partial<El>)}
-                    className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
-                    title="좌우 반전"
-                  >
-                    <FlipHorizontal2 size={14} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => patchEl(selected.id, { flipped: !selected.flipped } as Partial<El>)}
+                      className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
+                      title="좌우 반전"
+                    >
+                      <FlipHorizontal2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => patchEl(selected.id, { flippedY: !selected.flippedY } as Partial<El>)}
+                      className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
+                      title="상하 반전"
+                    >
+                      <FlipVertical2 size={14} />
+                    </button>
+                  </>
                 )}
                 <button type="button" onClick={() => reorder("front")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 앞으로">
                   <ArrowUpToLine size={14} />
@@ -3327,6 +4408,67 @@ export function StudioPage() {
             </div>
           )}
 
+          {/* 미니맵 / 네비게이터 */}
+          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">미니맵 / 네비게이터</p>
+            <div className="flex justify-center bg-background/30 rounded-xl p-2 border border-line/50">
+              <div
+                onClick={onMinimapClick}
+                style={{
+                  width: "120px",
+                  height: `${Math.round(120 * (canvasH / CANVAS_W))}px`,
+                  background: bgGrad ? `linear-gradient(${bgGrad[0]}, ${bgGrad[1]})` : bg,
+                  position: "relative",
+                  cursor: "pointer",
+                  overflow: "hidden",
+                }}
+                className="rounded border border-line shadow-inner"
+              >
+                {/* Render panels/frames */}
+                {elements.map((el) => {
+                  if (el.hidden) return null;
+                  const bounds = elBounds(el);
+                  const pctX = (bounds.x / CANVAS_W) * 100;
+                  const pctY = (bounds.y / canvasH) * 100;
+                  const pctW = (bounds.w / CANVAS_W) * 100;
+                  const pctH = (bounds.h / canvasH) * 100;
+
+                  let colorClass = "bg-accent/40";
+                  if (el.type === "frame") colorClass = "border border-red-500/50 bg-red-500/10";
+                  else if (el.type === "text") colorClass = "bg-orange-500/50";
+                  else if (el.type === "bubble") colorClass = "bg-yellow-500/50";
+                  else if (el.type === "draw") colorClass = "bg-green-500/30";
+
+                  return (
+                    <div
+                      key={`mini-${el.id}`}
+                      className={cn("absolute rounded-sm pointer-events-none", colorClass)}
+                      style={{
+                        left: `${pctX}%`,
+                        top: `${pctY}%`,
+                        width: `${pctW}%`,
+                        height: `${pctH}%`,
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Render scroll window box */}
+                {scrollPos.scrollWidth > 0 && (
+                  <div
+                    className="absolute border-2 border-red-500 pointer-events-none bg-red-500/5"
+                    style={{
+                      left: `${(scrollPos.left / (CANVAS_W * effScale)) * 100}%`,
+                      top: `${(scrollPos.top / (canvasH * effScale)) * 100}%`,
+                      width: `${(scrollPos.width / (CANVAS_W * effScale)) * 100}%`,
+                      height: `${(scrollPos.height / (canvasH * effScale)) * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
           <div ref={publishRef} className="rounded-2xl border border-line bg-panel/40 p-3">
             <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
             <input
@@ -3363,6 +4505,113 @@ export function StudioPage() {
           />
         ) : null}
       </Suspense>
+
+      {contextMenu.visible && (
+        <div
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.elId ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  duplicateSelected();
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <Copy size={12} />
+                복제하기 (⌘D)
+              </button>
+              <div className="my-1 h-px bg-line" />
+              <button
+                type="button"
+                onClick={() => {
+                  reorder("front");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <ArrowUpToLine size={12} />
+                맨 앞으로
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  reorder("forward");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <ChevronUp size={12} />
+                한 단계 앞으로
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  reorder("backward");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <ChevronDown size={12} />
+                한 단계 뒤로
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  reorder("back");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <ArrowDownToLine size={12} />
+                맨 뒤로
+              </button>
+              <div className="my-1 h-px bg-line" />
+              <button
+                type="button"
+                onClick={() => {
+                  const el = elements.find((e) => e.id === contextMenu.elId);
+                  if (el) patchEl(el.id, { locked: !el.locked });
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                {elements.find((e) => e.id === contextMenu.elId)?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
+                {elements.find((e) => e.id === contextMenu.elId)?.locked ? "잠금 해제" : "위치 잠금"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  removeSelected();
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-bad hover:bg-bad-soft/30"
+              >
+                <Trash2 size={12} />
+                삭제하기
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  addPage();
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <Plus size={12} />
+                새 페이지 추가
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </Container>
   );
 }

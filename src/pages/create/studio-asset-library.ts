@@ -116,3 +116,15 @@ export async function deleteAsset(id: string): Promise<void> {
     await done;
   });
 }
+
+export async function renameAsset(id: string, newName: string): Promise<void> {
+  await withDatabase(async (db) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const asset = await requestResult<StudioAsset>(store.get(id));
+    if (!asset) throw new Error("에셋을 찾을 수 없습니다.");
+    asset.name = normalizeAssetName(newName);
+    store.put(asset);
+    await transactionDone(tx);
+  });
+}

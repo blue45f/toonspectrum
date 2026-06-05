@@ -47,6 +47,10 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
   { id: "rubin", name: "루빈", url: "/vrm/Victoria_Rubin.vrm" },
+  { id: "orion", name: "오리온 (로봇)", url: "/vrm/Avatar_Orion.vrm" },
+  { id: "cryptovoxel", name: "크립토 (복셀봇)", url: "/vrm/cryptovoxels.vrm" },
+  { id: "meebit", name: "미빗 (블록맨)", url: "/vrm/meebit_09842.vrm" },
+  { id: "seedsan", name: "시드상 (마스코트)", url: "/vrm/Seed_san.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

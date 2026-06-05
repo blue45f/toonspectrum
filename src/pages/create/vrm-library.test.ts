@@ -6,7 +6,20 @@ import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMP
 
 describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
-    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name)).toEqual(["루미", "하린", "세라", "유나", "시온", "비비", "비타", "루빈"]);
+    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name)).toEqual([
+      "루미",
+      "하린",
+      "세라",
+      "유나",
+      "시온",
+      "비비",
+      "비타",
+      "루빈",
+      "오리온 (로봇)",
+      "크립토 (복셀봇)",
+      "미빗 (블록맨)",
+      "시드상 (마스코트)",
+    ]);
     expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
