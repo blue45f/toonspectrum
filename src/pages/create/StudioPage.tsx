@@ -1181,7 +1181,23 @@ export function StudioPage() {
     setEditing({ id, value: el.text });
   }
   function commitEditText() {
-    if (editing) patchEl(editing.id, { text: editing.value } as Partial<El>);
+    if (editing) {
+      const el = elements.find((e) => e.id === editing.id);
+      // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존).
+      let height: number | undefined;
+      if (el && el.type === "bubble") {
+        const measure = new Konva.Text({
+          text: editing.value || " ",
+          width: el.width - 36,
+          fontSize: el.fontSize ?? 24,
+          fontFamily: el.font ?? "Pretendard, sans-serif",
+          align: "center",
+        });
+        height = Math.max(el.height, Math.ceil(measure.height()) + 28);
+        measure.destroy();
+      }
+      patchEl(editing.id, { text: editing.value, ...(height !== undefined ? { height } : {}) } as Partial<El>);
+    }
     setEditing(null);
   }
 
