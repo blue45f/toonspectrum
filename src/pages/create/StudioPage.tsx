@@ -784,6 +784,8 @@ export function StudioPage() {
   const [history, setHistory] = useState<El[][]>([[]]);
   const [hi, setHi] = useState(0);
   const elements = history[hi];
+  // 연속 동작(방향키 미세이동 등)을 한 번의 실행취소로 합치기 위한 키.
+  const coalesceKeyRef = useRef<string | null>(null);
   const [bg, setBg] = useState("#ffffff");
   const [canvasH, setCanvasH] = useState(1080);
   const [webtoonTheme, setWebtoonTheme] = useState<"classic" | "soft" | "vivid">("soft");
@@ -888,10 +890,27 @@ export function StudioPage() {
 
   // 요소 변경을 히스토리에 커밋.
   function commit(next: El[]) {
+    coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const h = history.slice(0, hi + 1);
     h.push(next);
     setHistory(h);
     setHi(h.length - 1);
+  }
+  // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
+  function commitCoalesced(next: El[], key: string) {
+    if (coalesceKeyRef.current === key && hi === history.length - 1) {
+      setHistory((h) => {
+        const c = h.slice();
+        c[hi] = next;
+        return c;
+      });
+    } else {
+      const h = history.slice(0, hi + 1);
+      h.push(next);
+      setHistory(h);
+      setHi(h.length - 1);
+      coalesceKeyRef.current = key;
+    }
   }
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
@@ -1010,11 +1029,15 @@ export function StudioPage() {
   }
   function nudgeSelected(dx: number, dy: number) {
     if (!selected || selected.locked) return;
-    if (selected.type === "draw") {
-      patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
-    } else {
-      patchEl(selected.id, { x: selected.x + dx, y: selected.y + dy } as Partial<El>);
-    }
+    const id = selected.id;
+    const next = elements.map((e) =>
+      e.id !== id
+        ? e
+        : e.type === "draw"
+          ? ({ ...e, points: e.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
+          : ({ ...e, x: (e as { x: number }).x + dx, y: (e as { y: number }).y + dy } as El)
+    );
+    commitCoalesced(next, `nudge:${id}`); // 연속 방향키는 한 번의 실행취소로 합침
   }
   // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
   function centerSelected(axis: "h" | "v") {
