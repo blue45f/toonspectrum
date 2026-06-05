@@ -10,6 +10,8 @@ import {
   Circle,
   Copy,
   Eraser,
+  Eye,
+  EyeOff,
   Image as ImageIcon,
   Download,
   ImagePlus,
@@ -127,7 +129,8 @@ interface DrawEl {
   opacity?: number;
   fill?: string;
 }
-type El = ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl;
+// 인터섹션으로 모든 요소 변형에 `hidden?`(레이어 표시/숨김)을 부여.
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
@@ -1577,6 +1580,7 @@ export function StudioPage() {
                 fillLinearGradientColorStops={bgGrad ? [0, bgGrad[0], 1, bgGrad[1]] : undefined}
               />
               {elements.map((el) => {
+                if (el.hidden) return null; // 숨긴 레이어는 렌더/내보내기에서 제외
                 const draggable = tool === "select";
                 const onSelect = () => tool === "select" && setSelectedId(el.id);
                 const setRef = (n: Konva.Node | null) => {
@@ -2127,10 +2131,22 @@ export function StudioPage() {
                           setTool("select");
                           setSelectedId(el.id);
                         }}
-                        className="min-w-0 flex-1 truncate text-left text-xs text-fg-2"
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-left text-xs",
+                          el.hidden ? "text-fg-3/50 line-through" : "text-fg-2"
+                        )}
                         title={elementLabel(el)}
                       >
                         {elementLabel(el)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
+                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+                        aria-label={el.hidden ? "레이어 표시" : "레이어 숨김"}
+                        title={el.hidden ? "표시" : "숨김"}
+                      >
+                        {el.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
                       </button>
                       <button
                         type="button"
