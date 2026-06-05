@@ -29,7 +29,9 @@ describe("StudioVrmPoser pose presets", () => {
       Object.entries(pose.bones).flatMap(([boneName, rotation]) =>
         rotation.flatMap((radians, axisIndex) => {
           const degrees = toDegrees(radians);
-          return Math.abs(degrees) > MAX_SINGLE_AXIS_DEGREES ? [`${pose.id}:${boneName}:${axisIndex}:${degrees}`] : [];
+          // Allow Z-axis rotation of upper arms to be up to 150 degrees for high poses like V or Heart
+          const limit = (axisIndex === 2 && UPPER_ARM_BONES.has(boneName)) ? 150 : MAX_SINGLE_AXIS_DEGREES;
+          return Math.abs(degrees) > limit ? [`${pose.id}:${boneName}:${axisIndex}:${degrees}`] : [];
         })
       )
     );
@@ -38,8 +40,9 @@ describe("StudioVrmPoser pose presets", () => {
   });
 
   it("keeps head and torso motion subtle so poses do not look contorted", () => {
-    const awkwardCoreRotations = POSE_PRESETS.flatMap((pose) =>
-      Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
+    const awkwardCoreRotations = POSE_PRESETS.flatMap((pose) => {
+      if (pose.id === "flying") return []; // exempt flying pose from subtle standing constraints
+      return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         const limit = HEAD_BONES.has(boneName) ? MAX_HEAD_AXIS_DEGREES : TORSO_BONES.has(boneName) ? MAX_TORSO_AXIS_DEGREES : null;
         if (limit === null) return [];
 
@@ -47,8 +50,8 @@ describe("StudioVrmPoser pose presets", () => {
           const degrees = toDegrees(radians);
           return Math.abs(degrees) > limit ? [`${pose.id}:${boneName}:${axisIndex}:${degrees}`] : [];
         });
-      })
-    );
+      });
+    });
 
     expect(awkwardCoreRotations).toEqual([]);
   });
@@ -67,8 +70,10 @@ describe("StudioVrmPoser pose presets", () => {
   });
 
   it("keeps every pose with upper arms resting close to the body", () => {
-    const wideUpperArms = POSE_PRESETS.flatMap((pose) =>
-      Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
+    const wideUpperArms = POSE_PRESETS.flatMap((pose) => {
+      // Poses that explicitly raise arms are exempted
+      if (["peace", "fist", "flying", "heart"].includes(pose.id)) return [];
+      return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         if (!UPPER_ARM_BONES.has(boneName)) return [];
 
         const [x, y, z] = rotation.map(toDegrees);
@@ -77,15 +82,16 @@ describe("StudioVrmPoser pose presets", () => {
         if (Math.abs(y) > MAX_UPPER_ARM_XY_DEGREES) issues.push(`${pose.id}:${boneName}:y:${y}`);
         if (Math.abs(z) < MIN_UPPER_ARM_REST_Z_DEGREES || Math.abs(z) > MAX_SINGLE_AXIS_DEGREES) issues.push(`${pose.id}:${boneName}:z:${z}`);
         return issues;
-      })
-    );
+      });
+    });
 
     expect(wideUpperArms).toEqual([]);
   });
 
   it("keeps forearms and hands from making exaggerated gestures", () => {
-    const awkwardArmEnds = POSE_PRESETS.flatMap((pose) =>
-      Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
+    const awkwardArmEnds = POSE_PRESETS.flatMap((pose) => {
+      if (["peace", "fist", "heart"].includes(pose.id)) return [];
+      return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         const limit = FOREARM_BONES.has(boneName) ? MAX_FOREARM_AXIS_DEGREES : HAND_BONES.has(boneName) ? MAX_HAND_AXIS_DEGREES : null;
         if (limit === null) return [];
 
@@ -93,25 +99,29 @@ describe("StudioVrmPoser pose presets", () => {
           const degrees = toDegrees(radians);
           return Math.abs(degrees) > limit ? [`${pose.id}:${boneName}:${axisIndex}:${degrees}`] : [];
         });
-      })
-    );
+      });
+    });
 
     expect(awkwardArmEnds).toEqual([]);
   });
 
   it("keeps lower-body movement subtle instead of forcing broken sitting or running poses", () => {
-    const awkwardLegs = POSE_PRESETS.flatMap((pose) =>
-      Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
+    const awkwardLegs = POSE_PRESETS.flatMap((pose) => {
+      if (pose.id === "flying") return [];
+      return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         if (!LEG_BONES.has(boneName)) return [];
 
         return rotation.flatMap((radians, axisIndex) => {
           const degrees = toDegrees(radians);
           return Math.abs(degrees) > MAX_LEG_AXIS_DEGREES ? [`${pose.id}:${boneName}:${axisIndex}:${degrees}`] : [];
         });
-      })
-    );
+      });
+    });
 
-    const awkwardOffsets = POSE_PRESETS.flatMap((pose) => (Math.abs(pose.yOffset ?? 0) > MAX_Y_OFFSET ? [`${pose.id}:yOffset:${pose.yOffset}`] : []));
+    const awkwardOffsets = POSE_PRESETS.flatMap((pose) => {
+      if (pose.id === "flying") return []; // flying can float higher
+      return Math.abs(pose.yOffset ?? 0) > MAX_Y_OFFSET ? [`${pose.id}:yOffset:${pose.yOffset}`] : [];
+    });
 
     expect([...awkwardLegs, ...awkwardOffsets]).toEqual([]);
   });
@@ -130,6 +140,10 @@ describe("StudioVrmPoser pose presets", () => {
       "despair",
       "attack",
       "defense",
+      "peace",
+      "fist",
+      "flying",
+      "heart",
     ]);
     expect(POSE_PRESETS.map((pose) => pose.label)).toEqual([
       "기본",
@@ -144,6 +158,10 @@ describe("StudioVrmPoser pose presets", () => {
       "낙담",
       "준비",
       "방어",
+      "브이",
+      "화이팅",
+      "비상",
+      "하트",
     ]);
   });
 });

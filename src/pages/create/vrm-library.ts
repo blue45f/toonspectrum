@@ -36,12 +36,17 @@ type VrmThumbnailRecord = {
   updatedAt: number;
 };
 
-// 기본 번들 VRM 캐릭터(전부 라이선스 OK: pixiv 샘플 + VRoid CC0 AvatarSample A/B/C).
+// 기본 번들 VRM 캐릭터.
+// A-C는 pixiv VRoidPreset 조건, old beta 샘플 4종은 pixiv CC0 조건을 따른다.
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
   { id: "avatar-b", name: "세라", url: "/vrm/AvatarSample_B.vrm" },
   { id: "avatar-c", name: "유나", url: "/vrm/AvatarSample_C.vrm" },
+  { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
+  { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
+  { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
+  { id: "rubin", name: "루빈", url: "/vrm/Victoria_Rubin.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

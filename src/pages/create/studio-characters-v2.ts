@@ -105,6 +105,14 @@ const CHARS: Char[] = [
   { id: "dani", label: "다니", emoji: "☕", genre: "slice", style: "bob",
     skin: "#ffe7d4", skinSh: "#f6d0b4", hair: "#3a2f2a", hairSh: "#241c18", hairHi: "#6a564a",
     iris: "#6b4e3a", irisRim: "#3a281c", outfit: "#7fb88f", outfitSh: "#5d9c6e", accent: "#fff", collar: "#f0fbf3", eyeScale: 0.94 },
+  // 무협
+  { id: "muyeong", label: "무영", emoji: "⚔️", genre: "wuxia", style: "topknot",
+    skin: "#ecc499", skinSh: "#d6a674", hair: "#14110d", hairSh: "#080603", hairHi: "#3a322a",
+    iris: "#4a3526", irisRim: "#1f140c", outfit: "#3a5a8f", outfitSh: "#274273", accent: "#b8323c", collar: "#eef2fb", eyeScale: 0.9 },
+  // 판타지 (엘프)
+  { id: "elen", label: "엘렌", emoji: "🧝", genre: "fantasy", style: "flow",
+    skin: "#fbe6d4", skinSh: "#eecbb0", hair: "#cdd6e6", hairSh: "#a3aec4", hairHi: "#f0f4fb",
+    iris: "#5fc2c9", irisRim: "#2a8f96", outfit: "#6b8f5a", outfitSh: "#4f7341", accent: "#d8c06a", collar: "#f2f7ec", eyeScale: 1.08 },
   // 로맨스
   { id: "seyeon", label: "세연", emoji: "💞", genre: "romance", style: "wavy",
     skin: "#ffe1c6", skinSh: "#f3c19a", hair: "#5a2d4a", hairSh: "#3e1d33", hairHi: "#9a5286",
@@ -113,6 +121,66 @@ const CHARS: Char[] = [
   { id: "haeun", label: "하은", emoji: "🎒", genre: "school", style: "twin",
     skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
     iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff", eyeScale: 1.04 },
+  // 직장
+  { id: "jiwon", label: "지원", emoji: "💼", genre: "office", style: "ponytail",
+    skin: "#f6d3b2", skinSh: "#e3b68d", hair: "#2a2420", hairSh: "#171210", hairHi: "#564c44",
+    iris: "#5a4634", irisRim: "#2e2014", outfit: "#3b4660", outfitSh: "#28304a", accent: "#8fa6cf", collar: "#ffffff", eyeScale: 0.96 },
+  // 순정 (단발 보브, 또다른 룩)
+  { id: "narae", label: "나래", emoji: "🩷", genre: "shojo", style: "bun",
+    skin: "#ffe6cf", skinSh: "#f5cbab", hair: "#d76a8e", hairSh: "#b24a6e", hairHi: "#ffa6c0",
+    iris: "#d76a8e", irisRim: "#9a3a5e", outfit: "#8fd0e6", outfitSh: "#69b3cf", accent: "#fff", collar: "#eafaff", eyeScale: 1.12 },
+  // 판타지 (마법사, 짧은 머리)
+  { id: "ravi", label: "라비", emoji: "✨", genre: "fantasy", style: "short",
+    skin: "#efc9a3", skinSh: "#dbab7e", hair: "#6a4bd0", hairSh: "#4a30a0", hairHi: "#a78ef0",
+    iris: "#8a6cf0", irisRim: "#4a30a0", outfit: "#3a2d6a", outfitSh: "#281f4a", accent: "#ffd76a", collar: "#ece6ff", eyeScale: 1.02 },
+  // 소년 액션 (포니테일 여전사)
+  { id: "tara", label: "타라", emoji: "🏹", genre: "shonen", style: "ponytail",
+    skin: "#e9bf92", skinSh: "#d2a172", hair: "#8a3a2a", hairSh: "#5e2418", hairHi: "#c06848",
+    iris: "#c85a3a", irisRim: "#7a3220", outfit: "#4a7a5a", outfitSh: "#356043", accent: "#d4a23a", collar: "#f0f7f0", eyeScale: 0.92 },
+  // 일상툰 (소년, 스파이키 심플)
+  { id: "minho", label: "민호", emoji: "🎧", genre: "slice", style: "short",
+    skin: "#f1cda7", skinSh: "#ddaf83", hair: "#2c3a4a", hairSh: "#19232f", hairHi: "#54677a",
+    iris: "#3a4a5e", irisRim: "#1f2a38", outfit: "#e0a93b", outfitSh: "#c38f22", accent: "#fff", collar: "#fff8ec", eyeScale: 0.96 },
+  // 로판 (북부대공 스타일 백발 적안)
+  { id: "baekhan", label: "백한", emoji: "❄️", genre: "fantasy", style: "spiky",
+    skin: "#f2f7fc", skinSh: "#d5e2f0", hair: "#ffffff", hairSh: "#d2dbe6", hairHi: "#eef5ff",
+    iris: "#4ea3d7", irisRim: "#20679c", outfit: "#202e4d", outfitSh: "#111b30", accent: "#d4af37", collar: "#ffffff", eyeScale: 0.95 },
+  // 무협 (흑발 장발 서생/검사 스타일)
+  { id: "dowon", label: "도원", emoji: "🌙", genre: "wuxia", style: "flow",
+    skin: "#ffece0", skinSh: "#f3ccb5", hair: "#2b2724", hairSh: "#14110f", hairHi: "#5a5047",
+    iris: "#54463a", irisRim: "#2d221b", outfit: "#efeff4", outfitSh: "#cfcfda", accent: "#4a3b32", collar: "#3b3630", eyeScale: 0.98 },
+  // 직장 (지적인 안경남)
+  { id: "haejin", label: "해진", emoji: "👓", genre: "office", style: "short",
+    skin: "#ffebd6", skinSh: "#e4bd9d", hair: "#232d3d", hairSh: "#141b25", hairHi: "#51627c",
+    iris: "#384d6b", irisRim: "#1e2c41", outfit: "#485366", outfitSh: "#2f3847", accent: "#cfd8dc", collar: "#ffffff", eyeScale: 0.94 },
+  // 로맨스 (활기찬 아이돌 소녀)
+  { id: "sia", label: "시아", emoji: "💫", genre: "romance", style: "twin",
+    skin: "#ffe8dc", skinSh: "#f6c3a5", hair: "#c03a74", hairSh: "#8a214d", hairHi: "#f27ba6",
+    iris: "#d13c7a", irisRim: "#821a44", outfit: "#f3a2c2", outfitSh: "#dd719f", accent: "#ffffff", collar: "#fff3f7", eyeScale: 1.12 },
+  // 학원 (모범생 소녀)
+  { id: "sohee", label: "소희", emoji: "📚", genre: "school", style: "long",
+    skin: "#ffe9db", skinSh: "#f5bf9f", hair: "#2e2521", hairSh: "#19120f", hairHi: "#5e4b44",
+    iris: "#4d3d34", irisRim: "#261b15", outfit: "#34495e", outfitSh: "#2c3e50", accent: "#c0392b", collar: "#ffffff", eyeScale: 1.05 },
+  // 순정 (부드러운 미소년)
+  { id: "eunwoo", label: "은우", emoji: "💎", genre: "shojo", style: "wavy",
+    skin: "#ffe7db", skinSh: "#f9c8ad", hair: "#a182cc", hairSh: "#6a4b9c", hairHi: "#e4d0fc",
+    iris: "#7d5fb0", irisRim: "#3c2069", outfit: "#a8dbeb", outfitSh: "#7cb6d9", accent: "#ffffff", collar: "#f2f8fc", eyeScale: 1.08 },
+  // 무협 (냉정한 자객 소년)
+  { id: "ryu", label: "류", emoji: "🥷", genre: "wuxia", style: "spiky",
+    skin: "#f3ccb5", skinSh: "#db9e76", hair: "#1c1c1c", hairSh: "#0a0a0a", hairHi: "#3d3d3d",
+    iris: "#cbd5e1", irisRim: "#475569", outfit: "#1a202c", outfitSh: "#0f1219", accent: "#e53e3e", collar: "#2d3748", eyeScale: 0.88 },
+  // 판타지 (다크 엘프 마왕군녀)
+  { id: "luna", label: "루나", emoji: "😈", genre: "fantasy", style: "wavy",
+    skin: "#e2e8f0", skinSh: "#cbd5e1", hair: "#b91c1c", hairSh: "#7f1d1d", hairHi: "#ef4444",
+    iris: "#f59e0b", irisRim: "#b45309", outfit: "#4c1d95", outfitSh: "#2e1065", accent: "#f59e0b", collar: "#1e1b4b", eyeScale: 1.06 },
+  // 소년 (운동부 활달 소년)
+  { id: "hyeon", label: "현", emoji: "⚡", genre: "shonen", style: "short",
+    skin: "#eed2ba", skinSh: "#d6ab8c", hair: "#e28743", hairSh: "#b65f21", hairHi: "#f1ad70",
+    iris: "#e28743", irisRim: "#873e23", outfit: "#1e3a8a", outfitSh: "#172554", accent: "#facc15", collar: "#eff6ff", eyeScale: 0.92 },
+  // 로맨스 (단아한 다도부 차녀)
+  { id: "seora", label: "설아", emoji: "🍵", genre: "romance", style: "bun",
+    skin: "#ffeae0", skinSh: "#f6cbb7", hair: "#3e2723", hairSh: "#271714", hairHi: "#6d4c41",
+    iris: "#8d6e63", irisRim: "#4e342e", outfit: "#d7ccc8", outfitSh: "#b0bec5", accent: "#5d4037", collar: "#f5f5f5", eyeScale: 1.06 },
   // 프리셋 남자 캐릭터 포즈들
   { id: "m_pose1", label: "무사 소년 (프리셋 포즈)", emoji: "⚔️", genre: "wuxia", style: "spiky",
     skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
@@ -338,13 +406,7 @@ function mouth(m: Expr["mouth"], c: Char, g: string): string {
   const isFemaleOrRomance =
     c.genre === "shojo" ||
     c.genre === "romance" ||
-    c.id === "elen" ||
-    c.id === "narae" ||
-    c.id === "seyeon" ||
-    c.id === "yuna" ||
-    c.id === "haeun" ||
-    c.id === "jiwon" ||
-    c.id === "tara";
+    ["elen", "narae", "seyeon", "yuna", "haeun", "jiwon", "tara", "sia", "sohee", "luna", "seora"].includes(c.id);
 
   // 부드러운 입술 틴트 영역 (피치 핑크)
   const lipTint = isFemaleOrRomance
@@ -589,13 +651,7 @@ function build(c: Char, e: Expr): string {
   const isFemaleOrRomance =
     c.genre === "shojo" ||
     c.genre === "romance" ||
-    c.id === "elen" ||
-    c.id === "narae" ||
-    c.id === "seyeon" ||
-    c.id === "yuna" ||
-    c.id === "haeun" ||
-    c.id === "jiwon" ||
-    c.id === "tara";
+    ["elen", "narae", "seyeon", "yuna", "haeun", "jiwon", "tara", "sia", "sohee", "luna", "seora"].includes(c.id);
 
   const generalSkinWarmth = isFemaleOrRomance
     ? `<ellipse cx="${cx - 58}" cy="${headY + 34}" rx="14" ry="6" fill="url(#${g}_blushG)" opacity="0.3"/>` +
