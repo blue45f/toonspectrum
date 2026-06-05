@@ -113,6 +113,16 @@ const CHARS: Char[] = [
   { id: "haeun", label: "하은", emoji: "🎒", genre: "school", style: "twin",
     skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
     iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff", eyeScale: 1.04 },
+  // 프리셋 남자 캐릭터 포즈들
+  { id: "m_pose1", label: "무사 소년 (프리셋 포즈)", emoji: "⚔️", genre: "wuxia", style: "spiky",
+    skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
+    iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff" },
+  { id: "m_pose2", label: "캐주얼 소년 (프리셋 포즈)", emoji: "🎧", genre: "slice", style: "short",
+    skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
+    iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff" },
+  { id: "m_pose3", label: "교복 소년 (프리셋 포즈)", emoji: "🏫", genre: "school", style: "short",
+    skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
+    iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff" },
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -646,6 +656,8 @@ export const CHARACTER_LIBRARY_V2: CharacterAsset[] = CHARS.map((c) => ({
     svg: build(c, e),
     imgSrc: ["yuna", "kang", "seyeon", "dani", "haeun"].includes(c.id)
       ? `/assets/studio/characters/${c.id}_${e.id}.png`
-      : undefined,
+      : ["m_pose1", "m_pose2", "m_pose3"].includes(c.id)
+        ? `/assets/studio/characters/${c.id}.png`
+        : undefined,
   })),
 }));
