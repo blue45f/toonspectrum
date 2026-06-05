@@ -1209,6 +1209,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setStatus("empty");
     setError("");
     setIsCapturing(false);
+    setActiveProps([]);
   }, [open]);
 
   useEffect(() => {

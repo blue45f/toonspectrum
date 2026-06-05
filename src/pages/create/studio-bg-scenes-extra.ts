@@ -7,7 +7,7 @@ type Stop = readonly [offset: string, color: string, opacity?: string];
 type Point = readonly [x: number, y: number];
 
 function scene(defs: string, body: string): string {
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${body}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${body}</svg>`;
 }
 
 function grad(id: string, x1: number, y1: number, x2: number, y2: number, stops: readonly Stop[]): string {

@@ -150,7 +150,7 @@ function elBounds(el: El): { x: number; y: number; w: number; h: number } {
   if (el.type === "draw") {
     const xs = el.points.filter((_, i) => i % 2 === 0);
     const ys = el.points.filter((_, i) => i % 2 === 1);
-    if (!xs.length) return { x: 0, y: 0, w: 0, h: 0 };
+    if (!xs.length || !ys.length) return { x: xs[0] ?? 0, y: ys[0] ?? 0, w: 0, h: 0 };
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     return { x: minX, y: minY, w: Math.max(...xs) - minX, h: Math.max(...ys) - minY };
@@ -489,7 +489,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           opacity={opacity}
           lineCap="round"
           lineJoin="round"
-          tension={0}
+          tension={0.2}
           globalCompositeOperation={composite}
           listening={false}
         />
@@ -632,6 +632,7 @@ function UrlImage({
     im.onload = () => setImg(im);
     return () => {
       im.onload = null;
+      im.onerror = null;
     };
   }, [el.src]);
   if (!img) return null;
@@ -835,6 +836,14 @@ export function StudioPage() {
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
   const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
+
+  // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
+  useEffect(() => {
+    const ids = new Set(elements.map((e) => e.id));
+    for (const id of Object.keys(nodeRefs.current)) {
+      if (!ids.has(id)) delete nodeRefs.current[id];
+    }
+  }, [elements]);
 
   // 기존 작품 로드(편집 모드).
   useEffect(() => {
@@ -1407,6 +1416,7 @@ export function StudioPage() {
         status,
       };
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
+      setSaving(false);
       navigate(`/create/${work.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했어요.");
@@ -2272,6 +2282,7 @@ export function StudioPage() {
                       y={12}
                       fontSize={el.fontSize ?? 24}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
+                      fontStyle="bold"
                       fill={el.textFill}
                       align="center"
                       verticalAlign="middle"
@@ -2325,6 +2336,15 @@ export function StudioPage() {
                   autoFocus
                   value={editing.value}
                   onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setEditing(null);
+                    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      commitEditText();
+                    }
+                  }}
                   rows={3}
                   className="w-full resize-none rounded-lg border border-line bg-card p-2 text-sm text-fg outline-none focus:border-accent"
                 />
