@@ -2355,6 +2355,8 @@ export function StudioPage() {
               <Transformer
                 ref={trRef}
                 rotateEnabled
+                rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
+                rotationSnapTolerance={6}
                 keepRatio={selected?.type === "text" || selected?.type === "sticker"}
                 enabledAnchors={
                   selected?.type === "text" || selected?.type === "sticker"
