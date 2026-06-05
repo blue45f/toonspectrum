@@ -8,6 +8,7 @@ import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lu
 import { resolveSignupAvatarImage } from "@/lib/avatar";
 import { adminFetch, type AdminMe } from "@/src/components/admin/admin-client";
 import { useT } from "@/lib/i18n";
+import { keepInlineText } from "@/lib/utils";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -54,10 +55,13 @@ export function AuthMenu() {
       <>
         <button
           onClick={() => setModal(true)}
-          className="flex h-10 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+          aria-label={t("nav.login")}
+          className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
         >
-          <UserRound size={16} />
-          <span className="hidden sm:inline">{t("nav.login")}</span>
+          <UserRound size={16} className="shrink-0" />
+          <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">
+            {keepInlineText(t("nav.login"))}
+          </span>
         </button>
         {modal && <AuthModal onClose={() => setModal(false)} />}
       </>

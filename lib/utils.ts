@@ -5,6 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function keepInlineText(value: string): string {
+  return value.replace(/\s+/g, "\u00a0");
+}
+
 // 12345 -> "1.2만", 123456789 -> "1.2억", 980 -> "980"
 export function formatCount(n: number): string {
   if (n >= 1e8) {

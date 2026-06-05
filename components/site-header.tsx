@@ -18,7 +18,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, keepInlineText } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { AuthMenu } from "./auth/auth-menu";
 import { ToonSpectrumMark } from "./visual-marks";
@@ -149,16 +149,19 @@ export function SiteHeader() {
             {/* 내 서재 */}
             <Link
               href="/library"
+              aria-label={t("nav.library")}
               aria-current={isActive("/library") ? "page" : undefined}
               className={cn(
-                "group flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
+                "group flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors",
                 isActive("/library")
                   ? "bg-accent text-on-accent"
                   : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
               )}
             >
-              <Library size={16} className="text-fg-3 transition-colors group-hover:text-accent" />
-              <span className="hidden xl:inline">{t("nav.library")}</span>
+              <Library size={16} className="shrink-0 text-fg-3 transition-colors group-hover:text-accent" />
+              <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">
+                {keepInlineText(t("nav.library"))}
+              </span>
             </Link>
             <AuthMenu />
 
