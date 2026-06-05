@@ -1209,37 +1209,43 @@ export function StudioPage() {
 
   const onWrapDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    try {
-      const data = e.dataTransfer.getData("application/json-asset");
-      if (!data) return;
-      const { src, width, height } = JSON.parse(data);
-      const wrap = wrapRef.current;
-      if (!wrap) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    // 이벤트 풀링/await 후 무효화 대비 — 좌표·파일·데이터를 동기적으로 먼저 캡처.
+    const cx = e.clientX;
+    const cy = e.clientY;
+    const imageFile = e.dataTransfer.files
+      ? Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"))
+      : undefined;
+    const assetData = e.dataTransfer.getData("application/json-asset");
 
+    // 드롭 지점(스테이지 좌표) → 거기에 중앙을 맞춰 배치한다.
+    const placeAt = (src: string, width: number, height: number) => {
       const rect = wrap.getBoundingClientRect();
-      const clientX = e.clientX - rect.left;
-      const clientY = e.clientY - rect.top;
-
-      const scrollLeft = wrap.scrollLeft;
-      const scrollTop = wrap.scrollTop;
-
-      const x = (clientX + scrollLeft) / effScale;
-      const y = (clientY + scrollTop) / effScale;
-
+      const x = (cx - rect.left + wrap.scrollLeft) / effScale;
+      const y = (cy - rect.top + wrap.scrollTop) / effScale;
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       const targetW = Math.round(width * fit);
       const targetH = Math.round(height * fit);
+      addEl({ id: uid(), type: "image", src, x: x - targetW / 2, y: y - targetH / 2, width: targetW, height: targetH, rotation: 0 });
+    };
 
-      addEl({
-        id: uid(),
-        type: "image",
-        src,
-        x: x - targetW / 2,
-        y: y - targetH / 2,
-        width: targetW,
-        height: targetH,
-        rotation: 0,
-      });
+    // 1) 외부 이미지 파일 드롭(데스크톱에서 끌어다 놓기) — ⌘V 붙여넣기와 동일하게 추가.
+    if (imageFile) {
+      try {
+        const { src, width, height } = await downscaleImageFile(imageFile);
+        placeAt(src, width, height);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "이미지를 추가하지 못했어요.");
+      }
+      return;
+    }
+
+    // 2) 내부 에셋 패널에서 드래그한 경우.
+    if (!assetData) return;
+    try {
+      const { src, width, height } = JSON.parse(assetData);
+      placeAt(src, width, height);
     } catch (err) {
       console.error("Drop asset failed:", err);
     }
