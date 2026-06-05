@@ -74,6 +74,20 @@ export const TEMPLATES: TemplateSpec[] = [
   { id: "single", label: "한 컷", hint: "일러스트·표지", canvasH: 900, frames: stack(1, 900) },
 ];
 
+// 템플릿을 유형별로 묶어 메뉴에서 일관된 우선순위로 보여준다.
+export const TEMPLATE_GROUP_ORDER = ["세로 웹툰", "컷만화·그리드", "기본"] as const;
+function templateGroupOf(id: string): string {
+  if (id.startsWith("webtoon")) return "세로 웹툰";
+  if (id === "strip4" || id.startsWith("grid")) return "컷만화·그리드";
+  return "기본"; // blank, single
+}
+export function groupTemplates(templates: TemplateSpec[]): { group: string; templates: TemplateSpec[] }[] {
+  return TEMPLATE_GROUP_ORDER.map((group) => ({
+    group,
+    templates: templates.filter((t) => templateGroupOf(t.id) === group),
+  })).filter((g) => g.templates.length > 0);
+}
+
 export type BubbleVariant = "speech" | "thought" | "shout" | "box" | "whisper" | "scared" | "system" | "heart" | "phone" | "angry";
 export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; sample: string }[] = [
   { id: "speech", label: "말하기", sample: "💬" },

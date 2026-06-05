@@ -49,6 +49,7 @@ import {
   EFFECT_EMOJIS,
   SFX_PRESETS,
   TEMPLATES,
+  groupTemplates,
   type BgPreset,
   type BubbleVariant,
   type TemplateSpec,
@@ -1340,17 +1341,22 @@ export function StudioPage() {
             <LayoutTemplate size={14} /> 템플릿
           </button>
           {menu === "template" && (
-            <div className="absolute left-0 top-full z-30 mt-1 grid w-64 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => applyTemplate(t)}
-                  className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
-                >
-                  <span className="font-medium text-fg">{t.label}</span>
-                  <span className="text-fg-3">{t.hint}</span>
-                </button>
+            <div className="absolute left-0 top-full z-30 mt-1 grid max-h-80 w-64 gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-lg">
+              {groupTemplates(TEMPLATES).map((group) => (
+                <div key={group.group} className="grid gap-1">
+                  <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
+                  {group.templates.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => applyTemplate(t)}
+                      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                    >
+                      <span className="font-medium text-fg">{t.label}</span>
+                      <span className="text-fg-3">{t.hint}</span>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           )}
