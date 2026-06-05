@@ -1362,10 +1362,35 @@ export function StudioPage() {
     const pos = e.target.getStage()?.getRelativePointerPosition();
     if (!pos) return;
     const current = drawingRef.current;
-    const next =
-      (current.kind ?? "freehand") === "freehand"
-        ? { ...current, points: [...current.points, pos.x, pos.y] }
-        : { ...current, points: [current.points[0] ?? pos.x, current.points[1] ?? pos.y, pos.x, pos.y] };
+    const kind = current.kind ?? "freehand";
+    let next: DrawEl;
+    if (kind === "freehand") {
+      next = { ...current, points: [...current.points, pos.x, pos.y] };
+    } else {
+      const x0 = current.points[0] ?? pos.x;
+      const y0 = current.points[1] ?? pos.y;
+      let x1 = pos.x;
+      let y1 = pos.y;
+      // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
+      if (e.evt.shiftKey) {
+        const dx = x1 - x0;
+        const dy = y1 - y0;
+        if (kind === "line") {
+          if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
+          else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
+          else {
+            const s = Math.max(Math.abs(dx), Math.abs(dy));
+            x1 = x0 + Math.sign(dx || 1) * s;
+            y1 = y0 + Math.sign(dy || 1) * s;
+          }
+        } else {
+          const s = Math.max(Math.abs(dx), Math.abs(dy));
+          x1 = x0 + Math.sign(dx || 1) * s;
+          y1 = y0 + Math.sign(dy || 1) * s;
+        }
+      }
+      next = { ...current, points: [x0, y0, x1, y1] };
+    }
     drawingRef.current = next;
     setDraft(next);
   }
