@@ -78,6 +78,7 @@ interface ImageEl {
   width: number;
   height: number;
   rotation: number;
+  opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
 }
 interface TextEl {
   id: string;
@@ -645,6 +646,7 @@ function UrlImage({
       width={el.width}
       height={el.height}
       rotation={el.rotation}
+      opacity={el.opacity ?? 1}
       draggable={draggable}
       onMouseDown={onSelect}
       onTap={onSelect}
@@ -2620,6 +2622,22 @@ export function StudioPage() {
                     onChange={(e) => patchEl(selected.id, { noClip: !e.target.checked } as Partial<El>)}
                     className="size-4 accent-accent"
                   />
+                </label>
+              )}
+              {selected.type === "image" && (
+                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                  불투명도
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      value={Math.round((selected.opacity ?? 1) * 100)}
+                      onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) / 100 } as Partial<El>)}
+                      className="w-28 accent-accent"
+                    />
+                    <span className="w-9 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
+                  </span>
                 </label>
               )}
               <div className="mt-3 flex flex-wrap gap-1.5">
