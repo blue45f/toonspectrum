@@ -14,6 +14,7 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  FlipHorizontal2,
   Image as ImageIcon,
   Download,
   ImagePlus,
@@ -79,6 +80,7 @@ interface ImageEl {
   height: number;
   rotation: number;
   opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
+  flipped?: boolean; // 좌우 반전(캐릭터 미러링).
 }
 interface TextEl {
   id: string;
@@ -627,6 +629,8 @@ function UrlImage({
   onChange: (patch: Partial<ImageEl>) => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
+  // flip은 노드 scaleX 대신 거울 비트맵으로 처리(트랜스포머/좌표 영향 없음).
+  const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
   useEffect(() => {
     const im = new window.Image();
     im.src = el.src;
@@ -636,11 +640,35 @@ function UrlImage({
       im.onerror = null;
     };
   }, [el.src]);
-  if (!img) return null;
+  useEffect(() => {
+    if (!img) {
+      setDisplayImg(undefined);
+      return;
+    }
+    if (!el.flipped) {
+      setDisplayImg(img);
+      return;
+    }
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const cx = c.getContext("2d");
+    if (cx) {
+      cx.translate(w, 0);
+      cx.scale(-1, 1);
+      cx.drawImage(img, 0, 0);
+      setDisplayImg(c);
+    } else {
+      setDisplayImg(img);
+    }
+  }, [img, el.flipped]);
+  if (!displayImg) return null;
   return (
     <KImage
       ref={innerRef}
-      image={img}
+      image={displayImg}
       x={el.x}
       y={el.y}
       width={el.width}
@@ -2647,6 +2675,16 @@ export function StudioPage() {
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
                   <button type="button" onClick={() => startEditText(selected.id)} className={buttonClass({ size: "sm", variant: "quiet" })}>
                     글자 편집
+                  </button>
+                )}
+                {selected.type === "image" && (
+                  <button
+                    type="button"
+                    onClick={() => patchEl(selected.id, { flipped: !selected.flipped } as Partial<El>)}
+                    className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
+                    title="좌우 반전"
+                  >
+                    <FlipHorizontal2 size={14} />
                   </button>
                 )}
                 <button type="button" onClick={() => reorder("front")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 앞으로">
