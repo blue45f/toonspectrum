@@ -1234,6 +1234,40 @@ export function StudioPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // 클립보드 이미지 붙여넣기(⌘V): 스크린샷·외부 그림을 바로 캔버스에 추가.
+  // shortcutRef와 같은 방식으로 최신 상태/함수를 ref로 흘린다.
+  const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});
+  useEffect(() => {
+    pasteRef.current = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (typing || editing) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item.type.startsWith("image/")) continue;
+        const file = item.getAsFile();
+        if (!file) continue;
+        e.preventDefault();
+        void (async () => {
+          try {
+            const { src, width, height } = await downscaleImageFile(file);
+            addRenderedImage(src, width, height);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "이미지 붙여넣기 실패");
+          }
+        })();
+        return;
+      }
+    };
+  });
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => pasteRef.current(e);
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
   // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
   function spawnCenter(): [number, number] {
     if (selected?.type === "frame") return [selected.x + selected.width / 2, selected.y + selected.height / 2];
@@ -2036,7 +2070,7 @@ export function StudioPage() {
             </div>
           )}
         </div>
-        <label className={cn(toolBtn(false), "cursor-pointer")}>
+        <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
           <ImagePlus size={14} /> 이미지
           <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
         </label>
