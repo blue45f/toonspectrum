@@ -810,6 +810,13 @@ function FramePanel({
   );
 }
 
+// 캔버스 줌 한계와 클램프(0.05 단위 반올림으로 깔끔한 퍼센트 유지).
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+function clampZoom(z: number) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
+}
+
 export function StudioPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -864,6 +871,22 @@ export function StudioPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
+  const [zoom, setZoom] = useState(1);
+  const effScale = scale * zoom;
+  // ⌘/Ctrl + 휠로 줌(네이티브 비-passive 리스너 — preventDefault로 브라우저 줌 차단).
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom((z) => clampZoom(z + (e.deltaY < 0 ? 0.15 : -0.15)));
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
   }, []);
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -1178,6 +1201,15 @@ export function StudioPage() {
       } else if (mod && e.key === "[") {
         e.preventDefault();
         reorder("back");
+      } else if (mod && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        setZoom((z) => clampZoom(z + 0.25));
+      } else if (mod && e.key === "-") {
+        e.preventDefault();
+        setZoom((z) => clampZoom(z - 0.25));
+      } else if (mod && e.key === "0") {
+        e.preventDefault();
+        setZoom(1);
       } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
         removeSelected();
@@ -1536,7 +1568,7 @@ export function StudioPage() {
     try {
       const stage = stageRef.current;
       if (!stage) throw new Error("캔버스를 찾을 수 없어요.");
-      const full = stage.toDataURL({ pixelRatio: 1 / scale });
+      const full = stage.toDataURL({ pixelRatio: 1 / effScale });
       const cover = await downscaleDataUrl(full, 480);
       const tags = tagsText
         .split(/[,\s]+/)
@@ -1581,7 +1613,7 @@ export function StudioPage() {
       stage.batchDraw();
     }
     // 2× 해상도로 내보내 더 선명한 웹툰 출력(720→1440px 폭).
-    const full = stage.toDataURL({ pixelRatio: 2 / scale });
+    const full = stage.toDataURL({ pixelRatio: 2 / effScale });
     if (bgNode) {
       bgNode.show();
       stage.batchDraw();
@@ -2138,13 +2170,18 @@ export function StudioPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         {/* 캔버스 */}
-        <div ref={wrapRef} className="relative overflow-hidden rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px]">
+        <div className="relative min-w-0">
+          {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
+          <div
+            ref={wrapRef}
+            className="max-h-[calc(100dvh-21rem)] min-h-[20rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px]"
+          >
           <Stage
             ref={stageRef}
-            width={CANVAS_W * scale}
-            height={canvasH * scale}
-            scaleX={scale}
-            scaleY={scale}
+            width={CANVAS_W * effScale}
+            height={canvasH * effScale}
+            scaleX={effScale}
+            scaleY={effScale}
             onMouseDown={onStageDown}
             onMouseMove={onStageMove}
             onMouseUp={onStageUp}
@@ -2526,6 +2563,7 @@ export function StudioPage() {
               />
             </Layer>
           </Stage>
+          </div>
 
           {showQuickStart && (
             <QuickStartPanel
@@ -2548,6 +2586,39 @@ export function StudioPage() {
           >
             ?
           </button>
+
+          {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 */}
+          <div className="absolute bottom-3 left-3 z-30 flex items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+              disabled={zoom <= ZOOM_MIN}
+              className="grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="축소"
+              title="축소 (⌘−)"
+            >
+              <Minus className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="min-w-[3.25rem] rounded-full px-1 text-center text-xs font-semibold tabular-nums text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="확대·축소 100%로 맞춤"
+              title="100%로 맞춤 (⌘0)"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+              disabled={zoom >= ZOOM_MAX}
+              className="grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="확대"
+              title="확대 (⌘+)"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
 
           {/* 텍스트 인라인 편집 오버레이 */}
           {editing && (
