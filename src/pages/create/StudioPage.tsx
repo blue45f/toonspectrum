@@ -58,6 +58,7 @@ import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
+import { CREATURE_STICKERS } from "./studio-creature-stickers";
 
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -1506,6 +1507,23 @@ export function StudioPage() {
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
               <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
                 {COMIC_VECTOR_STICKERS.map((sticker) => (
+                  <button
+                    key={sticker.id}
+                    type="button"
+                    title={sticker.label}
+                    onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
+                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                  >
+                    <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+                      <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                    </div>
+                    <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">동물·캐릭터</p>
+              <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                {CREATURE_STICKERS.map((sticker) => (
                   <button
                     key={sticker.id}
                     type="button"
