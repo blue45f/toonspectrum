@@ -77,4 +77,31 @@ export class CreatorController {
     const uid = enforceUserOrError(userId);
     return this.creatorService.addComment(uid, id, body);
   }
+
+  // ── 공유 에셋(회원이 올려 모두가 재사용) ──────────────────────────────
+  @Get("/creator/assets")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listSharedAssets(
+    @Query() query: { mine?: string | null; limit?: string | null; offset?: string | null },
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.creatorService.listSharedAssets(query, userId || undefined);
+  }
+
+  @Post("/creator/assets")
+  async publishAsset(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.publishAsset(uid, body);
+  }
+
+  @Delete("/creator/assets/:id")
+  async deleteSharedAsset(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.deleteSharedAsset(uid, id, false);
+  }
+
+  @Post("/creator/assets/:id/use")
+  async useSharedAsset(@Param("id") id: string) {
+    return this.creatorService.useSharedAsset(id);
+  }
 }

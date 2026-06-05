@@ -301,6 +301,24 @@ export const creatorWorkComments = pgTable("creator_work_comment", {
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
+// 회원이 사이트에 공유한 커스텀 에셋(다른 회원이 스튜디오에서 재사용). 이미지 데이터URL 보관.
+export const creatorAssets = pgTable("creator_asset", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  dataUrl: text("dataUrl").notNull(), // 축소된 webp 데이터 URL(creator_work.cover와 동일 방식)
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  kind: text("kind").notNull().default("image"), // image | sticker (추후 vrm 등 확장)
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
+  downloads: integer("downloads").notNull().default(0),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
 // 런타임 토글/설정(key-value). 예: monetization.enabled (광고형 수익화 on/off).
 export const appSettings = pgTable("app_setting", {
   key: text("key").primaryKey(),

@@ -18,6 +18,8 @@ import {
   Folder,
   Image as ImageIcon,
   Download,
+  Share2,
+  Globe,
   ImagePlus,
   LayoutTemplate,
   Loader2,
@@ -44,7 +46,17 @@ import {
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { createWork, getWork, getCurrentUserId, updateWork } from "@/src/lib/creator-client";
+import {
+  createWork,
+  getWork,
+  getCurrentUserId,
+  updateWork,
+  listSharedAssets,
+  publishAsset,
+  deleteSharedAsset,
+  markSharedAssetUsed,
+  type SharedAsset,
+} from "@/src/lib/creator-client";
 import { processFreehandPoints, processPencilPoints } from "./studio-brush";
 import {
   BG_PRESETS,
@@ -851,6 +863,12 @@ export function StudioPage() {
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
+  const [assetTab, setAssetTab] = useState<"mine" | "community">("mine");
+  const [shared, setShared] = useState<SharedAsset[]>([]);
+  const [sharedLoading, setSharedLoading] = useState(false);
+  const [sharedError, setSharedError] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
@@ -986,6 +1004,58 @@ export function StudioPage() {
       await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
+    }
+  }
+
+  // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
+  const loadSharedAssets = async () => {
+    setSharedLoading(true);
+    setSharedError(null);
+    try {
+      setShared(await listSharedAssets({ limit: 60 }));
+    } catch (err) {
+      setSharedError(err instanceof Error ? err.message : "공유 에셋을 불러오지 못했어요.");
+      setShared([]);
+    } finally {
+      setSharedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (menu === "asset" && assetTab === "community") loadSharedAssets();
+  }, [menu, assetTab]);
+
+  // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
+  async function onShareAsset(asset: StudioAsset) {
+    if (!getCurrentUserId()) {
+      setError("에셋을 공유하려면 로그인이 필요해요.");
+      return;
+    }
+    setPublishingId(asset.id);
+    try {
+      await publishAsset({ name: asset.name, dataUrl: asset.dataUrl, width: asset.width, height: asset.height });
+      setAssetTab("community");
+      await loadSharedAssets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "에셋을 공유하지 못했어요.");
+    } finally {
+      setPublishingId(null);
+    }
+  }
+
+  // 커뮤니티 에셋을 캔버스에 삽입(다운로드 카운트 증가)
+  function onUseSharedAsset(asset: SharedAsset) {
+    addRenderedImage(asset.dataUrl, asset.width, asset.height);
+    markSharedAssetUsed(asset.id);
+    setMenu(null);
+  }
+
+  async function onDeleteSharedAsset(id: string) {
+    try {
+      await deleteSharedAsset(id);
+      await loadSharedAssets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "공유 에셋을 삭제하지 못했어요.");
     }
   }
 
@@ -2033,58 +2103,136 @@ export function StudioPage() {
           </button>
           {menu === "asset" && (
             <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-3 shadow-lg">
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[0.66rem] font-bold text-fg-3">내 에셋 라이브러리</span>
-                <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-accent px-2 py-1 text-[0.65rem] font-medium text-white hover:bg-accent/90 transition-colors">
-                  <ImagePlus size={12} /> 업로드
-                  <input type="file" accept="image/*" className="hidden" onChange={onUploadAsset} />
-                </label>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-0.5 rounded-lg border border-line bg-card p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setAssetTab("mine")}
+                    className={cn(
+                      "rounded-md px-2 py-1 text-[0.65rem] font-semibold transition-colors",
+                      assetTab === "mine" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+                    )}
+                  >
+                    내 에셋
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssetTab("community")}
+                    className={cn(
+                      "flex items-center gap-1 rounded-md px-2 py-1 text-[0.65rem] font-semibold transition-colors",
+                      assetTab === "community" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+                    )}
+                  >
+                    <Globe size={11} /> 커뮤니티
+                  </button>
+                </div>
+                {assetTab === "mine" && (
+                  <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-accent px-2 py-1 text-[0.65rem] font-medium text-white hover:bg-accent/90 transition-colors">
+                    <ImagePlus size={12} /> 업로드
+                    <input type="file" accept="image/*" className="hidden" onChange={onUploadAsset} />
+                  </label>
+                )}
               </div>
 
-              {assetsLoading ? (
+              {assetTab === "mine" ? (
+                assetsLoading ? (
+                  <div className="flex h-32 items-center justify-center text-fg-3">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                ) : assets.length === 0 ? (
+                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                    <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                    {assets.map((asset) => (
+                      <div
+                        key={asset.id}
+                        className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addRenderedImage(asset.dataUrl, asset.width, asset.height);
+                            setMenu(null);
+                          }}
+                          className="w-full h-16 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center cursor-pointer"
+                          title={asset.name}
+                        >
+                          <img src={asset.dataUrl} alt={asset.name} className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
+                        </button>
+                        <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
+                          {asset.name}
+                        </span>
+                        <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => onShareAsset(asset)}
+                            disabled={publishingId === asset.id}
+                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-accent disabled:opacity-50"
+                            title="커뮤니티에 공유"
+                          >
+                            {publishingId === asset.id ? <Loader2 size={10} className="animate-spin" /> : <Share2 size={10} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteAsset(asset.id)}
+                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-red-500"
+                            title="삭제"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : sharedLoading ? (
                 <div className="flex h-32 items-center justify-center text-fg-3">
                   <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
-              ) : assets.length === 0 ? (
+              ) : sharedError ? (
                 <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                  <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
-                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">
-                    자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.
-                  </p>
+                  <p className="text-xs text-fg-3">{sharedError}</p>
+                  <button type="button" onClick={loadSharedAssets} className="mt-2 rounded-md border border-line px-2 py-1 text-[0.6rem] text-fg-2 hover:bg-raised">
+                    다시 시도
+                  </button>
+                </div>
+              ) : shared.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                  <p className="text-xs text-fg-3">아직 공유된 에셋이 없어요.</p>
+                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {assets.map((asset) => (
+                  {shared.map((asset) => (
                     <div
                       key={asset.id}
                       className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50"
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          addRenderedImage(asset.dataUrl, asset.width, asset.height);
-                          setMenu(null);
-                        }}
+                        onClick={() => onUseSharedAsset(asset)}
                         className="w-full h-16 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center cursor-pointer"
-                        title={asset.name}
+                        title={`${asset.name} · ${asset.author.name}`}
                       >
-                        <img
-                          src={asset.dataUrl}
-                          alt={asset.name}
-                          className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
-                        />
+                        <img src={asset.dataUrl} alt={asset.name} className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
                       </button>
                       <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
                         {asset.name}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteAsset(asset.id)}
-                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-red-500 hover:text-white transition-colors"
-                        title="삭제"
-                      >
-                        <X size={10} />
-                      </button>
+                      <span className="block w-full truncate text-center text-[0.55rem] text-fg-4">{asset.author.name}</span>
+                      {asset.isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteSharedAsset(asset.id)}
+                          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded bg-black/60 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
+                          title="공유 취소(삭제)"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   addComment,
+  bumpAssetDownloads,
   bumpViews,
   createWork,
+  deleteSharedAsset,
   deleteWork,
   getWork,
   listComments,
+  listSharedAssets,
   listWorks,
   parseCreatorSort,
+  publishAsset,
   toggleLike,
   updateWork,
 } from "../../../../../lib/server/creator";
@@ -83,5 +87,35 @@ export class CreatorService {
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "댓글을 작성할 수 없습니다.");
     }
+  }
+
+  async listSharedAssets(q: { mine?: string | null; limit?: string | null; offset?: string | null }, viewerId?: string) {
+    return listSharedAssets({
+      mineUserId: q.mine === "1" ? viewerId : undefined,
+      limit: q.limit ? Number(q.limit) : undefined,
+      offset: q.offset ? Number(q.offset) : undefined,
+      viewerId,
+    });
+  }
+
+  async publishAsset(userId: string, body: unknown) {
+    try {
+      return await publishAsset(userId, (body ?? {}) as Record<string, unknown>);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "에셋을 공유할 수 없습니다.");
+    }
+  }
+
+  async deleteSharedAsset(userId: string, id: string, isAdmin: boolean) {
+    try {
+      return await deleteSharedAsset(userId, id, isAdmin);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "에셋을 삭제할 수 없습니다.");
+    }
+  }
+
+  async useSharedAsset(id: string) {
+    await bumpAssetDownloads(id);
+    return { ok: true };
   }
 }

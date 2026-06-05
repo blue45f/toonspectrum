@@ -183,3 +183,74 @@ export async function postComment(id: string, text: string): Promise<WorkComment
   });
   return readOrThrow<WorkComment>(res, "댓글을 등록하지 못했습니다.");
 }
+
+// ── 공유 에셋(회원이 올려 모두가 재사용) ──────────────────────────────
+export interface SharedAsset {
+  id: string;
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind: string;
+  downloads: number;
+  author: WorkAuthor;
+  isOwner: boolean;
+  createdAt: string;
+}
+
+export interface PublishAssetInput {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind?: string;
+}
+
+export async function listSharedAssets(
+  params: { mine?: boolean; limit?: number; offset?: number } = {},
+  signal?: AbortSignal
+): Promise<SharedAsset[]> {
+  const search = new URLSearchParams();
+  if (params.mine) search.set("mine", "1");
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.offset) search.set("offset", String(params.offset));
+  const qs = search.toString();
+  const res = await fetch(`${BASE}/assets${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+    headers: authHeaders(false), // x-user-id 전송 → isOwner 판정/내 공유 필터
+    signal,
+  });
+  const data = await readOrThrow<unknown>(res, "공유 에셋을 불러오지 못했습니다.");
+  return ensureArray<SharedAsset>(data);
+}
+
+export async function publishAsset(input: PublishAssetInput): Promise<SharedAsset> {
+  const res = await fetch(`${BASE}/assets`, {
+    method: "POST",
+    cache: "no-store",
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  return readOrThrow<SharedAsset>(res, "에셋을 공유하지 못했습니다.");
+}
+
+export async function deleteSharedAsset(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/assets/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    cache: "no-store",
+    headers: authHeaders(false),
+  });
+  if (!res.ok) {
+    const data = await safeParseJson<unknown>(res);
+    throw new Error(resolveApiError(data, `에셋을 삭제하지 못했습니다. (${res.status})`));
+  }
+}
+
+// 사용(삽입) 시 다운로드 카운트 증가 — best-effort, 실패해도 무시.
+export async function markSharedAssetUsed(id: string): Promise<void> {
+  try {
+    await fetch(`${BASE}/assets/${encodeURIComponent(id)}/use`, { method: "POST", cache: "no-store" });
+  } catch {
+    // ignore
+  }
+}

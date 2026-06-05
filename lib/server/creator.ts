@@ -2,7 +2,7 @@
 // 스키마는 lib/db/schema.ts에 이미 존재(creatorWorks/creatorWorkLikes/creatorWorkComments) — 재정의하지 않는다.
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { creatorWorkComments, creatorWorkLikes, creatorWorks, db, users } from "../db";
+import { creatorAssets, creatorWorkComments, creatorWorkLikes, creatorWorks, db, users } from "../db";
 
 const SORTS = new Set<CreatorWorkSort>(["recent", "likes", "views"]);
 const FORMATS = new Set<CreatorWorkFormat>(["cuttoon", "upload"]);
@@ -509,4 +509,127 @@ export async function addComment(userId: string, workId: string, text: unknown):
     text: clean,
     createdAt: safeDate(now),
   };
+}
+
+// ── 공유 에셋(회원이 사이트에 올려 모두가 재사용) ──────────────────────
+const MAX_ASSET_NAME = 60;
+const MAX_ASSET_DATAURL = 3_000_000; // 데이터URL 길이 상한(DB 보호; 축소 webp 기준 충분)
+const ASSET_KINDS = new Set(["image", "sticker"]);
+
+export interface CreatorSharedAsset {
+  id: string;
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind: string;
+  downloads: number;
+  author: CreatorAuthor;
+  isOwner: boolean;
+  createdAt: string;
+}
+
+function clampDim(value: unknown): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(4096, n));
+}
+
+export async function listSharedAssets(opts: {
+  limit?: number;
+  offset?: number;
+  mineUserId?: string; // 지정 시 해당 회원이 올린 것만(내 공유 목록)
+  viewerId?: string;
+} = {}): Promise<CreatorSharedAsset[]> {
+  const limit = Math.max(1, Math.min(120, opts.limit ?? 60));
+  const offset = Math.max(0, opts.offset ?? 0);
+  const wheres: SQL[] = [eq(creatorAssets.hidden, false)];
+  if (opts.mineUserId) wheres.push(eq(creatorAssets.userId, opts.mineUserId));
+  const rows = await db
+    .select({
+      id: creatorAssets.id,
+      userId: creatorAssets.userId,
+      name: creatorAssets.name,
+      dataUrl: creatorAssets.dataUrl,
+      width: creatorAssets.width,
+      height: creatorAssets.height,
+      kind: creatorAssets.kind,
+      downloads: creatorAssets.downloads,
+      createdAt: creatorAssets.createdAt,
+      author: users.name,
+      avatar: users.avatar,
+    })
+    .from(creatorAssets)
+    .leftJoin(users, eq(creatorAssets.userId, users.id))
+    .where(and(...wheres))
+    .orderBy(desc(creatorAssets.createdAt))
+    .limit(limit)
+    .offset(offset);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    dataUrl: row.dataUrl,
+    width: row.width,
+    height: row.height,
+    kind: row.kind,
+    downloads: row.downloads,
+    author: authorOf(row),
+    isOwner: !!opts.viewerId && opts.viewerId === row.userId,
+    createdAt: safeDate(row.createdAt),
+  }));
+}
+
+export async function publishAsset(
+  userId: string,
+  input: { name?: unknown; dataUrl?: unknown; width?: unknown; height?: unknown; kind?: unknown }
+): Promise<CreatorSharedAsset> {
+  const name = clampText(input.name, MAX_ASSET_NAME) || "내 에셋";
+  const dataUrl = String(input.dataUrl ?? "");
+  if (!/^data:image\//.test(dataUrl)) throw new Error("이미지 데이터가 올바르지 않습니다.");
+  if (dataUrl.length > MAX_ASSET_DATAURL) throw new Error("이미지 용량이 너무 큽니다. (3MB 이하)");
+  const kind = ASSET_KINDS.has(input.kind as string) ? (input.kind as string) : "image";
+  const id = crypto.randomUUID();
+  const now = new Date();
+  await db.insert(creatorAssets).values({
+    id,
+    userId,
+    name,
+    dataUrl,
+    width: clampDim(input.width),
+    height: clampDim(input.height),
+    kind,
+    createdAt: now,
+  });
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return {
+    id,
+    name,
+    dataUrl,
+    width: clampDim(input.width),
+    height: clampDim(input.height),
+    kind,
+    downloads: 0,
+    author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
+    isOwner: true,
+    createdAt: safeDate(now),
+  };
+}
+
+export async function deleteSharedAsset(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
+  const [existing] = await db
+    .select({ id: creatorAssets.id, ownerId: creatorAssets.userId })
+    .from(creatorAssets)
+    .where(eq(creatorAssets.id, id))
+    .limit(1);
+  if (!existing) return { deleted: false };
+  if (existing.ownerId !== userId && !isAdmin) throw new Error("올린 사람만 삭제할 수 있습니다.");
+  await db.delete(creatorAssets).where(eq(creatorAssets.id, id));
+  return { deleted: true };
+}
+
+export async function bumpAssetDownloads(id: string): Promise<void> {
+  await db
+    .update(creatorAssets)
+    .set({ downloads: sql`${creatorAssets.downloads} + 1` })
+    .where(eq(creatorAssets.id, id));
 }
