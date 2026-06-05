@@ -17,6 +17,8 @@ import {
   ImagePlus,
   LayoutTemplate,
   Loader2,
+  Lock,
+  LockOpen,
   MessageCircle,
   Minus,
   MousePointer2,
@@ -129,8 +131,8 @@ interface DrawEl {
   opacity?: number;
   fill?: string;
 }
-// 인터섹션으로 모든 요소 변형에 `hidden?`(레이어 표시/숨김)을 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean };
+// 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
@@ -695,7 +697,8 @@ export function StudioPage() {
   useEffect(() => {
     const tr = trRef.current;
     if (!tr) return;
-    const node = selectedId && tool === "select" ? nodeRefs.current[selectedId] : null;
+    const selLocked = elements.find((e) => e.id === selectedId)?.locked;
+    const node = selectedId && tool === "select" && !selLocked ? nodeRefs.current[selectedId] : null;
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
   }, [selectedId, tool, elements]);
@@ -800,7 +803,7 @@ export function StudioPage() {
     if (selectedId === id) setSelectedId(null);
   }
   function removeSelected() {
-    if (!selectedId) return;
+    if (!selectedId || selected?.locked) return;
     removeById(selectedId);
   }
   function moveLayer(id: string, dir: "up" | "down") {
@@ -816,14 +819,14 @@ export function StudioPage() {
     if (!selected) return;
     const copy: El =
       selected.type === "draw"
-        ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16) }
-        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16 } as El);
+        ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16), hidden: false, locked: false }
+        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16, hidden: false, locked: false } as El);
     commit([...elements, copy]);
     setSelectedId(copy.id);
     setTool("select");
   }
   function nudgeSelected(dx: number, dy: number) {
-    if (!selected) return;
+    if (!selected || selected.locked) return;
     if (selected.type === "draw") {
       patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
     } else {
@@ -1581,8 +1584,8 @@ export function StudioPage() {
               />
               {elements.map((el) => {
                 if (el.hidden) return null; // 숨긴 레이어는 렌더/내보내기에서 제외
-                const draggable = tool === "select";
-                const onSelect = () => tool === "select" && setSelectedId(el.id);
+                const draggable = tool === "select" && !el.locked;
+                const onSelect = () => tool === "select" && !el.locked && setSelectedId(el.id);
                 const setRef = (n: Konva.Node | null) => {
                   nodeRefs.current[el.id] = n;
                 };
@@ -2127,17 +2130,34 @@ export function StudioPage() {
                     >
                       <button
                         type="button"
+                        disabled={el.locked}
                         onClick={() => {
                           setTool("select");
                           setSelectedId(el.id);
                         }}
                         className={cn(
-                          "min-w-0 flex-1 truncate text-left text-xs",
-                          el.hidden ? "text-fg-3/50 line-through" : "text-fg-2"
+                          "min-w-0 flex-1 truncate text-left text-xs disabled:cursor-default",
+                          el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
                         )}
                         title={elementLabel(el)}
                       >
                         {elementLabel(el)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const willLock = !el.locked;
+                          patchEl(el.id, { locked: willLock } as Partial<El>);
+                          if (willLock && selectedId === el.id) setSelectedId(null);
+                        }}
+                        className={cn(
+                          "grid size-6 place-items-center rounded hover:bg-raised",
+                          el.locked ? "text-accent" : "text-fg-3"
+                        )}
+                        aria-label={el.locked ? "레이어 잠금 해제" : "레이어 잠금"}
+                        title={el.locked ? "잠금 해제" : "잠금"}
+                      >
+                        {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
                       </button>
                       <button
                         type="button"
