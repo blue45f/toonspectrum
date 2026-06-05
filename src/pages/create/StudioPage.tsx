@@ -1148,13 +1148,19 @@ export function StudioPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
+  function spawnCenter(): [number, number] {
+    if (selected?.type === "frame") return [selected.x + selected.width / 2, selected.y + selected.height / 2];
+    return [CANVAS_W / 2, canvasH / 2];
+  }
   function addText() {
+    const [cx, cy] = spawnCenter();
     addEl({
       id: uid(),
       type: "text",
       text: "텍스트",
-      x: CANVAS_W / 2 - 110,
-      y: canvasH / 2 - 24,
+      x: cx - 110,
+      y: cy - 24,
       width: 220,
       fontSize: 40,
       fill: color,
@@ -1197,13 +1203,14 @@ export function StudioPage() {
       height = 180;
     }
 
+    const [cx, cy] = spawnCenter();
     addEl({
       id: uid(),
       type: "bubble",
       variant,
       text,
-      x: CANVAS_W / 2 - width / 2,
-      y: canvasH / 2 - height / 2,
+      x: cx - width / 2,
+      y: cy - height / 2,
       width,
       height,
       fill,
@@ -1213,16 +1220,18 @@ export function StudioPage() {
   }
   function addSticker(emoji: string) {
     setMenu(null);
-    addEl({ id: uid(), type: "sticker", text: emoji, x: CANVAS_W / 2 - 40, y: canvasH / 2 - 40, fontSize: 96, rotation: 0 });
+    const [cx, cy] = spawnCenter();
+    addEl({ id: uid(), type: "sticker", text: emoji, x: cx - 40, y: cy - 40, fontSize: 96, rotation: 0 });
   }
   function addSfx(text: string, fill: string) {
     setMenu(null);
+    const [cx, cy] = spawnCenter();
     addEl({
       id: uid(),
       type: "text",
       text,
-      x: CANVAS_W / 2 - 80,
-      y: canvasH / 2 - 50,
+      x: cx - 80,
+      y: cy - 50,
       width: 220,
       fontSize: 88,
       fill,
