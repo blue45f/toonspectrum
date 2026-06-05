@@ -367,31 +367,42 @@ export function ToonSpectrumMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.14)] bg-[linear-gradient(145deg,#201a14,#17130f)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
+        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.14)] bg-[#1c1613] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
         className
       )}
       aria-hidden
     >
-      <span className="absolute inset-0 bg-[radial-gradient(circle_at_20%_5%,oklch(0.72_0.185_42/0.28),transparent_48%),radial-gradient(circle_at_82%_90%,oklch(0.8_0.11_232/0.18),transparent_42%)]" />
       <svg className="relative size-full" viewBox="0 0 32 32" fill="none" focusable="false">
-        <path
-          d="M7.1 6.7h17.8c1.3 0 2.3 1 2.3 2.3v11.3c0 1.3-1 2.3-2.3 2.3h-8.3l-5 3.9c-.6.5-1.5 0-1.3-.8l.6-3.1H7.1c-1.3 0-2.3-1-2.3-2.3V9c0-1.3 1-2.3 2.3-2.3Z"
-          fill="#f8f0df"
-        />
-        <path
-          d="M7.1 6.7h17.8c1.3 0 2.3 1 2.3 2.3v11.3c0 1.3-1 2.3-2.3 2.3h-8.3l-5 3.9c-.6.5-1.5 0-1.3-.8l.6-3.1H7.1c-1.3 0-2.3-1-2.3-2.3V9c0-1.3 1-2.3 2.3-2.3Z"
-          stroke="#fff8ea"
-          strokeWidth="0.9"
-          opacity="0.45"
-        />
-        <path d="M7.1 16h6.2" stroke="#e06b3a" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M17.1 15.8C20 13 22.1 11.6 25.4 10.7" stroke="#e85d3f" strokeWidth="2.1" strokeLinecap="round" />
-        <path d="M17.3 15.9h8.5" stroke="#e4bd55" strokeWidth="2.1" strokeLinecap="round" />
-        <path d="M17.1 16.1C20.1 18.1 22.3 19.2 25.6 20.4" stroke="#54c87a" strokeWidth="2.1" strokeLinecap="round" />
-        <path d="M16.5 16.5C19.1 20.1 21.3 22 24.7 23.5" stroke="#5aa8dc" strokeWidth="2.1" strokeLinecap="round" />
-        <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" fill="#201a14" />
-        <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" stroke="#fff8ea" strokeWidth="0.75" opacity="0.42" />
-        <path d="M13.9 13.2 17.4 16l-3.5 2.8Z" fill="#f8f0df" opacity="0.12" />
+        {/* 머리 위 스펙트럼 안테나/방울들 */}
+        <circle cx="16" cy="4.5" r="2.2" fill="#ff5e62" /> {/* 빨강 */}
+        <circle cx="11" cy="6" r="1.8" fill="#ff9966" />   {/* 주황 */}
+        <circle cx="21" cy="6" r="1.8" fill="#ffd15c" />   {/* 노랑 */}
+        <circle cx="7" cy="9.5" r="1.4" fill="#4fe090" />   {/* 초록 */}
+        <circle cx="25" cy="9.5" r="1.4" fill="#4ca3f5" />  {/* 파랑 */}
+
+        {/* 말풍선 꼬리 */}
+        <path d="M 12 25 L 7 28.5 L 9 23 Z" fill="#ffffff" stroke="#251c17" strokeWidth="1.8" strokeLinejoin="round" />
+
+        {/* 귀여운 말풍선 몸통 */}
+        <rect x="6" y="8" width="20" height="17" rx="5.5" ry="5.5" fill="#ffffff" stroke="#251c17" strokeWidth="1.8" />
+        
+        {/* 볼터치 */}
+        <ellipse cx="9.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
+        <ellipse cx="22.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
+
+        {/* 똘망똘망한 눈 */}
+        {/* 왼쪽 눈 */}
+        <circle cx="12.2" cy="16" r="1.6" fill="#251c17" />
+        <circle cx="11.7" cy="15.5" r="0.5" fill="#ffffff" />
+        {/* 오른쪽 눈 */}
+        <circle cx="19.8" cy="16" r="1.6" fill="#251c17" />
+        <circle cx="19.3" cy="15.5" r="0.5" fill="#ffffff" />
+
+        {/* 귀여운 웃는 입 */}
+        <path d="M 14.5 18 Q 16 19.5 17.5 18" stroke="#251c17" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+
+        {/* 반짝이 노란 별 */}
+        <path d="M 23.5 11 L 24 12.3 L 25.3 12.8 L 24 13.3 L 23.5 14.6 L 23 13.3 L 21.7 12.8 L 23 12.3 Z" fill="#ffd15c" />
       </svg>
     </span>
   );
