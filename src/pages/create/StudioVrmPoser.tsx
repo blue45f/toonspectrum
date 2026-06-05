@@ -108,264 +108,276 @@ const EXPRESSION_ORDER = [
   "lookRight",
 ];
 
+const NATURAL_LIMBS: BoneRotationMap = {
+  leftUpperArm: [d(1), 0, d(82)],
+  rightUpperArm: [d(1), 0, d(-82)],
+  leftLowerArm: [0, 0, d(-6)],
+  rightLowerArm: [0, 0, d(6)],
+  leftHand: [0, 0, d(2)],
+  rightHand: [0, 0, d(-2)],
+  leftThumbProximal: [0, 0, 0],
+  leftIndexProximal: [0, 0, 0],
+  leftMiddleProximal: [0, 0, 0],
+  leftRingProximal: [0, 0, 0],
+  leftLittleProximal: [0, 0, 0],
+  rightThumbProximal: [0, 0, 0],
+  rightIndexProximal: [0, 0, 0],
+  rightMiddleProximal: [0, 0, 0],
+  rightRingProximal: [0, 0, 0],
+  rightLittleProximal: [0, 0, 0],
+  leftUpperLeg: [d(1), 0, d(1)],
+  rightUpperLeg: [d(-1), 0, d(-1)],
+  leftLowerLeg: [d(2), 0, 0],
+  rightLowerLeg: [d(2), 0, 0],
+  leftFoot: [0, 0, 0],
+  rightFoot: [0, 0, 0],
+};
+
+function naturalPose(core: BoneRotationMap = {}) {
+  return { ...NATURAL_LIMBS, ...core };
+}
+
 export const POSE_PRESETS: PosePreset[] = [
   {
     id: "default",
     label: "기본",
     tone: "편한 스탠딩",
-    bones: {
+    bones: naturalPose({
       spine: [d(1), 0, 0],
       chest: [d(-1), 0, 0],
       neck: [d(1), 0, 0],
       head: [d(-1), 0, 0],
-      leftUpperArm: [d(1), 0, d(82)],
-      rightUpperArm: [d(1), 0, d(-82)],
-      leftLowerArm: [0, 0, d(-6)],
-      rightLowerArm: [0, 0, d(6)],
-      leftHand: [0, 0, d(2)],
-      rightHand: [0, 0, d(-2)],
-      leftUpperLeg: [d(1), 0, d(1)],
-      rightUpperLeg: [d(-1), 0, d(-1)],
-    },
+    }),
   },
   {
     id: "wave",
     label: "손인사",
-    tone: "가벼운 인사",
-    bones: {
+    tone: "고개 인사",
+    bones: naturalPose({
       spine: [d(-1), d(-2), 0],
-      chest: [d(1), d(-3), d(1)],
+      chest: [d(1), d(-3), 0],
       head: [d(-1), d(3), 0],
-      leftUpperArm: [d(1), 0, d(82)],
-      leftLowerArm: [0, 0, d(-8)],
-      leftHand: [0, 0, d(2)],
-      rightUpperArm: [d(-6), d(-10), d(-64)],
-      rightLowerArm: [d(-4), d(5), d(-52)],
-      rightHand: [d(0), d(0), d(-10)],
-      rightIndexProximal: [d(-4), 0, 0],
-      rightMiddleProximal: [d(-4), 0, 0],
-      rightRingProximal: [d(-4), 0, 0],
-      rightLittleProximal: [d(-4), 0, 0],
-    },
+      rightUpperArm: [d(0), d(-4), d(-82)],
+      rightLowerArm: [0, 0, d(8)],
+      rightHand: [0, 0, d(-6)],
+    }),
   },
   {
     id: "point",
     label: "대화",
-    tone: "말하는 손짓",
-    bones: {
+    tone: "작은 손짓",
+    bones: naturalPose({
       hips: [0, d(-2), 0],
       spine: [d(-1), d(3), 0],
       chest: [d(1), d(4), 0],
       head: [d(-1), d(-4), 0],
-      leftUpperArm: [d(1), 0, d(82)],
-      leftLowerArm: [0, 0, d(-8)],
-      rightUpperArm: [d(-3), d(-18), d(-82)],
-      rightLowerArm: [d(-2), d(-2), d(22)],
-      rightHand: [d(0), d(-2), d(-3)],
-      rightThumbProximal: [d(10), d(-4), d(10)],
-      rightIndexProximal: [d(6), 0, 0],
-      rightMiddleProximal: [d(16), 0, 0],
-      rightRingProximal: [d(18), 0, 0],
-      rightLittleProximal: [d(20), 0, 0],
-    },
+      rightUpperArm: [d(0), d(-5), d(-82)],
+      rightLowerArm: [0, 0, d(10)],
+      rightHand: [0, d(-2), d(-4)],
+    }),
   },
   {
     id: "cheer",
     label: "기쁨",
-    tone: "작은 환호",
-    bones: {
+    tone: "가벼운 활기",
+    bones: naturalPose({
       hips: [d(-1), 0, 0],
       spine: [d(-3), 0, 0],
       chest: [d(4), 0, 0],
       head: [d(-3), 0, 0],
-      leftUpperArm: [d(-5), d(6), d(88)],
-      rightUpperArm: [d(-5), d(-6), d(-88)],
-      leftLowerArm: [d(-3), 0, d(-16)],
-      rightLowerArm: [d(-3), 0, d(16)],
-      leftHand: [d(2), 0, d(4)],
-      rightHand: [d(2), 0, d(-4)],
-      leftUpperLeg: [d(-1), 0, d(3)],
-      rightUpperLeg: [d(1), 0, d(-3)],
-    },
+      leftUpperArm: [d(0), d(2), d(84)],
+      rightUpperArm: [d(0), d(-2), d(-84)],
+    }),
   },
   {
     id: "think",
     label: "생각",
     tone: "고민 컷",
-    bones: {
-      hips: [0, d(3), 0],
+    bones: naturalPose({
+      hips: [0, d(2), 0],
       spine: [d(3), d(-3), 0],
-      chest: [d(1), d(-4), d(-1)],
-      neck: [d(1), d(3), d(1)],
-      head: [d(6), d(4), d(1)],
-      leftUpperArm: [d(1), 0, d(82)],
-      leftLowerArm: [d(0), 0, d(-10)],
-      rightUpperArm: [d(6), d(-10), d(-72)],
-      rightLowerArm: [d(-12), d(-4), d(-82)],
-      rightHand: [d(4), d(-4), d(-12)],
-      rightIndexProximal: [d(18), 0, 0],
-      rightMiddleProximal: [d(22), 0, 0],
-    },
+      chest: [d(1), d(-4), 0],
+      neck: [d(1), d(3), 0],
+      head: [d(6), d(4), 0],
+      rightHand: [d(2), d(-2), d(-4)],
+    }),
   },
   {
     id: "sit",
     label: "앉기",
-    tone: "패널 배치용",
-    yOffset: -0.34,
-    bones: {
-      hips: [d(-5), 0, 0],
+    tone: "낮은 자세",
+    yOffset: -0.08,
+    bones: naturalPose({
+      hips: [d(-4), 0, 0],
       spine: [d(4), 0, 0],
       chest: [d(-1), 0, 0],
       head: [d(-2), 0, 0],
-      leftUpperArm: [d(3), d(2), d(82)],
-      rightUpperArm: [d(3), d(-2), d(-82)],
-      leftLowerArm: [d(0), 0, d(-24)],
-      rightLowerArm: [d(0), 0, d(24)],
-      leftUpperLeg: [d(-68), d(0), d(4)],
-      rightUpperLeg: [d(-68), d(0), d(-4)],
-      leftLowerLeg: [d(72), 0, 0],
-      rightLowerLeg: [d(72), 0, 0],
-      leftFoot: [d(-10), 0, d(3)],
-      rightFoot: [d(-10), 0, d(-3)],
-    },
+      leftUpperLeg: [d(-10), 0, d(2)],
+      rightUpperLeg: [d(-10), 0, d(-2)],
+      leftLowerLeg: [d(14), 0, 0],
+      rightLowerLeg: [d(14), 0, 0],
+      leftFoot: [d(-4), 0, d(1)],
+      rightFoot: [d(-4), 0, d(-1)],
+    }),
   },
   {
     id: "run",
     label: "걷기",
-    tone: "이동 컷",
+    tone: "한 걸음",
     yOffset: -0.01,
-    bones: {
+    bones: naturalPose({
       hips: [d(-2), d(-3), 0],
       spine: [d(3), d(2), 0],
       chest: [d(-1), d(2), 0],
-      neck: [0, d(-2), 0],
       head: [d(-2), d(-3), 0],
-      leftUpperArm: [d(7), d(4), d(82)],
-      leftLowerArm: [d(-4), d(2), d(-22)],
-      rightUpperArm: [d(-8), d(-4), d(-84)],
-      rightLowerArm: [d(-4), d(-2), d(22)],
-      leftUpperLeg: [d(-18), d(0), d(3)],
-      leftLowerLeg: [d(20), 0, 0],
-      leftFoot: [d(-8), 0, d(2)],
-      rightUpperLeg: [d(12), d(0), d(-3)],
-      rightLowerLeg: [d(10), 0, 0],
-      rightFoot: [d(-5), 0, d(-2)],
-    },
+      leftUpperLeg: [d(-10), 0, d(2)],
+      leftLowerLeg: [d(12), 0, 0],
+      rightUpperLeg: [d(8), 0, d(-2)],
+      rightLowerLeg: [d(8), 0, 0],
+    }),
   },
   {
     id: "present",
     label: "설명",
-    tone: "양손 제스처",
-    bones: {
-      hips: [0, d(4), 0],
+    tone: "차분한 안내",
+    bones: naturalPose({
+      hips: [0, d(3), 0],
       spine: [d(-1), d(-3), 0],
       chest: [d(1), d(-4), 0],
       head: [d(-1), d(4), 0],
-      leftUpperArm: [d(-2), d(16), d(82)],
-      leftLowerArm: [0, d(3), d(-24)],
-      leftHand: [d(0), d(4), d(8)],
-      rightUpperArm: [d(-2), d(-16), d(-82)],
-      rightLowerArm: [0, d(-3), d(24)],
-      rightHand: [0, d(-4), d(-8)],
-      leftThumbProximal: [d(12), d(6), d(-12)],
-      leftIndexProximal: [d(8), 0, 0],
-      leftMiddleProximal: [d(12), 0, 0],
-      leftRingProximal: [d(14), 0, 0],
-      leftLittleProximal: [d(16), 0, 0],
-      rightThumbProximal: [d(12), d(-6), d(12)],
-      rightIndexProximal: [d(8), 0, 0],
-      rightMiddleProximal: [d(12), 0, 0],
-      rightRingProximal: [d(14), 0, 0],
-      rightLittleProximal: [d(16), 0, 0],
-    },
+      leftUpperArm: [d(0), d(5), d(82)],
+      rightUpperArm: [d(0), d(-5), d(-82)],
+      leftLowerArm: [0, 0, d(-8)],
+      rightLowerArm: [0, 0, d(8)],
+      leftHand: [0, d(2), d(4)],
+      rightHand: [0, d(-2), d(-4)],
+    }),
   },
   {
     id: "support",
     label: "응원",
-    tone: "박수 직전",
-    bones: {
+    tone: "작은 박수",
+    bones: naturalPose({
       hips: [d(-1), d(-2), 0],
       spine: [d(-3), d(2), 0],
       chest: [d(4), d(2), 0],
-      neck: [0, d(-1), 0],
       head: [d(-2), d(-1), 0],
-      leftUpperArm: [d(-8), d(12), d(86)],
-      leftLowerArm: [d(-6), 0, d(30)],
-      leftHand: [d(4), 0, d(6)],
-      rightUpperArm: [d(-8), d(-12), d(-86)],
-      rightLowerArm: [d(-6), 0, d(-30)],
-      rightHand: [d(4), 0, d(-6)],
-      leftUpperLeg: [d(-3), 0, d(3)],
-      rightUpperLeg: [d(3), 0, d(-3)],
-    },
+      leftUpperArm: [d(0), d(4), d(84)],
+      rightUpperArm: [d(0), d(-4), d(-84)],
+      leftLowerArm: [0, 0, d(10)],
+      rightLowerArm: [0, 0, d(-10)],
+    }),
   },
   {
     id: "despair",
     label: "낙담",
     tone: "차분한 저점",
     yOffset: -0.03,
-    bones: {
+    bones: naturalPose({
       hips: [d(4), 0, 0],
       spine: [d(8), 0, 0],
       chest: [d(5), 0, 0],
       neck: [d(6), 0, 0],
       head: [d(8), 0, 0],
-      leftUpperArm: [d(6), d(3), d(82)],
-      leftLowerArm: [d(4), 0, d(-12)],
-      leftHand: [d(6), 0, d(4)],
-      rightUpperArm: [d(6), d(-3), d(-82)],
-      rightLowerArm: [d(4), 0, d(12)],
-      rightHand: [d(6), 0, d(-4)],
-      leftUpperLeg: [d(2), 0, d(2)],
-      rightUpperLeg: [d(2), 0, d(-2)],
-    },
+      leftHand: [d(4), 0, d(2)],
+      rightHand: [d(4), 0, d(-2)],
+    }),
   },
   {
     id: "attack",
     label: "준비",
     tone: "차분한 대치",
     yOffset: -0.02,
-    bones: {
-      hips: [d(-4), d(-5), d(1)],
+    bones: naturalPose({
+      hips: [d(-4), d(-5), 0],
       spine: [d(4), d(4), 0],
-      chest: [d(-2), d(5), d(1)],
-      neck: [d(-1), d(-4), 0],
+      chest: [d(-2), d(5), 0],
       head: [d(-3), d(-5), 0],
-      leftUpperArm: [d(6), d(10), d(84)],
-      leftLowerArm: [d(-4), d(2), d(-18)],
-      leftHand: [d(4), 0, d(8)],
-      rightUpperArm: [d(-8), d(-16), d(-86)],
-      rightLowerArm: [d(-4), d(-3), d(-18)],
-      rightHand: [d(5), d(-2), d(-10)],
-      leftUpperLeg: [d(-12), d(0), d(5)],
-      leftLowerLeg: [d(18), 0, d(-2)],
-      rightUpperLeg: [d(8), d(0), d(-5)],
-      rightLowerLeg: [d(12), 0, d(2)],
-      rightFoot: [d(-6), 0, d(-3)],
-    },
+      leftUpperArm: [d(0), d(5), d(84)],
+      rightUpperArm: [d(0), d(-5), d(-84)],
+      leftUpperLeg: [d(-8), 0, d(3)],
+      rightUpperLeg: [d(6), 0, d(-3)],
+    }),
   },
   {
     id: "defense",
     label: "방어",
-    tone: "긴장/대치",
+    tone: "조심스러운 자세",
     yOffset: -0.02,
-    bones: {
+    bones: naturalPose({
       hips: [d(-3), d(4), 0],
       spine: [d(3), d(-4), 0],
       chest: [d(2), d(-5), 0],
-      neck: [0, d(4), 0],
       head: [d(-2), d(5), 0],
-      leftUpperArm: [d(-5), d(14), d(86)],
-      leftLowerArm: [d(-6), d(2), d(-22)],
-      leftHand: [d(5), d(3), d(8)],
-      rightUpperArm: [d(-5), d(-14), d(-86)],
-      rightLowerArm: [d(-6), d(-2), d(22)],
-      rightHand: [d(5), d(-3), d(-8)],
-      leftUpperLeg: [d(-8), 0, d(5)],
-      leftLowerLeg: [d(14), 0, d(-2)],
-      rightUpperLeg: [d(-6), 0, d(-5)],
-      rightLowerLeg: [d(12), 0, d(2)],
-    },
+      leftUpperArm: [d(0), d(5), d(84)],
+      rightUpperArm: [d(0), d(-5), d(-84)],
+      leftLowerArm: [0, 0, d(-8)],
+      rightLowerArm: [0, 0, d(8)],
+      leftUpperLeg: [d(-6), 0, d(3)],
+      rightUpperLeg: [d(-4), 0, d(-3)],
+    }),
+  },
+  {
+    id: "peace",
+    label: "브이",
+    tone: "셀카 포즈",
+    bones: naturalPose({
+      hips: [0, d(-4), 0],
+      spine: [d(1), d(4), 0],
+      chest: [d(-1), d(4), d(3)],
+      head: [d(2), d(-6), d(-5)],
+      rightUpperArm: [d(-35), d(-25), d(-135)],
+      rightLowerArm: [0, 0, d(30)],
+      rightHand: [0, 0, d(-15)],
+    }),
+  },
+  {
+    id: "fist",
+    label: "화이팅",
+    tone: "결의 컷",
+    bones: naturalPose({
+      hips: [d(-2), 0, 0],
+      spine: [d(-3), 0, 0],
+      chest: [d(4), 0, 0],
+      head: [d(-3), 0, 0],
+      rightUpperArm: [d(-45), d(-20), d(-45)],
+      rightLowerArm: [0, 0, d(75)],
+      rightHand: [0, 0, 0],
+      leftUpperArm: [d(10), d(10), d(78)],
+    }),
+  },
+  {
+    id: "flying",
+    label: "비상",
+    tone: "날아오르기",
+    yOffset: 0.12,
+    bones: naturalPose({
+      hips: [d(45), 0, 0],
+      spine: [d(-10), 0, 0],
+      chest: [d(-5), 0, 0],
+      head: [d(-35), 0, 0],
+      leftUpperArm: [d(-10), 0, d(25)],
+      rightUpperArm: [d(-10), 0, d(-25)],
+      leftUpperLeg: [d(25), 0, d(5)],
+      rightUpperLeg: [d(25), 0, d(-5)],
+    }),
+  },
+  {
+    id: "heart",
+    label: "하트",
+    tone: "로맨스 연출",
+    bones: naturalPose({
+      hips: [0, 0, 0],
+      spine: [d(2), 0, 0],
+      chest: [d(-2), 0, 0],
+      head: [d(4), 0, 0],
+      leftUpperArm: [d(-30), d(35), d(95)],
+      rightUpperArm: [d(-30), d(-35), d(-95)],
+      leftLowerArm: [0, 0, d(65)],
+      rightLowerArm: [0, 0, d(-65)],
+      leftHand: [0, 0, d(25)],
+      rightHand: [0, 0, d(-25)],
+    }),
   },
 ];
 
@@ -374,6 +386,9 @@ const CAMERA_PRESETS: CameraPreset[] = [
   { id: "threeQuarter", label: "사선", position: [1.55, 1.48, 2.75], target: [0, 1.2, 0], fov: 31 },
   { id: "low", label: "로우", position: [0.52, 0.92, 3.02], target: [0, 1.18, 0], fov: 32 },
   { id: "bust", label: "상반신", position: [0, 1.68, 2.1], target: [0, 1.45, 0], fov: 27 },
+  { id: "high", label: "하이 앵글", position: [0, 2.2, 2.8], target: [0, 1.2, 0], fov: 28 },
+  { id: "extremeLow", label: "웅장한 앵글", position: [0.1, 0.4, 2.5], target: [0, 1.3, 0], fov: 36 },
+  { id: "closeup", label: "얼굴 줌", position: [0, 1.55, 1.25], target: [0, 1.5, 0], fov: 25 },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -591,7 +606,39 @@ function VrmActor({ bodyRotation, poseId, vrm }: { bodyRotation: number; poseId:
   return <primitive object={vrm.scene} />;
 }
 
-function VrmLighting() {
+type LightingTone = "morning" | "sunset" | "night" | "studio";
+
+function VrmLighting({ tone }: { tone: LightingTone }) {
+  if (tone === "sunset") {
+    return (
+      <>
+        <ambientLight intensity={0.52} color="#ffe8d6" />
+        <directionalLight castShadow intensity={1.5} position={[2.8, 3.8, 3.0]} color="#ffa07a" shadow-mapSize={[1024, 1024]} />
+        <directionalLight intensity={0.6} position={[-3.2, 2.0, 2.1]} color="#ffb732" />
+        <directionalLight intensity={0.3} position={[-1.6, 3.4, -3.2]} color="#ff6b8b" />
+      </>
+    );
+  }
+  if (tone === "night") {
+    return (
+      <>
+        <ambientLight intensity={0.34} color="#1b1c30" />
+        <directionalLight castShadow intensity={0.92} position={[2.8, 4.2, 3.6]} color="#7fa3ff" shadow-mapSize={[1024, 1024]} />
+        <directionalLight intensity={0.4} position={[-3.2, 2.6, 2.1]} color="#483d8b" />
+        <directionalLight intensity={0.5} position={[-1.6, 3.4, -3.2]} color="#8a2be2" />
+      </>
+    );
+  }
+  if (tone === "studio") {
+    return (
+      <>
+        <ambientLight intensity={0.92} />
+        <directionalLight intensity={1.5} position={[0, 3.0, 4.0]} />
+        <directionalLight intensity={0.8} position={[3.0, 2.0, 2.0]} />
+        <directionalLight intensity={0.8} position={[-3.0, 2.0, 2.0]} />
+      </>
+    );
+  }
   return (
     <>
       <ambientLight intensity={0.68} />
@@ -618,6 +665,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
+  const [lightingTone, setLightingTone] = useState<LightingTone>("morning");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -942,7 +990,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                 >
                   <CaptureBridge captureRef={captureRef} />
                   <CameraDirector presetId={activeCameraId} />
-                  <VrmLighting />
+                  <VrmLighting tone={lightingTone} />
                   {vrm ? <VrmActor bodyRotation={bodyRotation} poseId={activePoseId} vrm={vrm} /> : null}
                   <ContactShadows position={[0, 0.01, 0]} opacity={0.22} scale={4.8} blur={2.35} far={2.6} resolution={512} color="#3c2b20" />
                   <OrbitControls
@@ -1219,6 +1267,35 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     onChange={handleBodyRotationChange}
                   />
                 </label>
+              </section>
+
+              <section className="mt-4">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <WandSparkles size={15} className="text-accent" aria-hidden />
+                  조명 연출
+                </h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: "morning", label: "아침" },
+                    { id: "sunset", label: "노을" },
+                    { id: "night", label: "밤" },
+                    { id: "studio", label: "스튜디오" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className={cx(
+                        CONTROL_BUTTON,
+                        lightingTone === preset.id
+                          ? "border-accent/55 bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                      )}
+                      onClick={() => setLightingTone(preset.id as LightingTone)}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </section>
             </div>
 
