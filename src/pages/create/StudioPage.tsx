@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal2,
+  Folder,
   Image as ImageIcon,
   Download,
   ImagePlus,
@@ -63,6 +64,12 @@ import { BG_SCENES, bgSceneSections } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
 import { CREATURE_STICKERS } from "./studio-creature-stickers";
+import {
+  saveAsset,
+  listAssets,
+  deleteAsset,
+  type StudioAsset,
+} from "./studio-asset-library";
 
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -144,7 +151,7 @@ interface DrawEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset";
 
 const uid = () => crypto.randomUUID();
 
@@ -831,6 +838,8 @@ export function StudioPage() {
   const [shapeFill, setShapeFill] = useState(false);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
+  const [assets, setAssets] = useState<StudioAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
   const [bgGrad, setBgGrad] = useState<string[] | null>(null);
   const [charPick, setCharPick] = useState<string>(CHARACTERS[0]?.id ?? "");
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
@@ -907,6 +916,49 @@ export function StudioPage() {
       alive = false;
     };
   }, [workId]);
+
+  // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
+  const loadAssetsList = async () => {
+    setAssetsLoading(true);
+    try {
+      const list = await listAssets();
+      setAssets(list);
+    } catch (err) {
+      console.error("Failed to load custom assets:", err);
+      setAssets([]);
+    } finally {
+      setAssetsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (menu === "asset") {
+      loadAssetsList();
+    }
+  }, [menu]);
+
+  async function onUploadAsset(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const { src, width, height } = await downscaleImageFile(file);
+      await saveAsset({ name: file.name, dataUrl: src, width, height });
+      await loadAssetsList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "에셋 업로드 실패");
+    } finally {
+      e.target.value = "";
+    }
+  }
+
+  async function onDeleteAsset(id: string) {
+    try {
+      await deleteAsset(id);
+      await loadAssetsList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "에셋 삭제 실패");
+    }
+  }
 
   // 트랜스포머를 선택 노드에 부착.
   useEffect(() => {
@@ -1819,6 +1871,71 @@ export function StudioPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+        <div className="relative">
+          <button type="button" onClick={() => setMenu(menu === "asset" ? null : "asset")} className={toolBtn(menu === "asset")}>
+            <Folder size={14} /> 내 에셋
+          </button>
+          {menu === "asset" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-3 shadow-lg">
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="text-[0.66rem] font-bold text-fg-3">내 에셋 라이브러리</span>
+                <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-accent px-2 py-1 text-[0.65rem] font-medium text-white hover:bg-accent/90 transition-colors">
+                  <ImagePlus size={12} /> 업로드
+                  <input type="file" accept="image/*" className="hidden" onChange={onUploadAsset} />
+                </label>
+              </div>
+
+              {assetsLoading ? (
+                <div className="flex h-32 items-center justify-center text-fg-3">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : assets.length === 0 ? (
+                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                  <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
+                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">
+                    자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {assets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addRenderedImage(asset.dataUrl, asset.width, asset.height);
+                          setMenu(null);
+                        }}
+                        className="w-full h-16 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center cursor-pointer"
+                        title={asset.name}
+                      >
+                        <img
+                          src={asset.dataUrl}
+                          alt={asset.name}
+                          className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
+                        />
+                      </button>
+                      <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
+                        {asset.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteAsset(asset.id)}
+                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-red-500 hover:text-white transition-colors"
+                        title="삭제"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
