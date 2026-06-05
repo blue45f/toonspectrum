@@ -75,6 +75,7 @@ import {
   type FrameSpec,
 } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
+import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES, bgSceneSections } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
@@ -980,6 +981,7 @@ export function StudioPage() {
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [color, setColor] = useState("#7c5cfc");
   const [strokeWidth, setStrokeWidth] = useState(6);
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
@@ -1763,8 +1765,12 @@ export function StudioPage() {
       } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
         removeSelected();
+      } else if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
-        setSelectedId(null);
+        if (shortcutsOpen) setShortcutsOpen(false);
+        else setSelectedId(null);
       } else if (selectedId && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();
@@ -3754,6 +3760,18 @@ export function StudioPage() {
           >
             ?
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShortcutsOpen(true)}
+            className="absolute bottom-3 right-16 z-30 grid size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            aria-label="키보드 단축키 보기"
+            title="키보드 단축키 (?)"
+          >
+            ⌨
+          </button>
+
+          <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
           {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 */}
           <div className="absolute bottom-3 left-3 z-30 flex items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur">
