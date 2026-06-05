@@ -28,12 +28,6 @@ function vGrad(id: string, stops: [string, string][]): string {
   return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${s}</linearGradient>`;
 }
 
-// 가로 linearGradient 헬퍼.
-function hGrad(id: string, stops: [string, string][]): string {
-  const s = stops.map(([off, col]) => `<stop offset="${off}" stop-color="${col}"/>`).join("");
-  return `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0">${s}</linearGradient>`;
-}
-
 // 방사형 그라디언트(보케/성운/태양광 등).
 function rGrad(id: string, cx: number, cy: number, r: number, stops: [string, string, string?][]): string {
   const s = stops
