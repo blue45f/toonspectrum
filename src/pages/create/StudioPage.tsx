@@ -5,6 +5,10 @@ import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, 
 import {
   AlignHorizontalJustifyCenter,
   AlignVerticalJustifyCenter,
+  AlignStartVertical,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignEndHorizontal,
   ArrowDownToLine,
   ArrowUpToLine,
   ChevronDown,
@@ -1696,7 +1700,8 @@ export function StudioPage() {
     commitCoalesced(next, `nudge:${id}`); // 연속 방향키는 한 번의 실행취소로 합침
   }
   // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
-  function centerSelected(axis: "h" | "v") {
+  // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하.
+  function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
     if (!selected || selected.locked) return;
     const b = elBounds(selected);
     const frame = containingPanel(selected, elements);
@@ -1704,14 +1709,19 @@ export function StudioPage() {
     const ow = frame ? frame.width : CANVAS_W;
     const oy = frame ? frame.y : 0;
     const oh = frame ? frame.height : canvasH;
-    const targetX = ox + (ow - b.w) / 2;
-    const targetY = oy + (oh - b.h) / 2;
-    const dx = axis === "h" ? targetX - b.x : 0;
-    const dy = axis === "v" ? targetY - b.y : 0;
+    let dx = 0;
+    let dy = 0;
+    if (mode === "left") dx = ox - b.x;
+    else if (mode === "right") dx = ox + ow - b.w - b.x;
+    else if (mode === "hcenter") dx = ox + (ow - b.w) / 2 - b.x;
+    else if (mode === "top") dy = oy - b.y;
+    else if (mode === "bottom") dy = oy + oh - b.h - b.y;
+    else if (mode === "vcenter") dy = oy + (oh - b.h) / 2 - b.y;
+    if (dx === 0 && dy === 0) return;
     if (selected.type === "draw") {
       patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
     } else {
-      patchEl(selected.id, (axis === "h" ? { x: targetX } : { y: targetY }) as Partial<El>);
+      patchEl(selected.id, { x: b.x + dx, y: b.y + dy } as Partial<El>);
     }
   }
   function reorder(dir: "front" | "back" | "forward" | "backward") {
@@ -4325,11 +4335,23 @@ export function StudioPage() {
                 <button type="button" onClick={() => reorder("back")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 뒤로">
                   <ArrowDownToLine size={14} />
                 </button>
-                <button type="button" onClick={() => centerSelected("h")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="가로 가운데 정렬">
+                <button type="button" onClick={() => alignSelected("left")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="왼쪽 정렬">
+                  <AlignStartVertical size={14} />
+                </button>
+                <button type="button" onClick={() => alignSelected("hcenter")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="가로 가운데 정렬">
                   <AlignHorizontalJustifyCenter size={14} />
                 </button>
-                <button type="button" onClick={() => centerSelected("v")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="세로 가운데 정렬">
+                <button type="button" onClick={() => alignSelected("right")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="오른쪽 정렬">
+                  <AlignEndVertical size={14} />
+                </button>
+                <button type="button" onClick={() => alignSelected("top")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="위쪽 정렬">
+                  <AlignStartHorizontal size={14} />
+                </button>
+                <button type="button" onClick={() => alignSelected("vcenter")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="세로 가운데 정렬">
                   <AlignVerticalJustifyCenter size={14} />
+                </button>
+                <button type="button" onClick={() => alignSelected("bottom")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="아래쪽 정렬">
+                  <AlignEndHorizontal size={14} />
                 </button>
                 <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘D)">
                   <Copy size={14} />
