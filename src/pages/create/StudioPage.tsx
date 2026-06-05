@@ -56,6 +56,7 @@ import {
 import { CHARACTERS, svgToDataUrl } from "./studio-characters";
 import { createCanvasImageElement } from "./studio-image-placement";
 import { BG_SCENES } from "./studio-bg-scenes";
+import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
 
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
@@ -1434,7 +1435,7 @@ export function StudioPage() {
                 패널을 선택하고 배경을 누르면 그 컷 안에 들어갑니다.
               </p>
               <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-1">
-                {BG_SCENES.map((bg) => (
+                {[...BG_SCENES, ...BG_SCENES_EXTRA].map((bg) => (
                   <button
                     key={bg.id}
                     type="button"

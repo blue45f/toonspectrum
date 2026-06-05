@@ -1,0 +1,774 @@
+import type { BgScene } from "./studio-bg-scenes";
+
+const W = 720;
+const H = 1080;
+
+type Stop = readonly [offset: string, color: string, opacity?: string];
+type Point = readonly [x: number, y: number];
+
+function scene(defs: string, body: string): string {
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${body}</svg>`;
+}
+
+function grad(id: string, x1: number, y1: number, x2: number, y2: number, stops: readonly Stop[]): string {
+  const s = stops
+    .map(([offset, color, opacity]) => `<stop offset="${offset}" stop-color="${color}"${opacity ? ` stop-opacity="${opacity}"` : ""}/>`)
+    .join("");
+  return `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${s}</linearGradient>`;
+}
+
+function vGrad(id: string, stops: readonly Stop[]): string {
+  return grad(id, 0, 0, 0, 1, stops);
+}
+
+function hGrad(id: string, stops: readonly Stop[]): string {
+  return grad(id, 0, 0, 1, 0, stops);
+}
+
+function rGrad(id: string, cx: number, cy: number, r: number, stops: readonly Stop[]): string {
+  const s = stops
+    .map(([offset, color, opacity]) => `<stop offset="${offset}" stop-color="${color}"${opacity ? ` stop-opacity="${opacity}"` : ""}/>`)
+    .join("");
+  return `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse">${s}</radialGradient>`;
+}
+
+function bg(fill: string): string {
+  return `<rect x="0" y="0" width="${W}" height="${H}" fill="${fill}"/>`;
+}
+
+function rng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function stars(count: number, seed: number, x0: number, y0: number, x1: number, y1: number, rMin: number, rMax: number, fill: string): string {
+  const random = rng(seed);
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    const cx = (x0 + random() * (x1 - x0)).toFixed(1);
+    const cy = (y0 + random() * (y1 - y0)).toFixed(1);
+    const rad = (rMin + random() * (rMax - rMin)).toFixed(2);
+    const op = (0.35 + random() * 0.65).toFixed(2);
+    out += `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="${fill}" opacity="${op}"/>`;
+  }
+  return out;
+}
+
+function ridge(peaks: readonly Point[], baseY: number, fill: string, opacity = "1"): string {
+  let d = `M0 ${baseY}`;
+  for (const [x, y] of peaks) d += ` L ${x} ${y}`;
+  d += ` L${W} ${baseY} L${W} ${H} L0 ${H} Z`;
+  return `<path d="${d}" fill="${fill}" opacity="${opacity}"/>`;
+}
+
+function mist(y: number, h: number, fill: string, opacity: string): string {
+  return `<path d="M0 ${y} C160 ${y - 28} 280 ${y + 28} 430 ${y + 4} S630 ${y - 26} 720 ${y + 10} L720 ${y + h} C520 ${y + h - 20} 330 ${y + h + 22} 0 ${y + h - 4} Z" fill="${fill}" opacity="${opacity}"/>`;
+}
+
+function bambooStalk(x: number, width: number, base: number, height: number, lean: number, fill: string, nodeFill: string): string {
+  const topX = x + lean;
+  const body = `<path d="M${x - width / 2} ${base} C${x + lean * 0.2} ${base - height * 0.35} ${x + lean * 0.75} ${base - height * 0.7} ${topX - width / 2} ${base - height} L${topX + width / 2} ${base - height} C${x + lean * 0.8 + width / 2} ${base - height * 0.7} ${x + lean * 0.25 + width / 2} ${base - height * 0.35} ${x + width / 2} ${base} Z" fill="${fill}"/>`;
+  let nodes = "";
+  for (let i = 1; i < 8; i++) {
+    const t = i / 8;
+    const y = base - height * t;
+    const nx = x + lean * t;
+    nodes += `<path d="M${(nx - width * 0.65).toFixed(1)} ${y.toFixed(1)} Q${nx.toFixed(1)} ${(y + 4).toFixed(1)} ${(nx + width * 0.65).toFixed(1)} ${y.toFixed(1)}" stroke="${nodeFill}" stroke-width="3" fill="none" opacity="0.8"/>`;
+  }
+  return body + nodes;
+}
+
+function bambooLeaves(x: number, y: number, scale: number, fill: string, opacity: string): string {
+  let out = `<g transform="translate(${x} ${y}) scale(${scale})" fill="${fill}" opacity="${opacity}">`;
+  for (const [dx, dy, rot] of [
+    [-30, -18, -28],
+    [-12, -26, -6],
+    [18, -20, 18],
+    [38, -8, 36],
+    [-45, 4, -46],
+  ] as readonly (readonly [number, number, number])[]) {
+    out += `<path d="M${dx} ${dy} q36 -12 72 0 q-36 18 -72 0 Z" transform="rotate(${rot} ${dx} ${dy})"/>`;
+  }
+  return `${out}</g>`;
+}
+
+function pine(x: number, baseY: number, height: number, width: number, fill: string): string {
+  const trunkW = Math.max(5, width * 0.12);
+  let out = `<rect x="${(x - trunkW / 2).toFixed(1)}" y="${(baseY - height * 0.16).toFixed(1)}" width="${trunkW.toFixed(1)}" height="${(height * 0.18).toFixed(1)}" fill="${fill}"/>`;
+  for (let i = 0; i < 4; i++) {
+    const top = baseY - height + i * height * 0.18;
+    const bottom = baseY - height * 0.44 + i * height * 0.13;
+    const tierW = width * (1 - i * 0.12);
+    out += `<path d="M${x} ${top.toFixed(1)} L${(x - tierW / 2).toFixed(1)} ${bottom.toFixed(1)} L${(x + tierW / 2).toFixed(1)} ${bottom.toFixed(1)} Z" fill="${fill}"/>`;
+  }
+  return out;
+}
+
+function building(x: number, baseY: number, width: number, height: number, fill: string, windowFill: string, seed: number): string {
+  let out = `<rect x="${x}" y="${(baseY - height).toFixed(1)}" width="${width}" height="${height.toFixed(1)}" fill="${fill}"/>`;
+  const random = rng(seed);
+  const cols = Math.max(2, Math.floor(width / 22));
+  const rows = Math.max(4, Math.floor(height / 36));
+  const cellW = (width - 18) / cols;
+  const cellH = (height - 26) / rows;
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      if (random() < 0.36) continue;
+      const wx = x + 9 + c * cellW + cellW * 0.22;
+      const wy = baseY - height + 16 + r * cellH + cellH * 0.2;
+      out += `<rect x="${wx.toFixed(1)}" y="${wy.toFixed(1)}" width="${(cellW * 0.55).toFixed(1)}" height="${(cellH * 0.48).toFixed(1)}" fill="${windowFill}" opacity="${(0.42 + random() * 0.58).toFixed(2)}"/>`;
+    }
+  }
+  return out;
+}
+
+function rain(count: number, seed: number, color: string, opacity: string): string {
+  const random = rng(seed);
+  let out = `<g stroke="${color}" stroke-width="2" stroke-linecap="round" opacity="${opacity}">`;
+  for (let i = 0; i < count; i++) {
+    const x = random() * (W + 180) - 90;
+    const y = random() * H;
+    const len = 34 + random() * 56;
+    out += `<line x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x - 18).toFixed(1)}" y2="${(y + len).toFixed(1)}"/>`;
+  }
+  return `${out}</g>`;
+}
+
+function lightShaft(x: number, y: number, width: number, height: number, fill: string, opacity: string): string {
+  return `<path d="M${x} ${y} L${x + width} ${y} L${x + width * 1.55} ${y + height} L${x - width * 0.55} ${y + height} Z" fill="${fill}" opacity="${opacity}"/>`;
+}
+
+function windowGrid(x: number, y: number, width: number, height: number, cols: number, rows: number, frame: string, glass: string): string {
+  let out = `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${glass}" stroke="${frame}" stroke-width="5"/>`;
+  for (let c = 1; c < cols; c++) {
+    const gx = x + (width / cols) * c;
+    out += `<line x1="${gx.toFixed(1)}" y1="${y}" x2="${gx.toFixed(1)}" y2="${y + height}" stroke="${frame}" stroke-width="3"/>`;
+  }
+  for (let r = 1; r < rows; r++) {
+    const gy = y + (height / rows) * r;
+    out += `<line x1="${x}" y1="${gy.toFixed(1)}" x2="${x + width}" y2="${gy.toFixed(1)}" stroke="${frame}" stroke-width="3"/>`;
+  }
+  return out;
+}
+
+function snow(count: number, seed: number, fill: string): string {
+  const random = rng(seed);
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    const cx = (random() * W).toFixed(1);
+    const cy = (random() * H).toFixed(1);
+    const r = (0.8 + random() * 3.4).toFixed(1);
+    out += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="${(0.35 + random() * 0.55).toFixed(2)}"/>`;
+  }
+  return out;
+}
+
+const sMurimBambooCanyon = (() => {
+  const defs =
+    vGrad("mbc-sky", [
+      ["0", "#edf6df"],
+      ["0.48", "#c9dfb8"],
+      ["1", "#829d74"],
+    ]) +
+    rGrad("mbc-mist-glow", 360, 245, 520, [
+      ["0", "#fff8dc", "0.78"],
+      ["0.58", "#dceabb", "0.28"],
+      ["1", "#dceabb", "0"],
+    ]) +
+    hGrad("mbc-cliff-left", [
+      ["0", "#18291d"],
+      ["0.58", "#37563c"],
+      ["1", "#6f8362"],
+    ]) +
+    hGrad("mbc-cliff-right", [
+      ["0", "#7e936d"],
+      ["0.45", "#405f42"],
+      ["1", "#142517"],
+    ]) +
+    vGrad("mbc-ground", [
+      ["0", "#6a7650"],
+      ["0.52", "#35472d"],
+      ["1", "#182817"],
+    ]);
+  let farBamboo = "";
+  for (let i = 0; i < 11; i++) {
+    farBamboo += bambooStalk(20 + i * 70, 12, 980, 760, -30 + i * 5, "#6f9364", "#516f49");
+  }
+  let nearBamboo = "";
+  for (let i = 0; i < 7; i++) {
+    nearBamboo += bambooStalk(48 + i * 112, 24 + (i % 2) * 5, 1120, 1040, i % 2 === 0 ? 34 : -28, "#2f5732", "#1f3d23");
+    nearBamboo += bambooLeaves(62 + i * 112, 150 + (i % 3) * 80, 0.85 + (i % 2) * 0.18, "#2f5732", "0.75");
+  }
+  const body =
+    bg("url(#mbc-sky)") +
+    bg("url(#mbc-mist-glow)") +
+    `<g opacity="0.55">${farBamboo}</g>` +
+    `<path d="M0 350 C80 500 95 760 0 1080 L0 1080 Z" fill="url(#mbc-cliff-left)"/>` +
+    `<path d="M720 300 C610 510 600 760 720 1080 L720 1080 Z" fill="url(#mbc-cliff-right)"/>` +
+    ridge(
+      [
+        [110, 680],
+        [250, 595],
+        [392, 662],
+        [544, 570],
+        [690, 645],
+      ],
+      760,
+      "#536c4c",
+      "0.45",
+    ) +
+    mist(650, 90, "#f4f7e5", "0.48") +
+    nearBamboo +
+    `<path d="M0 900 C170 840 310 890 430 850 S620 800 720 850 L720 1080 L0 1080 Z" fill="url(#mbc-ground)"/>` +
+    `<path d="M330 980 C380 895 438 855 526 820" stroke="#cbd6a5" stroke-width="5" fill="none" opacity="0.36"/>`;
+  return scene(defs, body);
+})();
+
+const sSageukTiledNight = (() => {
+  const defs =
+    vGrad("stn-sky", [
+      ["0", "#080d24"],
+      ["0.56", "#1b2853"],
+      ["1", "#40527c"],
+    ]) +
+    rGrad("stn-moon", 548, 172, 210, [
+      ["0", "#fff4d7", "0.95"],
+      ["0.42", "#f8dca4", "0.42"],
+      ["1", "#f8dca4", "0"],
+    ]) +
+    vGrad("stn-paper", [
+      ["0", "#ffe9bc"],
+      ["1", "#b46b3f"],
+    ]) +
+    hGrad("stn-roof", [
+      ["0", "#10182b"],
+      ["0.5", "#31415b"],
+      ["1", "#0b1020"],
+    ]) +
+    vGrad("stn-courtyard", [
+      ["0", "#2f354d"],
+      ["1", "#0b0e18"],
+    ]);
+  const roofBack = `<path d="M-20 470 Q160 400 348 468 T740 452 L700 520 Q360 492 25 526 Z" fill="#26324a" opacity="0.72"/>`;
+  const roofFront =
+    `<path d="M-50 612 Q180 520 370 604 T770 582 L720 674 Q360 642 0 690 Z" fill="url(#stn-roof)"/>` +
+    `<path d="M14 628 Q178 592 352 630 T690 618" stroke="#62708e" stroke-width="7" fill="none" opacity="0.58"/>`;
+  let tiles = "";
+  for (let x = -30; x < 760; x += 46) {
+    tiles += `<path d="M${x} 614 Q${x + 22} 594 ${x + 46} 614" stroke="#71809a" stroke-width="3" fill="none" opacity="0.42"/>`;
+  }
+  const lanterns =
+    `<g>` +
+    `<line x1="112" y1="598" x2="112" y2="704" stroke="#392219" stroke-width="4"/>` +
+    `<ellipse cx="112" cy="735" rx="34" ry="48" fill="url(#stn-paper)" opacity="0.95"/>` +
+    `<line x1="596" y1="586" x2="596" y2="702" stroke="#392219" stroke-width="4"/>` +
+    `<ellipse cx="596" cy="734" rx="34" ry="48" fill="url(#stn-paper)" opacity="0.95"/>` +
+    `</g>`;
+  const body =
+    bg("url(#stn-sky)") +
+    `<circle cx="548" cy="172" r="210" fill="url(#stn-moon)"/>` +
+    `<circle cx="548" cy="172" r="74" fill="#fff4d7"/>` +
+    stars(76, 2201, 0, 0, 720, 420, 0.5, 1.9, "#d9e5ff") +
+    mist(385, 80, "#b7c5dc", "0.13") +
+    roofBack +
+    `<rect x="64" y="520" width="592" height="430" fill="#1e263a"/>` +
+    windowGrid(98, 578, 178, 244, 4, 5, "#6b4b2d", "url(#stn-paper)") +
+    windowGrid(444, 578, 178, 244, 4, 5, "#6b4b2d", "url(#stn-paper)") +
+    `<rect x="314" y="610" width="92" height="340" fill="#151b2a"/>` +
+    roofFront +
+    tiles +
+    lanterns +
+    `<path d="M0 906 C170 884 386 930 720 884 L720 1080 L0 1080 Z" fill="url(#stn-courtyard)"/>`;
+  return scene(defs, body);
+})();
+
+const sCyberNeonCity = (() => {
+  const defs =
+    vGrad("cnc-sky", [
+      ["0", "#050713"],
+      ["0.48", "#10133a"],
+      ["1", "#25082e"],
+    ]) +
+    rGrad("cnc-haze-a", 170, 545, 430, [
+      ["0", "#00e5ff", "0.34"],
+      ["0.7", "#00e5ff", "0.1"],
+      ["1", "#00e5ff", "0"],
+    ]) +
+    rGrad("cnc-haze-b", 590, 470, 430, [
+      ["0", "#ff3ca6", "0.42"],
+      ["0.66", "#ff3ca6", "0.14"],
+      ["1", "#ff3ca6", "0"],
+    ]) +
+    vGrad("cnc-road", [
+      ["0", "#211a32"],
+      ["0.45", "#111623"],
+      ["1", "#050713"],
+    ]) +
+    hGrad("cnc-neon", [
+      ["0", "#00f5ff"],
+      ["0.52", "#f9f871"],
+      ["1", "#ff2ea6"],
+    ]);
+  let far = "";
+  const randomFar = rng(301);
+  for (let x = -12; x < 720; x += 54) {
+    far += building(x, 760, 46, 180 + randomFar() * 300, "#1a2141", "#54e8ff", 400 + x);
+  }
+  let near = "";
+  const randomNear = rng(302);
+  for (let x = -40; x < 760; x += 92) {
+    const h = 300 + randomNear() * 470;
+    near += building(x, 1080, 78, h, "#080b19", randomNear() < 0.5 ? "#ff4eb3" : "#00f5ff", 900 + x);
+    near += `<rect x="${x + 10}" y="${(1080 - h + 26).toFixed(1)}" width="56" height="12" fill="url(#cnc-neon)" opacity="0.9"/>`;
+  }
+  const roadLines =
+    `<path d="M340 720 L270 1080" stroke="#00f5ff" stroke-width="5" opacity="0.65"/>` +
+    `<path d="M382 720 L492 1080" stroke="#ff2ea6" stroke-width="5" opacity="0.65"/>` +
+    `<path d="M360 728 L360 1080" stroke="#f9f871" stroke-width="4" stroke-dasharray="28 24" opacity="0.72"/>`;
+  const signs =
+    `<g opacity="0.94">` +
+    `<rect x="58" y="430" width="126" height="44" fill="#05101c" stroke="#00f5ff" stroke-width="4"/>` +
+    `<path d="M78 452 H164" stroke="#00f5ff" stroke-width="5"/>` +
+    `<rect x="516" y="342" width="102" height="138" fill="#150916" stroke="#ff2ea6" stroke-width="4"/>` +
+    `<path d="M540 382 H596 M540 424 H584" stroke="#ff2ea6" stroke-width="6"/>` +
+    `</g>`;
+  const body =
+    bg("url(#cnc-sky)") +
+    bg("url(#cnc-haze-a)") +
+    bg("url(#cnc-haze-b)") +
+    stars(70, 303, 0, 0, 720, 580, 0.8, 2.4, "#80f7ff") +
+    `<g opacity="0.56">${far}</g>` +
+    near +
+    signs +
+    `<path d="M0 720 H720 L630 1080 H80 Z" fill="url(#cnc-road)"/>` +
+    roadLines +
+    mist(670, 120, "#00f5ff", "0.1");
+  return scene(defs, body);
+})();
+
+const sSfStarshipInterior = (() => {
+  const defs =
+    vGrad("ssi-space", [
+      ["0", "#020716"],
+      ["0.52", "#0c1a35"],
+      ["1", "#111827"],
+    ]) +
+    rGrad("ssi-planet", 516, 315, 260, [
+      ["0", "#7dd3fc", "0.94"],
+      ["0.55", "#2563eb", "0.42"],
+      ["1", "#2563eb", "0"],
+    ]) +
+    hGrad("ssi-panel", [
+      ["0", "#101827"],
+      ["0.52", "#28364c"],
+      ["1", "#0b1220"],
+    ]) +
+    vGrad("ssi-floor", [
+      ["0", "#1f2937"],
+      ["0.48", "#111827"],
+      ["1", "#050914"],
+    ]) +
+    rGrad("ssi-console", 360, 795, 280, [
+      ["0", "#22d3ee", "0.4"],
+      ["0.66", "#22d3ee", "0.12"],
+      ["1", "#22d3ee", "0"],
+    ]);
+  const viewport =
+    `<path d="M78 118 H642 Q666 118 666 144 V506 Q666 532 642 532 H78 Q54 532 54 506 V144 Q54 118 78 118 Z" fill="#030712" stroke="#334155" stroke-width="12"/>` +
+    `<path d="M98 148 H622 Q638 148 638 164 V486 Q638 502 622 502 H98 Q82 502 82 486 V164 Q82 148 98 148 Z" fill="url(#ssi-space)"/>`;
+  const frame =
+    `<path d="M54 532 L0 700 V1080 H168 L248 532 Z" fill="url(#ssi-panel)"/>` +
+    `<path d="M666 532 L720 700 V1080 H552 L472 532 Z" fill="url(#ssi-panel)"/>` +
+    `<path d="M236 532 H484 L552 1080 H168 Z" fill="#111827"/>`;
+  const consoles =
+    `<path d="M112 760 H608 L680 1080 H40 Z" fill="url(#ssi-floor)"/>` +
+    `<path d="M190 816 H530 L590 1004 H130 Z" fill="#0f172a" stroke="#334155" stroke-width="5"/>` +
+    `<rect x="230" y="850" width="112" height="54" rx="8" fill="#083344" stroke="#22d3ee" stroke-width="3"/>` +
+    `<rect x="376" y="850" width="94" height="54" rx="8" fill="#1e1b4b" stroke="#818cf8" stroke-width="3"/>` +
+    `<path d="M242 930 H510" stroke="#22d3ee" stroke-width="4" stroke-dasharray="20 12" opacity="0.7"/>` +
+    bg("url(#ssi-console)");
+  const body =
+    bg("#050914") +
+    viewport +
+    `<circle cx="516" cy="315" r="260" fill="url(#ssi-planet)"/>` +
+    stars(120, 441, 92, 150, 638, 492, 0.5, 1.7, "#dbeafe") +
+    `<path d="M382 186 C500 230 560 314 602 448" stroke="#bae6fd" stroke-width="18" fill="none" opacity="0.24"/>` +
+    frame +
+    `<path d="M88 612 H632" stroke="#475569" stroke-width="10"/>` +
+    consoles +
+    lightShaft(238, 532, 68, 356, "#60a5fa", "0.12") +
+    lightShaft(420, 532, 68, 356, "#22d3ee", "0.1");
+  return scene(defs, body);
+})();
+
+const sHorrorFogHouse = (() => {
+  const defs =
+    vGrad("hfh-sky", [
+      ["0", "#10151c"],
+      ["0.55", "#34404a"],
+      ["1", "#6b7068"],
+    ]) +
+    rGrad("hfh-moon", 522, 210, 240, [
+      ["0", "#d8ddc9", "0.76"],
+      ["0.5", "#b6bdab", "0.34"],
+      ["1", "#b6bdab", "0"],
+    ]) +
+    hGrad("hfh-fog", [
+      ["0", "#c8cebf", "0"],
+      ["0.45", "#c8cebf", "0.42"],
+      ["1", "#c8cebf", "0"],
+    ]) +
+    vGrad("hfh-house", [
+      ["0", "#313438"],
+      ["1", "#0d0f12"],
+    ]) +
+    vGrad("hfh-ground", [
+      ["0", "#30352f"],
+      ["1", "#090b0a"],
+    ]);
+  let trees = "";
+  for (let i = 0; i < 12; i++) {
+    const x = 24 + i * 64;
+    const h = 300 + (i % 4) * 72;
+    trees += `<path d="M${x} 840 C${x - 20} 640 ${x + 18} 520 ${x - 8} ${840 - h}" stroke="#151a19" stroke-width="${10 + (i % 3) * 3}" fill="none" stroke-linecap="round" opacity="${i % 2 === 0 ? "0.88" : "0.6"}"/>`;
+    trees += `<path d="M${x} ${690 - i * 4} q-42 -40 -92 -34 M${x + 4} ${650 - i * 5} q42 -44 92 -38" stroke="#151a19" stroke-width="6" fill="none" opacity="0.55"/>`;
+  }
+  const house =
+    `<path d="M185 520 L360 394 L540 520 Z" fill="#171a1d"/>` +
+    `<path d="M214 520 H512 L540 926 H184 Z" fill="url(#hfh-house)"/>` +
+    `<path d="M160 536 L360 372 L566 536" stroke="#0a0b0d" stroke-width="34" fill="none" stroke-linecap="round"/>` +
+    `<rect x="258" y="606" width="64" height="86" fill="#d5b064" opacity="0.24"/>` +
+    `<rect x="414" y="622" width="56" height="72" fill="#d5b064" opacity="0.16"/>` +
+    `<path d="M338 746 H416 V926 H338 Z" fill="#08090a"/>` +
+    `<path d="M226 566 L512 566" stroke="#3f4548" stroke-width="6" opacity="0.5"/>`;
+  const body =
+    bg("url(#hfh-sky)") +
+    `<circle cx="522" cy="210" r="240" fill="url(#hfh-moon)"/>` +
+    `<circle cx="522" cy="210" r="82" fill="#cfd5c2" opacity="0.9"/>` +
+    trees +
+    mist(476, 120, "#aeb5aa", "0.28") +
+    house +
+    bg("url(#hfh-fog)") +
+    mist(726, 150, "#d6dccf", "0.42") +
+    mist(862, 170, "#aeb5aa", "0.36") +
+    `<path d="M0 850 C210 804 408 870 720 812 L720 1080 L0 1080 Z" fill="url(#hfh-ground)"/>`;
+  return scene(defs, body);
+})();
+
+const sSchoolRooftopSunset = (() => {
+  const defs =
+    vGrad("srs-sky", [
+      ["0", "#6d6ed5"],
+      ["0.35", "#f08eb1"],
+      ["0.76", "#ffd081"],
+      ["1", "#ffe7bd"],
+    ]) +
+    rGrad("srs-sun", 560, 380, 280, [
+      ["0", "#fff7c8", "0.96"],
+      ["0.5", "#ffd36f", "0.54"],
+      ["1", "#ff8b6f", "0"],
+    ]) +
+    hGrad("srs-cloud", [
+      ["0", "#ffffff", "0"],
+      ["0.45", "#ffe5cf", "0.58"],
+      ["1", "#ffffff", "0"],
+    ]) +
+    vGrad("srs-floor", [
+      ["0", "#607083"],
+      ["0.48", "#46566a"],
+      ["1", "#253044"],
+    ]) +
+    vGrad("srs-fence", [
+      ["0", "#eef3ff"],
+      ["1", "#8795ad"],
+    ]);
+  let skyline = "";
+  const random = rng(510);
+  for (let x = -20; x < 740; x += 68) {
+    skyline += building(x, 748, 58, 96 + random() * 178, "#6c6684", "#ffe6a8", 700 + x);
+  }
+  let fence = "";
+  for (let x = 36; x <= 684; x += 54) {
+    fence += `<line x1="${x}" y1="618" x2="${x}" y2="854" stroke="url(#srs-fence)" stroke-width="7"/>`;
+  }
+  const body =
+    bg("url(#srs-sky)") +
+    `<circle cx="560" cy="380" r="280" fill="url(#srs-sun)"/>` +
+    bg("url(#srs-cloud)") +
+    mist(252, 74, "#fff0d6", "0.22") +
+    skyline +
+    `<rect x="0" y="600" width="720" height="28" fill="#3b4658"/>` +
+    `<line x1="20" y1="618" x2="700" y2="618" stroke="url(#srs-fence)" stroke-width="8"/>` +
+    `<line x1="24" y1="738" x2="696" y2="738" stroke="#dbe4f4" stroke-width="6" opacity="0.75"/>` +
+    fence +
+    `<path d="M0 820 L720 760 L720 1080 L0 1080 Z" fill="url(#srs-floor)"/>` +
+    `<path d="M120 930 L642 846" stroke="#1f2937" stroke-width="5" opacity="0.36"/>` +
+    `<rect x="72" y="756" width="94" height="176" fill="#39475b"/>` +
+    `<rect x="84" y="724" width="70" height="34" fill="#506174"/>`;
+  return scene(defs, body);
+})();
+
+const sCozyCafeInterior = (() => {
+  const defs =
+    vGrad("cci-wall", [
+      ["0", "#ffe5bd"],
+      ["0.58", "#c98b5e"],
+      ["1", "#7a4b34"],
+    ]) +
+    rGrad("cci-lamp", 360, 170, 360, [
+      ["0", "#fff4ce", "0.95"],
+      ["0.45", "#f6b860", "0.36"],
+      ["1", "#f6b860", "0"],
+    ]) +
+    hGrad("cci-window", [
+      ["0", "#2a1c2e"],
+      ["0.52", "#4b3152"],
+      ["1", "#151827"],
+    ]) +
+    vGrad("cci-floor", [
+      ["0", "#9a6744"],
+      ["0.56", "#6c432e"],
+      ["1", "#3a241b"],
+    ]) +
+    vGrad("cci-table", [
+      ["0", "#c57d48"],
+      ["1", "#5a3322"],
+    ]);
+  let planks = "";
+  for (let i = 0; i < 11; i++) {
+    const x = i * 72;
+    planks += `<line x1="${x}" y1="742" x2="${(360 + (x - 360) * 0.28).toFixed(1)}" y2="1080" stroke="#44291d" stroke-width="3" opacity="0.42"/>`;
+  }
+  const pendant =
+    `<line x1="360" y1="0" x2="360" y2="128" stroke="#4a2d22" stroke-width="5"/>` +
+    `<path d="M284 126 H436 L396 208 H324 Z" fill="#5a3322"/>` +
+    `<ellipse cx="360" cy="210" rx="78" ry="30" fill="#f9c46b" opacity="0.82"/>`;
+  const shelves =
+    `<rect x="438" y="248" width="186" height="18" fill="#6f422a"/>` +
+    `<rect x="438" y="364" width="186" height="18" fill="#6f422a"/>` +
+    `<rect x="458" y="206" width="30" height="44" rx="5" fill="#d6a65f"/>` +
+    `<rect x="510" y="214" width="24" height="36" rx="5" fill="#92a879"/>` +
+    `<rect x="560" y="198" width="34" height="52" rx="5" fill="#b86b52"/>` +
+    `<rect x="462" y="322" width="42" height="42" rx="6" fill="#f2d3a3"/>` +
+    `<rect x="532" y="306" width="30" height="58" rx="6" fill="#7a9c8d"/>`;
+  const table =
+    `<ellipse cx="362" cy="825" rx="182" ry="42" fill="#3d2419" opacity="0.3"/>` +
+    `<path d="M178 762 Q360 716 542 762 L510 844 Q360 888 210 844 Z" fill="url(#cci-table)"/>` +
+    `<rect x="344" y="830" width="32" height="178" fill="#5a3322"/>` +
+    `<ellipse cx="360" cy="1008" rx="118" ry="26" fill="#3a241b"/>` +
+    `<rect x="292" y="718" width="48" height="56" rx="8" fill="#fff0d2"/>` +
+    `<path d="M340 736 q30 -8 30 20 q0 24 -32 18" stroke="#fff0d2" stroke-width="10" fill="none"/>`;
+  const body =
+    bg("url(#cci-wall)") +
+    bg("url(#cci-lamp)") +
+    windowGrid(72, 230, 280, 338, 3, 3, "#4a2d22", "url(#cci-window)") +
+    stars(36, 612, 90, 248, 334, 538, 0.6, 2.1, "#f9d783") +
+    shelves +
+    pendant +
+    `<rect x="0" y="720" width="720" height="360" fill="url(#cci-floor)"/>` +
+    planks +
+    `<rect x="0" y="698" width="720" height="30" fill="#5d3828"/>` +
+    table +
+    lightShaft(294, 202, 72, 640, "#fff0c2", "0.16");
+  return scene(defs, body);
+})();
+
+const sFantasyEnchantedWoods = (() => {
+  const defs =
+    vGrad("few-sky", [
+      ["0", "#17213d"],
+      ["0.48", "#27524b"],
+      ["1", "#9fd19a"],
+    ]) +
+    rGrad("few-orb", 356, 430, 420, [
+      ["0", "#b9ffdf", "0.86"],
+      ["0.48", "#5eead4", "0.34"],
+      ["1", "#5eead4", "0"],
+    ]) +
+    hGrad("few-vines", [
+      ["0", "#17351f"],
+      ["0.58", "#2f6942"],
+      ["1", "#112919"],
+    ]) +
+    vGrad("few-ground", [
+      ["0", "#2e744c"],
+      ["0.52", "#1d4930"],
+      ["1", "#092016"],
+    ]) +
+    rGrad("few-magic", 360, 780, 270, [
+      ["0", "#f0fdf4", "0.45"],
+      ["0.46", "#86efac", "0.22"],
+      ["1", "#86efac", "0"],
+    ]);
+  let trees = "";
+  for (let i = 0; i < 9; i++) {
+    const x = i * 92 - 28;
+    const base = 1088;
+    const height = 680 + (i % 3) * 110;
+    trees += `<path d="M${x} ${base} C${x - 34} ${820} ${x + 48} ${520} ${x + (i % 2 === 0 ? 12 : -30)} ${base - height}" stroke="url(#few-vines)" stroke-width="${32 + (i % 3) * 8}" fill="none" stroke-linecap="round" opacity="${i % 2 === 0 ? "0.88" : "0.66"}"/>`;
+    trees += `<path d="M${x + 10} ${base - 420} q90 -86 180 -92 M${x - 4} ${base - 520} q-82 -80 -174 -70" stroke="#15351f" stroke-width="12" fill="none" opacity="0.55"/>`;
+  }
+  let motes = "";
+  const random = rng(730);
+  for (let i = 0; i < 52; i++) {
+    const cx = (120 + random() * 480).toFixed(1);
+    const cy = (240 + random() * 620).toFixed(1);
+    const r = (1.8 + random() * 6.4).toFixed(1);
+    motes += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#d9ffe8" opacity="${(0.22 + random() * 0.58).toFixed(2)}"/>`;
+  }
+  const body =
+    bg("url(#few-sky)") +
+    bg("url(#few-orb)") +
+    `<circle cx="356" cy="430" r="82" fill="#ecfff4" opacity="0.72"/>` +
+    mist(520, 110, "#d4ffe3", "0.2") +
+    trees +
+    motes +
+    bg("url(#few-magic)") +
+    `<path d="M0 834 C174 760 330 846 496 780 S650 780 720 738 L720 1080 L0 1080 Z" fill="url(#few-ground)"/>` +
+    `<path d="M214 872 C286 820 436 810 512 858 C444 908 286 914 214 872 Z" fill="#b9ffdf" opacity="0.24"/>` +
+    `<path d="M238 870 C320 850 420 846 496 862" stroke="#d9ffe8" stroke-width="4" fill="none" stroke-dasharray="12 10" opacity="0.72"/>`;
+  return scene(defs, body);
+})();
+
+const sRainyCityStreet = (() => {
+  const defs =
+    vGrad("rcs-sky", [
+      ["0", "#151a2a"],
+      ["0.52", "#29364a"],
+      ["1", "#526171"],
+    ]) +
+    rGrad("rcs-lamp", 170, 650, 360, [
+      ["0", "#ffd98a", "0.48"],
+      ["0.54", "#ffd98a", "0.16"],
+      ["1", "#ffd98a", "0"],
+    ]) +
+    rGrad("rcs-neon", 552, 530, 360, [
+      ["0", "#fb7185", "0.46"],
+      ["0.58", "#60a5fa", "0.16"],
+      ["1", "#60a5fa", "0"],
+    ]) +
+    vGrad("rcs-road", [
+      ["0", "#2c3544"],
+      ["0.5", "#151b26"],
+      ["1", "#070a10"],
+    ]) +
+    hGrad("rcs-reflect", [
+      ["0", "#fbbf24", "0.16"],
+      ["0.48", "#38bdf8", "0.3"],
+      ["1", "#fb7185", "0.18"],
+    ]);
+  let blocks = "";
+  const random = rng(840);
+  for (let x = -28; x < 740; x += 86) {
+    blocks += building(x, 760, 72, 210 + random() * 330, "#182033", "#a7d8ff", 1000 + x);
+  }
+  const shop =
+    `<rect x="428" y="586" width="190" height="236" fill="#111827"/>` +
+    `<rect x="446" y="620" width="154" height="76" fill="#1d2b45" stroke="#38bdf8" stroke-width="4"/>` +
+    `<path d="M466 660 H582" stroke="#fb7185" stroke-width="7"/>` +
+    `<rect x="40" y="618" width="146" height="196" fill="#1b2332"/>` +
+    `<rect x="62" y="646" width="96" height="44" fill="#2b1e24" stroke="#fbbf24" stroke-width="4"/>`;
+  const body =
+    bg("url(#rcs-sky)") +
+    bg("url(#rcs-lamp)") +
+    bg("url(#rcs-neon)") +
+    `<g opacity="0.66">${blocks}</g>` +
+    mist(548, 92, "#b9c4d3", "0.18") +
+    shop +
+    `<path d="M0 762 L720 720 L720 1080 L0 1080 Z" fill="url(#rcs-road)"/>` +
+    `<path d="M0 805 C170 784 270 824 412 802 S620 768 720 786 L720 1080 L0 1080 Z" fill="url(#rcs-reflect)"/>` +
+    `<path d="M210 864 C300 838 456 828 560 846" stroke="#38bdf8" stroke-width="7" opacity="0.42"/>` +
+    `<path d="M86 910 C162 888 280 892 344 914" stroke="#fbbf24" stroke-width="7" opacity="0.32"/>` +
+    rain(142, 841, "#dcecff", "0.46") +
+    rain(72, 842, "#a7d8ff", "0.26");
+  return scene(defs, body);
+})();
+
+const sWinterSnowPeaks = (() => {
+  const defs =
+    vGrad("wsp-sky", [
+      ["0", "#d9f2ff"],
+      ["0.45", "#9ec7e8"],
+      ["1", "#5b7da3"],
+    ]) +
+    rGrad("wsp-sun", 138, 188, 300, [
+      ["0", "#fff9df", "0.9"],
+      ["0.44", "#ffe0a3", "0.28"],
+      ["1", "#ffe0a3", "0"],
+    ]) +
+    vGrad("wsp-far", [
+      ["0", "#f8fbff"],
+      ["0.58", "#b8cbe0"],
+      ["1", "#617795"],
+    ]) +
+    vGrad("wsp-near", [
+      ["0", "#ffffff"],
+      ["0.42", "#aebfd0"],
+      ["1", "#334155"],
+    ]) +
+    hGrad("wsp-shadow", [
+      ["0", "#315170", "0.08"],
+      ["0.48", "#1e3a5f", "0.32"],
+      ["1", "#0f253d", "0.08"],
+    ]);
+  const far =
+    ridge(
+      [
+        [88, 542],
+        [188, 360],
+        [278, 548],
+        [420, 340],
+        [558, 560],
+        [666, 430],
+      ],
+      690,
+      "url(#wsp-far)",
+      "0.86",
+    ) +
+    `<path d="M188 360 L150 538 H254 Z M420 340 L362 548 H502 Z M666 430 L608 598 H706 Z" fill="#ffffff" opacity="0.8"/>`;
+  const near =
+    ridge(
+      [
+        [92, 804],
+        [246, 470],
+        [360, 810],
+        [520, 500],
+        [700, 820],
+      ],
+      920,
+      "url(#wsp-near)",
+    ) +
+    `<path d="M246 470 L178 820 H322 Z M520 500 L438 864 H620 Z" fill="#ffffff" opacity="0.92"/>` +
+    `<path d="M246 470 L322 820 L246 704 Z M520 500 L620 864 L516 720 Z" fill="url(#wsp-shadow)"/>`;
+  let forest = "";
+  for (let i = 0; i < 12; i++) {
+    forest += pine(20 + i * 64, 1018 + (i % 3) * 18, 130 + (i % 4) * 34, 58 + (i % 3) * 12, i % 2 === 0 ? "#263847" : "#1d2f3c");
+  }
+  const body =
+    bg("url(#wsp-sky)") +
+    `<circle cx="138" cy="188" r="300" fill="url(#wsp-sun)"/>` +
+    mist(384, 70, "#ffffff", "0.24") +
+    far +
+    mist(668, 105, "#eaf7ff", "0.42") +
+    near +
+    forest +
+    `<path d="M0 986 C150 950 306 998 456 956 S630 940 720 970 L720 1080 L0 1080 Z" fill="#f8fbff"/>` +
+    snow(92, 921, "#ffffff");
+  return scene(defs, body);
+})();
+
+export const BG_SCENES_EXTRA: BgScene[] = [
+  { id: "x-murim-bamboo-canyon", label: "협곡 대나무길", genre: "무협", svg: sMurimBambooCanyon },
+  { id: "x-sageuk-tiled-night", label: "기와 야경", genre: "사극", svg: sSageukTiledNight },
+  { id: "x-cyber-neon-city", label: "네온 도시", genre: "사이버펑크", svg: sCyberNeonCity },
+  { id: "x-sf-starship-interior", label: "함선 내부", genre: "SF", svg: sSfStarshipInterior },
+  { id: "x-horror-fog-house", label: "안개 폐가", genre: "공포", svg: sHorrorFogHouse },
+  { id: "x-school-rooftop-sunset", label: "옥상 노을", genre: "학원", svg: sSchoolRooftopSunset },
+  { id: "x-cozy-cafe-interior", label: "아늑한 카페", genre: "일상", svg: sCozyCafeInterior },
+  { id: "x-fantasy-enchanted-woods", label: "마법 숲", genre: "판타지", svg: sFantasyEnchantedWoods },
+  { id: "x-rainy-city-street", label: "비 내린 거리", genre: "드라마", svg: sRainyCityStreet },
+  { id: "x-winter-snow-peaks", label: "설산 봉우리", genre: "모험", svg: sWinterSnowPeaks },
+];
