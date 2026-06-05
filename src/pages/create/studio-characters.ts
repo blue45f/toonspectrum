@@ -24,7 +24,7 @@ export function svgToDataUrl(svg: string): string {
   try {
     const base64 = btoa(unescape(encodeURIComponent(svg)));
     return `data:image/svg+xml;base64,${base64}`;
-  } catch (e) {
+  } catch {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 }
