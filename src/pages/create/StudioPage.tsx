@@ -1430,16 +1430,26 @@ export function StudioPage() {
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
-  async function handleDownload() {
+  async function handleDownload(transparent = false) {
     setSelectedId(null);
     await new Promise((r) => setTimeout(r, 60));
     const stage = stageRef.current;
     if (!stage) return;
+    // 투명 PNG: 배경 사각형을 잠시 숨겨 그린/구성한 콘텐츠만 추출(에셋 제작용).
+    const bgNode = transparent ? stage.findOne(".bg") : null;
+    if (bgNode) {
+      bgNode.hide();
+      stage.batchDraw();
+    }
     // 2× 해상도로 내보내 더 선명한 웹툰 출력(720→1440px 폭).
     const full = stage.toDataURL({ pixelRatio: 2 / scale });
+    if (bgNode) {
+      bgNode.show();
+      stage.batchDraw();
+    }
     const link = document.createElement("a");
     link.href = full;
-    link.download = `${title.trim() || "toonspectrum-comic"}.png`;
+    link.download = `${title.trim() || "toonspectrum-comic"}${transparent ? "-transparent" : ""}.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1456,8 +1466,11 @@ export function StudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={handleDownload} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}>
+          <button type="button" onClick={() => handleDownload(false)} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}>
             <Download size={14} /> 다운로드
+          </button>
+          <button type="button" onClick={() => handleDownload(true)} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })} title="배경 없이 투명 PNG로 내보내기">
+            <Download size={14} /> 투명 PNG
           </button>
           <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet" })}>
             임시저장
