@@ -26,7 +26,17 @@ type StudioVrmPoserProps = {
 type LoadStatus = "empty" | "loading" | "ready" | "error";
 type LibraryStatus = "loading" | "ready" | "error";
 type Vec3 = readonly [number, number, number];
-type BoneRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
+type SideAwareDirection = {
+  sideX: number;
+  y: number;
+  z?: number;
+};
+type DirectionTarget = Vec3 | SideAwareDirection;
+type PoseBone = {
+  direction?: DirectionTarget;
+  rotation?: Vec3;
+};
+type PoseBoneMap = Partial<Record<VRMHumanBoneName, PoseBone>>;
 type CaptureState = {
   gl: THREE.WebGLRenderer | null;
   scene: THREE.Scene | null;
@@ -38,7 +48,7 @@ type PosePreset = {
   label: string;
   tone: string;
   yOffset?: number;
-  bones: BoneRotationMap;
+  bones: PoseBoneMap;
 };
 
 type ExpressionAction = {
@@ -108,32 +118,30 @@ const EXPRESSION_ORDER = [
   "lookRight",
 ];
 
-const NATURAL_LIMBS: BoneRotationMap = {
-  leftUpperArm: [d(1), 0, d(82)],
-  rightUpperArm: [d(1), 0, d(-82)],
-  leftLowerArm: [0, 0, d(-6)],
-  rightLowerArm: [0, 0, d(6)],
-  leftHand: [0, 0, d(2)],
-  rightHand: [0, 0, d(-2)],
-  leftThumbProximal: [0, 0, 0],
-  leftIndexProximal: [0, 0, 0],
-  leftMiddleProximal: [0, 0, 0],
-  leftRingProximal: [0, 0, 0],
-  leftLittleProximal: [0, 0, 0],
-  rightThumbProximal: [0, 0, 0],
-  rightIndexProximal: [0, 0, 0],
-  rightMiddleProximal: [0, 0, 0],
-  rightRingProximal: [0, 0, 0],
-  rightLittleProximal: [0, 0, 0],
-  leftUpperLeg: [d(1), 0, d(1)],
-  rightUpperLeg: [d(-1), 0, d(-1)],
-  leftLowerLeg: [d(2), 0, 0],
-  rightLowerLeg: [d(2), 0, 0],
-  leftFoot: [0, 0, 0],
-  rightFoot: [0, 0, 0],
+function aim(sideX: number, y: number, z = 0): PoseBone {
+  return { direction: { sideX, y, z } };
+}
+
+function rotate(rotation: Vec3): PoseBone {
+  return { rotation };
+}
+
+const NATURAL_LIMBS: PoseBoneMap = {
+  leftUpperArm: aim(0.35, -0.94),
+  rightUpperArm: aim(0.35, -0.94),
+  leftLowerArm: aim(0.2, -0.98),
+  rightLowerArm: aim(0.2, -0.98),
+  leftHand: rotate([0, 0, d(2)]),
+  rightHand: rotate([0, 0, d(-2)]),
+  leftUpperLeg: aim(0.08, -1),
+  rightUpperLeg: aim(0.08, -1),
+  leftLowerLeg: aim(0.03, -1),
+  rightLowerLeg: aim(0.03, -1),
+  leftFoot: rotate([0, 0, 0]),
+  rightFoot: rotate([0, 0, 0]),
 };
 
-function naturalPose(core: BoneRotationMap = {}) {
+function naturalPose(core: PoseBoneMap = {}) {
   return { ...NATURAL_LIMBS, ...core };
 }
 
@@ -143,10 +151,10 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "기본",
     tone: "편한 스탠딩",
     bones: naturalPose({
-      spine: [d(1), 0, 0],
-      chest: [d(-1), 0, 0],
-      neck: [d(1), 0, 0],
-      head: [d(-1), 0, 0],
+      spine: rotate([d(1), 0, 0]),
+      chest: rotate([d(-1), 0, 0]),
+      neck: rotate([d(1), 0, 0]),
+      head: rotate([d(-1), 0, 0]),
     }),
   },
   {
@@ -154,12 +162,12 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "손인사",
     tone: "반가운 손짓",
     bones: naturalPose({
-      spine: [d(-1), d(-2), 0],
-      chest: [d(1), d(-3), 0],
-      head: [d(-2), d(3), d(3)],
-      rightUpperArm: [d(-15), d(-15), d(-25)],
-      rightLowerArm: [0, 0, d(70)],
-      rightHand: [0, 0, d(-15)],
+      spine: rotate([d(-1), d(-2), 0]),
+      chest: rotate([d(1), d(-3), 0]),
+      head: rotate([d(-2), d(3), d(3)]),
+      rightUpperArm: aim(0.48, 0.66, 0.08),
+      rightLowerArm: aim(0.18, 0.96, 0.1),
+      rightHand: rotate([0, 0, d(-15)]),
     }),
   },
   {
@@ -167,13 +175,13 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "대화",
     tone: "자연스러운 대화",
     bones: naturalPose({
-      hips: [0, d(-2), 0],
-      spine: [d(-1), d(3), 0],
-      chest: [d(1), d(4), 0],
-      head: [d(-1), d(-4), 0],
-      rightUpperArm: [d(-35), d(-10), d(-50)],
-      rightLowerArm: [0, 0, d(40)],
-      rightHand: [0, d(-10), d(-10)],
+      hips: rotate([0, d(-2), 0]),
+      spine: rotate([d(-1), d(3), 0]),
+      chest: rotate([d(1), d(4), 0]),
+      head: rotate([d(-1), d(-4), 0]),
+      rightUpperArm: aim(0.62, -0.12, 0.28),
+      rightLowerArm: aim(0.3, 0.05, 0.95),
+      rightHand: rotate([0, d(-10), d(-10)]),
     }),
   },
   {
@@ -181,14 +189,14 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "기쁨",
     tone: "만세 포즈",
     bones: naturalPose({
-      hips: [d(-1), 0, 0],
-      spine: [d(-3), 0, 0],
-      chest: [d(4), 0, 0],
-      head: [d(-6), 0, 0],
-      leftUpperArm: [d(-20), d(10), d(35)],
-      leftLowerArm: [0, 0, d(-35)],
-      rightUpperArm: [d(-20), d(-10), d(-35)],
-      rightLowerArm: [0, 0, d(35)],
+      hips: rotate([d(-1), 0, 0]),
+      spine: rotate([d(-3), 0, 0]),
+      chest: rotate([d(4), 0, 0]),
+      head: rotate([d(-6), 0, 0]),
+      leftUpperArm: aim(0.55, 0.83),
+      leftLowerArm: aim(0.22, 0.97),
+      rightUpperArm: aim(0.55, 0.83),
+      rightLowerArm: aim(0.22, 0.97),
     }),
   },
   {
@@ -196,14 +204,14 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "생각",
     tone: "고민 컷",
     bones: naturalPose({
-      hips: [0, d(2), 0],
-      spine: [d(3), d(-3), 0],
-      chest: [d(1), d(-4), 0],
-      neck: [d(1), d(3), 0],
-      head: [d(6), d(-4), d(-4)],
-      rightUpperArm: [d(-50), d(-30), d(-20)],
-      rightLowerArm: [0, 0, d(85)],
-      rightHand: [d(15), d(10), d(-15)],
+      hips: rotate([0, d(2), 0]),
+      spine: rotate([d(3), d(-3), 0]),
+      chest: rotate([d(1), d(-4), 0]),
+      neck: rotate([d(1), d(3), 0]),
+      head: rotate([d(6), d(-4), d(-4)]),
+      rightUpperArm: aim(0.38, -0.25, 0.25),
+      rightLowerArm: aim(-0.28, 0.55, 0.78),
+      rightHand: rotate([d(15), d(10), d(-15)]),
     }),
   },
   {
@@ -212,16 +220,16 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "낮은 자세",
     yOffset: -0.08,
     bones: naturalPose({
-      hips: [d(-4), 0, 0],
-      spine: [d(4), 0, 0],
-      chest: [d(-1), 0, 0],
-      head: [d(-2), 0, 0],
-      leftUpperLeg: [d(-10), 0, d(2)],
-      rightUpperLeg: [d(-10), 0, d(-2)],
-      leftLowerLeg: [d(14), 0, 0],
-      rightLowerLeg: [d(14), 0, 0],
-      leftFoot: [d(-4), 0, d(1)],
-      rightFoot: [d(-4), 0, d(-1)],
+      hips: rotate([d(-4), 0, 0]),
+      spine: rotate([d(4), 0, 0]),
+      chest: rotate([d(-1), 0, 0]),
+      head: rotate([d(-2), 0, 0]),
+      leftUpperLeg: aim(0.12, -0.28, 0.95),
+      rightUpperLeg: aim(0.12, -0.28, 0.95),
+      leftLowerLeg: aim(0.05, -0.88, -0.45),
+      rightLowerLeg: aim(0.05, -0.88, -0.45),
+      leftFoot: rotate([d(-4), 0, d(1)]),
+      rightFoot: rotate([d(-4), 0, d(-1)]),
     }),
   },
   {
@@ -230,14 +238,18 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "한 걸음",
     yOffset: -0.01,
     bones: naturalPose({
-      hips: [d(-2), d(-3), 0],
-      spine: [d(3), d(2), 0],
-      chest: [d(-1), d(2), 0],
-      head: [d(-2), d(-3), 0],
-      leftUpperLeg: [d(-10), 0, d(2)],
-      leftLowerLeg: [d(12), 0, 0],
-      rightUpperLeg: [d(8), 0, d(-2)],
-      rightLowerLeg: [d(8), 0, 0],
+      hips: rotate([d(-2), d(-3), 0]),
+      spine: rotate([d(3), d(2), 0]),
+      chest: rotate([d(-1), d(2), 0]),
+      head: rotate([d(-2), d(-3), 0]),
+      leftUpperArm: aim(0.32, -0.75, -0.55),
+      leftLowerArm: aim(0.18, -0.85, -0.48),
+      rightUpperArm: aim(0.32, -0.65, 0.68),
+      rightLowerArm: aim(0.18, -0.8, 0.56),
+      leftUpperLeg: aim(0.08, -0.55, 0.83),
+      leftLowerLeg: aim(0.03, -0.96, 0.25),
+      rightUpperLeg: aim(0.08, -0.72, -0.7),
+      rightLowerLeg: aim(0.03, -0.9, 0.44),
     }),
   },
   {
@@ -245,16 +257,13 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "설명",
     tone: "차분한 안내",
     bones: naturalPose({
-      hips: [0, d(3), 0],
-      spine: [d(-1), d(-3), 0],
-      chest: [d(1), d(-4), 0],
-      head: [d(-1), d(4), 0],
-      rightUpperArm: [d(-20), d(-15), d(-45)],
-      rightLowerArm: [0, 0, d(25)],
-      rightHand: [0, d(-10), d(-10)],
-      leftUpperArm: [d(1), 0, d(82)],
-      leftLowerArm: [0, 0, d(-6)],
-      leftHand: [0, 0, d(2)],
+      hips: rotate([0, d(3), 0]),
+      spine: rotate([d(-1), d(-3), 0]),
+      chest: rotate([d(1), d(-4), 0]),
+      head: rotate([d(-1), d(4), 0]),
+      rightUpperArm: aim(0.48, -0.2, 0.55),
+      rightLowerArm: aim(0.18, 0.05, 0.98),
+      rightHand: rotate([0, d(-10), d(-10)]),
     }),
   },
   {
@@ -262,16 +271,16 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "응원",
     tone: "화이팅 응원",
     bones: naturalPose({
-      hips: [d(-1), d(-2), 0],
-      spine: [d(-3), d(2), 0],
-      chest: [d(4), d(2), 0],
-      head: [d(-2), d(-1), 0],
-      leftUpperArm: [d(-25), d(20), d(65)],
-      leftLowerArm: [0, 0, d(-65)],
-      leftHand: [0, 0, d(10)],
-      rightUpperArm: [d(-25), d(-20), d(-65)],
-      rightLowerArm: [0, 0, d(65)],
-      rightHand: [0, 0, d(-10)],
+      hips: rotate([d(-1), d(-2), 0]),
+      spine: rotate([d(-3), d(2), 0]),
+      chest: rotate([d(4), d(2), 0]),
+      head: rotate([d(-2), d(-1), 0]),
+      leftUpperArm: aim(0.42, 0.9),
+      leftLowerArm: aim(0.1, 0.99),
+      leftHand: rotate([0, 0, d(10)]),
+      rightUpperArm: aim(0.42, 0.9),
+      rightLowerArm: aim(0.1, 0.99),
+      rightHand: rotate([0, 0, d(-10)]),
     }),
   },
   {
@@ -280,15 +289,17 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "차분한 저점",
     yOffset: -0.03,
     bones: naturalPose({
-      hips: [d(4), 0, 0],
-      spine: [d(8), 0, 0],
-      chest: [d(6), 0, 0],
-      neck: [d(8), 0, 0],
-      head: [d(6), 0, 0],
-      leftUpperArm: [d(8), d(4), d(83)],
-      rightUpperArm: [d(8), d(-4), d(-83)],
-      leftHand: [d(4), 0, d(2)],
-      rightHand: [d(4), 0, d(-2)],
+      hips: rotate([d(4), 0, 0]),
+      spine: rotate([d(8), 0, 0]),
+      chest: rotate([d(6), 0, 0]),
+      neck: rotate([d(8), 0, 0]),
+      head: rotate([d(6), 0, 0]),
+      leftUpperArm: aim(0.28, -0.96, 0.06),
+      rightUpperArm: aim(0.28, -0.96, 0.06),
+      leftLowerArm: aim(0.12, -0.99, 0.04),
+      rightLowerArm: aim(0.12, -0.99, 0.04),
+      leftHand: rotate([d(4), 0, d(2)]),
+      rightHand: rotate([d(4), 0, d(-2)]),
     }),
   },
   {
@@ -297,16 +308,16 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "대치 상태",
     yOffset: -0.02,
     bones: naturalPose({
-      hips: [d(-4), d(-6), 0],
-      spine: [d(4), d(4), 0],
-      chest: [d(-1), d(4), 0],
-      head: [d(-3), d(-5), 0],
-      leftUpperArm: [d(-35), d(15), d(60)],
-      leftLowerArm: [0, 0, d(-55)],
-      rightUpperArm: [d(-35), d(-15), d(-60)],
-      rightLowerArm: [0, 0, d(55)],
-      leftUpperLeg: [d(-10), 0, d(3)],
-      rightUpperLeg: [d(6), 0, d(-3)],
+      hips: rotate([d(-4), d(-6), 0]),
+      spine: rotate([d(4), d(4), 0]),
+      chest: rotate([d(-1), d(4), 0]),
+      head: rotate([d(-3), d(-5), 0]),
+      leftUpperArm: aim(0.5, 0.05, 0.55),
+      leftLowerArm: aim(0.2, 0.1, 0.98),
+      rightUpperArm: aim(0.5, 0.05, 0.55),
+      rightLowerArm: aim(0.2, 0.1, 0.98),
+      leftUpperLeg: aim(0.1, -0.7, 0.7),
+      rightUpperLeg: aim(0.1, -0.82, -0.56),
     }),
   },
   {
@@ -315,16 +326,16 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "조심스러운 자세",
     yOffset: -0.02,
     bones: naturalPose({
-      hips: [d(-3), d(4), 0],
-      spine: [d(3), d(-4), 0],
-      chest: [d(2), d(-5), 0],
-      head: [d(-2), d(5), 0],
-      leftUpperArm: [d(-50), d(25), d(45)],
-      leftLowerArm: [0, 0, d(-85)],
-      rightUpperArm: [d(-45), d(-25), d(-50)],
-      rightLowerArm: [0, 0, d(80)],
-      leftUpperLeg: [d(-6), 0, d(3)],
-      rightUpperLeg: [d(-4), 0, d(-3)],
+      hips: rotate([d(-3), d(4), 0]),
+      spine: rotate([d(3), d(-4), 0]),
+      chest: rotate([d(2), d(-5), 0]),
+      head: rotate([d(-2), d(5), 0]),
+      leftUpperArm: aim(0.58, 0.28, 0.35),
+      leftLowerArm: aim(0.18, 0.7, 0.68),
+      rightUpperArm: aim(0.58, 0.28, 0.35),
+      rightLowerArm: aim(0.18, 0.7, 0.68),
+      leftUpperLeg: aim(0.1, -0.88, 0.46),
+      rightUpperLeg: aim(0.1, -0.9, -0.42),
     }),
   },
   {
@@ -332,15 +343,13 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "브이",
     tone: "셀카 포즈",
     bones: naturalPose({
-      hips: [0, d(-4), 0],
-      spine: [d(2), d(4), 0],
-      chest: [d(-1), d(4), d(2)],
-      head: [d(4), d(-8), d(-5)],
-      rightUpperArm: [d(-35), d(-25), d(-135)],
-      rightLowerArm: [0, 0, d(35)],
-      rightHand: [0, 0, d(-15)],
-      leftUpperArm: [d(15), d(10), d(78)],
-      leftLowerArm: [0, 0, d(-15)],
+      hips: rotate([0, d(-4), 0]),
+      spine: rotate([d(2), d(4), 0]),
+      chest: rotate([d(-1), d(4), d(2)]),
+      head: rotate([d(4), d(-8), d(-5)]),
+      rightUpperArm: aim(0.4, 0.58, 0.35),
+      rightLowerArm: aim(0.1, 0.82, 0.55),
+      rightHand: rotate([0, 0, d(-15)]),
     }),
   },
   {
@@ -348,15 +357,13 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "화이팅",
     tone: "결의 컷",
     bones: naturalPose({
-      hips: [d(-2), d(4), 0],
-      spine: [d(-3), 0, 0],
-      chest: [d(5), 0, 0],
-      head: [d(-3), d(-4), 0],
-      rightUpperArm: [d(-45), d(-20), d(-45)],
-      rightLowerArm: [0, d(15), d(50)],
-      rightHand: [0, 0, 0],
-      leftUpperArm: [d(12), d(8), d(82)],
-      leftLowerArm: [0, 0, d(-10)],
+      hips: rotate([d(-2), d(4), 0]),
+      spine: rotate([d(-3), 0, 0]),
+      chest: rotate([d(5), 0, 0]),
+      head: rotate([d(-3), d(-4), 0]),
+      rightUpperArm: aim(0.35, 0.93, 0.05),
+      rightLowerArm: aim(0.08, 0.99, 0.02),
+      rightHand: rotate([0, 0, 0]),
     }),
   },
   {
@@ -365,18 +372,18 @@ export const POSE_PRESETS: PosePreset[] = [
     tone: "날아오르기",
     yOffset: 0.14,
     bones: naturalPose({
-      hips: [d(45), 0, 0],
-      spine: [d(-12), 0, 0],
-      chest: [d(-5), 0, 0],
-      head: [d(-35), 0, 0],
-      leftUpperArm: [d(-20), d(12), d(35)],
-      rightUpperArm: [d(-20), d(-12), d(-35)],
-      leftLowerArm: [0, 0, d(-10)],
-      rightLowerArm: [0, 0, d(10)],
-      leftUpperLeg: [d(28), 0, d(5)],
-      rightUpperLeg: [d(28), 0, d(-5)],
-      leftLowerLeg: [d(8), 0, 0],
-      rightLowerLeg: [d(8), 0, 0],
+      hips: rotate([d(45), 0, 0]),
+      spine: rotate([d(-12), 0, 0]),
+      chest: rotate([d(-5), 0, 0]),
+      head: rotate([d(-10), 0, 0]),
+      leftUpperArm: aim(0.72, 0.55, -0.42),
+      rightUpperArm: aim(0.72, 0.55, -0.42),
+      leftLowerArm: aim(0.55, 0.72, -0.42),
+      rightLowerArm: aim(0.55, 0.72, -0.42),
+      leftUpperLeg: aim(0.12, -0.45, -0.88),
+      rightUpperLeg: aim(0.12, -0.45, -0.88),
+      leftLowerLeg: aim(0.06, -0.8, -0.6),
+      rightLowerLeg: aim(0.06, -0.8, -0.6),
     }),
   },
   {
@@ -384,16 +391,16 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "하트",
     tone: "볼하트 연출",
     bones: naturalPose({
-      hips: [0, d(3), 0],
-      spine: [d(2), 0, 0],
-      chest: [d(-2), 0, 0],
-      head: [d(3), d(8), d(5)],
-      leftUpperArm: [d(-45), d(35), d(110)],
-      leftLowerArm: [0, 0, d(90)],
-      leftHand: [0, 0, d(15)],
-      rightUpperArm: [d(10), d(-15), d(-75)],
-      rightLowerArm: [0, 0, d(20)],
-      rightHand: [0, 0, d(-10)],
+      hips: rotate([0, d(3), 0]),
+      spine: rotate([d(2), 0, 0]),
+      chest: rotate([d(-2), 0, 0]),
+      head: rotate([d(3), d(8), d(5)]),
+      leftUpperArm: aim(0.38, 0.92),
+      leftLowerArm: aim(-0.45, 0.8),
+      leftHand: rotate([0, 0, d(15)]),
+      rightUpperArm: aim(0.38, 0.92),
+      rightLowerArm: aim(-0.45, 0.8),
+      rightHand: rotate([0, 0, d(-10)]),
     }),
   },
   {
@@ -401,11 +408,11 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "부끄럼",
     tone: "수줍은 자세",
     bones: naturalPose({
-      head: [d(8), d(3), d(5)],
-      leftUpperArm: [d(15), d(15), d(78)],
-      rightUpperArm: [d(15), d(-15), d(-78)],
-      leftLowerArm: [0, 0, d(-15)],
-      rightLowerArm: [0, 0, d(15)],
+      head: rotate([d(8), d(3), d(5)]),
+      leftUpperArm: aim(-0.22, -0.58, 0.78),
+      rightUpperArm: aim(-0.22, -0.58, 0.78),
+      leftLowerArm: aim(-0.2, 0.12, 0.97),
+      rightLowerArm: aim(-0.2, 0.12, 0.97),
     }),
   },
   {
@@ -413,13 +420,13 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "팔짱",
     tone: "거만한 태도",
     bones: naturalPose({
-      spine: [d(-3), 0, 0],
-      chest: [d(-2), 0, 0],
-      head: [d(-4), 0, 0],
-      leftUpperArm: [d(-20), d(40), d(45)],
-      leftLowerArm: [d(20), d(30), d(-85)],
-      rightUpperArm: [d(-20), d(-40), d(-45)],
-      rightLowerArm: [d(-20), d(-30), d(85)],
+      spine: rotate([d(-3), 0, 0]),
+      chest: rotate([d(-2), 0, 0]),
+      head: rotate([d(-4), 0, 0]),
+      leftUpperArm: aim(-0.55, -0.2, 0.45),
+      leftLowerArm: aim(-0.85, 0.18, 0.4),
+      rightUpperArm: aim(-0.55, -0.2, 0.45),
+      rightLowerArm: aim(-0.85, 0.18, 0.4),
     }),
   },
   {
@@ -427,15 +434,15 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "깜짝",
     tone: "충격 유발",
     bones: naturalPose({
-      spine: [d(5), 0, 0],
-      chest: [d(4), 0, 0],
-      head: [d(8), 0, 0],
-      leftUpperArm: [d(-60), d(25), d(35)],
-      leftLowerArm: [0, 0, d(-90)],
-      leftHand: [d(15), d(10), d(10)],
-      rightUpperArm: [d(-60), d(-25), d(-35)],
-      rightLowerArm: [0, 0, d(90)],
-      rightHand: [d(15), d(-10), d(-10)],
+      spine: rotate([d(5), 0, 0]),
+      chest: rotate([d(4), 0, 0]),
+      head: rotate([d(8), 0, 0]),
+      leftUpperArm: aim(0.62, 0.52, 0.3),
+      leftLowerArm: aim(0.22, 0.92, 0.28),
+      leftHand: rotate([d(15), d(10), d(10)]),
+      rightUpperArm: aim(0.62, 0.52, 0.3),
+      rightLowerArm: aim(0.22, 0.92, 0.28),
+      rightHand: rotate([d(15), d(-10), d(-10)]),
     }),
   },
   {
@@ -443,11 +450,11 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "항복",
     tone: "당황한 양손",
     bones: naturalPose({
-      head: [d(6), 0, 0],
-      leftUpperArm: [d(-10), d(10), d(15)],
-      leftLowerArm: [0, 0, d(-75)],
-      rightUpperArm: [d(-10), d(-10), d(-15)],
-      rightLowerArm: [0, 0, d(75)],
+      head: rotate([d(6), 0, 0]),
+      leftUpperArm: aim(0.46, 0.88, 0.04),
+      leftLowerArm: aim(0.14, 0.98, 0.02),
+      rightUpperArm: aim(0.46, 0.88, 0.04),
+      rightLowerArm: aim(0.14, 0.98, 0.02),
     }),
   },
   {
@@ -455,11 +462,9 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "통화",
     tone: "전화 연출",
     bones: naturalPose({
-      rightUpperArm: [d(-55), d(-25), d(-25)],
-      rightLowerArm: [0, 0, d(85)],
-      rightHand: [d(10), d(-15), d(-10)],
-      leftUpperArm: [d(12), d(10), d(76)],
-      leftLowerArm: [0, 0, d(-15)],
+      rightUpperArm: aim(0.36, -0.24, 0.34),
+      rightLowerArm: aim(-0.18, 0.72, 0.66),
+      rightHand: rotate([d(10), d(-15), d(-10)]),
     }),
   },
   {
@@ -467,10 +472,10 @@ export const POSE_PRESETS: PosePreset[] = [
     label: "경례",
     tone: "절제된 인사",
     bones: naturalPose({
-      head: [d(-2), d(-5), 0],
-      rightUpperArm: [d(-45), d(-35), d(-30)],
-      rightLowerArm: [0, 0, d(80)],
-      rightHand: [d(5), d(15), d(-15)],
+      head: rotate([d(-2), d(-5), 0]),
+      rightUpperArm: aim(0.45, 0.28, 0.35),
+      rightLowerArm: aim(-0.45, 0.58, 0.68),
+      rightHand: rotate([d(5), d(15), d(-15)]),
     }),
   },
 ];
@@ -598,24 +603,138 @@ function loadVrmAsset(url: string) {
   });
 }
 
-function applyPoseToVrm(vrm: VRM, bones: BoneRotationMap, yOffset: number) {
+const CORE_ROTATION_BONE_ORDER = ["hips", "spine", "chest", "neck", "head"] as const satisfies readonly VRMHumanBoneName[];
+const LIMB_BONE_ORDER = [
+  "leftUpperArm",
+  "rightUpperArm",
+  "leftLowerArm",
+  "rightLowerArm",
+  "leftUpperLeg",
+  "rightUpperLeg",
+  "leftLowerLeg",
+  "rightLowerLeg",
+] as const satisfies readonly VRMHumanBoneName[];
+const END_EFFECTOR_ROTATION_BONE_ORDER = ["leftHand", "rightHand", "leftFoot", "rightFoot"] as const satisfies readonly VRMHumanBoneName[];
+const ZERO_ROTATION: Vec3 = [0, 0, 0];
+const MIN_DIRECTION_LENGTH_SQ = 0.000001;
+
+type LimbBoneName = (typeof LIMB_BONE_ORDER)[number];
+
+const LIMB_CHILD_BONE: Record<LimbBoneName, VRMHumanBoneName> = {
+  leftUpperArm: "leftLowerArm",
+  rightUpperArm: "rightLowerArm",
+  leftLowerArm: "leftHand",
+  rightLowerArm: "rightHand",
+  leftUpperLeg: "leftLowerLeg",
+  rightUpperLeg: "rightLowerLeg",
+  leftLowerLeg: "leftFoot",
+  rightLowerLeg: "rightFoot",
+};
+
+function normalizeDirection(direction: THREE.Vector3) {
+  const lengthSq = direction.lengthSq();
+  if (lengthSq < MIN_DIRECTION_LENGTH_SQ) return false;
+  direction.multiplyScalar(1 / Math.sqrt(lengthSq));
+  return true;
+}
+
+function getPoseBoneRotation(poseBone: PoseBone | undefined) {
+  return poseBone?.rotation ?? ZERO_ROTATION;
+}
+
+function applyEulerRotation(humanoid: NonNullable<VRM["humanoid"]>, boneName: VRMHumanBoneName, rotation: Vec3) {
+  const bone = humanoid.getNormalizedBoneNode(boneName);
+  if (!bone) return;
+  bone.rotation.set(rotation[0], rotation[1], rotation[2]);
+  bone.updateMatrixWorld(true);
+}
+
+function getBoneWorldDirection(bone: THREE.Object3D, child: THREE.Object3D, out: THREE.Vector3) {
+  const bonePosition = new THREE.Vector3();
+  const childPosition = new THREE.Vector3();
+  bone.getWorldPosition(bonePosition);
+  child.getWorldPosition(childPosition);
+  out.subVectors(childPosition, bonePosition);
+  return normalizeDirection(out);
+}
+
+function isVec3Direction(target: DirectionTarget): target is Vec3 {
+  return Array.isArray(target);
+}
+
+function resolveTargetWorldDirection(target: DirectionTarget, restWorldDirection: THREE.Vector3, out: THREE.Vector3) {
+  if (isVec3Direction(target)) {
+    out.set(target[0], target[1], target[2]);
+  } else {
+    const sideSign = Math.abs(restWorldDirection.x) > MIN_DIRECTION_LENGTH_SQ ? Math.sign(restWorldDirection.x) : 0;
+    out.set(sideSign * target.sideX, target.y, target.z ?? 0);
+  }
+
+  return normalizeDirection(out);
+}
+
+function aimBoneToWorldDirection(humanoid: NonNullable<VRM["humanoid"]>, boneName: LimbBoneName, target: DirectionTarget) {
+  const bone = humanoid.getNormalizedBoneNode(boneName);
+  const child = humanoid.getNormalizedBoneNode(LIMB_CHILD_BONE[boneName]);
+  if (!bone || !child) return;
+
+  const restWorldDirection = new THREE.Vector3();
+  if (!getBoneWorldDirection(bone, child, restWorldDirection)) return;
+
+  const targetWorldDirection = new THREE.Vector3();
+  if (!resolveTargetWorldDirection(target, restWorldDirection, targetWorldDirection)) return;
+
+  const parentInverseWorldQuaternion = new THREE.Quaternion();
+  if (bone.parent) {
+    bone.parent.getWorldQuaternion(parentInverseWorldQuaternion).invert();
+  } else {
+    parentInverseWorldQuaternion.identity();
+  }
+
+  const restParentDirection = restWorldDirection.clone().applyQuaternion(parentInverseWorldQuaternion);
+  const targetParentDirection = targetWorldDirection.clone().applyQuaternion(parentInverseWorldQuaternion);
+  if (!normalizeDirection(restParentDirection) || !normalizeDirection(targetParentDirection)) return;
+
+  const aimQuaternion = new THREE.Quaternion().setFromUnitVectors(restParentDirection, targetParentDirection);
+  bone.quaternion.premultiply(aimQuaternion);
+  bone.updateMatrixWorld(true);
+}
+
+export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return false;
 
   humanoid.resetNormalizedPose();
   vrm.scene.position.y = yOffset;
+  vrm.scene.updateMatrixWorld(true);
 
-  const allBones = [
-    "hips", "spine", "chest", "neck", "head",
-    "leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm", "leftHand", "rightHand",
-    "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg", "leftFoot", "rightFoot"
-  ] as VRMHumanBoneName[];
+  CORE_ROTATION_BONE_ORDER.forEach((boneName) => {
+    const rotation = bones[boneName]?.rotation;
+    if (rotation) {
+      applyEulerRotation(humanoid, boneName, rotation);
+    }
+  });
+  vrm.scene.updateMatrixWorld(true);
 
-  allBones.forEach((boneName) => {
-    const bone = humanoid.getNormalizedBoneNode(boneName);
-    if (!bone) return;
-    const rotation = bones[boneName] || [0, 0, 0];
-    bone.rotation.set(rotation[0], rotation[1], rotation[2]);
+  LIMB_BONE_ORDER.forEach((boneName) => {
+    const poseBone = bones[boneName];
+    if (!poseBone) return;
+
+    if (poseBone.direction) {
+      aimBoneToWorldDirection(humanoid, boneName, poseBone.direction);
+      return;
+    }
+
+    if (poseBone.rotation) {
+      applyEulerRotation(humanoid, boneName, poseBone.rotation);
+    }
+  });
+
+  END_EFFECTOR_ROTATION_BONE_ORDER.forEach((boneName) => {
+    const rotation = bones[boneName]?.rotation;
+    if (rotation) {
+      applyEulerRotation(humanoid, boneName, rotation);
+    }
   });
 
   humanoid.update();
@@ -975,7 +1094,7 @@ function VrmActor({
   vrm,
 }: {
   bodyRotation: number;
-  customBones: BoneRotationMap;
+  customBones: PoseBoneMap;
   customYOffset: number;
   vrm: VRM;
 }) {
@@ -1045,7 +1164,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [modelName, setModelName] = useState("");
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [activePoseId, setActivePoseId] = useState("default");
-  const [customBones, setCustomBones] = useState<BoneRotationMap>(POSE_PRESETS[0].bones);
+  const [customBones, setCustomBones] = useState<PoseBoneMap>(POSE_PRESETS[0].bones);
   const [customYOffset, setCustomYOffset] = useState<number>(POSE_PRESETS[0].yOffset ?? 0);
   const [activeCategory, setActiveCategory] = useState("head");
   const [activeExpressionId, setActiveExpressionId] = useState("neutral");
@@ -1314,9 +1433,9 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     const radians = d(degrees);
     const key = boneName as VRMHumanBoneName;
     setCustomBones((prev) => {
-      const current = prev[key] ? [...prev[key]] : [0, 0, 0];
+      const current = [...getPoseBoneRotation(prev[key])] as [number, number, number];
       current[axisIndex] = radians;
-      return { ...prev, [key]: current as unknown as Vec3 };
+      return { ...prev, [key]: { rotation: current } };
     });
   }
 
@@ -1675,7 +1794,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     if (!cat) return null;
                     return cat.bones.map((boneName) => {
                       const label = BONE_LABELS[boneName] || boneName;
-                      const [xRad, yRad, zRad] = customBones[boneName] || [0, 0, 0];
+                      const [xRad, yRad, zRad] = getPoseBoneRotation(customBones[boneName]);
                       const xDeg = Math.round(THREE.MathUtils.radToDeg(xRad));
                       const yDeg = Math.round(THREE.MathUtils.radToDeg(yRad));
                       const zDeg = Math.round(THREE.MathUtils.radToDeg(zRad));
@@ -1690,7 +1809,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                               disabled={!vrm}
                               onClick={() => {
                                 setCustomBones((prev) => {
-                                  return { ...prev, [boneName]: [0, 0, 0] as unknown as Vec3 };
+                                  return { ...prev, [boneName]: { rotation: ZERO_ROTATION } };
                                 });
                               }}
                             >
