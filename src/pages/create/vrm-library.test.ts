@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_LIBRARY_ENTRY, withDefaultVrmEntry } from "./vrm-library";
+import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, withDefaultVrmEntry } from "./vrm-library";
 
 describe("VRM library helpers", () => {
-  it("keeps the bundled sample as the first library entry", () => {
+  it("keeps every bundled sample before uploaded library entries", () => {
     const entries = withDefaultVrmEntry([
       {
         id: "upload-1",
@@ -15,8 +15,8 @@ describe("VRM library helpers", () => {
       },
     ]);
 
-    expect(entries[0]).toEqual(SAMPLE_VRM_LIBRARY_ENTRY);
-    expect(entries.map((entry) => entry.id)).toEqual(["sample-vrm", "upload-1"]);
+    expect(entries.slice(0, SAMPLE_VRM_ENTRIES.length)).toEqual(SAMPLE_VRM_ENTRIES);
+    expect(entries.map((entry) => entry.id)).toEqual([...SAMPLE_VRM_ENTRIES.map((entry) => entry.id), "upload-1"]);
   });
 
   it("normalizes uploaded model names and creates blob-backed records", () => {
