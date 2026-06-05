@@ -7,6 +7,8 @@ on:
       - 'src/**'
       - 'components/**'
       - 'lib/**'
+      - 'apps/api/**'
+      - 'api/**'
       - 'public/**'
       - 'index.html'
       - 'vite.config.ts'
