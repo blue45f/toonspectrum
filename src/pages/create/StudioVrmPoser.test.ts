@@ -72,7 +72,7 @@ describe("StudioVrmPoser pose presets", () => {
   it("keeps every pose with upper arms resting close to the body", () => {
     const wideUpperArms = POSE_PRESETS.flatMap((pose) => {
       // Poses that explicitly raise arms are exempted
-      if (["peace", "fist", "flying", "heart"].includes(pose.id)) return [];
+      if (["peace", "fist", "flying", "heart", "wave", "point", "cheer", "think", "present", "support", "attack", "defense", "shy", "arrogant", "shock", "surrender", "phone", "salute"].includes(pose.id)) return [];
       return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         if (!UPPER_ARM_BONES.has(boneName)) return [];
 
@@ -90,7 +90,7 @@ describe("StudioVrmPoser pose presets", () => {
 
   it("keeps forearms and hands from making exaggerated gestures", () => {
     const awkwardArmEnds = POSE_PRESETS.flatMap((pose) => {
-      if (["peace", "fist", "heart"].includes(pose.id)) return [];
+      if (["peace", "fist", "heart", "wave", "point", "cheer", "think", "present", "support", "attack", "defense", "shy", "arrogant", "shock", "surrender", "phone", "salute"].includes(pose.id)) return [];
       return Object.entries(pose.bones).flatMap(([boneName, rotation]) => {
         const limit = FOREARM_BONES.has(boneName) ? MAX_FOREARM_AXIS_DEGREES : HAND_BONES.has(boneName) ? MAX_HAND_AXIS_DEGREES : null;
         if (limit === null) return [];
@@ -144,6 +144,12 @@ describe("StudioVrmPoser pose presets", () => {
       "fist",
       "flying",
       "heart",
+      "shy",
+      "arrogant",
+      "shock",
+      "surrender",
+      "phone",
+      "salute",
     ]);
     expect(POSE_PRESETS.map((pose) => pose.label)).toEqual([
       "기본",
@@ -162,6 +168,12 @@ describe("StudioVrmPoser pose presets", () => {
       "화이팅",
       "비상",
       "하트",
+      "부끄럼",
+      "팔짱",
+      "깜짝",
+      "항복",
+      "통화",
+      "경례",
     ]);
   });
 });

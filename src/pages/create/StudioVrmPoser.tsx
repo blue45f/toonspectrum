@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
-import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
+import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -152,41 +152,43 @@ export const POSE_PRESETS: PosePreset[] = [
   {
     id: "wave",
     label: "손인사",
-    tone: "고개 인사",
+    tone: "반가운 손짓",
     bones: naturalPose({
       spine: [d(-1), d(-2), 0],
       chest: [d(1), d(-3), 0],
-      head: [d(-1), d(3), 0],
-      rightUpperArm: [d(0), d(-4), d(-82)],
-      rightLowerArm: [0, 0, d(8)],
-      rightHand: [0, 0, d(-6)],
+      head: [d(-2), d(3), d(3)],
+      rightUpperArm: [d(-15), d(-15), d(-25)],
+      rightLowerArm: [0, 0, d(70)],
+      rightHand: [0, 0, d(-15)],
     }),
   },
   {
     id: "point",
     label: "대화",
-    tone: "작은 손짓",
+    tone: "자연스러운 대화",
     bones: naturalPose({
       hips: [0, d(-2), 0],
       spine: [d(-1), d(3), 0],
       chest: [d(1), d(4), 0],
       head: [d(-1), d(-4), 0],
-      rightUpperArm: [d(0), d(-5), d(-82)],
-      rightLowerArm: [0, 0, d(10)],
-      rightHand: [0, d(-2), d(-4)],
+      rightUpperArm: [d(-35), d(-10), d(-50)],
+      rightLowerArm: [0, 0, d(40)],
+      rightHand: [0, d(-10), d(-10)],
     }),
   },
   {
     id: "cheer",
     label: "기쁨",
-    tone: "가벼운 활기",
+    tone: "만세 포즈",
     bones: naturalPose({
       hips: [d(-1), 0, 0],
       spine: [d(-3), 0, 0],
       chest: [d(4), 0, 0],
-      head: [d(-3), 0, 0],
-      leftUpperArm: [d(0), d(2), d(84)],
-      rightUpperArm: [d(0), d(-2), d(-84)],
+      head: [d(-6), 0, 0],
+      leftUpperArm: [d(-20), d(10), d(35)],
+      leftLowerArm: [0, 0, d(-35)],
+      rightUpperArm: [d(-20), d(-10), d(-35)],
+      rightLowerArm: [0, 0, d(35)],
     }),
   },
   {
@@ -198,8 +200,10 @@ export const POSE_PRESETS: PosePreset[] = [
       spine: [d(3), d(-3), 0],
       chest: [d(1), d(-4), 0],
       neck: [d(1), d(3), 0],
-      head: [d(6), d(4), 0],
-      rightHand: [d(2), d(-2), d(-4)],
+      head: [d(6), d(-4), d(-4)],
+      rightUpperArm: [d(-50), d(-30), d(-20)],
+      rightLowerArm: [0, 0, d(85)],
+      rightHand: [d(15), d(10), d(-15)],
     }),
   },
   {
@@ -245,27 +249,29 @@ export const POSE_PRESETS: PosePreset[] = [
       spine: [d(-1), d(-3), 0],
       chest: [d(1), d(-4), 0],
       head: [d(-1), d(4), 0],
-      leftUpperArm: [d(0), d(5), d(82)],
-      rightUpperArm: [d(0), d(-5), d(-82)],
-      leftLowerArm: [0, 0, d(-8)],
-      rightLowerArm: [0, 0, d(8)],
-      leftHand: [0, d(2), d(4)],
-      rightHand: [0, d(-2), d(-4)],
+      rightUpperArm: [d(-20), d(-15), d(-45)],
+      rightLowerArm: [0, 0, d(25)],
+      rightHand: [0, d(-10), d(-10)],
+      leftUpperArm: [d(1), 0, d(82)],
+      leftLowerArm: [0, 0, d(-6)],
+      leftHand: [0, 0, d(2)],
     }),
   },
   {
     id: "support",
     label: "응원",
-    tone: "작은 박수",
+    tone: "화이팅 응원",
     bones: naturalPose({
       hips: [d(-1), d(-2), 0],
       spine: [d(-3), d(2), 0],
       chest: [d(4), d(2), 0],
       head: [d(-2), d(-1), 0],
-      leftUpperArm: [d(0), d(4), d(84)],
-      rightUpperArm: [d(0), d(-4), d(-84)],
-      leftLowerArm: [0, 0, d(10)],
-      rightLowerArm: [0, 0, d(-10)],
+      leftUpperArm: [d(-25), d(20), d(65)],
+      leftLowerArm: [0, 0, d(-65)],
+      leftHand: [0, 0, d(10)],
+      rightUpperArm: [d(-25), d(-20), d(-65)],
+      rightLowerArm: [0, 0, d(65)],
+      rightHand: [0, 0, d(-10)],
     }),
   },
   {
@@ -276,9 +282,11 @@ export const POSE_PRESETS: PosePreset[] = [
     bones: naturalPose({
       hips: [d(4), 0, 0],
       spine: [d(8), 0, 0],
-      chest: [d(5), 0, 0],
-      neck: [d(6), 0, 0],
-      head: [d(8), 0, 0],
+      chest: [d(6), 0, 0],
+      neck: [d(8), 0, 0],
+      head: [d(6), 0, 0],
+      leftUpperArm: [d(8), d(4), d(83)],
+      rightUpperArm: [d(8), d(-4), d(-83)],
       leftHand: [d(4), 0, d(2)],
       rightHand: [d(4), 0, d(-2)],
     }),
@@ -286,16 +294,18 @@ export const POSE_PRESETS: PosePreset[] = [
   {
     id: "attack",
     label: "준비",
-    tone: "차분한 대치",
+    tone: "대치 상태",
     yOffset: -0.02,
     bones: naturalPose({
-      hips: [d(-4), d(-5), 0],
+      hips: [d(-4), d(-6), 0],
       spine: [d(4), d(4), 0],
-      chest: [d(-2), d(5), 0],
+      chest: [d(-1), d(4), 0],
       head: [d(-3), d(-5), 0],
-      leftUpperArm: [d(0), d(5), d(84)],
-      rightUpperArm: [d(0), d(-5), d(-84)],
-      leftUpperLeg: [d(-8), 0, d(3)],
+      leftUpperArm: [d(-35), d(15), d(60)],
+      leftLowerArm: [0, 0, d(-55)],
+      rightUpperArm: [d(-35), d(-15), d(-60)],
+      rightLowerArm: [0, 0, d(55)],
+      leftUpperLeg: [d(-10), 0, d(3)],
       rightUpperLeg: [d(6), 0, d(-3)],
     }),
   },
@@ -309,10 +319,10 @@ export const POSE_PRESETS: PosePreset[] = [
       spine: [d(3), d(-4), 0],
       chest: [d(2), d(-5), 0],
       head: [d(-2), d(5), 0],
-      leftUpperArm: [d(0), d(5), d(84)],
-      rightUpperArm: [d(0), d(-5), d(-84)],
-      leftLowerArm: [0, 0, d(-8)],
-      rightLowerArm: [0, 0, d(8)],
+      leftUpperArm: [d(-50), d(25), d(45)],
+      leftLowerArm: [0, 0, d(-85)],
+      rightUpperArm: [d(-45), d(-25), d(-50)],
+      rightLowerArm: [0, 0, d(80)],
       leftUpperLeg: [d(-6), 0, d(3)],
       rightUpperLeg: [d(-4), 0, d(-3)],
     }),
@@ -386,6 +396,83 @@ export const POSE_PRESETS: PosePreset[] = [
       rightHand: [0, 0, d(-10)],
     }),
   },
+  {
+    id: "shy",
+    label: "부끄럼",
+    tone: "수줍은 자세",
+    bones: naturalPose({
+      head: [d(8), d(3), d(5)],
+      leftUpperArm: [d(15), d(15), d(78)],
+      rightUpperArm: [d(15), d(-15), d(-78)],
+      leftLowerArm: [0, 0, d(-15)],
+      rightLowerArm: [0, 0, d(15)],
+    }),
+  },
+  {
+    id: "arrogant",
+    label: "팔짱",
+    tone: "거만한 태도",
+    bones: naturalPose({
+      spine: [d(-3), 0, 0],
+      chest: [d(-2), 0, 0],
+      head: [d(-4), 0, 0],
+      leftUpperArm: [d(-20), d(40), d(45)],
+      leftLowerArm: [d(20), d(30), d(-85)],
+      rightUpperArm: [d(-20), d(-40), d(-45)],
+      rightLowerArm: [d(-20), d(-30), d(85)],
+    }),
+  },
+  {
+    id: "shock",
+    label: "깜짝",
+    tone: "충격 유발",
+    bones: naturalPose({
+      spine: [d(5), 0, 0],
+      chest: [d(4), 0, 0],
+      head: [d(8), 0, 0],
+      leftUpperArm: [d(-60), d(25), d(35)],
+      leftLowerArm: [0, 0, d(-90)],
+      leftHand: [d(15), d(10), d(10)],
+      rightUpperArm: [d(-60), d(-25), d(-35)],
+      rightLowerArm: [0, 0, d(90)],
+      rightHand: [d(15), d(-10), d(-10)],
+    }),
+  },
+  {
+    id: "surrender",
+    label: "항복",
+    tone: "당황한 양손",
+    bones: naturalPose({
+      head: [d(6), 0, 0],
+      leftUpperArm: [d(-10), d(10), d(15)],
+      leftLowerArm: [0, 0, d(-75)],
+      rightUpperArm: [d(-10), d(-10), d(-15)],
+      rightLowerArm: [0, 0, d(75)],
+    }),
+  },
+  {
+    id: "phone",
+    label: "통화",
+    tone: "전화 연출",
+    bones: naturalPose({
+      rightUpperArm: [d(-55), d(-25), d(-25)],
+      rightLowerArm: [0, 0, d(85)],
+      rightHand: [d(10), d(-15), d(-10)],
+      leftUpperArm: [d(12), d(10), d(76)],
+      leftLowerArm: [0, 0, d(-15)],
+    }),
+  },
+  {
+    id: "salute",
+    label: "경례",
+    tone: "절제된 인사",
+    bones: naturalPose({
+      head: [d(-2), d(-5), 0],
+      rightUpperArm: [d(-45), d(-35), d(-30)],
+      rightLowerArm: [0, 0, d(80)],
+      rightHand: [d(5), d(15), d(-15)],
+    }),
+  },
 ];
 
 const CAMERA_PRESETS: CameraPreset[] = [
@@ -397,6 +484,64 @@ const CAMERA_PRESETS: CameraPreset[] = [
   { id: "extremeLow", label: "웅장한 앵글", position: [0.1, 0.4, 2.5], target: [0, 1.3, 0], fov: 36 },
   { id: "closeup", label: "얼굴 줌", position: [0, 1.55, 1.25], target: [0, 1.5, 0], fov: 25 },
 ];
+
+const BONE_LABELS: Record<string, string> = {
+  head: "머리 (Head)",
+  neck: "목 (Neck)",
+  spine: "척추 (Spine)",
+  chest: "가슴 (Chest)",
+  leftUpperArm: "왼쪽 어깨 (L Upper Arm)",
+  rightUpperArm: "오른쪽 어깨 (R Upper Arm)",
+  leftLowerArm: "왼쪽 팔꿈치 (L Lower Arm)",
+  rightLowerArm: "오른쪽 팔꿈치 (R Lower Arm)",
+  leftHand: "왼쪽 손목 (L Hand)",
+  rightHand: "오른쪽 손목 (R Hand)",
+  leftUpperLeg: "왼쪽 고관절 (L Upper Leg)",
+  rightUpperLeg: "오른쪽 고관절 (R Upper Leg)",
+  leftLowerLeg: "왼쪽 무릎 (L Lower Leg)",
+  rightLowerLeg: "오른쪽 무릎 (R Lower Leg)",
+  leftFoot: "왼쪽 발목 (L Foot)",
+  rightFoot: "오른쪽 발목 (R Foot)",
+};
+
+const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneName[] }> = [
+  { id: "head", label: "머리/목", bones: ["head", "neck"] },
+  { id: "torso", label: "몸통/상체", bones: ["spine", "chest"] },
+  { id: "rightArm", label: "오른팔", bones: ["rightUpperArm", "rightLowerArm", "rightHand"] },
+  { id: "leftArm", label: "왼팔", bones: ["leftUpperArm", "leftLowerArm", "leftHand"] },
+  { id: "rightLeg", label: "오른다리", bones: ["rightUpperLeg", "rightLowerLeg", "rightFoot"] },
+  { id: "leftLeg", label: "왼다리", bones: ["leftUpperLeg", "leftLowerLeg", "leftFoot"] },
+];
+
+type ScenePropDef = {
+  id: string;
+  label: string;
+  emoji: string;
+  category: "animal" | "item" | "effect";
+  position: Vec3;
+  scale: number;
+};
+
+const SCENE_PROPS: ScenePropDef[] = [
+  { id: "cat", label: "고양이", emoji: "🐱", category: "animal", position: [0.5, 0, 0.3], scale: 0.12 },
+  { id: "dog", label: "강아지", emoji: "🐕", category: "animal", position: [-0.5, 0, 0.3], scale: 0.13 },
+  { id: "bunny", label: "토끼", emoji: "🐰", category: "animal", position: [0.6, 0, -0.2], scale: 0.1 },
+  { id: "bird", label: "새", emoji: "🐦", category: "animal", position: [0.35, 1.7, 0.1], scale: 0.08 },
+  { id: "fox", label: "여우", emoji: "🦊", category: "animal", position: [-0.55, 0, -0.15], scale: 0.12 },
+  { id: "bear", label: "곰", emoji: "🐻", category: "animal", position: [-0.6, 0, 0.4], scale: 0.15 },
+  { id: "chick", label: "병아리", emoji: "🐥", category: "animal", position: [0.3, 0, 0.5], scale: 0.07 },
+  { id: "fish", label: "물고기", emoji: "🐟", category: "animal", position: [0.5, 1.2, -0.3], scale: 0.08 },
+  { id: "sword", label: "검", emoji: "⚔️", category: "item", position: [0.65, 0, 0], scale: 0.14 },
+  { id: "shield", label: "방패", emoji: "🛡️", category: "item", position: [-0.65, 0.5, 0], scale: 0.16 },
+  { id: "book", label: "책", emoji: "📖", category: "item", position: [0.4, 0.85, 0.3], scale: 0.1 },
+  { id: "flower", label: "꽃", emoji: "🌸", category: "item", position: [0.35, 0, 0.45], scale: 0.09 },
+  { id: "gem", label: "보석", emoji: "💎", category: "item", position: [0.3, 1.5, 0.2], scale: 0.06 },
+  { id: "crystal", label: "수정구", emoji: "🔮", category: "item", position: [-0.35, 0.8, 0.35], scale: 0.1 },
+  { id: "cloud", label: "구름", emoji: "☁️", category: "effect", position: [0.5, 2.0, -0.5], scale: 0.2 },
+  { id: "star", label: "별", emoji: "🌟", category: "effect", position: [-0.4, 1.8, 0.2], scale: 0.07 },
+];
+
+const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -453,17 +598,23 @@ function loadVrmAsset(url: string) {
   });
 }
 
-function applyPoseToVrm(vrm: VRM, pose: PosePreset) {
+function applyPoseToVrm(vrm: VRM, bones: BoneRotationMap, yOffset: number) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return false;
 
   humanoid.resetNormalizedPose();
-  vrm.scene.position.y = pose.yOffset ?? 0;
+  vrm.scene.position.y = yOffset;
 
-  const entries = Object.entries(pose.bones) as Array<[VRMHumanBoneName, Vec3]>;
-  entries.forEach(([boneName, rotation]) => {
+  const allBones = [
+    "hips", "spine", "chest", "neck", "head",
+    "leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm", "leftHand", "rightHand",
+    "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg", "leftFoot", "rightFoot"
+  ] as VRMHumanBoneName[];
+
+  allBones.forEach((boneName) => {
     const bone = humanoid.getNormalizedBoneNode(boneName);
     if (!bone) return;
+    const rotation = bones[boneName] || [0, 0, 0];
     bone.rotation.set(rotation[0], rotation[1], rotation[2]);
   });
 
@@ -595,10 +746,242 @@ function CameraDirector({ presetId }: { presetId: string }) {
   return null;
 }
 
-function VrmActor({ bodyRotation, poseId, vrm }: { bodyRotation: number; poseId: string; vrm: VRM }) {
+/* ── 3D Scene Prop Meshes ─────────────────────────────── */
+
+function AnimalCat({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.8, 0]}><sphereGeometry args={[1, 16, 16]} /><meshStandardMaterial color="#444" /></mesh>
+      <mesh position={[-0.55, 2.7, 0]} rotation={[0, 0, 0.3]}><coneGeometry args={[0.35, 0.7, 4]} /><meshStandardMaterial color="#444" /></mesh>
+      <mesh position={[0.55, 2.7, 0]} rotation={[0, 0, -0.3]}><coneGeometry args={[0.35, 0.7, 4]} /><meshStandardMaterial color="#444" /></mesh>
+      <mesh position={[0, 0.8, 0]}><capsuleGeometry args={[0.7, 1.4, 8, 16]} /><meshStandardMaterial color="#555" /></mesh>
+      <mesh position={[-1.2, 1.3, 0]} rotation={[0, 0, 1.2]}><capsuleGeometry args={[0.15, 1.4, 4, 8]} /><meshStandardMaterial color="#555" /></mesh>
+      <mesh position={[0, 1.6, 0.8]}><sphereGeometry args={[0.2, 8, 8]} /><meshStandardMaterial color="#ffaacc" /></mesh>
+      <mesh position={[-0.3, 2, 0.85]}><sphereGeometry args={[0.18, 8, 8]} /><meshStandardMaterial color="#aaff88" emissive="#224400" /></mesh>
+      <mesh position={[0.3, 2, 0.85]}><sphereGeometry args={[0.18, 8, 8]} /><meshStandardMaterial color="#aaff88" emissive="#224400" /></mesh>
+    </group>
+  );
+}
+
+function AnimalDog({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.7, 0]}><sphereGeometry args={[0.9, 16, 16]} /><meshStandardMaterial color="#c49060" /></mesh>
+      <mesh position={[-0.6, 2.1, 0.2]} rotation={[0.3, 0, 0.6]}><capsuleGeometry args={[0.25, 0.8, 4, 8]} /><meshStandardMaterial color="#a07040" /></mesh>
+      <mesh position={[0.6, 2.1, 0.2]} rotation={[0.3, 0, -0.6]}><capsuleGeometry args={[0.25, 0.8, 4, 8]} /><meshStandardMaterial color="#a07040" /></mesh>
+      <mesh position={[0, 0.7, 0]}><capsuleGeometry args={[0.8, 1, 8, 16]} /><meshStandardMaterial color="#d4a060" /></mesh>
+      <mesh position={[0, 1.5, 0.75]}><sphereGeometry args={[0.22, 8, 8]} /><meshStandardMaterial color="#222" /></mesh>
+      <mesh position={[-0.25, 1.85, 0.75]}><sphereGeometry args={[0.14, 8, 8]} /><meshStandardMaterial color="#222" /></mesh>
+      <mesh position={[0.25, 1.85, 0.75]}><sphereGeometry args={[0.14, 8, 8]} /><meshStandardMaterial color="#222" /></mesh>
+      <mesh position={[-1.1, 1.8, -0.2]} rotation={[0, 0, 1.5]}><capsuleGeometry args={[0.1, 0.9, 4, 8]} /><meshStandardMaterial color="#c49060" /></mesh>
+    </group>
+  );
+}
+
+function AnimalBunny({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.5, 0]}><sphereGeometry args={[0.8, 16, 16]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[-0.25, 2.8, 0]}><capsuleGeometry args={[0.18, 1.2, 4, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[0.25, 2.8, 0]}><capsuleGeometry args={[0.18, 1.2, 4, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[-0.25, 2.8, 0.05]}><capsuleGeometry args={[0.1, 0.9, 4, 8]} /><meshStandardMaterial color="#ffbbcc" /></mesh>
+      <mesh position={[0.25, 2.8, 0.05]}><capsuleGeometry args={[0.1, 0.9, 4, 8]} /><meshStandardMaterial color="#ffbbcc" /></mesh>
+      <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.9, 16, 16]} /><meshStandardMaterial color="#f8f8f8" /></mesh>
+      <mesh position={[0, 1.35, 0.65]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#ffaabb" /></mesh>
+      <mesh position={[-0.22, 1.65, 0.65]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#ff3366" /></mesh>
+      <mesh position={[0.22, 1.65, 0.65]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#ff3366" /></mesh>
+      <mesh position={[0, 0.5, -0.8]}><sphereGeometry args={[0.35, 12, 12]} /><meshStandardMaterial color="#fff" /></mesh>
+    </group>
+  );
+}
+
+function AnimalBird({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.5, 0]}><sphereGeometry args={[0.8, 16, 16]} /><meshStandardMaterial color="#60a5fa" /></mesh>
+      <mesh position={[0, 1.2, 0]}><sphereGeometry args={[0.55, 16, 16]} /><meshStandardMaterial color="#93c5fd" /></mesh>
+      <mesh position={[0, 1.1, 0.55]}><coneGeometry args={[0.15, 0.5, 6]} /><meshStandardMaterial color="#fb923c" /></mesh>
+      <mesh position={[-0.22, 1.35, 0.4]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.22, 1.35, 0.4]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[-0.7, 0.6, 0]} rotation={[0, 0, 0.6]}><capsuleGeometry args={[0.1, 0.8, 4, 8]} /><meshStandardMaterial color="#2563eb" /></mesh>
+      <mesh position={[0.7, 0.6, 0]} rotation={[0, 0, -0.6]}><capsuleGeometry args={[0.1, 0.8, 4, 8]} /><meshStandardMaterial color="#2563eb" /></mesh>
+    </group>
+  );
+}
+
+function AnimalFox({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.6, 0]}><sphereGeometry args={[0.85, 16, 16]} /><meshStandardMaterial color="#ea580c" /></mesh>
+      <mesh position={[-0.45, 2.5, 0]} rotation={[0, 0, 0.25]}><coneGeometry args={[0.3, 0.7, 4]} /><meshStandardMaterial color="#ea580c" /></mesh>
+      <mesh position={[0.45, 2.5, 0]} rotation={[0, 0, -0.25]}><coneGeometry args={[0.3, 0.7, 4]} /><meshStandardMaterial color="#ea580c" /></mesh>
+      <mesh position={[0, 0.7, 0]}><capsuleGeometry args={[0.7, 1.2, 8, 16]} /><meshStandardMaterial color="#f97316" /></mesh>
+      <mesh position={[0, 1.3, 0.7]}><sphereGeometry args={[0.3, 8, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[0, 1.35, 0.85]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[-0.2, 1.7, 0.7]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.2, 1.7, 0.7]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[-1.0, 0.5, -0.2]} rotation={[0.3, 0, 1.0]}><capsuleGeometry args={[0.25, 1.0, 4, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+    </group>
+  );
+}
+
+function AnimalBear({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.8, 0]}><sphereGeometry args={[1, 16, 16]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[-0.65, 2.6, 0]}><sphereGeometry args={[0.35, 12, 12]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[0.65, 2.6, 0]}><sphereGeometry args={[0.35, 12, 12]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[-0.65, 2.6, 0.1]}><sphereGeometry args={[0.2, 8, 8]} /><meshStandardMaterial color="#fef08a" /></mesh>
+      <mesh position={[0.65, 2.6, 0.1]}><sphereGeometry args={[0.2, 8, 8]} /><meshStandardMaterial color="#fef08a" /></mesh>
+      <mesh position={[0, 0.8, 0]}><capsuleGeometry args={[0.9, 1.2, 8, 16]} /><meshStandardMaterial color="#92400e" /></mesh>
+      <mesh position={[0, 1.6, 0.85]}><sphereGeometry args={[0.2, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[-0.28, 2, 0.8]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.28, 2, 0.8]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0, 0.5, 0.7]}><sphereGeometry args={[0.45, 12, 12]} /><meshStandardMaterial color="#fef08a" /></mesh>
+    </group>
+  );
+}
+
+function AnimalChick({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.8, 0]}><sphereGeometry args={[0.9, 16, 16]} /><meshStandardMaterial color="#fef08a" /></mesh>
+      <mesh position={[0, 1.6, 0]}><sphereGeometry args={[0.6, 16, 16]} /><meshStandardMaterial color="#fde047" /></mesh>
+      <mesh position={[0, 1.4, 0.55]}><coneGeometry args={[0.15, 0.35, 6]} /><meshStandardMaterial color="#fb923c" /></mesh>
+      <mesh position={[-0.18, 1.7, 0.45]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.18, 1.7, 0.45]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[-0.6, 0.9, 0]} rotation={[0, 0, 0.5]}><capsuleGeometry args={[0.08, 0.5, 4, 8]} /><meshStandardMaterial color="#fde047" /></mesh>
+      <mesh position={[0.6, 0.9, 0]} rotation={[0, 0, -0.5]}><capsuleGeometry args={[0.08, 0.5, 4, 8]} /><meshStandardMaterial color="#fde047" /></mesh>
+    </group>
+  );
+}
+
+function AnimalFish({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0, 0.4, 0]}>
+      <mesh position={[0, 0.5, 0]}><sphereGeometry args={[0.7, 16, 12]} /><meshStandardMaterial color="#f97316" transparent opacity={0.9} /></mesh>
+      <mesh position={[-0.6, 0.7, 0]} rotation={[0, 0, 0.5]}><coneGeometry args={[0.45, 0.6, 6]} /><meshStandardMaterial color="#ea580c" /></mesh>
+      <mesh position={[0.2, 0.55, 0.55]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.5, 0.5, 0]}><coneGeometry args={[0.35, 0.55, 3]} /><meshStandardMaterial color="#fdba74" /></mesh>
+    </group>
+  );
+}
+
+function PropSword({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0, 0, 0.15]}>
+      <mesh position={[0, 3, 0]}><boxGeometry args={[0.15, 4, 0.06]} /><meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.2} /></mesh>
+      <mesh position={[0, 0.85, 0]}><boxGeometry args={[0.8, 0.15, 0.15]} /><meshStandardMaterial color="#d4af37" metalness={0.6} roughness={0.3} /></mesh>
+      <mesh position={[0, 0.35, 0]}><cylinderGeometry args={[0.08, 0.1, 0.8, 8]} /><meshStandardMaterial color="#5c4033" /></mesh>
+    </group>
+  );
+}
+
+function PropShield({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.5, 0]}><cylinderGeometry args={[1.2, 1, 0.15, 6]} /><meshStandardMaterial color="#1e3a5f" metalness={0.5} roughness={0.4} /></mesh>
+      <mesh position={[0, 1.5, 0.08]}><cylinderGeometry args={[0.4, 0.35, 0.08, 16]} /><meshStandardMaterial color="#d4af37" metalness={0.7} roughness={0.3} /></mesh>
+    </group>
+  );
+}
+
+function PropBook({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0.2, 0.3, 0]}>
+      <mesh position={[0, 0, 0]}><boxGeometry args={[1.6, 2.0, 0.3]} /><meshStandardMaterial color="#7c2d12" /></mesh>
+      <mesh position={[0, 0, 0.16]}><boxGeometry args={[1.4, 1.8, 0.02]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+      <mesh position={[-0.8, 0, 0]}><boxGeometry args={[0.06, 2.0, 0.34]} /><meshStandardMaterial color="#5c2d12" /></mesh>
+    </group>
+  );
+}
+
+function PropFlower({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 1.2, 0]}><cylinderGeometry args={[0.06, 0.06, 2.4, 6]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      {[0, 72, 144, 216, 288].map((angle) => (
+        <mesh key={angle} position={[Math.sin(d(angle)) * 0.35, 2.5 + Math.cos(d(angle)) * 0.1, Math.cos(d(angle)) * 0.35]}>
+          <sphereGeometry args={[0.25, 8, 8]} /><meshStandardMaterial color="#f472b6" />
+        </mesh>
+      ))}
+      <mesh position={[0, 2.5, 0]}><sphereGeometry args={[0.2, 8, 8]} /><meshStandardMaterial color="#facc15" /></mesh>
+    </group>
+  );
+}
+
+function PropGem({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.6, 0]} rotation={[0, 0.3, 0]}>
+        <octahedronGeometry args={[0.7, 0]} /><meshStandardMaterial color="#8b5cf6" metalness={0.3} roughness={0.1} transparent opacity={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
+function PropCrystal({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.8, 0]}><sphereGeometry args={[0.9, 24, 24]} /><meshStandardMaterial color="#a78bfa" metalness={0.2} roughness={0.05} transparent opacity={0.6} /></mesh>
+      <mesh position={[0, 0.8, 0]}><sphereGeometry args={[0.92, 24, 24]} /><meshStandardMaterial color="#c4b5fd" wireframe /></mesh>
+    </group>
+  );
+}
+
+function PropCloud({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0, 0]}><sphereGeometry args={[0.8, 12, 12]} /><meshStandardMaterial color="#fff" transparent opacity={0.85} /></mesh>
+      <mesh position={[0.65, 0.1, 0]}><sphereGeometry args={[0.6, 12, 12]} /><meshStandardMaterial color="#fff" transparent opacity={0.85} /></mesh>
+      <mesh position={[-0.65, 0.05, 0]}><sphereGeometry args={[0.65, 12, 12]} /><meshStandardMaterial color="#fff" transparent opacity={0.85} /></mesh>
+      <mesh position={[0.3, 0.4, 0]}><sphereGeometry args={[0.55, 12, 12]} /><meshStandardMaterial color="#f8fafc" transparent opacity={0.85} /></mesh>
+      <mesh position={[-0.3, 0.35, 0]}><sphereGeometry args={[0.5, 12, 12]} /><meshStandardMaterial color="#f8fafc" transparent opacity={0.85} /></mesh>
+    </group>
+  );
+}
+
+function PropStar({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.8, 0.8, 0.15, 5, 1]} /><meshStandardMaterial color="#facc15" emissive="#a16207" emissiveIntensity={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+const PROP_COMPONENTS: Record<string, React.FC<{ scale: number }>> = {
+  cat: AnimalCat, dog: AnimalDog, bunny: AnimalBunny, bird: AnimalBird,
+  fox: AnimalFox, bear: AnimalBear, chick: AnimalChick, fish: AnimalFish,
+  sword: PropSword, shield: PropShield, book: PropBook, flower: PropFlower,
+  gem: PropGem, crystal: PropCrystal, cloud: PropCloud, star: PropStar,
+};
+
+function SceneProp3D({ propId, position, scale }: { propId: string; position: Vec3; scale: number }) {
+  const Comp = PROP_COMPONENTS[propId];
+  if (!Comp) return null;
+  return (
+    <group position={[position[0], position[1], position[2]]}>
+      <Comp scale={scale} />
+    </group>
+  );
+}
+
+function VrmActor({
+  bodyRotation,
+  customBones,
+  customYOffset,
+  vrm,
+}: {
+  bodyRotation: number;
+  customBones: BoneRotationMap;
+  customYOffset: number;
+  vrm: VRM;
+}) {
   useEffect(() => {
-    applyPoseToVrm(vrm, findPose(poseId));
-  }, [poseId, vrm]);
+    applyPoseToVrm(vrm, customBones, customYOffset);
+  }, [customBones, customYOffset, vrm]);
 
   useEffect(() => {
     const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
@@ -662,6 +1045,9 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [modelName, setModelName] = useState("");
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [activePoseId, setActivePoseId] = useState("default");
+  const [customBones, setCustomBones] = useState<BoneRotationMap>(POSE_PRESETS[0].bones);
+  const [customYOffset, setCustomYOffset] = useState<number>(POSE_PRESETS[0].yOffset ?? 0);
+  const [activeCategory, setActiveCategory] = useState("head");
   const [activeExpressionId, setActiveExpressionId] = useState("neutral");
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [bodyRotation, setBodyRotation] = useState(0);
@@ -673,6 +1059,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [lightingTone, setLightingTone] = useState<LightingTone>("morning");
+  const [activeProps, setActiveProps] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -779,9 +1166,11 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setModelName(nextModelName);
     setActiveModelId(nextModelId);
     setActivePoseId("default");
+    setCustomBones(POSE_PRESETS[0].bones);
+    setCustomYOffset(POSE_PRESETS[0].yOffset ?? 0);
     setActiveExpressionId("neutral");
     setBodyRotation(0);
-    applyPoseToVrm(nextVrm, POSE_PRESETS[0]);
+    applyPoseToVrm(nextVrm, POSE_PRESETS[0].bones, POSE_PRESETS[0].yOffset ?? 0);
     applyExpressionToVrm(nextVrm, NEUTRAL_EXPRESSION_ACTION);
     setStatus("ready");
   }
@@ -912,9 +1301,27 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   function handlePoseSelect(poseId: string) {
     setActivePoseId(poseId);
+    const pose = findPose(poseId);
+    setCustomBones(pose.bones);
+    setCustomYOffset(pose.yOffset ?? 0);
     if (vrmRef.current) {
-      applyPoseToVrm(vrmRef.current, findPose(poseId));
+      applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset ?? 0);
     }
+  }
+
+  function handleBoneRotationChange(boneName: string, axisIndex: number, degrees: number) {
+    if (!vrm) return;
+    const radians = d(degrees);
+    const key = boneName as VRMHumanBoneName;
+    setCustomBones((prev) => {
+      const current = prev[key] ? [...prev[key]] : [0, 0, 0];
+      current[axisIndex] = radians;
+      return { ...prev, [key]: current as unknown as Vec3 };
+    });
+  }
+
+  function handleYOffsetChange(value: number) {
+    setCustomYOffset(value);
   }
 
   function handleExpressionSelect(action: ExpressionAction) {
@@ -998,7 +1405,12 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                   <CaptureBridge captureRef={captureRef} />
                   <CameraDirector presetId={activeCameraId} />
                   <VrmLighting tone={lightingTone} />
-                  {vrm ? <VrmActor bodyRotation={bodyRotation} poseId={activePoseId} vrm={vrm} /> : null}
+                  {vrm ? <VrmActor bodyRotation={bodyRotation} customBones={customBones} customYOffset={customYOffset} vrm={vrm} /> : null}
+                  {activeProps.map((propId) => {
+                    const propDef = SCENE_PROPS.find((p) => p.id === propId);
+                    if (!propDef) return null;
+                    return <SceneProp3D key={propId} propId={propId} position={propDef.position} scale={propDef.scale} />;
+                  })}
                   <ContactShadows position={[0, 0.01, 0]} opacity={0.22} scale={4.8} blur={2.35} far={2.6} resolution={512} color="#3c2b20" />
                   <OrbitControls
                     makeDefault
@@ -1233,6 +1645,138 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                 </div>
               </section>
 
+              <section className="rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
+                  <Sliders size={14} className="text-accent" aria-hidden />
+                  관절 미세 조정 (Manual Pose)
+                </h3>
+                
+                <div className="mb-3 flex flex-wrap gap-1">
+                  {BONE_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={cx(
+                        "rounded-lg border px-2 py-1 text-[0.68rem] font-bold transition-colors",
+                        activeCategory === cat.id
+                          ? "border-accent/60 bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg-2 hover:bg-raised"
+                      )}
+                      onClick={() => setActiveCategory(cat.id)}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-3.5">
+                  {(() => {
+                    const cat = BONE_CATEGORIES.find((c) => c.id === activeCategory);
+                    if (!cat) return null;
+                    return cat.bones.map((boneName) => {
+                      const label = BONE_LABELS[boneName] || boneName;
+                      const [xRad, yRad, zRad] = customBones[boneName] || [0, 0, 0];
+                      const xDeg = Math.round(THREE.MathUtils.radToDeg(xRad));
+                      const yDeg = Math.round(THREE.MathUtils.radToDeg(yRad));
+                      const zDeg = Math.round(THREE.MathUtils.radToDeg(zRad));
+
+                      return (
+                        <div key={boneName} className="rounded-lg border border-line/60 bg-panel/40 p-2.5">
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <span className="text-[0.7rem] font-bold text-fg-2">{label}</span>
+                            <button
+                              type="button"
+                              className="text-[0.62rem] text-accent hover:underline animate-fade-in"
+                              disabled={!vrm}
+                              onClick={() => {
+                                setCustomBones((prev) => {
+                                  return { ...prev, [boneName]: [0, 0, 0] as unknown as Vec3 };
+                                });
+                              }}
+                            >
+                              초기화
+                            </button>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-[0.65rem] text-fg-3">
+                            <span className="w-8 shrink-0">앞/뒤:</span>
+                            <input
+                              type="range"
+                              min="-180"
+                              max="180"
+                              value={xDeg}
+                              disabled={!vrm}
+                              className="h-1 flex-1 accent-accent"
+                              onChange={(e) => handleBoneRotationChange(boneName, 0, Number(e.target.value))}
+                            />
+                            <span className="w-8 text-right numeral">{xDeg}°</span>
+                          </div>
+
+                          <div className="mt-1.5 flex items-center gap-2 text-[0.65rem] text-fg-3">
+                            <span className="w-8 shrink-0">뒤틀기:</span>
+                            <input
+                              type="range"
+                              min="-180"
+                              max="180"
+                              value={yDeg}
+                              disabled={!vrm}
+                              className="h-1 flex-1 accent-accent"
+                              onChange={(e) => handleBoneRotationChange(boneName, 1, Number(e.target.value))}
+                            />
+                            <span className="w-8 text-right numeral">{yDeg}°</span>
+                          </div>
+
+                          <div className="mt-1.5 flex items-center gap-2 text-[0.65rem] text-fg-3">
+                            <span className="w-8 shrink-0">안/밖:</span>
+                            <input
+                              type="range"
+                              min="-180"
+                              max="180"
+                              value={zDeg}
+                              disabled={!vrm}
+                              className="h-1 flex-1 accent-accent"
+                              onChange={(e) => handleBoneRotationChange(boneName, 2, Number(e.target.value))}
+                            />
+                            <span className="w-8 text-right numeral">{zDeg}°</span>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                
+                <div className="mt-4 border-t border-line/60 pt-3">
+                  <label className="block">
+                    <span className="flex items-center justify-between text-[0.68rem] font-semibold text-fg-2">
+                      <span>캐릭터 높이 조정 (Y-Offset)</span>
+                      <span className="numeral text-fg-3">{customYOffset.toFixed(2)}m</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="-0.30"
+                      max="0.30"
+                      step="0.01"
+                      value={customYOffset}
+                      disabled={!vrm}
+                      className="mt-2 w-full accent-accent"
+                      onChange={(e) => handleYOffsetChange(Number(e.target.value))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
+                    disabled={!vrm}
+                    onClick={() => {
+                      const pose = findPose(activePoseId);
+                      setCustomBones(pose.bones);
+                      setCustomYOffset(pose.yOffset ?? 0);
+                    }}
+                  >
+                    현재 프리셋 포즈로 재설정
+                  </button>
+                </div>
+              </section>
+
               <section>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Camera size={15} className="text-accent" aria-hidden />
@@ -1303,6 +1847,59 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     </button>
                   ))}
                 </div>
+              </section>
+
+              <section className="mt-4">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Sparkles size={15} className="text-accent" aria-hidden />
+                  3D 소품 · 동물 배치
+                </h3>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  캐릭터 주변에 귀여운 동물이나 소품을 추가해 보세요. 여러 개를 동시에 배치할 수 있습니다.
+                </p>
+                {(["animal", "item", "effect"] as const).map((cat) => {
+                  const items = SCENE_PROPS.filter((p) => p.category === cat);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={cat} className="mb-3">
+                      <p className="mb-1.5 text-[0.65rem] font-bold text-fg-2">{PROP_CATEGORY_LABELS[cat]}</p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {items.map((prop) => {
+                          const isActive = activeProps.includes(prop.id);
+                          return (
+                            <button
+                              key={prop.id}
+                              type="button"
+                              className={cx(
+                                "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-center transition-colors",
+                                isActive
+                                  ? "border-accent/60 bg-accent-soft text-accent ring-1 ring-accent/30"
+                                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                              )}
+                              onClick={() => {
+                                setActiveProps((prev) =>
+                                  prev.includes(prop.id) ? prev.filter((id) => id !== prop.id) : [...prev, prop.id]
+                                );
+                              }}
+                            >
+                              <span className="text-base leading-none">{prop.emoji}</span>
+                              <span className="text-[0.55rem] font-semibold leading-tight">{prop.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                {activeProps.length > 0 && (
+                  <button
+                    type="button"
+                    className="mt-1 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised"
+                    onClick={() => setActiveProps([])}
+                  >
+                    모든 소품 제거
+                  </button>
+                )}
               </section>
             </div>
 

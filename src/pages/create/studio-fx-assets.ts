@@ -574,7 +574,124 @@ function stickerFocusMark(): string {
   return svg(W, H, rays + corners + `<circle cx="130" cy="130" r="30" fill="none" stroke="${INK}" stroke-width="8"/><circle cx="130" cy="130" r="7" fill="${INK}"/>`);
 }
 
+function stickerPuppy(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <path d="M50 60 C30 90, 25 150, 45 160 C60 165, 80 130, 80 90 Z" fill="#b07a56" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M190 60 C210 90, 215 150, 195 160 C180 165, 160 130, 160 90 Z" fill="#b07a56" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <ellipse cx="120" cy="115" rx="65" ry="55" fill="#f5e6d3" stroke="${INK}" stroke-width="8"/>
+    <circle cx="95" cy="105" r="8" fill="${INK}"/>
+    <circle cx="145" cy="105" r="8" fill="${INK}"/>
+    <circle cx="92" cy="102" r="2.5" fill="#fff"/>
+    <circle cx="142" cy="102" r="2.5" fill="#fff"/>
+    <ellipse cx="120" cy="130" rx="22" ry="16" fill="#ffffff" stroke="${INK}" stroke-width="4"/>
+    <polygon points="110,122 130,122 120,132" fill="${INK}" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M120 130 Q112 138 106 134 M120 130 Q128 138 134 134" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+  `);
+}
+
+function stickerKitten(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <polygon points="45,95 45,35 105,75" fill="#3a3a3a" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <polygon points="58,85 58,48 95,73" fill="#ffaabf"/>
+    <polygon points="195,95 195,35 135,75" fill="#3a3a3a" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <polygon points="182,85 182,48 145,73" fill="#ffaabf"/>
+    <ellipse cx="120" cy="115" rx="62" ry="48" fill="#e2e8f0" stroke="${INK}" stroke-width="8"/>
+    <ellipse cx="92" cy="110" rx="9" ry="12" fill="#22d3ee" stroke="${INK}" stroke-width="4"/>
+    <circle cx="92" cy="110" r="4" fill="${INK}"/>
+    <circle cx="90" cy="107" r="1.5" fill="#fff"/>
+    <ellipse cx="148" cy="110" rx="9" ry="12" fill="#22d3ee" stroke="${INK}" stroke-width="4"/>
+    <circle cx="148" cy="110" r="4" fill="${INK}"/>
+    <circle cx="146" cy="107" r="1.5" fill="#fff"/>
+    <polygon points="116,122 124,122 120,126" fill="#ffaabf" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120 126 Q115 132 110 129 M120 126 Q125 132 130 129" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="45" y1="120" x2="20" y2="118" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="45" y1="128" x2="18" y2="132" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="195" y1="120" x2="220" y2="118" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+    <line x1="195" y1="128" x2="222" y2="132" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+  `);
+}
+
+function stickerBunny(): string {
+  const W = 240;
+  const H = 260;
+  return svg(W, H, `
+    <path d="M70 100 C50 30, 75 10, 85 10 C95 10, 105 30, 95 100 Z" fill="#ffffff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M77 90 C62 40, 78 22, 85 22 C92 22, 98 40, 88 90 Z" fill="#ffccd5"/>
+    <path d="M170 100 C190 30, 165 10, 155 10 C145 10, 135 30, 145 100 Z" fill="#ffffff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M163 90 C178 40, 162 22, 155 22 C148 22, 142 40, 152 90 Z" fill="#ffccd5"/>
+    <circle cx="120" cy="165" r="54" fill="#ffffff" stroke="${INK}" stroke-width="8"/>
+    <circle cx="96" cy="160" r="7" fill="${INK}"/>
+    <circle cx="144" cy="160" r="7" fill="${INK}"/>
+    <circle cx="94" cy="158" r="2" fill="#fff"/>
+    <circle cx="142" cy="158" r="2" fill="#fff"/>
+    <ellipse cx="84" cy="172" rx="10" ry="5" fill="#ffaabf" opacity="0.6"/>
+    <ellipse cx="156" cy="172" rx="10" ry="5" fill="#ffaabf" opacity="0.6"/>
+    <polygon points="116,170 124,170 120,174" fill="#f43f5e" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M120 174 Q115 180 108 177 M120 174 Q125 180 132 177" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+  `);
+}
+
+function stickerChick(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <ellipse cx="56" cy="130" rx="14" ry="24" fill="#fde047" stroke="${INK}" stroke-width="8" transform="rotate(-20 56 130)"/>
+    <ellipse cx="184" cy="130" rx="14" ry="24" fill="#fde047" stroke="${INK}" stroke-width="8" transform="rotate(20 184 130)"/>
+    <ellipse cx="120" cy="120" rx="60" ry="58" fill="#fef08a" stroke="${INK}" stroke-width="8"/>
+    <circle cx="92" cy="115" r="7.5" fill="${INK}"/>
+    <circle cx="148" cy="115" r="7.5" fill="${INK}"/>
+    <circle cx="90" cy="112" r="2" fill="#fff"/>
+    <circle cx="146" cy="112" r="2" fill="#fff"/>
+    <path d="M106 126 Q120 114 134 126 Q120 144 106 126 Z" fill="#fb923c" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M96 178 v16 M96 186 l-10 8 M96 186 l10 8" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M144 178 v16 M144 186 l-10 8 M144 186 l10 8" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>
+  `);
+}
+
+function stickerBird(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <path d="M50 145 L20 170 L40 180 Z" fill="#60a5fa" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M100 135 C70 100, 60 70, 75 55 C90 50, 110 80, 130 115 Z" fill="#2563eb" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+    <ellipse cx="125" cy="130" rx="60" ry="46" fill="#60a5fa" stroke="${INK}" stroke-width="8"/>
+    <path d="M125 155 A 40 32 0 0 0 178 115 A 60 46 0 0 1 125 155 Z" fill="#93c5fd" opacity="0.9"/>
+    <circle cx="158" cy="118" r="7" fill="${INK}"/>
+    <circle cx="156" cy="115" r="2" fill="#fff"/>
+    <polygon points="182,122 205,124 184,134" fill="#fb923c" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
+  `);
+}
+
+function stickerTeddy(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <circle cx="65" cy="68" r="24" fill="#a16207" stroke="${INK}" stroke-width="8"/>
+    <circle cx="65" cy="68" r="13" fill="#fef08a"/>
+    <circle cx="175" cy="68" r="24" fill="#a16207" stroke="${INK}" stroke-width="8"/>
+    <circle cx="175" cy="68" r="13" fill="#fef08a"/>
+    <circle cx="120" cy="125" r="62" fill="#ca8a04" stroke="${INK}" stroke-width="8"/>
+    <circle cx="95" cy="115" r="8" fill="${INK}"/>
+    <circle cx="145" cy="115" r="8" fill="${INK}"/>
+    <circle cx="92" cy="112" r="2.5" fill="#fff"/>
+    <circle cx="142" cy="112" r="2.5" fill="#fff"/>
+    <ellipse cx="120" cy="140" rx="24" ry="18" fill="#fef08a" stroke="${INK}" stroke-width="4"/>
+    <ellipse cx="120" cy="136" rx="11" ry="7" fill="${INK}"/>
+    <path d="M120 143 Q114 149 108 146 M120 143 Q126 149 132 146" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/>
+  `);
+}
+
 export const COMIC_VECTOR_STICKERS: ComicVectorSticker[] = [
+  { id: "dog-sticker", label: "귀여운 강아지", svg: stickerPuppy(), width: 240, height: 240 },
+  { id: "cat-sticker", label: "귀여운 고양이", svg: stickerKitten(), width: 240, height: 240 },
+  { id: "bunny-sticker", label: "귀여운 토끼", svg: stickerBunny(), width: 240, height: 260 },
+  { id: "chick-sticker", label: "귀여운 병아리", svg: stickerChick(), width: 240, height: 240 },
+  { id: "bird-sticker", label: "아기 파랑새", svg: stickerBird(), width: 240, height: 240 },
+  { id: "teddy-sticker", label: "아기 곰돌이", svg: stickerTeddy(), width: 240, height: 240 },
   { id: "sweat-beads", label: "땀방울", svg: stickerSweatDrops(), width: 240, height: 220 },
   { id: "anger-pop", label: "분노마크", svg: stickerAngerPop(), width: 240, height: 240 },
   { id: "heart-sticker", label: "하트", svg: stickerHeart(), width: 240, height: 220 },

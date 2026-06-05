@@ -181,6 +181,33 @@ const CHARS: Char[] = [
   { id: "seora", label: "설아", emoji: "🍵", genre: "romance", style: "bun",
     skin: "#ffeae0", skinSh: "#f6cbb7", hair: "#3e2723", hairSh: "#271714", hairHi: "#6d4c41",
     iris: "#8d6e63", irisRim: "#4e342e", outfit: "#d7ccc8", outfitSh: "#b0bec5", accent: "#5d4037", collar: "#f5f5f5", eyeScale: 1.06 },
+
+  // 신규 추가: 다양한 남자 캐릭터 6종
+  // 1. 서율 (🦊) - 훈훈하고 매력적인 여우상 로맨스 남주
+  { id: "seoyul", label: "서율", emoji: "🦊", genre: "romance", style: "wavy",
+    skin: "#ffeae0", skinSh: "#f3c0aa", hair: "#bc6c46", hairSh: "#8e4a2b", hairHi: "#e7a17f",
+    iris: "#d38b27", irisRim: "#8b550c", outfit: "#4f5d75", outfitSh: "#2d3545", accent: "#ffffff", collar: "#e6eaf0", eyeScale: 1.06 },
+  // 2. 태오 (🐈‍⬛) - 소년만화 속 시크하고 반항적인 분위기의 흑발 소년
+  { id: "taeo", label: "태오", emoji: "🐈‍⬛", genre: "shonen", style: "spiky",
+    skin: "#eed2ba", skinSh: "#d3a785", hair: "#1b1a1f", hairSh: "#0b0a0d", hairHi: "#3b3a42",
+    iris: "#34495e", irisRim: "#1f2d3d", outfit: "#2c3e50", outfitSh: "#1a252f", accent: "#e74c3c", collar: "#ffffff", eyeScale: 0.88 },
+  // 3. 진우 (🧑‍💻) - 차분하고 지적인 느낌의 갈색머리 공대생/일상툰 남주
+  { id: "jinwoo", label: "진우", emoji: "🧑‍💻", genre: "slice", style: "short",
+    skin: "#ffece0", skinSh: "#ebbca0", hair: "#423027", hairSh: "#291c16", hairHi: "#6a5247",
+    iris: "#543d2b", irisRim: "#2d1f14", outfit: "#34495e", outfitSh: "#213040", accent: "#1abc9c", collar: "#e8f8f5", eyeScale: 0.94 },
+  // 4. 아라한 (🐉) - 무협 속 냉철한 백발의 젊은 고수/소문주
+  { id: "arahan", label: "아라한", emoji: "🐉", genre: "wuxia", style: "topknot",
+    skin: "#eed2ba", skinSh: "#dab095", hair: "#eef3f7", hairSh: "#cfd8e3", hairHi: "#ffffff",
+    iris: "#486581", irisRim: "#243b53", outfit: "#243b53", outfitSh: "#101f30", accent: "#b82631", collar: "#f0f4f8", eyeScale: 0.92 },
+  // 5. 루이 (👑) - 판타지 영지물/로판 속 금발의 엘프 왕자/성기사
+  { id: "louis", label: "루이", emoji: "👑", genre: "fantasy", style: "flow",
+    skin: "#fff1e5", skinSh: "#ebc5aa", hair: "#ffd700", hairSh: "#cca300", hairHi: "#ffea80",
+    iris: "#2ecc71", irisRim: "#219653", outfit: "#111b30", outfitSh: "#090d18", accent: "#ffd700", collar: "#ffffff", eyeScale: 1.02 },
+  // 6. 지석 (🥋) - 건강한 태닝 피부와 굵은 선을 가진 운동부 열혈 주장 소년
+  { id: "jiseok", label: "지석", emoji: "🥋", genre: "shonen", style: "short",
+    skin: "#d49a6a", skinSh: "#b37747", hair: "#241d19", hairSh: "#0f0b09", hairHi: "#4a3c36",
+    iris: "#3a261a", irisRim: "#1c0f0a", outfit: "#e74c3c", outfitSh: "#c0392b", accent: "#ffffff", collar: "#fce4d6", eyeScale: 0.9 },
+
   // 프리셋 남자 캐릭터 포즈들
   { id: "m_pose1", label: "무사 소년 (프리셋 포즈)", emoji: "⚔️", genre: "wuxia", style: "spiky",
     skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
