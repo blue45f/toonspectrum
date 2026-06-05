@@ -506,14 +506,6 @@ function getAvailableExpressionActions(vrm: VRM | null) {
   ];
 }
 
-function getModelTitle(vrm: VRM | null, fallbackName: string) {
-  if (!vrm) return "";
-  if (vrm.meta.metaVersion === "0") {
-    return vrm.meta.title ?? fallbackName;
-  }
-  return vrm.meta.name || fallbackName;
-}
-
 function roundExportSize(canvas: HTMLCanvasElement) {
   if (canvas.width <= 0 || canvas.height <= 0) {
     return { width: FALLBACK_EXPORT_WIDTH, height: EXPORT_HEIGHT };
@@ -635,7 +627,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const availableExpressionActions = getAvailableExpressionActions(vrm);
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
-  const displayModelName = getModelTitle(vrm, modelName);
+  const displayModelName = vrm ? modelName : "";
 
   useEffect(() => {
     return () => {

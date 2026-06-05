@@ -105,14 +105,6 @@ const CHARS: Char[] = [
   { id: "dani", label: "다니", emoji: "☕", genre: "slice", style: "bob",
     skin: "#ffe7d4", skinSh: "#f6d0b4", hair: "#3a2f2a", hairSh: "#241c18", hairHi: "#6a564a",
     iris: "#6b4e3a", irisRim: "#3a281c", outfit: "#7fb88f", outfitSh: "#5d9c6e", accent: "#fff", collar: "#f0fbf3", eyeScale: 0.94 },
-  // 무협
-  { id: "muyeong", label: "무영", emoji: "⚔️", genre: "wuxia", style: "topknot",
-    skin: "#ecc499", skinSh: "#d6a674", hair: "#14110d", hairSh: "#080603", hairHi: "#3a322a",
-    iris: "#4a3526", irisRim: "#1f140c", outfit: "#3a5a8f", outfitSh: "#274273", accent: "#b8323c", collar: "#eef2fb", eyeScale: 0.9 },
-  // 판타지 (엘프)
-  { id: "elen", label: "엘렌", emoji: "🧝", genre: "fantasy", style: "flow",
-    skin: "#fbe6d4", skinSh: "#eecbb0", hair: "#cdd6e6", hairSh: "#a3aec4", hairHi: "#f0f4fb",
-    iris: "#5fc2c9", irisRim: "#2a8f96", outfit: "#6b8f5a", outfitSh: "#4f7341", accent: "#d8c06a", collar: "#f2f7ec", eyeScale: 1.08 },
   // 로맨스
   { id: "seyeon", label: "세연", emoji: "💞", genre: "romance", style: "wavy",
     skin: "#ffe1c6", skinSh: "#f3c19a", hair: "#5a2d4a", hairSh: "#3e1d33", hairHi: "#9a5286",
@@ -121,34 +113,6 @@ const CHARS: Char[] = [
   { id: "haeun", label: "하은", emoji: "🎒", genre: "school", style: "twin",
     skin: "#ffe7d6", skinSh: "#f7d0b6", hair: "#23314e", hairSh: "#14203a", hairHi: "#4f648c",
     iris: "#3a5286", irisRim: "#1f3258", outfit: "#2f3a55", outfitSh: "#1f293f", accent: "#d24a5a", collar: "#ffffff", eyeScale: 1.04 },
-  // 직장
-  { id: "jiwon", label: "지원", emoji: "💼", genre: "office", style: "ponytail",
-    skin: "#f6d3b2", skinSh: "#e3b68d", hair: "#2a2420", hairSh: "#171210", hairHi: "#564c44",
-    iris: "#5a4634", irisRim: "#2e2014", outfit: "#3b4660", outfitSh: "#28304a", accent: "#8fa6cf", collar: "#ffffff", eyeScale: 0.96 },
-  // 순정 (단발 보브, 또다른 룩)
-  { id: "narae", label: "나래", emoji: "🩷", genre: "shojo", style: "bun",
-    skin: "#ffe6cf", skinSh: "#f5cbab", hair: "#d76a8e", hairSh: "#b24a6e", hairHi: "#ffa6c0",
-    iris: "#d76a8e", irisRim: "#9a3a5e", outfit: "#8fd0e6", outfitSh: "#69b3cf", accent: "#fff", collar: "#eafaff", eyeScale: 1.12 },
-  // 판타지 (마법사, 짧은 머리)
-  { id: "ravi", label: "라비", emoji: "✨", genre: "fantasy", style: "short",
-    skin: "#efc9a3", skinSh: "#dbab7e", hair: "#6a4bd0", hairSh: "#4a30a0", hairHi: "#a78ef0",
-    iris: "#8a6cf0", irisRim: "#4a30a0", outfit: "#3a2d6a", outfitSh: "#281f4a", accent: "#ffd76a", collar: "#ece6ff", eyeScale: 1.02 },
-  // 소년 액션 (포니테일 여전사)
-  { id: "tara", label: "타라", emoji: "🏹", genre: "shonen", style: "ponytail",
-    skin: "#e9bf92", skinSh: "#d2a172", hair: "#8a3a2a", hairSh: "#5e2418", hairHi: "#c06848",
-    iris: "#c85a3a", irisRim: "#7a3220", outfit: "#4a7a5a", outfitSh: "#356043", accent: "#d4a23a", collar: "#f0f7f0", eyeScale: 0.92 },
-  // 일상툰 (소년, 스파이키 심플)
-  { id: "minho", label: "민호", emoji: "🎧", genre: "slice", style: "short",
-    skin: "#f1cda7", skinSh: "#ddaf83", hair: "#2c3a4a", hairSh: "#19232f", hairHi: "#54677a",
-    iris: "#3a4a5e", irisRim: "#1f2a38", outfit: "#e0a93b", outfitSh: "#c38f22", accent: "#fff", collar: "#fff8ec", eyeScale: 0.96 },
-  // 로판 (북부대공 스타일 백발 적안)
-  { id: "baekhan", label: "백한", emoji: "❄️", genre: "fantasy", style: "spiky",
-    skin: "#f2f7fc", skinSh: "#d5e2f0", hair: "#ffffff", hairSh: "#d2dbe6", hairHi: "#eef5ff",
-    iris: "#4ea3d7", irisRim: "#20679c", outfit: "#202e4d", outfitSh: "#111b30", accent: "#d4af37", collar: "#ffffff", eyeScale: 0.95 },
-  // 무협 (흑발 장발 서생/검사 스타일)
-  { id: "dowon", label: "도원", emoji: "🌙", genre: "wuxia", style: "flow",
-    skin: "#ffece0", skinSh: "#f3ccb5", hair: "#2b2724", hairSh: "#14110f", hairHi: "#5a5047",
-    iris: "#54463a", irisRim: "#2d221b", outfit: "#efeff4", outfitSh: "#cfcfda", accent: "#4a3b32", collar: "#3b3630", eyeScale: 0.98 },
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -680,16 +644,8 @@ export const CHARACTER_LIBRARY_V2: CharacterAsset[] = CHARS.map((c) => ({
     id: e.id,
     label: e.label,
     svg: build(c, e),
-    imgSrc: (c.id === "yuna" && e.id === "neutral")
-      ? "/assets/studio/characters/yuna_neutral.png"
-      : (c.id === "kang" && e.id === "neutral")
-        ? "/assets/studio/characters/kang_neutral.png"
-        : (c.id === "seyeon" && e.id === "neutral")
-          ? "/assets/studio/characters/seyeon_neutral.png"
-          : (c.id === "dani" && e.id === "neutral")
-            ? "/assets/studio/characters/dani_neutral.png"
-            : (c.id === "haeun" && e.id === "neutral")
-              ? "/assets/studio/characters/haeun_neutral.png"
-              : undefined,
+    imgSrc: ["yuna", "kang", "seyeon", "dani", "haeun"].includes(c.id)
+      ? `/assets/studio/characters/${c.id}_${e.id}.png`
+      : undefined,
   })),
 }));
