@@ -141,7 +141,7 @@ interface DrawEl {
   brush?: string;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean };
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene";
 
 const uid = () => crypto.randomUUID();
@@ -2069,6 +2069,7 @@ export function StudioPage() {
                       fillAfterStrokeEnabled
                       lineJoin="round"
                       rotation={el.rotation}
+                      opacity={el.opacity ?? 1}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
                       fontStyle="bold"
                       draggable={draggable}
@@ -2097,6 +2098,7 @@ export function StudioPage() {
                       y={el.y}
                       fontSize={el.fontSize}
                       rotation={el.rotation}
+                      opacity={el.opacity ?? 1}
                       draggable={draggable}
                       onMouseDown={onSelect}
                       onTap={onSelect}
@@ -2155,6 +2157,7 @@ export function StudioPage() {
                     x={el.x}
                     y={el.y}
                     rotation={el.rotation}
+                    opacity={el.opacity ?? 1}
                     draggable={draggable}
                     shadowColor={bShadowColor}
                     shadowBlur={bShadowBlur}
@@ -2624,7 +2627,7 @@ export function StudioPage() {
                   />
                 </label>
               )}
-              {selected.type === "image" && (
+              {(selected.type === "image" || selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                   불투명도
                   <span className="flex items-center gap-2">
