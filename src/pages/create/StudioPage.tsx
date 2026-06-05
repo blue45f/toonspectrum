@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Path, Transformer } from "react-konva";
 import {
+  AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter,
   ArrowDownToLine,
   ArrowUpToLine,
   ChevronDown,
@@ -868,6 +870,25 @@ export function StudioPage() {
       patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
     } else {
       patchEl(selected.id, { x: selected.x + dx, y: selected.y + dy } as Partial<El>);
+    }
+  }
+  // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
+  function centerSelected(axis: "h" | "v") {
+    if (!selected || selected.locked) return;
+    const b = elBounds(selected);
+    const frame = containingPanel(selected, elements);
+    const ox = frame ? frame.x : 0;
+    const ow = frame ? frame.width : CANVAS_W;
+    const oy = frame ? frame.y : 0;
+    const oh = frame ? frame.height : canvasH;
+    const targetX = ox + (ow - b.w) / 2;
+    const targetY = oy + (oh - b.h) / 2;
+    const dx = axis === "h" ? targetX - b.x : 0;
+    const dy = axis === "v" ? targetY - b.y : 0;
+    if (selected.type === "draw") {
+      patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
+    } else {
+      patchEl(selected.id, (axis === "h" ? { x: targetX } : { y: targetY }) as Partial<El>);
     }
   }
   function reorder(dir: "front" | "back") {
@@ -2285,6 +2306,12 @@ export function StudioPage() {
                 </button>
                 <button type="button" onClick={() => reorder("back")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="맨 뒤로">
                   <ArrowDownToLine size={14} />
+                </button>
+                <button type="button" onClick={() => centerSelected("h")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="가로 가운데 정렬">
+                  <AlignHorizontalJustifyCenter size={14} />
+                </button>
+                <button type="button" onClick={() => centerSelected("v")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="세로 가운데 정렬">
+                  <AlignVerticalJustifyCenter size={14} />
                 </button>
                 <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘D)">
                   <Copy size={14} />
