@@ -60,37 +60,37 @@ export function CalendarPage() {
     "/api/calendar",
     "연재 캘린더를 불러오지 못했습니다."
   );
-  // 표시할 플랫폼 선택(빈 집합 = 전체 표시). 캘린더 응답에 작품별 availability가 들어 있어 클라에서 필터.
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformId>>(new Set());
-  const platformFilterActive = selectedPlatforms.size > 0;
-  const togglePlatform = (id: PlatformId) =>
-    setSelectedPlatforms((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const matchesFilter = (title: Title) =>
-    !platformFilterActive || title.availability.some((a) => selectedPlatforms.has(a.platformId));
-
-  // 공용 작품 필터(찜·장르·가격·이용가·평점·태그). 플랫폼은 전용 셀렉터가 따로 있어 facet에서 제외.
+  // 공용 작품 필터(찜·장르·플랫폼·가격·이용가·평점·태그). "필터 기억" ON이면 플랫폼 선택도 함께 유지된다.
   const { filters, setFilters, remember, toggleRemember } = useRememberedFilters("calendar");
+  // 표시할 플랫폼 선택은 공용 필터(filters.platforms)에 보관 — 별도 상태일 때 재방문 시 유지되지 않던 문제 해소.
+  // 캘린더 전용 칩 UI로 토글하며, 패널 facet에서는 'platform'을 제외해 중복 노출을 막는다.
+  const selectedPlatforms = new Set(filters.platforms);
+  const platformFilterActive = filters.platforms.length > 0;
+  const togglePlatform = (id: PlatformId) =>
+    setFilters({
+      ...filters,
+      platforms: filters.platforms.includes(id)
+        ? filters.platforms.filter((p) => p !== id)
+        : [...filters.platforms, id],
+    });
+
   const [showFilters, setShowFilters] = useState(false);
   // 모바일: 요일 탭으로 하루씩 본다(null = 오늘). 데스크톱(xl)은 7열 그리드 유지.
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
   const savedIds = useSavedTitleIds();
-  const titleFilterCount = countActiveTitleFilters(filters);
+  // '상세 필터' 배지는 패널에 보이는 facet만 센다(플랫폼은 전용 칩으로 분리 노출).
+  const titleFilterCount = countActiveTitleFilters(filters) - filters.platforms.length;
   const titleFilterActive = titleFilterCount > 0;
   const anyFilterActive = platformFilterActive || titleFilterActive;
 
   const todayIdx = data?.todayIdx ?? 0;
   const todayDay = data?.todayDay ?? WEEK_DAYS[todayIdx] ?? "월";
   const rawDays = data?.days ?? WEEK_DAYS.map((day) => ({ day, items: [] }));
-  // 플랫폼 셀렉터 + 공용 필터를 둘 다 적용. 둘 다 비활성이면 원본 그대로 사용.
+  // 공용 필터(플랫폼 포함)를 적용. 비활성이면 원본 그대로 사용.
   const days = anyFilterActive
     ? rawDays.map((d) => ({
         day: d.day,
-        items: applyTitleFilters(d.items.filter(matchesFilter), filters, savedIds),
+        items: applyTitleFilters(d.items, filters, savedIds),
       }))
     : rawDays;
   const totalScheduled = anyFilterActive
@@ -161,7 +161,7 @@ export function CalendarPage() {
               {platformFilterActive && (
                 <button
                   type="button"
-                  onClick={() => setSelectedPlatforms(new Set())}
+                  onClick={() => setFilters({ ...filters, platforms: [] })}
                   className="text-[0.72rem] text-accent hover:underline"
                 >
                   전체 보기
@@ -329,10 +329,7 @@ export function CalendarPage() {
               <p className="text-sm font-medium text-fg">선택한 조건에 맞는 연재 작품이 없습니다.</p>
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedPlatforms(new Set());
-                  setFilters(EMPTY_TITLE_FILTERS);
-                }}
+                onClick={() => setFilters(EMPTY_TITLE_FILTERS)}
                 className="mt-1 text-xs text-accent hover:underline"
               >
                 필터 초기화
