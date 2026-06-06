@@ -43,6 +43,8 @@ interface AppState {
   adultBirthdate: string | null; // 입력한 생년월일(ISO). 한번 입력하면 유지.
   ageGateOpen: boolean; // 연령 확인 모달 표시 여부
   collections: Collection[];
+  recentlyViewed: string[]; // 최근 본 작품 titleId (최신순, 브라우저 저장)
+  addRecentlyViewed: (titleId: string) => void;
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
   setUserId: (id: string | null) => void;
@@ -83,6 +85,7 @@ export const useApp = create<AppState>()(
       adultBirthdate: null,
       ageGateOpen: false,
       collections: seedCollections,
+      recentlyViewed: [],
       ratingScale: "star",
       userId: null,
 
@@ -181,6 +184,10 @@ export const useApp = create<AppState>()(
         }));
         if (get().userId) apiPost("/api/me/collection", { action: "create", name, emoji });
         return id;
+      },
+      addRecentlyViewed: (titleId) => {
+        if (!titleId) return;
+        set((s) => ({ recentlyViewed: [titleId, ...s.recentlyViewed.filter((id) => id !== titleId)].slice(0, 24) }));
       },
       renameCollection: (id, name) => {
         const clean = name.trim();

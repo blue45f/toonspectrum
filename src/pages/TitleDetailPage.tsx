@@ -32,6 +32,8 @@ import { NotFoundPage } from "./NotFoundPage";
 import { ErrorState } from "@/src/components/error-state";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { useApiResource } from "./use-api-resource";
+import { useApp } from "@/lib/store";
+import { useEffect } from "react";
 
 interface TitleDetailResponse {
   title: Title;
@@ -54,6 +56,12 @@ export function TitleDetailPage() {
     "작품 상세 데이터를 불러오지 못했습니다."
   );
   useDocumentTitle(data?.title?.title);
+
+  const addRecentlyViewed = useApp((s) => s.addRecentlyViewed);
+  const viewedId = data?.title?.id;
+  useEffect(() => {
+    if (viewedId) addRecentlyViewed(viewedId);
+  }, [viewedId, addRecentlyViewed]);
 
   if (loading) {
     return (

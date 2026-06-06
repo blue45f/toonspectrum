@@ -84,6 +84,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const ratings = useApp((s) => s.ratings);
   const subscriptions = useApp((s) => s.subscriptions);
   const collections = useApp((s) => s.collections);
+  const recentlyViewed = useApp((s) => s.recentlyViewed);
   const createCollection = useApp((s) => s.createCollection);
   const renameCollection = useApp((s) => s.renameCollection);
   const deleteCollection = useApp((s) => s.deleteCollection);
@@ -105,8 +106,9 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
       if (on) ids.add(id);
     });
     collections.forEach((collection) => collection.titleIds.forEach((id) => ids.add(id)));
+    recentlyViewed.forEach((id) => ids.add(id));
     return Array.from(ids).sort();
-  }, [collections, ratings, reads, subscriptions]);
+  }, [collections, ratings, reads, subscriptions, recentlyViewed]);
 
   const titleIdsKey = titleIds.join(",");
 
@@ -169,6 +171,12 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     .map(([id]) => titlesById[id])
     .filter((title): title is Title => Boolean(title));
 
+  // 최근 본 작품 — 상세 페이지 방문 순서(최신순), 서재에 담지 않은 것도 포함
+  const recentTitles = recentlyViewed
+    .map((id) => titlesById[id])
+    .filter((title): title is Title => Boolean(title))
+    .slice(0, 12);
+
   // 연재 알림 — 구독한 작품을 요일별로
   const subTitles = Object.entries(subscriptions)
     .filter(([, on]) => on)
@@ -194,6 +202,29 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
       {/* 서재 */}
       {tab === "shelf" && (
         <div className="flex flex-col gap-5">
+          {recentTitles.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-sm font-semibold text-fg">최근 본 작품</h3>
+                <span className="text-xs text-fg-3">방문 순</span>
+              </div>
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {recentTitles.map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/title/${t.slug}`}
+                    className="group w-[4.5rem] shrink-0"
+                    title={t.title}
+                  >
+                    <MiniPoster title={t} className="w-full" />
+                    <p className="mt-1.5 truncate text-[0.7rem] text-fg-3 group-hover:text-accent">
+                      {t.title}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           <Segmented
             value={readTab}
             onChange={setReadTab}
