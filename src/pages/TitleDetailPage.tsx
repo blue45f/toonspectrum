@@ -30,7 +30,7 @@ import { formatCount } from "@/lib/utils";
 import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { NotFoundPage } from "./NotFoundPage";
 import { ErrorState } from "@/src/components/error-state";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
 import { useApiResource } from "./use-api-resource";
 import { useApp } from "@/lib/store";
 import { useEffect } from "react";
@@ -56,6 +56,17 @@ export function TitleDetailPage() {
     "작품 상세 데이터를 불러오지 못했습니다."
   );
   useDocumentTitle(data?.title?.title);
+
+  const t = data?.title;
+  const metaDesc = t
+    ? [
+        [t.author, ...(t.genres ?? []).slice(0, 2)].filter(Boolean).join(" · "),
+        (t.synopsis ?? "").replace(/\s+/g, " ").trim(),
+      ]
+        .filter(Boolean)
+        .join(" — ")
+    : null;
+  useMetaDescription(metaDesc);
 
   const addRecentlyViewed = useApp((s) => s.addRecentlyViewed);
   const viewedId = data?.title?.id;

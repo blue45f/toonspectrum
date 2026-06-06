@@ -50,15 +50,64 @@ module.exports = async (req, res) => {
     const url = `${proto}://${host}/title/${encodeURIComponent(slug)}`;
     const sub = [t.author, ...(t.genres || []).slice(0, 2)].filter(Boolean).join(" · ");
     const fullDesc = sub ? `${sub} — ${desc}` : desc;
+    // 빌드된 index.html은 일부 메타 태그가 여러 줄로 포매팅되어 있어, 속성 사이 공백/줄바꿈을
+    // 허용하는 전체-태그 매칭으로 치환한다. 치환값은 함수로 전달해 '$' 특수해석을 피한다.
     page = page
-      .replace(/<title>[^<]*<\/title>/, `<title>${esc(titleText)}</title>`)
-      .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(titleText)}$2`)
-      .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(fullDesc)}$2`)
-      .replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${esc(img)}$2`)
-      .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${esc(url)}$2`)
-      .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(titleText)}$2`)
-      .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(fullDesc)}$2`)
-      .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(img)}$2`);
+      .replace(/<title>[^<]*<\/title>/, () => `<title>${esc(titleText)}</title>`)
+      .replace(/<meta\s+name="description"[^>]*>/, () => `<meta name="description" content="${esc(fullDesc)}" />`)
+      .replace(/<link\s+rel="canonical"[^>]*>/, () => `<link rel="canonical" href="${esc(url)}" />`)
+      .replace(/<meta\s+property="og:title"[^>]*>/, () => `<meta property="og:title" content="${esc(titleText)}" />`)
+      .replace(/<meta\s+property="og:description"[^>]*>/, () => `<meta property="og:description" content="${esc(fullDesc)}" />`)
+      .replace(/<meta\s+property="og:image"\s+content="[^>]*>/, () => `<meta property="og:image" content="${esc(img)}" />`)
+      .replace(/<meta\s+property="og:url"[^>]*>/, () => `<meta property="og:url" content="${esc(url)}" />`)
+      .replace(/<meta\s+name="twitter:title"[^>]*>/, () => `<meta name="twitter:title" content="${esc(titleText)}" />`)
+      .replace(/<meta\s+name="twitter:description"[^>]*>/, () => `<meta name="twitter:description" content="${esc(fullDesc)}" />`)
+      .replace(/<meta\s+name="twitter:image"[^>]*>/, () => `<meta name="twitter:image" content="${esc(img)}" />`);
+
+    // 구조화 데이터(schema.org) — 작품을 Book으로, 평점이 있으면 aggregateRating 포함(별점 리치 결과).
+    const st = t.stats || {};
+    const ratingCount = Number(st.ratingCount) || 0;
+    const ratingValue = Number(st.ratingAvg) || 0;
+    const work = {
+      "@type": "Book",
+      "@id": `${url}#work`,
+      name: t.title,
+      url,
+      inLanguage: "ko",
+    };
+    if (t.author) work.author = { "@type": "Person", name: t.author };
+    if (fullDesc) work.description = fullDesc;
+    if (img) work.image = img;
+    if (Array.isArray(t.genres) && t.genres.length) work.genre = t.genres;
+    if (t.releaseYear) work.datePublished = String(t.releaseYear);
+    if (ratingCount > 0 && ratingValue > 0) {
+      work.aggregateRating = {
+        "@type": "AggregateRating",
+        ratingValue: Math.round(ratingValue * 10) / 10,
+        ratingCount,
+        bestRating: 5,
+        worstRating: 1,
+      };
+    }
+    const ld = {
+      "@context": "https://schema.org",
+      "@graph": [
+        work,
+        {
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "홈", item: `${proto}://${host}/` },
+            { "@type": "ListItem", position: 2, name: t.title, item: url },
+          ],
+        },
+      ],
+    };
+    // </script> 조기 종료·HTML 주입 방지를 위해 '<'를 유니코드 이스케이프.
+    const ldJson = JSON.stringify(ld).replace(/</g, "\\u003c");
+    page = page.replace(
+      /<\/head>/,
+      `<script type="application/ld+json">${ldJson}</script></head>`
+    );
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   // 성공(작품 메타 주입)한 경우만 캐시 — 콜드스타트로 메타 주입 실패한 응답이 캐시에 박히지 않게.
