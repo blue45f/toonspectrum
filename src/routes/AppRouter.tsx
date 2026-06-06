@@ -12,6 +12,8 @@ const STATIC_TITLES: Record<string, string> = {
   "/search": "검색",
   "/recommend": "맞춤 추천",
   "/explore": "스펙트럼 탐색",
+  "/feedback": "의견 게시판",
+  "/tags": "태그로 찾기",
   "/calendar": "연재 캘린더",
   "/reviews": "리뷰",
   "/community": "커뮤니티",
