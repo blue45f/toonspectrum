@@ -229,6 +229,14 @@ export class MeService {
       return { ok: true, id: row.id };
     }
 
+    if (action === "rename") {
+      const id = String(payload.id ?? "").trim();
+      const name = String(payload.name ?? "").trim();
+      if (!id || !name) throw new BadRequestException("컬렉션 id와 이름 필요");
+      await db.update(collections).set({ name }).where(and(eq(collections.id, id), eq(collections.userId, uid)));
+      return { ok: true };
+    }
+
     if (action === "delete") {
       const id = String(payload.id ?? "").trim();
       if (!id) throw new BadRequestException("컬렉션 id 필요");

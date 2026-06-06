@@ -62,6 +62,7 @@ interface AppState {
   setRatingScale: (s: RatingScale) => void;
 
   createCollection: (name: string, emoji: string) => string;
+  renameCollection: (id: string, name: string) => void;
   deleteCollection: (id: string) => void;
   toggleInCollection: (collectionId: string, titleId: string) => void;
 
@@ -180,6 +181,12 @@ export const useApp = create<AppState>()(
         }));
         if (get().userId) apiPost("/api/me/collection", { action: "create", name, emoji });
         return id;
+      },
+      renameCollection: (id, name) => {
+        const clean = name.trim();
+        if (!clean) return;
+        set((s) => ({ collections: s.collections.map((c) => (c.id === id ? { ...c, name: clean } : c)) }));
+        if (get().userId) apiPost("/api/me/collection", { action: "rename", id, name: clean });
       },
       deleteCollection: (id) => {
         set((s) => ({ collections: s.collections.filter((c) => c.id !== id) }));

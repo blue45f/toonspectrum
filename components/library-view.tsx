@@ -13,7 +13,7 @@ import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
-import { Sparkles, Plus, Trash2, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
+import { Sparkles, Plus, Trash2, Pencil, Check, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
 import { COLLECTION_ICON_OPTIONS, CollectionIcon } from "./visual-marks";
 
 type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
@@ -85,6 +85,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const subscriptions = useApp((s) => s.subscriptions);
   const collections = useApp((s) => s.collections);
   const createCollection = useApp((s) => s.createCollection);
+  const renameCollection = useApp((s) => s.renameCollection);
   const deleteCollection = useApp((s) => s.deleteCollection);
   const adultVerified = useApp((s) => s.adultVerified);
   const setAdultVerified = useApp((s) => s.setAdultVerified);
@@ -431,6 +432,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           collections={collections}
           titlesById={titlesById}
           onCreate={createCollection}
+          onRename={renameCollection}
           onDelete={deleteCollection}
         />
       )}
@@ -465,15 +467,23 @@ function CollectionsTab({
   collections,
   titlesById,
   onCreate,
+  onRename,
   onDelete,
 }: {
   collections: ReturnType<typeof useApp.getState>["collections"];
   titlesById: Record<string, Title>;
   onCreate: (name: string, emoji: string) => string;
+  onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
 }) {
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState(COLLECTION_ICON_OPTIONS[0].value);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const commitRename = () => {
+    if (editingId && editName.trim()) onRename(editingId, editName);
+    setEditingId(null);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -527,20 +537,51 @@ function CollectionsTab({
             const titles = c.titleIds.map((id) => titlesById[id]).filter(Boolean).slice(0, 5);
             return (
               <div key={c.id} className="rounded-2xl border border-line bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-3">
                     <CollectionIcon value={c.emoji} size="lg" />
-                    <div>
-                      <p className="font-semibold text-fg">{c.name}</p>
+                    <div className="min-w-0">
+                      {editingId === c.id ? (
+                        <input
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitRename();
+                            else if (e.key === "Escape") setEditingId(null);
+                          }}
+                          aria-label="컬렉션 이름 변경"
+                          className="h-7 w-full rounded-md border border-accent/50 bg-canvas px-2 text-sm font-semibold text-fg outline-none"
+                        />
+                      ) : (
+                        <p className="truncate font-semibold text-fg">{c.name}</p>
+                      )}
                       <p className="text-xs text-fg-3">{c.titleIds.length}편</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => onDelete(c.id)}
-                    className="text-fg-3 transition-colors hover:text-bad"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {editingId === c.id ? (
+                      <button onClick={commitRename} aria-label="이름 저장" className="text-fg-3 transition-colors hover:text-good">
+                        <Check size={15} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditName(c.name);
+                        }}
+                        aria-label="이름 변경"
+                        title="이름 변경"
+                        className="text-fg-3 transition-colors hover:text-fg"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => onDelete(c.id)} aria-label="컬렉션 삭제" title="삭제" className="text-fg-3 transition-colors hover:text-bad">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 {titles.length > 0 ? (
                   <div className="mt-4 flex gap-2">
