@@ -71,7 +71,9 @@ export async function getInsightsData() {
   const distTotal: [number, number, number, number, number] = [0, 0, 0, 0, 0];
   TITLES.forEach((t) =>
     t.stats.ratingDist.forEach((v, i) => {
-      distTotal[i] += v;
+      // 일부 카탈로그 항목의 분포값이 음수/비정상(크롤 파싱 오류)일 수 있어 방어적으로 클램프.
+      // 미보정 시 집계 평가 수가 음수로 표시됨(라이브 인사이트 버그).
+      if (i < 5 && Number.isFinite(v) && v > 0) distTotal[i] += v;
     })
   );
   const distSum = distTotal.reduce((a, b) => a + b, 0);

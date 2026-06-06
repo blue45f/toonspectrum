@@ -282,7 +282,8 @@ function coverGradient(seed, genres) {
 }
 const proxied = proxiedCoverUrl;
 function synthDist(avg, count) {
-  const c = count || 1000;
+  // count가 음수/비유한이면 분포가 음수가 돼 집계가 깨짐 → 안전한 양수로 클램프.
+  const c = Number.isFinite(count) && count > 0 ? count : 1000;
   const w = [1, 2, 3, 4, 5].map((s) => Math.exp(-Math.pow(s - avg, 2) / 0.6));
   const sum = w.reduce((a, b) => a + b, 0);
   return w.map((x) => Math.round((x / sum) * c));
