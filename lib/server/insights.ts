@@ -3,7 +3,11 @@ import { PLATFORMS, PRICING_LABEL } from "../platforms";
 import { TYPE_LABEL } from "../taxonomy";
 import type { Pricing, Title } from "../types";
 
-const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
+// 불량 카탈로그값(NaN/Infinity, 크롤 파싱 오류)이 섞여도 평균이 깨지지 않도록 유한값만 집계.
+const avg = (ns: number[]) => {
+  const valid = ns.filter((n) => Number.isFinite(n));
+  return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+};
 
 const PRICING_COLOR: Record<Pricing, string> = {
   free: "var(--color-good)",
