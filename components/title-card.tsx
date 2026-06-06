@@ -1,5 +1,6 @@
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
+import { useIsBookmarked } from "@/lib/store";
 import { TitlePoster } from "./title-poster";
 import { AvailabilityDots, PlatformTags, bestPricing } from "./availability";
 import { BookmarkButton } from "./bookmark-button";
@@ -27,6 +28,9 @@ export function TitleCard({
   className?: string;
 }) {
   const price = bestPricing(title.availability);
+  // 이미 관심 등록된 작품은 북마크를 상시 노출(그리드에서 한눈에 식별), 그 외엔 호버 시 노출.
+  const saved = useIsBookmarked(title.id);
+  const bookmarkReveal = saved ? "opacity-100" : "opacity-0 group-hover:opacity-100";
 
   if (feature) {
     return (
@@ -66,7 +70,7 @@ export function TitleCard({
               className="mt-1"
             />
           </div>
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+          <div className={cn("absolute right-2 top-2 transition-opacity duration-150 focus-within:opacity-100", bookmarkReveal)}>
             <BookmarkButton titleId={title.id} size={14} />
           </div>
         </div>
@@ -85,7 +89,7 @@ export function TitleCard({
         </div>
         {/* 호버 보더 */}
         <div className="pointer-events-none absolute inset-1 rounded-[0.9rem] ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />
-        <div className="absolute right-1.5 top-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+        <div className={cn("absolute right-1.5 top-1.5 transition-opacity duration-150 focus-within:opacity-100", bookmarkReveal)}>
           <BookmarkButton titleId={title.id} size={14} />
         </div>
         <GenreSpectrum
