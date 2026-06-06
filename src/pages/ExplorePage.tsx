@@ -17,7 +17,7 @@ import {
 } from "@/lib/title-filters";
 import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Compass, RefreshCw, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApiResource } from "./use-api-resource";
 
@@ -236,6 +236,13 @@ export function ExplorePage() {
               장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께
               표시되어 무슨 작품인지 바로 판단할 수 있습니다.
             </p>
+            <Link
+              href={heroGenre ? `/random?genre=${encodeURIComponent(heroGenre)}` : "/random"}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
+            >
+              <Shuffle size={16} />
+              {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
+            </Link>
           </div>
 
           <div className="mt-8">

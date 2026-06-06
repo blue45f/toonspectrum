@@ -12,6 +12,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/search": "검색",
   "/recommend": "맞춤 추천",
   "/explore": "스펙트럼 탐색",
+  "/random": "랜덤 발견",
   "/feedback": "의견 게시판",
   "/tags": "태그로 찾기",
   "/calendar": "연재 캘린더",
@@ -63,6 +64,7 @@ const CommunityScopePage = lazy(() =>
 );
 const LibraryPage = lazy(() => import("@/src/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
 const ComparePage = lazy(() => import("@/src/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
+const RandomPage = lazy(() => import("@/src/pages/RandomPage").then((m) => ({ default: m.RandomPage })));
 const InsightsPage = lazy(() => import("@/src/pages/InsightsPage").then((m) => ({ default: m.InsightsPage })));
 const TitleDetailPage = lazy(() =>
   import("@/src/pages/TitleDetailPage").then((m) => ({ default: m.TitleDetailPage }))
@@ -124,6 +126,7 @@ export function AppRouter() {
           <Route path="/community/:scope" element={<CommunityScopePage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/random" element={<RandomPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/tags" element={<TagsPage />} />

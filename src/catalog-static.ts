@@ -212,9 +212,33 @@ function recommendData(body: Record<string, unknown>) {
   return { pickedRecs, pickedLabelGenres: genres, tasteRecs, reading, popular, seed, similar, profile: { ratedCount: profile.ratedCount, readCount: Object.keys(reads).length, topGenres: profile.topGenres }, generatedAt: new Date().toISOString() };
 }
 
+// 랜덤 발견 — 평가가 있고 표지가 있는 품질 풀에서 무작위 1편(기본 19금 제외).
+// type·genre로 좁힐 수 있고, 풀이 비면 단계적으로 필터를 완화한다.
+function randomData(sp: URLSearchParams) {
+  const type = sp.get("type");
+  const genre = sp.get("genre");
+  const allowAdult = boolParam(sp.get("adult"));
+  const quality = (t: Title) => Boolean(t.coverImage) && t.stats.ratingCount > 0;
+  const sfw = (t: Title) => allowAdult || t.ageRating !== "19";
+  let pool = TITLES.filter((t) => quality(t) && sfw(t));
+  if (type === "webtoon" || type === "webnovel") pool = pool.filter((t) => t.type === type);
+  if (genre) pool = pool.filter((t) => t.genres.includes(genre));
+  if (pool.length === 0) pool = TITLES.filter(sfw); // 완화 1: 품질 조건 해제
+  if (pool.length === 0) pool = TITLES; // 완화 2: 전부
+  const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  return {
+    slug: pick?.slug ?? pick?.id ?? null,
+    id: pick?.id ?? null,
+    title: pick?.title ?? null,
+    poolSize: pool.length,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 // URL → 카탈로그 핸들러(엔진). 카탈로그가 아니면 null(통과).
 function matchEngine(pathname: string, sp: URLSearchParams): null | ((init: RequestInit | undefined, origFetch: typeof fetch) => Promise<unknown> | unknown) {
   if (pathname === "/api/search") return () => searchData(sp);
+  if (pathname === "/api/random") return () => randomData(sp);
   if (pathname === "/api/ranking")
     // 실시간(live) 제거 — 스냅샷 기반 산식 랭킹(naver 호출·CORS·서버리스 없음).
     return async () => getRankingData({ get: (n: string) => sp.get(n) }, { disableLive: true });
