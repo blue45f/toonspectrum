@@ -39,6 +39,7 @@ function useRouteTitle(pathname: string) {
   useEffect(() => {
     if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
     if (pathname.startsWith("/create/")) return; // 창작물 상세는 페이지가 직접 설정
+    if (pathname.startsWith("/u/")) return; // 회원 프로필은 페이지가 직접 설정
     let title: string | undefined;
     if (pathname in STATIC_TITLES) title = STATIC_TITLES[pathname];
     else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
@@ -67,6 +68,7 @@ const TitleDetailPage = lazy(() =>
   import("@/src/pages/TitleDetailPage").then((m) => ({ default: m.TitleDetailPage }))
 );
 const AuthorPage = lazy(() => import("@/src/pages/AuthorPage").then((m) => ({ default: m.AuthorPage })));
+const UserProfilePage = lazy(() => import("@/src/pages/UserProfilePage").then((m) => ({ default: m.UserProfilePage })));
 const PencafePage = lazy(() => import("@/src/pages/PencafePage").then((m) => ({ default: m.PencafePage })));
 const AdminPage = lazy(() => import("@/src/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const FeedbackPage = lazy(() => import("@/src/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage })));
@@ -126,6 +128,7 @@ export function AppRouter() {
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/tags" element={<TagsPage />} />
           <Route path="/authors" element={<AuthorsPage />} />
+          <Route path="/u/:userId" element={<UserProfilePage />} />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />

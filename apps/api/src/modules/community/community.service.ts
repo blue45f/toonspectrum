@@ -44,6 +44,7 @@ interface ReviewPayload {
   sort?: string | null;
   spoiler?: string | null;
   rating?: string | null;
+  userId?: string | null;
 }
 
 interface ReplyPayload {
@@ -179,6 +180,7 @@ export class CommunityService {
       sort: query.sort ?? undefined,
       spoiler: query.spoiler ?? undefined,
       rating: query.rating ?? undefined,
+      userId: query.userId ?? undefined,
     });
   }
 }

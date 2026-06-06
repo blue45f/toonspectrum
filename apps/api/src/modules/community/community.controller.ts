@@ -20,6 +20,7 @@ interface ReviewQuery {
   sort?: string | null;
   spoiler?: string | null;
   rating?: string | null;
+  userId?: string | null;
 }
 
 interface PostQuery {

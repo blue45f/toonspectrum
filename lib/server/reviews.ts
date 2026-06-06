@@ -92,11 +92,13 @@ export async function getReviewsData(opts: {
   sort?: string;
   spoiler?: string;
   rating?: string;
+  userId?: string;
   includeHidden?: boolean;
 }) {
   const sort = normalizeReviewSort(opts.sort);
 
   const conditions: SQL[] = [];
+  if (opts.userId) conditions.push(eq(reviews.userId, opts.userId)); // 특정 회원의 리뷰만(프로필 페이지)
   if (opts.spoiler === "hide") conditions.push(eq(reviews.spoiler, false));
   if (opts.rating === "high") conditions.push(gte(reviews.rating, 40));
   else if (opts.rating === "low") conditions.push(lte(reviews.rating, 30));
