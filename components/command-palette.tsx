@@ -3,11 +3,12 @@
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import { useRouter } from "@/src/compat/navigation";
+import { useApp } from "@/lib/store";
 import type { Title } from "@/lib/types";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { RatingInline } from "./ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
-import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords } from "lucide-react";
+import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock } from "lucide-react";
 import { genreColor } from "@/lib/genre-color";
 import { MiniPoster } from "./rank-row";
 
@@ -26,6 +27,9 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Title[]>([]);
+  const [recent, setRecent] = useState<Title[]>([]);
+  const recentlyViewed = useApp((s) => s.recentlyViewed);
+  const recentKey = recentlyViewed.slice(0, 5).join(",");
   const router = useRouter();
 
   useEffect(() => {
@@ -80,6 +84,37 @@ export function CommandPalette() {
     };
   }, [open, q]);
 
+  // 팔레트가 열리고 질의가 없을 때만 최근 본 작품을 지연 로드(빈 상태 컨텍스트 제공).
+  useEffect(() => {
+    if (!open || !recentKey) {
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    fetch(`/api/titles?ids=${encodeURIComponent(recentKey)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : { items: [] }))
+      .then((data: { items?: Title[] }) => {
+        if (!alive) return;
+        const byId = new Map((data.items ?? []).map((t) => [t.id, t]));
+        setRecent(
+          recentKey
+            .split(",")
+            .map((id) => byId.get(id))
+            .filter((t): t is Title => Boolean(t))
+        );
+      })
+      .catch(() => {
+        if (alive) setRecent([]);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [open, recentKey]);
+
   const go = (href: string) => {
     setOpen(false);
     router.push(href);
@@ -129,6 +164,36 @@ export function CommandPalette() {
                 전체 검색에서 다시 찾기 →
               </button>
             </div>
+          )}
+
+          {!q.trim() && recent.length > 0 && (
+            <Command.Group
+              heading="최근 본 작품"
+              className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
+            >
+              {recent.map((t) => (
+                <Command.Item
+                  key={t.id}
+                  value={`recent-${t.id}`}
+                  onSelect={() => go(`/title/${t.slug}`)}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors data-[selected=true]:bg-raised"
+                >
+                  <MiniPoster title={t} className="w-9 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-fg">{t.title}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-fg-3">
+                      <Clock size={11} className="text-fg-3" />
+                      <span style={{ color: genreColor(t.genres[0], 0.8) }}>{TYPE_LABEL[t.type]}</span>
+                      · {t.author}
+                    </span>
+                  </span>
+                  <CornerDownLeft
+                    size={13}
+                    className="text-fg-3 opacity-0 data-[selected=true]:opacity-100"
+                  />
+                </Command.Item>
+              ))}
+            </Command.Group>
           )}
 
           {!q.trim() && (
