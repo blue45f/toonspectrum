@@ -20,8 +20,10 @@ function esc(s) {
 const BOT_RE = /bot|crawl|spider|facebookexternalhit|kakaotalk|slack|twitter|discord|whatsapp|telegram|line|pinterest|embedly|preview|naver|daum|skype|vkshare/i;
 
 module.exports = async (req, res) => {
-  const proto = (req.headers["x-forwarded-proto"] || "https").toString().split(",")[0];
-  const host = (req.headers["x-forwarded-host"] || req.headers.host || "toonspectrum.vercel.app").toString();
+  // SSRF 방지 — 서버 사이드 fetch와 정규(canonical) URL은 신뢰 가능한 고정 호스트만 사용한다.
+  // 요청 Host/X-Forwarded-Host 헤더는 공격자가 조작할 수 있어(내부 IP·메타데이터 엔드포인트 등) 신뢰하지 않는다.
+  const host = (process.env.CANONICAL_HOST || "toonspectrum.vercel.app").toString();
+  const proto = "https";
   const slug = decodeURIComponent((req.query?.slug || "").toString());
   const ua = (req.headers["user-agent"] || "").toString();
 

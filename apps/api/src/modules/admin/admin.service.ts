@@ -69,6 +69,11 @@ function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// LIKE 와일드카드(%, _)와 escape 문자(\)를 리터럴로 처리 — 사용자 입력이 패턴으로 해석되지 않게 한다.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 function normalizeRole(value: string | null | undefined): AdminRole {
   const role = String(value ?? "").toLowerCase();
   if (role === "admin" || role === "operator" || role === "creator") return role;
@@ -555,7 +560,7 @@ export class AdminService {
     if (parsed.creatorId) conditions.push(eq(creatorCampaigns.creatorId, parsed.creatorId));
     if (parsed.isActive !== null) conditions.push(eq(creatorCampaigns.isActive, parsed.isActive));
     if (parsed.title) {
-      conditions.push(sql`lower(${creatorCampaigns.title}) like ${"%" + parsed.title.toLowerCase() + "%"}`);
+      conditions.push(sql`lower(${creatorCampaigns.title}) like ${"%" + escapeLike(parsed.title.toLowerCase()) + "%"}`);
     }
 
     const rows = conditions.length
