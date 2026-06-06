@@ -4,12 +4,14 @@ import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
+import { sessionAuth } from "./session-middleware";
 
 async function bootstrap() {
   // 기본 본문 파서(100kb) 대신 직접 등록 — 창작 스튜디오가 data-URL 이미지(페이지/문서)를 전송하므로 한도를 키운다.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
+  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api");
   app.useGlobalPipes(
     new ValidationPipe({

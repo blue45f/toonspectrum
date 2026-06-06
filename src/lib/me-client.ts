@@ -1,6 +1,6 @@
 // 내 정보(/api/me) 프로필 갱신 전용 fetch 헬퍼.
 // 인증은 기존 세션 스킴(localStorage → x-user-id 헤더)을 재사용한다(creator-client 와 동일).
-import { getAuthUserId } from "@/src/compat/auth-session";
+import { getAuthToken } from "@/src/compat/auth-session";
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 
 export interface MeProfile {
@@ -20,8 +20,8 @@ export interface UpdateProfilePayload {
 
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const userId = getAuthUserId();
-  if (userId) headers["x-user-id"] = userId;
+  const token = getAuthToken();
+  if (token) headers["x-user-id"] = token;
   return headers;
 }
 

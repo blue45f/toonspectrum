@@ -67,6 +67,7 @@ export function FanCafePanel({
   onTopLevelPostCreated?: (post: FanCafePost) => void;
 }) {
   const userId = useApp((s) => s.userId);
+  const sessionToken = useApp((s) => s.sessionToken);
   const [posts, setPosts] = useState<FanCafePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +157,7 @@ export function FanCafePanel({
   );
 
   const canComposePost = scope !== "all" && Boolean(targetId);
-  const authHeaders = useMemo(() => (userId ? { "x-user-id": userId } : undefined), [userId]);
+  const authHeaders = useMemo(() => (sessionToken ? { "x-user-id": sessionToken } : undefined), [sessionToken]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -660,6 +661,7 @@ function FanPostCard({
   onDeleted?: (id: string) => void;
 }) {
   const userId = useApp((s) => s.userId);
+  const sessionToken = useApp((s) => s.sessionToken);
   const isOwner = !!userId && post.author?.id === userId;
   const [deleting, setDeleting] = useState(false);
   async function handleDelete() {
@@ -669,7 +671,7 @@ function FanPostCard({
     try {
       const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, {
         method: "DELETE",
-        headers: { "x-user-id": userId },
+        headers: { "x-user-id": sessionToken ?? "" },
       });
       if (res.ok) onDeleted?.(post.id);
       else setDeleting(false);
@@ -816,7 +818,7 @@ function FanPostCard({
       const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}/replies`, {
         method: "POST",
         cache: "no-store",
-        headers: { "Content-Type": "application/json", ...(userId ? { "x-user-id": userId } : {}) },
+        headers: { "Content-Type": "application/json", ...(sessionToken ? { "x-user-id": sessionToken } : {}) },
         body: JSON.stringify({
           text: draft,
           ...(parentId ? { parentId } : {}),

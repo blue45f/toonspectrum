@@ -32,13 +32,13 @@ export function AuthCallbackPage() {
     ran.current = true;
     const params = parseHash();
 
-    const finish = (user: { id?: string } | null | undefined, isDemo: boolean) => {
+    const finish = (user: { id?: string } | null | undefined, token: string | null | undefined, isDemo: boolean) => {
       if (!user?.id) {
         setPhase("error");
         setMessage("로그인 정보를 받지 못했어요.");
         return;
       }
-      completeOAuthLogin(user as never);
+      completeOAuthLogin(user as never, token ?? null);
       setDemo(isDemo);
       setPhase("done");
       setMessage(isDemo ? "데모 계정으로 로그인했어요." : "로그인되었어요.");
@@ -60,14 +60,14 @@ export function AuthCallbackPage() {
           });
           const data = await res.json().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "exchange-failed");
-          finish(data.user, false);
+          finish(data.user, data.token, false);
           return;
         }
         if (params.demo && (params.demo === "google" || params.demo === "kakao" || params.demo === "naver")) {
           const res = await fetch(`/api/auth/oauth/${params.demo}/demo`, { method: "POST" });
           const data = await res.json().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "demo-failed");
-          finish(data.user, true);
+          finish(data.user, data.token, true);
           return;
         }
         setPhase("error");

@@ -13,6 +13,7 @@ const MAX_REPLY_LENGTH = 700;
 
 export function ReviewReplies({ reviewId }: { reviewId: string }) {
   const userId = useApp((s) => s.userId);
+  const sessionToken = useApp((s) => s.sessionToken);
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,7 +88,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, {
       method: "POST",
       cache: "no-store",
-      headers: { "Content-Type": "application/json", "x-user-id": userId },
+      headers: { "Content-Type": "application/json", "x-user-id": sessionToken ?? "" },
       body: JSON.stringify(body),
     });
 

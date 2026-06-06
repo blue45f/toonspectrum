@@ -10,7 +10,7 @@ import { ErrorState } from "@/src/components/error-state";
 import { AvatarUploader } from "@/components/avatar-uploader";
 import { cn, formatCount, relativeDate } from "@/lib/utils";
 import { useApp, useHydrated } from "@/lib/store";
-import { useSession } from "@/src/compat/auth-session";
+import { useSession, getAuthToken } from "@/src/compat/auth-session";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/lib/creator-client";
 import { updateMyProfile } from "@/src/lib/me-client";
@@ -324,7 +324,7 @@ function ProfileTab() {
   useEffect(() => {
     if (!user?.id) return;
     let alive = true;
-    fetch("/api/me", { cache: "no-store", headers: { "x-user-id": user.id } })
+    fetch("/api/me", { cache: "no-store", headers: { "x-user-id": getAuthToken() ?? "" } })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { profile?: { name?: string | null; bio?: string | null; image?: string | null } } | null) => {
         if (!alive || !data?.profile) return;

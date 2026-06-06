@@ -9,8 +9,8 @@ import type { ReadState, UserReview } from "./types";
 function apiPost(path: string, body: unknown, method = "POST") {
   if (typeof window === "undefined") return;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const userId = useApp.getState().userId;
-  if (userId) headers["x-user-id"] = userId;
+  const token = useApp.getState().sessionToken;
+  if (token) headers["x-user-id"] = token; // 서명 세션 토큰(서버가 검증해 실제 userId로 치환)
   fetch(path, { method, headers, body: JSON.stringify(body) }).catch(() => {});
 }
 
@@ -49,6 +49,8 @@ interface AppState {
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
   setUserId: (id: string | null) => void;
+  sessionToken: string | null; // 서명 세션 토큰(x-user-id 헤더로 전송)
+  setSessionToken: (token: string | null) => void;
   hydrateFromServer: (data: HydratePayload) => void;
 
   setRating: (titleId: string, rating: number) => void;
@@ -89,8 +91,10 @@ export const useApp = create<AppState>()(
       recentlyViewed: [],
       ratingScale: "star",
       userId: null,
+      sessionToken: null,
 
       setUserId: (userId) => set({ userId }),
+      setSessionToken: (sessionToken) => set({ sessionToken }),
       // 서버를 진실원천으로 교체(replace). 게스트 데이터는 로그인 시 /api/me/merge 가 먼저 서버로
       // 병합하므로 여기서 덮어써도 손실이 없고, 다른 기기에서의 삭제·변경도 정확히 반영된다.
       hydrateFromServer: (d) =>

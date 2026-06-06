@@ -9,8 +9,10 @@ export function StoreSync() {
   const { data: session, status } = useSession();
   const hydrated = useHydrated();
   const setUserId = useApp((s) => s.setUserId);
+  const setSessionToken = useApp((s) => s.setSessionToken);
   const hydrate = useApp((s) => s.hydrateFromServer);
   const uid = session?.user?.id;
+  const token = session?.token ?? null;
 
   useEffect(() => {
     // persist 복원 후에만 — 게스트 로컬 데이터가 스토어에 올라온 뒤 병합해야 손실이 없다.
@@ -19,7 +21,9 @@ export function StoreSync() {
     if (status === "authenticated" && uid) {
       const prev = useApp.getState().userId;
       setUserId(uid);
-      const authHeaders = { "Content-Type": "application/json", "x-user-id": uid };
+      setSessionToken(token);
+      // 서명 토큰을 x-user-id로 전송(서버가 검증). 토큰 없는 레거시 세션은 미인증 → 재로그인 필요.
+      const authHeaders = { "Content-Type": "application/json", "x-user-id": token ?? "" };
 
       if (prev !== uid) {
         // 로그인 전환(게스트→계정 등): 로컬 상태를 서버로 1회 병합 후 통합 결과 하이드레이트
@@ -44,7 +48,7 @@ export function StoreSync() {
           .catch(() => {});
       } else {
         // 이미 로그인 상태(새로고침): 서버 데이터만 하이드레이트
-        fetch("/api/me", { headers: { "x-user-id": uid } })
+        fetch("/api/me", { headers: { "x-user-id": token ?? "" } })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             if (d) hydrate(d);
@@ -53,8 +57,9 @@ export function StoreSync() {
       }
     } else if (status === "unauthenticated") {
       setUserId(null);
+      setSessionToken(null);
     }
-  }, [hydrated, status, uid, setUserId, hydrate]);
+  }, [hydrated, status, uid, token, setUserId, setSessionToken, hydrate]);
 
   return null;
 }

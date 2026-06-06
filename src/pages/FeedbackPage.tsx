@@ -28,8 +28,8 @@ const composeSchema = z.object({
 });
 type ComposeValues = z.infer<typeof composeSchema>;
 
-function authHeaders(userId: string | null): Record<string, string> {
-  return userId ? { "Content-Type": "application/json", "x-user-id": userId } : { "Content-Type": "application/json" };
+function authHeaders(token: string | null): Record<string, string> {
+  return token ? { "Content-Type": "application/json", "x-user-id": token } : { "Content-Type": "application/json" };
 }
 
 function timeAgo(iso: string): string {
@@ -44,6 +44,7 @@ function timeAgo(iso: string): string {
 
 export function FeedbackPage() {
   const userId = useApp((s) => s.userId);
+  const sessionToken = useApp((s) => s.sessionToken);
   const hydrated = useHydrated();
   const [category, setCategory] = useState<FeedbackCategory | "all">("all");
   const [status, setStatus] = useState<FeedbackStatus | "all">("all");
@@ -92,7 +93,7 @@ export function FeedbackPage() {
     if (!userId) return;
     const res = await fetch("/api/feedback/posts", {
       method: "POST",
-      headers: authHeaders(userId),
+      headers: authHeaders(sessionToken),
       body: JSON.stringify({ ...values, tags: composeTags }),
     });
     if (res.ok) {
@@ -314,6 +315,7 @@ function PostCard({ post, expanded, onToggle, userId, onTagClick }: { post: Feed
 }
 
 function PostThread({ postId, userId }: { postId: string; userId: string | null }) {
+  const sessionToken = useApp((s) => s.sessionToken);
   const [replies, setReplies] = useState<FeedbackReply[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -335,7 +337,7 @@ function PostThread({ postId, userId }: { postId: string; userId: string | null 
     setSending(true);
     const res = await fetch(`/api/feedback/posts/${postId}/replies`, {
       method: "POST",
-      headers: authHeaders(userId),
+      headers: authHeaders(sessionToken),
       body: JSON.stringify({ text }),
     });
     setSending(false);

@@ -1,4 +1,6 @@
-// 관리자 API(Nest /api/admin/*) 공용 클라이언트 — 세션 uid를 x-user-id 헤더로 전달.
+// 관리자 API(Nest /api/admin/*) 공용 클라이언트 — 서명 세션 토큰을 x-user-id 헤더로 전달(서버 검증).
+import { getAuthToken } from "@/src/compat/auth-session";
+
 export interface AdminMe {
   id: string;
   name: string | null;
@@ -90,7 +92,7 @@ export async function adminFetch<T>(path: string, uid: string, init?: RequestIni
     ...init,
     cache: "no-store",
     headers: {
-      "x-user-id": uid,
+      "x-user-id": getAuthToken() ?? uid, // 서명 토큰 우선(없으면 레거시 uid → 서버가 거부)
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },

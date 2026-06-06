@@ -18,6 +18,7 @@ import {
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
 import { getAppConfig } from "../../../../../lib/server/app-config";
+import { signSession } from "../../../../../lib/server/session";
 
 interface AuthPayload {
   email?: unknown;
@@ -79,7 +80,7 @@ export class AuthController {
   oauthExchange(@Body() body: { token?: unknown }) {
     const user = consumeHandoff(typeof body?.token === "string" ? body.token : undefined);
     if (!user) throw new HttpException({ error: "만료되었거나 잘못된 로그인 토큰이에요." }, HttpStatus.UNAUTHORIZED);
-    return { ok: true, user };
+    return { ok: true, user, token: signSession(user.id) };
   }
 
   // 데모 폴백 로그인 — 실제 제공자 미설정 시에만 허용. 명확히 [데모] 사용자.
@@ -91,7 +92,7 @@ export class AuthController {
     }
     enforceRateLimit(`oauth-demo:${clientIp(req)}`, 20, 10 * 60_000);
     const user = await createDemoUser(provider);
-    return { ok: true, user, demo: true };
+    return { ok: true, user, demo: true, token: signSession(user.id) };
   }
 
   @Post("signup")
@@ -138,6 +139,7 @@ export class AuthController {
         image: user.image,
         role: normalizeRole(user.role),
       },
+      token: signSession(user.id),
     };
   }
 }

@@ -8,6 +8,7 @@ type Session = {
     image?: string | null;
     role?: string | null;
   };
+  token?: string | null; // 서명 세션 토큰 — 인증 요청의 x-user-id 헤더로 전송한다.
 } | null;
 
 type SessionContextValue =
@@ -99,7 +100,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
     }),
   });
   const payload = (await response.json().catch(() => null)) as
-    | { user?: NonNullable<Session>["user"]; error?: string }
+    | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
     | null;
 
   if (!response.ok || !payload?.user) {
@@ -111,7 +112,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
     };
   }
 
-  persistSession({ user: payload.user });
+  persistSession({ user: payload.user, token: payload.token ?? null });
   return {
     ok: true,
     error: null,
@@ -126,8 +127,8 @@ export async function signOut() {
 }
 
 // OAuth 콜백 페이지가 핸드오프/데모로 받은 사용자 객체로 세션을 확정할 때 사용.
-export function completeOAuthLogin(user: NonNullable<Session>["user"] | null) {
-  persistSession(user?.id ? { user } : null);
+export function completeOAuthLogin(user: NonNullable<Session>["user"] | null, token?: string | null) {
+  persistSession(user?.id ? { user, token: token ?? null } : null);
 }
 
 export function getAuthSession() {
@@ -136,6 +137,11 @@ export function getAuthSession() {
 
 export function getAuthUserId() {
   return currentSession?.user.id ?? null;
+}
+
+// 인증 요청의 x-user-id 헤더 값(서명 세션 토큰). 없으면 null → 미인증.
+export function getAuthToken() {
+  return currentSession?.token ?? null;
 }
 
 function readStoredSession(): Session {

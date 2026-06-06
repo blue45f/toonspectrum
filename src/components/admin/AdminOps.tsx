@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle } from "lucide-react";
 import { adminFetch, formatNum, type AdminApiError } from "./admin-client";
 import { AdminNotice, AdminSpinner, StatusBadge, adminButtonClass } from "./admin-ui";
+import { getAuthToken } from "@/src/compat/auth-session";
 
 interface AppConfig {
   monetizationEnabled: boolean;
@@ -177,7 +178,7 @@ function ManualIngest({ uid }: { uid: string }) {
       const res = await fetch("/api/catalog/ingest/run", {
         method: "POST",
         cache: "no-store",
-        headers: { "x-user-id": uid, "Content-Type": "application/json" },
+        headers: { "x-user-id": getAuthToken() ?? uid, "Content-Type": "application/json" },
         body: JSON.stringify({ requestedBy: "admin" }),
       });
       if (!res.ok) {

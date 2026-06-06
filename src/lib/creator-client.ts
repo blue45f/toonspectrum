@@ -1,7 +1,7 @@
 // 창작 게시판(/api/creator) 전용 타입 + fetch 헬퍼.
 // 인증은 기존 세션 스킴(localStorage "toonspectrum-auth-session" → x-user-id 헤더)을 그대로 재사용한다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
-import { getAuthUserId } from "@/src/compat/auth-session";
+import { getAuthUserId, getAuthToken } from "@/src/compat/auth-session";
 import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
 
 export type WorkFormat = "cuttoon" | "upload";
@@ -75,8 +75,8 @@ export function getCurrentUserId(): string | null {
 function authHeaders(json: boolean): Record<string, string> {
   const headers: Record<string, string> = {};
   if (json) headers["Content-Type"] = "application/json";
-  const userId = getCurrentUserId();
-  if (userId) headers["x-user-id"] = userId;
+  const token = getAuthToken();
+  if (token) headers["x-user-id"] = token; // 서명 세션 토큰(서버 검증)
   return headers;
 }
 
