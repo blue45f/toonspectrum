@@ -9,7 +9,7 @@ import {
   setRememberFlag,
   clearAllRememberedFilters,
 } from "@/lib/use-remembered-filters";
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload } from "lucide-react";
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: "ko", label: "한국어" },
@@ -87,11 +87,65 @@ export function SettingsPage() {
   const setAdultVerified = useApp((s) => s.setAdultVerified);
   const openAgeGate = useApp((s) => s.openAgeGate);
   const resetAll = useApp((s) => s.resetAll);
+  const hydrateFromServer = useApp((s) => s.hydrateFromServer);
 
   const [remember, setRemember] = useState(false);
   const [filtersCleared, setFiltersCleared] = useState(false);
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [imported, setImported] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  // 내 서재(별점·읽음·구독·컬렉션)는 이 브라우저에만 저장되므로 JSON 백업으로 내보내기/가져오기 지원.
+  const doExport = () => {
+    const s = useApp.getState();
+    const payload = {
+      _app: "toonspectrum-library",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      ratings: s.ratings,
+      reads: s.reads,
+      subscriptions: s.subscriptions,
+      reviews: s.reviews,
+      likedReviews: s.likedReviews,
+      collections: s.collections,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `toonspectrum-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(String(reader.result)) as Partial<Record<string, unknown>>;
+        if (!d || typeof d !== "object") throw new Error("invalid");
+        hydrateFromServer({
+          ratings: (d.ratings as Record<string, number>) ?? {},
+          reads: (d.reads as Record<string, never>) ?? {},
+          subscriptions: (d.subscriptions as Record<string, boolean>) ?? {},
+          reviews: (d.reviews as Record<string, never>) ?? {},
+          likedReviews: (d.likedReviews as Record<string, boolean>) ?? {},
+          collections: Array.isArray(d.collections) ? (d.collections as never[]) : [],
+        });
+        setImported(true);
+        setImportError(null);
+      } catch {
+        setImportError("파일을 읽을 수 없어요. 올바른 백업 파일인지 확인해주세요.");
+        setImported(false);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // 클라이언트에서만 localStorage 기반 선호값 반영.
   useStateOnceHydrated(hydrated, () => setRemember(getRememberFlag()));
@@ -206,6 +260,33 @@ export function SettingsPage() {
       {/* 내 데이터 */}
       <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">내 데이터</h2>
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
+        <Row icon={Download} title="내 서재 백업 내보내기" desc="별점·읽음·구독·컬렉션을 JSON 파일로 저장합니다.">
+          <button
+            type="button"
+            onClick={doExport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
+          >
+            <Download size={14} /> 내보내기
+          </button>
+        </Row>
+        <Row icon={Upload} title="백업 가져오기" desc="내보낸 JSON으로 복원합니다. 현재 이 브라우저의 데이터를 덮어씁니다.">
+          <span className="inline-flex items-center gap-2">
+            {imported && (
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-good">
+                <Check size={14} /> 가져옴
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
+            >
+              <Upload size={14} /> 가져오기
+            </button>
+            <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onImportPick} />
+          </span>
+        </Row>
+        {importError && <p className="-mt-1 pb-3 text-xs text-bad">{importError}</p>}
         <Row
           icon={Trash2}
           title="내 활동 초기화"
