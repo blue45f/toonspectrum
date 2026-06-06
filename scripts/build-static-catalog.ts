@@ -181,7 +181,7 @@ async function writeNews(): Promise<void> {
   }
 }
 
-// SEO 사이트맵 — 정적 라우트 + 인기 상위 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
+// SEO 사이트맵 — 정적 라우트 + 품질 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.
 // (public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
 function writeSitemap(): void {
   const BASE = "https://toonspectrum.vercel.app";
@@ -190,18 +190,24 @@ function writeSitemap(): void {
     "/reviews", "/community", "/insights", "/authors", "/tags", "/compare",
     "/about", "/guide", "/news",
   ];
-  // 인기 상위 작품만(전 3만편 색인은 과해 thin-content 위험) — 조회수 상위 5000편.
-  const topTitles = [...TITLES]
+  // thin-content 방지를 위해 '표지+평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
+  // 품질 게이트를 유지하면서 기존 5000편 대비 색인 커버리지를 넓힌다.
+  const topTitles = TITLES.filter((t) => t.coverImage && t.stats.ratingCount > 0)
     .sort((a, b) => b.stats.views - a.stats.views)
-    .slice(0, 5000);
+    .slice(0, 15000);
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const entry = (loc: string, priority: string) =>
+    `  <url><loc>${esc(loc)}</loc><priority>${priority}</priority></url>`;
   const urls = [
-    ...STATIC_ROUTES.map((r) => `${BASE}${r}`),
-    ...topTitles.map((t) => `${BASE}/title/${encodeURIComponent(t.slug)}`),
+    ...STATIC_ROUTES.map((r) => entry(`${BASE}${r}`, r === "/" ? "1.0" : "0.8")),
+    // 인기 순위 구간별 priority(상위일수록 높게) — 크롤 우선순위 힌트.
+    ...topTitles.map((t, i) =>
+      entry(`${BASE}/title/${encodeURIComponent(t.slug)}`, i < 1000 ? "0.7" : i < 5000 ? "0.6" : "0.5")
+    ),
   ];
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join("\n") +
+    urls.join("\n") +
     `\n</urlset>\n`;
   const file = path.join(ROOT, "public", "sitemap.xml");
   writeFileSync(file, xml);
