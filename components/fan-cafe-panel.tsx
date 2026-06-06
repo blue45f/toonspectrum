@@ -11,6 +11,7 @@ import {
   Tag,
   Search,
   Sparkles,
+  Trash2,
   UsersRound,
 } from "lucide-react";
 import type { FanCafePost, FanCafePostKind, FanCafeReply, FanCafeScopeFilter } from "@/lib/types";
@@ -626,6 +627,7 @@ export function FanCafePanel({
                 post={post}
                 compact={compact}
                 onReplyCreated={(replyPost) => applyTopLevelReplyDelta(replyPost, 1)}
+                onDeleted={(id) => setPosts((current) => current.filter((p) => p.id !== id))}
               />
             ))
           )}
@@ -650,12 +652,31 @@ function FanPostCard({
   post,
   compact,
   onReplyCreated,
+  onDeleted,
 }: {
   post: FanCafePost;
   compact?: boolean;
   onReplyCreated?: (post: FanCafePost, delta: number) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const userId = useApp((s) => s.userId);
+  const isOwner = !!userId && post.author?.id === userId;
+  const [deleting, setDeleting] = useState(false);
+  async function handleDelete() {
+    if (!userId || deleting) return;
+    if (!window.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, {
+        method: "DELETE",
+        headers: { "x-user-id": userId },
+      });
+      if (res.ok) onDeleted?.(post.id);
+      else setDeleting(false);
+    } catch {
+      setDeleting(false);
+    }
+  }
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(Boolean(post.replies));
   const [replies, setReplies] = useState<FanCafeReply[]>(post.replies ?? []);
@@ -856,6 +877,18 @@ function FanPostCard({
           </h3>
           <p className="mt-0.5 text-xs text-fg-3">{post.author.name}</p>
         </div>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label="내 글 삭제"
+            title="삭제"
+            className="shrink-0 rounded-lg p-1.5 text-fg-3 opacity-0 transition-colors hover:bg-raised hover:text-bad focus-visible:opacity-100 disabled:opacity-40 group-hover:opacity-100"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </header>
       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{post.text}</p>
       {post.tags.length > 0 && (

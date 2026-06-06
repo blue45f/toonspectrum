@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import {
   createFanPost,
+  deleteFanPost,
   createFanPostReply,
   listCommunityBoards,
   listFanPostReplies,
@@ -118,6 +119,15 @@ export class CommunityService {
       throw new BadRequestException(parsed.error ?? "잘못된 요청");
     }
     return createFanPost(userId, parsed.value);
+  }
+
+  async deletePost(postId: string, userId: string) {
+    if (!postId) throw new BadRequestException("postId 필요");
+    try {
+      return await deleteFanPost(userId, postId, false);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "글을 삭제하지 못했습니다.");
+    }
   }
 
   async listPostReplies(postId: string): Promise<FanCafeReply[]> {

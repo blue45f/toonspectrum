@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -146,6 +147,12 @@ export class CommunityController {
       throw new BadRequestException("게시글 작성이 너무 잦아요. 잠시 후 다시 시도해 주세요.");
     }
     return this.communityService.createPost(body, uid);
+  }
+
+  @Delete("/community/posts/:id")
+  async deletePost(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    return this.communityService.deletePost(id, uid);
   }
 
   @Get("/community/posts/:id/replies")

@@ -722,6 +722,20 @@ export async function createFanPost(userId: string, input: ValidatedFanPostInput
   };
 }
 
+// 팬카페 글 삭제(작성자 또는 관리자). FK ON DELETE CASCADE로 답글도 함께 정리된다.
+export async function deleteFanPost(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
+  await ensureCommunityTables();
+  const [existing] = await db
+    .select({ id: fanPosts.id, ownerId: fanPosts.userId })
+    .from(fanPosts)
+    .where(eq(fanPosts.id, id))
+    .limit(1);
+  if (!existing) return { deleted: false };
+  if (existing.ownerId !== userId && !isAdmin) throw new Error("작성자만 삭제할 수 있습니다.");
+  await db.delete(fanPosts).where(eq(fanPosts.id, id));
+  return { deleted: true };
+}
+
 export async function listFanPostReplies(postId: string): Promise<FanCafeReply[]> {
   await ensureCommunityTables();
   const rows = await db
