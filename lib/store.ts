@@ -45,6 +45,7 @@ interface AppState {
   collections: Collection[];
   recentlyViewed: string[]; // 최근 본 작품 titleId (최신순, 브라우저 저장)
   addRecentlyViewed: (titleId: string) => void;
+  clearRecentlyViewed: () => void;
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
   setUserId: (id: string | null) => void;
@@ -189,6 +190,7 @@ export const useApp = create<AppState>()(
         if (!titleId) return;
         set((s) => ({ recentlyViewed: [titleId, ...s.recentlyViewed.filter((id) => id !== titleId)].slice(0, 24) }));
       },
+      clearRecentlyViewed: () => set({ recentlyViewed: [] }),
       renameCollection: (id, name) => {
         const clean = name.trim();
         if (!clean) return;
@@ -223,6 +225,7 @@ export const useApp = create<AppState>()(
           likedReviews: {},
           subscriptions: {},
           collections: seedCollections,
+          recentlyViewed: [],
         }),
     }),
     {
