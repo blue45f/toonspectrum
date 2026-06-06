@@ -4,7 +4,7 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button";
 import { Stars } from "@/components/ui/stars";
 import { ErrorState } from "@/src/components/error-state";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
 import type { SeedReview, Title } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
 import { useApiResource } from "./use-api-resource";
@@ -29,6 +29,9 @@ export function UserProfilePage() {
   const avg = data?.stats.avg ?? 0;
   const distinctTitles = data?.stats.distinctTitles ?? 0;
   useDocumentTitle(loading ? "프로필" : `${author} 님`);
+  useMetaDescription(
+    data ? `${author} 님의 리뷰 ${total}편 · 작품 ${distinctTitles}편 · 평균 별점 ${avg ? avg.toFixed(1) : "-"} — 툰스펙트럼.` : null
+  );
 
   return (
     <div>

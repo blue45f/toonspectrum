@@ -50,9 +50,17 @@ export function NewsPage() {
       ) : error ? (
         <ErrorState title="뉴스를 불러오지 못했습니다." message={error} onRetry={reload} />
       ) : items.length === 0 ? (
-        <p className="rounded-2xl border border-line bg-card/30 p-6 text-center text-sm text-fg-3">
-          지금은 표시할 소식이 없어요. 잠시 후 다시 확인해 주세요.
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/40 px-6 py-16 text-center">
+          <span className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
+            <Newspaper size={22} />
+          </span>
+          <div>
+            <p className="font-semibold text-fg">표시할 소식이 없어요</p>
+            <p className="mt-1 max-w-xs text-sm text-fg-3">
+              새 헤드라인이 모이면 이곳에 표시됩니다. 잠시 후 다시 확인해 주세요.
+            </p>
+          </div>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2.5">
           {items.map((it, i) => (
