@@ -10,6 +10,26 @@ export interface SegItem<T extends string> {
   hint?: string;
 }
 
+// WAI-ARIA 탭 키보드 패턴 — ←/→(·↑/↓)·Home·End로 탭 이동(자동 선택 + 포커스 이동).
+function handleTabKeys<T extends string>(
+  e: React.KeyboardEvent<HTMLButtonElement>,
+  items: SegItem<T>[],
+  value: T,
+  onChange: (v: T) => void
+) {
+  const idx = items.findIndex((it) => it.value === value);
+  let next = -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % items.length;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + items.length) % items.length;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = items.length - 1;
+  else return;
+  e.preventDefault();
+  onChange(items[next].value);
+  const list = e.currentTarget.closest('[role="tablist"]');
+  list?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+}
+
 // 세그먼티드 컨트롤 — 알약형. active 뒤로 슬라이딩 인디케이터.
 export function Segmented<T extends string>({
   items,
@@ -40,8 +60,10 @@ export function Segmented<T extends string>({
             key={it.value}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             aria-label={typeof it.label === "string" ? undefined : it.hint}
             onClick={() => onChange(it.value)}
+            onKeyDown={(e) => handleTabKeys(e, items, value, onChange)}
             title={it.hint}
             className={cn(
               "relative z-10 rounded-full font-medium transition-colors duration-150",
@@ -86,7 +108,9 @@ export function UnderlineTabs<T extends string>({
             key={it.value}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(it.value)}
+            onKeyDown={(e) => handleTabKeys(e, items, value, onChange)}
             className={cn(
               "relative px-3 py-2.5 text-sm font-medium transition-colors duration-150",
               active ? "text-fg" : "text-fg-3 hover:text-fg-2"
