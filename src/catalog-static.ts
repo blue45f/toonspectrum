@@ -141,6 +141,16 @@ async function titleDetail(slug: string, origFetch: typeof fetch) {
   const similar = similarTitles(TITLES, title, 8);
   const original = originalOf(title) ?? title;
   const adaptations = adaptationsOf(original);
+  // 같은 작가의 다른 작품(자기·이미 'similar'에 든 작품 제외) — 작가 단위 디스커버리.
+  // "미상"·플랫폼/출판사 묶음 같은 플레이스홀더 작가명은 무관한 작품이 섞이므로 제외하고,
+  // 한 작가가 갖기엔 비현실적으로 많은 묶음(플레이스홀더 신호)도 건너뛴다.
+  const GENERIC_AUTHORS = new Set(["미상", "작가 미상", "익명", "unknown", "네이버웹툰 작가", "포스타입 오리지널"]);
+  const authorName = (title.author ?? "").trim();
+  const sameAuthor =
+    authorName && !GENERIC_AUTHORS.has(authorName) ? TITLES.filter((t) => t.author === title.author) : [];
+  const similarIds = new Set(similar.map((t) => t.id));
+  const byAuthor =
+    sameAuthor.length <= 25 ? sameAuthor.filter((t) => t.id !== title.id && !similarIds.has(t.id)).slice(0, 6) : [];
   // 리뷰는 하이브리드 — 런타임 /api(Neon)에서 가져와 병합. 실패(쿼터 등) 시 빈 배열로 폴백.
   let reviews: unknown[] = [];
   try {
@@ -151,7 +161,7 @@ async function titleDetail(slug: string, origFetch: typeof fetch) {
   }
   const reviewCount = reviews.length;
   const reviewAvg = reviewCount > 0 ? (reviews as { rating: number }[]).reduce((s, r) => s + (r.rating ?? 0), 0) / reviewCount : 0;
-  return { title, reviews, similar, original, adaptations, hasFamily: adaptations.length > 0, reviewAvg, reviewCount, generatedAt: new Date().toISOString(), source: "static-catalog" };
+  return { title, reviews, similar, byAuthor, original, adaptations, hasFamily: adaptations.length > 0, reviewAvg, reviewCount, generatedAt: new Date().toISOString(), source: "static-catalog" };
 }
 
 function recordNumbers(value: unknown): Record<string, number> {

@@ -37,6 +37,7 @@ interface TitleDetailResponse {
   title: Title;
   reviews: SeedReview[];
   similar: Title[];
+  byAuthor?: Title[];
   original: Title;
   adaptations: Title[];
   hasFamily: boolean;
@@ -88,6 +89,7 @@ export function TitleDetailPage() {
   }
 
   const { title, reviews, similar, original, adaptations, hasFamily } = data;
+  const byAuthor = data.byAuthor ?? [];
   // 영상화(드라마·영화·애니·OTT)는 통합 유니버스 데이터에서 조회(원작+현재작 합산).
   // 웹툰화 패밀리가 없어도(독립 작품) 영상화가 있으면 그래프를 노출한다.
   const externalMedia = mergedUniverse(title, original).adaptations;
@@ -306,6 +308,21 @@ export function TitleDetailPage() {
           </div>
         </div>
       </Section>
+
+      {byAuthor.length > 0 && (
+        <Section
+          className="mt-14"
+          eyebrow="BY THIS AUTHOR"
+          title={`${title.author}의 다른 작품`}
+          desc="같은 작가가 그린·쓴 다른 작품"
+        >
+          <Rail>
+            {byAuthor.map((item) => (
+              <TitleCard key={item.id} title={item} />
+            ))}
+          </Rail>
+        </Section>
+      )}
 
       {similar.length > 0 && (
         <Section
