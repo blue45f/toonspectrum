@@ -109,7 +109,9 @@ export function DistributionBars({
   className?: string;
 }) {
   const [ref, inView] = useInView<HTMLDivElement>();
-  const total = dist.reduce((a, b) => a + b, 0) || 1;
+  // 손상된 분포값(음수/비유한)이 들어와도 막대가 깨지지 않도록 방어적으로 0 처리.
+  const safe = dist.map((v) => (Number.isFinite(v) && v > 0 ? v : 0));
+  const total = safe.reduce((a, b) => a + b, 0) || 1;
   const rows = [5, 4, 3, 2, 1];
   // 5점=따뜻한 악센트 계열 → 1점=차가운 회색, 점수별 hue
   const hue = (s: number) => {
@@ -125,7 +127,7 @@ export function DistributionBars({
   return (
     <div ref={ref} className={cn("flex flex-col gap-1.5", className)}>
       {rows.map((s, i) => {
-        const v = dist[s - 1];
+        const v = safe[s - 1];
         const pct = (v / total) * 100;
         return (
           <div key={s} className="flex items-center gap-2.5">

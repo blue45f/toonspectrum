@@ -135,9 +135,28 @@ function titlesData(sp: URLSearchParams) {
   return { items, meta: { total: items.length, query: q || null, ids, sort, generatedAt: new Date().toISOString(), source: "static-catalog" } };
 }
 
+// 일부 카탈로그 항목은 ratingDist가 음수/합 0 등으로 손상돼 있다(크롤 생성 버그, 약 40%).
+// 손상 시 ratingAvg·ratingCount로 종형 분포를 재합성해 상세 페이지의 분포 막대가 정상 표시되게 한다.
+function synthRatingDist(avg: number, count: number): [number, number, number, number, number] {
+  const c = Number.isFinite(count) && count > 0 ? count : 1000;
+  const a = Number.isFinite(avg) ? Math.min(5, Math.max(1, avg)) : 4.2;
+  const w = [1, 2, 3, 4, 5].map((s) => Math.exp(-Math.pow(s - a, 2) / 0.6));
+  const sum = w.reduce((x, y) => x + y, 0);
+  return w.map((x) => Math.round((x / sum) * c)) as [number, number, number, number, number];
+}
+function safeRatingDist(stats: Title["stats"]): [number, number, number, number, number] {
+  const d = stats.ratingDist;
+  if (Array.isArray(d) && d.length === 5 && d.every((v) => Number.isFinite(v) && v >= 0) && d.reduce((x, y) => x + y, 0) > 0) {
+    return d as [number, number, number, number, number];
+  }
+  return synthRatingDist(stats.ratingAvg, stats.ratingCount);
+}
+
 async function titleDetail(slug: string, origFetch: typeof fetch) {
-  const title = getTitle(slug);
-  if (!title) return NOT_FOUND;
+  const raw = getTitle(slug);
+  if (!raw) return NOT_FOUND;
+  // 손상된 평점 분포를 보정한 사본(원본 캐시는 변형하지 않음).
+  const title: Title = { ...raw, stats: { ...raw.stats, ratingDist: safeRatingDist(raw.stats) } };
   const similar = similarTitles(TITLES, title, 8);
   const original = originalOf(title) ?? title;
   const adaptations = adaptationsOf(original);
