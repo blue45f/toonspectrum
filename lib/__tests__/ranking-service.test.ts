@@ -164,6 +164,36 @@ describe("ranking service", () => {
     expect(data.meta.reliability.fallbackReason).toContain("실시간 소스 보정 대상이 아니어서");
   });
 
+  it("스냅샷 운영 모드에서는 라이브 대상 축이어도 비대상 축으로 설명하지 않는다", async () => {
+    let liveCalls = 0;
+    const data = await getRankingData(
+      query({ axis: "popular", period: "daily", limit: "1", refresh: "true" }),
+      {
+        catalog: [
+          makeTitle({
+            id: "nw-static-mode",
+            type: "webtoon",
+            availability: [{ platformId: "naver-webtoon", pricing: "free" }],
+          }),
+        ],
+        fetchLive: async () => {
+          liveCalls += 1;
+          return emptyLive();
+        },
+        fetchStatus: emptyStatus,
+        disableLive: true,
+        now,
+      }
+    );
+
+    expect(liveCalls).toBe(0);
+    expect(data.meta.source).toBe("formula-api");
+    expect(data.meta.live.enabled).toBe(false);
+    expect(data.meta.reliability.fallbackReason).toContain("스냅샷");
+    expect(data.meta.reliability.fallbackReason).not.toContain("보정 대상이 아니어서");
+    expect(data.meta.reliability.basis).toContain("스냅샷 산식 운영 모드");
+  });
+
   it("완결축에서 외부 휴재 신호가 확인된 작품을 제외한다", async () => {
     const staleCompleted = makeTitle({
       id: "nw-rest",

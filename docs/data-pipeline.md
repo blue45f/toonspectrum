@@ -1,26 +1,28 @@
-# 데이터 파이프라인 — 크롤 → DB 적재 → API → 화면
+# 데이터 파이프라인 — 크롤 → 스냅샷 → 정적 카탈로그/API → 화면
 
-ToonSpectrum의 작품 데이터는 **파일 seed가 아니라 서버 DB 스냅샷**을 운영 소스로 사용합니다.
-공개 카탈로그를 크롤해 정규화한 스냅샷을 DB에 적재하고, API가 부팅 시 이를 메모리로 로드해
-프론트에 응답합니다. 아래는 수집부터 화면 노출까지의 전 과정입니다.
+ToonSpectrum의 작품 데이터는 **하드코딩 seed가 아니라 검증 스냅샷**을 운영 소스로 사용합니다.
+공개 카탈로그를 크롤해 정규화한 뒤 `catalog.json.gz`와 `public/data/*.json` 정적 카탈로그를 만들고,
+리뷰·인증·커뮤니티 같은 동적 데이터만 API/DB가 담당합니다. `VITE_CATALOG_SOURCE=api` 또는 API 폴백
+경로에서는 같은 스냅샷을 Nest 런타임 카탈로그로 로드할 수 있습니다.
 
 ## 한눈에 보기 (Mermaid)
 
 ```mermaid
 flowchart TD
     subgraph SRC["공개 카탈로그 소스 (robots 준수·공개 엔드포인트만)"]
-      A["네이버웹툰·시리즈 · 카카오웹툰 · 레진 (기존 4)"]
-      B["ridi · kakao-page · munpia · joara · postype<br/>mrblue · bookcube · onestory · yes24 (신규 9)"]
+      A["네이버웹툰·시리즈 · 카카오웹툰 · 레진"]
+      B["kakao-page · ridi · munpia · joara · novelpia<br/>bomtoon · toptoon · postype · mrblue · comico<br/>toomics · bookcube · onestory · kyobo · yes24"]
     end
 
     SRC --> C["① CRAWL<br/>scripts/crawl.mjs + scripts/crawlers/*.mjs<br/>정규화 → Title[] · 표지 → /api/cover?u= · 제목 정규화 교차연결"]
-    C -->|stdout JSON| D["② INGEST<br/>pnpm ingest · cron(fixed) · POST /api/catalog/ingest/run<br/>품질 게이트(회귀 차단) → persistCatalogSnapshot"]
+    C -->|stdout JSON| D["② SNAPSHOT<br/>pnpm ingest / catalog:update / cron<br/>품질 게이트(회귀 차단) → catalog.json.gz 또는 catalog_snapshot"]
     D --> DB[("PostgreSQL — 로컬 docker(:55432) / Neon(원격)<br/>catalog_snapshot · isCurrent=true")]
-    DB -. 폴링/refresh 핫 리로드 .-> ST
-    DB -->|API 부팅 시 1회 로드| E["③ catalog-store.ts<br/>메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)"]
-    E --> F["④ NestJS API :4001<br/>/titles /search /explore (카탈로그)<br/>/ranking /home /calendar (카탈로그 + 라이브 보정)"]
-    LIVE["live.ts 실시간 보정<br/>네이버·카카오 현재 순위"] -. 인기/급상승 축 .-> F
+    D --> STATIC[("public/data/*.json<br/>catalog:gen · ranking 사전계산(disableLive)")]
+    DB -. API 폴백/핫 리로드 .-> E["③ catalog-store.ts<br/>메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)"]
+    STATIC --> F["④ Vite 정적 카탈로그 엔진<br/>검색·탐색·랭킹은 CDN + 클라이언트 계산"]
+    E --> API["④ NestJS API :4001<br/>동적 데이터 + API 카탈로그 폴백(disableLive)"]
     F --> G["⑤ Vite + React :5173<br/>useApiResource → TitlePoster / CoverImage"]
+    API --> G
     F --> COV["/api/cover 프록시<br/>호스트 allowlist → referer → 매직바이트 검증 → 스트리밍"]
     COV --> G
     G --> SCREEN(["🖥️ 화면: 작품 목록 + 표지 썸네일"])
@@ -33,16 +35,17 @@ flowchart TD
    공개 카탈로그 fetch → Title[] 정규화 → 표지를 /api/cover?u= 로 치환 → 제목 정규화로 교차연결
         │ stdout JSON
         ▼
-② INGEST  pnpm ingest │ cron(CATALOG_INGEST_MODE=fixed) │ POST /api/catalog/ingest/run
-   품질 게이트(총건수 급감·주요소스 붕괴 시 승격 거부) → catalog_snapshot INSERT(isCurrent=1)
-        │  PostgreSQL: 로컬 docker(:55432) / Neon(원격) — DATABASE_URL
+② SNAPSHOT  catalog:update │ pnpm ingest │ cron │ POST /api/catalog/ingest/run
+   품질 게이트(총건수 급감·주요소스 붕괴 시 승격 거부) → catalog.json.gz 또는 catalog_snapshot
+        │  정적: public/data/*.json / 폴백 API: PostgreSQL catalog_snapshot
         ▼
 ③ LOAD  lib/server/catalog-store.ts  (API 부팅 시 1회)
    isCurrent=1 스냅샷 → 메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)
         ▼
-④ API  NestJS  apps/api  :4001
-   /titles /search /explore         ← 메모리 카탈로그 질의
-   /ranking /home /calendar         ← 카탈로그 + live.ts 실시간 보정(네이버·카카오)
+④ STATIC/API
+   public/data/*.json               ← 검색·탐색·랭킹 기본 경로(CDN + 클라이언트 계산)
+   NestJS apps/api :4001            ← 리뷰·인증·커뮤니티 + API 카탈로그 폴백
+   /ranking                         ← 현재 활성 경로는 disableLive=true 스냅샷 산식
    /api/cover?u=…                   ← 표지 프록시(allowlist→referer→매직바이트→스트리밍)
         │  (vite dev: "/api" → 127.0.0.1:4001 프록시)
         ▼
@@ -56,17 +59,16 @@ flowchart TD
 
 | 단계 | 무엇 | 핵심 파일 | 비고 |
 |---|---|---|---|
-| ① 수집 | 공개 카탈로그 fetch → `Title[]` 정규화, 표지 URL → `/api/cover?u=` | `scripts/crawl.mjs`, `scripts/crawlers/*.mjs`, `scripts/crawlers/_shared.mjs`, `scripts/crawl-helpers.mjs` | `WEBDEX_SOURCE_IDS`로 소스 제한(`all` 가능). 제목 정규화(`norm`)로 교차연결/신규 분리. 신규 9개는 `Promise.all` 병렬 크롤. |
-| ② 적재 | 크롤 JSON → 품질 게이트 → `catalog_snapshot` 적재 | `lib/server/catalog-ingest.ts`, `scripts/ingest.mjs` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 직전 `isCurrent`는 0으로 내리고 신규를 `isCurrent=1`로 INSERT(원자적). |
-| ③ 로드 | `isCurrent=1` 스냅샷 → 메모리 카탈로그 | `lib/server/catalog-store.ts`, `lib/db/index.ts` | API 부팅 시 1회 로드 + 인덱스 구성. 스냅샷 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
-| ④ API | 카탈로그 질의 + 라이브 보정 + 표지 프록시 | `apps/api/src/modules/catalog/catalog.controller.ts`, `catalog.service.ts`, `lib/server/live.ts` | `/api/cover`는 호스트 allowlist 통과분만 referer 붙여 업스트림서 받아 바이트 검증 후 스트리밍. |
-| ⑤ 화면 | API fetch → 표지/카드 렌더 | `src/pages/*`, `components/title-poster.tsx`, `components/cover-image.tsx`, `vite.config.ts` | vite dev가 `/api`를 Nest(:4001)로 프록시. `coverImage`(=`/api/cover`)를 `<img>`로 렌더, 실패 시 타이포그래픽 폴백. |
+| ① 수집 | 공개 카탈로그 fetch → `Title[]` 정규화, 표지 URL → `/api/cover?u=` | `scripts/crawl.mjs`, `scripts/crawlers/*.mjs`, `scripts/crawlers/_shared.mjs`, `scripts/crawl-helpers.mjs` | `WEBDEX_SOURCE_IDS`로 소스 제한(`all` 가능). 제목 정규화(`norm`)로 교차연결/신규 분리. 선택된 crawler를 병렬/제한 호출로 실행. |
+| ② 스냅샷 | 크롤 JSON → 품질 게이트 → `catalog.json.gz`/`catalog_snapshot` 저장 | `lib/server/catalog-ingest.ts`, `scripts/ingest.mjs`, `scripts/build-static-catalog.ts` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 정적 운영은 `catalog:gen`으로 `public/data/*.json`을 생성. |
+| ③ 로드 | 정적 파일 또는 `isCurrent=1` 스냅샷 → 메모리 카탈로그 | `src/catalog-static.ts`, `lib/server/catalog-store.ts`, `lib/db/index.ts` | 기본 프론트는 CDN 정적 파일을 사용. API 폴백은 부팅 시 1회 로드 + 인덱스 구성. 스냅샷 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
+| ④ STATIC/API | 카탈로그 질의 + 표지 프록시 + 동적 API | `src/catalog-static.ts`, `apps/api/src/modules/catalog/catalog.controller.ts`, `catalog.service.ts` | 검색·탐색·랭킹 기본은 정적/클라이언트 계산. `/api/cover`는 호스트 allowlist 통과분만 referer 붙여 업스트림서 받아 바이트 검증 후 스트리밍. |
+| ⑤ 화면 | 정적/API fetch → 표지/카드 렌더 | `src/pages/*`, `components/title-poster.tsx`, `components/cover-image.tsx`, `vite.config.ts` | `coverImage`(=`/api/cover`)를 `<img>`로 렌더, 실패 시 타이포그래픽 폴백. |
 
 ## 수집 소스 (현재)
 
-- **실크롤(crawler) — 13**: 네이버웹툰, 네이버시리즈, 카카오웹툰, 레진 + **ridi, 카카오페이지, 문피아, 조아라, 포스타입, 미스터블루, 북큐브, 원스토리, 예스24**
-  (신규 9개는 공개 카탈로그가 접근 가능하고 robots/ToS를 우회하지 않는 범위에서만 구현)
-- **pending(partner-required) — 미구현**: 노벨피아·코미코·버프툰·교보 등 — 로그인/성인 인증/서비스 종료/Cloudflare로 공개 수집이 불가하여 우회하지 않고 보류
+- **실크롤(crawler) — 19개 슬롯**: 네이버웹툰, 네이버시리즈, 카카오웹툰, 카카오페이지, 레진, 리디, 문피아, 조아라, 노벨피아, 봄툰, 탑툰, 포스타입, 미스터블루, 코미코, 투믹스, 북큐브, 원스토리, 교보문고, 예스24.
+- **조건부 소스**: 코미코는 한국 외 IP 지오펜스가 있어 KR egress에서만 수집되고, 그 외 환경에서는 빈 결과로 빠르게 종료한다.
 - 레지스트리·구현 상태: `lib/server/catalog-sources.ts` (`implementation: "crawler" | "partner-required"`)
 
 ## 설계 원칙
@@ -85,14 +87,15 @@ flowchart TD
 pnpm crawl                       # 크롤러 JSON을 stdout으로 출력(적재 안 함)
 pnpm ingest                      # 크롤 후 catalog_snapshot 적재(기본 WEBDEX_SOURCE_IDS=all)
 pnpm ingest --from out.json      # 미리 크롤해 둔 JSON 적재(재크롤 없음)
+pnpm catalog:gen                 # apps/api/data/catalog.json.gz → public/data/*.json 생성
 pnpm dev:all                     # 웹앱(:5173) + API(:4001) 동시 실행 → 화면에서 확인
 ```
 
 > 원격(Neon) 적재: `.env.local`의 `DATABASE_URL`(Neon, `sslmode=require`)을 설정하면 크롤/ingest/API가 모두 원격 Postgres를 사용합니다. (`apps/api`는 `load-env`가 다른 import보다 먼저 `.env.local`을 로드.)
 
-## 데이터 갱신 (무중단 핫 리로드)
+## 데이터 갱신 (정적 운영 + API 폴백)
 
-API는 부팅 시 current 스냅샷을 메모리로 1회 로드하지만, 외부 프로세스(`pnpm ingest`·cron·다른 인스턴스)가 새 스냅샷을 적재해도 **재시작 없이** 수렴합니다 — 공유 원격 DB(Neon)에서 특히 중요.
+정적 운영에서는 `catalog.json.gz`를 갱신한 뒤 `pnpm catalog:gen`이 `public/data/*.json`을 다시 만들고, 배포/CDN 전파로 사용자 경로가 갱신됩니다. API 폴백 모드에서는 부팅 시 current DB 스냅샷을 메모리로 1회 로드하며, 외부 프로세스(`pnpm ingest`·cron·다른 인스턴스)가 새 스냅샷을 적재해도 **재시작 없이** 수렴합니다.
 
 - **폴링 핫 리로드**: API가 `CATALOG_REFRESH_POLL_SECONDS`(기본 60초, 0=off)마다 DB의 current 스냅샷 id를 확인하고, 메모리에 로드된 것과 다르면 재로드(`refreshCatalogIfChanged`). Neon 풀러는 LISTEN/NOTIFY 미지원이라 폴링이 견고합니다.
 - **강제 리로드 엔드포인트**: `POST /api/catalog/refresh`(토큰 설정 시 `x-catalog-ingest-token`) → `{ reloaded, snapshotId, titleCount }`. 적재 직후 즉시 반영하고 싶을 때.

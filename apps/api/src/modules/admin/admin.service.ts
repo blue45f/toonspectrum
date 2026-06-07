@@ -305,7 +305,8 @@ export class AdminService {
     }
   }
 
-  async getConfig() {
+  async getConfig(userId: string) {
+    await requireAdminUser(userId);
     return getAppConfig();
   }
 

@@ -76,8 +76,8 @@ export class AdminController {
   @Get("config")
   @Header("Cache-Control", "no-store, max-age=0")
   async getConfig(@Headers("x-user-id") userId?: string) {
-    enforceUserOrError(userId);
-    return this.adminService.getConfig();
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getConfig(uid);
   }
 
   @Post("config")

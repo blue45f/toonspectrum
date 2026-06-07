@@ -1,6 +1,6 @@
-# Render Blueprint — ToonSpectrum NestJS API (long-running host).
-# 카탈로그 26k건을 부팅 시 메모리에 적재·인덱싱하므로 서버리스/콜드스타트가 아닌 상시구동 호스트가 필요하다.
-# 사용법: Render 대시보드 → New → Blueprint → 이 레포 연결. sync:false 변수는 대시보드에서 입력한다.
+# Render Blueprint — ToonSpectrum NestJS API optional long-running host.
+# 기본 배포는 Vercel serverless + 정적 카탈로그다. 이 파일은 API를 상시구동 호스트로 분리하고
+# 싶을 때의 보존된 대안이다. 사용 시 vercel.json의 /api 라우팅도 함께 조정해야 한다.
 services:
   - type: web
     name: webdex-api
@@ -21,8 +21,8 @@ services:
         value: production
       - key: TZ
         value: Asia/Seoul
-      # 카탈로그는 Neon의 catalog_snapshot에서 부팅 시 로드. 자동 크롤은 끄고(off) 데이터 갱신은
-      # GitHub cron(refresh-data.yml)이 /api/catalog/ingest/run 으로 트리거한다.
+      # 기본은 번들 catalog.json.gz를 먼저 로드하고, 필요 시 DB catalog_snapshot으로 폴백한다.
+      # 자동 크롤은 끄고(off) 별도 cron/운영 절차에서 수동 트리거하는 것을 권장한다.
       - key: CATALOG_INGEST_MODE
         value: "off"
       # Neon 연결 문자열(sslmode=require). 시크릿이라 대시보드에서 입력.

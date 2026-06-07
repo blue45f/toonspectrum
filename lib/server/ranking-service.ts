@@ -343,6 +343,7 @@ export function buildRankingReliability({
   items,
   liveItems,
   liveSources,
+  liveDisabled,
   shouldFetchLive,
   matched,
   axis,
@@ -354,6 +355,7 @@ export function buildRankingReliability({
   items: RankedTitle[];
   liveItems: LiveItem[];
   liveSources: LiveSourceStatus[];
+  liveDisabled: boolean;
   shouldFetchLive: boolean;
   matched: number;
   axis: RankAxis;
@@ -383,8 +385,10 @@ export function buildRankingReliability({
 
   const level = confidence >= 80 ? "high" : confidence >= 60 ? "medium" : "low";
   const label = level === "high" ? "신뢰 높음" : level === "medium" ? "주의해서 해석" : "폴백 중심";
-  const fallbackReason = !shouldFetchLive
-    ? `${axis}/${period} 조합은 공개 실시간 소스 보정 대상이 아니어서 산식만 사용합니다.`
+  const fallbackReason = liveDisabled
+    ? "현재 랭킹 경로는 스냅샷 산식 운영 모드라 외부 실시간 보정을 호출하지 않습니다."
+    : !shouldFetchLive
+      ? `${axis}/${period} 조합은 공개 실시간 소스 보정 대상이 아니어서 산식만 사용합니다.`
     : liveItems.length === 0
       ? "실시간 소스 응답이 없어 서버 산식으로 즉시 폴백했습니다."
       : matched === 0
@@ -405,7 +409,11 @@ export function buildRankingReliability({
     timeoutMs,
     basis: [
       `${items.length}개 후보를 요청 시점에 재계산`,
-      shouldFetchLive ? `외부 소스 ${okSources}/${sourceCount}개 정상` : "외부 실시간 보정 비대상 축",
+      liveDisabled
+        ? "스냅샷 산식 운영 모드"
+        : shouldFetchLive
+          ? `외부 소스 ${okSources}/${sourceCount}개 정상`
+          : "외부 실시간 보정 비대상 축",
       shouldFetchLive ? `라이브 매칭 ${matched}/${liveItems.length}` : "투명 산식 기반 정렬",
       statusSignalMeta.enabled
         ? `연재 상태 확인 ${statusSignalMeta.matched}개, 보정 ${statusSignalMeta.overridden}개`
@@ -527,6 +535,7 @@ export async function getRankingData(
     items: filtered,
     liveItems,
     liveSources,
+    liveDisabled: Boolean(options.disableLive),
     shouldFetchLive,
     matched,
     axis: params.axis,

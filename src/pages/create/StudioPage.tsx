@@ -235,11 +235,6 @@ import {
 import { svgToDataUrl } from "./studio-characters";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 import { createCanvasImageElement } from "./studio-image-placement";
-import { BG_SCENES, bgSceneSections } from "./studio-bg-scenes";
-import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
-import { COMIC_VECTOR_STICKERS, FX_OVERLAYS } from "./studio-fx-assets";
-import { CREATURE_STICKERS } from "./studio-creature-stickers";
-import { PROP_STICKERS } from "./studio-prop-stickers";
 import {
   saveAsset,
   listAssets,
@@ -412,8 +407,24 @@ interface SpeedLinesEl {
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset";
+type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
+type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
+type StudioOptionalAssetPacks = {
+  bgSceneSections: Array<{ genre: string; scenes: StudioBgScene[] }>;
+  comicVectorStickers: StudioFxAsset[];
+  creatureStickers: StudioFxAsset[];
+  propStickers: StudioFxAsset[];
+  fxOverlays: StudioFxAsset[];
+};
 
 const uid = () => crypto.randomUUID();
+const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
+  bgSceneSections: [],
+  comicVectorStickers: [],
+  creatureStickers: [],
+  propStickers: [],
+  fxOverlays: [],
+};
 
 // 요소의 대략적 바운딩 박스(중심·크기 판정용).
 function elBounds(el: El): { x: number; y: number; w: number; h: number } {
@@ -1559,6 +1570,9 @@ export function StudioPage() {
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
+  const [studioOptionalAssetPacks, setStudioOptionalAssetPacks] = useState<StudioOptionalAssetPacks | null>(null);
+  const [studioOptionalAssetsLoading, setStudioOptionalAssetsLoading] = useState(false);
+  const [studioOptionalAssetsError, setStudioOptionalAssetsError] = useState<string | null>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
   // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
@@ -1577,6 +1591,9 @@ export function StudioPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workHydrated, setWorkHydrated] = useState(!workId);
+  const studioOptionalAssets = studioOptionalAssetPacks ?? EMPTY_STUDIO_OPTIONAL_ASSETS;
+  const studioOptionalAssetsMountedRef = useRef(true);
+  const studioOptionalAssetsLoadRef = useRef<Promise<void> | null>(null);
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1914,6 +1931,49 @@ export function StudioPage() {
       alive = false;
     };
   }, [workId]);
+
+  useEffect(() => {
+    return () => {
+      studioOptionalAssetsMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (menu !== "bgScene" && menu !== "sticker") return;
+    if (studioOptionalAssetPacks || studioOptionalAssetsLoadRef.current) return;
+
+    setStudioOptionalAssetsLoading(true);
+    setStudioOptionalAssetsError(null);
+    studioOptionalAssetsLoadRef.current = Promise.all([
+      import("./studio-bg-scenes"),
+      import("./studio-bg-scenes-extra"),
+      import("./studio-fx-assets"),
+      import("./studio-creature-stickers"),
+      import("./studio-prop-stickers"),
+    ])
+      .then(([bgScenes, bgScenesExtra, fxAssets, creatureAssets, propAssets]) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setStudioOptionalAssetPacks({
+          bgSceneSections: bgScenes.bgSceneSections([...bgScenes.BG_SCENES, ...bgScenesExtra.BG_SCENES_EXTRA]),
+          comicVectorStickers: fxAssets.COMIC_VECTOR_STICKERS,
+          creatureStickers: creatureAssets.CREATURE_STICKERS,
+          propStickers: propAssets.PROP_STICKERS,
+          fxOverlays: fxAssets.FX_OVERLAYS,
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load studio optional asset packs:", err);
+        studioOptionalAssetsLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioOptionalAssetsError("스튜디오 에셋을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioOptionalAssetsLoading(false);
+        }
+      });
+  }, [menu, studioOptionalAssetPacks]);
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
@@ -2597,7 +2657,7 @@ export function StudioPage() {
       rotation: -6,
     });
   }
-  function addBgScene(bg: typeof BG_SCENES[number]) {
+  function addBgScene(bg: StudioBgScene) {
     setMenu(null);
     const src = bg.imgSrc || svgToDataUrl(bg.svg || "");
     if (selected?.type === "frame") {
@@ -3371,7 +3431,15 @@ export function StudioPage() {
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
               </p>
               <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {bgSceneSections([...BG_SCENES, ...BG_SCENES_EXTRA]).map((group) => (
+                {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
+                )}
+                {studioOptionalAssetsError && (
+                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                    {studioOptionalAssetsError}
+                  </p>
+                )}
+                {studioOptionalAssets.bgSceneSections.map((group) => (
                   <div key={group.genre}>
                     <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -3446,9 +3514,17 @@ export function StudioPage() {
                   </button>
                 ))}
               </div>
+              {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+                <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
+              )}
+              {studioOptionalAssetsError && (
+                <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                  {studioOptionalAssetsError}
+                </p>
+              )}
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
               <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {COMIC_VECTOR_STICKERS.map((sticker) => (
+                {studioOptionalAssets.comicVectorStickers.map((sticker) => (
                   <button
                     key={sticker.id}
                     type="button"
@@ -3465,7 +3541,7 @@ export function StudioPage() {
               </div>
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">동물·캐릭터</p>
               <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {CREATURE_STICKERS.map((sticker) => (
+                {studioOptionalAssets.creatureStickers.map((sticker) => (
                   <button
                     key={sticker.id}
                     type="button"
@@ -3482,7 +3558,7 @@ export function StudioPage() {
               </div>
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">소품·오브젝트</p>
               <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {PROP_STICKERS.map((sticker) => (
+                {studioOptionalAssets.propStickers.map((sticker) => (
                   <button
                     key={sticker.id}
                     type="button"
@@ -3522,7 +3598,7 @@ export function StudioPage() {
               </div>
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
               <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
-                {FX_OVERLAYS.map((fx) => (
+                {studioOptionalAssets.fxOverlays.map((fx) => (
                   <button
                     key={fx.id}
                     type="button"

@@ -29,7 +29,7 @@ export function RankingPage() {
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
         <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-          공개 신호, 라이브 보정, 투명 산식을 함께 반영해 지금 볼 작품을 고릅니다.
+          검증된 카탈로그 스냅샷과 투명 산식으로 지금 볼 작품을 고릅니다.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">

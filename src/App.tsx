@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { StoreSync } from "@/components/auth/store-sync";
-import { CommandPalette } from "@/components/command-palette";
+import { CommandPaletteHost } from "@/components/command-palette-host";
 import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -47,7 +47,7 @@ export default function App() {
             <AppRouter />
           </main>
           <SiteFooter />
-          <CommandPalette />
+          <CommandPaletteHost />
           <AgeGateModal />
           <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
             <ThemeSwitcher />

@@ -93,6 +93,133 @@ function parseFiniteRating(value: unknown): number {
 
 const toDb = (v: number) => Math.round(v * 10);
 
+export const MAX_MERGE_MAP_ITEMS = 500;
+export const MAX_MERGE_COLLECTIONS = 50;
+export const MAX_MERGE_COLLECTION_TITLE_IDS = 200;
+export const MAX_MERGE_ID_LENGTH = 120;
+export const MAX_MERGE_REVIEW_TEXT_LENGTH = 2000;
+export const MAX_MERGE_TAGS = 5;
+export const MAX_MERGE_TAG_LENGTH = 32;
+export const MAX_COLLECTION_NAME_LENGTH = 80;
+export const MAX_COLLECTION_EMOJI_LENGTH = 16;
+
+const VALID_READ_STATES = new Set(["want", "reading", "done", "dropped"]);
+
+interface NormalizedMergePayload {
+  ratings: { titleId: string; value: number }[];
+  reads: { titleId: string; state: string }[];
+  subscriptions: { titleId: string }[];
+  reviews: { titleId: string; rating: number; text: string; tags: string[]; spoiler: boolean }[];
+  likedReviews: { reviewId: string }[];
+  collections: { name: string; emoji: string; titleIds: string[] }[];
+}
+
+function clampText(value: unknown, max: number): string {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function clampMultiline(value: unknown, max: number): string {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function normalizeMergeId(value: unknown): string {
+  return clampText(value, MAX_MERGE_ID_LENGTH);
+}
+
+function mergeEntries(value: unknown): [string, unknown][] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return Object.entries(value as Record<string, unknown>).slice(0, MAX_MERGE_MAP_ITEMS);
+}
+
+function normalizeRatingValue(value: unknown): number | null {
+  const rating = Number(value);
+  if (!Number.isFinite(rating)) return null;
+  return Math.min(5, Math.max(0.5, rating));
+}
+
+function normalizeReviewTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const tags: string[] = [];
+  for (const raw of value) {
+    const tag = clampText(raw, MAX_MERGE_TAG_LENGTH);
+    if (tag) tags.push(tag);
+    if (tags.length >= MAX_MERGE_TAGS) break;
+  }
+  return tags;
+}
+
+export function normalizeCollectionName(value: unknown): string {
+  return clampText(value, MAX_COLLECTION_NAME_LENGTH);
+}
+
+export function normalizeCollectionEmoji(value: unknown): string {
+  return clampText(value, MAX_COLLECTION_EMOJI_LENGTH) || "📚";
+}
+
+export function normalizeMergePayload(payload: MergePayload): NormalizedMergePayload {
+  const ratings = mergeEntries(payload.ratings).flatMap(([rawTitleId, rawValue]) => {
+    const titleId = normalizeMergeId(rawTitleId);
+    const value = normalizeRatingValue(rawValue);
+    return titleId && value !== null ? [{ titleId, value }] : [];
+  });
+
+  const reads = mergeEntries(payload.reads).flatMap(([rawTitleId, rawState]) => {
+    const titleId = normalizeMergeId(rawTitleId);
+    const state = typeof rawState === "string" ? rawState.trim() : "";
+    return titleId && VALID_READ_STATES.has(state) ? [{ titleId, state }] : [];
+  });
+
+  const subscriptions = mergeEntries(payload.subscriptions).flatMap(([rawTitleId, enabled]) => {
+    const titleId = normalizeMergeId(rawTitleId);
+    return titleId && enabled ? [{ titleId }] : [];
+  });
+
+  const reviews = mergeEntries(payload.reviews).flatMap(([rawTitleId, rawReview]) => {
+    const titleId = normalizeMergeId(rawTitleId);
+    if (!titleId || !rawReview || typeof rawReview !== "object" || Array.isArray(rawReview)) return [];
+    const review = rawReview as MergeMapValue;
+    const rating = normalizeRatingValue(review.rating) ?? 0.5;
+    return [
+      {
+        titleId,
+        rating,
+        text: clampMultiline(review.text, MAX_MERGE_REVIEW_TEXT_LENGTH),
+        tags: normalizeReviewTags(review.tags),
+        spoiler: !!review.spoiler,
+      },
+    ];
+  });
+
+  const likedReviews = mergeEntries(payload.likedReviews).flatMap(([rawReviewId, enabled]) => {
+    const reviewId = normalizeMergeId(rawReviewId);
+    return reviewId && enabled ? [{ reviewId }] : [];
+  });
+
+  const collections = (Array.isArray(payload.collections) ? payload.collections : [])
+    .slice(0, MAX_MERGE_COLLECTIONS)
+    .flatMap((rawCollection) => {
+      if (!rawCollection || typeof rawCollection !== "object" || Array.isArray(rawCollection)) return [];
+      const collection = rawCollection as CollectionInput;
+      const name = normalizeCollectionName(collection.name);
+      const titleIds = Array.isArray(collection.titleIds) ? collection.titleIds : [];
+      const seen = new Set<string>();
+      const normalizedTitleIds: string[] = [];
+      for (const rawTitleId of titleIds) {
+        const titleId = normalizeMergeId(rawTitleId);
+        if (titleId && !seen.has(titleId)) {
+          seen.add(titleId);
+          normalizedTitleIds.push(titleId);
+        }
+        if (normalizedTitleIds.length >= MAX_MERGE_COLLECTION_TITLE_IDS) break;
+      }
+      return name && normalizedTitleIds.length
+        ? [{ name, emoji: normalizeCollectionEmoji(collection.emoji), titleIds: normalizedTitleIds }]
+        : [];
+    });
+
+  return { ratings, reads, subscriptions, reviews, likedReviews, collections };
+}
+
 @Injectable()
 export class MeService {
   async getMe(uid: string) {
@@ -220,18 +347,18 @@ export class MeService {
     if (!action) throw new BadRequestException("알 수 없는 action");
 
     if (action === "create") {
-      const name = String(payload.name ?? "").trim();
+      const name = normalizeCollectionName(payload.name);
       if (!name) throw new BadRequestException("이름 필요");
       const [row] = await db
         .insert(collections)
-        .values({ userId: uid, name, emoji: String(payload.emoji ?? "📚") })
+        .values({ userId: uid, name, emoji: normalizeCollectionEmoji(payload.emoji) })
         .returning({ id: collections.id });
       return { ok: true, id: row.id };
     }
 
     if (action === "rename") {
       const id = String(payload.id ?? "").trim();
-      const name = String(payload.name ?? "").trim();
+      const name = normalizeCollectionName(payload.name);
       if (!id || !name) throw new BadRequestException("컬렉션 id와 이름 필요");
       await db.update(collections).set({ name }).where(and(eq(collections.id, id), eq(collections.userId, uid)));
       return { ok: true };
@@ -274,7 +401,7 @@ export class MeService {
   }
 
   async merge(uid: string, payload: MergePayload) {
-    const body = (payload ?? {}) as MergePayload;
+    const body = normalizeMergePayload((payload ?? {}) as MergePayload);
     const tryInsert = async (label: string, fn: () => Promise<unknown>) => {
       try {
         await fn();
@@ -283,73 +410,54 @@ export class MeService {
       }
     };
 
-    const ratingEntries = Object.entries(body.ratings ?? {});
-    const ratingRows = ratingEntries
-      .filter(([, v]) => Number.isFinite(Number(v)))
-      .map(([titleId, v]) => ({ userId: uid, titleId, value: toDb(Math.min(5, Math.max(0.5, Number(v)))) }));
+    const ratingRows = body.ratings.map(({ titleId, value }) => ({ userId: uid, titleId, value: toDb(value) }));
     if (ratingRows.length) {
       await tryInsert("ratings", () => db.insert(ratings).values(ratingRows).onConflictDoNothing());
     }
 
-    const readEntries = Object.entries(body.reads ?? {});
-    const readRows = readEntries
-      .filter(([, state]) => typeof state === "string")
-      .map(([titleId, state]) => ({ userId: uid, titleId, state: String(state) }));
+    const readRows = body.reads.map(({ titleId, state }) => ({ userId: uid, titleId, state }));
     if (readRows.length) {
       await tryInsert("reads", () => db.insert(reads).values(readRows).onConflictDoNothing());
     }
 
-    const subscriptionEntries = Object.entries(body.subscriptions ?? {});
-    const subscriptionRows = subscriptionEntries.filter(([, on]) => on).map(([titleId]) => ({ userId: uid, titleId }));
+    const subscriptionRows = body.subscriptions.map(({ titleId }) => ({ userId: uid, titleId }));
     if (subscriptionRows.length) {
       await tryInsert("subscriptions", () =>
         db.insert(subscriptions).values(subscriptionRows).onConflictDoNothing()
       );
     }
 
-    const reviewEntries = Object.entries(body.reviews ?? {});
-    const reviewRows = reviewEntries
-      .filter(([, data]) => data && typeof data === "object")
-      .map(([titleId, data]) => {
-        const v = data as MergeMapValue;
-        const rating = Number(v.rating ?? 0.5);
-        const safeRating = Number.isFinite(rating) ? Math.min(5, Math.max(0.5, rating)) : 0.5;
-        return {
-          userId: uid,
-          titleId,
-          rating: toDb(safeRating),
-          text: String(v.text ?? ""),
-          tags: Array.isArray(v.tags) ? v.tags.map(String) : [],
-          spoiler: !!v.spoiler,
-        };
-      });
+    const reviewRows = body.reviews.map(({ titleId, rating, text, tags, spoiler }) => ({
+      userId: uid,
+      titleId,
+      rating: toDb(rating),
+      text,
+      tags,
+      spoiler,
+    }));
     if (reviewRows.length) {
       await tryInsert("reviews", () => db.insert(reviews).values(reviewRows).onConflictDoNothing());
     }
 
-    const likeEntries = Object.entries(body.likedReviews ?? {});
-    const likeRows = likeEntries.filter(([, on]) => on).map(([reviewId]) => ({ userId: uid, reviewId }));
+    const likeRows = body.likedReviews.map(({ reviewId }) => ({ userId: uid, reviewId }));
     if (likeRows.length) {
       await tryInsert("reviewLikes", () => db.insert(reviewLikes).values(likeRows).onConflictDoNothing());
     }
 
-    const cols = Array.isArray(body.collections) ? body.collections : [];
+    const cols = body.collections;
     if (cols.length) {
       try {
         const serverCols = await db.select().from(collections).where(eq(collections.userId, uid));
         const byName = new Map(serverCols.map((collection) => [collection.name, collection.id]));
 
         for (const rawCollection of cols) {
-          const c = rawCollection as CollectionInput;
-          const name = String(c?.name ?? "").trim();
-          const titleIds = Array.isArray(c?.titleIds) ? c.titleIds.map((titleId) => String(titleId)) : [];
-          if (!name || !titleIds.length) continue;
+          const { name, emoji, titleIds } = rawCollection;
 
           let collectionId = byName.get(name);
           if (!collectionId) {
             const [row] = await db
               .insert(collections)
-              .values({ userId: uid, name, emoji: String(c?.emoji ?? "📚") })
+              .values({ userId: uid, name, emoji })
               .returning({ id: collections.id });
             collectionId = row.id;
             byName.set(name, collectionId);

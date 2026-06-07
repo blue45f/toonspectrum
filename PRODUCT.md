@@ -44,11 +44,12 @@ register: product
 
 ## Data Governance
 
-- 운영 카탈로그의 권위 소스는 서버 DB `catalog_snapshot`이다. `lib/data/` 파일 seed는 제거하고, `lib/server/catalog-store.ts` 서버 런타임 카탈로그는 DB 스냅샷에서만 채운다. DB 스냅샷이 없으면 빈 런타임 카탈로그로 시작한다.
-- 수집은 `scripts/crawl.mjs --json --no-file` → Nest `CatalogService` → DB 스냅샷 저장 → 메모리 카탈로그 갱신 순서로 흐른다.
-- 국내 전체 확장은 `lib/server/catalog-sources.ts`의 source registry가 관리한다. 현재 crawler 소스(네이버웹툰·네이버시리즈·카카오웹툰·레진)와 제휴/정책 확인이 필요한 pending 소스를 분리한다.
+- 운영 카탈로그의 권위 소스는 크롤러가 만든 검증 스냅샷이다. 기본 사용자 경로는 `apps/api/data/catalog.json.gz` → `public/data/*.json` 정적 CDN이며, Nest API는 번들 스냅샷을 먼저 로드하고 필요 시 DB `catalog_snapshot`으로 폴백한다.
+- `lib/data/` 파일 seed는 제거했다. 스냅샷이 없거나 로드에 실패하면 런타임 카탈로그는 비어 있어 잘못된 하드코딩 데이터가 노출되지 않는다.
+- 수집은 `scripts/crawl.mjs --json --no-file` → `scripts/ingest.mjs` 또는 Nest `CatalogService` → 스냅샷 검증/저장 → `pnpm catalog:gen` 정적 파일 생성 순서로 흐른다.
+- 국내 전체 확장은 `lib/server/catalog-sources.ts`의 source registry가 관리한다. 현재 19개 플랫폼 슬롯과 `scripts/crawlers/*.mjs` 구현을 분리하고, 실행 대상은 `WEBDEX_SOURCE_IDS`와 `implementation` 상태로 통제한다.
 - 기본 수집 모드는 `CATALOG_INGEST_MODE=off`이며, 플랫폼별 약관/robots/API 정책/제휴 가능성을 확인한 뒤 `fixed`로 전환한다.
 - 저장 데이터는 작품 메타데이터, 공개 수치, 플랫폼 URL, 출처/갱신 메타데이터로 제한한다. 유료 본문, 회차 이미지 바이너리, 댓글/외부 리뷰 원문, 개인정보는 저장하지 않는다.
-- 모든 랭킹은 응답 메타데이터에 산식, source, reliability, snapshot/sourceVersion을 드러내 실제 공개 수치와 추정 지표를 구분한다.
+- 모든 랭킹은 응답 메타데이터에 산식, source, reliability, snapshot/sourceVersion을 드러내 실제 공개 수치와 추정 지표를 구분한다. 현재 활성 랭킹 경로는 `disableLive=true`인 스냅샷 산식 모드이며, `lib/server/live.ts` 라이브 어댑터는 별도 운영 경로로 재연결 가능한 보존 코드다.
 
 > 데이터 고지: 작품 메타데이터·공개 수치는 공개 접근 가능한 소스에서 벤치마킹 목적으로 수집한다. 평가 수·분포·완독률 등 비공개 보조 지표는 추정값으로 표시한다. 리뷰는 외부 원문을 복제하지 않고 ToonSpectrum DB에 작성·저장된 사용자 리뷰만 사용한다. 운영 전 플랫폼별 약관·robots·제휴 가능성을 별도로 검토한다.

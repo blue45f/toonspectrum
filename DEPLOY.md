@@ -1,109 +1,88 @@
-# ToonSpectrum 배포 가이드 (상용)
+# ToonSpectrum 배포 가이드
 
-웹 + API + DB를 분리 배포하는 3-tier 구성이다.
+현재 기본 배포는 **Vercel 단일 프로젝트**입니다. 프론트는 정적 SPA로, `/api/*`는 `api/index.js`가 컴파일된 NestJS 서버리스 앱(`apps/api/src/serverless.ts`)으로 위임합니다. 카탈로그 검색·탐색·랭킹은 빌드 시 생성된 `public/data/*.json` 정적 스냅샷을 기본으로 사용하고, 리뷰·인증·커뮤니티 같은 동적 기능만 API/DB를 사용합니다.
 
-| 레이어 | 스택 | 호스트 | 배포 산출물 |
+| 레이어 | 스택 | 기본 호스트 | 배포 산출물 |
 | --- | --- | --- | --- |
-| 프론트 | Vite + React SPA | **Vercel** | `dist/` (정적) + `/api` 프록시 rewrite |
-| API | NestJS | **Render**(상시구동) | `node dist/apps/api/src/main.js` |
-| DB | PostgreSQL | **Neon**(기존) | `catalog_snapshot` 등 |
+| 프론트 | Vite + React SPA | Vercel | `dist/` |
+| 카탈로그 | 정적 스냅샷 | Vercel CDN | `public/data/*.json` |
+| API | NestJS serverless | Vercel Functions | `api/index.js` → `apps/api/dist/.../serverless` |
+| DB | PostgreSQL | Neon 또는 호환 Postgres | 리뷰·인증·커뮤니티·ingest 폴백 |
 
-> **왜 API가 서버리스가 아닌가** — `lib/server/catalog-store.ts`가 카탈로그 26k건을 부팅 시
-> 메모리에 적재·인덱싱한다. 서버리스 콜드스타트마다 재적재하면 느리고 비싸므로 **상시구동 호스트**가 필요하다.
->
-> **왜 Vercel에 `/api` 프록시인가** — 프론트는 상대경로 `/api/...`로 호출한다(`apiPath()`는 미사용).
-> `vercel.json`의 rewrite가 `/api/*`를 API 호스트로 프록시하면 브라우저는 단일 오리진 → **CORS 불필요**.
-
----
+`render.yaml`은 장시간 상시구동 API를 다시 쓰고 싶을 때의 보존된 대안입니다. 현재 `vercel.json`은 Render 프록시가 아니라 Vercel 함수로 `/api/*`를 라우팅합니다.
 
 ## 0. 준비물
 
-- [Neon](https://neon.tech) DB와 `DATABASE_URL` (이미 보유)
-- [Render](https://render.com) 계정, [Vercel](https://vercel.com) 계정
-- 로컬: Node 22(`.nvmrc`), `corepack enable` (pnpm 11)
-- (선택) 소셜 로그인 실연동 시 Google Cloud / Kakao Developers 앱
+- Node 22.12+와 pnpm 11 (`corepack enable` 권장)
+- Vercel 계정
+- Neon 또는 호환 PostgreSQL `DATABASE_URL`
+- 소셜 로그인 실연동 시 Google Cloud / Kakao Developers 앱
 
----
+## 1. 로컬 검증
 
-## 1. API 배포 (Render)
-
-레포에 `render.yaml` Blueprint가 있다.
-
-1. Render → **New → Blueprint** → 이 레포 선택 → `render.yaml` 자동 감지.
-2. 환경변수 입력(`sync:false` 항목):
-   - `DATABASE_URL` — Neon 연결 문자열(`?sslmode=require`)
-   - `GOOGLE_OAUTH_*`, `KAKAO_*` — (선택) 미설정 시 로그인은 `[데모]` 폴백
-   - `OAUTH_REDIRECT_BASE_URL`, `WEB_APP_BASE_URL` — **둘 다 프론트(Vercel) 공개 도메인으로 동일하게** 설정한다(두 값이 다르면 OAuth 콜백이 실패). Vercel 프로젝트명이 정해졌으면 도메인을 예측해 미리 입력(예: `https://webdex.vercel.app`), 아니면 2단계 후 입력하고 **Render 재배포**.
-   - `AUTH_STATE_SECRET`, `CATALOG_INGEST_TRIGGER_TOKEN` — Render가 자동 생성(`generateValue`)
-3. 배포 완료 후 **API URL 확보** (예: `https://webdex-api.onrender.com`).
-4. 헬스체크 `GET /api/auth/providers` 가 200이면 정상.
-
-> free 플랜은 15분 무요청 시 슬립 → 재기동 시 카탈로그 재적재로 첫 응답이 느리다. 상용은 **Starter 이상**(상시구동) 권장.
-
----
-
-## 2. 프론트 배포 (Vercel)
-
-1. **배포 전에** `vercel.json`의 `/api` rewrite destination 플레이스홀더 **`CHANGE-ME-webdex-api.onrender.com`을 1단계 Render API URL로 교체**한다. 이 값이 남아 있으면 모든 API 호출이 깨진다.
-   ```jsonc
-   { "source": "/api/:path*", "destination": "https://webdex-api.onrender.com/api/:path*" }
-   ```
-   > `/api` 접두사는 의도된 것이다 — API는 전역 프리픽스 `/api`를 쓰므로 `/api/ranking` → `https://<api>/api/ranking` 로 정확히 매핑된다(중복 아님).
-2. Vercel → **Add New → Project** → 이 레포 선택. 설정은 `vercel.json`이 제공(빌드 `pnpm run build`, 출력 `dist`).
-   - 또는 CLI: `pnpm i -g vercel` → `vercel` (프리뷰) → `vercel --prod` (프로덕션).
-3. 배포 완료 후 **프론트 도메인 확보** (예: `https://webdex.vercel.app`).
-
----
-
-## 3. URL 정합 (OAuth/리다이렉트)
-
-프론트 도메인이 정해지면 **Render 환경변수**를 그 값으로 갱신한다. **두 값은 반드시 동일**(프론트 공개 도메인)해야 하며, 다르면 OAuth 콜백 리다이렉트가 실패한다:
-
-```
-OAUTH_REDIRECT_BASE_URL=https://webdex.vercel.app
-WEB_APP_BASE_URL=https://webdex.vercel.app
+```bash
+pnpm install
+pnpm catalog:gen
+pnpm run verify
 ```
 
-Render가 재배포되면 OAuth 콜백/복귀가 모두 Vercel 도메인을 통하게 된다(프록시 경유 → API).
+`pnpm catalog:gen`은 `apps/api/data/catalog.json.gz`를 읽어 `public/data/*.json`과 `public/data/ranking/*.json`을 만듭니다. 이 산출물은 빌드 시 다시 생성되며, 랭킹 기본 뷰는 `disableLive=true` 스냅샷 산식으로 사전 계산됩니다.
 
----
+## 2. Vercel 배포
 
-## 4. 소셜 로그인 콘솔 등록 (실 OAuth 쓸 때만)
+1. Vercel → Add New Project → 이 레포 선택.
+2. `vercel.json`의 설정을 그대로 사용합니다.
+   - `buildCommand`: `pnpm --filter @webtoon-nest/api build && pnpm run build`
+   - `outputDirectory`: `dist`
+   - `/api/:path*` → `/api/index`
+   - `/title/:slug` → `/api/og?slug=:slug`
+3. 환경변수를 설정합니다.
+   - `DATABASE_URL`: 동적 API가 사용할 PostgreSQL 연결 문자열.
+   - `AUTH_STATE_SECRET`: OAuth state 서명 키. 상용은 고정값 필수.
+   - `OAUTH_REDIRECT_BASE_URL`: Vercel 공개 도메인.
+   - `WEB_APP_BASE_URL`: Vercel 공개 도메인.
+   - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`: 선택.
+   - `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`: 선택.
+   - `ADMIN_EMAILS`: 선택.
+   - `CATALOG_INGEST_TRIGGER_TOKEN`: 원격 수동 ingest를 쓸 때만.
+   - `CATALOG_INGEST_MODE=off`: 기본 권장.
 
-각 콘솔에 **승인된 리디렉션 URI**를 등록:
+프론트가 상대경로 `/api/...`를 호출하므로 CORS 설정은 필요 없습니다. 같은 Vercel 도메인에서 정적 SPA와 서버리스 API가 함께 제공됩니다.
 
-- Google Cloud Console → 사용자 인증 정보 → OAuth 클라이언트
-  `https://webdex.vercel.app/api/auth/oauth/google/callback`
-- Kakao Developers → 카카오 로그인 → Redirect URI
-  `https://webdex.vercel.app/api/auth/oauth/kakao/callback`
-  - 동의항목: 닉네임·프로필이미지·(가능하면)이메일. 이메일 미동의 시 `kakao_<id>@kakao.local`로 대체.
+## 3. OAuth 콜백
 
-키를 Render 환경변수(`GOOGLE_OAUTH_*`, `KAKAO_*`)에 넣으면 로그인 모달의 `[데모]` 표시가 사라지고 실 로그인으로 전환된다.
+프론트 도메인이 `https://toonspectrum.example.com`이라면 아래 값을 Vercel 환경변수와 각 OAuth 콘솔에 맞춥니다.
 
----
+```env
+OAUTH_REDIRECT_BASE_URL=https://toonspectrum.example.com
+WEB_APP_BASE_URL=https://toonspectrum.example.com
+```
 
-## 5. 데이터 갱신
+콘솔 등록 URI:
 
-카탈로그는 Neon `catalog_snapshot`(`isCurrent`)에서 부팅 시 로드되며, 60초 폴링으로 외부 갱신을 핫리로드한다.
-주기 갱신은 GitHub Actions 크론(`refresh-data.yml`)이 담당한다:
+- Google: `https://toonspectrum.example.com/api/auth/oauth/google/callback`
+- Kakao: `https://toonspectrum.example.com/api/auth/oauth/kakao/callback`
 
-- Actions 시크릿: API 베이스 URL과 `CATALOG_INGEST_TRIGGER_TOKEN`(Render와 동일 값)을 설정.
-- 크론이 `POST /api/catalog/ingest/run`을 호출 → `scripts/crawl.mjs` 실행 → 품질 게이트 통과 시 새 스냅샷 승격.
-- 즉시 갱신은 관리자 콘솔(`/admin` → 운영 탭 → 수동 크롤)로도 가능.
+키가 없으면 로그인 모달은 데모 폴백을 명확히 표시합니다.
 
----
+## 4. 데이터 갱신
 
-## 6. 배포 후 점검
+기본 사용자 경로는 정적 카탈로그입니다.
 
-- [ ] 프론트 도메인 접속 → 랭킹/연재 캘린더에 데이터가 보이는가 (API 프록시 정상)
-- [ ] `GET https://<프론트>/api/auth/providers` 200
-- [ ] 로그인(이메일/비밀번호) 동작, 관리자 계정으로 `/admin` 대시보드 지표 로드
-- [ ] (실 OAuth 시) 구글/카카오 로그인 → `/auth/callback` 복귀 → 세션 유지
-- [ ] 표지 이미지 로드(`/api/cover` 프록시)
+1. 크롤러가 새 `apps/api/data/catalog.json.gz`를 만든다.
+2. `pnpm catalog:gen`이 `public/data/*.json`을 생성한다.
+3. Vercel 재배포로 CDN 스냅샷이 갱신된다.
 
----
+로컬 또는 운영 API 폴백 경로에서 DB 스냅샷을 직접 갱신하려면 `pnpm ingest` 또는 `POST /api/catalog/ingest/run`을 사용할 수 있습니다. 운영에서 자동 수집을 켜기 전에는 플랫폼별 robots.txt, 이용약관, API 약관, 호출량 제한, 저장 필드 범위를 별도로 검토해야 합니다.
 
-## 커스텀 도메인(선택)
+## 5. 배포 후 점검
 
-Vercel에 도메인 연결 후, `OAUTH_REDIRECT_BASE_URL`·`WEB_APP_BASE_URL`과 OAuth 콘솔 리디렉션 URI를
-그 도메인으로 갱신하면 된다.
+- 프론트 도메인 접속 → 홈/검색/랭킹이 로드되는지 확인.
+- `GET https://<domain>/api/auth/providers`가 200인지 확인.
+- `GET https://<domain>/api/ranking?axis=popular&period=daily&limit=5`가 `meta.source="formula-api"`와 스냅샷 산식 fallback reason을 반환하는지 확인.
+- 표지 프록시(`/api/cover?u=...`)가 이미지를 반환하거나 안전하게 폴백하는지 확인.
+- 로그인/리뷰/커뮤니티 기능이 DB 연결로 동작하는지 확인.
+
+## 6. Render 대안
+
+`render.yaml`은 장시간 상시구동 Nest API를 따로 배포하기 위한 보존된 Blueprint입니다. 이 경로를 쓰려면 `vercel.json`의 `/api/:path*` rewrite를 Render API URL로 바꾸거나 `VITE_API_BASE`/프록시 전략을 별도로 정해야 합니다. 현재 기본 배포와 자동 검증은 Vercel serverless 경로를 기준으로 합니다.

@@ -24,30 +24,19 @@ const QUICK = [
   { label: "내 서재", href: "/library", icon: Library, hint: "관심·평점·취향" },
 ];
 
-export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Title[]>([]);
   const [recent, setRecent] = useState<Title[]>([]);
   const recentlyViewed = useApp((s) => s.recentlyViewed);
   const recentKey = recentlyViewed.slice(0, 5).join(",");
   const router = useRouter();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((o) => !o);
-      }
-    };
-    const onOpen = () => setOpen(true);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("toonspectrum:search", onOpen);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("toonspectrum:search", onOpen);
-    };
-  }, []);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -117,7 +106,7 @@ export function CommandPalette() {
   }, [open, recentKey]);
 
   const go = (href: string) => {
-    setOpen(false);
+    onOpenChange(false);
     router.push(href);
   };
 
@@ -127,7 +116,7 @@ export function CommandPalette() {
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]">
       <button
         aria-label="닫기"
-        onClick={() => setOpen(false)}
+        onClick={() => onOpenChange(false)}
         className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm"
         style={{ animation: "fade-up 0.18s ease-out" }}
       />
