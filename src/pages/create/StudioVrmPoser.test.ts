@@ -4,7 +4,7 @@ import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import { applyPoseToVrm, POSE_PRESETS } from "./StudioVrmPoser";
 
-const MAX_Y_OFFSET = 0.16;
+const MAX_Y_OFFSET = 0.20;
 const MAX_HEAD_AXIS_DEGREES = 12;
 const MAX_TORSO_AXIS_DEGREES = 45;
 const HEAD_BONES = new Set(["neck", "head"]);
@@ -169,6 +169,18 @@ describe("StudioVrmPoser pose presets", () => {
       "surrender",
       "phone",
       "salute",
+      "fighting",
+      "thinking",
+      "pray",
+      "dance",
+      "bow",
+      "crouch",
+      "heroic",
+      "shy2",
+      "lean",
+      "crossArms",
+      "run2",
+      "jump",
     ]);
     expect(POSE_PRESETS.map((pose) => pose.label)).toEqual([
       "기본",
@@ -193,6 +205,18 @@ describe("StudioVrmPoser pose presets", () => {
       "항복",
       "통화",
       "경례",
+      "격투",
+      "생각중",
+      "기도",
+      "댄스",
+      "인사",
+      "쪼그림",
+      "영웅",
+      "수줍음",
+      "기대기",
+      "팔짱",
+      "달리기",
+      "점프",
     ]);
   });
 });

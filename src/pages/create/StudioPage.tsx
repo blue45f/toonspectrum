@@ -1,7 +1,154 @@
 import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
-import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Path, Transformer, Shape } from "react-konva";
+
+// @ts-ignore
+Konva.Filters.Screentone = function (imageData: ImageData) {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+  const size = 6;
+  
+  for (let y = 0; y < height; y += size) {
+    for (let x = 0; x < width; x += size) {
+      let totalLuminance = 0;
+      let count = 0;
+      for (let dy = 0; dy < size && y + dy < height; dy++) {
+        for (let dx = 0; dx < size && x + dx < width; dx++) {
+          const idx = ((y + dy) * width + (x + dx)) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          totalLuminance += lum;
+          count++;
+        }
+      }
+      
+      const avgLum = totalLuminance / count;
+      const radius = (1 - avgLum / 255) * (size / 2) * 1.2;
+      const cx = x + size / 2;
+      const cy = y + size / 2;
+      
+      for (let dy = 0; dy < size && y + dy < height; dy++) {
+        for (let dx = 0; dx < size && x + dx < width; dx++) {
+          const px = x + dx;
+          const py = y + dy;
+          const idx = (py * width + px) * 4;
+          
+          const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+          if (dist < radius) {
+            data[idx] = 40;
+            data[idx + 1] = 40;
+            data[idx + 2] = 40;
+          } else {
+            data[idx] = 255;
+            data[idx + 1] = 255;
+            data[idx + 2] = 255;
+          }
+        }
+      }
+    }
+  }
+};
+
+// @ts-ignore
+Konva.Filters.Lineart = function (imageData: ImageData) {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+  const src = new Uint8ClampedArray(data);
+  
+  const kernelX = [
+    [-1, 0, 1],
+    [-2, 0, 2],
+    [-1, 0, 1]
+  ];
+  const kernelY = [
+    [-1, -2, -1],
+    [ 0,  0,  0],
+    [ 1,  2,  1]
+  ];
+  
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let pixelX = 0;
+      let pixelY = 0;
+      
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx)) * 4;
+          const val = 0.299 * src[idx] + 0.587 * src[idx + 1] + 0.114 * src[idx + 2];
+          pixelX += val * kernelX[ky + 1][kx + 1];
+          pixelY += val * kernelY[ky + 1][kx + 1];
+        }
+      }
+      
+      const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY);
+      const currentIdx = (y * width + x) * 4;
+      
+      if (magnitude > 45) {
+        data[currentIdx] = 0;
+        data[currentIdx + 1] = 0;
+        data[currentIdx + 2] = 0;
+        data[currentIdx + 3] = 255;
+      } else {
+        data[currentIdx] = 255;
+        data[currentIdx + 1] = 255;
+        data[currentIdx + 2] = 255;
+        data[currentIdx + 3] = 255;
+      }
+    }
+  }
+};
+
+// @ts-ignore
+Konva.Filters.Chromatic = function (imageData: ImageData) {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+  const offset = (this as any).attrs?.chromatic || 4;
+  const src = new Uint8ClampedArray(data);
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const rx = Math.max(0, x - offset);
+      const ridx = (y * width + rx) * 4;
+      const bx = Math.min(width - 1, x + offset);
+      const bidx = (y * width + bx) * 4;
+      
+      data[idx] = src[ridx];
+      data[idx + 1] = src[idx + 1];
+      data[idx + 2] = src[bidx];
+    }
+  }
+};
+
+// @ts-ignore
+Konva.Filters.Posterize = function (imageData: ImageData) {
+  const data = imageData.data;
+  const levels = (this as any).attrs?.posterize || 4;
+  const step = 255 / (levels - 1);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.round(data[i] / step) * step;
+    data[i + 1] = Math.round(data[i + 1] / step) * step;
+    data[i + 2] = Math.round(data[i + 2] / step) * step;
+  }
+};
+
+// @ts-ignore
+Konva.Filters.Noise = function (imageData: ImageData) {
+  const data = imageData.data;
+  const amount = (this as any).attrs?.noise || 20;
+  for (let i = 0; i < data.length; i += 4) {
+    const noiseVal = (Math.random() - 0.5) * amount * 2.55;
+    data[i] = Math.min(255, Math.max(0, data[i] + noiseVal));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noiseVal));
+    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noiseVal));
+  }
+};
+import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
 import {
   AlignHorizontalJustifyCenter,
   AlignVerticalJustifyCenter,
@@ -18,9 +165,15 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  Italic,
   FlipHorizontal2,
   FlipVertical2,
   Folder,
+  Upload,
   Image as ImageIcon,
   Download,
   Share2,
@@ -68,6 +221,7 @@ import { processFreehandPoints, processPencilPoints } from "./studio-brush";
 import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
+  BUBBLE_STYLE_PRESETS,
   CANVAS_W,
   EFFECT_EMOJIS,
   SFX_PRESETS,
@@ -117,6 +271,11 @@ interface ImageEl {
   contrast?: number;
   grayscale?: boolean;
   sepia?: boolean;
+  screentone?: boolean;
+  lineart?: boolean;
+  chromatic?: number;
+  posterize?: number;
+  noise?: number;
 }
 interface TextEl {
   id: string;
@@ -133,6 +292,18 @@ interface TextEl {
   strokeWidth?: number;
   letterSpacing?: number; // 자간(px)
   lineHeight?: number; // 행간(배수)
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  fillType?: "solid" | "gradient";
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
+  gradientDirection?: "vertical" | "horizontal";
 }
 interface BubbleEl {
   id: string;
@@ -147,9 +318,22 @@ interface BubbleEl {
   textFill: string;
   rotation: number;
   tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
+  tailDirection?: "bottom" | "top" | "left" | "right"; // 말풍선 꼬리 방향(상하좌우).
   font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
   fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
   lineHeight?: number; // 행간(배수, 미설정 시 1.1)
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  tailXRatio?: number;
+  tailHeight?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
 }
 interface FrameEl {
   id: string;
@@ -159,6 +343,10 @@ interface FrameEl {
   width: number;
   height: number;
   bg?: string;
+  bgColor?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dashStyle?: "solid" | "dashed";
 }
 interface StickerEl {
   id: string;
@@ -180,9 +368,49 @@ interface DrawEl {
   opacity?: number;
   fill?: string;
   brush?: string;
+  pressures?: number[];
+  symmetry?: {
+    type: "none" | "vertical" | "horizontal" | "radial";
+    centerX: number;
+    centerY: number;
+    radialCount?: number;
+  };
+}
+interface FocusLinesEl {
+  id: string;
+  type: "focusLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineCount: number;
+  innerRadius: number;
+  outerRadius: number;
+  stroke: string;
+  strokeWidth: number;
+  noise: number;
+  rotation: number;
+  opacity?: number;
+  centerXRatio?: number;
+  centerYRatio?: number;
+}
+interface SpeedLinesEl {
+  id: string;
+  type: "speedLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineCount: number;
+  direction: "horizontal" | "vertical";
+  stroke: string;
+  strokeWidth: number;
+  noise?: number;
+  rotation: number;
+  opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number };
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset";
 
 const uid = () => crypto.randomUUID();
@@ -241,11 +469,15 @@ function elementLabel(el: El): string {
       return "▢ 패널";
     case "image":
       return "🖼️ 이미지";
+    case "focusLines":
+      return "🔆 집중선";
+    case "speedLines":
+      return "💨 속도선";
     default:
       return "요소";
   }
 }
-const DRAW_COLOR_SWATCHES = ["#16100c", "#f8f2df", "#f45d48", "#ff9f1c", "#ffd84d", "#56c271", "#2f9bff", "#7c5cfc", "#ff6fb1", "#8a5a44"];
+const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 
 interface BrushPreset {
   id: string;
@@ -414,6 +646,61 @@ function isCompleteDrawOp(el: DrawEl) {
   return box.width >= 3 && box.height >= 3;
 }
 
+function getSymmetricPoints(
+  points: number[],
+  symmetry: { type: "none" | "vertical" | "horizontal" | "radial"; centerX: number; centerY: number; radialCount?: number } | undefined
+): number[][] {
+  if (!symmetry || symmetry.type === "none" || points.length === 0) {
+    return [points];
+  }
+  
+  const result: number[][] = [points];
+  const cx = symmetry.centerX;
+  const cy = symmetry.centerY;
+  
+  if (symmetry.type === "vertical") {
+    const mirrored: number[] = [];
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i];
+      const y = points[i + 1];
+      if (x !== undefined && y !== undefined) {
+        mirrored.push(cx * 2 - x, y);
+      }
+    }
+    result.push(mirrored);
+  } else if (symmetry.type === "horizontal") {
+    const mirrored: number[] = [];
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i];
+      const y = points[i + 1];
+      if (x !== undefined && y !== undefined) {
+        mirrored.push(x, cy * 2 - y);
+      }
+    }
+    result.push(mirrored);
+  } else if (symmetry.type === "radial") {
+    const count = symmetry.radialCount ?? 4;
+    for (let s = 1; s < count; s++) {
+      const angle = (s * 2 * Math.PI) / count;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const rotated: number[] = [];
+      for (let i = 0; i < points.length; i += 2) {
+        const x = points[i];
+        const y = points[i + 1];
+        if (x !== undefined && y !== undefined) {
+          const dx = x - cx;
+          const dy = y - cy;
+          rotated.push(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+        }
+      }
+      result.push(rotated);
+    }
+  }
+  
+  return result;
+}
+
 function StudioDrawNode({ el }: { el: DrawEl }) {
   const kind = el.kind ?? "freehand";
   const composite = el.mode === "eraser" ? "destination-out" : "source-over";
@@ -421,169 +708,220 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
   const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
   const strokeWidth = Math.max(1, el.strokeWidth);
 
-  if (kind === "rect") {
-    const box = drawBounds(el.points);
-    return (
-      <Rect
-        x={box.x}
-        y={box.y}
-        width={Math.max(0.1, box.width)}
-        height={Math.max(0.1, box.height)}
-        fill={el.fill}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        opacity={opacity}
-        cornerRadius={3}
-        lineJoin="round"
-        globalCompositeOperation={composite}
-        listening={false}
-      />
-    );
-  }
-
-  if (kind === "ellipse") {
-    const box = drawBounds(el.points);
-    return (
-      <Ellipse
-        x={box.x + box.width / 2}
-        y={box.y + box.height / 2}
-        radiusX={Math.max(0.1, box.width / 2)}
-        radiusY={Math.max(0.1, box.height / 2)}
-        fill={el.fill}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        opacity={opacity}
-        globalCompositeOperation={composite}
-        listening={false}
-      />
-    );
-  }
-
-  if (kind === "star") {
-    const box = drawBounds(el.points);
-    return (
-      <Star
-        x={box.x + box.width / 2}
-        y={box.y + box.height / 2}
-        numPoints={5}
-        innerRadius={Math.max(0.1, Math.min(box.width, box.height) / 4)}
-        outerRadius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
-        fill={el.fill}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        opacity={opacity}
-        globalCompositeOperation={composite}
-        listening={false}
-      />
-    );
-  }
-
-  if (kind === "freehand") {
-    const brush = el.brush ?? "pen";
-
-    if (brush === "brush" && el.mode !== "eraser") {
-      const smoothed = processFreehandPoints(el.points);
-      return (
-        <Shape
-          sceneFunc={(context, shape) => {
-            if (smoothed.length < 2) return;
-            context.beginPath();
-            const angle = -Math.PI / 6;
-            const dx = (strokeWidth / 2) * Math.cos(angle);
-            const dy = (strokeWidth / 2) * Math.sin(angle);
-
-            if (smoothed.length === 2) {
-              const x0 = smoothed[0]!;
-              const y0 = smoothed[1]!;
-              context.moveTo(x0 - dx, y0 - dy);
-              context.lineTo(x0 + dx, y0 + dy);
-            } else {
-              for (let i = 0; i < smoothed.length - 2; i += 2) {
-                const x0 = smoothed[i]!;
-                const y0 = smoothed[i + 1]!;
-                const x1 = smoothed[i + 2]!;
-                const y1 = smoothed[i + 3]!;
-                
-                context.moveTo(x0 - dx, y0 - dy);
-                context.lineTo(x0 + dx, y0 + dy);
-                context.lineTo(x1 + dx, y1 + dy);
-                context.lineTo(x1 - dx, y1 - dy);
-                context.closePath();
-              }
-            }
-            context.fillStrokeShape(shape);
-          }}
-          fill={stroke}
-          opacity={opacity}
-          globalCompositeOperation={composite}
-          listening={false}
-        />
-      );
-    }
-
-    if (brush === "pencil" && el.mode !== "eraser") {
-      const jittered = processPencilPoints(el.points);
-      return (
-        <Line
-          points={jittered}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          opacity={opacity}
-          lineCap="round"
-          lineJoin="round"
-          tension={0.2}
-          globalCompositeOperation={composite}
-          listening={false}
-        />
-      );
-    }
-
-    if (brush === "highlighter" && el.mode !== "eraser") {
-      const smoothed = processFreehandPoints(el.points);
-      return (
-        <Line
-          points={smoothed}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          opacity={opacity}
-          lineCap="square"
-          lineJoin="miter"
-          tension={0.4}
-          globalCompositeOperation="multiply"
-          listening={false}
-        />
-      );
-    }
-
-    // Default "pen" or "marker" or "eraser"
-    const smoothed = processFreehandPoints(el.points);
-    return (
-      <Line
-        points={smoothed}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        opacity={opacity}
-        lineCap="round"
-        lineJoin="round"
-        tension={0.4}
-        globalCompositeOperation={composite}
-        listening={false}
-      />
-    );
-  }
+  const symmetricVariations = getSymmetricPoints(el.points, el.symmetry);
 
   return (
-    <Line
-      points={el.points}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      opacity={opacity}
-      lineCap="round"
-      lineJoin="round"
-      tension={0.4}
-      globalCompositeOperation={composite}
-      listening={false}
-    />
+    <>
+      {symmetricVariations.map((points, index) => {
+        if (kind === "rect") {
+          const box = drawBounds(points);
+          return (
+            <Rect
+              key={index}
+              x={box.x}
+              y={box.y}
+              width={Math.max(0.1, box.width)}
+              height={Math.max(0.1, box.height)}
+              fill={el.fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              cornerRadius={3}
+              lineJoin="round"
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "ellipse") {
+          const box = drawBounds(points);
+          return (
+            <Ellipse
+              key={index}
+              x={box.x + box.width / 2}
+              y={box.y + box.height / 2}
+              radiusX={Math.max(0.1, box.width / 2)}
+              radiusY={Math.max(0.1, box.height / 2)}
+              fill={el.fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "star") {
+          const box = drawBounds(points);
+          return (
+            <Star
+              key={index}
+              x={box.x + box.width / 2}
+              y={box.y + box.height / 2}
+              numPoints={5}
+              innerRadius={Math.max(0.1, Math.min(box.width, box.height) / 4)}
+              outerRadius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
+              fill={el.fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "freehand") {
+          const brush = el.brush ?? "pen";
+
+          if (brush === "brush" && el.mode !== "eraser") {
+            const smoothed = processFreehandPoints(points);
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context, shape) => {
+                  if (smoothed.length < 2) return;
+                  context.beginPath();
+                  const angle = -Math.PI / 6;
+                  const dx = (strokeWidth / 2) * Math.cos(angle);
+                  const dy = (strokeWidth / 2) * Math.sin(angle);
+
+                  if (smoothed.length === 2) {
+                    const x0 = smoothed[0]!;
+                    const y0 = smoothed[1]!;
+                    context.moveTo(x0 - dx, y0 - dy);
+                    context.lineTo(x0 + dx, y0 + dy);
+                  } else {
+                    for (let i = 0; i < smoothed.length - 2; i += 2) {
+                      const x0 = smoothed[i]!;
+                      const y0 = smoothed[i + 1]!;
+                      const x1 = smoothed[i + 2]!;
+                      const y1 = smoothed[i + 3]!;
+                      
+                      context.moveTo(x0 - dx, y0 - dy);
+                      context.lineTo(x0 + dx, y0 + dy);
+                      context.lineTo(x1 + dx, y1 + dy);
+                      context.lineTo(x1 - dx, y1 - dy);
+                      context.closePath();
+                    }
+                  }
+                  context.fillStrokeShape(shape);
+                }}
+                fill={stroke}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brush === "pencil" && el.mode !== "eraser") {
+            const jittered = processPencilPoints(points);
+            return (
+              <Line
+                key={index}
+                points={jittered}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                opacity={opacity}
+                lineCap="round"
+                lineJoin="round"
+                tension={0.2}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brush === "highlighter" && el.mode !== "eraser") {
+            const smoothed = processFreehandPoints(points);
+            return (
+              <Line
+                key={index}
+                points={smoothed}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                opacity={opacity}
+                lineCap="square"
+                lineJoin="miter"
+                tension={0.4}
+                globalCompositeOperation="multiply"
+                listening={false}
+              />
+            );
+          }
+
+          // Default "pen" or "marker" or "eraser"
+          const smoothed = processFreehandPoints(points);
+          const pressures = el.pressures;
+          if (pressures && pressures.length > 0 && smoothed.length >= 4) {
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  if (smoothed.length < 4) return;
+                  for (let i = 2; i < smoothed.length; i += 2) {
+                    const x0 = smoothed[i - 2]!;
+                    const y0 = smoothed[i - 1]!;
+                    const x1 = smoothed[i]!;
+                    const y1 = smoothed[i + 1]!;
+                    
+                    const idx = Math.floor(i / 2);
+                    const p = pressures[idx] ?? 0.5;
+                    const w = Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
+                    
+                    context.beginPath();
+                    context.moveTo(x0, y0);
+                    context.lineTo(x1, y1);
+                    
+                    context.lineWidth = w;
+                    context.lineCap = "round";
+                    context.lineJoin = "round";
+                    context.strokeStyle = stroke;
+                    context.stroke();
+                  }
+                }}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          return (
+            <Line
+              key={index}
+              points={smoothed}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              lineCap="round"
+              lineJoin="round"
+              tension={0.4}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        return (
+          <Line
+            key={index}
+            points={points}
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            opacity={opacity}
+            lineCap="round"
+            lineJoin="round"
+            tension={0.4}
+            globalCompositeOperation={composite}
+            listening={false}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -660,12 +998,14 @@ function UrlImage({
   innerRef,
   onSelect,
   onChange,
+  dragBoundFunc,
 }: {
   el: ImageEl;
   draggable: boolean;
   innerRef: (n: Konva.Image | null) => void;
   onSelect: () => void;
   onChange: (patch: Partial<ImageEl>) => void;
+  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
@@ -708,7 +1048,18 @@ function UrlImage({
     }
   }, [img, el.flipped, el.flippedY]);
 
-  const hasFilters = !!(el.blur || el.brightness || el.contrast || el.grayscale || el.sepia);
+  const hasFilters = !!(
+    el.blur ||
+    el.brightness ||
+    el.contrast ||
+    el.grayscale ||
+    el.sepia ||
+    el.screentone ||
+    el.lineart ||
+    el.chromatic ||
+    el.posterize ||
+    el.noise
+  );
 
   useEffect(() => {
     const node = imageRef.current;
@@ -720,7 +1071,22 @@ function UrlImage({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, el.blur, el.brightness, el.contrast, el.grayscale, el.sepia, hasFilters]);
+  }, [
+    displayImg,
+    el.width,
+    el.height,
+    el.blur,
+    el.brightness,
+    el.contrast,
+    el.grayscale,
+    el.sepia,
+    el.screentone,
+    el.lineart,
+    el.chromatic,
+    el.posterize,
+    el.noise,
+    hasFilters,
+  ]);
 
   if (!displayImg) return null;
 
@@ -730,6 +1096,16 @@ function UrlImage({
   if (el.contrast) filters.push(Konva.Filters.Contrast);
   if (el.grayscale) filters.push(Konva.Filters.Grayscale);
   if (el.sepia) filters.push(Konva.Filters.Sepia);
+  // @ts-ignore
+  if (el.screentone) filters.push(Konva.Filters.Screentone);
+  // @ts-ignore
+  if (el.lineart) filters.push(Konva.Filters.Lineart);
+  // @ts-ignore
+  if (el.chromatic) filters.push(Konva.Filters.Chromatic);
+  // @ts-ignore
+  if (el.posterize) filters.push(Konva.Filters.Posterize);
+  // @ts-ignore
+  if (el.noise) filters.push(Konva.Filters.Noise);
 
   return (
     <KImage
@@ -748,7 +1124,14 @@ function UrlImage({
       blurRadius={el.blur ?? 0}
       brightness={el.brightness ?? 0}
       contrast={el.contrast ?? 0}
+      // @ts-ignore
+      chromatic={el.chromatic ?? 0}
+      // @ts-ignore
+      posterize={el.posterize ?? 0}
+      // @ts-ignore
+      noise={el.noise ?? 0}
       draggable={draggable}
+      dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
       onTap={onSelect}
       onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
@@ -771,6 +1154,7 @@ function FramePanel({
   innerRef,
   onSelect,
   onChange,
+  dragBoundFunc,
 }: {
   el: FrameEl;
   theme: "classic" | "soft" | "vivid";
@@ -778,6 +1162,7 @@ function FramePanel({
   innerRef: (n: Konva.Node | null) => void;
   onSelect: () => void;
   onChange: (patch: Partial<FrameEl>) => void;
+  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
 }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
 
@@ -802,8 +1187,8 @@ function FramePanel({
     };
   }, [el.bg]);
 
-  let fStroke = "#16100c";
-  let fStrokeW = 3;
+  let fStroke = el.stroke ?? "#16100c";
+  let fStrokeW = el.strokeWidth ?? 3;
   let fRadius = 4;
   let fShadowColor = undefined;
   let fShadowBlur = 0;
@@ -811,12 +1196,12 @@ function FramePanel({
   let fShadowOffset = undefined;
 
   if (theme === "soft") {
-    fStroke = "#222222";
-    fStrokeW = 1.8;
+    fStroke = el.stroke ?? "#222222";
+    fStrokeW = el.strokeWidth ?? 1.8;
     fRadius = 0;
   } else if (theme === "vivid") {
-    fStroke = "#3a3a3a";
-    fStrokeW = 1.2;
+    fStroke = el.stroke ?? "#3a3a3a";
+    fStrokeW = el.strokeWidth ?? 1.2;
     fRadius = 6;
     fShadowColor = "black";
     fShadowBlur = 5;
@@ -837,6 +1222,7 @@ function FramePanel({
       clipWidth={el.width}
       clipHeight={el.height}
       draggable={draggable}
+      dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
       onTap={onSelect}
       onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
@@ -849,7 +1235,7 @@ function FramePanel({
         onChange({ x: node.x(), y: node.y(), width: w, height: h });
       }}
     >
-      <Rect width={el.width} height={el.height} fill="#ffffff" />
+      <Rect width={el.width} height={el.height} fill={el.bgColor ?? "#ffffff"} />
       {img && fit ? (
         <KImage
           image={img}
@@ -859,20 +1245,189 @@ function FramePanel({
           height={fit.height}
         />
       ) : null}
-      <Rect
-        x={borderInset}
-        y={borderInset}
-        width={Math.max(0, el.width - fStrokeW)}
-        height={Math.max(0, el.height - fStrokeW)}
-        stroke={fStroke}
-        strokeWidth={fStrokeW}
-        cornerRadius={Math.max(0, fRadius - borderInset)}
-        shadowColor={fShadowColor}
-        shadowBlur={fShadowBlur}
-        shadowOpacity={fShadowOpacity}
-        shadowOffset={fShadowOffset}
-      />
+      {fStrokeW > 0 && (
+        <Rect
+          x={borderInset}
+          y={borderInset}
+          width={Math.max(0, el.width - fStrokeW)}
+          height={Math.max(0, el.height - fStrokeW)}
+          stroke={fStroke}
+          strokeWidth={fStrokeW}
+          cornerRadius={Math.max(0, fRadius - borderInset)}
+          shadowColor={fShadowColor}
+          shadowBlur={fShadowBlur}
+          shadowOpacity={fShadowOpacity}
+          shadowOffset={fShadowOffset}
+          dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
+        />
+      )}
     </Group>
+  );
+}
+
+function seededRandom(seedStr: string) {
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return () => {
+    const x = Math.sin(hash++) * 10000;
+    return x - Math.floor(x);
+  };
+}
+
+function formatVerticalText(text: string): string {
+  const lines = text.split("\n");
+  const maxLen = Math.max(...lines.map((l) => l.length));
+  const resultLines: string[] = [];
+  for (let charIdx = 0; charIdx < maxLen; charIdx++) {
+    const rowChars: string[] = [];
+    for (let lineIdx = lines.length - 1; lineIdx >= 0; lineIdx--) {
+      const char = lines[lineIdx]?.[charIdx] ?? "　";
+      rowChars.push(char);
+    }
+    resultLines.push(rowChars.join("  "));
+  }
+  return resultLines.join("\n");
+}
+
+function FocusLinesNode({
+  el,
+  draggable,
+  innerRef,
+  onSelect,
+  onChange,
+  dragBoundFunc,
+}: {
+  el: FocusLinesEl;
+  draggable: boolean;
+  innerRef: (n: Konva.Node | null) => void;
+  onSelect: () => void;
+  onChange: (patch: Partial<FocusLinesEl>) => void;
+  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+}) {
+  const count = el.lineCount ?? 80;
+  const innerR = el.innerRadius ?? 120;
+  const outerR = el.outerRadius ?? 600;
+  const noise = el.noise ?? 24;
+
+  return (
+    <Shape
+      ref={innerRef}
+      sceneFunc={(context, shape) => {
+        context.beginPath();
+        const cx = el.width * (el.centerXRatio ?? 0.5);
+        const cy = el.height * (el.centerYRatio ?? 0.5);
+        const rand = seededRandom(el.id);
+        for (let i = 0; i < count; i++) {
+          const angle = (i * 2 * Math.PI) / count;
+          const nStart = (rand() - 0.5) * noise;
+          const nEnd = (rand() - 0.5) * noise;
+          const rStart = Math.max(1, innerR + nStart);
+          const rEnd = Math.max(rStart + 10, outerR + nEnd);
+
+          const x1 = cx + rStart * Math.cos(angle);
+          const y1 = cy + rStart * Math.sin(angle);
+          const x2 = cx + rEnd * Math.cos(angle);
+          const y2 = cy + rEnd * Math.sin(angle);
+
+          context.moveTo(x1, y1);
+          context.lineTo(x2, y2);
+        }
+        context.fillStrokeShape(shape);
+      }}
+      x={el.x}
+      y={el.y}
+      width={el.width}
+      height={el.height}
+      stroke={el.stroke ?? "#000000"}
+      strokeWidth={el.strokeWidth ?? 2.5}
+      rotation={el.rotation ?? 0}
+      opacity={el.opacity ?? 1}
+      draggable={draggable}
+      dragBoundFunc={dragBoundFunc}
+      onMouseDown={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        const w = Math.max(20, node.width() * node.scaleX());
+        const h = Math.max(20, node.height() * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
+      }}
+    />
+  );
+}
+
+function SpeedLinesNode({
+  el,
+  draggable,
+  innerRef,
+  onSelect,
+  onChange,
+  dragBoundFunc,
+}: {
+  el: SpeedLinesEl;
+  draggable: boolean;
+  innerRef: (n: Konva.Node | null) => void;
+  onSelect: () => void;
+  onChange: (patch: Partial<SpeedLinesEl>) => void;
+  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+}) {
+  const count = el.lineCount ?? 60;
+  const dir = el.direction ?? "horizontal";
+
+  return (
+    <Shape
+      ref={innerRef}
+      sceneFunc={(context, shape) => {
+        context.beginPath();
+        const rand = seededRandom(el.id);
+        const w = el.width;
+        const h = el.height;
+        if (dir === "horizontal") {
+          for (let i = 0; i < count; i++) {
+            const y = rand() * h;
+            const len = w * (0.2 + rand() * 0.8);
+            const xStart = rand() > 0.5 ? 0 : w - len;
+            context.moveTo(xStart, y);
+            context.lineTo(xStart + len, y);
+          }
+        } else {
+          for (let i = 0; i < count; i++) {
+            const x = rand() * w;
+            const len = h * (0.2 + rand() * 0.8);
+            const yStart = rand() > 0.5 ? 0 : h - len;
+            context.moveTo(x, yStart);
+            context.lineTo(x, yStart + len);
+          }
+        }
+        context.fillStrokeShape(shape);
+      }}
+      x={el.x}
+      y={el.y}
+      width={el.width}
+      height={el.height}
+      stroke={el.stroke ?? "#000000"}
+      strokeWidth={el.strokeWidth ?? 2.5}
+      rotation={el.rotation ?? 0}
+      opacity={el.opacity ?? 1}
+      draggable={draggable}
+      dragBoundFunc={dragBoundFunc}
+      onMouseDown={onSelect}
+      onTap={onSelect}
+      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onTransformEnd={(e) => {
+        const node = e.target;
+        const w = Math.max(20, node.width() * node.scaleX());
+        const h = Math.max(20, node.height() * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
+      }}
+    />
   );
 }
 
@@ -967,6 +1522,7 @@ export function StudioPage() {
   // 템플릿 및 여백 관리 상태
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
   const [panelGutter, setPanelGutter] = useState(24);
+  const [panelSplitRatio, setPanelSplitRatio] = useState(50);
 
   // 우클릭 컨텍스트 메뉴 상태
   const [contextMenu, setContextMenu] = useState<{
@@ -993,6 +1549,14 @@ export function StudioPage() {
   const [brush, setBrush] = useState<string>("pen");
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
+  const [stabilizer, setStabilizer] = useState<number>(6);
+  const [pressureCurve, setPressureCurve] = useState<number>(1.0);
+  const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(true);
+  const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
+  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial">("none");
+  const [symmetryCenterX, setSymmetryCenterX] = useState<number>(400);
+  const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
+  const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
@@ -1030,6 +1594,16 @@ export function StudioPage() {
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
   const effScale = scale * zoom;
+  const snapBoundFunc = (pos: { x: number; y: number }) => {
+    if (!snapEnabled) return pos;
+    const stage = stageRef.current;
+    if (!stage) return pos;
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const localPos = transform.point(pos);
+    const snappedLocalX = Math.round(localPos.x / gridSize) * gridSize;
+    const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
+    return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
+  };
   // ⌘/Ctrl + 휠로 줌(네이티브 비-passive 리스너 — preventDefault로 브라우저 줌 차단).
   useEffect(() => {
     const node = wrapRef.current;
@@ -1275,6 +1849,8 @@ export function StudioPage() {
   const [draft, setDraft] = useState<DrawEl | null>(null);
   // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
   const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
@@ -1606,6 +2182,97 @@ export function StudioPage() {
         sourceHeight: height,
       })
     );
+  }
+  function splitFrameSelected(orientation: "horizontal" | "vertical") {
+    if (!selected || selected.type !== "frame") return;
+    const f = selected as FrameEl;
+    const ratio = panelSplitRatio / 100;
+    const gutter = panelGutter;
+
+    let f1: FrameEl;
+    let f2: FrameEl;
+
+    if (orientation === "horizontal") {
+      const availableH = f.height - gutter;
+      const h1 = Math.round(availableH * ratio);
+      const h2 = Math.round(availableH * (1 - ratio));
+      f1 = {
+        id: uid(),
+        type: "frame",
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: h1,
+        bg: f.bg,
+      };
+      f2 = {
+        id: uid(),
+        type: "frame",
+        x: f.x,
+        y: f.y + h1 + gutter,
+        width: f.width,
+        height: h2,
+        bg: f.bg,
+      };
+    } else {
+      const availableW = f.width - gutter;
+      const w1 = Math.round(availableW * ratio);
+      const w2 = Math.round(availableW * (1 - ratio));
+      f1 = {
+        id: uid(),
+        type: "frame",
+        x: f.x,
+        y: f.y,
+        width: w1,
+        height: f.height,
+        bg: f.bg,
+      };
+      f2 = {
+        id: uid(),
+        type: "frame",
+        x: f.x + w1 + gutter,
+        y: f.y,
+        width: w2,
+        height: f.height,
+        bg: f.bg,
+      };
+    }
+
+    const nextElements = elements.filter((e) => e.id !== f.id);
+    commit([...nextElements, f1, f2]);
+    setSelectedId(f1.id);
+  }
+  function addFocusLines() {
+    addEl({
+      id: uid(),
+      type: "focusLines",
+      x: 100,
+      y: 100,
+      width: 360,
+      height: 360,
+      lineCount: 80,
+      innerRadius: 100,
+      outerRadius: 360,
+      stroke: "#16100c",
+      strokeWidth: 2.5,
+      noise: 20,
+      rotation: 0,
+    });
+  }
+  function addSpeedLines() {
+    addEl({
+      id: uid(),
+      type: "speedLines",
+      x: 50,
+      y: 200,
+      width: 500,
+      height: 180,
+      lineCount: 50,
+      direction: "horizontal",
+      stroke: "#16100c",
+      strokeWidth: 2.5,
+      rotation: 0,
+    });
   }
   function dismissQuickStart() {
     setQuickStartOpen(false);
@@ -2089,10 +2756,19 @@ export function StudioPage() {
 
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle") {
+      return;
+    }
     if (tool === "draw") {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
       setSelectedId(null);
+      
+      const rawPressure = (e.evt as any).pressure;
+      const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
+      const basePressure = hasHardwarePressure ? rawPressure : 0.8;
+      const pressure = Math.pow(basePressure, pressureCurve);
+
       const common = {
         id: uid(),
         type: "draw" as const,
@@ -2100,6 +2776,12 @@ export function StudioPage() {
         strokeWidth,
         opacity: brushOpacity,
         brush: drawMode === "pen" ? brush : undefined,
+        symmetry: symmetryType !== "none" ? {
+          type: symmetryType,
+          centerX: symmetryCenterX,
+          centerY: symmetryCenterY,
+          radialCount: symmetryRadialCount,
+        } : undefined,
       };
       const next: DrawEl =
         drawMode === "shape"
@@ -2109,12 +2791,14 @@ export function StudioPage() {
               mode: "pen",
               points: [pos.x, pos.y, pos.x, pos.y],
               fill: shapeFill && drawShape !== "line" ? color : undefined,
+              pressures: [pressure, pressure],
             }
           : {
               ...common,
               kind: "freehand",
               mode: drawMode,
               points: [pos.x, pos.y],
+              pressures: [pressure],
             };
       drawingRef.current = next;
       setDraft(next);
@@ -2131,7 +2815,44 @@ export function StudioPage() {
     const kind = current.kind ?? "freehand";
     let next: DrawEl;
     if (kind === "freehand") {
-      next = { ...current, points: [...current.points, pos.x, pos.y] };
+      const rawPressure = (e.evt as any).pressure;
+      const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
+      
+      let pressure = 0.5;
+      if (hasHardwarePressure && !useVelocityPressure) {
+        pressure = Math.pow(rawPressure, pressureCurve);
+      } else if (useVelocityPressure && current.points.length >= 2) {
+        const lastX = current.points[current.points.length - 2]!;
+        const lastY = current.points[current.points.length - 1]!;
+        const dx = pos.x - lastX;
+        const dy = pos.y - lastY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        const maxDist = 28;
+        const speedRatio = Math.min(1, dist / maxDist);
+        const factor = velocitySensitivity * 0.75;
+        const base = 1.0 - speedRatio * factor;
+        pressure = Math.pow(base, pressureCurve);
+      } else {
+        const base = typeof rawPressure === "number" && rawPressure > 0 ? rawPressure : 0.5;
+        pressure = Math.pow(base, pressureCurve);
+      }
+
+      let targetX = pos.x;
+      let targetY = pos.y;
+      if (stabilizer > 0 && current.points.length >= 2) {
+        const lastX = current.points[current.points.length - 2];
+        const lastY = current.points[current.points.length - 1];
+        const weight = 1 / (stabilizer + 1);
+        targetX = lastX + (pos.x - lastX) * weight;
+        targetY = lastY + (pos.y - lastY) * weight;
+      }
+
+      next = { 
+        ...current, 
+        points: [...current.points, targetX, targetY],
+        pressures: current.pressures ? [...current.pressures, pressure] : [pressure]
+      };
     } else {
       const x0 = current.points[0] ?? pos.x;
       const y0 = current.points[1] ?? pos.y;
@@ -2189,6 +2910,12 @@ export function StudioPage() {
     // 스냅 기준선: 캔버스 가장자리·중앙 + (있으면)들어있는 패널 가장자리·중앙
     const vLines = [0, CANVAS_W / 2, CANVAS_W];
     const hLines = [0, canvasH / 2, canvasH];
+
+    // 작가 수동 가이드선 추가
+    for (const guide of userGuides) {
+      if (guide.type === "v") vLines.push(guide.pos);
+      else hLines.push(guide.pos);
+    }
 
     if (showGrid) {
       for (let x = gridSize; x < CANVAS_W; x += gridSize) {
@@ -2251,6 +2978,10 @@ export function StudioPage() {
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
     setEditing({ id, value: el.text });
   }
+
+
+
+
   function commitEditText() {
     if (editing) {
       const el = elements.find((e) => e.id === editing.id);
@@ -2285,6 +3016,7 @@ export function StudioPage() {
     setSaving(true);
     setError(null);
     setSelectedId(null);
+    setIsExporting(true);
     // 트랜스포머가 캡처되지 않도록 한 프레임 양보.
     await new Promise((r) => setTimeout(r, 60));
     try {
@@ -2338,10 +3070,12 @@ export function StudioPage() {
       }
 
       setSaving(false);
+      setIsExporting(false);
       navigate(`/create/${work.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했어요.");
       setSaving(false);
+      setIsExporting(false);
     }
   }
 
@@ -2353,9 +3087,13 @@ export function StudioPage() {
 
   async function handleDownload(transparent = false) {
     setSelectedId(null);
+    setIsExporting(true);
     await new Promise((r) => setTimeout(r, 60));
     const stage = stageRef.current;
-    if (!stage) return;
+    if (!stage) {
+      setIsExporting(false);
+      return;
+    }
     // 투명 PNG: 배경 사각형을 잠시 숨겨 그린/구성한 콘텐츠만 추출(에셋 제작용).
     const bgNode = transparent ? stage.findOne(".bg") : null;
     if (bgNode) {
@@ -2368,12 +3106,134 @@ export function StudioPage() {
       bgNode.show();
       stage.batchDraw();
     }
+    setIsExporting(false);
     const link = document.createElement("a");
     link.href = full;
     link.download = `${title.trim() || "toonspectrum-comic"}${transparent ? "-transparent" : ""}.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
+  }
+
+  async function handleDownloadAll(spacing = 24) {
+    setSelectedId(null);
+    setIsExporting(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const originalPageId = currentPageId;
+    const images: HTMLImageElement[] = [];
+
+    try {
+      // 모든 페이지를 순회하며 렌더링하고 이미지를 캡처
+      for (const page of pages) {
+        setCurrentPageId(page.id);
+        // React 렌더링 및 Konva 업데이트 대기
+        await new Promise((resolve) => setTimeout(resolve, 180));
+
+        const stage = stageRef.current;
+        if (!stage) continue;
+
+        const dataUrl = stage.toDataURL({ pixelRatio: 2 / effScale });
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+        images.push(img);
+      }
+    } finally {
+      // 원래 선택 페이지 복구
+      setCurrentPageId(originalPageId);
+      setIsExporting(false);
+    }
+
+    if (images.length === 0) return;
+
+    // 긴 스크롤 웹툰 합성용 캔버스 생성
+    const compositeCanvas = document.createElement("canvas");
+    const width = images[0].width;
+    let totalHeight = 0;
+    for (let i = 0; i < images.length; i++) {
+      totalHeight += images[i].height;
+      if (i < images.length - 1) totalHeight += spacing * 2; // 고해상도 배율 보정
+    }
+
+    compositeCanvas.width = width;
+    compositeCanvas.height = totalHeight;
+
+    const ctx = compositeCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // 전체 흰색 배경
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, totalHeight);
+
+    let currentY = 0;
+    for (let i = 0; i < images.length; i++) {
+      ctx.drawImage(images[i], 0, currentY);
+      currentY += images[i].height + spacing * 2;
+    }
+
+    // 파일 저장
+    const link = document.createElement("a");
+    link.href = compositeCanvas.toDataURL("image/png");
+    link.download = `${title.trim() || "toonspectrum-webtoon"}-strip.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  // 스튜디오 프로젝트 내보내기 (.json)
+  function handleExportProject() {
+    const projectData = {
+      version: "1.0",
+      title: title,
+      linkedTitleId: linkedTitleId,
+      pages: pages,
+    };
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${title.trim() || "toonspectrum-studio-project"}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  // 스튜디오 프로젝트 불러오기 (.json)
+  function handleImportProject(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const projectData = JSON.parse(text);
+        
+        if (!projectData.pages || !Array.isArray(projectData.pages)) {
+          alert("올바르지 않은 프로젝트 파일 형식입니다.");
+          return;
+        }
+
+        // 히스토리에 새 페이지 상태 추가하여 undo/redo와 호환되게 함
+        const nextHistory = pagesHistory.slice(0, pagesHi + 1);
+        nextHistory.push(projectData.pages);
+        setPagesHistory(nextHistory);
+        setPagesHi(nextHistory.length - 1);
+
+        if (projectData.title) {
+          setTitle(projectData.title);
+        }
+        alert("프로젝트 불러오기가 완료되었습니다!");
+      } catch (err) {
+        console.error(err);
+        alert("프로젝트 파일을 읽는 도중 오류가 발생했습니다.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   return (
@@ -2393,6 +3253,27 @@ export function StudioPage() {
           <button type="button" onClick={() => handleDownload(true)} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })} title="배경 없이 투명 PNG로 내보내기">
             <Download size={14} /> 투명 PNG
           </button>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => handleDownloadAll(24)}
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
+              })}
+              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드"
+            >
+              <Download size={14} /> 웹툰 연합 스크롤
+            </button>
+          )}
+          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })} title="편집 중인 모든 레이아웃과 요소를 .json 파일로 PC에 저장">
+            <Download size={14} /> 백업 (.json)
+          </button>
+          <label className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" }), "cursor-pointer")} title="백업해둔 .json 파일을 불러와 작업을 이어함">
+            <Upload size={14} /> 복구 (.json)
+            <input type="file" accept=".json" className="hidden" onChange={handleImportProject} />
+          </label>
           <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet" })}>
             임시저장
           </button>
@@ -2615,6 +3496,29 @@ export function StudioPage() {
                     <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
                   </button>
                 ))}
+              </div>
+              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    addFocusLines();
+                    setMenu(null);
+                  }}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                >
+                  🔆 집중선 생성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    addSpeedLines();
+                    setMenu(null);
+                  }}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                >
+                  💨 속도선 생성
+                </button>
               </div>
               <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
               <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
@@ -3295,12 +4199,9 @@ export function StudioPage() {
             height={canvasH * effScale}
             scaleX={effScale}
             scaleY={effScale}
-            onMouseDown={onStageDown}
-            onMouseMove={onStageMove}
-            onMouseUp={onStageUp}
-            onTouchStart={onStageDown}
-            onTouchMove={onStageMove}
-            onTouchEnd={onStageUp}
+            onPointerDown={onStageDown}
+            onPointerMove={onStageMove}
+            onPointerUp={onStageUp}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
             onContextMenu={(e) => {
@@ -3372,14 +4273,22 @@ export function StudioPage() {
                 };
                 // 패널 내부 콘텐츠 클리핑: 들어간 패널 영역으로 잘라낸다(noClip이면 해제).
                 const clipFrame = el.noClip ? null : containingPanel(el, elements);
-                const wrapClip = (node: ReactNode) =>
-                  clipFrame ? (
-                    <Group key={el.id} clipX={clipFrame.x} clipY={clipFrame.y} clipWidth={clipFrame.width} clipHeight={clipFrame.height}>
+                const wrapClip = (node: ReactNode) => {
+                  const composite = (el.blendMode as any) || "source-over";
+                  return clipFrame ? (
+                    <Group key={el.id} clipX={clipFrame.x} clipY={clipFrame.y} clipWidth={clipFrame.width} clipHeight={clipFrame.height} globalCompositeOperation={composite}>
                       {node}
                     </Group>
                   ) : (
-                    node
+                    composite !== "source-over" ? (
+                      <Group key={el.id} globalCompositeOperation={composite}>
+                        {node}
+                      </Group>
+                    ) : (
+                      node
+                    )
                   );
+                };
                 if (el.type === "image")
                   return wrapClip(
                     <UrlImage
@@ -3389,6 +4298,7 @@ export function StudioPage() {
                       innerRef={setRef}
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch)}
+                      dragBoundFunc={snapBoundFunc}
                     />
                   );
                 if (el.type === "frame") {
@@ -3401,9 +4311,34 @@ export function StudioPage() {
                       innerRef={setRef}
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch as Partial<El>)}
+                      dragBoundFunc={snapBoundFunc}
                     />
                   );
                 }
+                if (el.type === "focusLines")
+                  return wrapClip(
+                    <FocusLinesNode
+                      key={el.id}
+                      el={el}
+                      draggable={draggable}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onChange={(patch) => patchEl(el.id, patch)}
+                      dragBoundFunc={snapBoundFunc}
+                    />
+                  );
+                if (el.type === "speedLines")
+                  return wrapClip(
+                    <SpeedLinesNode
+                      key={el.id}
+                      el={el}
+                      draggable={draggable}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onChange={(patch) => patchEl(el.id, patch)}
+                      dragBoundFunc={snapBoundFunc}
+                    />
+                  );
                 if (el.type === "draw")
                   return wrapClip(<StudioDrawNode key={el.id} el={el} />);
                 if (el.type === "text")
@@ -3411,12 +4346,15 @@ export function StudioPage() {
                     <KText
                       key={el.id}
                       ref={setRef}
-                      text={el.text}
+                      text={el.vertical ? formatVerticalText(el.text) : el.text}
                       x={el.x}
                       y={el.y}
                       width={el.width}
                       fontSize={el.fontSize}
-                      fill={el.fill}
+                      fill={el.fillType === "gradient" ? undefined : el.fill}
+                      fillLinearGradientStartPoint={el.fillType === "gradient" ? { x: 0, y: 0 } : undefined}
+                      fillLinearGradientEndPoint={el.fillType === "gradient" ? (el.gradientDirection === "horizontal" ? { x: el.width, y: 0 } : { x: 0, y: el.fontSize * 1.3 }) : undefined}
+                      fillLinearGradientColorStops={el.fillType === "gradient" ? [0, el.gradientColorStart ?? "#ff3b30", 1, el.gradientColorEnd ?? "#ffcc00"] : undefined}
                       stroke={el.stroke}
                       strokeWidth={el.strokeWidth ?? 0}
                       fillAfterStrokeEnabled
@@ -3424,10 +4362,18 @@ export function StudioPage() {
                       rotation={el.rotation}
                       opacity={el.opacity ?? 1}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
-                      fontStyle="bold"
+                      fontStyle={el.fontStyle ?? "bold"}
+                      align={el.align ?? "left"}
                       letterSpacing={el.letterSpacing ?? 0}
                       lineHeight={el.lineHeight ?? 1}
+                      shadowColor={el.shadowColor}
+                      shadowBlur={el.shadowBlur}
+                      shadowOffsetX={el.shadowOffsetX}
+                      shadowOffsetY={el.shadowOffsetY}
+                      shadowOpacity={el.shadowOpacity}
+                      shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
                       draggable={draggable}
+                      dragBoundFunc={snapBoundFunc}
                       onMouseDown={onSelect}
                       onTap={onSelect}
                       onDblClick={() => startEditText(el.id)}
@@ -3444,7 +4390,7 @@ export function StudioPage() {
                     />
                   );
                 if (el.type === "sticker")
-                  return (
+                  return wrapClip(
                     <KText
                       key={el.id}
                       ref={setRef}
@@ -3455,6 +4401,7 @@ export function StudioPage() {
                       rotation={el.rotation}
                       opacity={el.opacity ?? 1}
                       draggable={draggable}
+                      dragBoundFunc={snapBoundFunc}
                       onMouseDown={onSelect}
                       onTap={onSelect}
                       onDblClick={() => startEditText(el.id)}
@@ -3470,40 +4417,169 @@ export function StudioPage() {
                     />
                   );
                 // bubble
-                let bStroke = "#16100c";
-                let bStrokeW = 3;
+                let bStroke = el.stroke ?? "#16100c";
+                let bStrokeW = el.strokeWidth ?? 3;
                 let bRadius = 18;
-                let bShadowColor = undefined;
-                let bShadowBlur = 0;
-                let bShadowOpacity = 0;
-                let bShadowOffset = undefined;
-                let bTailPoints = [el.width * 0.3, el.height - 3, el.width * 0.22, el.height + 30, el.width * 0.47, el.height - 3];
+                let bShadowColor = el.shadowColor !== undefined ? el.shadowColor : undefined;
+                let bShadowBlur = el.shadowBlur !== undefined ? el.shadowBlur : 0;
+                let bShadowOpacity = el.shadowOpacity !== undefined ? el.shadowOpacity : 0;
+                let bShadowOffset = el.shadowOffsetX !== undefined && el.shadowOffsetY !== undefined
+                  ? { x: el.shadowOffsetX, y: el.shadowOffsetY }
+                  : undefined;
+                const tXRatio = el.tailXRatio ?? 0.35;
+                const tHeight = el.tailHeight ?? 30;
+                const tailDir = el.tail ?? "left";
+                const tailDirection = el.tailDirection ?? "bottom";
+                const showTail = tailDir !== "none";
+
+                // 테마별 파라미터 사전 계산
+                let themeOffset = 3;
+                let tHeightWithTheme = tHeight;
+                let borderRatio = 0.08;
 
                 if (webtoonTheme === "soft") {
-                  bStroke = "#2d2d2d";
-                  bStrokeW = 1.8;
+                  bStroke = el.stroke ?? "#2d2d2d";
+                  bStrokeW = el.strokeWidth ?? 1.8;
                   bRadius = 24;
-                  bTailPoints = [el.width * 0.4, el.height - 2, el.width * 0.35, el.height + 20, el.width * 0.52, el.height - 2];
+                  themeOffset = 2;
+                  tHeightWithTheme = tHeight - 10;
+                  borderRatio = 0.08;
                 } else if (webtoonTheme === "vivid") {
-                  bStroke = "#444444";
-                  bStrokeW = 1.0;
+                  bStroke = el.stroke ?? "#444444";
+                  bStrokeW = el.strokeWidth ?? 1.0;
                   bRadius = Math.min(el.width, el.height) / 2;
-                  bShadowColor = "black";
-                  bShadowBlur = 8;
-                  bShadowOpacity = 0.12;
-                  bShadowOffset = { x: 2, y: 3 };
-                  bTailPoints = [el.width * 0.45, el.height - 2, el.width * 0.45, el.height + 16, el.width * 0.55, el.height - 2];
+                  if (el.shadowColor === undefined) {
+                    bShadowColor = "black";
+                    bShadowBlur = 8;
+                    bShadowOpacity = 0.12;
+                    bShadowOffset = { x: 2, y: 3 };
+                  }
+                  themeOffset = 2;
+                  tHeightWithTheme = tHeight - 14;
+                  borderRatio = 0.06;
                 }
 
-                // 말풍선 꼬리 방향: 기본 왼쪽, "right"는 x를 좌우 반전, "none"은 숨김.
-                const tailDir = el.tail ?? "left";
-                const showTail = tailDir !== "none";
-                const flipTailX = (pts: number[]) =>
-                  tailDir === "right" ? pts.map((v, i) => (i % 2 === 0 ? el.width - v : v)) : pts;
+                // tailDirection에 따른 bTailPoints 좌표 계산
+                let bTailPoints: number[] = [];
+                if (tailDirection === "bottom") {
+                  bTailPoints = [
+                    el.width * Math.max(0.1, tXRatio - borderRatio),
+                    el.height - themeOffset,
+                    el.width * tXRatio,
+                    el.height + tHeightWithTheme,
+                    el.width * Math.min(0.9, tXRatio + borderRatio),
+                    el.height - themeOffset
+                  ];
+                } else if (tailDirection === "top") {
+                  bTailPoints = [
+                    el.width * Math.max(0.1, tXRatio - borderRatio),
+                    themeOffset,
+                    el.width * tXRatio,
+                    -tHeightWithTheme,
+                    el.width * Math.min(0.9, tXRatio + borderRatio),
+                    themeOffset
+                  ];
+                } else if (tailDirection === "left") {
+                  bTailPoints = [
+                    themeOffset,
+                    el.height * Math.max(0.1, tXRatio - borderRatio),
+                    -tHeightWithTheme,
+                    el.height * tXRatio,
+                    themeOffset,
+                    el.height * Math.min(0.9, tXRatio + borderRatio)
+                  ];
+                } else if (tailDirection === "right") {
+                  bTailPoints = [
+                    el.width - themeOffset,
+                    el.height * Math.max(0.1, tXRatio - borderRatio),
+                    el.width + tHeightWithTheme,
+                    el.height * tXRatio,
+                    el.width - themeOffset,
+                    el.height * Math.min(0.9, tXRatio + borderRatio)
+                  ];
+                }
+
+                const flipTailX = (pts: number[]) => {
+                  if (tailDir !== "right") return pts;
+                  if (tailDirection === "bottom" || tailDirection === "top") {
+                    return pts.map((v, i) => (i % 2 === 0 ? el.width - v : v));
+                  }
+                  return pts;
+                };
+
                 const speechTailPts = flipTailX(bTailPoints);
-                const scaredTailPts = flipTailX([el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2]);
+
+                let baseScaredTailPts: number[] = [];
+                if (tailDirection === "bottom") {
+                  baseScaredTailPts = [el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2];
+                } else if (tailDirection === "top") {
+                  baseScaredTailPts = [el.width * 0.32, 2, el.width * 0.26, -22, el.width * 0.45, 2];
+                } else if (tailDirection === "left") {
+                  baseScaredTailPts = [2, el.height * 0.32, -22, el.height * 0.26, 2, el.height * 0.45];
+                } else if (tailDirection === "right") {
+                  baseScaredTailPts = [el.width - 2, el.height * 0.32, el.width + 22, el.height * 0.26, el.width - 2, el.height * 0.45];
+                }
+                const scaredTailPts = flipTailX(baseScaredTailPts);
+
                 const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
                 const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
+
+                let thoughtEllipses = null;
+                if (showTail) {
+                  if (tailDirection === "bottom") {
+                    thoughtEllipses = (
+                      <>
+                        <Ellipse x={thoughtBigX} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        <Ellipse x={thoughtSmallX} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                      </>
+                    );
+                  } else if (tailDirection === "top") {
+                    thoughtEllipses = (
+                      <>
+                        <Ellipse x={thoughtBigX} y={-12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        <Ellipse x={thoughtSmallX} y={-32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                      </>
+                    );
+                  } else if (tailDirection === "left") {
+                    const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
+                    const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
+                    thoughtEllipses = (
+                      <>
+                        <Ellipse x={-12} y={bigY} radiusX={10} radiusY={13} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        <Ellipse x={-32} y={smallY} radiusX={7} radiusY={8} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                      </>
+                    );
+                  } else if (tailDirection === "right") {
+                    const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
+                    const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
+                    thoughtEllipses = (
+                      <>
+                        <Ellipse x={el.width + 12} y={bigY} radiusX={10} radiusY={13} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        <Ellipse x={el.width + 32} y={smallY} radiusX={7} radiusY={8} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                      </>
+                    );
+                  }
+                }
+
+                let phoneTailPts = tailDir === "right"
+                  ? [el.width - 1, 14, el.width + 10, 20, el.width - 1, 26]
+                  : [1, 14, -10, 20, 1, 26];
+
+                if (showTail) {
+                  if (tailDirection === "bottom") {
+                    phoneTailPts = tailDir === "right"
+                      ? [el.width - 26, el.height - 1, el.width - 20, el.height + 10, el.width - 14, el.height - 1]
+                      : [14, el.height - 1, 20, el.height + 10, 26, el.height - 1];
+                  } else if (tailDirection === "top") {
+                    phoneTailPts = tailDir === "right"
+                      ? [el.width - 26, 1, el.width - 20, -10, el.width - 14, 1]
+                      : [14, 1, 20, -10, 26, 1];
+                  } else if (tailDirection === "left") {
+                    phoneTailPts = [1, el.height * 0.35, -10, el.height * 0.45, 1, el.height * 0.55];
+                  } else if (tailDirection === "right") {
+                    phoneTailPts = [el.width - 1, el.height * 0.35, el.width + 10, el.height * 0.45, el.width - 1, el.height * 0.55];
+                  }
+                }
 
                 return wrapClip(
                   <Group
@@ -3514,6 +4590,7 @@ export function StudioPage() {
                     rotation={el.rotation}
                     opacity={el.opacity ?? 1}
                     draggable={draggable}
+                    dragBoundFunc={snapBoundFunc}
                     shadowColor={bShadowColor}
                     shadowBlur={bShadowBlur}
                     shadowOpacity={bShadowOpacity}
@@ -3555,12 +4632,7 @@ export function StudioPage() {
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
                         />
-                        {showTail && (
-                          <>
-                            <Ellipse x={thoughtBigX} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                            <Ellipse x={thoughtSmallX} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                          </>
-                        )}
+                        {thoughtEllipses}
                       </>
                     ) : el.variant === "whisper" ? (
                       <>
@@ -3589,7 +4661,7 @@ export function StudioPage() {
                         <Rect
                           width={el.width}
                           height={el.height}
-                          fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
+                          fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
                           cornerRadius={14}
                           stroke="#7c3aed"
                           strokeWidth={2}
@@ -3601,7 +4673,7 @@ export function StudioPage() {
                           <Line
                             points={scaredTailPts}
                             closed
-                            fill={el.fill === "#ffffff" ? "#f5f3ff" : el.fill}
+                            fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
                             stroke="#7c3aed"
                             strokeWidth={2}
                           />
@@ -3658,11 +4730,7 @@ export function StudioPage() {
                         />
                         {showTail && (
                           <Line
-                            points={
-                              tailDir === "right"
-                                ? [el.width - 1, 14, el.width + 10, 20, el.width - 1, 26]
-                                : [1, 14, -10, 20, 1, 26]
-                            }
+                            points={phoneTailPts}
                             closed
                             fill={el.fill}
                             stroke={bStroke}
@@ -3696,16 +4764,16 @@ export function StudioPage() {
                       </>
                     )}
                     <KText
-                      text={el.text}
+                      text={el.vertical ? formatVerticalText(el.text) : el.text}
                       width={el.width - 36}
                       height={el.height - 24}
                       x={18}
                       y={12}
                       fontSize={el.fontSize ?? 24}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
-                      fontStyle="bold"
+                      fontStyle={el.fontStyle ?? "bold"}
                       fill={el.textFill}
-                      align="center"
+                      align={el.align ?? "center"}
                       verticalAlign="middle"
                       lineHeight={el.lineHeight ?? 1.1}
                     />
@@ -3727,7 +4795,7 @@ export function StudioPage() {
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
             </Layer>
-            {(guides.x.length > 0 || guides.y.length > 0) && (
+            {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
               <Layer listening={false}>
                 {guides.x.map((gx) => (
                   <Line
@@ -3747,6 +4815,192 @@ export function StudioPage() {
                     dash={[5 / effScale, 4 / effScale]}
                   />
                 ))}
+              </Layer>
+            )}
+            
+            {/* 작가 수동 가이드선 */}
+            {!isExporting && userGuides.length > 0 && (
+              <Layer>
+                {userGuides.map((g) => (
+                  <Group key={`user-guide-${g.id}`}>
+                    <Line
+                      points={g.type === "v" ? [g.pos, 0, g.pos, canvasH] : [0, g.pos, CANVAS_W, g.pos]}
+                      stroke="#0ea5e9"
+                      strokeWidth={1.5 / effScale}
+                      dash={[8 / effScale, 5 / effScale]}
+                      listening={false}
+                    />
+                    <Line
+                      points={g.type === "v" ? [g.pos, 0, g.pos, canvasH] : [0, g.pos, CANVAS_W, g.pos]}
+                      stroke="transparent"
+                      strokeWidth={12 / effScale}
+                      draggable={true}
+                      name="guide-line-handle"
+                      onMouseEnter={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = g.type === "v" ? "ew-resize" : "ns-resize";
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "default";
+                      }}
+                      onDragMove={(e) => {
+                        const node = e.target;
+                        if (g.type === "v") {
+                          node.y(0);
+                          const offset = node.x();
+                          const updatedPos = Math.max(0, Math.min(CANVAS_W, g.pos + offset));
+                          setUserGuides((prev) =>
+                            prev.map((item) => (item.id === g.id ? { ...item, pos: updatedPos } : item))
+                          );
+                          node.x(0);
+                        } else {
+                          node.x(0);
+                          const offset = node.y();
+                          const updatedPos = Math.max(0, Math.min(canvasH, g.pos + offset));
+                          setUserGuides((prev) =>
+                            prev.map((item) => (item.id === g.id ? { ...item, pos: updatedPos } : item))
+                          );
+                          node.y(0);
+                        }
+                      }}
+                    />
+                  </Group>
+                ))}
+              </Layer>
+            )}
+
+            {/* 대칭자 가이드선 */}
+            {!isExporting && tool === "draw" && symmetryType !== "none" && (
+              <Layer>
+                {symmetryType === "vertical" && (
+                  <>
+                    <Line
+                      points={[symmetryCenterX, 0, symmetryCenterX, canvasH]}
+                      stroke="#0ea5e9"
+                      strokeWidth={1.5 / effScale}
+                      dash={[6 / effScale, 4 / effScale]}
+                      listening={false}
+                    />
+                    <KCircle
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radius={7 / effScale}
+                      fill="#0ea5e9"
+                      stroke="#ffffff"
+                      strokeWidth={2 / effScale}
+                      draggable={true}
+                      name="symmetry-handle"
+                      onMouseEnter={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "ew-resize";
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "default";
+                      }}
+                      onDragMove={(e) => {
+                        const node = e.target;
+                        node.y(symmetryCenterY); // Restrict Y
+                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
+                        setSymmetryCenterX(newX);
+                      }}
+                    />
+                  </>
+                )}
+                {symmetryType === "horizontal" && (
+                  <>
+                    <Line
+                      points={[0, symmetryCenterY, CANVAS_W, symmetryCenterY]}
+                      stroke="#0ea5e9"
+                      strokeWidth={1.5 / effScale}
+                      dash={[6 / effScale, 4 / effScale]}
+                      listening={false}
+                    />
+                    <KCircle
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radius={7 / effScale}
+                      fill="#0ea5e9"
+                      stroke="#ffffff"
+                      strokeWidth={2 / effScale}
+                      draggable={true}
+                      name="symmetry-handle"
+                      onMouseEnter={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "ns-resize";
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "default";
+                      }}
+                      onDragMove={(e) => {
+                        const node = e.target;
+                        node.x(symmetryCenterX); // Restrict X
+                        const newY = Math.max(0, Math.min(canvasH, node.y()));
+                        setSymmetryCenterY(newY);
+                      }}
+                    />
+                  </>
+                )}
+                {symmetryType === "radial" && (
+                  <>
+                    <Ellipse
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radiusX={6 / effScale}
+                      radiusY={6 / effScale}
+                      stroke="#0ea5e9"
+                      strokeWidth={1.5 / effScale}
+                      listening={false}
+                    />
+                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
+                      const angle = (idx * 2 * Math.PI) / symmetryRadialCount;
+                      const len = Math.max(CANVAS_W, canvasH) * 1.5;
+                      return (
+                        <Line
+                          key={`radial-${idx}`}
+                          points={[
+                            symmetryCenterX,
+                            symmetryCenterY,
+                            symmetryCenterX + len * Math.cos(angle),
+                            symmetryCenterY + len * Math.sin(angle),
+                          ]}
+                          stroke="#0ea5e9"
+                          strokeWidth={1 / effScale}
+                          dash={[4 / effScale, 4 / effScale]}
+                          opacity={0.7}
+                          listening={false}
+                        />
+                      );
+                    })}
+                    <KCircle
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radius={8 / effScale}
+                      fill="#0ea5e9"
+                      stroke="#ffffff"
+                      strokeWidth={2 / effScale}
+                      draggable={true}
+                      name="symmetry-handle"
+                      onMouseEnter={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "move";
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "default";
+                      }}
+                      onDragMove={(e) => {
+                        const node = e.target;
+                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
+                        const newY = Math.max(0, Math.min(canvasH, node.y()));
+                        setSymmetryCenterX(newX);
+                        setSymmetryCenterY(newY);
+                      }}
+                    />
+                  </>
+                )}
               </Layer>
             )}
           </Stage>
@@ -3944,6 +5198,80 @@ export function StudioPage() {
                   )}
                 </div>
               </label>
+
+              {/* 작가 가이드선 (Artist Guidelines) */}
+              <div className="pt-2 border-t border-line/35 space-y-2">
+                <p className="text-[0.65rem] font-bold text-fg-2">스냅 가이드선</p>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserGuides((prev) => [
+                        ...prev,
+                        { id: uid(), type: "v", pos: 400 },
+                      ]);
+                    }}
+                    className="flex-1 rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
+                  >
+                    + 세로 가이드
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserGuides((prev) => [
+                        ...prev,
+                        { id: uid(), type: "h", pos: canvasH / 2 },
+                      ]);
+                    }}
+                    className="flex-1 rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
+                  >
+                    + 가로 가이드
+                  </button>
+                </div>
+
+                {userGuides.length > 0 && (
+                  <div className="space-y-1.5 rounded-lg border border-line bg-card/30 p-2 max-h-40 overflow-y-auto">
+                    {userGuides.map((guide, idx) => (
+                      <div key={guide.id} className="flex items-center justify-between gap-1.5 text-[0.65rem]">
+                        <span className="text-fg-2 font-medium">
+                          {guide.type === "v" ? "세로" : "가로"} #{idx + 1} ({Math.round(guide.pos)}px)
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="range"
+                            min={0}
+                            max={guide.type === "v" ? 800 : canvasH}
+                            value={guide.pos}
+                            onChange={(e) => {
+                              const pos = Number(e.target.value);
+                              setUserGuides((prev) =>
+                                prev.map((g) => (g.id === guide.id ? { ...g, pos } : g))
+                              );
+                            }}
+                            className="w-16 h-2 accent-accent cursor-pointer"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserGuides((prev) => prev.filter((g) => g.id !== guide.id));
+                            }}
+                            className="text-[9px] text-bad hover:underline ml-1 cursor-pointer"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setUserGuides([])}
+                      className="w-full text-center text-[9px] text-bad-light hover:underline pt-1 border-t border-line/30 cursor-pointer"
+                    >
+                      모든 가이드 삭제
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mt-3 border-t border-line pt-3">
               <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
@@ -3970,6 +5298,67 @@ export function StudioPage() {
           {selected && (
             <div className="rounded-2xl border border-line bg-panel/40 p-3">
               <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
+              {selected.type === "draw" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 색상
+                    <input
+                      type="color"
+                      value={selected.stroke || "#16100c"}
+                      onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                      className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                    />
+                  </div>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 두께
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={1}
+                        max={48}
+                        value={selected.strokeWidth ?? 3}
+                        onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.strokeWidth ?? 3}px</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    불투명도
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={1}
+                        step={0.05}
+                        value={selected.opacity ?? 1}
+                        onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
+                    </span>
+                  </label>
+
+                  {/* 도형 타입(rect, ellipse, star)일 경우 채우기 색상 조절 */}
+                  {(selected.kind === "rect" || selected.kind === "ellipse" || selected.kind === "star") && (
+                    <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기</p>
+                      <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        채우기 색상
+                        <input
+                          type="color"
+                          value={selected.fill || "#ffffff"}
+                          onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)}
+                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {(selected.type === "text" || selected.type === "bubble") && (
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
                   글자색
@@ -3981,36 +5370,405 @@ export function StudioPage() {
                   />
                 </label>
               )}
-              {selected.type === "bubble" && (
-                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                  말풍선색
-                  <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
-                </label>
-              )}
-              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (
-                <div className="mt-2">
-                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">꼬리 방향</p>
-                  <div className="flex gap-1">
+              
+              {selected.type === "text" && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기 스타일</p>
+                  
+                  <div className="flex gap-1.5 bg-card rounded-lg p-0.5 border border-line">
                     {[
-                      { label: "왼쪽", v: "left" },
-                      { label: "오른쪽", v: "right" },
-                      { label: "없음", v: "none" },
-                    ].map((t) => (
+                      { label: "단색 채우기", v: "solid" },
+                      { label: "그라데이션", v: "gradient" }
+                    ].map((mode) => (
                       <button
-                        key={t.v}
+                        key={mode.v}
                         type="button"
-                        onClick={() => patchEl(selected.id, { tail: t.v } as Partial<El>)}
+                        onClick={() => patchEl(selected.id, { fillType: mode.v as "solid" | "gradient" } as Partial<El>)}
                         className={cn(
-                          "rounded-md border px-2 py-1 text-xs",
-                          (selected.tail ?? "left") === t.v
-                            ? "border-accent/60 bg-accent-soft/50 text-fg"
-                            : "border-line text-fg-2 hover:bg-raised"
+                          "flex-1 rounded py-1 text-[0.62rem] font-semibold transition-colors",
+                          (selected.fillType ?? "solid") === mode.v
+                            ? "bg-accent text-on-accent"
+                            : "text-fg-2 hover:bg-raised"
                         )}
                       >
-                        {t.label}
+                        {mode.label}
                       </button>
                     ))}
                   </div>
+
+                  {(selected.fillType ?? "solid") === "gradient" && (
+                    <div className="space-y-2 pt-1">
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        시작 색상
+                        <input
+                          type="color"
+                          value={selected.gradientColorStart || "#ff3b30"}
+                          onChange={(e) => patchEl(selected.id, { gradientColorStart: e.target.value } as Partial<El>)}
+                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                        />
+                      </label>
+                      
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        종료 색상
+                        <input
+                          type="color"
+                          value={selected.gradientColorEnd || "#ffcc00"}
+                          onChange={(e) => patchEl(selected.id, { gradientColorEnd: e.target.value } as Partial<El>)}
+                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                        />
+                      </label>
+
+                      <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        <span>그라데이션 방향</span>
+                        <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line w-28">
+                          {[
+                            { label: "가로", v: "horizontal" },
+                            { label: "세로", v: "vertical" }
+                          ].map((dir) => (
+                            <button
+                              key={dir.v}
+                              type="button"
+                              onClick={() => patchEl(selected.id, { gradientDirection: dir.v as "horizontal" | "vertical" } as Partial<El>)}
+                              className={cn(
+                                "flex-1 rounded py-0.5 text-[0.6rem] font-semibold transition-colors",
+                                (selected.gradientDirection ?? "vertical") === dir.v
+                                  ? "bg-accent text-on-accent"
+                                  : "text-fg-2 hover:bg-raised"
+                              )}
+                            >
+                              {dir.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {selected.type === "bubble" && (
+                <>
+                  <div className="mt-2.5 pb-2.5 border-b border-line/40">
+                    <p className="mb-2 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">스타일 프리셋</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {BUBBLE_STYLE_PRESETS.map((p) => {
+                        const isMatch =
+                          selected.fill === p.fill &&
+                          selected.textFill === p.textFill &&
+                          (p.stroke ? selected.stroke === p.stroke : !selected.stroke) &&
+                          (p.strokeWidth ? selected.strokeWidth === p.strokeWidth : true);
+                        
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              patchEl(selected.id, {
+                                fill: p.fill,
+                                textFill: p.textFill,
+                                stroke: p.stroke,
+                                strokeWidth: p.strokeWidth,
+                                shadowColor: p.shadowColor,
+                                shadowBlur: p.shadowBlur,
+                                shadowOffsetX: p.shadowOffsetX,
+                                shadowOffsetY: p.shadowOffsetY,
+                                shadowOpacity: p.shadowOpacity,
+                                font: p.font ?? selected.font,
+                              } as Partial<El>);
+                            }}
+                            className={cn(
+                              "flex flex-col items-start p-1.5 rounded-lg border text-left transition-all hover:bg-raised/70 cursor-pointer",
+                              isMatch
+                                ? "border-accent bg-accent-soft/40 shadow-sm"
+                                : "border-line bg-card"
+                            )}
+                            title={p.description}
+                          >
+                            <span className="text-[0.65rem] font-semibold text-fg mb-1">{p.label}</span>
+                            <div className="flex items-center gap-1 w-full mt-auto">
+                              <span
+                                className="size-3.5 rounded-full border border-line shadow-sm flex items-center justify-center text-[8px] font-bold"
+                                style={{
+                                  backgroundColor: p.fill === "transparent" ? "transparent" : p.fill,
+                                  color: p.textFill,
+                                  borderColor: p.stroke || "rgba(0,0,0,0.15)",
+                                  borderWidth: p.stroke ? "1.5px" : "1px"
+                                }}
+                              >
+                                가
+                              </span>
+                              <span className="text-[0.55rem] text-fg-3 truncate">{p.description}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                    배경 투명
+                    <input
+                      type="checkbox"
+                      checked={selected.fill === "transparent"}
+                      onChange={(e) => {
+                        patchEl(selected.id, {
+                          fill: e.target.checked ? "transparent" : "#ffffff",
+                        } as Partial<El>);
+                      }}
+                      className="size-4 accent-accent cursor-pointer"
+                    />
+                  </div>
+
+                  {selected.fill !== "transparent" && (
+                    <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                      말풍선색
+                      <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
+                    </label>
+                  )}
+
+                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">테두리 설정</p>
+
+                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                      테두리 커스텀
+                      <input
+                        type="checkbox"
+                        checked={!!selected.stroke}
+                        onChange={(e) => {
+                          const hasStroke = e.target.checked;
+                          patchEl(selected.id, {
+                            stroke: hasStroke ? (selected.stroke || "#16100c") : undefined,
+                            strokeWidth: hasStroke ? (selected.strokeWidth || 3) : undefined,
+                          } as Partial<El>);
+                        }}
+                        className="size-4 accent-accent cursor-pointer"
+                      />
+                    </div>
+
+                    {!!selected.stroke && (
+                      <>
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          테두리 색상
+                          <input
+                            type="color"
+                            value={selected.stroke || "#16100c"}
+                            onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          테두리 두께
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0.5}
+                              max={12}
+                              step={0.5}
+                              value={selected.strokeWidth ?? 3}
+                              onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
+                          </span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">말풍선 그림자 (Shadow)</p>
+
+                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                      그림자 사용
+                      <input
+                        type="checkbox"
+                        checked={selected.shadowColor !== undefined}
+                        onChange={(e) => {
+                          const hasShadow = e.target.checked;
+                          patchEl(selected.id, {
+                            shadowColor: hasShadow ? (selected.shadowColor || "#000000") : undefined,
+                            shadowBlur: hasShadow ? (selected.shadowBlur || 6) : undefined,
+                            shadowOffsetX: hasShadow ? (selected.shadowOffsetX || 2) : undefined,
+                            shadowOffsetY: hasShadow ? (selected.shadowOffsetY || 3) : undefined,
+                            shadowOpacity: hasShadow ? (selected.shadowOpacity || 0.15) : undefined,
+                          } as Partial<El>);
+                        }}
+                        className="size-4 accent-accent cursor-pointer"
+                      />
+                    </div>
+
+                    {selected.shadowColor !== undefined && (
+                      <>
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          그림자 색상
+                          <input
+                            type="color"
+                            value={selected.shadowColor || "#000000"}
+                            onChange={(e) => patchEl(selected.id, { shadowColor: e.target.value } as Partial<El>)}
+                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          흐림 정도 (Blur)
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0}
+                              max={24}
+                              step={1}
+                              value={selected.shadowBlur ?? 6}
+                              onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 6}px</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          가로 오프셋 (X)
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={-15}
+                              max={15}
+                              step={1}
+                              value={selected.shadowOffsetX ?? 2}
+                              onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 2}px</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          세로 오프셋 (Y)
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={-15}
+                              max={15}
+                              step={1}
+                              value={selected.shadowOffsetY ?? 3}
+                              onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          불투명도
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0.05}
+                              max={1}
+                              step={0.05}
+                              value={selected.shadowOpacity ?? 0.15}
+                              onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.15) * 100)}%</span>
+                          </span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5">
+                  <p className="mb-1 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">꼬리 위치 & 방향</p>
+                  
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs text-fg-2">
+                      <span>꼬리 대칭 방향</span>
+                      <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
+                        {[
+                          { label: "왼쪽", v: "left" },
+                          { label: "오른쪽", v: "right" },
+                          { label: "없음", v: "none" },
+                        ].map((t) => (
+                          <button
+                            key={t.v}
+                            type="button"
+                            onClick={() => patchEl(selected.id, { tail: t.v } as Partial<El>)}
+                            className={cn(
+                              "rounded px-2 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
+                              (selected.tail ?? "left") === t.v
+                                ? "bg-accent text-accent-fg shadow-sm font-semibold"
+                                : "text-fg-2 hover:bg-raised"
+                            )}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(selected.tail ?? "left") !== "none" && (
+                      <div className="flex items-center justify-between text-xs text-fg-2">
+                        <span>말풍선 부착면</span>
+                        <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
+                          {[
+                            { label: "위", v: "top" },
+                            { label: "아래", v: "bottom" },
+                            { label: "왼쪽", v: "left" },
+                            { label: "오른쪽", v: "right" },
+                          ].map((td) => (
+                            <button
+                              key={td.v}
+                              type="button"
+                              onClick={() => patchEl(selected.id, { tailDirection: td.v as "top" | "bottom" | "left" | "right" } as Partial<El>)}
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
+                                (selected.tailDirection ?? "bottom") === td.v
+                                  ? "bg-accent text-accent-fg shadow-sm font-semibold"
+                                  : "text-fg-2 hover:bg-raised"
+                              )}
+                            >
+                              {td.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
+                <div className="mt-3 space-y-2 border-t border-line/40 pt-2.5">
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    {(selected.tailDirection === "left" || selected.tailDirection === "right") ? "꼬리 세로 위치" : "꼬리 가로 위치"}
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={0.9}
+                        step={0.05}
+                        value={selected.tailXRatio ?? 0.35}
+                        onChange={(e) => patchEl(selected.id, { tailXRatio: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.tailXRatio ?? 0.35) * 100)}%</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    꼬리 길이
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={10}
+                        max={80}
+                        step={2}
+                        value={selected.tailHeight ?? 30}
+                        onChange={(e) => patchEl(selected.id, { tailHeight: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.tailHeight ?? 30}px</span>
+                    </span>
+                  </label>
                 </div>
               )}
               {(selected.type === "text" || selected.type === "bubble") && (
@@ -4021,7 +5779,13 @@ export function StudioPage() {
                       {[
                         { label: "고딕", v: "Pretendard, sans-serif" },
                         { label: "명조", v: "'Nanum Myeongjo', serif" },
+                        { label: "둥근만화", v: "'Jua', sans-serif" },
+                        { label: "타이틀/굵은", v: "'Black Han Sans', sans-serif" },
                         { label: "손글씨", v: "'Gaegu', cursive" },
+                        { label: "펜글씨", v: "'Nanum Pen Script', cursive" },
+                        { label: "아기자기", v: "'Gamja Flower', cursive" },
+                        { label: "붓글씨/고풍", v: "'Yeon Sung', cursive" },
+                        { label: "분노/공포", v: "'East Sea Dokdo', cursive" },
                       ].map((f) => (
                         <button
                           key={f.label}
@@ -4062,41 +5826,138 @@ export function StudioPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* 정렬 및 스타일 설정 */}
+                  <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line/30 pt-2.5">
+                    <div>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">정렬</p>
+                      <div className="flex gap-0.5 rounded-lg border border-line bg-panel p-0.5">
+                        {(["left", "center", "right"] as const).map((a) => {
+                          const active = (selected.align ?? (selected.type === "text" ? "left" : "center")) === a;
+                          const Icon = a === "left" ? AlignLeft : a === "center" ? AlignCenter : AlignRight;
+                          return (
+                            <button
+                              key={a}
+                              type="button"
+                              onClick={() => patchEl(selected.id, { align: a } as Partial<El>)}
+                              className={cn(
+                                "grid size-7 place-items-center rounded transition-colors cursor-pointer",
+                                active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                              )}
+                              title={`${a === "left" ? "왼쪽" : a === "center" ? "가운데" : "오른쪽"} 정렬`}
+                            >
+                              <Icon size={14} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">스타일</p>
+                      <div className="flex gap-0.5 rounded-lg border border-line bg-panel p-0.5">
+                        {/* Bold / Italic Toggle Buttons */}
+                        {(() => {
+                          const fsVal = selected.fontStyle ?? "bold";
+                          const isBold = fsVal.includes("bold");
+                          const isItalic = fsVal.includes("italic");
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic" = "normal";
+                                  if (isBold) {
+                                    nextStyle = isItalic ? "italic" : "normal";
+                                  } else {
+                                    nextStyle = isItalic ? "bold italic" : "bold";
+                                  }
+                                  patchEl(selected.id, { fontStyle: nextStyle } as Partial<El>);
+                                }}
+                                className={cn(
+                                  "grid size-7 place-items-center rounded transition-colors cursor-pointer",
+                                  isBold ? "bg-accent/20 text-accent font-bold border border-accent/35" : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                                )}
+                                title="굵게"
+                              >
+                                <Bold size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic" = "normal";
+                                  if (isItalic) {
+                                    nextStyle = isBold ? "bold" : "normal";
+                                  } else {
+                                    nextStyle = isBold ? "bold italic" : "italic";
+                                  }
+                                  patchEl(selected.id, { fontStyle: nextStyle } as Partial<El>);
+                                }}
+                                className={cn(
+                                  "grid size-7 place-items-center rounded transition-colors cursor-pointer",
+                                  isItalic ? "bg-accent/20 text-accent font-bold border border-accent/35" : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                                )}
+                                title="기울임꼴"
+                              >
+                                <Italic size={14} />
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
               {selected.type === "text" && (
-                <div className="mt-2">
-                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">외곽선</p>
-                  <div className="flex gap-1">
-                    {[
-                      { label: "없음", v: null },
-                      { label: "흰색", v: "#ffffff" },
-                      { label: "검정", v: "#16100c" },
-                    ].map((o) => {
-                      const hasOutline = !!selected.stroke && !!selected.strokeWidth;
-                      const active = o.v === null ? !hasOutline : hasOutline && selected.stroke === o.v;
-                      return (
-                        <button
-                          key={o.label}
-                          type="button"
-                          onClick={() =>
-                            patchEl(
-                              selected.id,
-                              (o.v === null
-                                ? { stroke: undefined, strokeWidth: 0 }
-                                : { stroke: o.v, strokeWidth: Math.max(3, Math.round(selected.fontSize * 0.08)) }) as Partial<El>
-                            )
-                          }
-                          className={cn(
-                            "rounded-md border px-2 py-1 text-xs",
-                            active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line text-fg-2 hover:bg-raised"
-                          )}
-                        >
-                          {o.label}
-                        </button>
-                      );
-                    })}
+                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">글자 외곽선 (Border)</p>
+
+                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    외곽선 사용
+                    <input
+                      type="checkbox"
+                      checked={!!selected.stroke}
+                      onChange={(e) => {
+                        const hasStroke = e.target.checked;
+                        patchEl(selected.id, {
+                          stroke: hasStroke ? (selected.stroke || "#ffffff") : undefined,
+                          strokeWidth: hasStroke ? (selected.strokeWidth || 3) : 0,
+                        } as Partial<El>);
+                      }}
+                      className="size-4 accent-accent cursor-pointer"
+                    />
                   </div>
+
+                  {!!selected.stroke && (
+                    <>
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        외곽선 색상
+                        <input
+                          type="color"
+                          value={selected.stroke || "#ffffff"}
+                          onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        외곽선 두께
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={0.5}
+                            max={16}
+                            step={0.5}
+                            value={selected.strokeWidth ?? 3}
+                            onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                          />
+                          <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
+                        </span>
+                      </label>
+                    </>
+                  )}
                 </div>
               )}
               {selected.type === "text" && (
@@ -4133,6 +5994,108 @@ export function StudioPage() {
                   </label>
                 </div>
               )}
+              {selected.type === "text" && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">글자 그림자 (Shadow)</p>
+
+                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    그림자 사용
+                    <input
+                      type="checkbox"
+                      checked={!!selected.shadowColor}
+                      onChange={(e) => {
+                        const hasShadow = e.target.checked;
+                        patchEl(selected.id, {
+                          shadowColor: hasShadow ? (selected.shadowColor || "#000000") : undefined,
+                          shadowBlur: hasShadow ? (selected.shadowBlur || 5) : undefined,
+                          shadowOffsetX: hasShadow ? (selected.shadowOffsetX || 3) : undefined,
+                          shadowOffsetY: hasShadow ? (selected.shadowOffsetY || 3) : undefined,
+                          shadowOpacity: hasShadow ? (selected.shadowOpacity || 0.6) : undefined,
+                        } as Partial<El>);
+                      }}
+                      className="size-4 accent-accent cursor-pointer"
+                    />
+                  </div>
+
+                  {!!selected.shadowColor && (
+                    <>
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        그림자 색상
+                        <input
+                          type="color"
+                          value={selected.shadowColor || "#000000"}
+                          onChange={(e) => patchEl(selected.id, { shadowColor: e.target.value } as Partial<El>)}
+                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        흐림 정도 (Blur)
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={0}
+                            max={20}
+                            step={1}
+                            value={selected.shadowBlur ?? 5}
+                            onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
+                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                          />
+                          <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 5}px</span>
+                        </span>
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        가로 오프셋 (X)
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={-15}
+                            max={15}
+                            step={1}
+                            value={selected.shadowOffsetX ?? 3}
+                            onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
+                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                          />
+                          <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 3}px</span>
+                        </span>
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        세로 오프셋 (Y)
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={-15}
+                            max={15}
+                            step={1}
+                            value={selected.shadowOffsetY ?? 3}
+                            onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
+                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                          />
+                          <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
+                        </span>
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                        불투명도
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={0.1}
+                            max={1}
+                            step={0.05}
+                            value={selected.shadowOpacity ?? 0.6}
+                            onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
+                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                          />
+                          <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.6) * 100)}%</span>
+                        </span>
+                      </label>
+                    </>
+                  )}
+                </div>
+              )}
               {selected.type !== "frame" && containingPanel(selected, elements) && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                   패널 안에 가두기
@@ -4143,6 +6106,44 @@ export function StudioPage() {
                     className="size-4 accent-accent"
                   />
                 </label>
+              )}
+              {(selected.type === "text" || selected.type === "bubble") && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    글자 정렬
+                    <div className="flex gap-1">
+                      {[
+                        { label: "왼쪽", v: "left" },
+                        { label: "가운데", v: "center" },
+                        { label: "오른쪽", v: "right" },
+                      ].map((a) => (
+                        <button
+                          key={a.v}
+                          type="button"
+                          onClick={() => patchEl(selected.id, { align: a.v } as Partial<El>)}
+                          className={cn(
+                            "rounded-md border px-2.5 py-0.5 text-xs",
+                            (selected.align ?? "center") === a.v
+                              ? "border-accent/60 bg-accent-soft/50 text-fg"
+                              : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2 cursor-pointer">
+                    세로 쓰기 (세로 연출)
+                    <input
+                      type="checkbox"
+                      checked={!!selected.vertical}
+                      onChange={(e) => patchEl(selected.id, { vertical: e.target.checked } as Partial<El>)}
+                      className="size-4 accent-accent"
+                    />
+                  </label>
+                </div>
               )}
               {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -4158,6 +6159,30 @@ export function StudioPage() {
                     />
                     <span className="w-9 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
                   </span>
+                </label>
+              )}
+
+              {selected.type !== "frame" && (
+                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                  혼합 모드 (Blend)
+                  <select
+                    value={selected.blendMode || "source-over"}
+                    onChange={(e) => patchEl(selected.id, { blendMode: e.target.value } as Partial<El>)}
+                    className="rounded border border-line bg-card px-2 py-1 text-xs text-fg focus-visible:outline focus-visible:outline-accent cursor-pointer"
+                  >
+                    <option value="source-over">보통 (Normal)</option>
+                    <option value="multiply">곱하기 (Multiply)</option>
+                    <option value="screen">스크린 (Screen)</option>
+                    <option value="overlay">오버레이 (Overlay)</option>
+                    <option value="darken">어둡게 (Darken)</option>
+                    <option value="lighten">밝게 (Lighten)</option>
+                    <option value="color-dodge">색상 닷지 (Color Dodge)</option>
+                    <option value="color-burn">색상 번 (Color Burn)</option>
+                    <option value="hard-light">하드 라이트 (Hard Light)</option>
+                    <option value="soft-light">소프트 라이트 (Soft Light)</option>
+                    <option value="difference">차이 (Difference)</option>
+                    <option value="exclusion">제외 (Exclusion)</option>
+                  </select>
                 </label>
               )}
 
@@ -4231,6 +6256,370 @@ export function StudioPage() {
                 </div>
               )}
 
+              {/* 집중선 및 속도선 선 효과 설정 */}
+              {selected.type === "focusLines" && (
+                <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">집중선 설정</p>
+
+                  <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
+                    <p className="text-[0.6rem] font-semibold text-fg-3">집중선 프리셋</p>
+                    <div className="mt-1 grid grid-cols-2 gap-1.5">
+                      {[
+                        { label: "기본 집중선", config: { lineCount: 80, innerRadius: 100, outerRadius: 400, noise: 20, strokeWidth: 2.5 } },
+                        { label: "강렬한 스릴러", config: { lineCount: 160, innerRadius: 80, outerRadius: 500, noise: 40, strokeWidth: 4.5 } },
+                        { label: "미세 집중선", config: { lineCount: 140, innerRadius: 120, outerRadius: 400, noise: 10, strokeWidth: 1.2 } },
+                        { label: "방사형 어둠", config: { lineCount: 180, innerRadius: 155, outerRadius: 320, noise: 30, strokeWidth: 6.0 } },
+                      ].map((p) => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => patchEl(selected.id, p.config as Partial<El>)}
+                          className="rounded-md border border-line bg-panel py-0.5 text-center text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg font-medium transition-colors"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 개수
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={10}
+                        max={200}
+                        step={5}
+                        value={selected.lineCount ?? 80}
+                        onChange={(e) => patchEl(selected.id, { lineCount: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.lineCount ?? 80}</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    내부 반경
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={300}
+                        step={5}
+                        value={selected.innerRadius ?? 100}
+                        onChange={(e) => patchEl(selected.id, { innerRadius: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.innerRadius ?? 100}px</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    외부 반경
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={100}
+                        max={800}
+                        step={10}
+                        value={selected.outerRadius ?? 400}
+                        onChange={(e) => patchEl(selected.id, { outerRadius: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.outerRadius ?? 400}px</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    지터 노이즈
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={2}
+                        value={selected.noise ?? 20}
+                        onChange={(e) => patchEl(selected.id, { noise: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.noise ?? 20}</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 색상
+                    <input
+                      type="color"
+                      value={selected.stroke ?? "#000000"}
+                      onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                      className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 두께
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={10}
+                        step={0.5}
+                        value={selected.strokeWidth ?? 2.5}
+                        onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 2.5).toFixed(1)}</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    초점 가로 위치
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={selected.centerXRatio ?? 0.5}
+                        onChange={(e) => patchEl(selected.id, { centerXRatio: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.centerXRatio ?? 0.5) * 100)}%</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    초점 세로 위치
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={selected.centerYRatio ?? 0.5}
+                        onChange={(e) => patchEl(selected.id, { centerYRatio: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.centerYRatio ?? 0.5) * 100)}%</span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {selected.type === "speedLines" && (
+                <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">속도선 설정</p>
+
+                  <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
+                    <p className="text-[0.6rem] font-semibold text-fg-3">속도선 프리셋</p>
+                    <div className="mt-1 grid grid-cols-2 gap-1.5">
+                      {[
+                        { label: "가로 질주", config: { direction: "horizontal", lineCount: 50, strokeWidth: 2.5 } },
+                        { label: "세로 낙하", config: { direction: "vertical", lineCount: 60, strokeWidth: 3.5 } },
+                        { label: "미세 속도선", config: { lineCount: 100, strokeWidth: 1.2 } },
+                        { label: "강한 폭발선", config: { lineCount: 35, strokeWidth: 6.0 } },
+                      ].map((p) => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => patchEl(selected.id, p.config as Partial<El>)}
+                          className="rounded-md border border-line bg-panel py-0.5 text-center text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg font-medium transition-colors"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    방향
+                    <div className="flex gap-1">
+                      {[
+                        { label: "가로", v: "horizontal" },
+                        { label: "세로", v: "vertical" },
+                      ].map((d) => (
+                        <button
+                          key={d.v}
+                          type="button"
+                          onClick={() => patchEl(selected.id, { direction: d.v } as Partial<El>)}
+                          className={cn(
+                            "rounded-md border px-2.5 py-0.5 text-xs",
+                            (selected.direction ?? "horizontal") === d.v
+                              ? "border-accent/60 bg-accent-soft/50 text-fg"
+                              : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 개수
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={10}
+                        max={150}
+                        step={5}
+                        value={selected.lineCount ?? 50}
+                        onChange={(e) => patchEl(selected.id, { lineCount: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.lineCount ?? 50}</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 색상
+                    <input
+                      type="color"
+                      value={selected.stroke ?? "#000000"}
+                      onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                      className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    선 두께
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={10}
+                        step={0.5}
+                        value={selected.strokeWidth ?? 2.5}
+                        onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 2.5).toFixed(1)}</span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {selected.type === "frame" && (
+                <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
+                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 컷 분할</p>
+                  <label className="block">
+                    <span className="flex items-center justify-between text-xs text-fg-2 mb-1.5">
+                      <span>분할 비율</span>
+                      <span className="numeral text-fg-3">{panelSplitRatio}% / {100 - panelSplitRatio}%</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={20}
+                      max={80}
+                      step={5}
+                      className="w-full accent-accent cursor-pointer"
+                      value={panelSplitRatio}
+                      onChange={(e) => setPanelSplitRatio(Number(e.target.value))}
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => splitFrameSelected("vertical")}
+                      className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-9 w-full justify-center text-xs")}
+                    >
+                      세로로 분할
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => splitFrameSelected("horizontal")}
+                      className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-9 w-full justify-center text-xs")}
+                    >
+                      가로로 분할
+                    </button>
+                  </div>
+
+                  <div className="mt-3.5 border-t border-line/40 pt-2.5 space-y-2.5">
+                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 배경 및 테두리</p>
+
+                    <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                      배경색
+                      <input
+                        type="color"
+                        value={selected.bgColor || "#ffffff"}
+                        onChange={(e) => patchEl(selected.id, { bgColor: e.target.value } as Partial<El>)}
+                        className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                      />
+                    </label>
+
+                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                      테두리 커스텀
+                      <input
+                        type="checkbox"
+                        checked={!!selected.stroke}
+                        onChange={(e) => {
+                          const hasStroke = e.target.checked;
+                          patchEl(selected.id, {
+                            stroke: hasStroke ? (selected.stroke || "#16100c") : undefined,
+                            strokeWidth: hasStroke ? (selected.strokeWidth || 3) : undefined,
+                          } as Partial<El>);
+                        }}
+                        className="size-4 accent-accent cursor-pointer"
+                      />
+                    </div>
+
+                    {!!selected.stroke && (
+                      <>
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          테두리 색상
+                          <input
+                            type="color"
+                            value={selected.stroke || "#16100c"}
+                            onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
+                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          테두리 두께
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0}
+                              max={16}
+                              step={0.5}
+                              value={selected.strokeWidth ?? 3}
+                              onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
+                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                            />
+                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
+                          </span>
+                        </label>
+
+                        <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                          <span>테두리 스타일</span>
+                          <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line w-28">
+                            {[
+                              { label: "실선", v: "solid" },
+                              { label: "점선", v: "dashed" }
+                            ].map((style) => (
+                              <button
+                                key={style.v}
+                                type="button"
+                                onClick={() => patchEl(selected.id, { dashStyle: style.v as "solid" | "dashed" } as Partial<El>)}
+                                className={cn(
+                                  "flex-1 rounded py-0.5 text-[0.6rem] font-semibold transition-colors",
+                                  (selected.dashStyle ?? "solid") === style.v
+                                    ? "bg-accent text-on-accent"
+                                    : "text-fg-2 hover:bg-raised"
+                                )}
+                              >
+                                {style.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* 이미지 필터 효과 (코미포 스타일) */}
               {selected.type === "image" && (
                 <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
@@ -4279,7 +6668,7 @@ export function StudioPage() {
                         <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{selected.contrast ?? 0}</span>
                       </span>
                     </label>
-                    <div className="flex gap-4 pt-1">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
                       <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -4298,7 +6687,73 @@ export function StudioPage() {
                         />
                         세피아
                       </label>
+                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!(selected as any).screentone}
+                          onChange={(e) => patchEl(selected.id, { screentone: e.target.checked } as Partial<El>)}
+                          className="size-3.5 accent-accent"
+                        />
+                        스크린톤 (만화망점)
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!(selected as any).lineart}
+                          onChange={(e) => patchEl(selected.id, { lineart: e.target.checked } as Partial<El>)}
+                          className="size-3.5 accent-accent"
+                        />
+                        외곽선 (선화추출)
+                      </label>
                     </div>
+
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2 mt-2">
+                      색수차 왜곡 (Chromatic)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={12}
+                          step={1}
+                          value={(selected as any).chromatic ?? 0}
+                          onChange={(e) => patchEl(selected.id, { chromatic: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).chromatic ?? 0}px</span>
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                      툰 쉐이딩 단계 (Toon)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={8}
+                          step={1}
+                          value={(selected as any).posterize ?? 0}
+                          onChange={(e) => patchEl(selected.id, { posterize: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).posterize ?? 0}</span>
+                      </span>
+                    </label>
+
+                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                      노이즈 (Noise)
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={(selected as any).noise ?? 0}
+                          onChange={(e) => patchEl(selected.id, { noise: Number(e.target.value) } as Partial<El>)}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).noise ?? 0}%</span>
+                      </span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -4359,6 +6814,326 @@ export function StudioPage() {
                 <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })} title="삭제 (Delete)">
                   <Trash2 size={14} /> 삭제
                 </button>
+              </div>
+            </div>
+          )}
+
+          {selected === null && tool === "draw" && (
+            <div className="rounded-2xl border border-line bg-panel/40 p-3 space-y-3">
+              <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
+              
+              {/* 모드 선택: 펜 / 지우개 / 도형 */}
+              <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
+                {[
+                  { label: "펜", v: "pen" },
+                  { label: "지우개", v: "eraser" },
+                  { label: "도형", v: "shape" },
+                ].map((mode) => (
+                  <button
+                    key={mode.v}
+                    type="button"
+                    onClick={() => {
+                      setDrawMode(mode.v as "pen" | "eraser" | "shape");
+                      if (mode.v === "shape") {
+                        setDrawShape("line");
+                      }
+                    }}
+                    className={cn(
+                      "flex-1 rounded py-1 text-[0.62rem] font-semibold transition-colors",
+                      drawMode === mode.v
+                        ? "bg-accent text-on-accent"
+                        : "text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 지우개가 아닐 때 브러시 종류 선택 */}
+              {drawMode === "pen" && (
+                <div className="space-y-1">
+                  <p className="text-[0.66rem] font-medium text-fg-3">브러시 프리셋</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {BRUSH_PRESETS.map((p) => {
+                      const active = brush === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setBrush(p.id);
+                            setStrokeWidth(p.defaultWidth);
+                            setBrushOpacity(p.defaultOpacity);
+                            if (p.defaultColor) {
+                              setColor(p.defaultColor);
+                            }
+                          }}
+                          className={cn(
+                            "rounded border py-1 text-xs transition-colors",
+                            active
+                              ? "border-accent bg-accent-soft/30 text-accent font-semibold"
+                              : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 도형 모드일 때 도형 선택 */}
+              {drawMode === "shape" && (
+                <div className="space-y-1">
+                  <p className="text-[0.66rem] font-medium text-fg-3">도형 종류</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([
+                      { kind: "line" as const, label: "선" },
+                      { kind: "rect" as const, label: "사각형" },
+                      { kind: "ellipse" as const, label: "타원" },
+                      { kind: "star" as const, label: "별" },
+                    ]).map((item) => {
+                      const active = drawShape === item.kind;
+                      return (
+                        <button
+                          key={item.kind}
+                          type="button"
+                          onClick={() => setDrawShape(item.kind)}
+                          className={cn(
+                            "rounded border py-1 text-xs transition-colors",
+                            active
+                              ? "border-accent bg-accent-soft/30 text-accent font-semibold"
+                              : "border-line text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 색상 선택 (지우개 아닐 때) */}
+              {drawMode !== "eraser" && (
+                <div className="space-y-1.5 pt-1.5 border-t border-line/35">
+                  <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
+                  <div className="flex flex-wrap gap-1">
+                    {DRAW_COLOR_SWATCHES.map((swatch) => (
+                      <button
+                        key={swatch}
+                        type="button"
+                        onClick={() => setColor(swatch)}
+                        className={cn(
+                          "size-5 rounded border transition-transform hover:scale-110",
+                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : "border-line/60"
+                        )}
+                        style={{ background: swatch }}
+                        title={swatch}
+                      />
+                    ))}
+                    {/* 커스텀 컬러 */}
+                    <label
+                      className="relative flex items-center justify-center cursor-pointer size-5 rounded border border-line shadow-sm overflow-hidden"
+                      title="사용자 정의 색상"
+                      style={{ background: color }}
+                    >
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer size-full"
+                      />
+                      <span className="text-[8px] mix-blend-difference text-white font-bold select-none">C</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* 크기 슬라이더 */}
+              <div className="space-y-1.5 pt-1.5 border-t border-line/35">
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  <span>크기</span>
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="range"
+                      min={1}
+                      max={48}
+                      value={strokeWidth}
+                      onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                      className="w-24 accent-accent cursor-pointer"
+                    />
+                    <span className="w-8 text-right text-xs tabular-nums text-fg-3">{strokeWidth}px</span>
+                  </span>
+                </label>
+
+                {/* 투명도 슬라이더 */}
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  <span>투명도</span>
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      step={5}
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                      className="w-24 accent-accent cursor-pointer"
+                    />
+                    <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round(brushOpacity * 100)}%</span>
+                  </span>
+                </label>
+
+                {/* 손떨림 보정 (Stabilizer) */}
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2 pt-1.5 border-t border-line/35">
+                  <span title="선화를 보정하여 부드러운 드로잉을 지원합니다.">손떨림 보정</span>
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      step={1}
+                      value={stabilizer}
+                      onChange={(e) => setStabilizer(Number(e.target.value))}
+                      className="w-24 accent-accent cursor-pointer"
+                    />
+                    <span className="w-8 text-right text-xs tabular-nums text-fg-3">{stabilizer}</span>
+                  </span>
+                </label>
+
+                {/* 속도 기반 필압 (Velocity Pressure) */}
+                <div className="pt-1.5 border-t border-line/35 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-fg-2" title="드로잉 속도에 감응하여 선 굵기를 시뮬레이션합니다.">속도 감응형 필압</span>
+                    <input
+                      type="checkbox"
+                      checked={useVelocityPressure}
+                      onChange={(e) => setUseVelocityPressure(e.target.checked)}
+                      className="accent-accent size-4 cursor-pointer rounded"
+                    />
+                  </div>
+
+                  {useVelocityPressure && (
+                    <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1">
+                      <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
+                        <span>감도 조절</span>
+                        <span className="flex items-center gap-1.5">
+                          <input
+                            type="range"
+                            min={0.1}
+                            max={1.0}
+                            step={0.05}
+                            value={velocitySensitivity}
+                            onChange={(e) => setVelocitySensitivity(Number(e.target.value))}
+                            className="w-20 accent-accent cursor-pointer"
+                          />
+                          <span className="w-8 text-right tabular-nums">{Math.round(velocitySensitivity * 100)}%</span>
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
+                    <span title="필압 변화 민감도를 설정합니다.">필압 곡선</span>
+                    <select
+                      value={pressureCurve === 1.0 ? "linear" : pressureCurve === 1.8 ? "soft" : "hard"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "linear") setPressureCurve(1.0);
+                        else if (val === "soft") setPressureCurve(1.8);
+                        else if (val === "hard") setPressureCurve(0.65);
+                      }}
+                      className="rounded border border-line bg-card px-1.5 py-0.5 text-xs text-fg focus-visible:outline focus-visible:outline-accent"
+                    >
+                      <option value="linear">기본 (선형)</option>
+                      <option value="soft">부드럽게 (Soft)</option>
+                      <option value="hard">단단하게 (Hard)</option>
+                    </select>
+                  </label>
+                </div>
+
+                {/* 대칭 그리기 자 (Symmetry Ruler) */}
+                <div className="pt-2.5 border-t border-line/35 space-y-2">
+                  <p className="text-xs font-semibold text-fg-3">대칭 자 (Symmetry)</p>
+                  
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { id: "none", label: "없음" },
+                      { id: "vertical", label: "세로" },
+                      { id: "horizontal", label: "가로" },
+                      { id: "radial", label: "방사" },
+                    ].map((type) => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setSymmetryType(type.id as any)}
+                        className={cn(
+                          "rounded py-1 text-[0.62rem] font-semibold border transition-colors cursor-pointer",
+                          symmetryType === type.id
+                            ? "border-accent bg-accent/15 text-accent"
+                            : "border-line text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {symmetryType !== "none" && (
+                    <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1 animate-fade-in">
+                      {symmetryType === "radial" && (
+                        <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
+                          <span>갈래 수</span>
+                          <select
+                            value={symmetryRadialCount}
+                            onChange={(e) => setSymmetryRadialCount(Number(e.target.value))}
+                            className="rounded border border-line bg-card px-1 py-0.5 text-xs text-fg focus-visible:outline focus-visible:outline-accent"
+                          >
+                            {[4, 6, 8, 12, 16].map((num) => (
+                              <option key={num} value={num}>
+                                {num}방향
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+
+                      <div className="flex gap-2">
+                        <label className="flex-1 flex flex-col gap-0.5 text-[0.62rem] text-fg-3">
+                          <span>중앙 X</span>
+                          <input
+                            type="number"
+                            value={Math.round(symmetryCenterX)}
+                            onChange={(e) => setSymmetryCenterX(Number(e.target.value))}
+                            className="w-full rounded border border-line bg-card px-1 py-0.5 text-[0.65rem] text-fg focus-visible:outline focus-visible:outline-accent"
+                          />
+                        </label>
+                        <label className="flex-1 flex flex-col gap-0.5 text-[0.62rem] text-fg-3">
+                          <span>중앙 Y</span>
+                          <input
+                            type="number"
+                            value={Math.round(symmetryCenterY)}
+                            onChange={(e) => setSymmetryCenterY(Number(e.target.value))}
+                            className="w-full rounded border border-line bg-card px-1 py-0.5 text-[0.65rem] text-fg focus-visible:outline focus-visible:outline-accent"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSymmetryCenterX(400);
+                          setSymmetryCenterY(canvasH / 2);
+                        }}
+                        className="w-full rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised transition-colors cursor-pointer"
+                      >
+                        대칭축 중앙 정렬
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

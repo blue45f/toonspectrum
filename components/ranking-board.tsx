@@ -810,7 +810,7 @@ export function RankingBoard({
       ) : view === "list" ? (
         <div className="rounded-xl border border-line bg-panel/30 p-2 sm:p-3">
           {visibleRanked.map((r) => (
-            <RankRow key={r.title.id} ranked={r} metric={metric} />
+            <RankRow key={r.title.id} ranked={r} axis={axis} metric={metric} />
           ))}
         </div>
       ) : view === "poster" ? (

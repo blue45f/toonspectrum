@@ -32,13 +32,13 @@ jobs:
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Skip deployment when Vercel token is not configured
         if: env.VERCEL_TOKEN == ''
         run: echo "VERCEL_TOKEN is not configured; skipping Vercel deployment."
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         if: env.VERCEL_TOKEN != ''
         with:
           node-version: 22

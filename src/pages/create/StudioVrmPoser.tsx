@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type MutableRefObject } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
 import * as THREE from "three";
@@ -16,6 +16,12 @@ import {
   saveVrmThumbnail,
   type VrmLibraryEntry,
 } from "./vrm-library";
+import {
+  publishAsset,
+  listSharedAssets,
+  deleteSharedAsset,
+  type SharedAsset,
+} from "../../lib/creator-client";
 
 type StudioVrmPoserProps = {
   open: boolean;
@@ -51,6 +57,14 @@ type PosePreset = {
   bones: PoseBoneMap;
 };
 
+type CustomPose = {
+  id: string;
+  label: string;
+  yOffset: number;
+  bones: PoseBoneMap;
+  expressionWeights?: Record<string, number>;
+};
+
 type ExpressionAction = {
   id: string;
   label: string;
@@ -65,6 +79,136 @@ type CameraPreset = {
   target: Vec3;
   fov: number;
 };
+
+type CostumePreset = {
+  id: string;
+  name: string;
+  emoji: string;
+  colors: Record<string, string>;
+};
+
+const COSTUME_PRESETS: CostumePreset[] = [
+  {
+    id: "school",
+    name: "스쿨룩 (교복)",
+    emoji: "🏫",
+    colors: { tops: "#f8f9fa", bottoms: "#1e293b", hair: "#475569", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "knight",
+    name: "성기사 (갑옷)",
+    emoji: "🛡️",
+    colors: { tops: "#cbd5e1", bottoms: "#1e3a8a", hair: "#fbbf24", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "royal",
+    name: "로판 황실예복",
+    emoji: "👑",
+    colors: { tops: "#991b1b", bottoms: "#d97706", hair: "#e2e8f0", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "cyber",
+    name: "사이버펑크",
+    emoji: "⚡",
+    colors: { tops: "#0f172a", bottoms: "#ec4899", hair: "#a855f7", body: "#06b6d4", face: "#06b6d4" },
+  },
+  {
+    id: "gothic",
+    name: "고스 롤리타",
+    emoji: "🖤",
+    colors: { tops: "#111827", bottoms: "#581c87", hair: "#f3f4f6", body: "#f9fafb", face: "#f9fafb" },
+  },
+  {
+    id: "autumn",
+    name: "클래식 코트",
+    emoji: "🍂",
+    colors: { tops: "#d97706", bottoms: "#451a03", hair: "#b45309", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "marine",
+    name: "마린 세일러",
+    emoji: "⚓",
+    colors: { tops: "#f8f9fa", bottoms: "#0f172a", hair: "#0284c7", body: "#ffe4e6", face: "#ffe4e6" },
+  },
+  {
+    id: "druid",
+    name: "숲의 엘프",
+    emoji: "🍃",
+    colors: { tops: "#065f46", bottoms: "#78350f", hair: "#10b981", body: "#fef3c7", face: "#fef3c7" },
+  },
+  {
+    id: "ninja",
+    name: "그림자 암살자",
+    emoji: "🥷",
+    colors: { tops: "#111827", bottoms: "#1f2937", hair: "#9ca3af", body: "#e5e7eb", face: "#e5e7eb" },
+  },
+  {
+    id: "magical",
+    name: "마법소녀/소년",
+    emoji: "💖",
+    colors: { tops: "#f472b6", bottoms: "#f472b6", hair: "#fb7185", body: "#ffe4e6", face: "#ffe4e6" },
+  },
+  {
+    id: "wizard",
+    name: "판타지 마법사",
+    emoji: "🔮",
+    colors: { tops: "#3b0764", bottoms: "#1e1b4b", hair: "#a5b4fc", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "murim",
+    name: "무협 소협",
+    emoji: "⚔️",
+    colors: { tops: "#0284c7", bottoms: "#f8f9fa", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "ceo",
+    name: "현대 재벌/정장",
+    emoji: "💼",
+    colors: { tops: "#0f172a", bottoms: "#0f172a", hair: "#1e293b", body: "#ffe4e6", face: "#ffe4e6" },
+  },
+  {
+    id: "sporty",
+    name: "스포티 트랙슈트",
+    emoji: "🏃",
+    colors: { tops: "#10b981", bottoms: "#10b981", hair: "#6b7280", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "explorer",
+    name: "설원 탐험가",
+    emoji: "❄️",
+    colors: { tops: "#f1f5f9", bottoms: "#64748b", hair: "#38bdf8", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "steampunk",
+    name: "스팀펑크",
+    emoji: "⚙️",
+    colors: { tops: "#78350f", bottoms: "#451a03", hair: "#d97706", body: "#fef3c7", face: "#fef3c7" },
+  },
+  {
+    id: "angel",
+    name: "성직자/천사",
+    emoji: "👼",
+    colors: { tops: "#ffffff", bottoms: "#ffffff", hair: "#fef08a", body: "#fffbeb", face: "#fffbeb" },
+  },
+  {
+    id: "devil",
+    name: "심연의 악마",
+    emoji: "😈",
+    colors: { tops: "#450a0a", bottoms: "#1a0505", hair: "#ef4444", body: "#1c1917", face: "#1c1917" },
+  },
+  {
+    id: "zombie",
+    name: "강시/강령술사",
+    emoji: "🧟",
+    colors: { tops: "#1e1b4b", bottoms: "#0f172a", hair: "#312e81", body: "#86efac", face: "#86efac" },
+  },
+  {
+    id: "astronaut",
+    name: "우주 대원",
+    emoji: "👨‍🚀",
+    colors: { tops: "#f97316", bottoms: "#e2e8f0", hair: "#475569", body: "#f1f5f9", face: "#f1f5f9" },
+  },
+];
 
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
@@ -478,6 +622,240 @@ export const POSE_PRESETS: PosePreset[] = [
       rightHand: rotate([d(5), d(15), d(-15)]),
     }),
   },
+  {
+    id: "fighting",
+    label: "격투",
+    tone: "전투 준비 자세",
+    yOffset: -0.03,
+    bones: naturalPose({
+      hips: rotate([d(-5), d(-10), 0]),
+      spine: rotate([d(5), d(8), 0]),
+      chest: rotate([d(-2), d(6), 0]),
+      head: rotate([d(-4), d(-8), 0]),
+      leftUpperArm: aim(0.55, 0.1, 0.6),
+      leftLowerArm: aim(0.1, 0.45, 0.88),
+      leftHand: rotate([d(10), 0, d(10)]),
+      rightUpperArm: aim(0.5, -0.15, 0.55),
+      rightLowerArm: aim(0.15, 0.5, 0.85),
+      rightHand: rotate([d(10), 0, d(-10)]),
+      leftUpperLeg: aim(0.15, -0.65, 0.75),
+      rightUpperLeg: aim(0.1, -0.85, -0.52),
+      leftLowerLeg: aim(0.05, -0.92, 0.38),
+      rightLowerLeg: aim(0.03, -0.95, -0.3),
+    }),
+  },
+  {
+    id: "thinking",
+    label: "생각중",
+    tone: "턱을 괴고 생각",
+    bones: naturalPose({
+      hips: rotate([0, d(5), 0]),
+      spine: rotate([d(4), d(-5), 0]),
+      chest: rotate([d(2), d(-4), 0]),
+      neck: rotate([d(2), d(4), 0]),
+      head: rotate([d(8), d(-6), d(-5)]),
+      rightUpperArm: aim(0.35, -0.2, 0.3),
+      rightLowerArm: aim(-0.35, 0.6, 0.7),
+      rightHand: rotate([d(20), d(15), d(-10)]),
+      leftUpperArm: aim(-0.4, -0.3, 0.5),
+      leftLowerArm: aim(-0.6, 0.15, 0.78),
+      leftHand: rotate([d(5), 0, d(5)]),
+    }),
+  },
+  {
+    id: "pray",
+    label: "기도",
+    tone: "합장/기도",
+    bones: naturalPose({
+      spine: rotate([d(3), 0, 0]),
+      chest: rotate([d(2), 0, 0]),
+      neck: rotate([d(4), 0, 0]),
+      head: rotate([d(8), 0, 0]),
+      leftUpperArm: aim(-0.4, -0.25, 0.6),
+      leftLowerArm: aim(-0.55, 0.35, 0.75),
+      leftHand: rotate([d(10), d(-15), d(15)]),
+      rightUpperArm: aim(-0.4, -0.25, 0.6),
+      rightLowerArm: aim(-0.55, 0.35, 0.75),
+      rightHand: rotate([d(10), d(15), d(-15)]),
+    }),
+  },
+  {
+    id: "dance",
+    label: "댄스",
+    tone: "춤추는 자세",
+    yOffset: -0.01,
+    bones: naturalPose({
+      hips: rotate([d(-3), d(-8), d(3)]),
+      spine: rotate([d(-2), d(6), d(-2)]),
+      chest: rotate([d(3), d(5), d(-3)]),
+      head: rotate([d(-4), d(-6), d(4)]),
+      leftUpperArm: aim(0.62, 0.7, 0.15),
+      leftLowerArm: aim(0.3, 0.92, 0.2),
+      leftHand: rotate([0, 0, d(15)]),
+      rightUpperArm: aim(0.5, -0.4, 0.4),
+      rightLowerArm: aim(0.2, -0.2, 0.96),
+      rightHand: rotate([0, 0, d(-10)]),
+      leftUpperLeg: aim(0.1, -0.6, 0.79),
+      leftLowerLeg: aim(0.05, -0.85, 0.52),
+      rightUpperLeg: aim(0.18, -0.88, -0.42),
+      rightLowerLeg: aim(0.05, -0.72, -0.69),
+    }),
+  },
+  {
+    id: "bow",
+    label: "인사",
+    tone: "깊은 인사",
+    yOffset: -0.04,
+    bones: naturalPose({
+      hips: rotate([d(25), 0, 0]),
+      spine: rotate([d(15), 0, 0]),
+      chest: rotate([d(8), 0, 0]),
+      neck: rotate([d(5), 0, 0]),
+      head: rotate([d(3), 0, 0]),
+      leftUpperArm: aim(0.2, -0.98),
+      rightUpperArm: aim(0.2, -0.98),
+      leftLowerArm: aim(0.1, -0.99),
+      rightLowerArm: aim(0.1, -0.99),
+    }),
+  },
+  {
+    id: "crouch",
+    label: "쪼그림",
+    tone: "웅크리기",
+    yOffset: -0.18,
+    bones: naturalPose({
+      hips: rotate([d(-15), 0, 0]),
+      spine: rotate([d(12), 0, 0]),
+      chest: rotate([d(5), 0, 0]),
+      neck: rotate([d(3), 0, 0]),
+      head: rotate([d(-5), 0, 0]),
+      leftUpperArm: aim(0.3, -0.65, 0.5),
+      leftLowerArm: aim(0.15, -0.3, 0.94),
+      rightUpperArm: aim(0.3, -0.65, 0.5),
+      rightLowerArm: aim(0.15, -0.3, 0.94),
+      leftUpperLeg: aim(0.12, -0.15, 0.98),
+      rightUpperLeg: aim(0.12, -0.15, 0.98),
+      leftLowerLeg: aim(0.05, -0.95, -0.3),
+      rightLowerLeg: aim(0.05, -0.95, -0.3),
+      leftFoot: rotate([d(-8), 0, d(1)]),
+      rightFoot: rotate([d(-8), 0, d(-1)]),
+    }),
+  },
+  {
+    id: "heroic",
+    label: "영웅",
+    tone: "영웅적 포즈",
+    bones: naturalPose({
+      hips: rotate([d(-2), d(-6), 0]),
+      spine: rotate([d(-4), d(4), 0]),
+      chest: rotate([d(-3), d(4), 0]),
+      head: rotate([d(-4), d(-3), 0]),
+      leftUpperArm: aim(0.45, -0.5, 0.15),
+      leftLowerArm: aim(0.2, -0.92, 0.32),
+      leftHand: rotate([0, 0, d(5)]),
+      rightUpperArm: aim(0.6, 0.78, 0.1),
+      rightLowerArm: aim(0.2, 0.96, 0.15),
+      rightHand: rotate([0, 0, d(-5)]),
+      leftUpperLeg: aim(0.12, -0.7, 0.7),
+      rightUpperLeg: aim(0.05, -0.99, -0.1),
+    }),
+  },
+  {
+    id: "shy2",
+    label: "수줍음",
+    tone: "수줍은 자세",
+    bones: naturalPose({
+      hips: rotate([d(2), d(4), 0]),
+      spine: rotate([d(3), d(-3), 0]),
+      chest: rotate([d(2), d(-2), 0]),
+      head: rotate([d(10), d(6), d(5)]),
+      leftUpperArm: aim(-0.3, -0.55, 0.72),
+      leftLowerArm: aim(-0.5, 0.2, 0.84),
+      leftHand: rotate([d(5), 0, d(5)]),
+      rightUpperArm: aim(-0.3, -0.55, 0.72),
+      rightLowerArm: aim(-0.5, 0.2, 0.84),
+      rightHand: rotate([d(5), 0, d(-5)]),
+      leftUpperLeg: aim(0.15, -0.98, 0.1),
+      rightUpperLeg: aim(0.05, -0.95, -0.3),
+    }),
+  },
+  {
+    id: "lean",
+    label: "기대기",
+    tone: "벽에 기대기",
+    yOffset: -0.01,
+    bones: naturalPose({
+      hips: rotate([d(3), d(-5), d(-4)]),
+      spine: rotate([d(-2), d(3), d(2)]),
+      chest: rotate([d(-1), d(2), d(1)]),
+      head: rotate([d(-3), d(-3), d(-2)]),
+      leftUpperArm: aim(0.35, -0.94),
+      rightUpperArm: aim(-0.2, -0.4, 0.5),
+      rightLowerArm: aim(-0.6, 0.3, 0.72),
+      rightHand: rotate([0, d(-10), d(-5)]),
+      leftUpperLeg: aim(0.1, -0.85, 0.52),
+      rightUpperLeg: aim(0.08, -0.92, -0.38),
+      rightLowerLeg: aim(0.03, -0.88, -0.47),
+    }),
+  },
+  {
+    id: "crossArms",
+    label: "팔짱",
+    tone: "팔짱 끼기",
+    bones: naturalPose({
+      spine: rotate([d(-2), 0, 0]),
+      chest: rotate([d(-3), 0, 0]),
+      head: rotate([d(-3), 0, 0]),
+      leftUpperArm: aim(-0.55, -0.25, 0.48),
+      leftLowerArm: aim(-0.88, 0.12, 0.38),
+      leftHand: rotate([d(5), d(-10), d(8)]),
+      rightUpperArm: aim(-0.55, -0.25, 0.48),
+      rightLowerArm: aim(-0.88, 0.12, 0.38),
+      rightHand: rotate([d(5), d(10), d(-8)]),
+    }),
+  },
+  {
+    id: "run2",
+    label: "달리기",
+    tone: "달리는 자세",
+    yOffset: -0.02,
+    bones: naturalPose({
+      hips: rotate([d(-6), d(-5), 0]),
+      spine: rotate([d(6), d(4), 0]),
+      chest: rotate([d(-2), d(3), 0]),
+      head: rotate([d(-3), d(-4), 0]),
+      leftUpperArm: aim(0.3, -0.6, -0.72),
+      leftLowerArm: aim(0.15, -0.7, -0.7),
+      rightUpperArm: aim(0.3, -0.5, 0.8),
+      rightLowerArm: aim(0.15, -0.6, 0.78),
+      leftUpperLeg: aim(0.1, -0.35, 0.93),
+      leftLowerLeg: aim(0.03, -0.82, 0.57),
+      rightUpperLeg: aim(0.1, -0.6, -0.79),
+      rightLowerLeg: aim(0.03, -0.88, 0.48),
+    }),
+  },
+  {
+    id: "jump",
+    label: "점프",
+    tone: "점프 자세",
+    yOffset: 0.1,
+    bones: naturalPose({
+      hips: rotate([d(-8), 0, 0]),
+      spine: rotate([d(-4), 0, 0]),
+      chest: rotate([d(5), 0, 0]),
+      head: rotate([d(-6), 0, 0]),
+      leftUpperArm: aim(0.55, 0.82, 0.12),
+      leftLowerArm: aim(0.25, 0.96, 0.08),
+      rightUpperArm: aim(0.55, 0.82, 0.12),
+      rightLowerArm: aim(0.25, 0.96, 0.08),
+      leftUpperLeg: aim(0.1, -0.55, 0.83),
+      leftLowerLeg: aim(0.05, -0.82, -0.57),
+      rightUpperLeg: aim(0.1, -0.55, 0.83),
+      rightLowerLeg: aim(0.05, -0.82, -0.57),
+      leftFoot: rotate([d(-15), 0, 0]),
+      rightFoot: rotate([d(-15), 0, 0]),
+    }),
+  },
 ];
 
 const CAMERA_PRESETS: CameraPreset[] = [
@@ -544,6 +922,43 @@ const SCENE_PROPS: ScenePropDef[] = [
   { id: "crystal", label: "수정구", emoji: "🔮", category: "item", position: [-0.35, 0.8, 0.35], scale: 0.1 },
   { id: "cloud", label: "구름", emoji: "☁️", category: "effect", position: [0.5, 2.0, -0.5], scale: 0.2 },
   { id: "star", label: "별", emoji: "🌟", category: "effect", position: [-0.4, 1.8, 0.2], scale: 0.07 },
+  /* ── Animals (new) ── */
+  { id: "penguin", label: "펭귄", emoji: "🐧", category: "animal", position: [0.55, 0, 0.25], scale: 0.11 },
+  { id: "dragon", label: "드래곤", emoji: "🐉", category: "animal", position: [-0.7, 0, -0.3], scale: 0.12 },
+  { id: "unicorn", label: "유니콘", emoji: "🦄", category: "animal", position: [0.7, 0, -0.2], scale: 0.13 },
+  { id: "owl", label: "부엉이", emoji: "🦉", category: "animal", position: [0.4, 1.6, 0.15], scale: 0.09 },
+  { id: "butterfly", label: "나비", emoji: "🦋", category: "animal", position: [0.35, 1.5, 0.4], scale: 0.08 },
+  { id: "deer", label: "사슴", emoji: "🦌", category: "animal", position: [-0.65, 0, 0.35], scale: 0.12 },
+  { id: "wolf", label: "늑대", emoji: "🐺", category: "animal", position: [0.65, 0, -0.35], scale: 0.12 },
+  { id: "turtle", label: "거북이", emoji: "🐢", category: "animal", position: [-0.45, 0, 0.5], scale: 0.1 },
+  /* ── Items (new) ── */
+  { id: "staff", label: "지팡이", emoji: "🪄", category: "item", position: [0.6, 0, 0.1], scale: 0.13 },
+  { id: "bowWeapon", label: "활", emoji: "🏹", category: "item", position: [-0.6, 0.5, 0.1], scale: 0.14 },
+  { id: "lantern", label: "랜턴", emoji: "🏮", category: "item", position: [0.4, 0.8, 0.3], scale: 0.1 },
+  { id: "crown", label: "왕관", emoji: "👑", category: "item", position: [0.3, 1.7, 0.15], scale: 0.08 },
+  { id: "ring", label: "반지", emoji: "💍", category: "item", position: [0.25, 1.2, 0.3], scale: 0.05 },
+  { id: "potion", label: "물약", emoji: "🧪", category: "item", position: [0.35, 0.4, 0.4], scale: 0.09 },
+  { id: "scroll", label: "두루마리", emoji: "📜", category: "item", position: [-0.4, 0.6, 0.35], scale: 0.1 },
+  { id: "guitar", label: "기타", emoji: "🎸", category: "item", position: [-0.55, 0.3, 0.25], scale: 0.12 },
+  { id: "umbrella", label: "우산", emoji: "☂️", category: "item", position: [0.45, 0.5, 0.2], scale: 0.14 },
+  { id: "hammer", label: "망치", emoji: "🔨", category: "item", position: [0.6, 0.3, -0.1], scale: 0.13 },
+  { id: "wand", label: "마법봉", emoji: "✨", category: "item", position: [0.5, 0.9, 0.2], scale: 0.1 },
+  { id: "heartProp", label: "하트", emoji: "❤️", category: "item", position: [0.3, 1.4, 0.3], scale: 0.08 },
+  { id: "moon", label: "초승달", emoji: "🌙", category: "item", position: [-0.5, 1.9, -0.3], scale: 0.12 },
+  { id: "sun", label: "태양", emoji: "☀️", category: "item", position: [0.5, 2.1, -0.4], scale: 0.14 },
+  { id: "treasureChest", label: "보물상자", emoji: "🧳", category: "item", position: [-0.5, 0, 0.4], scale: 0.11 },
+  { id: "balloon", label: "풍선", emoji: "🎈", category: "item", position: [0.4, 1.8, 0.2], scale: 0.1 },
+  { id: "candle", label: "초", emoji: "🕯️", category: "item", position: [0.3, 0.3, 0.45], scale: 0.08 },
+  { id: "mask", label: "가면", emoji: "🎭", category: "item", position: [-0.3, 1.3, 0.3], scale: 0.09 },
+  /* ── Effects (new) ── */
+  { id: "sparkle", label: "반짝이", emoji: "💫", category: "effect", position: [0.3, 1.6, 0.3], scale: 0.1 },
+  { id: "fire", label: "불꽃", emoji: "🔥", category: "effect", position: [0.5, 0, 0.3], scale: 0.12 },
+  { id: "lightning", label: "번개", emoji: "⚡", category: "effect", position: [-0.3, 1.5, -0.2], scale: 0.12 },
+  { id: "snowflake", label: "눈결정", emoji: "❄️", category: "effect", position: [0.4, 1.8, 0.1], scale: 0.08 },
+  { id: "rainbow", label: "무지개", emoji: "🌈", category: "effect", position: [0, 2.2, -0.6], scale: 0.15 },
+  { id: "bubbles", label: "비눗방울", emoji: "🫧", category: "effect", position: [-0.35, 1.3, 0.35], scale: 0.1 },
+  { id: "leaves", label: "나뭇잎", emoji: "🍃", category: "effect", position: [0.4, 1.5, -0.2], scale: 0.1 },
+  { id: "feather", label: "깃털", emoji: "🪶", category: "effect", position: [-0.3, 1.6, 0.25], scale: 0.09 },
 ];
 
 const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };
@@ -743,19 +1158,49 @@ export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
   return true;
 }
 
-function applyExpressionToVrm(vrm: VRM, action: ExpressionAction) {
+export function applyExpressionWeightsToVrm(vrm: VRM, weights: Record<string, number>) {
   const expressionManager = vrm.expressionManager;
   if (!expressionManager) return false;
 
   expressionManager.resetValues();
 
-  if (action.name && expressionManager.getExpression(action.name)) {
-    expressionManager.setValue(action.name, 1);
-  }
+  Object.entries(weights).forEach(([name, weight]) => {
+    if (expressionManager.getExpression(name)) {
+      expressionManager.setValue(name, weight);
+    }
+  });
 
   expressionManager.update();
   vrm.update(0);
   return true;
+}
+
+export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, string>) {
+  vrm.scene.traverse((obj) => {
+    if ((obj as any).isMesh) {
+      const mesh = obj as THREE.Mesh;
+      const name = mesh.name.toLowerCase();
+      
+      let part: string | null = null;
+      if (name.includes("tops") || name.includes("top") || name.includes("clothes") || name.includes("shirt")) part = "tops";
+      else if (name.includes("bottoms") || name.includes("bottom") || name.includes("pants") || name.includes("skirt") || name.includes("shoes") || name.includes("acc")) part = "bottoms";
+      else if (name.includes("hair")) part = "hair";
+      else if (name.includes("body") || name.includes("skin") || name.includes("hand") || name.includes("leg") || name.includes("arm") || name.includes("head") || name.includes("foot")) part = "body";
+      else if (name.includes("face") || name.includes("eye") || name.includes("mouth") || name.includes("brow")) part = "face";
+
+      if (part && customColors[part]) {
+        const hex = customColors[part]!;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        
+        materials.forEach((mat: any) => {
+          if (mat && mat.color) {
+            mat.color.set(hex);
+            mat.needsUpdate = true;
+          }
+        });
+      }
+    }
+  });
 }
 
 function getExpressionTone(name: string, vrm: VRM) {
@@ -796,6 +1241,22 @@ function getAvailableExpressionActions(vrm: VRM | null) {
       tone: getExpressionTone(name, vrm),
     })),
   ];
+}
+
+function getExpressionCategory(action: ExpressionAction): "emotion" | "eye" | "mouth" | "custom" {
+  const name = action.name;
+  if (!name) return "emotion";
+  const tone = action.tone;
+  if (tone === "눈" || tone === "시선" || name.startsWith("blink") || name.startsWith("look")) {
+    return "eye";
+  }
+  if (tone === "입모양" || ["aa", "ih", "ou", "ee", "oh"].includes(name)) {
+    return "mouth";
+  }
+  if (["happy", "sad", "relaxed", "angry", "surprised"].includes(name) || tone === "기본") {
+    return "emotion";
+  }
+  return "custom";
 }
 
 function roundExportSize(canvas: HTMLCanvasElement) {
@@ -1070,19 +1531,774 @@ function PropStar({ scale: s }: { scale: number }) {
   );
 }
 
+/* ── NEW Animals ─────────────────────────────── */
+
+function AnimalPenguin({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 0.9, 0]}><capsuleGeometry args={[0.7, 1.0, 8, 16]} /><meshStandardMaterial color="#1e293b" /></mesh>
+      {/* belly */}
+      <mesh position={[0, 0.85, 0.35]}><capsuleGeometry args={[0.5, 0.7, 8, 16]} /><meshStandardMaterial color="#f1f5f9" /></mesh>
+      {/* head */}
+      <mesh position={[0, 1.9, 0]}><sphereGeometry args={[0.55, 16, 16]} /><meshStandardMaterial color="#0f172a" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.18, 2.0, 0.45]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[0.18, 2.0, 0.45]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+      {/* beak */}
+      <mesh position={[0, 1.8, 0.55]} rotation={[0.3, 0, 0]}><coneGeometry args={[0.12, 0.3, 6]} /><meshStandardMaterial color="#f97316" /></mesh>
+      {/* feet */}
+      <mesh position={[-0.25, 0.05, 0.15]}><boxGeometry args={[0.25, 0.08, 0.35]} /><meshStandardMaterial color="#f97316" /></mesh>
+      <mesh position={[0.25, 0.05, 0.15]}><boxGeometry args={[0.25, 0.08, 0.35]} /><meshStandardMaterial color="#f97316" /></mesh>
+      {/* wings */}
+      <mesh position={[-0.7, 0.9, 0]} rotation={[0, 0, 0.4]}><capsuleGeometry args={[0.12, 0.7, 4, 8]} /><meshStandardMaterial color="#1e293b" /></mesh>
+      <mesh position={[0.7, 0.9, 0]} rotation={[0, 0, -0.4]}><capsuleGeometry args={[0.12, 0.7, 4, 8]} /><meshStandardMaterial color="#1e293b" /></mesh>
+    </group>
+  );
+}
+
+function AnimalDragon({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 1.0, 0]}><capsuleGeometry args={[0.8, 1.2, 8, 16]} /><meshStandardMaterial color="#15803d" /></mesh>
+      {/* head */}
+      <mesh position={[0, 2.2, 0.2]}><sphereGeometry args={[0.65, 16, 16]} /><meshStandardMaterial color="#166534" /></mesh>
+      {/* snout */}
+      <mesh position={[0, 2.0, 0.75]} rotation={[0.4, 0, 0]}><coneGeometry args={[0.2, 0.5, 8]} /><meshStandardMaterial color="#14532d" /></mesh>
+      {/* horns */}
+      <mesh position={[-0.3, 2.8, -0.1]} rotation={[0.3, 0, 0.2]}><coneGeometry args={[0.08, 0.5, 6]} /><meshStandardMaterial color="#7e22ce" /></mesh>
+      <mesh position={[0.3, 2.8, -0.1]} rotation={[0.3, 0, -0.2]}><coneGeometry args={[0.08, 0.5, 6]} /><meshStandardMaterial color="#7e22ce" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.22, 2.35, 0.55]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#92400e" /></mesh>
+      <mesh position={[0.22, 2.35, 0.55]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#92400e" /></mesh>
+      {/* wings */}
+      <mesh position={[-0.9, 1.6, -0.3]} rotation={[0, 0, 0.5]}><boxGeometry args={[1.0, 0.6, 0.04]} /><meshStandardMaterial color="#7e22ce" transparent opacity={0.7} /></mesh>
+      <mesh position={[0.9, 1.6, -0.3]} rotation={[0, 0, -0.5]}><boxGeometry args={[1.0, 0.6, 0.04]} /><meshStandardMaterial color="#7e22ce" transparent opacity={0.7} /></mesh>
+      {/* tail */}
+      <mesh position={[0, 0.5, -0.8]} rotation={[0.8, 0, 0]}><capsuleGeometry args={[0.15, 1.2, 4, 8]} /><meshStandardMaterial color="#15803d" /></mesh>
+      <mesh position={[0, 0.15, -1.3]} rotation={[1.0, 0, 0]}><coneGeometry args={[0.2, 0.4, 6]} /><meshStandardMaterial color="#7e22ce" /></mesh>
+    </group>
+  );
+}
+
+function AnimalUnicorn({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 1.0, 0]}><capsuleGeometry args={[0.8, 1.4, 8, 16]} /><meshStandardMaterial color="#f8fafc" /></mesh>
+      {/* head */}
+      <mesh position={[0, 2.2, 0.3]}><sphereGeometry args={[0.6, 16, 16]} /><meshStandardMaterial color="#fff" /></mesh>
+      {/* snout */}
+      <mesh position={[0, 2.0, 0.85]}><capsuleGeometry args={[0.2, 0.3, 8, 8]} /><meshStandardMaterial color="#fce7f3" /></mesh>
+      {/* horn */}
+      <mesh position={[0, 2.95, 0.2]} rotation={[0.15, 0, 0]}><coneGeometry args={[0.08, 0.7, 8]} /><meshStandardMaterial color="#fbbf24" metalness={0.7} roughness={0.2} /></mesh>
+      {/* ears */}
+      <mesh position={[-0.3, 2.7, 0.1]} rotation={[0, 0, 0.3]}><coneGeometry args={[0.1, 0.35, 4]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[0.3, 2.7, 0.1]} rotation={[0, 0, -0.3]}><coneGeometry args={[0.1, 0.35, 4]} /><meshStandardMaterial color="#fff" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.2, 2.3, 0.7]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#6366f1" /></mesh>
+      <mesh position={[0.2, 2.3, 0.7]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#6366f1" /></mesh>
+      {/* mane */}
+      <mesh position={[0, 2.5, -0.2]} rotation={[0.5, 0, 0]}><capsuleGeometry args={[0.15, 0.8, 4, 8]} /><meshStandardMaterial color="#c084fc" /></mesh>
+      {/* legs */}
+      <mesh position={[-0.35, 0, 0.3]}><cylinderGeometry args={[0.1, 0.1, 0.8, 8]} /><meshStandardMaterial color="#e2e8f0" /></mesh>
+      <mesh position={[0.35, 0, 0.3]}><cylinderGeometry args={[0.1, 0.1, 0.8, 8]} /><meshStandardMaterial color="#e2e8f0" /></mesh>
+      <mesh position={[-0.35, 0, -0.3]}><cylinderGeometry args={[0.1, 0.1, 0.8, 8]} /><meshStandardMaterial color="#e2e8f0" /></mesh>
+      <mesh position={[0.35, 0, -0.3]}><cylinderGeometry args={[0.1, 0.1, 0.8, 8]} /><meshStandardMaterial color="#e2e8f0" /></mesh>
+      {/* tail */}
+      <mesh position={[0, 1.0, -0.9]} rotation={[0.6, 0, 0]}><capsuleGeometry args={[0.1, 0.9, 4, 8]} /><meshStandardMaterial color="#f0abfc" /></mesh>
+    </group>
+  );
+}
+
+function AnimalOwl({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 0.7, 0]}><capsuleGeometry args={[0.65, 0.9, 8, 16]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* head */}
+      <mesh position={[0, 1.7, 0]}><sphereGeometry args={[0.65, 16, 16]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* face disk */}
+      <mesh position={[0, 1.65, 0.45]}><sphereGeometry args={[0.5, 16, 16]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+      {/* big eyes */}
+      <mesh position={[-0.2, 1.8, 0.6]}><sphereGeometry args={[0.18, 12, 12]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+      <mesh position={[0.2, 1.8, 0.6]}><sphereGeometry args={[0.18, 12, 12]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+      <mesh position={[-0.2, 1.8, 0.72]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.2, 1.8, 0.72]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      {/* beak */}
+      <mesh position={[0, 1.55, 0.75]} rotation={[0.3, 0, 0]}><coneGeometry args={[0.08, 0.2, 4]} /><meshStandardMaterial color="#f59e0b" /></mesh>
+      {/* ear tufts */}
+      <mesh position={[-0.35, 2.3, 0]} rotation={[0, 0, 0.2]}><coneGeometry args={[0.12, 0.4, 4]} /><meshStandardMaterial color="#92400e" /></mesh>
+      <mesh position={[0.35, 2.3, 0]} rotation={[0, 0, -0.2]}><coneGeometry args={[0.12, 0.4, 4]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* chest pattern */}
+      <mesh position={[0, 0.6, 0.4]}><sphereGeometry args={[0.4, 12, 12]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+    </group>
+  );
+}
+
+function AnimalButterfly({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 0.5, 0]}><capsuleGeometry args={[0.06, 0.6, 4, 8]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      {/* head */}
+      <mesh position={[0, 1.0, 0]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#312e81" /></mesh>
+      {/* antennae */}
+      <mesh position={[-0.1, 1.25, 0]} rotation={[0, 0, 0.3]}><cylinderGeometry args={[0.01, 0.01, 0.3, 4]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      <mesh position={[0.1, 1.25, 0]} rotation={[0, 0, -0.3]}><cylinderGeometry args={[0.01, 0.01, 0.3, 4]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      {/* upper wings */}
+      <mesh position={[-0.55, 0.75, 0]} rotation={[0, 0.1, 0.3]}><sphereGeometry args={[0.45, 12, 12]} /><meshStandardMaterial color="#c084fc" transparent opacity={0.8} /></mesh>
+      <mesh position={[0.55, 0.75, 0]} rotation={[0, -0.1, -0.3]}><sphereGeometry args={[0.45, 12, 12]} /><meshStandardMaterial color="#c084fc" transparent opacity={0.8} /></mesh>
+      {/* lower wings */}
+      <mesh position={[-0.4, 0.35, 0]} rotation={[0, 0.1, 0.4]}><sphereGeometry args={[0.3, 12, 12]} /><meshStandardMaterial color="#fb7185" transparent opacity={0.75} /></mesh>
+      <mesh position={[0.4, 0.35, 0]} rotation={[0, -0.1, -0.4]}><sphereGeometry args={[0.3, 12, 12]} /><meshStandardMaterial color="#fb7185" transparent opacity={0.75} /></mesh>
+      {/* wing spots */}
+      <mesh position={[-0.55, 0.8, 0.15]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+      <mesh position={[0.55, 0.8, 0.15]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#fbbf24" /></mesh>
+    </group>
+  );
+}
+
+function AnimalDeer({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 1.0, 0]}><capsuleGeometry args={[0.7, 1.4, 8, 16]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* head */}
+      <mesh position={[0, 2.2, 0.3]}><sphereGeometry args={[0.5, 16, 16]} /><meshStandardMaterial color="#a16207" /></mesh>
+      {/* snout */}
+      <mesh position={[0, 2.0, 0.7]}><capsuleGeometry args={[0.15, 0.2, 8, 8]} /><meshStandardMaterial color="#d4a06a" /></mesh>
+      {/* nose */}
+      <mesh position={[0, 1.95, 0.85]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.2, 2.3, 0.55]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.2, 2.3, 0.55]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      {/* ears */}
+      <mesh position={[-0.4, 2.55, 0]} rotation={[0, 0, 0.5]}><capsuleGeometry args={[0.08, 0.3, 4, 8]} /><meshStandardMaterial color="#a16207" /></mesh>
+      <mesh position={[0.4, 2.55, 0]} rotation={[0, 0, -0.5]}><capsuleGeometry args={[0.08, 0.3, 4, 8]} /><meshStandardMaterial color="#a16207" /></mesh>
+      {/* antlers */}
+      <mesh position={[-0.2, 2.8, -0.05]} rotation={[0.1, 0, 0.2]}><cylinderGeometry args={[0.04, 0.03, 0.6, 6]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[0.2, 2.8, -0.05]} rotation={[0.1, 0, -0.2]}><cylinderGeometry args={[0.04, 0.03, 0.6, 6]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[-0.35, 3.05, -0.1]} rotation={[0, 0, 0.8]}><cylinderGeometry args={[0.03, 0.02, 0.3, 6]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[0.35, 3.05, -0.1]} rotation={[0, 0, -0.8]}><cylinderGeometry args={[0.03, 0.02, 0.3, 6]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* legs */}
+      <mesh position={[-0.3, 0, 0.25]}><cylinderGeometry args={[0.08, 0.07, 0.7, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[0.3, 0, 0.25]}><cylinderGeometry args={[0.08, 0.07, 0.7, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[-0.3, 0, -0.25]}><cylinderGeometry args={[0.08, 0.07, 0.7, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+      <mesh position={[0.3, 0, -0.25]}><cylinderGeometry args={[0.08, 0.07, 0.7, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* tail */}
+      <mesh position={[0, 1.2, -0.7]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#fff" /></mesh>
+    </group>
+  );
+}
+
+function AnimalWolf({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 1.0, 0]}><capsuleGeometry args={[0.75, 1.3, 8, 16]} /><meshStandardMaterial color="#6b7280" /></mesh>
+      {/* head */}
+      <mesh position={[0, 2.1, 0.2]}><sphereGeometry args={[0.6, 16, 16]} /><meshStandardMaterial color="#9ca3af" /></mesh>
+      {/* snout */}
+      <mesh position={[0, 1.9, 0.75]}><capsuleGeometry args={[0.18, 0.3, 8, 8]} /><meshStandardMaterial color="#d1d5db" /></mesh>
+      <mesh position={[0, 1.85, 0.95]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.2, 2.2, 0.55]}><sphereGeometry args={[0.09, 8, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#713f12" /></mesh>
+      <mesh position={[0.2, 2.2, 0.55]}><sphereGeometry args={[0.09, 8, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#713f12" /></mesh>
+      {/* ears */}
+      <mesh position={[-0.3, 2.65, 0]} rotation={[0, 0, 0.15]}><coneGeometry args={[0.15, 0.4, 4]} /><meshStandardMaterial color="#6b7280" /></mesh>
+      <mesh position={[0.3, 2.65, 0]} rotation={[0, 0, -0.15]}><coneGeometry args={[0.15, 0.4, 4]} /><meshStandardMaterial color="#6b7280" /></mesh>
+      {/* chest */}
+      <mesh position={[0, 0.8, 0.4]}><sphereGeometry args={[0.45, 12, 12]} /><meshStandardMaterial color="#e5e7eb" /></mesh>
+      {/* tail */}
+      <mesh position={[0, 0.8, -0.8]} rotation={[0.8, 0, 0]}><capsuleGeometry args={[0.15, 1.0, 4, 8]} /><meshStandardMaterial color="#9ca3af" /></mesh>
+    </group>
+  );
+}
+
+function AnimalTurtle({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* shell */}
+      <mesh position={[0, 0.6, 0]}><sphereGeometry args={[0.9, 16, 12]} /><meshStandardMaterial color="#166534" /></mesh>
+      {/* shell pattern */}
+      <mesh position={[0, 0.85, 0]}><sphereGeometry args={[0.7, 6, 4]} /><meshStandardMaterial color="#15803d" wireframe /></mesh>
+      {/* belly */}
+      <mesh position={[0, 0.3, 0]}><sphereGeometry args={[0.75, 16, 12]} /><meshStandardMaterial color="#fef08a" /></mesh>
+      {/* head */}
+      <mesh position={[0, 0.5, 0.8]}><sphereGeometry args={[0.3, 12, 12]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      {/* eyes */}
+      <mesh position={[-0.1, 0.6, 1.0]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      <mesh position={[0.1, 0.6, 1.0]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#111" /></mesh>
+      {/* legs */}
+      <mesh position={[-0.55, 0.15, 0.4]} rotation={[0, 0, 0.6]}><capsuleGeometry args={[0.12, 0.3, 4, 8]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      <mesh position={[0.55, 0.15, 0.4]} rotation={[0, 0, -0.6]}><capsuleGeometry args={[0.12, 0.3, 4, 8]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      <mesh position={[-0.5, 0.15, -0.35]} rotation={[0, 0, 0.6]}><capsuleGeometry args={[0.12, 0.3, 4, 8]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      <mesh position={[0.5, 0.15, -0.35]} rotation={[0, 0, -0.6]}><capsuleGeometry args={[0.12, 0.3, 4, 8]} /><meshStandardMaterial color="#22c55e" /></mesh>
+      {/* tail */}
+      <mesh position={[0, 0.3, -0.85]}><coneGeometry args={[0.08, 0.3, 6]} /><meshStandardMaterial color="#22c55e" /></mesh>
+    </group>
+  );
+}
+
+/* ── NEW Items ─────────────────────────────── */
+
+function PropStaff({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0, 0, 0.1]}>
+      {/* shaft */}
+      <mesh position={[0, 2.0, 0]}><cylinderGeometry args={[0.06, 0.08, 4.0, 8]} /><meshStandardMaterial color="#5c4033" /></mesh>
+      {/* orb */}
+      <mesh position={[0, 4.2, 0]}><sphereGeometry args={[0.3, 16, 16]} /><meshStandardMaterial color="#7dd3fc" metalness={0.3} roughness={0.1} transparent opacity={0.8} /></mesh>
+      {/* orb glow ring */}
+      <mesh position={[0, 4.2, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.35, 0.03, 8, 24]} /><meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.5} /></mesh>
+      {/* grip wrap */}
+      <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.09, 0.09, 0.5, 8]} /><meshStandardMaterial color="#a16207" /></mesh>
+    </group>
+  );
+}
+
+function PropBowWeapon({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* bow body - curved */}
+      <mesh position={[0, 2.0, 0]} rotation={[0, 0, 0]}><torusGeometry args={[1.2, 0.06, 8, 16, Math.PI]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* string */}
+      <mesh position={[0, 2.0, 0]}><cylinderGeometry args={[0.01, 0.01, 2.4, 4]} /><meshStandardMaterial color="#e5e7eb" /></mesh>
+      {/* grip */}
+      <mesh position={[0, 2.0, -0.05]}><cylinderGeometry args={[0.08, 0.08, 0.4, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+    </group>
+  );
+}
+
+function PropLantern({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* top cap */}
+      <mesh position={[0, 2.0, 0]}><coneGeometry args={[0.35, 0.3, 8]} /><meshStandardMaterial color="#b91c1c" /></mesh>
+      {/* handle */}
+      <mesh position={[0, 2.25, 0]} rotation={[0, 0, 0]}><torusGeometry args={[0.15, 0.02, 8, 16]} /><meshStandardMaterial color="#d4af37" metalness={0.6} /></mesh>
+      {/* body */}
+      <mesh position={[0, 1.4, 0]}><cylinderGeometry args={[0.35, 0.3, 0.9, 8]} /><meshStandardMaterial color="#dc2626" transparent opacity={0.8} /></mesh>
+      {/* glow */}
+      <mesh position={[0, 1.4, 0]}><sphereGeometry args={[0.25, 12, 12]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.8} transparent opacity={0.6} /></mesh>
+      {/* bottom */}
+      <mesh position={[0, 0.9, 0]}><cylinderGeometry args={[0.3, 0.25, 0.1, 8]} /><meshStandardMaterial color="#d4af37" metalness={0.6} /></mesh>
+      {/* tassel */}
+      <mesh position={[0, 0.7, 0]}><cylinderGeometry args={[0.02, 0.08, 0.3, 6]} /><meshStandardMaterial color="#dc2626" /></mesh>
+    </group>
+  );
+}
+
+function PropCrown({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* base ring */}
+      <mesh position={[0, 0.3, 0]}><cylinderGeometry args={[0.6, 0.65, 0.3, 16]} /><meshStandardMaterial color="#d4af37" metalness={0.7} roughness={0.25} /></mesh>
+      {/* spikes */}
+      {[0, 72, 144, 216, 288].map((angle) => (
+        <mesh key={angle} position={[Math.sin(d(angle)) * 0.5, 0.8, Math.cos(d(angle)) * 0.5]}>
+          <coneGeometry args={[0.12, 0.6, 4]} /><meshStandardMaterial color="#fbbf24" metalness={0.7} roughness={0.25} />
+        </mesh>
+      ))}
+      {/* gems on spikes */}
+      {[0, 144, 288].map((angle) => (
+        <mesh key={`gem-${angle}`} position={[Math.sin(d(angle)) * 0.48, 0.55, Math.cos(d(angle)) * 0.48]}>
+          <sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropRing({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.5, 0.1, 16, 32]} /><meshStandardMaterial color="#d4af37" metalness={0.8} roughness={0.2} /></mesh>
+      <mesh position={[0, 0.5, 0.5]}><octahedronGeometry args={[0.2, 0]} /><meshStandardMaterial color="#8b5cf6" metalness={0.3} roughness={0.1} transparent opacity={0.9} /></mesh>
+    </group>
+  );
+}
+
+function PropPotion({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* bottle body */}
+      <mesh position={[0, 0.5, 0]}><sphereGeometry args={[0.5, 16, 16]} /><meshStandardMaterial color="#a78bfa" transparent opacity={0.5} /></mesh>
+      {/* liquid */}
+      <mesh position={[0, 0.35, 0]}><sphereGeometry args={[0.42, 16, 12]} /><meshStandardMaterial color="#7c3aed" transparent opacity={0.7} /></mesh>
+      {/* neck */}
+      <mesh position={[0, 1.1, 0]}><cylinderGeometry args={[0.12, 0.18, 0.5, 8]} /><meshStandardMaterial color="#c4b5fd" transparent opacity={0.5} /></mesh>
+      {/* cork */}
+      <mesh position={[0, 1.45, 0]}><cylinderGeometry args={[0.14, 0.12, 0.2, 8]} /><meshStandardMaterial color="#a16207" /></mesh>
+      {/* bubbles */}
+      <mesh position={[-0.1, 0.55, 0.15]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#e9d5ff" transparent opacity={0.6} /></mesh>
+      <mesh position={[0.15, 0.65, -0.1]}><sphereGeometry args={[0.04, 8, 8]} /><meshStandardMaterial color="#e9d5ff" transparent opacity={0.6} /></mesh>
+    </group>
+  );
+}
+
+function PropScroll({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0.2, 0.3, 0]}>
+      {/* rolled paper body */}
+      <mesh position={[0, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.25, 0.25, 2.0, 12]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+      {/* end caps */}
+      <mesh position={[-1.05, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.3, 0.3, 0.1, 12]} /><meshStandardMaterial color="#92400e" /></mesh>
+      <mesh position={[1.05, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.3, 0.3, 0.1, 12]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* ribbon */}
+      <mesh position={[0, 0.5, 0.25]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.02, 0.02, 0.6, 4]} /><meshStandardMaterial color="#dc2626" /></mesh>
+    </group>
+  );
+}
+
+function PropGuitar({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* body */}
+      <mesh position={[0, 0.6, 0]}><sphereGeometry args={[0.7, 16, 16]} /><meshStandardMaterial color="#a16207" /></mesh>
+      <mesh position={[0, 1.2, 0]}><sphereGeometry args={[0.5, 16, 16]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* sound hole */}
+      <mesh position={[0, 0.6, 0.55]} rotation={[0, 0, 0]}><torusGeometry args={[0.2, 0.03, 8, 16]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      {/* neck */}
+      <mesh position={[0, 2.2, 0]}><boxGeometry args={[0.15, 1.6, 0.08]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* headstock */}
+      <mesh position={[0, 3.1, 0]}><boxGeometry args={[0.2, 0.3, 0.1]} /><meshStandardMaterial color="#5c4033" /></mesh>
+      {/* strings */}
+      <mesh position={[0, 1.8, 0.06]}><boxGeometry args={[0.08, 2.5, 0.01]} /><meshStandardMaterial color="#e5e7eb" /></mesh>
+      {/* bridge */}
+      <mesh position={[0, 0.2, 0.55]}><boxGeometry args={[0.3, 0.05, 0.04]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+    </group>
+  );
+}
+
+function PropUmbrella({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* canopy */}
+      <mesh position={[0, 3.0, 0]}><coneGeometry args={[1.5, 0.6, 8]} /><meshStandardMaterial color="#ec4899" side={2} /></mesh>
+      {/* shaft */}
+      <mesh position={[0, 1.5, 0]}><cylinderGeometry args={[0.04, 0.04, 3.0, 8]} /><meshStandardMaterial color="#374151" /></mesh>
+      {/* handle */}
+      <mesh position={[0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[0.15, 0.03, 8, 12, Math.PI]} /><meshStandardMaterial color="#374151" /></mesh>
+      {/* tip */}
+      <mesh position={[0, 3.35, 0]}><sphereGeometry args={[0.06, 8, 8]} /><meshStandardMaterial color="#374151" /></mesh>
+    </group>
+  );
+}
+
+function PropHammer({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0, 0, 0.1]}>
+      {/* handle */}
+      <mesh position={[0, 1.5, 0]}><cylinderGeometry args={[0.06, 0.07, 3.0, 8]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* head */}
+      <mesh position={[0, 3.1, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.35, 0.35, 1.2, 8]} /><meshStandardMaterial color="#6b7280" metalness={0.7} roughness={0.3} /></mesh>
+      {/* grip */}
+      <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.08, 0.08, 0.6, 8]} /><meshStandardMaterial color="#a16207" /></mesh>
+    </group>
+  );
+}
+
+function PropWand({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* shaft */}
+      <mesh position={[0, 1.2, 0]}><cylinderGeometry args={[0.04, 0.06, 2.2, 8]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      {/* star tip */}
+      <mesh position={[0, 2.5, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.25, 0.25, 0.08, 5, 1]} /><meshStandardMaterial color="#fbbf24" emissive="#a16207" emissiveIntensity={0.6} /></mesh>
+      {/* sparkle dots */}
+      <mesh position={[-0.15, 2.7, 0]}><sphereGeometry args={[0.04, 6, 6]} /><meshStandardMaterial color="#fde047" emissive="#fbbf24" emissiveIntensity={0.8} /></mesh>
+      <mesh position={[0.2, 2.6, 0.1]}><sphereGeometry args={[0.03, 6, 6]} /><meshStandardMaterial color="#fde047" emissive="#fbbf24" emissiveIntensity={0.8} /></mesh>
+      {/* grip */}
+      <mesh position={[0, 0.3, 0]}><cylinderGeometry args={[0.06, 0.05, 0.4, 8]} /><meshStandardMaterial color="#6d28d9" /></mesh>
+    </group>
+  );
+}
+
+function PropHeartShape({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* left lobe */}
+      <mesh position={[-0.28, 0.9, 0]}><sphereGeometry args={[0.4, 16, 16]} /><meshStandardMaterial color="#f43f5e" /></mesh>
+      {/* right lobe */}
+      <mesh position={[0.28, 0.9, 0]}><sphereGeometry args={[0.4, 16, 16]} /><meshStandardMaterial color="#f43f5e" /></mesh>
+      {/* bottom point */}
+      <mesh position={[0, 0.35, 0]} rotation={[0, 0, Math.PI]}><coneGeometry args={[0.55, 0.7, 16]} /><meshStandardMaterial color="#e11d48" /></mesh>
+    </group>
+  );
+}
+
+function PropMoonShape({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* main moon */}
+      <mesh position={[0, 1.0, 0]}><sphereGeometry args={[0.8, 24, 24]} /><meshStandardMaterial color="#fde68a" emissive="#a16207" emissiveIntensity={0.3} /></mesh>
+      {/* cutout (darker sphere offset to make crescent) */}
+      <mesh position={[0.35, 1.15, 0.15]}><sphereGeometry args={[0.65, 24, 24]} /><meshStandardMaterial color="#1e293b" /></mesh>
+    </group>
+  );
+}
+
+function PropSunShape({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* core */}
+      <mesh position={[0, 1.0, 0]}><sphereGeometry args={[0.5, 24, 24]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.6} /></mesh>
+      {/* rays */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+        <mesh key={angle} position={[Math.sin(d(angle)) * 0.85, 1.0 + Math.cos(d(angle)) * 0.85, 0]} rotation={[0, 0, d(-angle)]}>
+          <coneGeometry args={[0.08, 0.35, 4]} /><meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={0.4} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropTreasureChest({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* base */}
+      <mesh position={[0, 0.3, 0]}><boxGeometry args={[1.4, 0.6, 0.9]} /><meshStandardMaterial color="#92400e" /></mesh>
+      {/* lid (open) */}
+      <mesh position={[0, 0.75, -0.3]} rotation={[-0.6, 0, 0]}><boxGeometry args={[1.4, 0.15, 0.9]} /><meshStandardMaterial color="#78350f" /></mesh>
+      {/* gold coins inside */}
+      <mesh position={[0, 0.55, 0]}><sphereGeometry args={[0.35, 12, 8]} /><meshStandardMaterial color="#fbbf24" metalness={0.7} roughness={0.3} /></mesh>
+      <mesh position={[-0.25, 0.5, 0.15]}><sphereGeometry args={[0.15, 8, 8]} /><meshStandardMaterial color="#d4af37" metalness={0.7} /></mesh>
+      <mesh position={[0.2, 0.5, -0.1]}><sphereGeometry args={[0.12, 8, 8]} /><meshStandardMaterial color="#f59e0b" metalness={0.7} /></mesh>
+      {/* lock */}
+      <mesh position={[0, 0.45, 0.46]}><boxGeometry args={[0.15, 0.15, 0.05]} /><meshStandardMaterial color="#d4af37" metalness={0.6} /></mesh>
+      {/* gem inside */}
+      <mesh position={[0.15, 0.65, 0.1]}><octahedronGeometry args={[0.12, 0]} /><meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.1} /></mesh>
+    </group>
+  );
+}
+
+function PropBalloon({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* balloon body */}
+      <mesh position={[0, 2.0, 0]}><sphereGeometry args={[0.6, 16, 16]} /><meshStandardMaterial color="#f43f5e" transparent opacity={0.85} /></mesh>
+      {/* knot */}
+      <mesh position={[0, 1.35, 0]}><coneGeometry args={[0.08, 0.15, 6]} /><meshStandardMaterial color="#e11d48" /></mesh>
+      {/* string */}
+      <mesh position={[0, 0.7, 0]}><cylinderGeometry args={[0.01, 0.01, 1.2, 4]} /><meshStandardMaterial color="#e5e7eb" /></mesh>
+      {/* highlight */}
+      <mesh position={[-0.15, 2.2, 0.35]}><sphereGeometry args={[0.1, 8, 8]} /><meshStandardMaterial color="#fff" transparent opacity={0.5} /></mesh>
+    </group>
+  );
+}
+
+function PropCandle({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* base plate */}
+      <mesh position={[0, 0.05, 0]}><cylinderGeometry args={[0.4, 0.45, 0.1, 12]} /><meshStandardMaterial color="#d4af37" metalness={0.5} /></mesh>
+      {/* wax body */}
+      <mesh position={[0, 0.7, 0]}><cylinderGeometry args={[0.15, 0.18, 1.2, 12]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+      {/* wick */}
+      <mesh position={[0, 1.38, 0]}><cylinderGeometry args={[0.01, 0.01, 0.12, 4]} /><meshStandardMaterial color="#374151" /></mesh>
+      {/* flame */}
+      <mesh position={[0, 1.55, 0]}><sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={1.0} /></mesh>
+      <mesh position={[0, 1.65, 0]}><coneGeometry args={[0.06, 0.2, 8]} /><meshStandardMaterial color="#fb923c" emissive="#ea580c" emissiveIntensity={0.8} transparent opacity={0.8} /></mesh>
+      {/* drip */}
+      <mesh position={[0.08, 0.9, 0.15]}><sphereGeometry args={[0.04, 6, 6]} /><meshStandardMaterial color="#fef9c3" /></mesh>
+    </group>
+  );
+}
+
+function PropMask({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* face shape */}
+      <mesh position={[0, 1.0, 0]}><sphereGeometry args={[0.7, 16, 16]} /><meshStandardMaterial color="#fef3c7" /></mesh>
+      {/* eye holes */}
+      <mesh position={[-0.25, 1.1, 0.55]}><sphereGeometry args={[0.15, 8, 8]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      <mesh position={[0.25, 1.1, 0.55]}><sphereGeometry args={[0.15, 8, 8]} /><meshStandardMaterial color="#1e1b4b" /></mesh>
+      {/* decorative elements */}
+      <mesh position={[0, 1.5, 0.35]}><coneGeometry args={[0.5, 0.4, 8]} /><meshStandardMaterial color="#dc2626" /></mesh>
+      {/* nose bridge */}
+      <mesh position={[0, 0.9, 0.6]}><boxGeometry args={[0.08, 0.3, 0.08]} /><meshStandardMaterial color="#fde68a" /></mesh>
+      {/* side ribbons */}
+      <mesh position={[-0.65, 1.0, -0.15]} rotation={[0, 0, 0.3]}><capsuleGeometry args={[0.04, 0.5, 4, 8]} /><meshStandardMaterial color="#7c3aed" /></mesh>
+      <mesh position={[0.65, 1.0, -0.15]} rotation={[0, 0, -0.3]}><capsuleGeometry args={[0.04, 0.5, 4, 8]} /><meshStandardMaterial color="#7c3aed" /></mesh>
+    </group>
+  );
+}
+
+/* ── NEW Effects ─────────────────────────────── */
+
+function PropSparkle({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {[
+        { pos: [0, 0.5, 0] as const, sz: 0.12, c: "#fde047" },
+        { pos: [-0.3, 0.8, 0.2] as const, sz: 0.08, c: "#fbbf24" },
+        { pos: [0.25, 1.0, -0.15] as const, sz: 0.1, c: "#f59e0b" },
+        { pos: [0.1, 0.3, 0.3] as const, sz: 0.06, c: "#fef08a" },
+        { pos: [-0.2, 1.2, 0.1] as const, sz: 0.09, c: "#fde047" },
+        { pos: [0.35, 0.6, -0.2] as const, sz: 0.07, c: "#fbbf24" },
+        { pos: [-0.1, 0.9, -0.25] as const, sz: 0.05, c: "#fef08a" },
+      ].map((p, i) => (
+        <mesh key={i} position={[p.pos[0], p.pos[1], p.pos[2]]}>
+          <sphereGeometry args={[p.sz, 8, 8]} /><meshStandardMaterial color={p.c} emissive={p.c} emissiveIntensity={0.8} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropFire({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* base flames */}
+      <mesh position={[0, 0.4, 0]}><coneGeometry args={[0.45, 1.2, 8]} /><meshStandardMaterial color="#f97316" emissive="#ea580c" emissiveIntensity={0.7} transparent opacity={0.85} /></mesh>
+      <mesh position={[-0.15, 0.55, 0.1]}><coneGeometry args={[0.3, 0.9, 8]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.8} transparent opacity={0.8} /></mesh>
+      <mesh position={[0.12, 0.5, -0.08]}><coneGeometry args={[0.25, 0.8, 8]} /><meshStandardMaterial color="#fde047" emissive="#fbbf24" emissiveIntensity={0.9} transparent opacity={0.75} /></mesh>
+      {/* core */}
+      <mesh position={[0, 0.3, 0]}><coneGeometry args={[0.15, 0.5, 8]} /><meshStandardMaterial color="#fff" emissive="#fef08a" emissiveIntensity={1.0} transparent opacity={0.6} /></mesh>
+      {/* embers */}
+      <mesh position={[-0.3, 0.9, 0.15]}><sphereGeometry args={[0.04, 6, 6]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={1.0} /></mesh>
+      <mesh position={[0.2, 1.0, -0.1]}><sphereGeometry args={[0.03, 6, 6]} /><meshStandardMaterial color="#fb923c" emissive="#ea580c" emissiveIntensity={1.0} /></mesh>
+    </group>
+  );
+}
+
+function PropLightning({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* bolt segments */}
+      <mesh position={[0, 2.0, 0]} rotation={[0, 0, 0.1]}><boxGeometry args={[0.2, 1.0, 0.06]} /><meshStandardMaterial color="#fde047" emissive="#fbbf24" emissiveIntensity={0.9} /></mesh>
+      <mesh position={[0.15, 1.2, 0]} rotation={[0, 0, -0.3]}><boxGeometry args={[0.18, 0.8, 0.06]} /><meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.9} /></mesh>
+      <mesh position={[0.05, 0.5, 0]} rotation={[0, 0, 0.15]}><boxGeometry args={[0.15, 0.7, 0.06]} /><meshStandardMaterial color="#fde047" emissive="#fbbf24" emissiveIntensity={0.9} /></mesh>
+      {/* glow */}
+      <mesh position={[0.1, 1.2, 0]}><sphereGeometry args={[0.3, 8, 8]} /><meshStandardMaterial color="#fef08a" transparent opacity={0.2} /></mesh>
+    </group>
+  );
+}
+
+function PropSnowflake({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {/* 6 arms */}
+      {[0, 60, 120, 180, 240, 300].map((angle) => (
+        <group key={angle} rotation={[0, 0, d(angle)]}>
+          <mesh position={[0, 0.5, 0]}><boxGeometry args={[0.06, 0.8, 0.03]} /><meshStandardMaterial color="#bfdbfe" metalness={0.3} roughness={0.2} /></mesh>
+          <mesh position={[-0.15, 0.65, 0]} rotation={[0, 0, 0.6]}><boxGeometry args={[0.04, 0.3, 0.03]} /><meshStandardMaterial color="#93c5fd" metalness={0.3} roughness={0.2} /></mesh>
+          <mesh position={[0.15, 0.65, 0]} rotation={[0, 0, -0.6]}><boxGeometry args={[0.04, 0.3, 0.03]} /><meshStandardMaterial color="#93c5fd" metalness={0.3} roughness={0.2} /></mesh>
+        </group>
+      ))}
+      {/* center */}
+      <mesh position={[0, 0, 0]}><sphereGeometry args={[0.12, 12, 12]} /><meshStandardMaterial color="#dbeafe" metalness={0.4} roughness={0.1} /></mesh>
+    </group>
+  );
+}
+
+function PropRainbow({ scale: s }: { scale: number }) {
+  const colors = ["#ef4444", "#f97316", "#fbbf24", "#22c55e", "#3b82f6", "#6366f1", "#a855f7"];
+  return (
+    <group scale={s} rotation={[0, 0, 0]}>
+      {colors.map((color, i) => (
+        <mesh key={i} position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[1.5 - i * 0.12, 0.05, 8, 32, Math.PI]} /><meshStandardMaterial color={color} transparent opacity={0.8} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropBubbles({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {[
+        { pos: [0, 0.5, 0] as const, sz: 0.25 },
+        { pos: [-0.35, 0.9, 0.15] as const, sz: 0.18 },
+        { pos: [0.3, 1.2, -0.1] as const, sz: 0.22 },
+        { pos: [0.1, 0.3, 0.3] as const, sz: 0.15 },
+        { pos: [-0.2, 1.5, 0.05] as const, sz: 0.2 },
+        { pos: [0.25, 0.7, 0.25] as const, sz: 0.12 },
+      ].map((b, i) => (
+        <mesh key={i} position={[b.pos[0], b.pos[1], b.pos[2]]}>
+          <sphereGeometry args={[b.sz, 16, 16]} /><meshStandardMaterial color="#bfdbfe" transparent opacity={0.3} metalness={0.1} roughness={0.05} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropLeaves({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s}>
+      {[
+        { pos: [0, 0.3, 0] as const, rot: [0.2, 0.3, 0.5] as const, c: "#22c55e" },
+        { pos: [-0.3, 0.7, 0.2] as const, rot: [0.5, -0.2, 0.8] as const, c: "#16a34a" },
+        { pos: [0.25, 1.0, -0.15] as const, rot: [-0.3, 0.4, -0.6] as const, c: "#15803d" },
+        { pos: [0.1, 0.5, 0.3] as const, rot: [0.1, 0.6, 0.3] as const, c: "#4ade80" },
+        { pos: [-0.2, 1.2, 0.1] as const, rot: [0.7, -0.1, 0.4] as const, c: "#86efac" },
+      ].map((leaf, i) => (
+        <mesh key={i} position={[leaf.pos[0], leaf.pos[1], leaf.pos[2]]} rotation={[leaf.rot[0], leaf.rot[1], leaf.rot[2]]}>
+          <boxGeometry args={[0.3, 0.02, 0.15]} /><meshStandardMaterial color={leaf.c} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function PropFeather({ scale: s }: { scale: number }) {
+  return (
+    <group scale={s} rotation={[0, 0, 0.2]}>
+      {/* quill */}
+      <mesh position={[0, 1.0, 0]}><cylinderGeometry args={[0.02, 0.01, 2.0, 6]} /><meshStandardMaterial color="#f5f5f4" /></mesh>
+      {/* vane */}
+      <mesh position={[-0.15, 1.3, 0]} rotation={[0, 0, 0.15]}><boxGeometry args={[0.35, 1.2, 0.02]} /><meshStandardMaterial color="#e0e7ff" transparent opacity={0.85} /></mesh>
+      <mesh position={[0.12, 1.3, 0]} rotation={[0, 0, -0.15]}><boxGeometry args={[0.25, 1.0, 0.02]} /><meshStandardMaterial color="#c7d2fe" transparent opacity={0.85} /></mesh>
+      {/* tip */}
+      <mesh position={[0, 2.1, 0]}><coneGeometry args={[0.08, 0.15, 6]} /><meshStandardMaterial color="#e0e7ff" /></mesh>
+    </group>
+  );
+}
+
 const PROP_COMPONENTS: Record<string, React.FC<{ scale: number }>> = {
   cat: AnimalCat, dog: AnimalDog, bunny: AnimalBunny, bird: AnimalBird,
   fox: AnimalFox, bear: AnimalBear, chick: AnimalChick, fish: AnimalFish,
   sword: PropSword, shield: PropShield, book: PropBook, flower: PropFlower,
   gem: PropGem, crystal: PropCrystal, cloud: PropCloud, star: PropStar,
+  /* new animals */
+  penguin: AnimalPenguin, dragon: AnimalDragon, unicorn: AnimalUnicorn, owl: AnimalOwl,
+  butterfly: AnimalButterfly, deer: AnimalDeer, wolf: AnimalWolf, turtle: AnimalTurtle,
+  /* new items */
+  staff: PropStaff, bowWeapon: PropBowWeapon, lantern: PropLantern, crown: PropCrown,
+  ring: PropRing, potion: PropPotion, scroll: PropScroll, guitar: PropGuitar,
+  umbrella: PropUmbrella, hammer: PropHammer, wand: PropWand, heartProp: PropHeartShape,
+  moon: PropMoonShape, sun: PropSunShape, treasureChest: PropTreasureChest, balloon: PropBalloon,
+  candle: PropCandle, mask: PropMask,
+  /* new effects */
+  sparkle: PropSparkle, fire: PropFire, lightning: PropLightning, snowflake: PropSnowflake,
+  rainbow: PropRainbow, bubbles: PropBubbles, leaves: PropLeaves, feather: PropFeather,
 };
 
-function SceneProp3D({ propId, position, scale }: { propId: string; position: Vec3; scale: number }) {
+type PropAttachmentConfig = {
+  bone: VRMHumanBoneName | "none";
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  scale: number;
+};
+
+const DEFAULT_BONE_OFFSETS: Record<string, Partial<Record<VRMHumanBoneName, Partial<PropAttachmentConfig>>>> = {
+  sword: {
+    rightHand: { offsetX: 0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: -20, scale: 0.75 },
+    leftHand: { offsetX: -0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: 20, scale: 0.75 },
+    head: { offsetX: 0, offsetY: 0.28, offsetZ: -0.1, rotX: 90, rotY: 0, rotZ: 0, scale: 0.8 },
+  },
+  shield: {
+    leftHand: { offsetX: -0.08, offsetY: 0.06, offsetZ: 0.04, rotX: 0, rotY: 85, rotZ: 0, scale: 0.75 },
+    rightHand: { offsetX: 0.08, offsetY: 0.06, offsetZ: 0.04, rotX: 0, rotY: -85, rotZ: 0, scale: 0.75 },
+    hips: { offsetX: 0, offsetY: -0.15, offsetZ: -0.15, rotX: 180, rotY: 0, rotZ: 0, scale: 0.9 },
+  },
+  flower: {
+    head: { offsetX: 0.05, offsetY: 0.14, offsetZ: 0.04, rotX: 0, rotY: 0, rotZ: 15, scale: 1.0 },
+    rightHand: { offsetX: 0.02, offsetY: 0.08, offsetZ: 0, rotX: 90, rotY: 0, rotZ: 0, scale: 0.8 },
+    leftHand: { offsetX: -0.02, offsetY: 0.08, offsetZ: 0, rotX: 90, rotY: 0, rotZ: 0, scale: 0.8 },
+  },
+  star: {
+    head: { offsetX: 0, offsetY: 0.26, offsetZ: 0.02, rotX: 0, rotY: 0, rotZ: 0, scale: 0.7 },
+  },
+  cloud: {
+    head: { offsetX: 0, offsetY: 0.38, offsetZ: -0.08, rotX: 0, rotY: 0, rotZ: 0, scale: 1.0 },
+  },
+  /* ── new bone offsets ── */
+  staff: {
+    rightHand: { offsetX: 0.05, offsetY: 0.15, offsetZ: -0.04, rotX: 75, rotY: 0, rotZ: -15, scale: 0.6 },
+    leftHand: { offsetX: -0.05, offsetY: 0.15, offsetZ: -0.04, rotX: 75, rotY: 0, rotZ: 15, scale: 0.6 },
+  },
+  bowWeapon: {
+    leftHand: { offsetX: -0.06, offsetY: 0.1, offsetZ: 0.02, rotX: 0, rotY: 90, rotZ: 0, scale: 0.6 },
+    rightHand: { offsetX: 0.06, offsetY: 0.1, offsetZ: 0.02, rotX: 0, rotY: -90, rotZ: 0, scale: 0.6 },
+  },
+  crown: {
+    head: { offsetX: 0, offsetY: 0.18, offsetZ: 0.02, rotX: 0, rotY: 0, rotZ: 0, scale: 0.55 },
+  },
+  hammer: {
+    rightHand: { offsetX: 0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: -15, scale: 0.55 },
+    leftHand: { offsetX: -0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: 15, scale: 0.55 },
+  },
+  wand: {
+    rightHand: { offsetX: 0.03, offsetY: 0.1, offsetZ: -0.03, rotX: 65, rotY: 0, rotZ: -10, scale: 0.7 },
+    leftHand: { offsetX: -0.03, offsetY: 0.1, offsetZ: -0.03, rotX: 65, rotY: 0, rotZ: 10, scale: 0.7 },
+  },
+  umbrella: {
+    rightHand: { offsetX: 0.04, offsetY: 0.12, offsetZ: -0.04, rotX: 80, rotY: 0, rotZ: -10, scale: 0.5 },
+    leftHand: { offsetX: -0.04, offsetY: 0.12, offsetZ: -0.04, rotX: 80, rotY: 0, rotZ: 10, scale: 0.5 },
+  },
+  lantern: {
+    rightHand: { offsetX: 0.04, offsetY: 0.08, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 0.65 },
+    leftHand: { offsetX: -0.04, offsetY: 0.08, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 0.65 },
+  },
+  guitar: {
+    hips: { offsetX: 0.1, offsetY: 0, offsetZ: 0.1, rotX: 15, rotY: -20, rotZ: -10, scale: 0.55 },
+  },
+  mask: {
+    head: { offsetX: 0, offsetY: -0.02, offsetZ: 0.12, rotX: 0, rotY: 0, rotZ: 0, scale: 0.6 },
+  },
+  ring: {
+    rightHand: { offsetX: 0.02, offsetY: 0.02, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 0.4 },
+    leftHand: { offsetX: -0.02, offsetY: 0.02, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 0.4 },
+  },
+};
+
+function SceneProp3D({
+  propId,
+  vrm,
+  config,
+  defaultPosition,
+  defaultScale,
+}: {
+  propId: string;
+  vrm: VRM | null;
+  config: PropAttachmentConfig | undefined;
+  defaultPosition: Vec3;
+  defaultScale: number;
+}) {
   const Comp = PROP_COMPONENTS[propId];
   if (!Comp) return null;
+
+  const attachmentBone = config?.bone ?? "none";
+  const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    if (vrm && attachmentBone !== "none") {
+      const node = vrm.humanoid?.getNormalizedBoneNode(attachmentBone);
+      setBoneNode(node || null);
+    } else {
+      setBoneNode(null);
+    }
+  }, [vrm, attachmentBone]);
+
+  if (boneNode) {
+    const px = config?.offsetX ?? 0;
+    const py = config?.offsetY ?? 0;
+    const pz = config?.offsetZ ?? 0;
+    const rx = THREE.MathUtils.degToRad(config?.rotX ?? 0);
+    const ry = THREE.MathUtils.degToRad(config?.rotY ?? 0);
+    const rz = THREE.MathUtils.degToRad(config?.rotZ ?? 0);
+    const scl = (config?.scale ?? 1.0) * defaultScale;
+
+    return createPortal(
+      <group position={[px, py, pz]} rotation={[rx, ry, rz]}>
+        <Comp scale={scl} />
+      </group>,
+      boneNode
+    );
+  }
+
   return (
-    <group position={[position[0], position[1], position[2]]}>
-      <Comp scale={scale} />
+    <group position={[defaultPosition[0], defaultPosition[1], defaultPosition[2]]}>
+      <Comp scale={defaultScale} />
     </group>
   );
 }
@@ -1091,22 +2307,34 @@ function VrmActor({
   bodyRotation,
   customBones,
   customYOffset,
+  expressionWeights,
   vrm,
+  customColors,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
   customYOffset: number;
+  expressionWeights: Record<string, number>;
   vrm: VRM;
+  customColors: Record<string, string>;
 }) {
   useEffect(() => {
     applyPoseToVrm(vrm, customBones, customYOffset);
   }, [customBones, customYOffset, vrm]);
 
   useEffect(() => {
+    applyExpressionWeightsToVrm(vrm, expressionWeights);
+  }, [expressionWeights, vrm]);
+
+  useEffect(() => {
     const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
     vrm.scene.rotation.y = baseRotationY + bodyRotation;
     vrm.scene.updateMatrixWorld(true);
   }, [bodyRotation, vrm]);
+
+  useEffect(() => {
+    applyVrmCustomColors(vrm, customColors);
+  }, [customColors, vrm]);
 
   useFrame((_, delta) => {
     vrm.update(delta);
@@ -1168,6 +2396,8 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [customYOffset, setCustomYOffset] = useState<number>(POSE_PRESETS[0].yOffset ?? 0);
   const [activeCategory, setActiveCategory] = useState("head");
   const [activeExpressionId, setActiveExpressionId] = useState("neutral");
+  const [expressionWeights, setExpressionWeights] = useState<Record<string, number>>({});
+  const [activeExpressionCategory, setActiveExpressionCategory] = useState<string>("emotion");
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [bodyRotation, setBodyRotation] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -1177,8 +2407,22 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
+  const [customColors, setCustomColors] = useState<Record<string, string>>({
+    tops: "#ffffff",
+    bottoms: "#ffffff",
+    hair: "#ffffff",
+    body: "#ffffff",
+    face: "#ffffff",
+  });
+  const [isSharingPose, setIsSharingPose] = useState(false);
+  const [sharedPoses, setSharedPoses] = useState<SharedAsset[]>([]);
+  const [sharedPosesStatus, setSharedPosesStatus] = useState<"idle" | "loading" | "error">("idle");
   const [lightingTone, setLightingTone] = useState<LightingTone>("morning");
   const [activeProps, setActiveProps] = useState<string[]>([]);
+  const [propAttachments, setPropAttachments] = useState<Record<string, PropAttachmentConfig>>({});
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const [savedPoses, setSavedPoses] = useState<CustomPose[]>([]);
+  const [preserveExpression, setPreserveExpression] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -1189,6 +2433,312 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
+
+  useEffect(() => {
+    const stored = localStorage.getItem("studio_custom_poses");
+    if (stored) {
+      try {
+        setSavedPoses(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to load custom poses", e);
+      }
+    }
+  }, []);
+
+  function handleSavePose() {
+    const label = window.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
+    if (!label) return;
+    const newPose: CustomPose = {
+      id: `custom-${Date.now()}`,
+      label,
+      yOffset: customYOffset,
+      bones: customBones,
+      expressionWeights: { ...expressionWeights }
+    };
+    const next = [...savedPoses, newPose];
+    setSavedPoses(next);
+    localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+  }
+
+  function handleDeletePose(id: string, e: MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    if (!window.confirm("이 커스텀 포즈를 삭제할까요?")) return;
+    const next = savedPoses.filter((p) => p.id !== id);
+    setSavedPoses(next);
+    localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+    if (activePoseId === id) {
+      setActivePoseId("default");
+    }
+  }
+
+  function handleCustomPoseSelect(pose: CustomPose) {
+    setActivePoseId(pose.id);
+    setCustomBones(pose.bones);
+    setCustomYOffset(pose.yOffset);
+    if (vrmRef.current) {
+      applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset);
+      if (preserveExpression) {
+        applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
+      } else if (pose.expressionWeights) {
+        setExpressionWeights(pose.expressionWeights);
+        applyExpressionWeightsToVrm(vrmRef.current, pose.expressionWeights);
+      } else {
+        setExpressionWeights({});
+        setActiveExpressionId("neutral");
+        applyExpressionWeightsToVrm(vrmRef.current, {});
+      }
+    }
+  }
+
+  function handleCopyPose() {
+    try {
+      const poseData = {
+        yOffset: customYOffset,
+        bones: customBones,
+        expressionWeights: expressionWeights,
+      };
+      const jsonStr = JSON.stringify(poseData, null, 2);
+      navigator.clipboard.writeText(jsonStr)
+        .then(() => {
+          alert("현재 자세와 표정이 클립보드에 복사되었습니다.\n다른 캐릭터나 다른 컷의 캐릭터에 붙여넣기(Paste)할 수 있습니다.");
+        })
+        .catch(() => {
+          localStorage.setItem("studio_pose_clipboard", jsonStr);
+          alert("현재 자세와 표정이 로컬 저장소에 임시 복사되었습니다.");
+        });
+    } catch (_e) {
+      alert("포즈 복사에 실패했습니다.");
+    }
+  }
+
+  async function handlePastePose() {
+    try {
+      let jsonStr = "";
+      try {
+        jsonStr = await navigator.clipboard.readText();
+      } catch (_clipErr) {
+        jsonStr = localStorage.getItem("studio_pose_clipboard") || "";
+      }
+
+      if (!jsonStr) {
+        alert("클립보드 또는 로컬 저장소에 저장된 포즈 데이터가 없습니다.");
+        return;
+      }
+
+      const parsed = JSON.parse(jsonStr);
+      if (!parsed || typeof parsed !== "object" || !parsed.bones) {
+        alert("올바른 포즈 데이터 형식이 아닙니다.");
+        return;
+      }
+
+      setCustomBones(parsed.bones);
+      setCustomYOffset(parsed.yOffset ?? 0);
+
+      if (!preserveExpression && parsed.expressionWeights) {
+        setExpressionWeights(parsed.expressionWeights);
+        if (vrmRef.current) {
+          applyExpressionWeightsToVrm(vrmRef.current, parsed.expressionWeights);
+        }
+      } else if (vrmRef.current) {
+        applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
+      }
+
+      if (vrmRef.current) {
+        applyPoseToVrm(vrmRef.current, parsed.bones, parsed.yOffset ?? 0);
+      }
+
+      alert("복사된 포즈를 성공적으로 붙여넣었습니다!");
+    } catch (_e) {
+      alert("포즈 붙여넣기에 실패했습니다. 데이터 형식을 확인해 주세요.");
+    }
+  }
+
+  function handleExportPoses() {
+    if (savedPoses.length === 0) return;
+    try {
+      const dataStr = JSON.stringify(savedPoses, null, 2);
+      const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `toonspectrum_custom_poses_${Date.now()}.json`;
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", dataUri);
+      linkElement.setAttribute("download", exportFileDefaultName);
+      linkElement.click();
+    } catch (_e) {
+      alert("포즈 내보내기에 실패했습니다.");
+    }
+  }
+
+  function handleImportPoses() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = (event) => {
+      const target = event.target as HTMLInputElement;
+      if (!target.files || target.files.length === 0) return;
+      const file = target.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const contents = e.target?.result as string;
+          const parsed = JSON.parse(contents);
+          if (!Array.isArray(parsed)) {
+            alert("올바른 포즈 파일 형식이 아닙니다 (배열 형태여야 함).");
+            return;
+          }
+          
+          const validPoses = parsed.filter((p) => p && typeof p === "object" && p.label && p.bones);
+          if (validPoses.length === 0) {
+            alert("가져올 수 있는 유효한 포즈 데이터가 없습니다.");
+            return;
+          }
+          
+          if (window.confirm(`${validPoses.length}개의 포즈를 가져올까요? (기존 포즈에 추가됩니다)`)) {
+            const sanitized = validPoses.map((p) => ({
+              ...p,
+              id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+            }));
+            const next = [...savedPoses, ...sanitized];
+            setSavedPoses(next);
+            localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+          }
+        } catch (_err) {
+          alert("파일 읽기 또는 파싱에 실패했습니다.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  async function loadSharedPoses() {
+    setSharedPosesStatus("loading");
+    try {
+      const assets = await listSharedAssets({ limit: 100 });
+      const poses = assets.filter((asset) => asset.name.startsWith("[3D_POSE]") || asset.kind === "vrm_pose");
+      setSharedPoses(poses);
+      setSharedPosesStatus("idle");
+    } catch (e) {
+      console.error(e);
+      setSharedPosesStatus("error");
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
+      loadSharedPoses();
+    }
+  }, [open]);
+
+  async function handleSharePoseToServer() {
+    const currentCapture = captureRef.current;
+    const currentVrm = vrmRef.current;
+
+    if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera || !currentVrm) {
+      alert("공유할 VRM 장면이 아직 준비되지 않았습니다.");
+      return;
+    }
+
+    const title = window.prompt("서버에 공유할 포즈의 이름을 입력해주세요 (최대 30자):");
+    if (!title) return;
+
+    if (title.length > 30) {
+      alert("이름은 최대 30자까지 가능합니다.");
+      return;
+    }
+
+    const name = `[3D_POSE] ${title}`;
+
+    setIsSharingPose(true);
+    try {
+      const { camera, gl, scene } = currentCapture;
+      currentVrm.update(0);
+      gl.render(scene, camera);
+      const baseDataUrl = gl.domElement.toDataURL("image/png");
+      const { width, height } = roundExportSize(gl.domElement);
+
+      const poseMetadata = {
+        yOffset: customYOffset,
+        bones: customBones,
+        expressionWeights: expressionWeights,
+        customColors: customColors,
+        modelName: modelName
+      };
+
+      const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
+      const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
+
+      await publishAsset({
+        name,
+        dataUrl: fullDataUrl,
+        width,
+        height,
+        kind: "vrm_pose"
+      });
+
+      alert("포즈가 성공적으로 서버에 공유되었습니다!");
+      loadSharedPoses();
+    } catch (e) {
+      console.error(e);
+      alert("포즈 공유에 실패했습니다.");
+    } finally {
+      setIsSharingPose(false);
+    }
+  }
+
+  function handleSelectSharedPose(asset: SharedAsset) {
+    try {
+      const hashIndex = asset.dataUrl.indexOf("#");
+      if (hashIndex === -1) {
+        alert("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
+        return;
+      }
+      const hashStr = asset.dataUrl.substring(hashIndex + 1);
+      const poseData = JSON.parse(decodeURIComponent(hashStr));
+
+      if (poseData.bones) {
+        setCustomBones(poseData.bones);
+      }
+      if (typeof poseData.yOffset === "number") {
+        setCustomYOffset(poseData.yOffset);
+      }
+      if (poseData.expressionWeights) {
+        setExpressionWeights(poseData.expressionWeights);
+      } else {
+        setExpressionWeights({});
+      }
+      if (poseData.customColors) {
+        setCustomColors(poseData.customColors);
+      }
+
+      if (vrmRef.current) {
+        applyPoseToVrm(vrmRef.current, poseData.bones || {}, poseData.yOffset ?? 0);
+        applyExpressionWeightsToVrm(vrmRef.current, poseData.expressionWeights || {});
+        applyVrmCustomColors(vrmRef.current, poseData.customColors || {});
+      }
+
+      setActivePoseId(`shared-${asset.id}`);
+      alert(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`);
+    } catch (e) {
+      console.error(e);
+      alert("포즈 데이터를 파싱하는 중 오류가 발생했습니다.");
+    }
+  }
+
+  async function handleDeleteSharedPose(asset: SharedAsset, e: MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    if (!window.confirm(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 서버에서 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      await deleteSharedAsset(asset.id);
+      alert("공유된 포즈가 성공적으로 삭제되었습니다.");
+      loadSharedPoses();
+    } catch (err) {
+      console.error(err);
+      alert("삭제에 실패했습니다.");
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -1210,6 +2760,8 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setError("");
     setIsCapturing(false);
     setActiveProps([]);
+    setPropAttachments({});
+    setSelectedPropId(null);
   }, [open]);
 
   useEffect(() => {
@@ -1289,9 +2841,24 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setCustomBones(POSE_PRESETS[0].bones);
     setCustomYOffset(POSE_PRESETS[0].yOffset ?? 0);
     setActiveExpressionId("neutral");
+    setExpressionWeights({});
     setBodyRotation(0);
+    setCustomColors({
+      tops: "#ffffff",
+      bottoms: "#ffffff",
+      hair: "#ffffff",
+      body: "#ffffff",
+      face: "#ffffff",
+    });
     applyPoseToVrm(nextVrm, POSE_PRESETS[0].bones, POSE_PRESETS[0].yOffset ?? 0);
-    applyExpressionToVrm(nextVrm, NEUTRAL_EXPRESSION_ACTION);
+    applyExpressionWeightsToVrm(nextVrm, {});
+    applyVrmCustomColors(nextVrm, {
+      tops: "#ffffff",
+      bottoms: "#ffffff",
+      hair: "#ffffff",
+      body: "#ffffff",
+      face: "#ffffff",
+    });
     setStatus("ready");
   }
 
@@ -1426,6 +2993,13 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setCustomYOffset(pose.yOffset ?? 0);
     if (vrmRef.current) {
       applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset ?? 0);
+      if (preserveExpression) {
+        applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
+      } else {
+        setExpressionWeights({});
+        setActiveExpressionId("neutral");
+        applyExpressionWeightsToVrm(vrmRef.current, {});
+      }
     }
   }
 
@@ -1446,9 +3020,38 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   function handleExpressionSelect(action: ExpressionAction) {
     setActiveExpressionId(action.id);
-    if (vrmRef.current) {
-      applyExpressionToVrm(vrmRef.current, action);
+    const newWeights: Record<string, number> = {};
+    if (action.name) {
+      newWeights[action.name] = 1.0;
     }
+    setExpressionWeights(newWeights);
+    if (vrmRef.current) {
+      applyExpressionWeightsToVrm(vrmRef.current, newWeights);
+    }
+  }
+
+  function updateExpressionWeight(name: string, value: number) {
+    setExpressionWeights((prev) => {
+      const next = { ...prev, [name]: value };
+      if (value <= 0) {
+        delete next[name];
+      }
+
+      if (vrmRef.current) {
+        applyExpressionWeightsToVrm(vrmRef.current, next);
+      }
+
+      const activeKeys = Object.entries(next).filter(([_, val]) => val > 0);
+      if (activeKeys.length === 0) {
+        setActiveExpressionId("neutral");
+      } else if (activeKeys.length === 1 && activeKeys[0][1] === 1.0) {
+        setActiveExpressionId(activeKeys[0][0]);
+      } else {
+        setActiveExpressionId("custom");
+      }
+
+      return next;
+    });
   }
 
   function handleBodyRotationChange(event: ChangeEvent<HTMLInputElement>) {
@@ -1525,11 +3128,29 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                   <CaptureBridge captureRef={captureRef} />
                   <CameraDirector presetId={activeCameraId} />
                   <VrmLighting tone={lightingTone} />
-                  {vrm ? <VrmActor bodyRotation={bodyRotation} customBones={customBones} customYOffset={customYOffset} vrm={vrm} /> : null}
+                  {vrm ? (
+                    <VrmActor
+                      bodyRotation={bodyRotation}
+                      customBones={customBones}
+                      customYOffset={customYOffset}
+                      expressionWeights={expressionWeights}
+                      vrm={vrm}
+                      customColors={customColors}
+                    />
+                  ) : null}
                   {activeProps.map((propId) => {
                     const propDef = SCENE_PROPS.find((p) => p.id === propId);
                     if (!propDef) return null;
-                    return <SceneProp3D key={propId} propId={propId} position={propDef.position} scale={propDef.scale} />;
+                    return (
+                      <SceneProp3D
+                        key={propId}
+                        propId={propId}
+                        vrm={vrm}
+                        config={propAttachments[propId]}
+                        defaultPosition={propDef.position}
+                        defaultScale={propDef.scale}
+                      />
+                    );
                   })}
                   <ContactShadows position={[0, 0.01, 0]} opacity={0.22} scale={4.8} blur={2.35} far={2.6} resolution={512} color="#3c2b20" />
                   <OrbitControls
@@ -1739,11 +3360,138 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                 )}
               </section>
 
-              <section>
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
-                  <UserRound size={15} className="text-accent" aria-hidden />
-                  포즈
+              <section className="rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
+                  <Sliders size={14} className="text-accent" aria-hidden />
+                  표정 세부 조절 (Blendshape Mix)
                 </h3>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  각 표정 슬라이더를 조절하여 여러 표정을 믹스해 보세요.
+                </p>
+
+                <div className="mb-3 flex flex-wrap gap-1">
+                  {[
+                    { id: "emotion", label: "감정" },
+                    { id: "eye", label: "눈/시선" },
+                    { id: "mouth", label: "입모양" },
+                    { id: "custom", label: "기타/커스텀" },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={cx(
+                        "rounded-lg border px-2 py-1 text-[0.68rem] font-bold transition-colors",
+                        activeExpressionCategory === cat.id
+                          ? "border-accent/60 bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg-2 hover:bg-raised"
+                      )}
+                      onClick={() => setActiveExpressionCategory(cat.id)}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {(() => {
+                  const filteredActions = availableExpressionActions.filter(
+                    (action) => action.name !== null && getExpressionCategory(action) === activeExpressionCategory
+                  );
+
+                  if (filteredActions.length > 0) {
+                    return (
+                      <div className="space-y-2.5">
+                        {filteredActions.map((action) => {
+                          const name = action.name!;
+                          const weight = expressionWeights[name] ?? 0;
+                          return (
+                            <div key={name} className="flex items-center gap-2 text-[0.65rem] text-fg-3">
+                              <span className="w-20 shrink-0 truncate font-semibold text-fg-2" title={action.label}>
+                                {action.label}:
+                              </span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={weight}
+                                disabled={!vrm}
+                                className="h-1 flex-1 accent-accent"
+                                onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
+                              />
+                              <span className="w-8 text-right numeral">{Math.round(weight * 100)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <p className="text-center py-2 text-[0.68rem] text-fg-3">이 카테고리에 해당하는 표정이 없습니다.</p>
+                  );
+                })()}
+
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
+                  disabled={!vrm || Object.keys(expressionWeights).length === 0}
+                  onClick={() => {
+                    setExpressionWeights({});
+                    setActiveExpressionId("neutral");
+                    if (vrmRef.current) {
+                      applyExpressionWeightsToVrm(vrmRef.current, {});
+                    }
+                  }}
+                >
+                  표정 믹스 초기화
+                </button>
+              </section>
+
+              <section>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                    <UserRound size={15} className="text-accent" aria-hidden />
+                    포즈
+                  </h3>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!vrm}
+                      onClick={handleCopyPose}
+                      className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                      title="클립보드로 포즈 데이터 복사"
+                    >
+                      복사
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!vrm}
+                      onClick={handlePastePose}
+                      className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                      title="클립보드 포즈 데이터 붙여넣기"
+                    >
+                      붙여넣기
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!vrm}
+                      onClick={handleSavePose}
+                      className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
+                    >
+                      <Sparkles size={11} /> 저장
+                    </button>
+                  </div>
+                </div>
+
+                <label className="mb-3 flex items-center gap-2 text-xs text-fg-2 cursor-pointer bg-card/30 border border-line/50 p-2 rounded-lg hover:bg-raised/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={preserveExpression}
+                    onChange={(e) => setPreserveExpression(e.target.checked)}
+                    className="size-3.5 accent-accent cursor-pointer"
+                  />
+                  <span className="font-medium">포즈 적용 시 캐릭터 표정 유지</span>
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {POSE_PRESETS.map((pose) => (
                     <button
@@ -1763,6 +3511,243 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     </button>
                   ))}
                 </div>
+
+                <div className="mt-3.5 space-y-2 border-t border-line/45 pt-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[0.65rem] font-bold text-fg-3 uppercase tracking-wider">내가 만든 포즈 ({savedPoses.length})</p>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={handleExportPoses}
+                        disabled={savedPoses.length === 0}
+                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40"
+                        title="JSON 파일로 백업 내보내기"
+                      >
+                        내보내기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleImportPoses}
+                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised hover:text-fg"
+                        title="JSON 포즈 파일 가져오기"
+                      >
+                        가져오기
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {savedPoses.length === 0 ? (
+                    <p className="text-center py-4 text-[0.68rem] text-fg-3/60 italic bg-card/20 rounded-xl border border-dashed border-line/55">
+                      저장된 커스텀 포즈가 없습니다.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {savedPoses.map((pose) => (
+                        <div
+                          key={pose.id}
+                          className={cx(
+                            "relative flex min-h-[3.2rem] flex-col justify-center rounded-xl border px-3 py-2 text-left transition-colors",
+                            activePoseId === pose.id
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-2"
+                          )}
+                        >
+                          <button
+                            type="button"
+                            className="w-full text-left focus:outline-none"
+                            disabled={!vrm}
+                            onClick={() => handleCustomPoseSelect(pose)}
+                          >
+                            <span className="block text-xs font-bold truncate pr-5">{pose.label}</span>
+                            <span className="mt-0.5 block text-[0.65rem] text-fg-3">Y-Offset: {pose.yOffset.toFixed(2)}m</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeletePose(pose.id, e)}
+                            className="absolute right-2 top-2 grid size-5 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-bad"
+                            aria-label="포즈 삭제"
+                            title="삭제"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-line bg-card/45 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                    <Sparkles size={15} className="text-accent" aria-hidden />
+                    서버 공유 포즈 라이브러리
+                  </h3>
+                  <button
+                    type="button"
+                    disabled={!vrm || isSharingPose}
+                    onClick={handleSharePoseToServer}
+                    className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
+                  >
+                    {isSharingPose ? <Loader2 className="animate-spin" size={11} /> : <Upload size={11} />}
+                    포즈 서버에 공유
+                  </button>
+                </div>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  다른 웹툰 작가들이 공유한 포즈를 내 캐릭터에 즉시 입히고, 나만의 멋진 포즈를 서버에 올려 공유하세요!
+                </p>
+
+                {sharedPosesStatus === "loading" && sharedPoses.length === 0 ? (
+                  <div className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
+                    공유된 포즈를 불러오는 중입니다...
+                  </div>
+                ) : sharedPoses.length === 0 ? (
+                  <p className="text-center py-4 text-[0.68rem] text-fg-3/60 italic bg-card/20 rounded-xl border border-dashed border-line/55">
+                    서버에 등록된 공유 포즈가 없습니다. 첫 포즈를 공유해 보세요!
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                    {sharedPoses.map((asset) => {
+                      const isActive = activePoseId === `shared-${asset.id}`;
+                      return (
+                        <div
+                          key={asset.id}
+                          className={cx(
+                            "relative flex min-h-[4rem] flex-col justify-between rounded-xl border p-2 text-left transition-colors",
+                            isActive
+                              ? "border-accent bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          <button
+                            type="button"
+                            className="w-full text-left focus:outline-none flex flex-col h-full justify-between"
+                            disabled={!vrm}
+                            onClick={() => handleSelectSharedPose(asset)}
+                          >
+                            <div className="min-w-0">
+                              <span className="block text-[0.7rem] font-bold truncate pr-4 text-fg" title={asset.name.replace("[3D_POSE] ", "")}>
+                                {asset.name.replace("[3D_POSE] ", "")}
+                              </span>
+                              <span className="block text-[0.55rem] text-fg-3 truncate">
+                                작성자: {asset.author?.name || "익명"}
+                              </span>
+                            </div>
+                            <span className="mt-1 block text-[0.55rem] text-fg-3 font-semibold">
+                              다운로드 {asset.downloads}회
+                            </span>
+                          </button>
+                          {asset.isOwner && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteSharedPose(asset, e)}
+                              className="absolute right-2 top-2 grid size-5 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-bad"
+                              aria-label="포즈 삭제"
+                              title="서버에서 삭제"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
+                  <Sliders size={14} className="text-accent" aria-hidden />
+                  의상 및 신체 색상 변경
+                </h3>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  캐릭터의 부위별 색상을 자유롭게 변경해 보세요.
+                </p>
+
+                {/* 의상 테마 프리셋 */}
+                <div className="mb-4 space-y-1.5 border-b border-line/35 pb-3">
+                  <p className="text-[0.65rem] font-bold text-fg-2">테마 추천 의상셋</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {COSTUME_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={!vrm}
+                        onClick={() => {
+                          setCustomColors(p.colors);
+                          if (vrmRef.current) {
+                            applyVrmCustomColors(vrmRef.current, p.colors);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-[0.68rem] font-medium text-fg hover:bg-raised disabled:opacity-40 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs">{p.emoji}</span>
+                        <span className="truncate">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="mb-2 text-[0.65rem] font-bold text-fg-2">부위별 정밀 채색</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { key: "tops", label: "상의/드레스" },
+                    { key: "bottoms", label: "하의/신발" },
+                    { key: "hair", label: "머리카락" },
+                    { key: "body", label: "피부(몸)" },
+                    { key: "face", label: "얼굴" },
+                  ].map((part) => (
+                    <div key={part.key} className="flex flex-col gap-1">
+                      <span className="text-[0.65rem] font-semibold text-fg-2">{part.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="color"
+                          value={customColors[part.key] || "#ffffff"}
+                          disabled={!vrm}
+                          onChange={(e) => {
+                            const hex = e.target.value;
+                            setCustomColors((prev) => ({
+                              ...prev,
+                              [part.key]: hex,
+                            }));
+                          }}
+                          className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
+                        />
+                        <input
+                          type="text"
+                          value={customColors[part.key] || "#ffffff"}
+                          disabled={!vrm}
+                          onChange={(e) => {
+                            const hex = e.target.value;
+                            if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                              setCustomColors((prev) => ({
+                                ...prev,
+                                [part.key]: hex,
+                              }));
+                            }
+                          }}
+                          className="w-16 rounded border border-line bg-card px-1 py-0.5 text-[0.65rem] text-fg focus-visible:outline focus-visible:outline-accent"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
+                  disabled={!vrm}
+                  onClick={() => {
+                    setCustomColors({
+                      tops: "#ffffff",
+                      bottoms: "#ffffff",
+                      hair: "#ffffff",
+                      body: "#ffffff",
+                      face: "#ffffff",
+                    });
+                  }}
+                >
+                  색상 초기화
+                </button>
               </section>
 
               <section className="rounded-xl border border-line bg-card/45 p-3">
@@ -1887,9 +3872,29 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
                     disabled={!vrm}
                     onClick={() => {
-                      const pose = findPose(activePoseId);
-                      setCustomBones(pose.bones);
-                      setCustomYOffset(pose.yOffset ?? 0);
+                      if (activePoseId.startsWith("custom-")) {
+                        const pose = savedPoses.find((p) => p.id === activePoseId);
+                        if (pose) {
+                          setCustomBones(pose.bones);
+                          setCustomYOffset(pose.yOffset);
+                          if (pose.expressionWeights) {
+                            setExpressionWeights(pose.expressionWeights);
+                            if (vrmRef.current) {
+                              applyExpressionWeightsToVrm(vrmRef.current, pose.expressionWeights);
+                            }
+                          }
+                          if (vrmRef.current) {
+                            applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset);
+                          }
+                        }
+                      } else {
+                        const pose = findPose(activePoseId);
+                        setCustomBones(pose.bones);
+                        setCustomYOffset(pose.yOffset ?? 0);
+                        if (vrmRef.current) {
+                          applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset ?? 0);
+                        }
+                      }
                     }}
                   >
                     현재 프리셋 포즈로 재설정
@@ -1986,24 +3991,40 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                       <div className="grid grid-cols-4 gap-1.5">
                         {items.map((prop) => {
                           const isActive = activeProps.includes(prop.id);
+                          const isSelected = selectedPropId === prop.id;
                           return (
                             <button
                               key={prop.id}
                               type="button"
                               className={cx(
-                                "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-center transition-colors",
+                                "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-center transition-colors relative",
                                 isActive
-                                  ? "border-accent/60 bg-accent-soft text-accent ring-1 ring-accent/30"
+                                  ? isSelected
+                                    ? "border-accent bg-accent text-on-accent ring-2 ring-accent/40"
+                                    : "border-accent/60 bg-accent-soft text-accent ring-1 ring-accent/30"
                                   : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
                               )}
                               onClick={() => {
-                                setActiveProps((prev) =>
-                                  prev.includes(prop.id) ? prev.filter((id) => id !== prop.id) : [...prev, prop.id]
-                                );
+                                setActiveProps((prev) => {
+                                  const wasActive = prev.includes(prop.id);
+                                  if (wasActive) {
+                                    if (selectedPropId === prop.id) setSelectedPropId(null);
+                                    return prev.filter((id) => id !== prop.id);
+                                  } else {
+                                    setSelectedPropId(prop.id);
+                                    return [...prev, prop.id];
+                                  }
+                                });
                               }}
                             >
                               <span className="text-base leading-none">{prop.emoji}</span>
                               <span className="text-[0.55rem] font-semibold leading-tight">{prop.label}</span>
+                              {isActive && (
+                                <span 
+                                  className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent"
+                                  title="클릭하여 장착/위치 세부설정"
+                                />
+                              )}
                             </button>
                           );
                         })}
@@ -2015,11 +4036,186 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                   <button
                     type="button"
                     className="mt-1 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised"
-                    onClick={() => setActiveProps([])}
+                    onClick={() => {
+                      setActiveProps([]);
+                      setSelectedPropId(null);
+                    }}
                   >
                     모든 소품 제거
                   </button>
                 )}
+
+                {selectedPropId && activeProps.includes(selectedPropId) && (() => {
+                  const prop = SCENE_PROPS.find((p) => p.id === selectedPropId);
+                  if (!prop) return null;
+                  const config = propAttachments[selectedPropId] || {
+                    bone: "none",
+                    offsetX: 0,
+                    offsetY: 0,
+                    offsetZ: 0,
+                    rotX: 0,
+                    rotY: 0,
+                    rotZ: 0,
+                    scale: 1,
+                  };
+
+                  const handleConfigChange = (patch: Partial<PropAttachmentConfig>) => {
+                    setPropAttachments((prev) => ({
+                      ...prev,
+                      [selectedPropId]: { ...config, ...patch },
+                    }));
+                  };
+
+                  return (
+                    <div className="mt-3 rounded-xl border border-accent/40 bg-accent-soft/20 p-3 space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-accent flex items-center gap-1">
+                          <span>{prop.emoji}</span>
+                          <span>{prop.label} 장착 및 위치 설정</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="text-[0.62rem] text-fg-3 hover:underline"
+                          onClick={() => setSelectedPropId(null)}
+                        >
+                          설정 닫기
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-[0.68rem] font-semibold text-fg-2 mb-1">장착 부위 (Bone)</label>
+                        <select
+                          className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                          value={config.bone}
+                          onChange={(e) => {
+                            const nextBone = e.target.value as VRMHumanBoneName | "none";
+                            const defaultVals = nextBone !== "none" ? DEFAULT_BONE_OFFSETS[selectedPropId]?.[nextBone] || {} : {};
+                            handleConfigChange({
+                              bone: nextBone,
+                              offsetX: defaultVals.offsetX ?? 0,
+                              offsetY: defaultVals.offsetY ?? 0,
+                              offsetZ: defaultVals.offsetZ ?? 0,
+                              rotX: defaultVals.rotX ?? 0,
+                              rotY: defaultVals.rotY ?? 0,
+                              rotZ: defaultVals.rotZ ?? 0,
+                              scale: defaultVals.scale ?? 1.0,
+                            });
+                          }}
+                        >
+                          <option value="none">없음 (3D 월드 좌표 배치)</option>
+                          <option value="head">머리 (Head)</option>
+                          <option value="chest">가슴 (Chest)</option>
+                          <option value="rightHand">오른손 (Right Hand)</option>
+                          <option value="leftHand">왼손 (Left Hand)</option>
+                          <option value="hips">골반 (Hips)</option>
+                        </select>
+                      </div>
+
+                      {config.bone !== "none" && (
+                        <div className="space-y-2.5">
+                          <div className="border-t border-line/40 pt-2.5">
+                            <p className="text-[0.62rem] font-semibold text-fg-3 mb-1.5">위치 미세조정 (X / Y / Z)</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              <label className="block text-[0.55rem] text-fg-3">
+                                X: {(config.offsetX || 0).toFixed(2)}
+                                <input
+                                  type="range"
+                                  min="-0.5"
+                                  max="0.5"
+                                  step="0.01"
+                                  className="w-full accent-accent h-1"
+                                  value={config.offsetX}
+                                  onChange={(e) => handleConfigChange({ offsetX: Number(e.target.value) })}
+                                />
+                              </label>
+                              <label className="block text-[0.55rem] text-fg-3">
+                                Y: {(config.offsetY || 0).toFixed(2)}
+                                <input
+                                  type="range"
+                                  min="-0.5"
+                                  max="0.5"
+                                  step="0.01"
+                                  className="w-full accent-accent h-1"
+                                  value={config.offsetY}
+                                  onChange={(e) => handleConfigChange({ offsetY: Number(e.target.value) })}
+                                />
+                              </label>
+                              <label className="block text-[0.55rem] text-fg-3">
+                                Z: {(config.offsetZ || 0).toFixed(2)}
+                                <input
+                                  type="range"
+                                  min="-0.5"
+                                  max="0.5"
+                                  step="0.01"
+                                  className="w-full accent-accent h-1"
+                                  value={config.offsetZ}
+                                  onChange={(e) => handleConfigChange({ offsetZ: Number(e.target.value) })}
+                                />
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-line/40 pt-2.5">
+                            <p className="text-[0.62rem] font-semibold text-fg-3 mb-1.5">회전 조정 (앞/뒤, 뒤틀기, 안/밖)</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              <label className="block text-[0.55rem] text-fg-3">
+                                앞/뒤: {Math.round(config.rotX)}°
+                                <input
+                                  type="range"
+                                  min="-180"
+                                  max="180"
+                                  className="w-full accent-accent h-1"
+                                  value={config.rotX}
+                                  onChange={(e) => handleConfigChange({ rotX: Number(e.target.value) })}
+                                />
+                              </label>
+                              <label className="block text-[0.55rem] text-fg-3">
+                                뒤틀기: {Math.round(config.rotY)}°
+                                <input
+                                  type="range"
+                                  min="-180"
+                                  max="180"
+                                  className="w-full accent-accent h-1"
+                                  value={config.rotY}
+                                  onChange={(e) => handleConfigChange({ rotY: Number(e.target.value) })}
+                                />
+                              </label>
+                              <label className="block text-[0.55rem] text-fg-3">
+                                안/밖: {Math.round(config.rotZ)}°
+                                <input
+                                  type="range"
+                                  min="-180"
+                                  max="180"
+                                  className="w-full accent-accent h-1"
+                                  value={config.rotZ}
+                                  onChange={(e) => handleConfigChange({ rotZ: Number(e.target.value) })}
+                                />
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-line/40 pt-2.5">
+                            <label className="block">
+                              <span className="flex items-center justify-between text-[0.65rem] text-fg-3">
+                                <span>크기 배율</span>
+                                <span>{config.scale.toFixed(1)}x</span>
+                              </span>
+                              <input
+                                type="range"
+                                min="0.2"
+                                max="2.5"
+                                step="0.1"
+                                className="w-full accent-accent h-1 mt-1"
+                                value={config.scale}
+                                onChange={(e) => handleConfigChange({ scale: Number(e.target.value) })}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </section>
             </div>
 
