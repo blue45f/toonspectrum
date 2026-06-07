@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import Link from "@/src/compat/router-link";
 import { AvailabilityDots } from "@/components/availability";
 import { MiniPoster } from "@/components/rank-row";
@@ -254,12 +255,19 @@ export function CalendarPage() {
                     aria-selected={on}
                     onClick={() => setSelectedDayIdx(index)}
                     className={cn(
-                      "inline-flex shrink-0 flex-col items-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
+                      "relative inline-flex shrink-0 flex-col items-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
                       on
-                        ? "border-accent/60 bg-accent-soft/55 text-fg"
+                        ? "border-accent/60 text-fg"
                         : "border-line bg-panel/30 text-fg-2 hover:bg-raised"
                     )}
                   >
+                    {on && (
+                      <motion.span
+                        layoutId="cal-active-day"
+                        className="absolute inset-0 -z-10 rounded-xl bg-accent-soft/55 border border-accent/60"
+                        transition={{ type: "spring", stiffness: 400, damping: 33 }}
+                      />
+                    )}
                     <span className={cn("font-display text-sm font-bold", isToday && !on && "text-accent")}>
                       {day}
                       {isToday && <span className="ml-1 text-[0.55rem] align-top">●</span>}

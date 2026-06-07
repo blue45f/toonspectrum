@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
 import { TitlePoster } from "./title-poster";
 import { MiniPoster } from "./rank-row";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { GenreChip } from "./ui/chip";
-import { AvailabilityDots } from "./availability";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { statsAreEstimated } from "@/lib/estimate";
 import { cn, formatCount } from "@/lib/utils";
-import { Search, X, Swords } from "lucide-react";
+import { Search, X, Swords, ArrowRight } from "lucide-react";
 
 type Metric = {
   label: string;
@@ -184,69 +184,212 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-[1fr_auto_1fr]">
-        <div className="skeleton aspect-[3/4]" />
-        <div className="skeleton aspect-[3/4]" />
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="skeleton aspect-[3/4] rounded-2xl" />
+        <div className="flex items-center justify-center py-20">
+          <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+        <div className="skeleton aspect-[3/4] rounded-2xl" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="flex flex-col gap-8"
+    >
       <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-6">
         <Picker value={a} onPick={setA} onClear={() => setA(null)} />
-        <div className="mt-16 grid size-11 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent">
-          <Swords size={18} />
+        <div className="group mt-16 grid size-11 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-accent hover:text-on-accent shadow-[0_0_12px_var(--color-accent-soft)]">
+          <Swords size={18} className="transition-transform group-hover:animate-pulse" />
         </div>
         <Picker value={b} onPick={setB} onClear={() => setB(null)} />
       </div>
 
       {a && b && (
-        <>
-          <div className="overflow-hidden rounded-2xl border border-line bg-panel/40">
-            {METRICS.map((m, i) => {
-              const va = m.get(a);
-              const vb = m.get(b);
-              const aWin = m.better === "high" && va > vb && !eitherEstimated;
-              const bWin = m.better === "high" && vb > va && !eitherEstimated;
-              return (
-                <div
-                  key={m.label}
-                  className={cn(
-                    "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3",
-                    i % 2 === 1 && "bg-card/40"
-                  )}
-                >
-                  <div className={cn("text-right numeral text-lg", aWin ? "text-accent" : "text-fg-2")}>
-                    {m.fmt(va)}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-6"
+        >
+          {/* 주요 수치 대조 패널 */}
+          <div className="overflow-hidden rounded-2xl border border-line bg-panel/40 backdrop-blur-sm p-2 sm:p-4">
+            <h3 className="mb-4 px-2 text-xs font-bold text-fg-3 uppercase tracking-wider">주요 지표 비교분석</h3>
+            <div className="space-y-4">
+              {METRICS.map((m, i) => {
+                const va = m.get(a);
+                const vb = m.get(b);
+                const aWin = m.better === "high" && va > vb && !eitherEstimated;
+                const bWin = m.better === "high" && vb > va && !eitherEstimated;
+
+                // 비교 바 비중 계산
+                let pctA = 50;
+                let pctB = 50;
+                if (m.label === "별점") {
+                  pctA = (va / 5) * 100;
+                  pctB = (vb / 5) * 100;
+                } else {
+                  const sum = va + vb;
+                  if (sum > 0) {
+                    pctA = (va / sum) * 100;
+                    pctB = (vb / sum) * 100;
+                  } else {
+                    pctA = 0;
+                    pctB = 0;
+                  }
+                }
+
+                return (
+                  <div
+                    key={m.label}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl p-3 transition-colors hover:bg-card/45",
+                      i % 2 === 1 && "bg-card/20"
+                    )}
+                  >
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                      {/* Left value (A) */}
+                      <div className={cn("text-right numeral text-lg font-bold transition-all", aWin ? "text-accent text-xl" : "text-fg-2")}>
+                        {m.fmt(va)}
+                      </div>
+                      
+                      {/* Metric Label */}
+                      <div className="w-24 text-center text-xs font-semibold text-fg-3">{m.label}</div>
+                      
+                      {/* Right value (B) */}
+                      <div className={cn("text-left numeral text-lg font-bold transition-all", bWin ? "text-accent text-xl" : "text-fg-2")}>
+                        {m.fmt(vb)}
+                      </div>
+                    </div>
+
+                    {/* 양방향 비교 바 그래프 (Visual Spectrum Chart) */}
+                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-line/20 px-2.5 sm:px-6">
+                      <div className="flex w-full h-full gap-0.5">
+                        {/* A Bar */}
+                        <div className="flex justify-end flex-1">
+                          <div 
+                            className={cn(
+                              "h-full rounded-l-full transition-all duration-500 origin-right",
+                              aWin ? "bg-accent" : "bg-fg-3/50"
+                            )}
+                            style={{ width: `${pctA}%` }}
+                          />
+                        </div>
+                        {/* Center Gap */}
+                        <div className="w-1 bg-transparent" />
+                        {/* B Bar */}
+                        <div className="flex justify-start flex-1">
+                          <div 
+                            className={cn(
+                              "h-full rounded-r-full transition-all duration-500 origin-left",
+                              bWin ? "bg-accent" : "bg-fg-3/50"
+                            )}
+                            style={{ width: `${pctB}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-24 text-center text-xs font-medium text-fg-3">{m.label}</div>
-                  <div className={cn("text-left numeral text-lg", bWin ? "text-accent" : "text-fg-2")}>
-                    {m.fmt(vb)}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {eitherEstimated && (
-            <p className="-mt-4 text-center text-xs text-fg-3">
-              ≈ 비교 작품 중 카카오웹툰·웹소설은 별점·조회 등이 추정값이라 우열 표시를 생략했어요.
+            <p className="text-center text-[0.68rem] text-fg-3 leading-relaxed">
+              * 비교 작품 중 카카오웹툰·웹소설은 별점·조회 등이 보정된 추정값이라 우열 그래프 표시를 생략했어요.
             </p>
           )}
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
-            {[a, b].flatMap((t, idx) =>
-              idx === 0
-                ? [
-                    <CompareExtra key="a" t={a} align="right" />,
-                    <div key="mid" className="w-11" />,
-                  ]
-                : [<CompareExtra key="b" t={b} align="left" />]
-            )}
+          {/* 에디토리얼 요약 및 플랫폼 가용성 가격 비교 표 */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* 작품 A 디테일 */}
+            <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-line/45 pb-3">
+                <span className="text-xs font-bold text-accent">LEFT COLUMN</span>
+                <span className="text-xs text-fg-3">{STATUS_LABEL[a.status]}</span>
+              </div>
+              <CompareExtra t={a} align="left" />
+              <ComparePlatformPrice t={a} />
+            </div>
+
+            {/* 작품 B 디테일 */}
+            <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-line/45 pb-3">
+                <span className="text-xs font-bold text-accent">RIGHT COLUMN</span>
+                <span className="text-xs text-fg-3">{STATUS_LABEL[b.status]}</span>
+              </div>
+              <CompareExtra t={b} align="left" />
+              <ComparePlatformPrice t={b} />
+            </div>
           </div>
-        </>
+        </motion.div>
       )}
+    </motion.div>
+  );
+}
+
+const PLATFORM_NAMES: Record<string, string> = {
+  "naver-webtoon": "네이버웹툰",
+  "naver-series": "네이버시리즈",
+  "kakao-webtoon": "카카오웹툰",
+  "kakao-page": "카카오페이지",
+  lezhin: "레진코믹스",
+  ridi: "리디북스",
+  munpia: "문피아",
+  joara: "조아라",
+  novelpia: "노벨피아",
+  bomtoon: "봄툰",
+  toptoon: "탑툰",
+  toomics: "투믹스",
+  kyobo: "교보문고",
+  yes24: "예스24",
+  postype: "포스타입",
+  mrblue: "미스터블루",
+  bookcube: "북큐브",
+  onestory: "원스토리",
+};
+
+const PRICING_BADGES: Record<string, { label: string; className: string }> = {
+  free: { label: "무료 연재", className: "border-good/30 bg-[oklch(0.8_0.15_150/0.08)] text-good" },
+  "wait-free": { label: "기다무 무료", className: "border-accent/30 bg-accent-soft/40 text-accent" },
+  paid: { label: "유료 소장/대여", className: "border-line-strong bg-canvas/60 text-fg-2" },
+};
+
+function ComparePlatformPrice({ t }: { t: Title }) {
+  return (
+    <div className="rounded-xl border border-line/50 bg-canvas/30 p-3 space-y-2">
+      <p className="text-[0.68rem] font-bold text-fg-3 uppercase tracking-wider mb-2">어디서 봐 (요금 매트릭스)</p>
+      <div className="divide-y divide-line/35">
+        {t.availability.map((av) => {
+          const platName = PLATFORM_NAMES[av.platformId] ?? av.platformId;
+          const badge = PRICING_BADGES[av.pricing] ?? { label: av.pricing, className: "border-line bg-card" };
+          return (
+            <div key={av.platformId} className="flex items-center justify-between py-2 first:pt-0 last:pb-0 text-xs">
+              <span className="font-semibold text-fg">{platName}</span>
+              <div className="flex items-center gap-2">
+                <span className={cn("rounded border px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-wide", badge.className)}>
+                  {badge.label}
+                </span>
+                {av.url && (
+                  <a
+                    href={av.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-0.5 text-[0.62rem] text-fg-3 hover:text-accent font-semibold transition-colors"
+                  >
+                    이동 <ArrowRight size={10} />
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -260,13 +403,14 @@ function CompareExtra({ t, align }: { t: Title; align: "left" | "right" }) {
           <GenreChip key={g} genre={g} size="sm" />
         ))}
       </div>
-      <div className={cn("flex items-center gap-2", align === "right" && "flex-row-reverse")}>
-        <span className="text-xs text-fg-3">{STATUS_LABEL[t.status]}</span>
-        <AvailabilityDots availability={t.availability} max={4} />
+      <p className="text-xs text-fg-3 leading-relaxed mt-1 line-clamp-3">
+        {t.synopsis}
+      </p>
+      <div className="w-full pt-1">
+        <Link href={`/title/${t.slug}`} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-2 transition-colors">
+          작품 상세 정보 바로가기 <ArrowRight size={12} />
+        </Link>
       </div>
-      <Link href={`/title/${t.slug}`} className="text-xs font-medium text-accent hover:underline">
-        작품 상세 →
-      </Link>
     </div>
   );
 }
