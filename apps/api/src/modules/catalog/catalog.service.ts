@@ -446,7 +446,9 @@ function findTitle(identifier: string): Title | null {
 }
 
 function bayes(title: Title) {
-  return (4 * 800 + title.stats.ratingAvg * title.stats.ratingCount) / (800 + title.stats.ratingCount);
+  const ratingAvg = Math.max(0, Math.min(5, title.stats.ratingAvg));
+  const ratingCount = Math.max(0, title.stats.ratingCount);
+  return (4 * 800 + ratingAvg * ratingCount) / (800 + ratingCount);
 }
 
 function platformCoverage(titles: Title[]) {
