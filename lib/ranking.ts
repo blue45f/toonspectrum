@@ -87,7 +87,8 @@ export const PERIODS: { key: RankPeriod; label: string }[] = [
 const C = 4.0; // 사전 평균
 const M = 800; // 사전 가중 표본
 function bayesRating(t: Title): number {
-  const { ratingAvg, ratingCount } = t.stats;
+  const ratingAvg = Math.max(0, Math.min(5, t.stats.ratingAvg));
+  const ratingCount = Math.max(0, t.stats.ratingCount);
   return (C * M + ratingAvg * ratingCount) / (M + ratingCount);
 }
 
@@ -170,11 +171,11 @@ function rawScore(t: Title, axis: RankAxis): number {
       return (movement + momentum + reachPct + ratingComp) * confidenceFactor(t);
     }
     case "rating":
-      return bayesRating(t) * 20 + Math.log10(s.ratingCount + 1) * 2;
+      return bayesRating(t) * 20 + Math.log10(Math.max(0, s.ratingCount) + 1) * 2;
     case "favorites":
-      return Math.log10(s.bookmarks + 1) * 14 + Math.log10(s.likes + 1) * 4 + bayesRating(t) * 6;
+      return Math.log10(Math.max(0, s.bookmarks) + 1) * 14 + Math.log10(Math.max(0, s.likes) + 1) * 4 + bayesRating(t) * 6;
     case "hidden":
-      return bayesRating(t) * 22 - Math.log10(s.views + 1) * 3.5 + Math.log10(s.ratingCount + 1) * 2;
+      return bayesRating(t) * 22 - Math.log10(Math.max(0, s.views) + 1) * 3.5 + Math.log10(Math.max(0, s.ratingCount) + 1) * 2;
     case "binge":
       return s.bingeIndex * 1.0 + s.completionRate * 0.4;
     case "completed":
