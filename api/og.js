@@ -10,7 +10,7 @@ function template() {
     for (const p of [path.join(process.cwd(), "dist", "index.html"), path.join(__dirname, "..", "dist", "index.html")]) {
       try { TEMPLATE = fs.readFileSync(p, "utf8"); break; } catch { /* try next */ }
     }
-    if (TEMPLATE === null) TEMPLATE = "<!doctype html><html><head></head><body><div id=\"root\"></div></body></html>";
+    if (TEMPLATE === null) TEMPLATE = "<!doctype html><html><head><title></title><meta name=\"description\" content=\"\" /><link rel=\"canonical\" href=\"\" /><meta property=\"og:title\" content=\"\" /><meta property=\"og:description\" content=\"\" /><meta property=\"og:image\" content=\"\" /><meta property=\"og:url\" content=\"\" /><meta name=\"twitter:title\" content=\"\" /><meta name=\"twitter:description\" content=\"\" /><meta name=\"twitter:image\" content=\"\" /></head><body><div id=\"root\"></div></body></html>";
   }
   return TEMPLATE;
 }

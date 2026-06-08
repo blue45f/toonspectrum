@@ -1,6 +1,4 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 // CJS handler를 require로 가져옵니다.
 const ogHandler = require("../../api/og.js");
