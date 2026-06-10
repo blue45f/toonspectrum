@@ -1,6 +1,11 @@
 import Link from "@/src/compat/router-link";
 import { ToonSpectrumMark } from "./visual-marks";
 
+const TERMSDESK_BASE = "https://termsdesk.vercel.app";
+const TERMS_URL = `${TERMSDESK_BASE}/p/webtoon-index/terms-of-service`;
+const PRIVACY_URL = `${TERMSDESK_BASE}/p/webtoon-index/privacy-policy`;
+const SUPPORT_URL = `${TERMSDESK_BASE}/support/webtoon-index`;
+
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "탐색",
@@ -36,10 +41,10 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "이용 안내",
     links: [
-      { label: "이용약관", href: "/terms" },
-      { label: "개인정보처리방침", href: "/privacy" },
+      { label: "이용약관", href: TERMS_URL },
+      { label: "개인정보처리방침", href: PRIVACY_URL },
       { label: "저작권·콘텐츠 안내", href: "/copyright" },
-      { label: "광고·제휴 문의", href: "/contact" },
+      { label: "지원", href: SUPPORT_URL },
     ],
   },
 ];
@@ -72,6 +77,8 @@ export function SiteFooter() {
               <Link
                 key={l.href}
                 href={l.href}
+                target={l.href.startsWith(TERMSDESK_BASE) ? "_blank" : undefined}
+                rel={l.href.startsWith(TERMSDESK_BASE) ? "noreferrer" : undefined}
                 className="inline-flex items-center text-sm text-fg-2 transition-colors hover:text-accent"
               >
                 {l.label}

@@ -1,5 +1,28 @@
 import { Container } from "@/components/section";
-import { Phone, Mail, Megaphone, Handshake, Database, MessagesSquare } from "lucide-react";
+import { Bug, Megaphone, Handshake, Database, MessagesSquare } from "lucide-react";
+
+const SUPPORT_URL = "https://termsdesk.vercel.app/support/webtoon-index";
+
+const SUPPORT_LINKS = [
+  {
+    icon: MessagesSquare,
+    title: "사이트 문의",
+    body: "서비스 이용, 계정, 데이터 표시처럼 일반 문의를 남깁니다.",
+    href: `${SUPPORT_URL}?category=site-inquiry`,
+  },
+  {
+    icon: Handshake,
+    title: "제휴 문의",
+    body: "광고, 플랫폼 연동, 콘텐츠 제휴 같은 비즈니스 제안을 접수합니다.",
+    href: `${SUPPORT_URL}?category=partnership`,
+  },
+  {
+    icon: Bug,
+    title: "버그 제보",
+    body: "오류 화면, 재현 경로, 기대 동작을 공개 보드에 남깁니다.",
+    href: `${SUPPORT_URL}?category=bug`,
+  },
+];
 
 // 광고·제휴/문의(/contact) — 광고 슬롯·업무제휴·데이터 문의 등 비즈니스 연락 창구.
 const TYPES = [
@@ -15,31 +38,24 @@ export function ContactPage() {
       <p className="eyebrow text-accent">CONTACT</p>
       <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">광고·제휴 문의</h1>
       <p className="mt-4 text-pretty text-base leading-relaxed text-fg-2">
-        툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 광고 집행, 업무 제휴, 데이터 활용
-        등 어떤 제안이든 아래 연락처로 편하게 문의해 주세요. 영업일 기준 빠르게 회신드립니다.
+        툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 광고 집행, 업무 제휴, 데이터 활용,
+        버그 제보는 TermsDesk 공식 지원 보드로 접수합니다.
       </p>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-2">
-        <a
-          href="tel:01038734197"
-          className="flex items-center gap-3 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
-        >
-          <Phone className="text-accent" size={22} />
-          <span>
-            <span className="block text-xs text-fg-3">전화</span>
-            <span className="numeral text-lg font-bold text-fg">010-3873-4197</span>
-          </span>
-        </a>
-        <a
-          href="mailto:blue45f@gmail.com?subject=[툰스펙트럼] 광고·제휴 문의"
-          className="flex items-center gap-3 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
-        >
-          <Mail className="text-accent" size={22} />
-          <span className="min-w-0">
-            <span className="block text-xs text-fg-3">이메일</span>
-            <span className="block truncate text-lg font-bold text-fg">blue45f@gmail.com</span>
-          </span>
-        </a>
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
+        {SUPPORT_LINKS.map((link) => (
+          <a
+            key={link.title}
+            href={link.href}
+            target="_blank"
+            rel="noreferrer"
+            className="flex min-h-full flex-col gap-2 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
+          >
+            <link.icon className="text-accent" size={22} />
+            <span className="text-base font-bold text-fg">{link.title}</span>
+            <span className="text-sm leading-relaxed text-fg-3">{link.body}</span>
+          </a>
+        ))}
       </div>
 
       <h2 className="mt-10 mb-3 text-lg font-bold text-fg">이런 문의를 받습니다</h2>
@@ -55,10 +71,12 @@ export function ContactPage() {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <a
-          href="mailto:blue45f@gmail.com?subject=[툰스펙트럼] 광고·제휴 문의&body=문의 유형:%0D%0A회사/담당자:%0D%0A연락처:%0D%0A내용:%0D%0A"
+          href={`${SUPPORT_URL}?category=partnership`}
+          target="_blank"
+          rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition-transform hover:translate-y-[-1px]"
         >
-          <Mail size={16} /> 문의 메일 보내기
+          <Handshake size={16} /> 제휴 문의 남기기
         </a>
       </div>
     </Container>
