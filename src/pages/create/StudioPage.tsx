@@ -426,6 +426,12 @@ const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   fxOverlays: [],
 };
 
+// 스튜디오 전용 구글폰트 7종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
+// 전역 폰트(Space Grotesk·Nanum Myeongjo)만 남기고, 이 7종은 스튜디오 마운트 시에만 주입한다.
+const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
+const STUDIO_FONTS_CSS2_URL =
+  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
+
 // 요소의 대략적 바운딩 박스(중심·크기 판정용).
 function elBounds(el: El): { x: number; y: number; w: number; h: number } {
   if (el.type === "draw") {
@@ -1974,6 +1980,31 @@ export function StudioPage() {
         }
       });
   }, [menu, studioOptionalAssetPacks]);
+
+  // 스튜디오 전용 구글폰트 로드 — 스타일시트는 마운트 시 1회 주입하고 언마운트 후에도 남긴다
+  // (재진입 시 id 가드로 중복 주입 방지·폰트 캐시 유지). konva 캔버스 텍스트는 DOM과 달리
+  // 폰트 스왑을 스스로 감지하지 못하므로, 폰트가 도착하는 시점에 스테이지를 한 번씩 다시 그린다.
+  useEffect(() => {
+    if (!document.getElementById(STUDIO_FONTS_LINK_ID)) {
+      const link = document.createElement("link");
+      link.id = STUDIO_FONTS_LINK_ID;
+      link.rel = "stylesheet";
+      link.href = STUDIO_FONTS_CSS2_URL;
+      document.head.appendChild(link);
+    }
+    const redrawStage = () => stageRef.current?.batchDraw();
+    let mounted = true;
+    // 진행 중이던 로드(전역 폰트 포함)가 정리된 뒤 일회 보정 — 이미 캐시돼 있으면 즉시 실행된다.
+    document.fonts.ready.then(() => {
+      if (mounted) redrawStage();
+    });
+    // display=swap 특성상 폰트는 실제 사용 시점(글꼴 패널 노출 등)에 늦게 도착할 수 있다 — 도착할 때마다 보정.
+    document.fonts.addEventListener("loadingdone", redrawStage);
+    return () => {
+      mounted = false;
+      document.fonts.removeEventListener("loadingdone", redrawStage);
+    };
+  }, []);
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rankBy } from "../ranking";
+import { rankBy, rankingItemListJsonLd } from "../ranking";
 import { makeTitle } from "./fixtures";
 
 describe("rankBy", () => {
@@ -74,5 +74,40 @@ describe("rankBy", () => {
     const kakao = makeTitle({ id: "k", availability: [{ platformId: "kakao-webtoon", pricing: "wait-free" }] });
     const ranked = rankBy([naver, kakao], "popular", { period: "all", platform: "kakao-webtoon" });
     expect(ranked.map((x) => x.title.id)).toEqual(["k"]);
+  });
+});
+
+describe("rankingItemListJsonLd", () => {
+  it("상위 20개만 순위 position + 절대 URL의 ListItem으로 변환한다", () => {
+    const pool = Array.from({ length: 30 }, (_, i) => makeTitle({ id: `n${i}` }));
+    const ranked = rankBy(pool, "popular", { period: "all" });
+    const ld = rankingItemListJsonLd(ranked, "실시간 인기");
+    expect(ld?.["@type"]).toBe("ItemList");
+    expect(ld?.name).toBe("툰스펙트럼 통합 랭킹 · 실시간 인기");
+    expect(ld?.numberOfItems).toBe(20);
+    expect(ld?.itemListElement).toHaveLength(20);
+    expect(ld?.itemListElement[0]).toEqual({
+      "@type": "ListItem",
+      position: 1,
+      name: ranked[0].title.title,
+      url: `https://toonspectrum.vercel.app/title/${encodeURIComponent(ranked[0].title.slug)}`,
+    });
+  });
+
+  it("한글 slug는 URL 인코딩되고, 빈 목록은 null(스크립트 미주입)", () => {
+    const slug = "나 혼자만 레벨업";
+    const ranked = rankBy([makeTitle({ id: "kr", slug })], "popular", { period: "all" });
+    const url = rankingItemListJsonLd(ranked, "실시간 인기")?.itemListElement[0].url;
+    expect(url).toBe(`https://toonspectrum.vercel.app/title/${encodeURIComponent(slug)}`);
+    expect(url).not.toContain(" ");
+    expect(rankingItemListJsonLd([], "실시간 인기")).toBeNull();
+  });
+
+  it("자체 산식 점수·평점 지표는 스키마에 넣지 않는다(외부 평점으로 오인 금지)", () => {
+    const ranked = rankBy([makeTitle({ id: "honest" })], "popular", { period: "all" });
+    const json = JSON.stringify(rankingItemListJsonLd(ranked, "실시간 인기"));
+    expect(json).not.toContain("aggregateRating");
+    expect(json).not.toContain("ratingValue");
+    expect(json).not.toContain("score");
   });
 });

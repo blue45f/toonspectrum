@@ -6,10 +6,12 @@ import {
   RANK_AXES,
   PERIODS,
   axisMeta,
+  rankingItemListJsonLd,
   type RankedTitle,
   type RankAxis,
   type RankPeriod,
 } from "@/lib/ranking";
+import { useJsonLd } from "@/src/hooks/use-document-title";
 import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
 import { useSavedTitleIds } from "@/lib/store";
 import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
@@ -402,6 +404,11 @@ export function RankingBoard({
 
   const axisDetail = axisMeta(axis);
   const metric = metricFor(axis);
+
+  // /ranking 구조화 데이터 — 현재 축의 서버 순위 상위권을 ItemList로 노출(이 보드는 랭킹 페이지 전용 마운트).
+  // 구글이 JS 렌더링으로 수집해 '웹툰 랭킹' 계열 질의의 사이트 구조 이해·사이트링크 노출에 쓰인다.
+  useJsonLd(rankingItemListJsonLd(ranked, axisDetail.label));
+
   const query = useMemo(() => {
     const params = new URLSearchParams({
       axis,

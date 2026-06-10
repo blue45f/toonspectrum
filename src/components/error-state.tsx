@@ -3,6 +3,7 @@ import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // 데이터 로드 실패 시 페이지들이 공통으로 쓰는 에러 안내 + 재시도 블록.
+// role="alert"로 등장 시점에 스크린리더에 실패를 즉시 공지한다.
 export function ErrorState({
   title,
   message,
@@ -20,6 +21,7 @@ export function ErrorState({
         "rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center",
         className
       )}
+      role="alert"
     >
       <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
       <p className="text-sm font-medium text-fg">{title}</p>

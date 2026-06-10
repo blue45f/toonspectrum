@@ -3,6 +3,7 @@
   "short_name": "툰스펙트럼",
   "description": "웹툰·웹소설 통합 인덱스",
   "lang": "ko-KR",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -13,13 +14,45 @@
       "src": "/favicon.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/favicon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "통합 검색",
+      "short_name": "검색",
+      "description": "질의 + 패싯 필터로 웹툰·웹소설 통합 검색",
+      "url": "/search"
+    },
+    {
+      "name": "통합 랭킹",
+      "short_name": "랭킹",
+      "description": "인기·급상승·평점 등 6개 축 통합 랭킹",
+      "url": "/ranking"
+    },
+    {
+      "name": "연재 캘린더",
+      "short_name": "연재",
+      "description": "연재요일 기준 요일별 보드",
+      "url": "/calendar"
     }
   ]
 }

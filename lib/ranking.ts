@@ -328,3 +328,27 @@ export function rankBy(
 
   return limit ? out.slice(0, limit) : out;
 }
+
+// 랭킹 허브(/ranking) 구조화 데이터 — 서버 순위 상위권을 schema.org ItemList(JSON-LD)로 변환.
+// 자체 산식 점수·추정 지표는 스키마에 넣지 않는다(외부 평점처럼 보이면 안 됨 — 데이터 정직성.
+// aggregateRating은 실제 사용자 평점이 있는 작품 상세의 봇 주입(api/og.js)에만 존재).
+// index.html의 WebSite/Organization @graph와 충돌하지 않도록 @id 없는 독립 객체로 만든다.
+const SITE_BASE = "https://toonspectrum.vercel.app"; // 정규 호스트 — scripts/build-static-catalog.ts 사이트맵과 동일 기준
+const RANKING_ITEMLIST_TOP = 20; // 상위 20개만 — 리스트 전체(200)를 넣으면 신호 희석 + 페이로드 낭비
+
+export function rankingItemListJsonLd(items: RankedTitle[], axisLabel: string) {
+  if (items.length === 0) return null;
+  const top = items.slice(0, RANKING_ITEMLIST_TOP);
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `툰스펙트럼 통합 랭킹 · ${axisLabel}`,
+    numberOfItems: top.length,
+    itemListElement: top.map((r) => ({
+      "@type": "ListItem",
+      position: r.rank,
+      name: r.title.title,
+      url: `${SITE_BASE}/title/${encodeURIComponent(r.title.slug)}`,
+    })),
+  };
+}

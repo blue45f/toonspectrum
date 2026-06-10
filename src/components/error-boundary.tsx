@@ -38,7 +38,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <Container size="wide" className="py-16">
-          <div className="mx-auto max-w-md rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center">
+          <div
+            className="mx-auto max-w-md rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center"
+            role="alert"
+          >
             <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
             <p className="text-sm font-medium text-fg">이 화면을 표시하는 중 문제가 발생했어요.</p>
             <p className="mt-1 text-xs text-fg-3">다시 시도하거나 홈으로 이동해 주세요.</p>

@@ -62,4 +62,25 @@ describe("vite migration", () => {
       expect(studio).toContain(`import("./${moduleName}")`);
     }
   });
+
+  it("keeps studio-only Google Fonts out of the global render-blocking stylesheet", () => {
+    const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
+    const studio = readFileSync(join(process.cwd(), "src/pages/create/StudioPage.tsx"), "utf8");
+    const studioOnlyFamilies = [
+      "Black+Han+Sans",
+      "East+Sea+Dokdo",
+      "Gaegu",
+      "Gamja+Flower",
+      "Jua",
+      "Nanum+Pen+Script",
+      "Yeon+Sung",
+    ];
+
+    expect(html).toContain("family=Space+Grotesk");
+    expect(html).toContain("family=Nanum+Myeongjo");
+    for (const family of studioOnlyFamilies) {
+      expect(html).not.toContain(`family=${family}`);
+      expect(studio).toContain(`family=${family}`);
+    }
+  });
 });

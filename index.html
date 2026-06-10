@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- iOS는 SVG apple-touch-icon 미지원 — 180x180 PNG(icon-maskable.svg 래스터) 사용 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
@@ -83,8 +84,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Pretendard(주 한국어 UI 폰트)는 jsDelivr에서 옴 — 렌더 임계 경로라 연결을 미리 warm -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <!-- 임계 경로에는 전역 폰트 2종만 — Space Grotesk(--font-display)·Nanum Myeongjo(--font-serif).
+         스튜디오 전용 7종(Jua·Black Han Sans·Gaegu 등)은 StudioPage 마운트 시 동적 주입한다. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=Space+Grotesk:wght@400;500;600;700&family=Yeon+Sung&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link
