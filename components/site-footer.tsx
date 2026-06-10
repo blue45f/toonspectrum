@@ -2,8 +2,8 @@ import Link from "@/src/compat/router-link";
 import { ToonSpectrumMark } from "./visual-marks";
 
 const TERMSDESK_BASE = "https://termsdesk.vercel.app";
-const TERMS_URL = `${TERMSDESK_BASE}/p/webtoon-index/terms-of-service`;
-const PRIVACY_URL = `${TERMSDESK_BASE}/p/webtoon-index/privacy-policy`;
+// 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
+// 지원 보드만 외부(TermsDesk) 링크를 유지한다.
 const SUPPORT_URL = `${TERMSDESK_BASE}/support/webtoon-index`;
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
@@ -41,8 +41,8 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "이용 안내",
     links: [
-      { label: "이용약관", href: TERMS_URL },
-      { label: "개인정보처리방침", href: PRIVACY_URL },
+      { label: "이용약관", href: "/terms" },
+      { label: "개인정보처리방침", href: "/privacy" },
       { label: "저작권·콘텐츠 안내", href: "/copyright" },
       { label: "지원", href: SUPPORT_URL },
     ],

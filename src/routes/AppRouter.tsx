@@ -36,10 +36,6 @@ const STATIC_TITLES: Record<string, string> = {
   "/me": "내 정보",
 };
 
-const TERMSDESK_BASE = "https://termsdesk.vercel.app";
-const TERMS_URL = `${TERMSDESK_BASE}/p/webtoon-index/terms-of-service`;
-const PRIVACY_URL = `${TERMSDESK_BASE}/p/webtoon-index/privacy-policy`;
-
 function useRouteTitle(pathname: string) {
   useEffect(() => {
     if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
@@ -85,6 +81,8 @@ const SettingsPage = lazy(() => import("@/src/pages/SettingsPage").then((m) => (
 const AboutPage = lazy(() => import("@/src/pages/AboutPage").then((m) => ({ default: m.AboutPage })));
 const GuidePage = lazy(() => import("@/src/pages/GuidePage").then((m) => ({ default: m.GuidePage })));
 const CopyrightPage = lazy(() => import("@/src/pages/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })));
+const TermsPage = lazy(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.PrivacyPage })));
 const ContactPage = lazy(() => import("@/src/pages/ContactPage").then((m) => ({ default: m.ContactPage })));
 const CreateGalleryPage = lazy(() =>
   import("@/src/pages/create/CreateGalleryPage").then((m) => ({ default: m.CreateGalleryPage }))
@@ -108,14 +106,6 @@ function RouteFallback() {
       <span className="size-6 animate-spin rounded-full border-2 border-line border-t-accent" />
     </div>
   );
-}
-
-function ExternalRedirect({ to }: { to: string }) {
-  useEffect(() => {
-    window.location.replace(to);
-  }, [to]);
-
-  return <RouteFallback />;
 }
 
 export function AppRouter() {
@@ -146,8 +136,8 @@ export function AppRouter() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/guide" element={<GuidePage />} />
-          <Route path="/terms" element={<ExternalRedirect to={TERMS_URL} />} />
-          <Route path="/privacy" element={<ExternalRedirect to={PRIVACY_URL} />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/copyright" element={<CopyrightPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/create" element={<CreateGalleryPage />} />
