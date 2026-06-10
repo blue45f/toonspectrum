@@ -97,7 +97,9 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          {/* 데스크탑 내비 (≥1024px) — 8개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출 */}
+          {/* 데스크탑 내비 (≥1024px) — 9개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출.
+              텍스트 전용 링크: 항목별 아이콘 박스는 EN 라벨 합산 폭이 컨테이너 상한(1320px)을
+              넘겨 어느 뷰포트에서도 한 줄에 들어가지 않는다(아이콘은 오버플로/모바일 메뉴 담당). */}
           <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
             {NAV.map((n) => (
               <Link
@@ -105,42 +107,32 @@ export function SiteHeader() {
                 href={n.href}
                 aria-current={isActive(n.href, n.exact) ? "page" : undefined}
                 className={cn(
-                  "group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
+                  "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
                   isActive(n.href, n.exact)
                     ? "bg-accent-soft text-accent"
                     : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                 )}
               >
-                {/* 아이콘 박스는 폭이 빠듯한 lg~xl 구간에선 숨겨 헤더 줄바꿈을 막고, xl+에서만 노출 */}
-                <span
-                  className={cn(
-                    "hidden size-6 place-items-center rounded-lg border transition-colors duration-150 xl:grid",
-                    isActive(n.href, n.exact)
-                      ? "border-accent/35 bg-canvas/45"
-                      : "border-transparent bg-transparent group-hover:border-line group-hover:bg-card"
-                  )}
-                >
-                  <n.icon size={15} className="text-fg-3 transition-colors group-hover:text-accent" />
-                </span>
                 {t(n.i18n)}
               </Link>
             ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* 검색 트리거 */}
+            {/* 검색 트리거 — lg(1024~1280px)에선 9개 내비와 폭을 절충해 한 단계 좁힘.
+                힌트 텍스트는 truncate로 방어하고 ⌘K 배지는 그 구간만 양보(xl부터 복귀) */}
             <button
               onClick={openSearch}
               aria-label={t("nav.searchOpen")}
-              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between xl:w-56"
+              className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card/70 px-3 text-sm text-fg-3 transition-all duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 sm:w-48 sm:justify-between lg:w-40 xl:w-56"
             >
-              <span className="flex items-center gap-2">
-                <Search size={16} />
-                <span className="hidden sm:inline">{t("nav.search")}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <Search size={16} className="shrink-0" />
+                <span className="hidden truncate sm:inline">{t("nav.search")}</span>
               </span>
               <kbd
                 aria-hidden="true"
-                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[0.65rem] sm:flex"
+                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 text-[0.65rem] sm:flex lg:hidden xl:flex"
               >
                 ⌘K
               </kbd>
@@ -181,7 +173,7 @@ export function SiteHeader() {
         </div>
       </header>
 
-      {/* 오버플로 메뉴 (<1024px): 8개 목적지 전부 + 내 서재 */}
+      {/* 오버플로 메뉴 (<1024px): 9개 목적지 전부 + 내 서재 */}
       {menuOpen && (
         <div className="fixed inset-0 z-[60] lg:hidden">
           {/* 백드롭 */}

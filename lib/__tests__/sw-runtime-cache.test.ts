@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 const ORIGIN = "https://toonspectrum.test";
 const source = readFileSync(join(process.cwd(), "public/sw.js"), "utf8");
 const cacheName = source.match(/const CACHE_NAME = '([^']+)'/)?.[1] ?? "";
+const coverCacheName = source.match(/const COVER_CACHE_NAME = '([^']+)'/)?.[1] ?? "";
+const coverCacheLimit = Number(source.match(/const COVER_CACHE_LIMIT = (\d+)/)?.[1] ?? 0);
+
+const coverPath = (upstream: string) => `/api/cover?u=${encodeURIComponent(upstream)}`;
 
 interface WorkerRequest {
   url: string;
@@ -56,6 +60,9 @@ function createWorker() {
           store.set(keyOf(target), response);
         },
         match: async (target: WorkerRequest | string) => store.get(keyOf(target))?.clone(),
+        // Real Cache.keys() yields entries oldest-first; Map iteration order mirrors that.
+        keys: async () => [...store.keys()],
+        delete: async (target: WorkerRequest | string) => store.delete(keyOf(target)),
       };
     },
     match: async (target: WorkerRequest | string) => {
@@ -105,6 +112,9 @@ function createWorker() {
     cached(name: string, path: string) {
       return stores.get(name)?.get(keyOf(path));
     },
+    cachedCount(name: string) {
+      return stores.get(name)?.size ?? 0;
+    },
     async dispatchFetch(target: WorkerRequest) {
       let handled = false;
       let responded: Response | undefined | Promise<Response | undefined>;
@@ -130,9 +140,11 @@ function createWorker() {
 }
 
 describe("service worker runtime caching", () => {
-  it("retires the v1 cache name so stale runtime caches get purged", () => {
+  it("retires superseded cache names so stale runtime caches get purged", () => {
     expect(cacheName).toMatch(/^webtoon-index-pwa-v\d+$/);
     expect(cacheName).not.toBe("webtoon-index-pwa-v1");
+    expect(cacheName).not.toBe("webtoon-index-pwa-v2");
+    expect(coverCacheName).toMatch(/^webtoon-index-covers-v\d+$/);
   });
 
   it("deletes previous-version caches on activate and claims clients", async () => {
@@ -180,6 +192,87 @@ describe("service worker runtime caching", () => {
     await flush();
 
     expect(worker.cached(cacheName, "/assets/missing.js")).toBeUndefined();
+  });
+
+  it("keeps the cover cache across activate while purging stale shell caches", async () => {
+    const worker = createWorker();
+    worker.seed("webtoon-index-pwa-v2", "/", new Response("old shell"));
+    worker.seed(cacheName, "/", new Response("current shell"));
+    worker.seed(coverCacheName, coverPath("https://img.ridicdn.net/cover.jpg"), new Response("cover"));
+
+    await worker.dispatchActivate();
+
+    expect(worker.cacheKeys().sort()).toEqual([cacheName, coverCacheName].sort());
+  });
+
+  it("serves /api/cover cache-first without hitting the network", async () => {
+    const worker = createWorker();
+    const cover = coverPath("https://ccdn.lezhin.com/v2/comics/1/images/wide.jpg");
+    worker.seed(coverCacheName, cover, new Response("cached cover"));
+
+    const { handled, response } = await worker.dispatchFetch(request(cover));
+
+    expect(handled).toBe(true);
+    expect(await response?.text()).toBe("cached cover");
+    expect(worker.fetchCalls).toEqual([]);
+  });
+
+  it("fills the cover cache from the network and reuses it offline", async () => {
+    const worker = createWorker();
+    worker.setNetwork(async () => new Response("cover bytes", { status: 200 }));
+
+    const cover = coverPath("https://image.yes24.com/goods/1/L");
+    const first = await worker.dispatchFetch(request(cover));
+    expect(await first.response?.text()).toBe("cover bytes");
+    await flush();
+
+    expect(worker.cached(coverCacheName, cover)).toBeDefined();
+    expect(worker.cached(cacheName, cover)).toBeUndefined();
+
+    worker.setNetwork(() => Promise.reject(new Error("offline")));
+    const second = await worker.dispatchFetch(request(cover));
+    expect(await second.response?.text()).toBe("cover bytes");
+    expect(worker.fetchCalls).toHaveLength(1);
+  });
+
+  it("does not pin non-ok cover responses in the cache", async () => {
+    const worker = createWorker();
+    worker.setNetwork(async () => new Response("forbidden host", { status: 403 }));
+
+    const cover = coverPath("https://evil.example/cover.jpg");
+    const { response } = await worker.dispatchFetch(request(cover));
+    expect(response?.status).toBe(403);
+    await flush();
+
+    expect(worker.cached(coverCacheName, cover)).toBeUndefined();
+  });
+
+  it("caps the cover cache by evicting the oldest covers", async () => {
+    expect(coverCacheLimit).toBeGreaterThan(0);
+    const worker = createWorker();
+    for (let i = 0; i < coverCacheLimit; i += 1) {
+      worker.seed(coverCacheName, coverPath(`https://img.ridicdn.net/${i}.jpg`), new Response(`cover ${i}`));
+    }
+    worker.setNetwork(async () => new Response("newest cover", { status: 200 }));
+
+    const newest = coverPath("https://img.ridicdn.net/newest.jpg");
+    await worker.dispatchFetch(request(newest));
+    await flush();
+
+    expect(worker.cachedCount(coverCacheName)).toBe(coverCacheLimit);
+    expect(worker.cached(coverCacheName, coverPath("https://img.ridicdn.net/0.jpg"))).toBeUndefined();
+    expect(worker.cached(coverCacheName, newest)).toBeDefined();
+  });
+
+  it("leaves other /api/ routes to the network so data stays fresh", async () => {
+    const worker = createWorker();
+
+    const search = await worker.dispatchFetch(request("/api/search?q=%EB%82%98%20%ED%98%BC%EC%9E%90"));
+    const ranking = await worker.dispatchFetch(request("/api/rankings"));
+
+    expect(search.handled).toBe(false);
+    expect(ranking.handled).toBe(false);
+    expect(worker.fetchCalls).toEqual([]);
   });
 
   it("serves /data/ JSON stale-while-revalidate: cached now, refreshed behind", async () => {

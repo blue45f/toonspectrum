@@ -48,18 +48,22 @@ const DICT: Record<Lang, Record<string, string>> = {
     "lang.en": "English",
     "lang.switch": "Language",
     "common.retry": "Retry",
+    // 데스크탑 헤더는 nav 9개+검색을 한 줄에 수용해야 한다 — EN 라벨은 짧게 유지
+    // (헤더 폭 예산: lib/__tests__/header-width-budget.test.ts 참조).
     "nav.home": "Home",
     "nav.ranking": "Ranking",
-    "nav.calendar": "Schedule",
-    "nav.recommend": "For You",
+    "nav.calendar": "Series",
+    "nav.recommend": "Picks",
     "nav.explore": "Explore",
     "nav.reviews": "Reviews",
-    "nav.community": "Community",
-    "nav.insights": "Insights",
+    "nav.community": "Forum",
+    "nav.insights": "Stats",
     "nav.create": "Create",
     "nav.library": "Library",
     "nav.login": "Sign in",
-    "nav.search": "Search titles, authors, tags",
+    // 검색 트리거 힌트 — sm(w-48)·lg(w-40) 폭에 잘림 없이 들어가는 길이 유지(상세 힌트는
+    // 열린 팔레트 placeholder와 nav.searchOpen aria-label이 담당)
+    "nav.search": "Find webtoons",
     "nav.searchOpen": "Open search (titles, authors, tags)",
     "nav.menu": "Menu",
     "nav.allMenu": "All menu",
