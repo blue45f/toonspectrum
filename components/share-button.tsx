@@ -60,7 +60,7 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
         <Share2 size={15} /> 공유
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-line-strong bg-panel p-1 shadow-2xl shadow-black/40">
+        <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-line-strong bg-panel p-1 shadow-2xl shadow-[oklch(0.1_0.02_70/0.42)]">
           <button type="button" onClick={copyLink} className={itemCls}>
             {copied ? <Check size={15} className="text-good" /> : <Link2 size={15} />}
             {copied ? "링크 복사됨" : "링크 복사"}

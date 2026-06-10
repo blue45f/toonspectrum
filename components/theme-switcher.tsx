@@ -14,7 +14,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
       aria-label={isDark ? "주간 모드로 전환" : "야간 모드로 전환"}
       title={isDark ? "주간 모드" : "야간 모드"}
       className={cn(
-        "grid size-9 place-items-center rounded-full border border-line bg-panel/90 text-fg-2 shadow-lg shadow-black/30 backdrop-blur transition-colors hover:text-fg",
+        "grid size-9 place-items-center rounded-full border border-line bg-panel/90 text-fg-2 shadow-lg shadow-[oklch(0.1_0.02_70/0.3)] backdrop-blur transition-colors hover:text-fg",
         className
       )}
     >

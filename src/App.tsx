@@ -38,7 +38,7 @@ export default function App() {
           <ScrollToTop />
           <a
             href="#main-content"
-            className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-[#1a1410]"
+            className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
           >
             본문으로 건너뛰기
           </a>

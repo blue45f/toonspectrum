@@ -206,7 +206,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
                 type="button"
                 disabled={selectedGenres.length < 2}
                 onClick={() => setOnboardingStep(2)}
-                className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all"
+                className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-on-accent shadow-md hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all"
               >
                 다음 단계로
               </button>
@@ -246,7 +246,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
                         {t.title}
                       </span>
                       {selected && (
-                        <span className="absolute top-1.5 right-1.5 bg-accent text-white rounded-full size-4 flex items-center justify-center text-[10px] font-bold shadow">
+                        <span className="absolute top-1.5 right-1.5 bg-accent text-on-accent rounded-full size-4 flex items-center justify-center text-[10px] font-bold shadow">
                           ✓
                         </span>
                       )}
@@ -269,7 +269,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
               <button
                 type="button"
                 onClick={() => setOnboardingStep(3)}
-                className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-accent/90 cursor-pointer transition-all"
+                className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-on-accent shadow-md hover:bg-accent/90 cursor-pointer transition-all"
               >
                 {selectedTitles.length > 0 ? "다음 단계로" : "선택 없이 건너뛰기"}
               </button>
@@ -347,7 +347,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
               <button
                 type="button"
                 onClick={handleOnboardingComplete}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:bg-accent/90 cursor-pointer transition-all animate-pulse-soft"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-6 py-2.5 text-xs font-bold text-on-accent shadow-lg hover:bg-accent/90 cursor-pointer transition-all animate-pulse-soft"
               >
                 <Wand2 size={13} />
                 취향 분석 완료 및 추천받기
@@ -511,7 +511,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
               setShowOnboarding(true);
               setOnboardingStep(1);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-white hover:bg-accent/90 transition-all cursor-pointer shadow-md"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-on-accent hover:bg-accent/90 transition-all cursor-pointer shadow-md"
           >
             <Wand2 size={13} />
             10초 취향 테스트 시작

@@ -36,7 +36,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-line bg-panel/90 p-0.5 shadow-lg shadow-black/30 backdrop-blur",
+        "inline-flex items-center gap-1 rounded-full border border-line bg-panel/90 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.3)] backdrop-blur",
         "transition-opacity duration-500 ease-out hover:opacity-100 focus-within:opacity-100",
         visible ? "opacity-100" : "opacity-0",
         className
