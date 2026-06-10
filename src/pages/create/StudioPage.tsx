@@ -226,6 +226,8 @@ import {
   EFFECT_EMOJIS,
   SFX_PRESETS,
   TEMPLATES,
+  filterAssetsByLabel,
+  filterBgSceneSections,
   groupTemplates,
   type BgPreset,
   type BubbleVariant,
@@ -235,6 +237,21 @@ import {
 import { svgToDataUrl } from "./studio-characters";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  EXPORT_SCALES,
+  JPEG_QUALITY,
+  MAX_CANVAS_DIM,
+  canvasToBlob,
+  downloadBlob,
+  exportMimeType,
+  maxFittingScale,
+  pageExportFileName,
+  splitPagesForExport,
+  stripExportFileName,
+  stripTotalHeight,
+  type ExportFormat,
+  type ExportScale,
+} from "./studio-export";
 import {
   saveAsset,
   listAssets,
@@ -425,6 +442,25 @@ const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   propStickers: [],
   fxOverlays: [],
 };
+
+// 효과 피커 카테고리 칩 — 클릭 시 해당 섹션만 보여줘 7개 섹션 스크롤 없이 점프한다.
+type FxPickerSection = "all" | "sfx" | "emoji" | "comic" | "creature" | "prop" | "lines" | "overlay";
+const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
+  { id: "all", label: "전체" },
+  { id: "sfx", label: "효과음" },
+  { id: "emoji", label: "이모지" },
+  { id: "comic", label: "만화 스티커" },
+  { id: "creature", label: "동물·캐릭터" },
+  { id: "prop", label: "소품·오브젝트" },
+  { id: "lines", label: "선 효과" },
+  { id: "overlay", label: "특수 효과" },
+];
+
+// 만화 선 효과(집중선·속도선) — 효과 피커 검색이 라벨로 거를 수 있게 데이터로 둔다.
+const FX_LINE_PRESETS: { id: "focus" | "speed"; label: string }[] = [
+  { id: "focus", label: "🔆 집중선 생성" },
+  { id: "speed", label: "💨 속도선 생성" },
+];
 
 // 스튜디오 전용 구글폰트 7종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
 // 전역 폰트(Space Grotesk·Nanum Myeongjo)만 남기고, 이 7종은 스튜디오 마운트 시에만 주입한다.
@@ -1874,6 +1910,34 @@ export function StudioPage() {
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportScale, setExportScale] = useState<ExportScale>(2);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
+  const [exportTransparent, setExportTransparent] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // 내보내기 옵션 팝오버 바깥 클릭시 닫기
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [exportMenuOpen]);
+
+  // 툴바 드롭다운(템플릿·배경 씬·말풍선·효과·내 에셋) 바깥 클릭시 닫기.
+  // ref는 열린 메뉴의 래퍼(트리거+드롭다운)에만 붙는다 — 한 번에 하나만 열리므로 ref 하나로 충분.
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [menu]);
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
   const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
@@ -2097,6 +2161,38 @@ export function StudioPage() {
     }
     return list;
   }, [shared, assetSearchQuery, assetSortOrder]);
+
+  // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
+  const [fxSearchQuery, setFxSearchQuery] = useState("");
+  const [fxPickerSection, setFxPickerSection] = useState<FxPickerSection>("all");
+  const [bgSceneSearchQuery, setBgSceneSearchQuery] = useState("");
+  const [bgSceneGenreFilter, setBgSceneGenreFilter] = useState("all");
+
+  const fxQuery = fxSearchQuery.trim().toLowerCase();
+  const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
+    fxPickerSection === "all" || fxPickerSection === section;
+  const fxSfxFiltered = fxQuery ? SFX_PRESETS.filter((s) => s.text.toLowerCase().includes(fxQuery)) : SFX_PRESETS;
+  const fxEmojisFiltered = fxQuery ? [] : EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
+  const fxComicFiltered = filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery);
+  const fxCreatureFiltered = filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery);
+  const fxPropFiltered = filterAssetsByLabel(studioOptionalAssets.propStickers, fxSearchQuery);
+  const fxLinePresetsFiltered = filterAssetsByLabel(FX_LINE_PRESETS, fxSearchQuery);
+  const fxOverlaysFiltered = filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery);
+  const fxPickerHasResults =
+    (fxSectionVisible("sfx") && fxSfxFiltered.length > 0) ||
+    (fxSectionVisible("emoji") && fxEmojisFiltered.length > 0) ||
+    (fxSectionVisible("comic") && fxComicFiltered.length > 0) ||
+    (fxSectionVisible("creature") && fxCreatureFiltered.length > 0) ||
+    (fxSectionVisible("prop") && fxPropFiltered.length > 0) ||
+    (fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0) ||
+    (fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0);
+
+  const bgSceneSectionsFiltered = filterBgSceneSections(
+    bgSceneGenreFilter === "all"
+      ? studioOptionalAssets.bgSceneSections
+      : studioOptionalAssets.bgSceneSections.filter((group) => group.genre === bgSceneGenreFilter),
+    bgSceneSearchQuery
+  );
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -2502,7 +2598,7 @@ export function StudioPage() {
   const undo = () => setPagesHi((i) => Math.max(0, i - 1));
   const redo = () => setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
 
-  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 선택해제.
+  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
@@ -2544,7 +2640,12 @@ export function StudioPage() {
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
         if (shortcutsOpen) setShortcutsOpen(false);
-        else setSelectedId(null);
+        else if (menu) {
+          // 위 레이어부터 닫기: 단축키 오버레이 → 열린 툴바 드롭다운 → 선택해제.
+          // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
+          menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
+          setMenu(null);
+        } else setSelectedId(null);
       } else if (selectedId && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();
@@ -3176,7 +3277,8 @@ export function StudioPage() {
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
-  async function handleDownload(transparent = false) {
+  async function handleDownload() {
+    setExportMenuOpen(false);
     setSelectedId(null);
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 60));
@@ -3185,36 +3287,64 @@ export function StudioPage() {
       setIsExporting(false);
       return;
     }
-    // 투명 PNG: 배경 사각형을 잠시 숨겨 그린/구성한 콘텐츠만 추출(에셋 제작용).
+    // 투명 PNG: 배경 사각형을 잠시 숨겨 그린/구성한 콘텐츠만 추출(에셋 제작용). JPG는 투명도 미지원.
+    const transparent = exportTransparent && exportFormat === "png";
     const bgNode = transparent ? stage.findOne(".bg") : null;
     if (bgNode) {
       bgNode.hide();
       stage.batchDraw();
     }
-    // 2× 해상도로 내보내 더 선명한 웹툰 출력(720→1440px 폭).
-    const full = stage.toDataURL({ pixelRatio: 2 / effScale });
+    // 선택 배율로 내보내기(기본 2× — 720→1440px 폭). dataURL 대신 캔버스→Blob으로 대형 출력 메모리 절감.
+    const canvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
     if (bgNode) {
       bgNode.show();
       stage.batchDraw();
     }
     setIsExporting(false);
-    const link = document.createElement("a");
-    link.href = full;
-    link.download = `${title.trim() || "toonspectrum-comic"}${transparent ? "-transparent" : ""}.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    try {
+      const blob = await canvasToBlob(canvas, exportMimeType(exportFormat), exportFormat === "jpg" ? JPEG_QUALITY : undefined);
+      downloadBlob(blob, pageExportFileName(title, exportFormat, transparent));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이미지 내보내기에 실패했어요.");
+    }
   }
 
   async function handleDownloadAll(spacing = 24) {
+    setExportMenuOpen(false);
+    // 합성 전 캔버스 한계 가드: 총 높이×배율이 한계를 넘으면 빈 PNG가 조용히 저장되므로
+    // 분할 저장 또는 배율 자동 하향 중 하나를 먼저 고른다.
+    const pageHeights = pages.map((p) => p.canvasH);
+    let scale: number = exportScale;
+    let wantSplit = false;
+    if (stripTotalHeight(pageHeights, spacing, scale) > MAX_CANVAS_DIM) {
+      const fitScale = maxFittingScale(pageHeights, spacing, scale);
+      const plannedParts = splitPagesForExport(pageHeights, spacing, scale).length;
+      if (fitScale !== null) {
+        wantSplit = window.confirm(
+          `${scale}×로 한 장에 합치면 브라우저 캔버스 한계(약 ${MAX_CANVAS_DIM.toLocaleString()}px)를 넘어요.\n` +
+            `확인: ${plannedParts}개 파일로 나눠 저장 / 취소: ${fitScale}×로 낮춰 한 파일로 저장`
+        );
+        if (!wantSplit) scale = fitScale;
+      } else {
+        if (
+          !window.confirm(
+            `페이지가 길어 ${scale}× 한 파일로는 저장할 수 없어요.\n${plannedParts}개 파일로 나눠 저장할까요?`
+          )
+        ) {
+          return;
+        }
+        wantSplit = true;
+      }
+    }
+
     setSelectedId(null);
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 60));
     const originalPageId = currentPageId;
-    const images: HTMLImageElement[] = [];
+    const pageCanvases: HTMLCanvasElement[] = [];
 
     try {
-      // 모든 페이지를 순회하며 렌더링하고 이미지를 캡처
+      // 모든 페이지를 순회하며 렌더링하고 캔버스로 캡처(dataURL 미사용 — 대형 출력 메모리 절감)
       for (const page of pages) {
         setCurrentPageId(page.id);
         // React 렌더링 및 Konva 업데이트 대기
@@ -3223,13 +3353,7 @@ export function StudioPage() {
         const stage = stageRef.current;
         if (!stage) continue;
 
-        const dataUrl = stage.toDataURL({ pixelRatio: 2 / effScale });
-        const img = new Image();
-        img.src = dataUrl;
-        await new Promise((resolve) => {
-          img.onload = resolve;
-        });
-        images.push(img);
+        pageCanvases.push(stage.toCanvas({ pixelRatio: scale / effScale }));
       }
     } finally {
       // 원래 선택 페이지 복구
@@ -3237,40 +3361,54 @@ export function StudioPage() {
       setIsExporting(false);
     }
 
-    if (images.length === 0) return;
+    if (pageCanvases.length === 0) return;
 
-    // 긴 스크롤 웹툰 합성용 캔버스 생성
-    const compositeCanvas = document.createElement("canvas");
-    const width = images[0].width;
-    let totalHeight = 0;
-    for (let i = 0; i < images.length; i++) {
-      totalHeight += images[i].height;
-      if (i < images.length - 1) totalHeight += spacing * 2; // 고해상도 배율 보정
+    // 분할 시 실제 캡처된 픽셀 높이로 다시 묶는다(이미 배율이 반영된 값이라 scale=1).
+    const chunks = wantSplit
+      ? splitPagesForExport(pageCanvases.map((c) => c.height), spacing * scale, 1)
+      : [pageCanvases.map((_, i) => i)];
+
+    try {
+      for (let c = 0; c < chunks.length; c++) {
+        const chunk = chunks[c];
+        // 긴 스크롤 웹툰 합성용 캔버스 생성
+        const compositeCanvas = document.createElement("canvas");
+        const width = pageCanvases[chunk[0]].width;
+        let totalHeight = 0;
+        for (let i = 0; i < chunk.length; i++) {
+          totalHeight += pageCanvases[chunk[i]].height;
+          if (i < chunk.length - 1) totalHeight += spacing * scale; // 고해상도 배율 보정
+        }
+
+        compositeCanvas.width = width;
+        compositeCanvas.height = totalHeight;
+
+        const ctx = compositeCanvas.getContext("2d");
+        if (!ctx) return;
+
+        // 전체 흰색 배경
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, totalHeight);
+
+        let currentY = 0;
+        for (const idx of chunk) {
+          ctx.drawImage(pageCanvases[idx], 0, currentY);
+          currentY += pageCanvases[idx].height + spacing * scale;
+        }
+
+        // 파일 저장(분할 시 -1of2 식 접미사)
+        const blob = await canvasToBlob(
+          compositeCanvas,
+          exportMimeType(exportFormat),
+          exportFormat === "jpg" ? JPEG_QUALITY : undefined
+        );
+        downloadBlob(blob, stripExportFileName(title, exportFormat, { index: c, total: chunks.length }));
+        // 연속 다운로드가 브라우저에서 차단되지 않게 한 박자 쉼
+        if (c < chunks.length - 1) await new Promise((r) => setTimeout(r, 250));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이미지 내보내기에 실패했어요.");
     }
-
-    compositeCanvas.width = width;
-    compositeCanvas.height = totalHeight;
-
-    const ctx = compositeCanvas.getContext("2d");
-    if (!ctx) return;
-
-    // 전체 흰색 배경
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, totalHeight);
-
-    let currentY = 0;
-    for (let i = 0; i < images.length; i++) {
-      ctx.drawImage(images[i], 0, currentY);
-      currentY += images[i].height + spacing * 2;
-    }
-
-    // 파일 저장
-    const link = document.createElement("a");
-    link.href = compositeCanvas.toDataURL("image/png");
-    link.download = `${title.trim() || "toonspectrum-webtoon"}-strip.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   }
 
   // 스튜디오 프로젝트 내보내기 (.json)
@@ -3338,12 +3476,90 @@ export function StudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => handleDownload(false)} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}>
-            <Download size={14} /> 다운로드
-          </button>
-          <button type="button" onClick={() => handleDownload(true)} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })} title="배경 없이 투명 PNG로 내보내기">
-            <Download size={14} /> 투명 PNG
-          </button>
+          <div ref={exportMenuRef} className="relative flex items-center">
+            <button
+              type="button"
+              onClick={() => handleDownload()}
+              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 pr-2" })}
+              title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
+            >
+              <Download size={14} /> 다운로드
+              <span className="text-[10px] font-semibold tabular-nums text-fg-3">
+                {exportScale}× {exportFormat.toUpperCase()}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExportMenuOpen((open) => !open)}
+              aria-expanded={exportMenuOpen}
+              aria-label="내보내기 옵션"
+              className={buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" })}
+              title="내보내기 옵션 (배율·포맷·투명 배경)"
+            >
+              <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 top-full z-30 mt-1.5 w-60 rounded-xl border border-line bg-panel p-3 shadow-xl">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-fg-2">배율</span>
+                  <div className="flex items-center gap-1">
+                    {EXPORT_SCALES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setExportScale(s)}
+                        aria-pressed={exportScale === s}
+                        className={cn(
+                          "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
+                          exportScale === s ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {s}×
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-fg-2">포맷</span>
+                  <div className="flex items-center gap-1">
+                    {(["png", "jpg"] as const).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setExportFormat(f)}
+                        aria-pressed={exportFormat === f}
+                        className={cn(
+                          "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
+                          exportFormat === f ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {f.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label
+                  className={cn(
+                    "mt-2.5 flex items-center gap-1.5 text-xs",
+                    exportFormat === "jpg" ? "cursor-not-allowed text-fg-3 opacity-50" : "cursor-pointer text-fg-2"
+                  )}
+                  title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명 PNG로 내보내기"}
+                >
+                  <input
+                    type="checkbox"
+                    checked={exportTransparent && exportFormat === "png"}
+                    disabled={exportFormat === "jpg"}
+                    onChange={(e) => setExportTransparent(e.target.checked)}
+                    className="size-3.5 accent-[var(--color-accent)] cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  투명 배경 (PNG)
+                </label>
+                <p className="mt-2 text-[10px] tabular-nums text-fg-3">
+                  출력 폭 {(CANVAS_W * exportScale).toLocaleString()}px{exportFormat === "jpg" ? " · 품질 92%" : ""}
+                </p>
+              </div>
+            )}
+          </div>
           {pages.length > 1 && (
             <button
               type="button"
@@ -3353,7 +3569,7 @@ export function StudioPage() {
                 variant: "quiet",
                 className: "gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
               })}
-              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드"
+              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
             >
               <Download size={14} /> 웹툰 연합 스크롤
             </button>
@@ -3386,8 +3602,8 @@ export function StudioPage() {
 
       {/* 툴바 */}
       <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} className={toolBtn(menu === "template")}>
+        <div ref={menu === "template" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} aria-haspopup="menu" aria-expanded={menu === "template"} className={toolBtn(menu === "template")}>
             <LayoutTemplate size={14} /> 템플릿
           </button>
           {menu === "template" && (
@@ -3451,8 +3667,8 @@ export function StudioPage() {
         >
           <Sparkles size={14} /> 3D 캐릭터
         </button>
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} className={toolBtn(menu === "bgScene")}>
+        <div ref={menu === "bgScene" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} aria-haspopup="menu" aria-expanded={menu === "bgScene"} className={toolBtn(menu === "bgScene")}>
             <ImageIcon size={14} /> 배경 씬
           </button>
           {menu === "bgScene" && (
@@ -3461,6 +3677,43 @@ export function StudioPage() {
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
               </p>
+              <div className="relative mb-2">
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <input
+                  type="text"
+                  placeholder="배경 씬 검색..."
+                  value={bgSceneSearchQuery}
+                  onChange={(e) => setBgSceneSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                />
+                {bgSceneSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setBgSceneSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+              {studioOptionalAssets.bgSceneSections.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {["all", ...studioOptionalAssets.bgSceneSections.map((group) => group.genre)].map((genre) => (
+                    <button
+                      key={genre}
+                      type="button"
+                      onClick={() => setBgSceneGenreFilter(genre)}
+                      aria-pressed={bgSceneGenreFilter === genre}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                        bgSceneGenreFilter === genre ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                      )}
+                    >
+                      {genre === "all" ? "전체" : genre}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
                 {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
                   <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
@@ -3470,7 +3723,13 @@ export function StudioPage() {
                     {studioOptionalAssetsError}
                   </p>
                 )}
-                {studioOptionalAssets.bgSceneSections.map((group) => (
+                {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
+                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                  </div>
+                )}
+                {bgSceneSectionsFiltered.map((group) => (
                   <div key={group.genre}>
                     <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -3498,8 +3757,8 @@ export function StudioPage() {
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "bubble" ? null : "bubble")} className={toolBtn(menu === "bubble")}>
+        <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "bubble" ? null : "bubble")} aria-haspopup="menu" aria-expanded={menu === "bubble"} className={toolBtn(menu === "bubble")}>
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
@@ -3518,33 +3777,76 @@ export function StudioPage() {
             </div>
           )}
         </div>
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "sticker" ? null : "sticker")} className={toolBtn(menu === "sticker")}>
+        <div ref={menu === "sticker" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "sticker" ? null : "sticker")} aria-haspopup="menu" aria-expanded={menu === "sticker"} className={toolBtn(menu === "sticker")}>
             <Sparkles size={14} /> 효과
           </button>
           {menu === "sticker" && (
             <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
-              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
-              <div className="mb-2 flex flex-wrap gap-1">
-                {SFX_PRESETS.map((s) => (
+              <div className="relative mb-2">
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <input
+                  type="text"
+                  placeholder="효과 검색..."
+                  value={fxSearchQuery}
+                  onChange={(e) => setFxSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                />
+                {fxSearchQuery && (
                   <button
-                    key={s.text}
                     type="button"
-                    onClick={() => addSfx(s.text, s.fill)}
-                    className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
+                    onClick={() => setFxSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
                   >
-                    {s.text}
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+              <div className="mb-2 flex flex-wrap gap-1">
+                {FX_PICKER_SECTIONS.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setFxPickerSection(section.id)}
+                    aria-pressed={fxPickerSection === section.id}
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                      fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                    )}
+                  >
+                    {section.label}
                   </button>
                 ))}
               </div>
-              <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
-              <div className="grid grid-cols-8 gap-1 mb-2">
-                {EFFECT_EMOJIS.map((em) => (
-                  <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
-                    {em}
-                  </button>
-                ))}
-              </div>
+              {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {fxSfxFiltered.map((s) => (
+                      <button
+                        key={s.text}
+                        type="button"
+                        onClick={() => addSfx(s.text, s.fill)}
+                        className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
+                      >
+                        {s.text}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
+                  <div className="grid grid-cols-8 gap-1 mb-2">
+                    {fxEmojisFiltered.map((em) => (
+                      <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
                 <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
               )}
@@ -3553,102 +3855,122 @@ export function StudioPage() {
                   {studioOptionalAssetsError}
                 </p>
               )}
-              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
-              <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {studioOptionalAssets.comicVectorStickers.map((sticker) => (
-                  <button
-                    key={sticker.id}
-                    type="button"
-                    title={sticker.label}
-                    onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                  >
-                    <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                      <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                    </div>
-                    <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">동물·캐릭터</p>
-              <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {studioOptionalAssets.creatureStickers.map((sticker) => (
-                  <button
-                    key={sticker.id}
-                    type="button"
-                    title={sticker.label}
-                    onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                  >
-                    <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                      <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                    </div>
-                    <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">소품·오브젝트</p>
-              <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                {studioOptionalAssets.propStickers.map((sticker) => (
-                  <button
-                    key={sticker.id}
-                    type="button"
-                    title={sticker.label}
-                    onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                  >
-                    <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                      <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                    </div>
-                    <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    addFocusLines();
-                    setMenu(null);
-                  }}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
-                >
-                  🔆 집중선 생성
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    addSpeedLines();
-                    setMenu(null);
-                  }}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
-                >
-                  💨 속도선 생성
-                </button>
-              </div>
-              <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
-              <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
-                {studioOptionalAssets.fxOverlays.map((fx) => (
-                  <button
-                    key={fx.id}
-                    type="button"
-                    title={fx.label}
-                    onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
-                    className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                  >
-                    <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
-                      <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                    </div>
-                    <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
-                  </button>
-                ))}
-              </div>
+              {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
+                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    {fxComicFiltered.map((sticker) => (
+                      <button
+                        key={sticker.id}
+                        type="button"
+                        title={sticker.label}
+                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
+                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                      >
+                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                        </div>
+                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">동물·캐릭터</p>
+                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    {fxCreatureFiltered.map((sticker) => (
+                      <button
+                        key={sticker.id}
+                        type="button"
+                        title={sticker.label}
+                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
+                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                      >
+                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                        </div>
+                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">소품·오브젝트</p>
+                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    {fxPropFiltered.map((sticker) => (
+                      <button
+                        key={sticker.id}
+                        type="button"
+                        title={sticker.label}
+                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
+                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                      >
+                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
+                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                        </div>
+                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {fxLinePresetsFiltered.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          if (preset.id === "focus") addFocusLines();
+                          else addSpeedLines();
+                          setMenu(null);
+                        }}
+                        className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
+                <>
+                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
+                  <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
+                    {fxOverlaysFiltered.map((fx) => (
+                      <button
+                        key={fx.id}
+                        type="button"
+                        title={fx.label}
+                        onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
+                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                      >
+                        <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
+                          <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                        </div>
+                        <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {!fxPickerHasResults && fxQuery !== "" && (
+                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                  <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
-        <div className="relative">
-          <button type="button" onClick={() => setMenu(menu === "asset" ? null : "asset")} className={toolBtn(menu === "asset")}>
+        <div ref={menu === "asset" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "asset" ? null : "asset")} aria-haspopup="menu" aria-expanded={menu === "asset"} className={toolBtn(menu === "asset")}>
             <Folder size={14} /> 내 에셋
           </button>
           {menu === "asset" && (

@@ -9,6 +9,7 @@ import { ErrorState } from "@/src/components/error-state";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
 import { useRememberedFilters } from "@/lib/use-remembered-filters";
 import { statsAreEstimated } from "@/lib/estimate";
+import { buildWeeklyIcs, downloadIcs, titleToWeeklyIcsEvent } from "@/lib/ics";
 import { useSavedTitleIds } from "@/lib/store";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/lib/title-filters";
 import type { PlatformId, Title } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, CalendarPlus, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useApiResource } from "./use-api-resource";
 
@@ -103,6 +104,27 @@ export function CalendarPage() {
   const selDay = Math.min(selectedDayIdx ?? todayIdx, Math.max(0, days.length - 1));
   const selItems = days[selDay]?.items ?? [];
 
+  // ICS 내보내기 대상: 현재 필터가 적용된 보드의 고유 작품. 같은 작품이 여러 요일에 보이면
+  // VEVENT 1건으로 합치고 보드 버킷 요일을 RRULE BYDAY 다중으로 넣는다.
+  const exportable = new Map<string, { title: Title; days: string[] }>();
+  for (const { day, items } of days) {
+    for (const title of items) {
+      const entry = exportable.get(title.id);
+      if (entry) entry.days.push(day);
+      else exportable.set(title.id, { title, days: [day] });
+    }
+  }
+  const exportIcs = () => {
+    if (exportable.size === 0) return;
+    const events = [...exportable.values()].map(({ title, days: titleDays }) =>
+      titleToWeeklyIcsEvent(title, titleDays)
+    );
+    downloadIcs(
+      buildWeeklyIcs(events, { calendarName: "툰스펙트럼 연재 캘린더" }),
+      "toonspectrum-calendar.ics"
+    );
+  };
+
   return (
     <Container size="wide" className="py-10">
       <header className="mb-7 rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
@@ -139,6 +161,21 @@ export function CalendarPage() {
               {titleFilterActive && (
                 <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
                   {titleFilterCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={exportIcs}
+              disabled={loading || !!error || exportable.size === 0}
+              title="현재 필터 기준 연재 일정을 캘린더 앱용 .ics 파일로 저장 (주간 반복 일정)"
+              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
+            >
+              <CalendarPlus size={14} />
+              내보내기 (.ics)
+              {exportable.size > 0 && (
+                <span className="numeral text-[0.68rem] text-fg-3">
+                  {exportable.size.toLocaleString("ko-KR")}
                 </span>
               )}
             </button>

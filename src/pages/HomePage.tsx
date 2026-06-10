@@ -13,7 +13,7 @@ import { GenreSpectrum } from "@/components/ui/spectrum-bar";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
 import type { Title } from "@/lib/types";
-import { ArrowRight, Layers, Search } from "lucide-react";
+import { ArrowRight, Layers, LayoutTemplate, MessageCircle, Palette, PersonStanding, Search } from "lucide-react";
 import { useApiResource } from "./use-api-resource";
 
 interface HomeResponse {
@@ -298,6 +298,50 @@ export function HomePage() {
             </div>
           </Section>
         </div>
+
+        <Section
+          eyebrow="CREATOR STUDIO"
+          title="읽다가, 만들어 보세요"
+          desc="설치 없이 브라우저에서 컷툰을 만들고, 창작 게시판에서 독자 반응을 받아보세요."
+        >
+          <div className="grid gap-3.5 sm:grid-cols-3">
+            {[
+              {
+                icon: LayoutTemplate,
+                title: "컷 템플릿",
+                body: "컷 분할 템플릿으로 캔버스를 잡고, 이미지·스티커·펜으로 장면을 채웁니다.",
+              },
+              {
+                icon: MessageCircle,
+                title: "말풍선·대사",
+                body: "꼬리 방향과 글꼴을 고를 수 있는 말풍선으로 컷에 대사를 입힙니다.",
+              },
+              {
+                icon: PersonStanding,
+                title: "3D 캐릭터 포즈",
+                body: "3D 캐릭터에 원하는 포즈를 잡아 컷에 내려놓습니다. VRM 모델도 불러올 수 있어요.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="rounded-2xl border border-line bg-card/30 p-5 surface-hl">
+                <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent">
+                  <f.icon size={18} />
+                </span>
+                <h3 className="mt-3 font-bold text-fg">{f.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{f.body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link href="/studio" className={buttonClass({ className: "gap-2" })}>
+              <Palette size={16} />
+              창작 스튜디오 열기
+            </Link>
+            <Link href="/create" className={buttonClass({ variant: "outline", className: "gap-1.5" })}>
+              창작 게시판 둘러보기
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </Section>
       </Container>
     </div>
   );

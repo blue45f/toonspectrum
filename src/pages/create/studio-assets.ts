@@ -132,6 +132,25 @@ export const BG_PRESETS: BgPreset[] = [
   { id: "night", label: "밤", grad: ["#2a2350", "#0e0b1f"] },
 ];
 
+// ── 에셋 피커 검색(효과·배경 씬 메뉴) ──────────────────────────
+// 라벨 부분일치(대소문자 무시·공백 트림)로 에셋 목록을 거른다. 빈 검색어는 원본 그대로.
+export function filterAssetsByLabel<T extends { label: string }>(assets: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return assets;
+  return assets.filter((asset) => asset.label.toLowerCase().includes(q));
+}
+
+// 장르 섹션 배열을 같은 규칙으로 거르고, 결과가 빈 섹션은 숨긴다(배경 씬 메뉴용).
+export function filterBgSceneSections<T extends { label: string }>(
+  sections: { genre: string; scenes: T[] }[],
+  query: string
+): { genre: string; scenes: T[] }[] {
+  if (!query.trim()) return sections;
+  return sections
+    .map((section) => ({ ...section, scenes: filterAssetsByLabel(section.scenes, query) }))
+    .filter((section) => section.scenes.length > 0);
+}
+
 export interface BubbleStylePreset {
   id: string;
   label: string;
