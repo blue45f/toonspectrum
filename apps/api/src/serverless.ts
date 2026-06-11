@@ -2,6 +2,7 @@ import "./load-env"; // 첫 import — lib/db가 DATABASE_URL 읽기 전 주입(
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import { json, urlencoded } from "express";
 import type { Express } from "express";
 import { AppModule } from "./app.module";
 import { sessionAuth } from "./session-middleware";
@@ -12,7 +13,11 @@ import { sessionAuth } from "./session-middleware";
 let appPromise: Promise<Express> | null = null;
 
 async function create(): Promise<Express> {
-  const app = await NestFactory.create(AppModule, { logger: ["error", "warn"] });
+  // 기본 본문 파서(100kb) 대신 직접 등록(main.ts와 동일) — 스튜디오/커뮤니티 첨부가 data-URL
+  // 이미지를 JSON으로 보내므로 서버리스에서도 한도를 키운다(미러 누락 시 프로덕션만 413).
+  const app = await NestFactory.create(AppModule, { logger: ["error", "warn"], bodyParser: false });
+  app.use(json({ limit: "16mb" }));
+  app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api");
   app.useGlobalPipes(

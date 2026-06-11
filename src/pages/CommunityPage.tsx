@@ -1,14 +1,18 @@
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import Link from "@/src/compat/router-link";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
-import { COMMUNITY_SCOPE_DESCRIPTION, COMMUNITY_SCOPE_LABEL } from "@/lib/community-ui";
+import {
+  COMMUNITY_SCOPE_DESCRIPTION,
+  COMMUNITY_SCOPE_DIRECTORIES,
+  COMMUNITY_SCOPE_LABEL,
+} from "@/lib/community-ui";
 import type { FanCafeScopeFilter } from "@/lib/types";
 import { Compass, MessageCircle, UsersRound } from "lucide-react";
 
 const SCOPES = ["title", "author", "pencafe"] as const;
 
-function parseScope(raw: string | undefined): Exclude<FanCafeScopeFilter, "all"> | null {
+function parseScope(raw: string | undefined): Exclude<FanCafeScopeFilter, "all" | "cafe"> | null {
   return SCOPES.find((scope) => scope === raw) ?? null;
 }
 
@@ -39,13 +43,14 @@ export function CommunityPage() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {SCOPES.map((scope) => (
+            {COMMUNITY_SCOPE_DIRECTORIES.map((entry) => (
               <Link
-                key={scope}
-                href={`/community/${scope}`}
-                className="inline-flex items-center rounded-full border border-line bg-card/50 px-3 py-1.5 text-xs text-fg-3 transition-colors hover:text-fg"
+                key={entry.value}
+                href={entry.href}
+                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card/50 px-3 py-1.5 text-xs text-fg-3 transition-colors hover:text-fg"
               >
-                {COMMUNITY_SCOPE_LABEL[scope]} 디렉토리
+                <span aria-hidden>{entry.icon}</span>
+                {entry.label} 디렉토리
               </Link>
             ))}
           </div>
@@ -62,6 +67,11 @@ export function CommunityPage() {
 export function CommunityScopePage() {
   const { scope: rawScope } = useParams();
   const scope = parseScope(rawScope);
+
+  // 장르 카페는 전용 분할 라우트(목록·상세·생성)를 쓴다.
+  if (rawScope === "cafe" || rawScope === "cafes") {
+    return <Navigate to="/community/cafes" replace />;
+  }
 
   if (!scope) {
     return (

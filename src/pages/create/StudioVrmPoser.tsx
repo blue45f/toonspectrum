@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
@@ -22,6 +22,7 @@ import {
   deleteSharedAsset,
   type SharedAsset,
 } from "../../lib/creator-client";
+import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, type StudioExpressionPreset } from "./studio-pose-presets";
 
 type StudioVrmPoserProps = {
   open: boolean;
@@ -967,8 +968,9 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function findPose(id: string) {
-  return POSE_PRESETS.find((pose) => pose.id === id) ?? POSE_PRESETS[0];
+function findPose(id: string): PosePreset {
+  // 기본 프리셋 → 확장 팩(studio-pose-presets) 순으로 탐색. 둘 다 같은 본 규약을 쓴다.
+  return POSE_PRESETS.find((pose) => pose.id === id) ?? EXTRA_POSE_PRESETS.find((pose) => pose.id === id) ?? POSE_PRESETS[0];
 }
 
 function findCameraPreset(id: string) {
@@ -1291,17 +1293,32 @@ function getErrorMessage(caughtError: unknown, fallback: string) {
   return caughtError instanceof Error ? caughtError.message : fallback;
 }
 
-function CaptureBridge({ captureRef }: { captureRef: MutableRefObject<CaptureState> }) {
+function applyCameraPreset(camera: THREE.Camera, preset: CameraPreset, invalidate: () => void) {
+  camera.position.set(preset.position[0], preset.position[1], preset.position[2]);
+  camera.lookAt(preset.target[0], preset.target[1], preset.target[2]);
+
+  if (camera instanceof THREE.PerspectiveCamera) {
+    camera.fov = preset.fov;
+    camera.updateProjectionMatrix();
+  }
+
+  camera.updateMatrixWorld();
+  invalidate();
+}
+
+function CaptureBridge({
+  onCaptureUpdate,
+}: {
+  onCaptureUpdate: (state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => void;
+}) {
   const { camera, gl, scene } = useThree();
 
   useEffect(() => {
-    captureRef.current = { camera, gl, scene };
+    onCaptureUpdate({ camera, gl, scene });
     return () => {
-      if (captureRef.current.gl === gl) {
-        captureRef.current = { camera: null, gl: null, scene: null };
-      }
+      onCaptureUpdate({ camera: null, gl: null, scene: null }, gl);
     };
-  }, [camera, captureRef, gl, scene]);
+  }, [camera, gl, scene, onCaptureUpdate]);
 
   return null;
 }
@@ -1311,17 +1328,8 @@ function CameraDirector({ presetId }: { presetId: string }) {
   const preset = findCameraPreset(presetId);
 
   useEffect(() => {
-    camera.position.set(preset.position[0], preset.position[1], preset.position[2]);
-    camera.lookAt(preset.target[0], preset.target[1], preset.target[2]);
-
-    if (camera instanceof THREE.PerspectiveCamera) {
-      camera.fov = preset.fov;
-      camera.updateProjectionMatrix();
-    }
-
-    camera.updateMatrixWorld();
-    invalidate();
-  }, [camera, invalidate, preset.fov, preset.position, preset.target]);
+    applyCameraPreset(camera, preset, invalidate);
+  }, [camera, invalidate, preset]);
 
   return null;
 }
@@ -2265,8 +2273,6 @@ function SceneProp3D({
   defaultScale: number;
 }) {
   const Comp = PROP_COMPONENTS[propId];
-  if (!Comp) return null;
-
   const attachmentBone = config?.bone ?? "none";
   const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
 
@@ -2278,6 +2284,8 @@ function SceneProp3D({
       setBoneNode(null);
     }
   }, [vrm, attachmentBone]);
+
+  if (!Comp) return null;
 
   if (boneNode) {
     const px = config?.offsetX ?? 0;
@@ -2301,6 +2309,12 @@ function SceneProp3D({
       <Comp scale={defaultScale} />
     </group>
   );
+}
+
+function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
+  const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
+  vrm.scene.rotation.y = baseRotationY + bodyRotation;
+  vrm.scene.updateMatrixWorld(true);
 }
 
 function VrmActor({
@@ -2327,9 +2341,7 @@ function VrmActor({
   }, [expressionWeights, vrm]);
 
   useEffect(() => {
-    const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
-    vrm.scene.rotation.y = baseRotationY + bodyRotation;
-    vrm.scene.updateMatrixWorld(true);
+    applyRotationToVrm(vrm, bodyRotation);
   }, [bodyRotation, vrm]);
 
   useEffect(() => {
@@ -2428,6 +2440,15 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
+  const onCaptureUpdate = useCallback((state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => {
+    if (cleanupGl) {
+      if (captureRef.current.gl === cleanupGl) {
+        captureRef.current = { camera: null, gl: null, scene: null };
+      }
+    } else {
+      captureRef.current = state;
+    }
+  }, []);
   const activeCamera = findCameraPreset(activeCameraId);
   const availableExpressionActions = getAvailableExpressionActions(vrm);
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
@@ -2764,6 +2785,9 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setSelectedPropId(null);
   }, [open]);
 
+  const loadModelRef = useRef(loadModelFromLibraryEntry);
+  loadModelRef.current = loadModelFromLibraryEntry;
+
   useEffect(() => {
     if (!open) return;
 
@@ -2776,20 +2800,20 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
         if (cancelled) return;
         setLibraryEntries(entries);
         setLibraryStatus("ready");
-        loadModelFromLibraryEntry(entries.find((entry) => entry.id === activeModelId) ?? entries[0]);
+        loadModelRef.current(entries.find((entry) => entry.id === activeModelId) ?? entries[0]);
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return;
         setLibraryEntries(SAMPLE_VRM_ENTRIES);
         setLibraryStatus("error");
         setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
-        loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
+        loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, activeModelId]);
 
   useEffect(() => {
     if (!open || status !== "ready" || !vrm || !activeLibraryEntry || activeLibraryEntry.thumbnail) return;
@@ -3030,6 +3054,17 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     }
   }
 
+  // 표정 프리셋(조합) 원클릭 적용 — VRM 표준 blendshape 가중치 믹스를 한 번에 입힌다.
+  // 모델에 없는 표정 이름은 applyExpressionWeightsToVrm이 건너뛴다.
+  function handleExpressionPresetSelect(preset: StudioExpressionPreset) {
+    setActiveExpressionId(`preset:${preset.id}`);
+    const newWeights = { ...preset.weights };
+    setExpressionWeights(newWeights);
+    if (vrmRef.current) {
+      applyExpressionWeightsToVrm(vrmRef.current, newWeights);
+    }
+  }
+
   function updateExpressionWeight(name: string, value: number) {
     setExpressionWeights((prev) => {
       const next = { ...prev, [name]: value };
@@ -3125,7 +3160,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     gl.setClearAlpha(0);
                   }}
                 >
-                  <CaptureBridge captureRef={captureRef} />
+                  <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
                   <CameraDirector presetId={activeCameraId} />
                   <VrmLighting tone={lightingTone} />
                   {vrm ? (
@@ -3358,6 +3393,31 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     이 VRM에는 사용할 수 있는 표정 프리셋이 없습니다.
                   </p>
                 )}
+
+                {/* 표정 조합 프리셋(studio-pose-presets) — 여러 blendshape를 섞은 만화식 표정을 원클릭 적용 */}
+                <div className="mt-3 border-t border-line/45 pt-3">
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">원클릭 표정 조합 ({EXPRESSION_PRESETS.length})</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {EXPRESSION_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        title={preset.tone}
+                        className={cx(
+                          "flex min-h-[3.4rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-1.5 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                          activeExpressionId === `preset:${preset.id}`
+                            ? "border-accent/55 bg-accent-soft text-accent"
+                            : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                        )}
+                        disabled={!vrm}
+                        onClick={() => handleExpressionPresetSelect(preset)}
+                      >
+                        <span className="text-base leading-none" aria-hidden>{preset.emoji}</span>
+                        <span className="block w-full truncate text-[0.66rem] font-bold">{preset.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </section>
 
               <section className="rounded-xl border border-line bg-card/45 p-3">
@@ -3510,6 +3570,30 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                       <span className="mt-0.5 block text-[0.68rem] text-fg-3">{pose.tone}</span>
                     </button>
                   ))}
+                </div>
+
+                {/* 확장 포즈 프리셋(studio-pose-presets) — 코미Po!식 상황별 포즈 팩 */}
+                <div className="mt-3.5 border-t border-line/45 pt-3">
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">확장 포즈 팩 ({EXTRA_POSE_PRESETS.length})</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {EXTRA_POSE_PRESETS.map((pose) => (
+                      <button
+                        key={pose.id}
+                        type="button"
+                        className={cx(
+                          "min-h-[3.2rem] rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                          activePoseId === pose.id
+                            ? "border-accent/55 bg-accent-soft text-accent"
+                            : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                        )}
+                        disabled={!vrm}
+                        onClick={() => handlePoseSelect(pose.id)}
+                      >
+                        <span className="block text-xs font-bold">{pose.label}</span>
+                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{pose.tone}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="mt-3.5 space-y-2 border-t border-line/45 pt-3">

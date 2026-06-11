@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck } from "lucide-react";
+import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
 import type { ReviewReply } from "@/lib/types";
 import { useApp } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
@@ -109,6 +109,50 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     setOpenComposerFor(null);
   }
 
+  // 소프트 삭제 마스킹/제거 — 서버(deleteReviewReply)와 동일하게 하위 답글이 있으면 자리 표시만 남긴다.
+  function maskNode(nodes: ReviewReply[], replyId: string): ReviewReply[] {
+    return nodes.map((node) => {
+      if (node.id === replyId) {
+        return { ...node, deleted: true, text: "", author: { name: "삭제됨", avatar: "#5b5751" } };
+      }
+      if (!node.children || node.children.length === 0) return node;
+      return { ...node, children: maskNode(node.children, replyId) };
+    });
+  }
+
+  function removeNode(nodes: ReviewReply[], replyId: string): ReviewReply[] {
+    return nodes
+      .filter((node) => node.id !== replyId)
+      .map((node) =>
+        node.children && node.children.length > 0 ? { ...node, children: removeNode(node.children, replyId) } : node
+      );
+  }
+
+  async function deleteReply(replyId: string) {
+    if (!userId || !sessionToken) return;
+    if (!window.confirm("이 답글을 삭제할까요?")) return;
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/reviews/${encodeURIComponent(reviewId)}/replies/${encodeURIComponent(replyId)}`,
+        { method: "DELETE", cache: "no-store", headers: { "x-user-id": sessionToken } }
+      );
+      const data = await safeParseJson<unknown>(res);
+      if (!res.ok) {
+        setError(resolveApiError(data, "답글을 삭제하지 못했습니다."));
+        return;
+      }
+      const result = (data ?? {}) as { deleted?: boolean; soft?: boolean };
+      if (!result.deleted) {
+        setError("답글을 삭제하지 못했습니다.");
+        return;
+      }
+      setReplies((current) => (result.soft ? maskNode(current, replyId) : removeNode(current, replyId)));
+    } catch {
+      setError("답글을 삭제하지 못했습니다.");
+    }
+  }
+
   const count = countReplies(replies);
 
   return (
@@ -139,6 +183,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
               items={replies}
               userId={userId}
               onSubmit={submit}
+              onDelete={deleteReply}
               onToggleComposer={toggleComposer}
               openComposerFor={openComposerFor}
               drafts={drafts}
@@ -199,6 +244,7 @@ function ReplyThread({
   items,
   userId,
   onSubmit,
+  onDelete,
   onToggleComposer,
   openComposerFor,
   drafts,
@@ -210,6 +256,7 @@ function ReplyThread({
   items: ReviewReply[];
   userId: string | null;
   onSubmit: (parentId?: string | null) => Promise<void>;
+  onDelete: (replyId: string) => Promise<void>;
   onToggleComposer: (parentId: string | null) => void;
   openComposerFor: string | null;
   drafts: Record<string, string>;
@@ -230,6 +277,7 @@ function ReplyThread({
           canReply={depth < MAX_REPLY_DEPTH}
           depth={depth}
           onSubmit={onSubmit}
+              onDelete={onDelete}
               onToggleComposer={onToggleComposer}
               openComposerFor={openComposerFor}
               drafts={drafts}
@@ -248,6 +296,7 @@ function ReviewReplyItem({
   canReply,
   depth,
   onSubmit,
+  onDelete,
   onToggleComposer,
   openComposerFor,
   drafts,
@@ -260,6 +309,7 @@ function ReviewReplyItem({
   canReply: boolean;
   depth: number;
   onSubmit: (parentId?: string | null) => Promise<void>;
+  onDelete: (replyId: string) => Promise<void>;
   onToggleComposer: (parentId: string | null) => void;
   openComposerFor: string | null;
   drafts: Record<string, string>;
@@ -270,12 +320,14 @@ function ReviewReplyItem({
   const [revealed, setRevealed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const children = reply.children ?? [];
-  const hasSpoiler = reply.spoiler;
+  const isDeleted = Boolean(reply.deleted);
+  const hasSpoiler = reply.spoiler && !isDeleted;
   const isOpen = openComposerFor === reply.id;
   const draft = drafts[reply.id] ?? "";
   const spoilerDraft = spoilerByReplyId[reply.id] ?? false;
   const hidden = hasSpoiler && !revealed;
   const hasChildren = children.length > 0;
+  const isOwnReply = !isDeleted && Boolean(userId) && reply.author.id === userId;
 
   return (
     <article className={cn("rounded-xl border border-line bg-panel/45 p-3", depth > 0 && "ml-4 border-l-2 border-line")}>
@@ -288,20 +340,36 @@ function ReviewReplyItem({
         </span>
         <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg">{reply.author.name}</span>
         <span className="text-[0.68rem] text-fg-3">{relativeDate(reply.createdAt)}</span>
-      </div>
-      <div className="relative">
-        <p className={cn("text-sm leading-relaxed text-fg-2", hidden && "select-none blur-[5px]")}>{reply.text}</p>
-        {hidden && (
+        {isOwnReply && (
           <button
             type="button"
-            onClick={() => setRevealed(true)}
-            className="absolute inset-0 flex items-center justify-center text-xs font-medium text-fg-2 hover:text-fg"
+            onClick={() => void onDelete(reply.id)}
+            aria-label="내 답글 삭제"
+            title="삭제"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
           >
-            스포일러 답글 보기
+            <Trash2 size={12} />
+            삭제
           </button>
         )}
       </div>
-        {canReply && (
+      {isDeleted ? (
+        <p className="text-sm italic leading-relaxed text-fg-3">삭제된 답글입니다.</p>
+      ) : (
+        <div className="relative">
+          <p className={cn("text-sm leading-relaxed text-fg-2", hidden && "select-none blur-[5px]")}>{reply.text}</p>
+          {hidden && (
+            <button
+              type="button"
+              onClick={() => setRevealed(true)}
+              className="absolute inset-0 flex items-center justify-center text-xs font-medium text-fg-2 hover:text-fg"
+            >
+              스포일러 답글 보기
+            </button>
+          )}
+        </div>
+      )}
+        {!isDeleted && canReply && (
           <button
             type="button"
             onClick={() => onToggleComposer(reply.id)}
@@ -382,6 +450,7 @@ function ReviewReplyItem({
             items={children}
             userId={userId}
             onSubmit={onSubmit}
+            onDelete={onDelete}
             onToggleComposer={onToggleComposer}
             openComposerFor={openComposerFor}
             drafts={drafts}

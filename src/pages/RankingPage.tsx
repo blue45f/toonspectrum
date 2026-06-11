@@ -29,7 +29,8 @@ export function RankingPage() {
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
         <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-          검증된 카탈로그 스냅샷과 투명 산식으로 지금 볼 작품을 고릅니다.
+          검증된 카탈로그 스냅샷에 투명 산식을 적용해 지금 볼 작품을 고릅니다. 기간(일간·주간·월간·전체)은
+          무작위 변주가 아니라 실 신호(순위 변동·트렌드·누적 조회/관심/평점)의 가중 블렌딩으로 달라집니다.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2">

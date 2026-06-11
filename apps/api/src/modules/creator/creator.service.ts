@@ -3,16 +3,26 @@ import {
   addComment,
   bumpAssetDownloads,
   bumpViews,
+  createSeries,
   createWork,
+  deleteSeries,
   deleteSharedAsset,
   deleteWork,
+  getChallenge,
+  getCreatorPublicProfile,
+  getSeries,
   getWork,
+  listChallenges,
   listComments,
+  listSeries,
   listSharedAssets,
   listWorks,
   parseCreatorSort,
+  parseSeriesSort,
   publishAsset,
+  toggleFollow,
   toggleLike,
+  updateSeries,
   updateWork,
 } from "../../../../../lib/server/creator";
 
@@ -21,6 +31,8 @@ interface ListQuery {
   userId?: string | null;
   sort?: string | null;
   tag?: string | null;
+  seriesId?: string | null;
+  challengeId?: string | null;
 }
 
 @Injectable()
@@ -31,6 +43,8 @@ export class CreatorService {
       userId: q.userId ?? undefined,
       sort: parseCreatorSort(q.sort),
       tag: q.tag ?? undefined,
+      seriesId: q.seriesId ?? undefined,
+      challengeId: q.challengeId ?? undefined,
       viewerId: viewerId ?? undefined,
     });
   }
@@ -117,5 +131,75 @@ export class CreatorService {
   async useSharedAsset(id: string) {
     await bumpAssetDownloads(id);
     return { ok: true };
+  }
+
+  // ── 연재 시리즈 ──────────────────────────────────────────────────
+  async listSeries(q: { userId?: string | null; sort?: string | null }, viewerId?: string) {
+    return listSeries({
+      userId: q.userId ?? undefined,
+      sort: parseSeriesSort(q.sort),
+      viewerId: viewerId ?? undefined,
+    });
+  }
+
+  async getSeries(id: string, viewerId?: string) {
+    const series = await getSeries(id, viewerId);
+    if (!series) throw new NotFoundException("시리즈를 찾을 수 없습니다.");
+    return series;
+  }
+
+  async createSeries(userId: string, body: unknown) {
+    try {
+      return await createSeries(userId, (body ?? {}) as Record<string, unknown>);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "시리즈를 만들 수 없습니다.");
+    }
+  }
+
+  async updateSeries(userId: string, id: string, body: unknown) {
+    try {
+      return await updateSeries(userId, id, (body ?? {}) as Record<string, unknown>);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "시리즈를 수정할 수 없습니다.");
+    }
+  }
+
+  async deleteSeries(userId: string, id: string, isAdmin: boolean) {
+    try {
+      return await deleteSeries(userId, id, isAdmin);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "시리즈를 삭제할 수 없습니다.");
+    }
+  }
+
+  // ── 창작 챌린지 ──────────────────────────────────────────────────
+  async listChallenges() {
+    return listChallenges();
+  }
+
+  async getChallenge(key: string, viewerId?: string) {
+    const challenge = await getChallenge(key, viewerId);
+    if (!challenge) throw new NotFoundException("챌린지를 찾을 수 없습니다.");
+    return challenge;
+  }
+
+  // ── 팔로우/공개 프로필 ───────────────────────────────────────────
+  async toggleFollow(followerId: string, creatorId: string) {
+    try {
+      return await toggleFollow(followerId, creatorId);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "팔로우를 처리할 수 없습니다.");
+    }
+  }
+
+  async getCreatorProfile(userId: string, viewerId?: string) {
+    const profile = await getCreatorPublicProfile(userId, viewerId);
+    if (!profile) throw new NotFoundException("회원을 찾을 수 없습니다.");
+    return profile;
+  }
+
+  // 팔로잉 피드 — 팔로우한 창작자의 최신 작품.
+  async listFollowingFeed(viewerId: string) {
+    return listWorks({ followedBy: viewerId, viewerId, sort: "recent" });
   }
 }

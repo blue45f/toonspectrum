@@ -18,6 +18,9 @@ const STATIC_TITLES: Record<string, string> = {
   "/calendar": "연재 캘린더",
   "/reviews": "리뷰",
   "/community": "커뮤니티",
+  "/community/cafes": "장르 카페",
+  "/admin/community": "커뮤니티 관리",
+  "/admin/members": "회원 관리",
   "/library": "내 서재",
   "/compare": "작품 비교",
   "/insights": "트렌드 인사이트",
@@ -41,6 +44,8 @@ function useRouteTitle(pathname: string) {
     if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
     if (pathname.startsWith("/create/")) return; // 창작물 상세는 페이지가 직접 설정
     if (pathname.startsWith("/u/")) return; // 회원 프로필은 페이지가 직접 설정
+    if (pathname.startsWith("/community/cafes/")) return; // 카페 상세는 페이지가 직접 설정
+    if (pathname.startsWith("/community/post/")) return; // 토론 스레드는 페이지가 직접 설정
     let title: string | undefined;
     if (pathname in STATIC_TITLES) title = STATIC_TITLES[pathname];
     else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
@@ -61,6 +66,19 @@ const ReviewsPage = lazy(() => import("@/src/pages/ReviewsPage").then((m) => ({ 
 const CommunityPage = lazy(() => import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityPage })));
 const CommunityScopePage = lazy(() =>
   import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityScopePage }))
+);
+const CafesPage = lazy(() => import("@/src/pages/community/CafesPage").then((m) => ({ default: m.CafesPage })));
+const CafeDetailPage = lazy(() =>
+  import("@/src/pages/community/CafeDetailPage").then((m) => ({ default: m.CafeDetailPage }))
+);
+const CommunityPostPage = lazy(() =>
+  import("@/src/pages/community/CommunityPostPage").then((m) => ({ default: m.CommunityPostPage }))
+);
+const AdminCommunityPage = lazy(() =>
+  import("@/src/pages/admin/AdminCommunityPage").then((m) => ({ default: m.AdminCommunityPage }))
+);
+const AdminMembersPage = lazy(() =>
+  import("@/src/pages/admin/AdminMembersPage").then((m) => ({ default: m.AdminMembersPage }))
 );
 const LibraryPage = lazy(() => import("@/src/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
 const ComparePage = lazy(() => import("@/src/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
@@ -89,6 +107,12 @@ const CreateGalleryPage = lazy(() =>
 );
 const CreateWorkPage = lazy(() =>
   import("@/src/pages/create/CreateWorkPage").then((m) => ({ default: m.CreateWorkPage }))
+);
+const CreateSeriesPage = lazy(() =>
+  import("@/src/pages/create/CreateSeriesPage").then((m) => ({ default: m.CreateSeriesPage }))
+);
+const CreateChallengesPage = lazy(() =>
+  import("@/src/pages/create/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage }))
 );
 const StudioPage = lazy(() => import("@/src/pages/create/StudioPage").then((m) => ({ default: m.StudioPage })));
 const AccountPage = lazy(() => import("@/src/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
@@ -123,6 +147,9 @@ export function AppRouter() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/reviews" element={<ReviewsPage />} />
           <Route path="/community" element={<CommunityPage />} />
+          <Route path="/community/cafes" element={<CafesPage />} />
+          <Route path="/community/cafes/:slug" element={<CafeDetailPage />} />
+          <Route path="/community/post/:id" element={<CommunityPostPage />} />
           <Route path="/community/:scope" element={<CommunityScopePage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/compare" element={<ComparePage />} />
@@ -141,6 +168,8 @@ export function AppRouter() {
           <Route path="/copyright" element={<CopyrightPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/create" element={<CreateGalleryPage />} />
+          <Route path="/create/challenges" element={<CreateChallengesPage />} />
+          <Route path="/create/series/:id" element={<CreateSeriesPage />} />
           <Route path="/create/:id" element={<CreateWorkPage />} />
           <Route path="/studio" element={<StudioPage />} />
           <Route path="/me" element={<AccountPage />} />
@@ -148,6 +177,8 @@ export function AppRouter() {
           <Route path="/author/:name" element={<AuthorPage />} />
           <Route path="/pencafe/:name" element={<PencafePage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/community" element={<AdminCommunityPage />} />
+          <Route path="/admin/members" element={<AdminMembersPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

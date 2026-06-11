@@ -52,18 +52,25 @@ export function validateInquiryInput(input: unknown): { value?: InquiryInput; er
   return { value: { category, title, body: text, contact: contact || undefined, website } };
 }
 
-// termsdesk로 보낼 최종 페이로드 — 연락처는 본문 푸터로 합친다.
+const SIMPLE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// termsdesk로 보낼 최종 페이로드 — 이메일 연락처는 계약의 contactEmail 필드로,
+// 그 외(전화번호 등)는 본문 푸터로 합친다.
 export function buildInquiryPayload(input: InquiryInput): {
   category: InquiryCategory;
   title: string;
   body: string;
+  contactEmail?: string;
   website: string;
 } {
-  const footer = input.contact ? `\n\n— 답변 받을 연락처: ${input.contact}` : "";
+  const contact = (input.contact ?? "").trim();
+  const isEmail = SIMPLE_EMAIL_RE.test(contact);
+  const footer = contact && !isEmail ? `\n\n— 답변 받을 연락처: ${contact}` : "";
   return {
     category: input.category,
     title: input.title,
     body: `${input.body}${footer}`.slice(0, INQUIRY_BODY_MAX + 200),
+    ...(isEmail ? { contactEmail: contact } : {}),
     website: input.website ?? "",
   };
 }

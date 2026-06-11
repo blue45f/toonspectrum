@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { replaceCatalogData } from "../server/catalog-store";
+import { rankBy } from "../ranking";
 import type { Title } from "../types";
 import { makeTitle } from "./fixtures";
 
@@ -84,5 +85,47 @@ describe("교차-플랫폼 인기 백분위 (computeCrossPlatformPopularity)", (
     ]);
     expect(byId(out, "noavail").stats.popularityPercentile).toBeUndefined();
     expect(byId(out, "ok").stats.popularityPercentile).toBe(100); // 단독 그룹 → 100
+  });
+});
+
+describe("크로스플랫폼 융합 (rankBy 멀티플랫폼 보너스·도달 최댓값 원칙)", () => {
+  it("2곳 이상 유통작(검증된 IP)은 동일 신호의 단일 유통작보다 소폭 위", () => {
+    const solo = makeTitle({
+      id: "fusion-solo",
+      availability: [{ platformId: "naver-webtoon", pricing: "free" }],
+      stats: { popularityPercentile: 92 },
+    });
+    const multi = makeTitle({
+      id: "fusion-multi",
+      availability: [
+        { platformId: "naver-webtoon", pricing: "free" },
+        { platformId: "kakao-page", pricing: "wait-free" },
+        { platformId: "ridi", pricing: "paid" },
+      ],
+      stats: { popularityPercentile: 92 },
+    });
+    const ranked = rankBy([solo, multi], "popular", { period: "weekly" });
+    expect(ranked[0].title.id).toBe("fusion-multi");
+    // '소폭 보너스' 계약: 추가 플랫폼당 +2%, 최대 +6% — 점수 비율이 과장되면 안 된다.
+    expect(ranked[0].score / ranked[1].score).toBeLessThan(1.07);
+  });
+
+  it("도달 가중은 합산이 아니라 최댓값 — 군소 플랫폼 여러 곳이 메이저 1곳을 넘지 못한다", () => {
+    const major = makeTitle({
+      id: "fusion-major",
+      availability: [{ platformId: "naver-webtoon", pricing: "free" }],
+      stats: { popularityPercentile: 90 },
+    });
+    const smallMulti = makeTitle({
+      id: "fusion-smalls",
+      availability: [
+        { platformId: "lezhin", pricing: "paid" },
+        { platformId: "ridi", pricing: "paid" },
+        { platformId: "novelpia", pricing: "subscription" },
+        { platformId: "munpia", pricing: "paid" },
+      ],
+      stats: { popularityPercentile: 90 },
+    });
+    expect(rankBy([smallMulti, major], "popular", { period: "weekly" })[0].title.id).toBe("fusion-major");
   });
 });

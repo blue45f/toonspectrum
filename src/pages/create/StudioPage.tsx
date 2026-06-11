@@ -188,6 +188,7 @@ import {
   MousePointer2,
   PaintBucket,
   Pencil,
+  PenTool,
   Plus,
   Redo2,
   Send,
@@ -217,7 +218,18 @@ import {
   markSharedAssetUsed,
   type SharedAsset,
 } from "@/src/lib/creator-client";
-import { processFreehandPoints, processPencilPoints } from "./studio-brush";
+import {
+  BRUSH_PRESETS,
+  gpenSegmentWidths,
+  processFreehandPoints,
+  processPencilPoints,
+  screentoneDotRadius,
+  screentoneDotsForStroke,
+  smoothStrokePoints,
+  stabilizePoint,
+  STABILIZER_MAX,
+} from "./studio-brush";
+import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
 import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
@@ -423,15 +435,19 @@ interface SpeedLinesEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
+// 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
+type StudioEmeresTemplate = { id: string; label: string; category: string; svg: string; width: number; height: number; tip: string };
 type StudioOptionalAssetPacks = {
   bgSceneSections: Array<{ genre: string; scenes: StudioBgScene[] }>;
   comicVectorStickers: StudioFxAsset[];
   creatureStickers: StudioFxAsset[];
   propStickers: StudioFxAsset[];
   fxOverlays: StudioFxAsset[];
+  emeresSections: Array<{ category: string; templates: StudioEmeresTemplate[] }>;
+  emeresUnderlayOpacity: number;
 };
 
 const uid = () => crypto.randomUUID();
@@ -441,6 +457,8 @@ const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   creatureStickers: [],
   propStickers: [],
   fxOverlays: [],
+  emeresSections: [],
+  emeresUnderlayOpacity: 0.42,
 };
 
 // 효과 피커 카테고리 칩 — 클릭 시 해당 섹션만 보여줘 7개 섹션 스크롤 없이 점프한다.
@@ -531,22 +549,6 @@ function elementLabel(el: El): string {
   }
 }
 const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
-
-interface BrushPreset {
-  id: string;
-  name: string;
-  defaultWidth: number;
-  defaultOpacity: number;
-  defaultColor?: string;
-}
-
-const BRUSH_PRESETS: BrushPreset[] = [
-  { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
-  { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
-  { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
-  { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
-  { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
-];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 const QUICK_SAMPLE_CANVAS_H = 1120;
 const QUICK_SAMPLE_MARGIN = 24;
@@ -859,6 +861,69 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                       context.lineTo(x1 - dx, y1 - dy);
                       context.closePath();
                     }
+                  }
+                  context.fillStrokeShape(shape);
+                }}
+                fill={stroke}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brush === "gpen" && el.mode !== "eraser") {
+            // G펜: 필압(또는 속도 기반 의사 필압)에 따라 굵기가 변하고 양 끝이 가늘어지는 만화 잉크 선.
+            const smoothed = processFreehandPoints(points);
+            const segmentCount = Math.floor(smoothed.length / 2);
+            const rawPressures = el.pressures ?? [];
+            const sampled = Array.from({ length: segmentCount }, (_, i) => {
+              if (rawPressures.length === 0) return 0.6;
+              const idx = segmentCount <= 1 ? 0 : Math.round((i / (segmentCount - 1)) * (rawPressures.length - 1));
+              return rawPressures[idx] ?? 0.6;
+            });
+            const widths = gpenSegmentWidths(sampled, strokeWidth);
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  for (let i = 2; i < smoothed.length; i += 2) {
+                    const x0 = smoothed[i - 2]!;
+                    const y0 = smoothed[i - 1]!;
+                    const x1 = smoothed[i]!;
+                    const y1 = smoothed[i + 1]!;
+                    const w = widths[Math.floor(i / 2)] ?? strokeWidth;
+                    context.beginPath();
+                    context.moveTo(x0, y0);
+                    context.lineTo(x1, y1);
+                    context.lineWidth = w;
+                    context.lineCap = "round";
+                    context.lineJoin = "round";
+                    context.strokeStyle = stroke;
+                    context.stroke();
+                  }
+                }}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brush === "screentone" && el.mode !== "eraser") {
+            // 스크린톤: 전역 격자에 정렬된 망점 도트를 스트로크 경로에 찍는다(겹쳐도 패턴 유지).
+            const pitch = Math.max(3, strokeWidth * 0.42);
+            const radius = Math.max(2, strokeWidth / 2);
+            const dots = screentoneDotsForStroke(points, radius, pitch);
+            const dotR = screentoneDotRadius(pitch);
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context, shape) => {
+                  context.beginPath();
+                  for (let i = 0; i < dots.length; i += 2) {
+                    context.moveTo(dots[i]! + dotR, dots[i + 1]!);
+                    context.arc(dots[i]!, dots[i + 1]!, dotR, 0, Math.PI * 2);
                   }
                   context.fillStrokeShape(shape);
                 }}
@@ -1933,6 +1998,8 @@ export function StudioPage() {
   const publishRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
+  // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
+  const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
   // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
@@ -2037,7 +2104,7 @@ export function StudioPage() {
   }, []);
 
   useEffect(() => {
-    if (menu !== "bgScene" && menu !== "sticker") return;
+    if (menu !== "bgScene" && menu !== "sticker" && menu !== "emeres") return;
     if (studioOptionalAssetPacks || studioOptionalAssetsLoadRef.current) return;
 
     setStudioOptionalAssetsLoading(true);
@@ -2048,8 +2115,9 @@ export function StudioPage() {
       import("./studio-fx-assets"),
       import("./studio-creature-stickers"),
       import("./studio-prop-stickers"),
+      import("./studio-emeres-templates"),
     ])
-      .then(([bgScenes, bgScenesExtra, fxAssets, creatureAssets, propAssets]) => {
+      .then(([bgScenes, bgScenesExtra, fxAssets, creatureAssets, propAssets, emeres]) => {
         if (!studioOptionalAssetsMountedRef.current) return;
         setStudioOptionalAssetPacks({
           bgSceneSections: bgScenes.bgSceneSections([...bgScenes.BG_SCENES, ...bgScenesExtra.BG_SCENES_EXTRA]),
@@ -2057,6 +2125,8 @@ export function StudioPage() {
           creatureStickers: creatureAssets.CREATURE_STICKERS,
           propStickers: propAssets.PROP_STICKERS,
           fxOverlays: fxAssets.FX_OVERLAYS,
+          emeresSections: emeres.emeresSections(),
+          emeresUnderlayOpacity: emeres.EMERES_DEFAULT_OPACITY,
         });
       })
       .catch((err) => {
@@ -2221,6 +2291,14 @@ export function StudioPage() {
       : studioOptionalAssets.bgSceneSections.filter((group) => group.genre === bgSceneGenreFilter),
     bgSceneSearchQuery
   );
+
+  // 이메레스(스케치 밑그림) 피커 검색/카테고리 상태
+  const [emeresSearchQuery, setEmeresSearchQuery] = useState("");
+  const [emeresCategoryFilter, setEmeresCategoryFilter] = useState("all");
+  const emeresSectionsFiltered = studioOptionalAssets.emeresSections
+    .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
+    .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
+    .filter((section) => section.templates.length > 0);
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -2880,6 +2958,49 @@ export function StudioPage() {
       })
     );
   }
+  // 이메레스(툰스푼 스타일) — 스케치 밑그림을 반투명+잠금 레이어로 깔고 바로 펜 모드로 전환.
+  // 패널이 선택돼 있으면 그 칸 안에 맞춰 넣고, 아니면 캔버스 중앙에 배치한다.
+  function addEmeresTemplate(t: StudioEmeresTemplate) {
+    setMenu(null);
+    const src = svgToDataUrl(t.svg);
+    const opacity = studioOptionalAssets.emeresUnderlayOpacity;
+    let el: El;
+    if (selected?.type === "frame") {
+      const fit = Math.min(selected.width / t.width, selected.height / t.height) * 0.94;
+      const w = Math.round(t.width * fit);
+      const h = Math.round(t.height * fit);
+      el = {
+        id: uid(),
+        type: "image",
+        src,
+        x: Math.round(selected.x + (selected.width - w) / 2),
+        y: Math.round(selected.y + (selected.height - h) / 2),
+        width: w,
+        height: h,
+        rotation: 0,
+        opacity,
+        locked: true,
+      };
+    } else {
+      el = {
+        ...createCanvasImageElement({
+          id: uid(),
+          src,
+          canvasWidth: CANVAS_W,
+          canvasHeight: canvasH,
+          sourceWidth: t.width,
+          sourceHeight: t.height,
+          horizontalInset: 80,
+        }),
+        opacity,
+        locked: true,
+      };
+    }
+    commit([...elements, el]);
+    setSelectedId(null);
+    setTool("draw");
+    setDrawMode("pen");
+  }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
     if (tpl.id === "blank") {
@@ -2943,6 +3064,38 @@ export function StudioPage() {
     setCurrentTemplate(tpl);
     const nextEls = regenerateTemplate(tpl, panelGutter, []);
     commit(nextEls);
+    setSelectedId(null);
+  }
+  // 코미Po!식 정형 컷 레이아웃 — 패널 프레임(+말풍선 시드)을 한 번에 배치.
+  function applyPanelLayout(layout: PanelLayoutPreset) {
+    setMenu(null);
+    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
+    setCanvasH(layout.canvasH);
+    setBg("#ffffff");
+    setBgGrad(null);
+    setCurrentTemplate(null);
+    const frames: El[] = layout.frames.map((f) => ({
+      id: uid(),
+      type: "frame" as const,
+      x: f.x,
+      y: f.y,
+      width: f.width,
+      height: f.height,
+    }));
+    const bubbles: El[] = (layout.bubbles ?? []).map((b) => ({
+      id: uid(),
+      type: "bubble" as const,
+      variant: b.variant,
+      text: b.text,
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+      fill: "#ffffff",
+      textFill: "#16100c",
+      rotation: 0,
+    }));
+    commit([...frames, ...bubbles]);
     setSelectedId(null);
   }
   function applyBgPreset(p: BgPreset) {
@@ -3028,6 +3181,17 @@ export function StudioPage() {
     if (e.target === e.target.getStage() || e.target.name() === "bg") setSelectedId(null);
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // 브러시 커서 프리뷰: 드로잉 모드에선 포인터 위치에 브러시 크기 원을 따라 그린다.
+    // (React 상태를 거치지 않고 Konva 노드를 직접 갱신 — hover 중 리렌더 없음)
+    if (tool === "draw") {
+      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
+      const cursorNode = brushCursorRef.current;
+      if (cursorPos && cursorNode) {
+        cursorNode.position(cursorPos);
+        if (!cursorNode.visible()) cursorNode.visible(true);
+        cursorNode.getLayer()?.batchDraw();
+      }
+    }
     if (tool !== "draw" || !drawingRef.current) return;
     const pos = e.target.getStage()?.getRelativePointerPosition();
     if (!pos) return;
@@ -3061,11 +3225,10 @@ export function StudioPage() {
       let targetX = pos.x;
       let targetY = pos.y;
       if (stabilizer > 0 && current.points.length >= 2) {
-        const lastX = current.points[current.points.length - 2];
-        const lastY = current.points[current.points.length - 1];
-        const weight = 1 / (stabilizer + 1);
-        targetX = lastX + (pos.x - lastX) * weight;
-        targetY = lastY + (pos.y - lastY) * weight;
+        // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush).
+        const lastX = current.points[current.points.length - 2]!;
+        const lastY = current.points[current.points.length - 1]!;
+        [targetX, targetY] = stabilizePoint(lastX, lastY, pos.x, pos.y, stabilizer);
       }
 
       next = { 
@@ -3103,10 +3266,23 @@ export function StudioPage() {
   }
   function onStageUp() {
     if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
-      commit([...elements, drawingRef.current]);
+      let finished = drawingRef.current;
+      // 손떨림 보정 2단계: 프리핸드 스트로크 확정 시 이동평균 스무딩(점 개수·필압 정렬 보존).
+      if ((finished.kind ?? "freehand") === "freehand" && stabilizer > 0) {
+        finished = { ...finished, points: smoothStrokePoints(finished.points, stabilizer) };
+      }
+      commit([...elements, finished]);
     }
     drawingRef.current = null;
     setDraft(null);
+  }
+  // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
+  function hideBrushCursor() {
+    const cursorNode = brushCursorRef.current;
+    if (cursorNode && cursorNode.visible()) {
+      cursorNode.visible(false);
+      cursorNode.getLayer()?.batchDraw();
+    }
   }
 
   // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
@@ -3652,6 +3828,21 @@ export function StudioPage() {
                   ))}
                 </div>
               ))}
+              {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
+              <div className="grid gap-1 border-t border-line pt-1.5">
+                <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
+                {PANEL_LAYOUTS.map((layout) => (
+                  <button
+                    key={layout.id}
+                    type="button"
+                    onClick={() => applyPanelLayout(layout)}
+                    className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                  >
+                    <span className="font-medium text-fg">{layout.label}</span>
+                    <span className="text-fg-3">{layout.hint}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -3773,6 +3964,91 @@ export function StudioPage() {
                             <img src={bg.imgSrc || svgToDataUrl(bg.svg || "")} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                           </div>
                           <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div ref={menu === "emeres" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "emeres" ? null : "emeres")} aria-haspopup="menu" aria-expanded={menu === "emeres"} className={toolBtn(menu === "emeres")}>
+            <PenTool size={14} /> 이메레스
+          </button>
+          {menu === "emeres" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
+              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
+              </p>
+              <div className="relative mb-2">
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <input
+                  type="text"
+                  placeholder="이메레스 검색..."
+                  value={emeresSearchQuery}
+                  onChange={(e) => setEmeresSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                />
+                {emeresSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setEmeresSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+              {studioOptionalAssets.emeresSections.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setEmeresCategoryFilter(category)}
+                      aria-pressed={emeresCategoryFilter === category}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                        emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                      )}
+                    >
+                      {category === "all" ? "전체" : category}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
+                )}
+                {studioOptionalAssetsError && (
+                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioOptionalAssetsError}</p>
+                )}
+                {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
+                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                  </div>
+                )}
+                {emeresSectionsFiltered.map((section) => (
+                  <div key={section.category}>
+                    <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {section.templates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          title={`${t.label} — ${t.tip}`}
+                          onClick={() => addEmeresTemplate(t)}
+                          className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                        >
+                          <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
+                            <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                          </div>
+                          <span className="mt-1 block truncate text-center text-[0.6rem] font-medium text-fg-2">{t.label}</span>
                         </button>
                       ))}
                     </div>
@@ -4659,6 +4935,7 @@ export function StudioPage() {
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
+            onMouseLeave={hideBrushCursor}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
             onContextMenu={(e) => {
@@ -5252,6 +5529,20 @@ export function StudioPage() {
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
             </Layer>
+            {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
+            {!isExporting && tool === "draw" && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={brushCursorRef}
+                  visible={false}
+                  radius={Math.max(1.5, (drawMode === "shape" ? 6 : strokeWidth) / 2)}
+                  stroke={drawMode === "eraser" ? "#71717a" : color}
+                  strokeWidth={1.25 / effScale}
+                  dash={drawMode === "eraser" ? [4 / effScale, 3 / effScale] : undefined}
+                  opacity={0.9}
+                />
+              </Layer>
+            )}
             {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
               <Layer listening={false}>
                 {guides.x.map((gx) => (
@@ -7443,14 +7734,14 @@ export function StudioPage() {
                   </span>
                 </label>
 
-                {/* 손떨림 보정 (Stabilizer) */}
+                {/* 손떨림 보정 (Stabilizer) — 0(끔)~10(최대). 입력 끌림 + 확정 시 이동평균 스무딩 */}
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2 pt-1.5 border-t border-line/35">
-                  <span title="선화를 보정하여 부드러운 드로잉을 지원합니다.">손떨림 보정</span>
+                  <span title="선화를 보정하여 부드러운 드로잉을 지원합니다. (0=끔 ~ 10=최대, 그리는 중 끌림 + 선 확정 시 스무딩)">손떨림 보정</span>
                   <span className="flex items-center gap-1.5">
                     <input
                       type="range"
                       min={0}
-                      max={20}
+                      max={STABILIZER_MAX}
                       step={1}
                       value={stabilizer}
                       onChange={(e) => setStabilizer(Number(e.target.value))}

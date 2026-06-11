@@ -326,7 +326,8 @@ export function buildRankingInsights(items: RankedTitle[], liveItems: LiveItem[]
     leader: top
       ? { title: top.title.title, rank: top.rank, score: Math.round(top.score * 10) / 10 }
       : null,
-    rising: strongestRise
+    // delta 정직화: 양의 변동이 실제로 있을 때만 '상승' 인사이트를 노출(0·추정 0을 상승으로 과장 금지).
+    rising: strongestRise && strongestRise.delta > 0
       ? { title: strongestRise.title.title, delta: strongestRise.delta, rank: strongestRise.rank }
       : null,
     liveCoverage:

@@ -12,24 +12,178 @@ import { cn, formatCount, relativeDate } from "@/lib/utils";
 import {
   deleteWork,
   getWork,
+  listChallenges,
   listComments,
+  listSeries,
   postComment,
   toggleWorkLike,
+  updateWork,
+  type ChallengeSummary,
+  type SeriesSummary,
   type WorkComment,
   type WorkDetail,
 } from "@/src/lib/creator-client";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   Heart,
+  Layers,
   Link2,
   MessageCircle,
   Pencil,
   Send,
+  Settings2,
   Trash2,
+  Trophy,
 } from "lucide-react";
 
 const MAX_COMMENT_LENGTH = 700;
+
+// ── 연재·챌린지 설정(작성자 전용) — StudioPage를 건드리지 않는 추가 게시 설정 패널 ──
+function WorkCommunityPanel({
+  work,
+  onUpdated,
+}: {
+  work: WorkDetail;
+  onUpdated: (patch: Partial<WorkDetail>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mySeries, setMySeries] = useState<SeriesSummary[]>([]);
+  const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
+  const [seriesId, setSeriesId] = useState(work.seriesId ?? "");
+  const [challengeId, setChallengeId] = useState(work.challengeId ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const userId = useApp((s) => s.userId);
+
+  // 패널을 열 때 내 시리즈 + 진행중 챌린지 목록 로드.
+  useEffect(() => {
+    if (!open || !userId) return;
+    let alive = true;
+    const controller = new AbortController();
+    listSeries({ userId }, controller.signal)
+      .then((result) => {
+        if (alive) setMySeries(result.filter((s) => s.isOwner));
+      })
+      .catch(() => {
+        if (alive) setMySeries([]);
+      });
+    listChallenges(controller.signal)
+      .then((result) => {
+        if (alive) setChallenges(result.filter((c) => c.state === "ongoing"));
+      })
+      .catch(() => {
+        if (alive) setChallenges([]);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [open, userId]);
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await updateWork(work.id, {
+        seriesId: seriesId || null,
+        challengeId: challengeId || null,
+      });
+      onUpdated({
+        seriesId: saved.seriesId ?? null,
+        episodeNo: saved.episodeNo ?? null,
+        seriesTitle: saved.seriesTitle ?? null,
+        challengeId: saved.challengeId ?? null,
+        challengeTitle: saved.challengeTitle ?? null,
+      });
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "설정을 저장하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-line bg-card/50">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
+      >
+        <Settings2 size={13} className="text-accent" />
+        연재·챌린지 설정
+        <span className="ml-auto text-[0.7rem] text-fg-3">
+          {work.seriesTitle ? `시리즈: ${work.seriesTitle}` : "시리즈 미연결"}
+          {" · "}
+          {work.challengeTitle ? `챌린지: ${work.challengeTitle}` : "챌린지 미참여"}
+        </span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2.5 border-t border-line px-3.5 py-3">
+          <label className="flex flex-col gap-1 text-xs text-fg-2">
+            연재 시리즈 (선택 시 회차 번호 자동 부여)
+            <select
+              value={seriesId}
+              onChange={(event) => setSeriesId(event.target.value)}
+              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
+            >
+              <option value="">시리즈에 연결하지 않음</option>
+              {mySeries.map((series) => (
+                <option key={series.id} value={series.id}>
+                  {series.title} ({series.episodes}화)
+                </option>
+              ))}
+            </select>
+          </label>
+          {mySeries.length === 0 && (
+            <p className="text-[0.7rem] text-fg-3">
+              아직 만든 시리즈가 없어요.{" "}
+              <Link href="/create?tab=series" className="text-accent hover:underline">
+                창작 게시판 시리즈 탭
+              </Link>
+              에서 새 시리즈를 만들 수 있습니다.
+            </p>
+          )}
+          <label className="flex flex-col gap-1 text-xs text-fg-2">
+            창작 챌린지 참여
+            <select
+              value={challengeId}
+              onChange={(event) => setChallengeId(event.target.value)}
+              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
+            >
+              <option value="">챌린지에 참여하지 않음</option>
+              {/* 이미 연결된(종료됐을 수도 있는) 챌린지는 유지 옵션으로 노출 */}
+              {work.challengeId && !challenges.some((c) => c.id === work.challengeId) && (
+                <option value={work.challengeId}>{work.challengeTitle ?? "현재 참여 중인 챌린지"}</option>
+              )}
+              {challenges.map((challenge) => (
+                <option key={challenge.id} value={challenge.id}>
+                  {challenge.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {error && <p className="text-xs text-bad">{error}</p>}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className={buttonClass({ size: "sm", variant: "solid" })}
+            >
+              설정 저장
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function WorkComments({ workId }: { workId: string }) {
   const userId = useApp((s) => s.userId);
@@ -276,6 +430,18 @@ export function CreateWorkPage() {
       </Link>
 
       <header className="mb-6">
+        {/* 연재 시리즈 배지 — 시리즈 상세로 이동 */}
+        {work.series && (
+          <Link
+            href={`/create/series/${encodeURIComponent(work.series.id)}`}
+            className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cool/40 bg-[oklch(0.8_0.11_232/0.1)] px-2.5 py-1 text-xs font-medium text-cool transition-colors hover:border-cool/70"
+          >
+            <Layers size={12} />
+            {work.series.title}
+            {work.episodeNo != null && <span className="numeral">· {work.episodeNo}화</span>}
+            {work.series.status === "completed" && <span className="text-[0.7rem] opacity-80">(완결)</span>}
+          </Link>
+        )}
         <h1 className="text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
           {work.title}
         </h1>
@@ -294,7 +460,16 @@ export function CreateWorkPage() {
             )}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-fg">{work.author.name}</p>
+            {work.author.id ? (
+              <Link
+                href={`/u/${encodeURIComponent(work.author.id)}`}
+                className="block truncate text-sm font-medium text-fg transition-colors hover:text-accent"
+              >
+                {work.author.name}
+              </Link>
+            ) : (
+              <p className="truncate text-sm font-medium text-fg">{work.author.name}</p>
+            )}
             <p className="text-xs text-fg-3">{relativeDate(work.createdAt)}</p>
           </div>
         </div>
@@ -319,15 +494,27 @@ export function CreateWorkPage() {
           </div>
         )}
 
-        {work.titleId && (
-          <Link
-            href={`/title/${encodeURIComponent(work.titleId)}`}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
-          >
-            <Link2 size={14} className="text-accent" />
-            연관 웹툰 보러 가기
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {work.titleId && (
+            <Link
+              href={`/title/${encodeURIComponent(work.titleId)}`}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <Link2 size={14} className="text-accent" />
+              연관 웹툰 보러 가기
+            </Link>
+          )}
+          {/* 챌린지 참여 배지 — 챌린지 페이지로 이동 */}
+          {work.challenge && (
+            <Link
+              href={`/create/challenges?c=${encodeURIComponent(work.challenge.slug)}`}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/40 px-3 py-2 text-xs text-accent transition-colors hover:bg-accent-soft"
+            >
+              <Trophy size={14} />
+              {work.challenge.title} 챌린지 참여작
+            </Link>
+          )}
+        </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <button
@@ -373,6 +560,17 @@ export function CreateWorkPage() {
         </div>
 
         {actionError && <p className="mt-3 text-xs text-bad">{actionError}</p>}
+
+        {/* 작성자 전용: 연재 시리즈/챌린지 연결 설정 */}
+        {work.isOwner && (
+          <WorkCommunityPanel
+            work={work}
+            onUpdated={(patch) => {
+              setWork((current) => (current ? { ...current, ...patch } : current));
+              setReloadKey((value) => value + 1); // 시리즈/회차·이웃 회차 정보 새로고침
+            }}
+          />
+        )}
       </header>
 
       {/* 세로 웹툰 스크롤 — 페이지 이미지를 풀 너비로 이어 붙인다. */}
@@ -395,6 +593,63 @@ export function CreateWorkPage() {
           ))
         )}
       </div>
+
+      {/* 시리즈 회차 내비게이션 — 이전화/시리즈 목록/다음화 */}
+      {work.series && (
+        <nav aria-label="회차 이동" className="mb-8 grid grid-cols-3 gap-2">
+          {work.prevEpisode ? (
+            <Link
+              href={`/create/${encodeURIComponent(work.prevEpisode.id)}`}
+              className="group flex min-w-0 items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <ChevronLeft size={15} className="shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-[0.66rem] text-fg-3">이전화</span>
+                <span className="block truncate text-xs font-medium">
+                  {work.prevEpisode.episodeNo != null && (
+                    <span className="numeral">{work.prevEpisode.episodeNo}화 </span>
+                  )}
+                  {work.prevEpisode.title}
+                </span>
+              </span>
+            </Link>
+          ) : (
+            <span className="grid place-items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-xs text-fg-3">
+              첫 화입니다
+            </span>
+          )}
+          <Link
+            href={`/create/series/${encodeURIComponent(work.series.id)}`}
+            className="grid place-items-center rounded-xl border border-line bg-card px-3 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+          >
+            <span className="inline-flex items-center gap-1">
+              <Layers size={13} />
+              회차 목록
+            </span>
+          </Link>
+          {work.nextEpisode ? (
+            <Link
+              href={`/create/${encodeURIComponent(work.nextEpisode.id)}`}
+              className="group flex min-w-0 items-center justify-end gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-right text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <span className="min-w-0">
+                <span className="block text-[0.66rem] text-fg-3">다음화</span>
+                <span className="block truncate text-xs font-medium">
+                  {work.nextEpisode.episodeNo != null && (
+                    <span className="numeral">{work.nextEpisode.episodeNo}화 </span>
+                  )}
+                  {work.nextEpisode.title}
+                </span>
+              </span>
+              <ChevronRight size={15} className="shrink-0" />
+            </Link>
+          ) : (
+            <span className="grid place-items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-xs text-fg-3">
+              최신화입니다
+            </span>
+          )}
+        </nav>
+      )}
 
       <WorkComments workId={work.id} />
     </Container>

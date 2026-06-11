@@ -12,9 +12,13 @@ import {
   createFanPostReply,
   ensureCommunityTables,
   listFanPostReplies,
+  maskDeletedReply,
+  slugifyCafeName,
+  validateCafeInput,
   validatePostInput,
   validateReplyText,
 } from "../server/community";
+import { GENRES } from "../taxonomy";
 
 const createdUserIds = new Set<string>();
 const createdPostIds = new Set<string>();
@@ -147,6 +151,55 @@ describe("community validation", () => {
     expect(getCommunityScopeTargetLink("title", "nw-183559", "작품명")).toBe("/title/nw-183559");
     expect(getCommunityScopeTargetLink("author", "unused", "김초월 작가")).toBe("/author/김초월%20작가");
     expect(getCommunityScopeTargetLink("pencafe", "unused", "번역자_카페")).toBe("/pencafe/%EB%B2%88%EC%97%AD%EC%9E%90_%EC%B9%B4%ED%8E%98");
+    expect(getCommunityScopeTargetLink("cafe", "ro-fan-club", "로판 모임")).toBe("/community/cafes/ro-fan-club");
+  });
+
+  it("게시글 첨부는 허용된 이미지 데이터 URL만 통과한다", () => {
+    const base = {
+      scope: "title",
+      targetId: "t1",
+      targetLabel: "작품",
+      title: "첨부 테스트",
+      text: "본문입니다.",
+    };
+    const ok = validatePostInput({ ...base, images: [`data:image/webp;base64,${"A".repeat(64)}`] });
+    expect(ok.error).toBeUndefined();
+    expect(ok.value?.images).toHaveLength(1);
+
+    expect(validatePostInput({ ...base, images: ["data:image/svg+xml;base64,PHN2Zy8+"] }).error).toBeTruthy();
+    expect(validatePostInput({ ...base, images: ["data:text/plain;base64,aGVsbG8="] }).error).toBeTruthy();
+    expect(validatePostInput({ ...base, images: ["https://example.com/a.png"] }).error).toBeTruthy();
+  });
+
+  it("카페 이름을 한글 보존 slug로 변환한다", () => {
+    expect(slugifyCafeName("로판 정주행 모임")).toBe("로판-정주행-모임");
+    expect(slugifyCafeName("  Hello__World!! ")).toBe("hello-world");
+    expect(slugifyCafeName("###")).toBe("");
+    expect(slugifyCafeName("긴이름".repeat(40)).length).toBeLessThanOrEqual(60);
+  });
+
+  it("카페 입력은 이름·소개·장르 화이트리스트를 강제한다", () => {
+    expect(validateCafeInput({ name: "로", description: "소개입니다", genre: "" }, GENRES).error).toBeTruthy();
+    expect(validateCafeInput({ name: "로판 모임", description: "", genre: "" }, GENRES).error).toBeTruthy();
+    expect(validateCafeInput({ name: "로판 모임", description: "소개", genre: "없는장르" }, GENRES).error).toBeTruthy();
+    const ok = validateCafeInput({ name: "로판 모임", description: "로판을 함께 파요", genre: "로판" }, GENRES);
+    expect(ok.error).toBeUndefined();
+    expect(ok.value).toEqual({ name: "로판 모임", description: "로판을 함께 파요", genre: "로판" });
+  });
+
+  it("소프트 삭제 마스킹은 본문·작성자를 비우고 deleted 플래그를 남긴다", () => {
+    const reply = {
+      id: "r1",
+      text: "원본 댓글",
+      author: { id: "u1", name: "독자", avatar: "#123456" },
+    };
+    const masked = maskDeletedReply(reply, true);
+    expect(masked.deleted).toBe(true);
+    expect(masked.text).toBe("");
+    expect(masked.author.name).toBe("삭제됨");
+    const intact = maskDeletedReply(reply, false);
+    expect(intact.deleted).toBe(false);
+    expect(intact.text).toBe("원본 댓글");
   });
 
   it("게시글 댓글의 대댓글을 같은 게시글 트리 아래에 저장한다", async (ctx) => {

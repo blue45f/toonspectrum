@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { spectrumGradient, genreColor } from "@/lib/genre-color";
 import { useInView } from "@/components/use-in-view";
@@ -24,7 +24,6 @@ export function GenreSpectrum({
   label?: string;
 }) {
   const [ref, inView] = useInView<HTMLDivElement>();
-  const trackRef = useRef<HTMLDivElement>(null);
   const [scrub, setScrub] = useState<{ x: number; genre: string } | null>(null);
 
   const list = genres.length ? genres : ["로맨스", "판타지", "액션"];
@@ -36,20 +35,15 @@ export function GenreSpectrum({
 
   function onMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!interactive) return;
-    const rect = trackRef.current?.getBoundingClientRect();
+    const rect = ref.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     setScrub({ x: ratio, genre: fillGenre(ratio) });
   }
 
-  const setRefs = (node: HTMLDivElement | null) => {
-    ref.current = node;
-    trackRef.current = node;
-  };
-
   return (
     <div
-      ref={setRefs}
+      ref={ref}
       className={cn(
         "group/spectrum relative w-full overflow-hidden rounded-full",
         interactive && "cursor-ew-resize",

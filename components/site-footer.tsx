@@ -21,6 +21,8 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "커뮤니티",
     links: [
+      { label: "커뮤니티 허브", href: "/community" },
+      { label: "장르 카페", href: "/community/cafes" },
       { label: "리뷰 피드", href: "/reviews" },
       { label: "작품 비교", href: "/compare" },
       { label: "트렌드 대시보드", href: "/insights" },

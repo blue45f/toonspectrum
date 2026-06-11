@@ -307,9 +307,64 @@ export const creatorWorks = pgTable("creator_work", {
   status: text("status").notNull().default("published"), // draft | published
   hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
   views: integer("views").notNull().default(0),
+  // 연재 시리즈(코미코 베스트도전 스타일) — 설정 시 시리즈의 한 회차가 된다.
+  // FK는 의도적으로 생략(reviewLikes.reviewId와 동일 관례) — 런타임 ensure DDL과 push 양쪽 호환.
+  seriesId: text("seriesId"),
+  episodeNo: integer("episodeNo"), // 시리즈 내 회차 번호(서버가 max+1 자동 부여)
+  // 창작 챌린지(툰스푼 창작 작업실 스타일) — 설정 시 해당 챌린지 참여작.
+  challengeId: text("challengeId"),
   createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
+
+// ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
+// author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
+export const creatorSeries = pgTable("creator_series", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  author: text("author").notNull().default(""),
+  avatar: text("avatar").notNull().default(""),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  cover: text("cover").notNull().default(""), // 대표 커버(데이터 URL 또는 외부 URL)
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  status: text("status").notNull().default("ongoing"), // ongoing(연재중) | completed(완결)
+  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
+// ── 창작 챌린지(주간 주제 이벤트) — 기본 시드는 lib/server/creator.ts가 idempotent 보장 ──
+export const creatorChallenges = pgTable("creator_challenge", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  theme: text("theme").notNull().default(""), // 주제 설명
+  startsAt: timestamp("startsAt", { mode: "date" }),
+  endsAt: timestamp("endsAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+});
+
+// ── 창작자 팔로우 — follower가 creator(userId)를 구독 ──────────────────────
+export const creatorFollows = pgTable(
+  "creator_follow",
+  {
+    followerId: text("followerId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    creatorId: text("creatorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.followerId, t.creatorId] })]
+);
 
 export const creatorWorkLikes = pgTable(
   "creator_work_like",

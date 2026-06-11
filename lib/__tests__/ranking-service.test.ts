@@ -278,6 +278,34 @@ describe("ranking service", () => {
     expect(data.meta.live.nextRefreshAt).toBe(new Date(Date.parse(fixedTime) + ttlSeconds * 1000).toISOString());
   });
 
+  it("스냅샷 산식 모드는 결정적이다 — 같은 카탈로그·쿼리 두 번 → 동일 순서·동일 점수", async () => {
+    const catalog = () => [
+      makeTitle({ id: "a", stats: { popularityPercentile: 95, rankDelta: 12, trendingScore: 90 } }),
+      makeTitle({ id: "b", stats: { popularityPercentile: 95, rankDelta: 0, trendingScore: 5, views: 700_000_000 } }),
+      makeTitle({ id: "c", stats: { popularityPercentile: 40 } }),
+    ];
+    const q = query({ axis: "trending", period: "daily", limit: "10" });
+    const first = await getRankingData(q, { catalog: catalog(), disableLive: true, now });
+    const second = await getRankingData(q, { catalog: catalog(), disableLive: true, now });
+
+    expect(first.items.map((item) => item.title.id)).toEqual(second.items.map((item) => item.title.id));
+    expect(first.items.map((item) => item.score)).toEqual(second.items.map((item) => item.score));
+  });
+
+  it("양의 delta가 없으면 rising 인사이트를 null로 둔다(0을 상승으로 과장하지 않음)", async () => {
+    const data = await getRankingData(query({ axis: "rating", period: "weekly", limit: "5" }), {
+      catalog: [
+        makeTitle({ id: "flat-a", stats: { rankDelta: 0 } }),
+        makeTitle({ id: "flat-b", stats: { rankDelta: -3 } }),
+      ],
+      disableLive: true,
+      now,
+    });
+
+    expect(data.items.every((item) => item.delta === 0)).toBe(true);
+    expect(data.insights.rising).toBeNull();
+  });
+
   it("refresh가 없으면 라이브 수집은 stale 폴백용 옵션을 사용한다", async () => {
     const calls: Array<{
       options: {

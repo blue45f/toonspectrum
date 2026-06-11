@@ -174,6 +174,70 @@ The Vite client normally reads ranking data from static files or computes filter
 
 If live mode is re-enabled later, unmatched external live items must not enter the unified ranking because ToonSpectrum cannot show full metadata, reviews, platform routing, or detail pages for them. This protects ranking integrity.
 
+## 투명 산식 v2 — 기간 블렌딩 · 신선도 · 유도 사전값
+
+`lib/ranking.ts`의 산식은 완전히 결정적입니다. `Math.random`은 물론 과거의 `seededRandom` 기간 변주(wobble)도 사용하지 않습니다 — 같은 카탈로그·같은 쿼리는 언제나 같은 순서와 같은 점수를 돌려줍니다. 기간 간 순위 차이는 전부 실제 신호의 가중 차이로 설명됩니다.
+
+### 제거한 가짜 신호
+
+- `periodFactor`: `seededRandom(id:axis:period)` 기반 곱셈 wobble(일간 ±25% 등) → **기간별 신호 블렌딩으로 대체**.
+- 표시용 가짜 delta: 비모멘텀 축의 `seededRandom(...)` 순위 변동 → **실데이터 rankDelta 또는 결정적 추정으로 대체**.
+
+### 기간별 신호 블렌딩 (`PERIOD_BLEND`)
+
+```
+최종점수 = 축점수 × (1 + momentum가중 × 모멘텀정규화 + cumulative가중 × 누적정규화) + ε(id)
+```
+
+| period  | momentum 가중 | cumulative 가중 | 의도 |
+| ------- | ------------ | -------------- | ---- |
+| daily   | 0.45         | 0.05           | 단기 모멘텀(실 순위변동·트렌드) 비중↑ |
+| weekly  | 0.18         | 0.12           | 균형(기본) — delta 추정의 기준 기간 |
+| monthly | 0.06         | 0.30           | 누적 신호(조회·관심·베이즈평점) 비중↑ |
+| all     | 0            | 0.35           | 모멘텀 제외, 누적+평점 위주 |
+
+- 모멘텀정규화 ≈ −0.64~1.06: `(clamp(rankDelta, ±15)/15 × 0.6 + clamp(trendingScore, 0~100)/100 × 0.4) × 신뢰계수`. 신뢰계수를 곱해 합성(추정) 모멘텀이 실데이터만큼 힘을 갖지 못합니다. 음수(하락)도 그대로 반영합니다.
+- 누적정규화 0~1: `log10(조회)/9 × 0.45 + log10(관심)/7 × 0.3 + 베이즈정규화 × 0.25`. `hidden` 축만 예외로 조회·관심 대신 평점·평가수를 사용합니다(낮은 조회 역가중 철학과 모순 방지).
+- ε(id): id의 FNV-1a 해시 기반 극소 타이브레이크(< 1e-6). 점수가 완전히 같은 작품의 순서를 결정적으로 고정할 뿐, 1e-6을 넘는 점수 차이에는 어떤 영향도 없습니다.
+
+### 연재 신선도 (popular / trending 한정)
+
+연재 활동 메타데이터(`status`, `updateDays`)로 휴재·완결작이 과거 누적 신호만으로 실시간 상위를 점유하지 못하게 합니다.
+
+| 상태 | popular | trending |
+| ---- | ------- | -------- |
+| 연재중 + 연재요일 보유 | ×1.05 | ×1.05 |
+| 연재중(요일 미상) | ×1.00 | ×1.00 |
+| 휴재 | ×0.93 | ×0.85 |
+| 완결 | ×0.95 | ×0.80 (제외 대신 감쇠) |
+
+### 베이즈 사전값(C·m) 카탈로그 유도
+
+하드코딩(C=4.0, m=800) 대신 `rankBy` 호출 시 카탈로그 분포에서 1회 유도하고 WeakMap으로 캐시합니다.
+
+```
+C = Σ(가중 × min(5, 평균평점)) / Σ(가중)   # 가중 = 실수집 표본 ratingCount, 추정 표본은 ratingCount × 0.25
+m = 평가 보유작 ratingCount 중앙값
+클램프: C ∈ [3.2, 4.6], m ∈ [50, 5000]
+폴백: 평가 보유작 8편 미만이면 기본값(C=4.0, m=800)
+```
+
+`explainScore`는 공개 시그니처(`(title, axis)`) 유지를 위해 마지막 `rankBy`가 유도한 사전값을 표시에 사용합니다(랭킹 행은 항상 rankBy 결과에서 펼쳐지므로 일치). rankBy 호출 전이라면 기본값으로 표시됩니다.
+
+### 크로스플랫폼 융합
+
+- 도달 가중(reach)은 **최댓값 플랫폼 기준 유지** — 군소 플랫폼 여러 곳을 합산해도 메이저 1곳을 넘지 못합니다.
+- 멀티플랫폼 유통작(서로 다른 플랫폼 2곳 이상)은 '검증된 IP' 보너스로 추가 플랫폼당 +2%, 최대 +6%를 받습니다(popular의 인기 성분과 trending의 백분위 성분에 곱셈).
+- 인기 백분위 지수감쇠(`exp((pct−100)/2.5)`)와 신뢰계수(실데이터 1.00~1.06 / 추정 0.78~0.80) 메커니즘은 그대로입니다.
+
+### 순위 변동(delta) 정직화
+
+- `popular`/`trending`: 실데이터 `stats.rankDelta`를 그대로 노출합니다(없으면 0).
+- 그 외 축: 주간(기준 블렌드) 순위 대비 현재 기간 순위의 차이를 ±5로 클램프한 **결정적 추정**만 노출하고 `deltaEstimated: true`로 표식합니다. weekly는 기준 기간 그 자체이므로 0입니다.
+- `insights.rising`은 양의 delta가 실제로 있을 때만 채워집니다(0을 상승으로 과장하지 않음).
+
+테스트는 `lib/__tests__/ranking.test.ts`(결정성·기간 신호 차이·seededRandom 미사용 소스 검증·신선도·C/m 유도·delta 정직화)와 `lib/__tests__/cross-platform-popularity.test.ts`(멀티플랫폼 보너스·도달 최댓값 원칙)가 보호합니다.
+
 ## Reliability model
 
 The API returns `meta.reliability` for every request.

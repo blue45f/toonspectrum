@@ -187,8 +187,8 @@ function writeSitemap(): void {
   const BASE = "https://toonspectrum.vercel.app";
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
-    "/reviews", "/community", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/guide", "/news", "/create",
+    "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
+    "/about", "/guide", "/news", "/create", "/contact",
   ];
   // thin-content 방지를 위해 '표지+평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
   // 품질 게이트를 유지하면서 기존 5000편 대비 색인 커버리지를 넓힌다.

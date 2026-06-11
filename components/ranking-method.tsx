@@ -53,8 +53,28 @@ export function RankingMethod() {
           <Info size={14} className="mt-0.5 shrink-0 text-fg-2" />
           <span>
             <span className="font-medium text-fg-2">베이즈 평균 보정</span> — 평가 수가 적은 작품의 평점
-            거품을 막기 위해 사전 평균(C=4.0)과 가중 표본(m=800)으로 보정합니다. 표본이 클수록 실제 평점에
-            수렴합니다.
+            거품을 막기 위해 사전 평균(C)과 가중 표본(m)으로 보정합니다. C와 m은 고정값이 아니라 카탈로그
+            분포에서 유도합니다 — C는 평가수 가중 평균 평점(추정 표본은 25%만 가중), m은 평가수 중앙값이며,
+            안전 범위(C 3.2~4.6 · m 50~5000)로 클램프합니다. 표본이 클수록 실제 평점에 수렴합니다.
+          </span>
+        </p>
+        <p className="flex gap-2">
+          <Info size={14} className="mt-0.5 shrink-0 text-fg-2" />
+          <span>
+            <span className="font-medium text-fg-2">기간별 신호 블렌딩</span> — 일간·주간·월간·전체의 순위
+            차이는 무작위 변주가 아니라 신호 가중치의 차이입니다. 일간은 단기 모멘텀(실 순위 변동·트렌드
+            지수), 월간·전체는 누적 신호(조회·관심·베이즈 평점)의 비중을 높입니다. 같은 데이터면 언제나
+            같은 순위가 나옵니다(결정적). 순위 변동(△)은 실데이터가 있으면 그대로 쓰고, 없는 축에서는
+            기간 가중 차이로 추정한 값(±5 한도)만 표시합니다.
+          </span>
+        </p>
+        <p className="flex gap-2">
+          <Info size={14} className="mt-0.5 shrink-0 text-fg-2" />
+          <span>
+            <span className="font-medium text-fg-2">연재 신선도 · 멀티플랫폼</span> — 인기·급상승 축은
+            연재중(연재요일 확인) 작품에 소폭 가중(×1.05)하고 휴재·완결작은 감쇠해, 갱신이 멈춘 작품이
+            실시간 상위를 점유하지 않게 합니다(완결은 급상승에서 제외 대신 ×0.80 감쇠). 두 곳 이상에
+            유통되는 검증된 IP는 +2~6% 보너스를 받되, 도달 가중은 최대 플랫폼 기준을 유지합니다.
           </span>
         </p>
         <p className="flex gap-2">

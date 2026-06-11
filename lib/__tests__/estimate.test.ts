@@ -27,4 +27,14 @@ describe("statsAreEstimated", () => {
     });
     expect(statsAreEstimated(t)).toBe(false);
   });
+
+  it("statsEstimated 플래그가 켜진 작품은 네이버 웹툰이어도 추정으로 본다(0 노출 방지 보정)", () => {
+    // 랭킹 산식은 이 판별로 신뢰계수 감점·모멘텀 감쇠·베이즈 사전값 가중(25%)을 일관 적용한다.
+    const t = makeTitle({
+      type: "webtoon",
+      statsEstimated: true,
+      availability: [{ platformId: "naver-webtoon", pricing: "free" }],
+    });
+    expect(statsAreEstimated(t)).toBe(true);
+  });
 });

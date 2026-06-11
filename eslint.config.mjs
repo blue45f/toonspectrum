@@ -1,3 +1,5 @@
+import reactCompiler from 'eslint-plugin-react-compiler';
+import reactHooks from 'eslint-plugin-react-hooks';
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
@@ -75,6 +77,17 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-]);
+  {
+    files: ["**/*.{ts,tsx}"],
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-compiler': reactCompiler
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-compiler/react-compiler': 'error'
+    }
+  }]);
 
 export default eslintConfig;

@@ -40,6 +40,7 @@ export function makeTitle(
     availability: p.availability ?? [{ platformId: "naver-webtoon", pricing: "free" }],
     adaptedFrom: p.adaptedFrom,
     stats: { ...baseStats, ...(p.stats ?? {}) },
+    statsEstimated: p.statsEstimated,
     featured: p.featured,
     editorNote: p.editorNote,
   };

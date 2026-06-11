@@ -27,12 +27,29 @@ export interface WorkSummary {
   views: number;
   liked: boolean;
   createdAt: string;
+  // 연재 시리즈/챌린지 연결 — 구버전 서버 응답엔 없을 수 있어 optional(하위호환).
+  seriesId?: string | null;
+  episodeNo?: number | null;
+  seriesTitle?: string | null;
+  challengeId?: string | null;
+  challengeTitle?: string | null;
+}
+
+// 작품 상세의 이전화/다음화 내비게이션 항목.
+export interface EpisodeRef {
+  id: string;
+  title: string;
+  episodeNo: number | null;
 }
 
 export interface WorkDetail extends WorkSummary {
   pages: string[];
   doc: Record<string, unknown>;
   isOwner: boolean;
+  series?: { id: string; title: string; status: SeriesStatus } | null;
+  prevEpisode?: EpisodeRef | null;
+  nextEpisode?: EpisodeRef | null;
+  challenge?: { id: string; slug: string; title: string; endsAt: string | null } | null;
 }
 
 export interface WorkComment {
@@ -49,6 +66,8 @@ export interface WorkListParams {
   userId?: string;
   sort?: WorkSort;
   tag?: string;
+  seriesId?: string;
+  challengeId?: string;
 }
 
 export interface CreateWorkInput {
@@ -61,6 +80,9 @@ export interface CreateWorkInput {
   pages: string[];
   doc: Record<string, unknown>;
   status: string;
+  // 선택: 연재 시리즈 회차로 게시(서버가 episodeNo 자동 부여) / 챌린지 참여작으로 게시.
+  seriesId?: string | null;
+  challengeId?: string | null;
 }
 
 export type UpdateWorkInput = Partial<CreateWorkInput>;
@@ -105,6 +127,8 @@ export async function listWorks(
   if (params.userId) search.set("userId", params.userId);
   if (params.sort) search.set("sort", params.sort);
   if (params.tag) search.set("tag", params.tag);
+  if (params.seriesId) search.set("seriesId", params.seriesId);
+  if (params.challengeId) search.set("challengeId", params.challengeId);
   const qs = search.toString();
   const res = await fetch(`${BASE}/works${qs ? `?${qs}` : ""}`, {
     cache: "no-store",
@@ -253,4 +277,180 @@ export async function markSharedAssetUsed(id: string): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+// ── 연재 시리즈(코미코 베스트도전 스타일) ──────────────────────────────
+export type SeriesStatus = "ongoing" | "completed";
+export type SeriesSort = "recent" | "likes" | "views";
+
+export interface SeriesSummary {
+  id: string;
+  title: string;
+  description: string;
+  cover: string;
+  tags: string[];
+  status: SeriesStatus;
+  author: WorkAuthor;
+  episodes: number;
+  views: number;
+  likes: number;
+  latestEpisodeAt: string | null;
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SeriesDetail extends SeriesSummary {
+  episodeList: WorkSummary[];
+}
+
+export interface SeriesInput {
+  title: string;
+  description?: string;
+  cover?: string;
+  tags?: string[];
+  status?: SeriesStatus;
+}
+
+export async function listSeries(
+  params: { userId?: string; sort?: SeriesSort } = {},
+  signal?: AbortSignal
+): Promise<SeriesSummary[]> {
+  const search = new URLSearchParams();
+  if (params.userId) search.set("userId", params.userId);
+  if (params.sort) search.set("sort", params.sort);
+  const qs = search.toString();
+  const res = await fetch(`${BASE}/series${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+    headers: authHeaders(false),
+    signal,
+  });
+  const data = await readOrThrow<unknown>(res, "시리즈 목록을 불러오지 못했습니다.");
+  return ensureArray<SeriesSummary>(data);
+}
+
+export async function getSeries(id: string, signal?: AbortSignal): Promise<SeriesDetail> {
+  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+    headers: authHeaders(false),
+    signal,
+  });
+  return readOrThrow<SeriesDetail>(res, "시리즈를 불러오지 못했습니다.");
+}
+
+export async function createSeries(input: SeriesInput): Promise<SeriesSummary> {
+  const res = await fetch(`${BASE}/series`, {
+    method: "POST",
+    cache: "no-store",
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  return readOrThrow<SeriesSummary>(res, "시리즈를 만들지 못했습니다.");
+}
+
+export async function updateSeries(id: string, input: Partial<SeriesInput>): Promise<SeriesSummary> {
+  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    cache: "no-store",
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  return readOrThrow<SeriesSummary>(res, "시리즈를 수정하지 못했습니다.");
+}
+
+export async function deleteSeries(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    cache: "no-store",
+    headers: authHeaders(false),
+  });
+  if (!res.ok) {
+    const data = await safeParseJson<unknown>(res);
+    throw new Error(resolveApiError(data, `시리즈를 삭제하지 못했습니다. (${res.status})`));
+  }
+}
+
+// ── 창작 챌린지(주간 주제 이벤트) ──────────────────────────────────────
+export type ChallengeState = "upcoming" | "ongoing" | "ended";
+
+export interface ChallengeSummary {
+  id: string;
+  slug: string;
+  title: string;
+  theme: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  state: ChallengeState;
+  entries: number;
+  createdAt: string;
+}
+
+export interface ChallengeDetail extends ChallengeSummary {
+  works: WorkSummary[];
+}
+
+export async function listChallenges(signal?: AbortSignal): Promise<ChallengeSummary[]> {
+  const res = await fetch(`${BASE}/challenges`, { cache: "no-store", signal });
+  const data = await readOrThrow<unknown>(res, "챌린지 목록을 불러오지 못했습니다.");
+  return ensureArray<ChallengeSummary>(data);
+}
+
+export async function getChallenge(key: string, signal?: AbortSignal): Promise<ChallengeDetail> {
+  const res = await fetch(`${BASE}/challenges/${encodeURIComponent(key)}`, {
+    cache: "no-store",
+    headers: authHeaders(false),
+    signal,
+  });
+  return readOrThrow<ChallengeDetail>(res, "챌린지를 불러오지 못했습니다.");
+}
+
+// 마감 D-day — 음수면 마감 지남, null이면 상시. (UI 표기용 순수 헬퍼)
+export function challengeDday(endsAt: string | null, now: Date = new Date()): number | null {
+  if (!endsAt) return null;
+  const end = new Date(endsAt).getTime();
+  if (!Number.isFinite(end)) return null;
+  return Math.ceil((end - now.getTime()) / 86_400_000);
+}
+
+// ── 창작자 팔로우/공개 프로필 ──────────────────────────────────────────
+export interface CreatorProfile {
+  id: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  createdAt: string | null;
+  followers: number;
+  following: number;
+  isFollowing: boolean;
+  works: number;
+  series: number;
+}
+
+export async function getCreatorProfile(userId: string, signal?: AbortSignal): Promise<CreatorProfile> {
+  const res = await fetch(`${BASE}/users/${encodeURIComponent(userId)}/profile`, {
+    cache: "no-store",
+    headers: authHeaders(false),
+    signal,
+  });
+  return readOrThrow<CreatorProfile>(res, "프로필을 불러오지 못했습니다.");
+}
+
+export async function toggleFollow(creatorId: string): Promise<{ following: boolean; followers: number }> {
+  const res = await fetch(`${BASE}/users/${encodeURIComponent(creatorId)}/follow`, {
+    method: "POST",
+    cache: "no-store",
+    headers: authHeaders(false),
+  });
+  return readOrThrow<{ following: boolean; followers: number }>(res, "팔로우를 처리하지 못했습니다.");
+}
+
+// 팔로잉 피드 — 팔로우한 창작자의 최신 작품(로그인 필요).
+export async function listFollowingFeed(signal?: AbortSignal): Promise<WorkSummary[]> {
+  const res = await fetch(`${BASE}/feed/following`, {
+    cache: "no-store",
+    headers: authHeaders(false),
+    signal,
+  });
+  const data = await readOrThrow<unknown>(res, "팔로잉 피드를 불러오지 못했습니다.");
+  return unwrapWorks(data);
 }

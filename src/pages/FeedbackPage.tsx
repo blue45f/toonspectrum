@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Container } from "@/components/section";
+import { InquiryForm } from "@/components/inquiry-form";
 import { Button, buttonClass } from "@/components/ui/button";
 import { useApp, useHydrated } from "@/lib/store";
 import type { FeedbackCategory, FeedbackPost, FeedbackReply, FeedbackStatus } from "@/lib/types";
@@ -242,6 +243,19 @@ export function FeedbackPage() {
                 로그인하면 글을 쓸 수 있어요. <br /> 읽기는 누구나 가능합니다.
               </p>
             )}
+
+            {/* 게시판에 올리기 어려운 내용(계정·권리·제휴)은 비공개 문의로 — /contact와 같은 접수함을 쓴다. */}
+            <details className="mt-4 rounded-xl border border-line bg-card/50 open:bg-card/70">
+              <summary className="cursor-pointer rounded-xl px-3 py-2.5 text-xs font-semibold text-fg-2 transition-colors hover:text-fg">
+                운영팀에 비공개 문의
+              </summary>
+              <div className="border-t border-line px-3 pb-3 pt-3">
+                <p className="mb-3 text-[0.7rem] leading-relaxed text-fg-3">
+                  공개 게시판 대신 운영팀에게만 전달돼요. 로그인 없이 보낼 수 있습니다.
+                </p>
+                <InquiryForm defaultCategory="contact" />
+              </div>
+            </details>
           </div>
         </aside>
       </div>

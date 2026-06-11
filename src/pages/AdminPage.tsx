@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
+import Link from "@/src/compat/router-link";
 import { Container } from "@/components/section";
-import { useSession } from "@/src/compat/auth-session";
-import { adminFetch, type AdminApiError, type AdminMe } from "@/src/components/admin/admin-client";
-import { AdminNotice, AdminSpinner } from "@/src/components/admin/admin-ui";
+import { useAdminGate, AdminGateFallback } from "@/src/components/admin/admin-gate";
 import { AdminDashboard } from "@/src/components/admin/AdminDashboard";
 import { AdminPlans } from "@/src/components/admin/AdminPlans";
 import { AdminRevenue } from "@/src/components/admin/AdminRevenue";
@@ -20,41 +19,15 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-type Gate =
-  | { kind: "loading" }
-  | { kind: "guest" }
-  | { kind: "forbidden" }
-  | { kind: "error"; message: string }
-  | { kind: "admin"; me: AdminMe };
+// 무거운 모더레이션 화면은 분할 라우트로 분리 — 콘솔 번들을 가볍게 유지한다.
+const SPLIT_ROUTES = [
+  { href: "/admin/community", label: "커뮤니티 글" },
+  { href: "/admin/members", label: "회원" },
+] as const;
 
 export function AdminPage() {
-  const { data: session, status } = useSession();
-  const uid = session?.user?.id;
-  const [gate, setGate] = useState<Gate>({ kind: "loading" });
+  const { gate, uid } = useAdminGate();
   const [tab, setTab] = useState<TabKey>("dashboard");
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      setGate({ kind: "guest" });
-      return;
-    }
-    if (status !== "authenticated" || !uid) {
-      setGate({ kind: "loading" });
-      return;
-    }
-    let alive = true;
-    setGate({ kind: "loading" });
-    adminFetch<AdminMe>("/me", uid)
-      .then((me) => alive && setGate({ kind: "admin", me }))
-      .catch((e: AdminApiError) => {
-        if (!alive) return;
-        if (e.status === 401 || e.status === 403) setGate({ kind: "forbidden" });
-        else setGate({ kind: "error", message: e.message });
-      });
-    return () => {
-      alive = false;
-    };
-  }, [status, uid]);
 
   return (
     <Container size="wide" className="py-10">
@@ -68,20 +41,7 @@ export function AdminPage() {
         </p>
       </header>
 
-      {gate.kind === "loading" && <AdminSpinner />}
-      {gate.kind === "guest" && (
-        <AdminNotice
-          title="로그인이 필요해요"
-          body="관리자 콘솔은 로그인 후 이용할 수 있습니다. 우측 상단에서 로그인해 주세요."
-        />
-      )}
-      {gate.kind === "forbidden" && (
-        <AdminNotice
-          title="관리자 권한이 없어요"
-          body="이 계정에는 관리자 권한이 없습니다. 권한이 필요하면 운영자에게 문의하세요. (ADMIN_EMAILS 또는 users.role=admin)"
-        />
-      )}
-      {gate.kind === "error" && <AdminNotice title="콘솔을 불러오지 못했어요" body={gate.message} />}
+      <AdminGateFallback gate={gate} />
 
       {gate.kind === "admin" && uid && (
         <div className="flex flex-col gap-6">
@@ -89,7 +49,7 @@ export function AdminPage() {
             <div className="text-xs text-fg-3">
               {gate.me.name ?? gate.me.email} · 역할 <span className="text-accent">{gate.me.role}</span>
             </div>
-            <nav className="inline-flex rounded-lg border border-line bg-card p-0.5" aria-label="관리 영역">
+            <nav className="inline-flex flex-wrap rounded-lg border border-line bg-card p-0.5" aria-label="관리 영역">
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -102,6 +62,16 @@ export function AdminPage() {
                 >
                   {t.label}
                 </button>
+              ))}
+              <span className="mx-1 my-1 w-px bg-line" aria-hidden />
+              {SPLIT_ROUTES.map((route) => (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:text-fg"
+                >
+                  {route.label}
+                </Link>
               ))}
             </nav>
           </div>

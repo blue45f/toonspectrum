@@ -32,8 +32,6 @@ export function AuthorPage() {
     "작가 데이터를 불러오지 못했습니다."
   );
 
-  if (notFound || (!loading && !error && authorParam && data === null)) return <NotFoundPage />;
-
   const author = data?.author ?? decodedAuthor;
   const works = data?.works ?? [];
   const totalViews = data?.totalViews ?? 0;
@@ -45,6 +43,8 @@ export function AuthorPage() {
       ? `${author} 작가의 작품 ${works.length}편${genres.length ? ` · ${genres.slice(0, 3).join("·")}` : ""} — 툰스펙트럼에서 작가별로 모아 봅니다.`
       : null
   );
+
+  if (notFound || (!loading && !error && authorParam && data === null)) return <NotFoundPage />;
 
   return (
     <Container size="wide" className="py-10">

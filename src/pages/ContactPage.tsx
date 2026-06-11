@@ -1,5 +1,6 @@
 import { Container } from "@/components/section";
-import { Bug, Megaphone, Handshake, Database, MessagesSquare } from "lucide-react";
+import { InquiryForm } from "@/components/inquiry-form";
+import { Bug, Megaphone, Handshake, Database, MessagesSquare, ExternalLink } from "lucide-react";
 
 const SUPPORT_URL = "https://termsdesk.vercel.app/support/webtoon-index";
 
@@ -34,50 +35,57 @@ const TYPES = [
 
 export function ContactPage() {
   return (
-    <Container size="prose" className="py-12 lg:py-16">
+    <Container size="default" className="py-12 lg:py-16">
       <p className="eyebrow text-accent">CONTACT</p>
       <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">광고·제휴 문의</h1>
-      <p className="mt-4 text-pretty text-base leading-relaxed text-fg-2">
-        툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 광고 집행, 업무 제휴, 데이터 활용,
-        버그 제보는 TermsDesk 공식 지원 보드로 접수합니다.
+      <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-fg-2">
+        툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 아래 폼으로 보내시면 운영팀
+        비공개 보드로 바로 접수돼요. 공개 논의가 필요한 버그·QA는 TermsDesk 지원 보드도 이용할 수 있습니다.
       </p>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-3">
-        {SUPPORT_LINKS.map((link) => (
-          <a
-            key={link.title}
-            href={link.href}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-full flex-col gap-2 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
-          >
-            <link.icon className="text-accent" size={22} />
-            <span className="text-base font-bold text-fg">{link.title}</span>
-            <span className="text-sm leading-relaxed text-fg-3">{link.body}</span>
-          </a>
-        ))}
-      </div>
-
-      <h2 className="mt-10 mb-3 text-lg font-bold text-fg">이런 문의를 받습니다</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {TYPES.map((t) => (
-          <div key={t.title} className="rounded-2xl border border-line bg-card/60 p-5">
-            <t.icon className="mb-2 text-accent" size={20} />
-            <p className="font-semibold text-fg">{t.title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-fg-3">{t.body}</p>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div>
+          <h2 className="mb-3 text-lg font-bold text-fg">이런 문의를 받습니다</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TYPES.map((t) => (
+              <div key={t.title} className="rounded-2xl border border-line bg-card/60 p-5">
+                <t.icon className="mb-2 text-accent" size={20} />
+                <p className="font-semibold text-fg">{t.title}</p>
+                <p className="mt-1 text-sm leading-relaxed text-fg-3">{t.body}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <a
-          href={`${SUPPORT_URL}?category=partnership`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition-transform hover:translate-y-[-1px]"
-        >
-          <Handshake size={16} /> 제휴 문의 남기기
-        </a>
+          <h2 className="mt-8 mb-3 text-lg font-bold text-fg">공개 지원 보드</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {SUPPORT_LINKS.map((link) => (
+              <a
+                key={link.title}
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-full flex-col gap-2 rounded-2xl border border-line bg-card p-5 transition-colors hover:border-accent/50 hover:bg-accent-soft"
+              >
+                <link.icon className="text-accent" size={22} />
+                <span className="inline-flex items-center gap-1 text-base font-bold text-fg">
+                  {link.title}
+                  <ExternalLink size={13} className="text-fg-3" />
+                </span>
+                <span className="text-sm leading-relaxed text-fg-3">{link.body}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <aside>
+          <div className="sticky top-20 rounded-2xl border border-line bg-panel/40 p-5">
+            <h2 className="mb-1 text-sm font-semibold text-fg">바로 문의하기</h2>
+            <p className="mb-4 text-xs leading-relaxed text-fg-3">
+              로그인 없이 보낼 수 있어요. 답변이 필요하면 연락처를 함께 남겨주세요.
+            </p>
+            <InquiryForm defaultCategory="partnership" />
+          </div>
+        </aside>
       </div>
     </Container>
   );
