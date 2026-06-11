@@ -1,36 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="툰스펙트럼">
-  <!-- 백그라운드 둥근 사각형 -->
-  <rect width="32" height="32" rx="9" fill="#1c1613" />
-  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="8.25" fill="none" stroke="#f6ecc9" stroke-width="0.8" opacity="0.12" />
-
-  <!-- 머리 위 스펙트럼 안테나/무지개 별/에너지 방울들 -->
-  <circle cx="16" cy="4.5" r="2.2" fill="#ff5e62" /> <!-- 빨강 -->
-  <circle cx="11" cy="6" r="1.8" fill="#ff9966" />   <!-- 주황 -->
-  <circle cx="21" cy="6" r="1.8" fill="#ffd15c" />   <!-- 노랑 -->
-  <circle cx="7" cy="9.5" r="1.4" fill="#4fe090" />   <!-- 초록 -->
-  <circle cx="25" cy="9.5" r="1.4" fill="#4ca3f5" />  <!-- 파랑 -->
-
-  <!-- 말풍선 꼬리 (귀여운 캐릭터 뒤에 튀어나온 꼬리 느낌) -->
-  <path d="M 12 25 L 7 28.5 L 9 23 Z" fill="#ffffff" stroke="#251c17" stroke-width="1.8" stroke-linejoin="round" />
-
-  <!-- 귀여운 둥글둥글 말풍선 몸통 -->
-  <rect x="6" y="8" width="20" height="17" rx="5.5" ry="5.5" fill="#ffffff" stroke="#251c17" stroke-width="1.8" />
-  
-  <!-- 볼터치 -->
-  <ellipse cx="9.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
-  <ellipse cx="22.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
-
-  <!-- 똘망똘망한 눈 -->
-  <!-- 왼쪽 눈 -->
-  <circle cx="12.2" cy="16" r="1.6" fill="#251c17" />
-  <circle cx="11.7" cy="15.5" r="0.5" fill="#ffffff" />
-  <!-- 오른쪽 눈 -->
-  <circle cx="19.8" cy="16" r="1.6" fill="#251c17" />
-  <circle cx="19.3" cy="15.5" r="0.5" fill="#ffffff" />
-
-  <!-- 귀여운 웃는 입 -->
-  <path d="M 14.5 18 Q 16 19.5 17.5 18" stroke="#251c17" stroke-width="1.2" stroke-linecap="round" fill="none" />
-
-  <!-- 반짝이 노란 별 -->
-  <path d="M 23.5 11 L 24 12.3 L 25.3 12.8 L 24 13.3 L 23.5 14.6 L 23 13.3 L 21.7 12.8 L 23 12.3 Z" fill="#ffd15c" />
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="툰스펙트럼">
+  <defs>
+    <linearGradient id="bg" x1="70" y1="40" x2="442" y2="476" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3b224f"/>
+      <stop offset=".56" stop-color="#1a1410"/>
+      <stop offset="1" stop-color="#3b224f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="72%" cy="23%" r="68%">
+      <stop stop-color="#ff5c8a" stop-opacity=".72"/>
+      <stop offset=".58" stop-color="#facc15" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#1a1410" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#1a1410" flood-opacity=".34"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <path d="M46 342C154 278 238 414 466 292" fill="none" stroke="#f7efe4" stroke-opacity=".1" stroke-width="26" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+        <g transform="translate(0 0) scale(1)">
+          <rect x="108" y="116" width="128" height="158" rx="28" fill="#f7efe4"/>
+          <rect x="260" y="116" width="144" height="96" rx="28" fill="#ff5c8a"/>
+          <rect x="260" y="236" width="144" height="160" rx="28" fill="#f7efe4"/>
+          <rect x="108" y="298" width="128" height="98" rx="28" fill="#facc15"/>
+          <path d="M144 164h54M144 202h34M296 284h70M296 326h42" stroke="#1a1410" stroke-width="18" stroke-linecap="round"/>
+          <path d="M120 416c84 28 188 28 272 0" fill="none" stroke="#ff5c8a" stroke-width="24" stroke-linecap="round"/>
+        </g></g>
 </svg>
