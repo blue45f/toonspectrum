@@ -1731,6 +1731,17 @@ export function StudioPage() {
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
     if (!workHydrated) return;
+    // 복구 배너가 떠 있는 동안(복구/비우기 결정 전)은 저장하지 않는다 — 가드가 없으면
+    // 재진입 1.5초 뒤 빈 초기 상태가 직전 작업을 덮어써 "복구하기"가 빈 캔버스를 복원한다.
+    if (hasAutosave) return;
+    // 빈 문서(요소·게시 정보 모두 없음)는 저장하지 않는다 — 의미 없는 복구 배너를 막고,
+    // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
+    const hasContent =
+      pages.some((p) => p.elements.length > 0) ||
+      title.trim() !== "" ||
+      description.trim() !== "" ||
+      tagsText.trim() !== "";
+    if (!hasContent) return;
     const timer = setTimeout(() => {
       try {
         const payload = {
@@ -1747,18 +1758,35 @@ export function StudioPage() {
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated]);
+  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated, hasAutosave]);
 
-  // 로드 시 임시저장 확인 리스너
+  // 복구 여부를 정하지 않은 채 캔버스 편집을 시작하면(undo 히스토리 누적) 배너를 닫고
+  // 자동 저장을 재개한다 — 배너를 무시한 새 작업이 저장되지 않는 공백을 막는다.
+  useEffect(() => {
+    if (hasAutosave && pagesHistory.length > 1) setHasAutosave(false);
+  }, [hasAutosave, pagesHistory]);
+
+  // 로드 시 임시저장 확인 리스너 — 실제 내용이 있는 백업만 복구 배너를 띄운다.
+  // (요소·게시 정보가 전부 빈 백업은 복구 가치가 없고, 과거 버전이 남긴 빈 페이로드도 거른다.)
   useEffect(() => {
     if (!workId) {
       try {
         const saved = localStorage.getItem("toonspectrum-studio-autosave");
         if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.pagesList && parsed.pagesList.length > 0) {
-            setHasAutosave(true);
-          }
+          const parsed: {
+            pagesList?: { elements?: unknown[] }[];
+            title?: string;
+            description?: string;
+            tagsText?: string;
+          } = JSON.parse(saved);
+          const hasContent =
+            Array.isArray(parsed.pagesList) &&
+            parsed.pagesList.length > 0 &&
+            (parsed.pagesList.some((p) => (p?.elements?.length ?? 0) > 0) ||
+              (parsed.title ?? "").trim() !== "" ||
+              (parsed.description ?? "").trim() !== "" ||
+              (parsed.tagsText ?? "").trim() !== "");
+          if (hasContent) setHasAutosave(true);
         }
       } catch {
         // 무시
