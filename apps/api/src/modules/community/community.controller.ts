@@ -119,6 +119,39 @@ export class CommunityController {
     return this.communityService.boards(query.scope ?? null, query.q ?? null, query.sort ?? null, query.limit ?? null);
   }
 
+  // ── 장르 카페(소모임) — 목록/생성/상세/가입 ──────────────────────────
+  @Get("/community/cafes")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listCafes(@Query() query: { genre?: string | null; q?: string | null; sort?: string | null }) {
+    return this.communityService.listCafes(query.genre ?? null, query.q ?? null, query.sort ?? null);
+  }
+
+  @Post("/community/cafes")
+  async createCafe(@Body() body: unknown, @Headers("x-user-id") userId?: string, @Req() req?: Request) {
+    const uid = enforceUserOrError(userId);
+    this.checkRateLimit(`cafe-create:${uid}:${parseIp(req ?? ({} as Request))}`, 4, 60 * 60_000);
+    return this.communityService.createCafe(body, uid);
+  }
+
+  @Get("/community/cafes/:slug")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getCafe(@Param("slug") slug: string, @Headers("x-user-id") userId?: string) {
+    return this.communityService.getCafe(slug, userId ?? null);
+  }
+
+  @Post("/community/cafes/:slug/membership")
+  async joinCafe(@Param("slug") slug: string, @Headers("x-user-id") userId?: string, @Req() req?: Request) {
+    const uid = enforceUserOrError(userId);
+    this.checkRateLimit(`cafe-join:${uid}:${parseIp(req ?? ({} as Request))}`, 30, 10 * 60_000);
+    return this.communityService.joinCafe(slug, uid);
+  }
+
+  @Delete("/community/cafes/:slug/membership")
+  async leaveCafe(@Param("slug") slug: string, @Headers("x-user-id") userId?: string) {
+    const uid = enforceUserOrError(userId);
+    return this.communityService.leaveCafe(slug, uid);
+  }
+
   @Get("/community/posts")
   @Header("Cache-Control", "no-store, max-age=0")
   async listPosts(@Query() query: PostQuery, @Headers("x-user-id") userId?: string) {
@@ -149,10 +182,28 @@ export class CommunityController {
     return this.communityService.createPost(body, uid);
   }
 
+  // 토론 스레드 상세 — 분할 라우트(/community/post/:id)가 사용.
+  @Get("/community/posts/:id")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getPost(@Param("id") id: string) {
+    return this.communityService.getPost(id);
+  }
+
   @Delete("/community/posts/:id")
   async deletePost(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
     return this.communityService.deletePost(id, uid);
+  }
+
+  // 답글 삭제(작성자) — 하위 답글이 있으면 자리 표시로 남는다.
+  @Delete("/community/posts/:id/replies/:replyId")
+  async deletePostReply(
+    @Param("id") postId: string,
+    @Param("replyId") replyId: string,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.communityService.deletePostReply(postId, replyId, uid);
   }
 
   @Get("/community/posts/:id/replies")
@@ -195,5 +246,16 @@ export class CommunityController {
     const uid = enforceUserOrError(userId);
     this.checkRateLimit(`review-reply:${uid}:${parseIp(req ?? ({} as Request))}`, 20, 10 * 60_000);
     return this.communityService.createReviewReply(reviewId, uid, body);
+  }
+
+  // 리뷰 답글 삭제(작성자) — 하위 답글이 있으면 자리 표시로 남는다.
+  @Delete("/reviews/:id/replies/:replyId")
+  async deleteReviewReply(
+    @Param("id") reviewId: string,
+    @Param("replyId") replyId: string,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.communityService.deleteReviewReply(reviewId, replyId, uid);
   }
 }

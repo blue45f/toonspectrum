@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { Request } from "express";
+import { forwardInquiry } from "../../../../../lib/server/inquiry";
 import { FeedbackService } from "./feedback.service";
 
 interface ListQuery {
@@ -91,5 +92,20 @@ export class FeedbackController {
     const uid = enforceUserOrError(userId);
     rateLimit(`feedback-reply:${uid}:${parseIp(req ?? ({} as Request))}`, 30, 10 * 60_000);
     return this.feedbackService.createReply(postId, uid, body);
+  }
+
+  // 인앱 문의 — TermsDesk 공개 문의함으로 서버 간 전달(브라우저 CORS 제약 우회).
+  // 비로그인도 허용(문의 창구), IP 기준 레이트리밋.
+  @Post("/support/inquiries")
+  async submitInquiry(@Body() body: unknown, @Req() req?: Request) {
+    rateLimit(`support-inquiry:${parseIp(req ?? ({} as Request))}`, 5, 10 * 60_000);
+    const result = await forwardInquiry(body);
+    if (!result.ok) {
+      throw new HttpException(
+        { error: result.error ?? "문의를 접수하지 못했어요." },
+        result.status === 429 ? HttpStatus.TOO_MANY_REQUESTS : (result.status ?? 502)
+      );
+    }
+    return { ok: true };
   }
 }
