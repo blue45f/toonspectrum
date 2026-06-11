@@ -16,6 +16,15 @@ import { rankBy, RANK_AXES } from "../lib/ranking";
 import { sortTitles } from "../lib/search";
 import { kstDayOfWeek } from "../lib/utils";
 import {
+  buildDetailExtra,
+  detailShardBucket,
+  detailShardFileForBucket,
+  DETAIL_SHARD_COUNT,
+  toCalendarTitle,
+  toListTitle,
+  type DetailShardFile,
+} from "../lib/catalog-slim";
+import {
   activeTags,
   adaptationsOf,
   getAuthorDirectory,
@@ -25,20 +34,38 @@ import {
 import { getCalendarData } from "../lib/server/calendar";
 import { getInsightsData } from "../lib/server/insights";
 import { getRankingData } from "../lib/server/ranking-service";
+import { readFileIfExists, writeNews } from "./news-gen";
 import type { Title } from "../lib/types";
 
 const RANK_TYPES = ["all", "webtoon", "webnovel"];
 
 // 랭킹 기본 뷰(축×타입, 필터 없음) 사전계산 — live 비활성(스냅샷 산식)으로 결정적.
-// /ranking 이 17.8MB 전체 카탈로그를 클라이언트에서 로드하지 않고 작은 정적 파일로 즉시 표시한다.
+// /ranking 이 전체 카탈로그를 클라이언트에서 로드하지 않고 작은 정적 파일로 즉시 표시한다.
+// 항목의 title 은 경량 카드(toListTitle)로 줄인다 — rank-row·ranking-board·explainScore 가
+// 읽는 필드(스칼라 stats·platformId·pricing·축약 시놉시스 등)는 모두 유지된다.
 async function buildRankingFiles(writeJson: (name: string, data: unknown) => void): Promise<void> {
   for (const axis of RANK_AXES.map((a) => a.key)) {
     for (const type of RANK_TYPES) {
       const reader = { get: (n: string) => (n === "axis" ? axis : n === "type" ? type : null) };
       const data = await getRankingData(reader, { disableLive: true });
-      writeJson(`ranking/${axis}-${type}.json`, data);
+      const slim = { ...data, items: data.items.map((item) => ({ ...item, title: toListTitle(item.title) })) };
+      writeJson(`ranking/${axis}-${type}.json`, slim);
     }
   }
+}
+
+// 상세 전용 필드(시놉시스 원문·보러가기 URL·평점분포)를 해시 버킷 샤드로 분리 —
+// 상세/비교 화면이 작은 샤드 1개만 추가로 받아 병합한다(src/catalog-static-engine.ts).
+function buildDetailShards(titles: readonly Title[]): { files: DetailShardFile[]; entryCount: number } {
+  const files: DetailShardFile[] = Array.from({ length: DETAIL_SHARD_COUNT }, () => ({}));
+  let entryCount = 0;
+  for (const title of titles) {
+    const extra = buildDetailExtra(title);
+    if (!extra) continue;
+    files[detailShardBucket(title.id)][title.id] = extra;
+    entryCount += 1;
+  }
+  return { files, entryCount };
 }
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,15 +136,35 @@ async function main(): Promise<void> {
   replaceCatalogData(titles, { source: "cli-ingest", sourceVersion: "static-build" });
   console.log(`정적 카탈로그 생성: ${TITLES.length}편 → ${path.relative(ROOT, OUT)}/`);
 
-  // 산출물 초기화(낡은 파일 제거) 후 재생성.
+  // 산출물 초기화(낡은 파일 제거) 후 재생성. 뉴스는 수집 전체 실패 시 직전 스냅샷을
+  // 보존해야 하므로(빈 파일로 덮지 않기) 삭제 전에 원문을 확보해 둔다.
+  const newsFallbackRaw = readFileIfExists(path.join(OUT, "news.json"));
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
-  // 전체 카탈로그(클라이언트 검색·탐색·랭킹·추천·상세 계산용) — Vercel/CDN 이 전송 시 압축.
-  writeJson("catalog.json", TITLES);
+  // 전체 카탈로그(클라이언트 검색·탐색·랭킹·추천 계산용) — 경량 카드로 슬리밍해 싣는다.
+  // 상세 전용 필드(시놉시스 원문·availability.url·ratingDist)는 detail/<bucket>.json 샤드로 분리.
+  // 메모리 스토어(TITLES)는 풀 데이터를 유지 — insights(평점분포)·뉴스 매칭 등 빌드 계산은 원본 사용.
+  writeJson("catalog.json", TITLES.map(toListTitle));
+  const { files: detailShards, entryCount: detailEntryCount } = buildDetailShards(TITLES);
+  let detailBytes = 0;
+  detailShards.forEach((shard, bucket) => {
+    const file = path.join(OUT, detailShardFileForBucket(bucket));
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(shard));
+    detailBytes += statSync(file).size;
+  });
+  console.log(
+    `  detail/*.json    ${String(DETAIL_SHARD_COUNT).padStart(5)} files (${detailEntryCount} entries, ${(detailBytes / 1024).toFixed(0)} KB)`
+  );
   // 파라미터 없는 공통 페이지 — 사전 계산(즉시 로드).
   writeJson("home.json", buildHome());
-  writeJson("calendar.json", await getCalendarData());
+  const calendar = await getCalendarData();
+  // 캘린더 항목도 경량 카드로 — CalItem·공용 필터·ICS 내보내기가 읽는 필드만 유지(시놉시스 제외).
+  writeJson("calendar.json", {
+    ...calendar,
+    days: calendar.days.map((d) => ({ ...d, items: d.items.map(toCalendarTitle) })),
+  });
   writeJson("insights.json", await getInsightsData());
   writeJson("tags.json", { tags: activeTags() });
   writeJson("authors.json", getAuthorDirectory());
@@ -133,52 +180,11 @@ async function main(): Promise<void> {
   console.log(`  ranking/*.json   ${String(rankingCount).padStart(5)} files (축×타입 사전계산)`);
 
   writeSitemap();
-  await writeNews();
+  // 웹툰·웹소설 뉴스 — 수집·정제·작품 매칭은 scripts/news-gen.ts 담당(단독 실행도 가능).
+  // 실패해도 빌드는 계속(직전 스냅샷 보존 → 없으면 빈 목록 폴백).
+  await writeNews({ outFile: path.join(OUT, "news.json"), titles: TITLES, fallbackRaw: newsFallbackRaw });
 
   console.log("완료.");
-}
-
-// 웹툰·웹소설 뉴스 — Google News RSS(공개)에서 헤드라인을 받아 정적 JSON 으로 저장.
-// 저작권 안전: 헤드라인(사실) + 출처·날짜만 저장하고 본문은 담지 않으며, 링크는 발행처로 보낸다.
-// 실패(네트워크/지역차단)해도 빌드는 계속(빈 목록 폴백). 갱신은 catalog:gen 마다(크론 푸시→배포).
-async function writeNews(): Promise<void> {
-  const out = path.join(OUT, "news.json");
-  const decode = (s: string) =>
-    s
-      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&amp;/g, "&")
-      .replace(/<[^>]+>/g, "").trim();
-  try {
-    const url =
-      "https://news.google.com/rss/search?q=" +
-      encodeURIComponent("웹툰 OR 웹소설") +
-      "&hl=ko&gl=KR&ceid=KR:ko";
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error(`news rss ${res.status}`);
-    const xml = await res.text();
-    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
-      .map((m) => {
-        const b = m[1];
-        const rawTitle = decode((b.match(/<title>([\s\S]*?)<\/title>/) || [])[1] ?? "");
-        const source = decode((b.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] ?? "");
-        // Google News 제목은 "헤드라인 - 출처" 형태 → 출처 접미사 제거.
-        const title = source && rawTitle.endsWith(` - ${source}`) ? rawTitle.slice(0, -(source.length + 3)) : rawTitle;
-        return {
-          title,
-          source,
-          url: decode((b.match(/<link>([\s\S]*?)<\/link>/) || [])[1] ?? ""),
-          date: ((b.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] ?? "").trim(),
-        };
-      })
-      .filter((it) => it.title && it.url)
-      .slice(0, 40);
-    writeFileSync(out, JSON.stringify({ items, generatedAt: new Date().toISOString() }));
-    console.log(`  news.json        ${(statSync(out).size / 1024).toFixed(0).padStart(5)} KB (${items.length} items)`);
-  } catch (e) {
-    writeFileSync(out, JSON.stringify({ items: [], generatedAt: new Date().toISOString() }));
-    console.log(`  news.json        (수집 실패 — 빈 목록 폴백: ${(e as Error)?.message ?? e})`);
-  }
 }
 
 // SEO 사이트맵 — 정적 라우트 + 품질 작품 상세 URL. public/ 루트에 써서 /sitemap.xml 로 서빙.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { motion } from "motion/react";
 import Link from "@/src/compat/router-link";
 import type { Title } from "@/lib/types";
@@ -128,10 +128,34 @@ function Picker({
   );
 }
 
+// 정적 모드의 목록 응답(/api/titles)은 경량 카드(보러가기 URL·시놉시스 원문·평점분포 생략)라,
+// 비교 대상으로 확정된 작품은 상세 엔드포인트로 풀 데이터를 보강한다(요금 매트릭스의 '이동' 링크,
+// 시놉시스 원문). API 폴백 모드에서도 같은 shape 의 title 을 돌려주므로 무해한 중복 보강이다.
+function useHydratedPick(set: Dispatch<SetStateAction<Title | null>>) {
+  return useCallback(
+    (picked: Title | null) => {
+      set(picked);
+      if (!picked) return;
+      fetch(`/api/titles/${encodeURIComponent(picked.slug)}`, { cache: "no-store" })
+        .then((res) => (res.ok ? (res.json() as Promise<{ title?: Title }>) : null))
+        .then((detail) => {
+          if (!detail?.title) return;
+          set((current) => (current && current.id === picked.id ? { ...current, ...detail.title } : current));
+        })
+        .catch(() => {
+          // 보강 실패 시 경량 카드 그대로 사용(링크만 생략됨)
+        });
+    },
+    [set]
+  );
+}
+
 export function CompareView({ initialA, initialB }: { initialA?: string; initialB?: string }) {
   const [loading, setLoading] = useState(true);
   const [a, setA] = useState<Title | null>(null);
   const [b, setB] = useState<Title | null>(null);
+  const pickA = useHydratedPick(setA);
+  const pickB = useHydratedPick(setB);
   // 비교 두 작품 중 하나라도 합성 지표(카카오웹툰·웹소설)면 우열 강조를 끈다(추정값으로 우열 판정 방지)
   const eitherEstimated = !!a && !!b && (statsAreEstimated(a) || statsAreEstimated(b));
 
@@ -164,8 +188,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
         exactItems.find((t) => t.id !== first?.id) ??
         null;
 
-      setA(first);
-      setB(second);
+      pickA(first);
+      pickB(second);
       setLoading(false);
     }
 
@@ -180,7 +204,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
     return () => {
       controller.abort();
     };
-  }, [initialA, initialB]);
+  }, [initialA, initialB, pickA, pickB]);
 
   if (loading) {
     return (
@@ -202,11 +226,11 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       className="flex flex-col gap-8"
     >
       <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-6">
-        <Picker value={a} onPick={setA} onClear={() => setA(null)} />
+        <Picker value={a} onPick={pickA} onClear={() => setA(null)} />
         <div className="group mt-16 grid size-11 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-accent hover:text-on-accent shadow-[0_0_12px_var(--color-accent-soft)]">
           <Swords size={18} className="transition-transform group-hover:animate-pulse" />
         </div>
-        <Picker value={b} onPick={setB} onClear={() => setB(null)} />
+        <Picker value={b} onPick={pickB} onClear={() => setB(null)} />
       </div>
 
       {a && b && (
