@@ -94,6 +94,12 @@ export class CreatorController {
     return this.creatorService.publishAsset(uid, body);
   }
 
+  @Post("/creator/assets/generate")
+  async generateAsset(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
+    enforceUserOrError(userId);
+    return this.creatorService.generateAsset(body);
+  }
+
   @Delete("/creator/assets/:id")
   async deleteSharedAsset(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);

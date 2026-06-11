@@ -20,6 +20,9 @@ const FORMAT_LABEL: Record<WorkSummary["format"], string> = {
   upload: "업로드",
 };
 
+const CREATOR_BOARD_HERO = "/assets/create/creator-board-hero.png";
+const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
+
 function isSort(value: string | null): value is WorkSort {
   return value === "recent" || value === "likes" || value === "views";
 }
@@ -132,60 +135,70 @@ export function CreateGalleryPage() {
 
   return (
     <Container size="wide" className="py-10">
-      <header className="mb-7 overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Sparkles size={14} /> CREATOR BOARD
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">창작 게시판</h1>
-            <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              직접 그린 컷툰과 업로드한 작품을 자유롭게 공유하는 공간입니다. 좋아요와 댓글로 다른
-              창작자를 응원해 보세요.
-            </p>
-          </div>
-          <Link
-            href="/studio"
-            className={buttonClass({ variant: "solid", className: "shrink-0 gap-1.5" })}
-          >
-            <PenLine size={16} />
-            창작 스튜디오로 만들기
-          </Link>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          <div role="tablist" aria-label="정렬" className="flex flex-wrap gap-1.5">
-            {SORTS.map((option) => {
-              const on = option.value === sort;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setSort(option.value)}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] transition-colors",
-                    on
-                      ? "border-accent/60 bg-accent-soft/55 text-fg"
-                      : "border-line bg-card text-fg-2 hover:bg-raised"
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-          {tag && (
-            <button
-              type="button"
-              onClick={clearTag}
-              className="ml-auto inline-flex h-8 items-center gap-1 rounded-full border border-accent/50 bg-accent-soft/50 px-3 text-[0.8125rem] text-accent transition-colors hover:bg-accent-soft"
+      <header className="relative mb-7 overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 shadow-sm sm:p-6">
+        <img
+          src={CREATOR_BOARD_HERO}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.1_0.015_245/0.92)] via-[oklch(0.1_0.015_245/0.72)] to-[oklch(0.1_0.015_245/0.18)]" />
+        <div className="relative flex min-h-[230px] flex-col justify-between gap-7">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="eyebrow flex items-center gap-1.5 text-accent">
+                <Sparkles size={14} /> CREATOR BOARD
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">창작 게시판</h1>
+              <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-white/78">
+                직접 그린 컷툰과 업로드한 작품을 자유롭게 공유하는 공간입니다. 좋아요와 댓글로 다른
+                창작자를 응원해 보세요.
+              </p>
+            </div>
+            <Link
+              href="/studio"
+              className={buttonClass({ variant: "solid", className: "shrink-0 gap-1.5" })}
             >
-              #{tag}
-              <X size={13} />
-            </button>
-          )}
+              <PenLine size={16} />
+              창작 스튜디오로 만들기
+            </Link>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/15 pt-4">
+            <div role="tablist" aria-label="정렬" className="flex flex-wrap gap-1.5">
+              {SORTS.map((option) => {
+                const on = option.value === sort;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setSort(option.value)}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] transition-colors",
+                      on
+                        ? "border-accent/70 bg-accent text-white"
+                        : "border-white/18 bg-white/10 text-white/78 backdrop-blur-md hover:bg-white/15"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {tag && (
+              <button
+                type="button"
+                onClick={clearTag}
+                className="ml-auto inline-flex h-8 items-center gap-1 rounded-full border border-accent/50 bg-accent-soft/70 px-3 text-[0.8125rem] text-white transition-colors hover:bg-accent-soft"
+              >
+                #{tag}
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -210,7 +223,13 @@ export function CreateGalleryPage() {
         </div>
       ) : works.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
-          <PenLine size={26} className="mx-auto mb-3 text-fg-3" />
+          <img
+            src={CREATOR_BOARD_EMPTY}
+            alt=""
+            className="mx-auto mb-5 aspect-square w-40 max-w-full rounded-2xl object-cover"
+            loading="lazy"
+            decoding="async"
+          />
           <p className="text-sm font-medium text-fg">
             {tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "아직 등록된 창작물이 없습니다."}
           </p>

@@ -206,6 +206,26 @@ export interface PublishAssetInput {
   kind?: string;
 }
 
+export type GeneratedAssetSize = "1024x1024" | "1536x1024" | "1024x1536";
+export type GeneratedAssetQuality = "low" | "medium" | "high" | "auto";
+
+export interface GenerateAssetInput {
+  prompt: string;
+  name?: string;
+  size?: GeneratedAssetSize;
+  quality?: GeneratedAssetQuality;
+}
+
+export interface GeneratedAsset {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  model: "gpt-image-2";
+  size: GeneratedAssetSize;
+  quality: GeneratedAssetQuality;
+}
+
 export async function listSharedAssets(
   params: { mine?: boolean; limit?: number; offset?: number } = {},
   signal?: AbortSignal
@@ -232,6 +252,16 @@ export async function publishAsset(input: PublishAssetInput): Promise<SharedAsse
     body: JSON.stringify(input),
   });
   return readOrThrow<SharedAsset>(res, "에셋을 공유하지 못했습니다.");
+}
+
+export async function generateAsset(input: GenerateAssetInput): Promise<GeneratedAsset> {
+  const res = await fetch(`${BASE}/assets/generate`, {
+    method: "POST",
+    cache: "no-store",
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  return readOrThrow<GeneratedAsset>(res, "이미지를 생성하지 못했습니다.");
 }
 
 export async function deleteSharedAsset(id: string): Promise<void> {

@@ -213,8 +213,11 @@ import {
   updateWork,
   listSharedAssets,
   publishAsset,
+  generateAsset,
   deleteSharedAsset,
   markSharedAssetUsed,
+  type GeneratedAssetQuality,
+  type GeneratedAssetSize,
   type SharedAsset,
 } from "@/src/lib/creator-client";
 import { processFreehandPoints, processPencilPoints } from "./studio-brush";
@@ -2146,6 +2149,11 @@ export function StudioPage() {
   const [assetSortOrder, setAssetSortOrder] = useState<"newest" | "name" | "size">("newest");
   const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null);
   const [renamingAssetName, setRenamingAssetName] = useState("");
+  const [assetPrompt, setAssetPrompt] = useState("");
+  const [assetPromptName, setAssetPromptName] = useState("");
+  const [assetPromptSize, setAssetPromptSize] = useState<GeneratedAssetSize>("1024x1024");
+  const [assetPromptQuality, setAssetPromptQuality] = useState<GeneratedAssetQuality>("medium");
+  const [assetGenerating, setAssetGenerating] = useState(false);
 
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
@@ -2155,6 +2163,40 @@ export function StudioPage() {
       await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 이름 변경 실패");
+    }
+  }
+
+  async function onGenerateAsset() {
+    const prompt = assetPrompt.trim();
+    if (!prompt || assetGenerating) return;
+    if (!getCurrentUserId()) {
+      setError("AI 에셋을 생성하려면 로그인이 필요해요.");
+      return;
+    }
+    setAssetGenerating(true);
+    setError(null);
+    try {
+      const generated = await generateAsset({
+        prompt,
+        name: assetPromptName.trim() || undefined,
+        size: assetPromptSize,
+        quality: assetPromptQuality,
+      });
+      const saved = await saveAsset({
+        name: generated.name,
+        dataUrl: generated.dataUrl,
+        width: generated.width,
+        height: generated.height,
+      });
+      setAssetPrompt("");
+      setAssetPromptName("");
+      await loadAssetsList();
+      addRenderedImage(saved.dataUrl, saved.width, saved.height);
+      setMenu(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "AI 에셋 생성 실패");
+    } finally {
+      setAssetGenerating(false);
     }
   }
 
@@ -4033,6 +4075,64 @@ export function StudioPage() {
                   </label>
                 )}
               </div>
+
+              {assetTab === "mine" && (
+                <div className="mb-2 rounded-lg border border-line bg-card/70 p-2">
+                  <div className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-semibold text-fg-2">
+                    <Sparkles size={12} className="text-accent" />
+                    AI 에셋 생성
+                  </div>
+                  <textarea
+                    value={assetPrompt}
+                    onChange={(e) => setAssetPrompt(e.target.value.slice(0, 1000))}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void onGenerateAsset();
+                    }}
+                    placeholder="예: 비 오는 골목 배경, 마법 소품, 놀란 표정 캐릭터"
+                    rows={2}
+                    className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
+                  />
+                  <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1.5">
+                    <input
+                      type="text"
+                      value={assetPromptName}
+                      onChange={(e) => setAssetPromptName(e.target.value.slice(0, 60))}
+                      placeholder="이름"
+                      className="min-w-0 rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={onGenerateAsset}
+                      disabled={!assetPrompt.trim() || assetGenerating}
+                      className="inline-flex h-7 items-center gap-1 rounded-md bg-accent px-2 text-[0.65rem] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      {assetGenerating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                      생성
+                    </button>
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                    <select
+                      value={assetPromptSize}
+                      onChange={(e) => setAssetPromptSize(e.target.value as GeneratedAssetSize)}
+                      className="rounded-md border border-line bg-panel px-1.5 py-1 text-[0.6rem] text-fg-2 outline-none focus:border-accent"
+                    >
+                      <option value="1024x1024">정사각</option>
+                      <option value="1536x1024">가로 배경</option>
+                      <option value="1024x1536">세로 컷</option>
+                    </select>
+                    <select
+                      value={assetPromptQuality}
+                      onChange={(e) => setAssetPromptQuality(e.target.value as GeneratedAssetQuality)}
+                      className="rounded-md border border-line bg-panel px-1.5 py-1 text-[0.6rem] text-fg-2 outline-none focus:border-accent"
+                    >
+                      <option value="low">빠르게</option>
+                      <option value="medium">표준</option>
+                      <option value="high">고품질</option>
+                      <option value="auto">자동</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* 검색 및 정렬 필터 */}
               <div className="mb-2 flex items-center gap-1.5">

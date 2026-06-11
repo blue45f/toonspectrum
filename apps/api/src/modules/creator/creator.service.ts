@@ -6,6 +6,7 @@ import {
   createWork,
   deleteSharedAsset,
   deleteWork,
+  generateImageAsset,
   getWork,
   listComments,
   listSharedAssets,
@@ -103,6 +104,14 @@ export class CreatorService {
       return await publishAsset(userId, (body ?? {}) as Record<string, unknown>);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "에셋을 공유할 수 없습니다.");
+    }
+  }
+
+  async generateAsset(body: unknown) {
+    try {
+      return await generateImageAsset((body ?? {}) as Record<string, unknown>);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "이미지를 생성할 수 없습니다.");
     }
   }
 
