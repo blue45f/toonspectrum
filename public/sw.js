@@ -28,7 +28,10 @@ const cacheCover = (request, response) => {
     .catch(() => {})
 }
 
-self.addEventListener('install', () => {
+// Precache '/' so the offline navigation fallback below has a shell even for
+// routes that were deep-linked into and never visited while online.
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.add('/')))
   self.skipWaiting()
 })
 

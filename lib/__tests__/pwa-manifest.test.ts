@@ -16,12 +16,22 @@ interface ManifestShortcut {
   url: string;
 }
 
+interface ManifestScreenshot {
+  src: string;
+  sizes: string;
+  type: string;
+  form_factor: "wide" | "narrow";
+  label: string;
+}
+
 interface WebManifest {
   id?: string;
   start_url: string;
   scope: string;
+  categories?: string[];
   icons: ManifestIcon[];
   shortcuts?: ManifestShortcut[];
+  screenshots?: ManifestScreenshot[];
 }
 
 const manifest = JSON.parse(
@@ -60,6 +70,31 @@ describe("PWA manifest", () => {
     const routePaths = appRoutes.map((route) => route.path);
     for (const shortcut of shortcuts) {
       expect(routePaths).toContain(shortcut.url);
+    }
+  });
+
+  it("declares store categories for richer install surfaces", () => {
+    expect(manifest.categories).toEqual(["entertainment", "books"]);
+  });
+
+  it("ships wide and narrow install-UI screenshots whose declared sizes match the PNGs", () => {
+    const screenshots = manifest.screenshots ?? [];
+    expect(screenshots.map((shot) => shot.form_factor).sort()).toEqual(["narrow", "wide"]);
+
+    for (const shot of screenshots) {
+      expect(shot.type).toBe("image/png");
+      expect(shot.label).not.toBe("");
+
+      const file = join(process.cwd(), "public", shot.src);
+      expect(existsSync(file)).toBe(true);
+
+      // PNG IHDR: width/height live at byte offsets 16/20, big-endian.
+      const png = readFileSync(file);
+      expect(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`).toBe(shot.sizes);
+
+      // Chrome's richer install UI rejects screenshots wider/taller than 2.3:1.
+      const [width, height] = shot.sizes.split("x").map(Number);
+      expect(Math.max(width, height) / Math.min(width, height)).toBeLessThanOrEqual(2.3);
     }
   });
 

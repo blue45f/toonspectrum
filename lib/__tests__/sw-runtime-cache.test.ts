@@ -51,12 +51,22 @@ function createWorker() {
     }
     return store;
   };
+  const workerFetch = (target: WorkerRequest) => {
+    fetchCalls.push(keyOf(target));
+    return network(target);
+  };
 
   const cachesMock = {
     open: async (name: string) => {
       const store = storeOf(name);
       return {
         put: async (target: WorkerRequest | string, response: Response) => {
+          store.set(keyOf(target), response);
+        },
+        // Real Cache.add fetches the target and rejects on non-ok responses.
+        add: async (target: WorkerRequest | string) => {
+          const response = await workerFetch(typeof target === "string" ? request(target) : target);
+          if (!response.ok) throw new Error(`cache.add failed: ${response.status}`);
           store.set(keyOf(target), response);
         },
         match: async (target: WorkerRequest | string) => store.get(keyOf(target))?.clone(),
@@ -90,14 +100,7 @@ function createWorker() {
     location: { origin: ORIGIN },
   };
 
-  new Function("self", "caches", "fetch", source)(
-    workerSelf,
-    cachesMock,
-    (target: WorkerRequest) => {
-      fetchCalls.push(keyOf(target));
-      return network(target);
-    }
-  );
+  new Function("self", "caches", "fetch", source)(workerSelf, cachesMock, workerFetch);
 
   return {
     fetchCalls,
@@ -127,6 +130,15 @@ function createWorker() {
       });
       return { handled, response: await responded };
     },
+    async dispatchInstall() {
+      let waited: Promise<unknown> = Promise.resolve();
+      listeners.get("install")?.({
+        waitUntil: (value) => {
+          waited = value;
+        },
+      });
+      await waited;
+    },
     async dispatchActivate() {
       let waited: Promise<unknown> = Promise.resolve();
       listeners.get("activate")?.({
@@ -145,6 +157,19 @@ describe("service worker runtime caching", () => {
     expect(cacheName).not.toBe("webtoon-index-pwa-v1");
     expect(cacheName).not.toBe("webtoon-index-pwa-v2");
     expect(coverCacheName).toMatch(/^webtoon-index-covers-v\d+$/);
+  });
+
+  it("precaches the app shell on install so first-run deep links can fall back offline", async () => {
+    const worker = createWorker();
+    worker.setNetwork(async () => new Response("<html>shell</html>", { status: 200 }));
+
+    await worker.dispatchInstall();
+    expect(worker.fetchCalls).toEqual([new URL("/", ORIGIN).href]);
+    expect(worker.cached(cacheName, "/")).toBeDefined();
+
+    worker.setNetwork(() => Promise.reject(new Error("offline")));
+    const deepLink = await worker.dispatchFetch(request("/title/never-visited", { mode: "navigate" }));
+    expect(await deepLink.response?.text()).toBe("<html>shell</html>");
   });
 
   it("deletes previous-version caches on activate and claims clients", async () => {

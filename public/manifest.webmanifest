@@ -3,6 +3,7 @@
   "short_name": "툰스펙트럼",
   "description": "웹툰·웹소설 통합 인덱스",
   "lang": "ko-KR",
+  "categories": ["entertainment", "books"],
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -53,6 +54,22 @@
       "short_name": "연재",
       "description": "연재요일 기준 요일별 보드",
       "url": "/calendar"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x820",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "홈 — 웹툰·웹소설 통합 인덱스 (데스크톱)"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "585x1266",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "홈 — 웹툰·웹소설 통합 인덱스 (모바일)"
     }
   ]
 }
