@@ -197,10 +197,6 @@ function PolicyPageShell({
       <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">
         {doc?.name || fallbackName}
       </h1>
-      <p className="mt-3 text-sm leading-relaxed text-fg-3">
-        TermsDesk에 게시된 정본을 그대로 불러옵니다. 문서 하단의 버전·해시로 게시본과의 일치를
-        확인할 수 있어요.
-      </p>
       {loading ? (
         <PolicySkeleton label={fallbackName} />
       ) : error || !doc ? (
