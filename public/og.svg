@@ -1,59 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="툰스펙트럼">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="툰스펙트럼 공유 이미지">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1a1410"/>
-      <stop offset=".58" stop-color="#3b224f"/>
-      <stop offset="1" stop-color="#ff5c8a"/>
+    <!-- Deep studio space background -->
+    <linearGradient id="studioBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#110f0c" />
+      <stop offset="50%" stop-color="#181512" />
+      <stop offset="100%" stop-color="#2a1f18" />
     </linearGradient>
-    <radialGradient id="halo" cx="78%" cy="19%" r="62%">
-      <stop stop-color="#facc15" stop-opacity=".82"/>
-      <stop offset=".56" stop-color="#ff5c8a" stop-opacity=".22"/>
-      <stop offset="1" stop-color="#1a1410" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#1a1410" flood-opacity=".26"/>
+    <linearGradient id="spectrum" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff884f" />
+      <stop offset="50%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#ff884f" flood-opacity="0.3" />
     </filter>
   </defs>
-  <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect width="1200" height="630" fill="url(#halo)"/>
-  <path d="M0 498C166 430 340 458 512 512c176 54 336 44 504-54 72-42 126-57 184-54v226H0Z" fill="#f7efe4" opacity=".12"/>
-  <path d="M74 96h216M74 542h412" stroke="#f7efe4" stroke-opacity=".16" stroke-width="16" stroke-linecap="round"/>
-  <g transform="translate(84 86)" filter="url(#soft)">
-    <svg width="104" height="104" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
-  <path d="M46 342C154 278 238 414 466 292" fill="none" stroke="#f7efe4" stroke-opacity=".1" stroke-width="26" stroke-linecap="round"/>
-  <g filter="url(#shadow)">
-        <g transform="translate(0 0) scale(1)">
-          <rect x="108" y="116" width="128" height="158" rx="28" fill="#f7efe4"/>
-          <rect x="260" y="116" width="144" height="96" rx="28" fill="#ff5c8a"/>
-          <rect x="260" y="236" width="144" height="160" rx="28" fill="#f7efe4"/>
-          <rect x="108" y="298" width="128" height="98" rx="28" fill="#facc15"/>
-          <path d="M144 164h54M144 202h34M296 284h70M296 326h42" stroke="#1a1410" stroke-width="18" stroke-linecap="round"/>
-          <path d="M120 416c84 28 188 28 272 0" fill="none" stroke="#ff5c8a" stroke-width="24" stroke-linecap="round"/>
-        </g></g>
-</svg>
+
+  <rect width="1200" height="630" fill="url(#studioBg)" />
+  <circle cx="140" cy="76" r="210" fill="#ff884f" opacity="0.12" />
+  <circle cx="1060" cy="570" r="260" fill="#06b6d4" opacity="0.08" />
+  <path d="M0 520C220 456 360 584 540 520s312-68 660 18v92H0Z" fill="#181512" opacity="0.85" />
+
+  <!-- Brand logomark (ToonSpectrum icon) -->
+  <g transform="translate(88 84) scale(2.05)" filter="url(#softGlow)">
+    <rect width="32" height="32" rx="8" fill="#181512" stroke="#2a1f18" stroke-width="1" />
+    <circle cx="8" cy="6" r="9" fill="#ff884f" opacity="0.15" />
+    <circle cx="25" cy="27" r="8" fill="#06b6d4" opacity="0.1" />
+    <!-- Chat bubble frame -->
+    <path d="M7.1 6.7h17.8c1.3 0 2.3 1 2.3 2.3v11.3c0 1.3-1 2.3-2.3 2.3h-8.3l-5 3.9c-.6.5-1.5 0-1.3-.8l.6-3.1H7.1c-1.3 0-2.3-1-2.3-2.3V9c0-1.3 1-2.3 2.3-2.3Z" fill="#ffffff" />
+    <!-- Spectrum line beams -->
+    <path d="M7.1 16h6.2" stroke="#ff884f" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M17.1 15.8C20 13 22.1 11.6 25.4 10.7" stroke="#ec4899" stroke-width="2.1" stroke-linecap="round" />
+    <path d="M17.3 15.9h8.5" stroke="#f59e0b" stroke-width="2.1" stroke-linecap="round" />
+    <path d="M17.1 16.1C20.1 18.1 22.3 19.2 25.6 20.4" stroke="#10b981" stroke-width="2.1" stroke-linecap="round" />
+    <path d="M16.5 16.5C19.1 20.1 21.3 22 24.7 23.5" stroke="#06b6d4" stroke-width="2.1" stroke-linecap="round" />
+    <!-- Speech arrow overlay -->
+    <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" fill="#181512" />
+    <path d="M12.6 10.7 18.8 16l-6.2 5.3Z" fill="none" stroke="#ffffff" stroke-width="0.75" opacity="0.3" />
   </g>
-  <text x="214" y="148" font-family="Inter, Pretendard, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="34" font-weight="900" fill="#f7efe4">툰스펙트럼</text>
-  <text x="92" y="270" font-family="Inter, Pretendard, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="62" font-weight="900" fill="#f7efe4">툰스펙트럼</text>
-  <text x="94" y="335" font-family="Pretendard, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="27" font-weight="700" fill="#f7efe4" opacity=".86">웹툰과 웹소설을 검색, 랭킹, 캘린더, 리뷰로 연결하는 통합 인덱스</text>
-  <g transform="translate(92 485)"><rect width="166" height="44" rx="22" fill="#f7efe4" opacity=".13" stroke="#f7efe4" stroke-opacity=".26"/><text x="83" y="28" text-anchor="middle" font-size="15" font-weight="800" fill="#f7efe4">통합 검색</text></g><g transform="translate(282 485)"><rect width="166" height="44" rx="22" fill="#f7efe4" opacity=".13" stroke="#f7efe4" stroke-opacity=".26"/><text x="83" y="28" text-anchor="middle" font-size="15" font-weight="800" fill="#f7efe4">랭킹</text></g><g transform="translate(472 485)"><rect width="166" height="44" rx="22" fill="#f7efe4" opacity=".13" stroke="#f7efe4" stroke-opacity=".26"/><text x="83" y="28" text-anchor="middle" font-size="15" font-weight="800" fill="#f7efe4">연재 캘린더</text></g>
-  <g filter="url(#soft)">
-    <g transform="translate(722 116)">
-      <rect width="342" height="330" rx="46" fill="#f7efe4" opacity=".94"/>
-      <rect x="34" y="36" width="176" height="22" rx="11" fill="#1a1410" opacity=".84"/>
-      <rect x="34" y="82" width="252" height="14" rx="7" fill="#1a1410" opacity=".22"/>
-      <rect x="34" y="112" width="206" height="14" rx="7" fill="#1a1410" opacity=".14"/>
-      <g transform="translate(34 156) scale(.56)">
-        <g transform="translate(0 0) scale(1)">
-          <rect x="108" y="116" width="128" height="158" rx="28" fill="#f7efe4"/>
-          <rect x="260" y="116" width="144" height="96" rx="28" fill="#ff5c8a"/>
-          <rect x="260" y="236" width="144" height="160" rx="28" fill="#f7efe4"/>
-          <rect x="108" y="298" width="128" height="98" rx="28" fill="#facc15"/>
-          <path d="M144 164h54M144 202h34M296 284h70M296 326h42" stroke="#1a1410" stroke-width="18" stroke-linecap="round"/>
-          <path d="M120 416c84 28 188 28 272 0" fill="none" stroke="#ff5c8a" stroke-width="24" stroke-linecap="round"/>
-        </g></g>
-      <rect x="216" y="177" width="72" height="118" rx="24" fill="#ff5c8a" opacity=".88"/>
-      <rect x="104" y="252" width="184" height="22" rx="11" fill="#facc15" opacity=".82"/>
-    </g></g>
+
+  <!-- Wordmarks -->
+  <text x="176" y="124" fill="#ffffff" font-size="40" font-weight="800" font-family="Pretendard, Apple SD Gothic Neo, system-ui, sans-serif">툰스펙트럼</text>
+  <text x="378" y="122" fill="#ff884f" font-size="21" font-weight="700" letter-spacing="8" font-family="Space Grotesk, Pretendard, system-ui, sans-serif">WEBTOON · WEBNOVEL SPECTRUM</text>
+
+  <!-- Title Copy -->
+  <text x="88" y="268" fill="#ffffff" font-size="78" font-weight="800" letter-spacing="-1" font-family="Apple SD Gothic Neo, Pretendard, system-ui, sans-serif">흩어진 이야기를,</text>
+  <text x="88" y="358" fill="url(#spectrum)" font-size="82" font-weight="950" letter-spacing="-1" font-family="Apple SD Gothic Neo, Pretendard, system-ui, sans-serif">취향의 스펙트럼으로.</text>
+
+  <!-- Sub-Description -->
+  <text x="88" y="433" fill="#94a3b8" font-size="28" font-weight="600" font-family="Pretendard, Apple SD Gothic Neo, system-ui, sans-serif">네이버·카카오·리디·레진 등 국내 웹툰·웹소설을 가로질러</text>
+  <text x="88" y="475" fill="#94a3b8" font-size="28" font-weight="600" font-family="Pretendard, Apple SD Gothic Neo, system-ui, sans-serif">무엇을, 어디서, 왜 봐야 하는지 한 곳에서.</text>
+
+  <!-- Details footer -->
+  <circle cx="92" cy="552" r="4.5" fill="#ff884f" />
+  <text x="116" y="561" fill="#64748b" font-size="22" font-weight="600" font-family="Pretendard, Apple SD Gothic Neo, system-ui, sans-serif">통합 랭킹 · 연재 캘린더 · 교차 플랫폼 가격비교 · 작가별 보기</text>
 </svg>
