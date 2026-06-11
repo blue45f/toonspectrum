@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenText,
+  ImagePlus,
   MessageCircle,
   Bell,
   CornerDownRight,
@@ -13,11 +14,14 @@ import {
   Sparkles,
   Trash2,
   UsersRound,
+  X,
 } from "lucide-react";
+import Link from "@/src/compat/router-link";
 import type { FanCafePost, FanCafePostKind, FanCafeReply, FanCafeScopeFilter } from "@/lib/types";
 import { useApp } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
 import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
+import { ATTACHMENT_MAX_COUNT, fileToAttachmentDataUrl } from "@/lib/image-attach";
 import {
   COMMUNITY_SORT_OPTIONS,
   COMMUNITY_SORT_LABEL,
@@ -39,32 +43,8 @@ const FAN_CAFE_POST_TITLE_MAX_LENGTH = 80;
 const FAN_CAFE_POST_TEXT_MAX_LENGTH = 1200;
 const FAN_CAFE_POST_TAGS_MAX_LENGTH = 80;
 const FAN_CAFE_ACTIVITY_STORAGE_KEY = "webtoon-index-fan-cafe-activity-log-v1";
-const FAN_CAFE_ACTIVITY_LIMIT = 60;
-
-const FAN_CAFE_DEMO_ACTIONS = [
-  "search",
-  "search-reset",
-  "filter-kind",
-  "tag-filter",
-  "sort",
-  "mine-filter",
-  "refresh",
-  "load-more",
-  "blocked",
-  "post-created",
-] as const;
 
 type FanCafeKindFilter = FanCafePostKind | "all";
-type FanCafeDemoAction = (typeof FAN_CAFE_DEMO_ACTIONS)[number];
-type FanCafeDemoActivity = {
-  id: string;
-  at: number;
-  action: FanCafeDemoAction;
-  label: string;
-  detail?: string;
-  scope: FanCafeScopeFilter;
-  targetLabel: string;
-};
 
 const KIND_ITEMS: { value: FanCafeKindFilter; label: string }[] = [
   { value: "all", label: "전체" },
@@ -75,66 +55,20 @@ const KIND_ITEMS: { value: FanCafeKindFilter; label: string }[] = [
 ];
 
 const MAX_REPLY_DEPTH = 4;
-const FAN_CAFE_DEMO_ACTION_SET = new Set<string>(FAN_CAFE_DEMO_ACTIONS);
 
-const FAN_CAFE_ACTION_LABEL: Record<FanCafeDemoAction, string> = {
-  search: "검색",
-  "search-reset": "검색 초기화",
-  "filter-kind": "분류 필터",
-  "tag-filter": "태그 필터",
-  sort: "정렬",
-  "mine-filter": "내 글",
-  refresh: "새로고침",
-  "load-more": "더 보기",
-  blocked: "차단",
-  "post-created": "글 등록",
-};
-
-const makeFanCafeActivityId = () => `fc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const readFanCafeActivityLog = (): FanCafeDemoActivity[] => {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const raw = window.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((item): item is FanCafeDemoActivity => {
-        const candidate = item as Partial<FanCafeDemoActivity>;
-        return (
-          typeof candidate.id === "string" &&
-          typeof candidate.at === "number" &&
-          typeof candidate.action === "string" &&
-          FAN_CAFE_DEMO_ACTION_SET.has(candidate.action) &&
-          typeof candidate.label === "string" &&
-          typeof candidate.scope === "string" &&
-          typeof candidate.targetLabel === "string"
-        );
-      })
-      .slice(-FAN_CAFE_ACTIVITY_LIMIT);
-  } catch {
-    return [];
-  }
-};
-
-const writeFanCafeActivityLog = (items: FanCafeDemoActivity[]) => {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(FAN_CAFE_ACTIVITY_STORAGE_KEY, JSON.stringify(items.slice(-FAN_CAFE_ACTIVITY_LIMIT)));
-  } catch {
-    // Ignore storage failures. The visible session log still works through React state.
-  }
-};
+// 글쓰기 잠금(예: 장르 카페 미가입) — 잠금 사유와 해제 액션을 패널 밖에서 주입한다.
+export interface FanCafeComposeLock {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
 
 export function FanCafePanel({
   scope,
   targetId,
   targetLabel,
   compact = false,
+  composeLock = null,
   onTopLevelReplyDelta,
   onTopLevelPostCreated,
 }: {
@@ -142,6 +76,7 @@ export function FanCafePanel({
   targetId?: string;
   targetLabel: string;
   compact?: boolean;
+  composeLock?: FanCafeComposeLock | null;
   onTopLevelReplyDelta?: (post: FanCafePost, delta: number) => void;
   onTopLevelPostCreated?: (post: FanCafePost) => void;
 }) {
@@ -162,6 +97,8 @@ export function FanCafePanel({
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [tags, setTags] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [attachBusy, setAttachBusy] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -171,46 +108,10 @@ export function FanCafePanel({
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [showMyPostsOnly, setShowMyPostsOnly] = useState(false);
   const [postPulse, setPostPulse] = useState(0);
-  const [activityLog, setActivityLog] = useState<FanCafeDemoActivity[]>(readFanCafeActivityLog);
   const postsRequestSignatureRef = useRef("");
-  const lastLoggedQueryRef = useRef("");
   const postPulseTimerRef = useRef<number | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
   const selectedTagContext = `${scope}|${targetId ?? ""}`;
-
-  const appendDemoActivity = useCallback(
-    (action: FanCafeDemoAction, label: string, detail?: string) => {
-      setActivityLog((current) => {
-        const next = [
-          ...current,
-          {
-            id: makeFanCafeActivityId(),
-            at: Date.now(),
-            action,
-            label,
-            detail,
-            scope,
-            targetLabel,
-          },
-        ].slice(-FAN_CAFE_ACTIVITY_LIMIT);
-        writeFanCafeActivityLog(next);
-        return next;
-      });
-    },
-    [scope, targetLabel]
-  );
-
-  const recentActivityLog = useMemo(() => activityLog.slice().reverse().slice(0, 5), [activityLog]);
-
-  const activitySummary = useMemo(
-    () => ({
-      searchCount: activityLog.filter((item) => item.action === "search" || item.action === "search-reset").length,
-      filterCount: activityLog.filter((item) => item.action === "filter-kind" || item.action === "tag-filter" || item.action === "mine-filter").length,
-      sortCount: activityLog.filter((item) => item.action === "sort").length,
-      blockedCount: activityLog.filter((item) => item.action === "blocked").length,
-      postCount: activityLog.filter((item) => item.action === "post-created").length,
-    }),
-    [activityLog]
-  );
 
   function applyTopLevelReplyDelta(postItem: FanCafePost, delta: number) {
     if (!Number.isFinite(delta) || delta === 0) return;
@@ -255,7 +156,6 @@ export function FanCafePanel({
   function setSelectedTagFilter(tag: string | null) {
     setLoading(true);
     setError(null);
-    appendDemoActivity("tag-filter", tag ? `태그 필터: #${tag}` : "태그 필터 초기화");
     setSelectedTagState({ context: selectedTagContext, tag });
   }
 
@@ -276,6 +176,30 @@ export function FanCafePanel({
   const canComposePost = scope !== "all" && Boolean(targetId);
   const authHeaders = useMemo(() => (sessionToken ? { "x-user-id": sessionToken } : undefined), [sessionToken]);
 
+  function appendDemoActivity(action: string, label: string, detail?: string) {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const current = Array.isArray(parsed) ? parsed : [];
+      const next = [
+        ...current,
+        {
+          id: `fan-cafe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          at: Date.now(),
+          action,
+          label,
+          detail,
+          scope,
+          targetLabel,
+        },
+      ].slice(-20);
+      window.localStorage.setItem(FAN_CAFE_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Demo activity is optional; storage failures should not block the UI.
+    }
+  }
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(true);
@@ -284,19 +208,6 @@ export function FanCafePanel({
     }, 220);
     return () => clearTimeout(timer);
   }, [searchText]);
-
-  useEffect(() => {
-    const query = queryText.trim();
-    if (query && query !== lastLoggedQueryRef.current) {
-      lastLoggedQueryRef.current = query;
-      appendDemoActivity("search", `검색 실행: ${query}`);
-      return;
-    }
-    if (!query && lastLoggedQueryRef.current) {
-      lastLoggedQueryRef.current = "";
-      appendDemoActivity("search-reset", "검색 초기화");
-    }
-  }, [appendDemoActivity, queryText]);
 
   useEffect(() => {
     if (!autoRefreshEnabled) return;
@@ -427,7 +338,6 @@ export function FanCafePanel({
       const parsedData = data as { items: unknown[]; nextCursor?: string | null; hasMore?: boolean };
       const nextItems = ensureArray<FanCafePost>(parsedData.items);
       setPosts((current) => [...current, ...nextItems]);
-      appendDemoActivity("load-more", "팬카페 더 보기", `${nextItems.length}건 추가`);
       setNextCursor(parsedData.nextCursor ?? null);
       setHasMore(Boolean(parsedData.hasMore));
     } catch {
@@ -437,15 +347,33 @@ export function FanCafePanel({
     }
   }
 
-  async function submit() {
-    if (!userId) {
-      appendDemoActivity("blocked", "로그인 전 작성 차단", "읽기는 가능하고 작성은 로그인 이후 가능합니다.");
-      return;
+  async function attachFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    setAttachBusy(true);
+    try {
+      const incoming = [...files].slice(0, ATTACHMENT_MAX_COUNT - images.length);
+      if (incoming.length === 0) {
+        setError(`이미지는 최대 ${ATTACHMENT_MAX_COUNT}장까지 첨부할 수 있어요.`);
+        return;
+      }
+      const converted: string[] = [];
+      for (const file of incoming) {
+        converted.push(await fileToAttachmentDataUrl(file));
+      }
+      setImages((current) => [...current, ...converted].slice(0, ATTACHMENT_MAX_COUNT));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "이미지를 처리하지 못했어요.");
+    } finally {
+      setAttachBusy(false);
     }
+  }
+
+  async function submit() {
+    if (!userId) return;
     if (!title.trim() || !text.trim()) return;
     if (!canComposePost) {
       setError("팬카페 대상이 지정된 보드에서만 글을 작성할 수 있어요.");
-      appendDemoActivity("blocked", "통합 피드 작성 차단", "작품·작가·펜카페 보드에서 작성할 수 있습니다.");
       return;
     }
     setIsSubmittingPost(true);
@@ -462,6 +390,7 @@ export function FanCafePanel({
           kind: composeKind,
           title,
           text,
+          images,
           tags: tags
             .split(/[,\s#]+/)
             .map((tag) => tag.trim().toLowerCase())
@@ -478,7 +407,6 @@ export function FanCafePanel({
         return;
       }
       const created = data as FanCafePost;
-      appendDemoActivity("post-created", `글 등록: ${created.title}`, KIND_LABEL[created.kind]);
       onTopLevelPostCreated?.(created);
       const normalizedCreatedTags = created.tags.map((tag) => tag.toLowerCase());
       const tagMatch = !selectedTag || normalizedCreatedTags.includes(selectedTag);
@@ -504,6 +432,7 @@ export function FanCafePanel({
       setTitle("");
       setText("");
       setTags("");
+      setImages([]);
       setRefreshTick((current) => current + 1);
     } catch {
       setError("팬카페 글을 저장하지 못했습니다.");
@@ -515,7 +444,6 @@ export function FanCafePanel({
   function refreshNow() {
     setLoading(true);
     setError(null);
-    appendDemoActivity("refresh", "수동 새로고침");
     setRefreshTick((current) => current + 1);
   }
 
@@ -557,10 +485,7 @@ export function FanCafePanel({
             <input
               type="checkbox"
               checked={autoRefreshEnabled}
-              onChange={(event) => {
-                setAutoRefreshEnabled(event.target.checked);
-                appendDemoActivity("refresh", event.target.checked ? "자동 새로고침 활성화" : "자동 새로고침 비활성화");
-              }}
+              onChange={(event) => setAutoRefreshEnabled(event.target.checked)}
               className="size-3.5"
             />
             <span className="text-fg-3">실시간 새로고침(30초)</span>
@@ -605,9 +530,6 @@ export function FanCafePanel({
               onClick={() => {
                 setLoading(true);
                 setError(null);
-                if (option.value !== sort) {
-                  appendDemoActivity("sort", `정렬 변경: ${COMMUNITY_SORT_LABEL[option.value]}`);
-                }
                 setSort(option.value);
               }}
               className={cn(
@@ -644,51 +566,6 @@ export function FanCafePanel({
         </div>
       )}
 
-      <div className="mb-4 rounded-2xl border border-line bg-raised/30 p-3 surface-hl sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="eyebrow text-accent">DEMO OPS</p>
-            <h3 className="mt-1 text-sm font-bold text-fg">커뮤니티 기능 체크</h3>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-              검색·필터·정렬·작성 차단을 로컬 로그로 남겨 약관 페이지의 점검 항목과 연결합니다.
-            </p>
-          </div>
-          <a
-            href="/terms"
-            className="inline-flex w-fit items-center justify-center rounded-lg border border-line bg-canvas/45 px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
-          >
-            약관 체크로 이동
-          </a>
-        </div>
-        <div className="mt-3 grid gap-2 text-xs sm:grid-cols-5">
-          <span className="rounded-lg border border-line bg-canvas/35 px-2 py-1.5 text-fg-3">검색 {activitySummary.searchCount}건</span>
-          <span className="rounded-lg border border-line bg-canvas/35 px-2 py-1.5 text-fg-3">필터 {activitySummary.filterCount}건</span>
-          <span className="rounded-lg border border-line bg-canvas/35 px-2 py-1.5 text-fg-3">정렬 {activitySummary.sortCount}건</span>
-          <span className="rounded-lg border border-line bg-canvas/35 px-2 py-1.5 text-fg-3">작성 {activitySummary.postCount}건</span>
-          <span className="rounded-lg border border-line bg-canvas/35 px-2 py-1.5 text-bad">차단 {activitySummary.blockedCount}건</span>
-        </div>
-        <div className="mt-3 space-y-1.5" aria-label="팬카페 데모 활동 로그">
-          {recentActivityLog.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-line bg-canvas/30 px-3 py-2 text-xs text-fg-3">
-              아직 로그가 없습니다. 검색, 필터, 작성 제한 버튼을 눌러 데모 흐름을 생성하세요.
-            </p>
-          ) : (
-            recentActivityLog.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-xs",
-                  item.action === "blocked" ? "border-bad/35 bg-bad/10 text-fg-2" : "border-line bg-canvas/30 text-fg-3"
-                )}
-              >
-                <span className="font-semibold text-fg">{FAN_CAFE_ACTION_LABEL[item.action]}</span> · {item.label}
-                {item.detail ? <span className="ml-1 text-fg-3">({item.detail})</span> : null}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
           <div className={cn("grid gap-4", !compact && "lg:grid-cols-[0.9fr_1.1fr]")}>
             <div className="rounded-xl border border-line bg-card p-4">
               {userId ? (
@@ -700,7 +577,6 @@ export function FanCafePanel({
                       setLoading(true);
                       setError(null);
                       setShowMyPostsOnly(event.target.checked);
-                      appendDemoActivity("mine-filter", event.target.checked ? "내 글만 보기 활성화" : "내 글만 보기 해제");
                     }}
                     className="size-3.5"
                   />
@@ -715,9 +591,6 @@ export function FanCafePanel({
                 onClick={() => {
                   setLoading(true);
                   setError(null);
-                  if (item.value !== filterKind) {
-                    appendDemoActivity("filter-kind", `분류 필터: ${item.label}`);
-                  }
                   setFilterKind(item.value);
                 }}
                 className={cn(

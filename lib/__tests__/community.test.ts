@@ -160,6 +160,7 @@ describe("community validation", () => {
       title: "대댓글 테스트",
       text: "대댓글 트리 저장을 검증합니다.",
       tags: [],
+      images: [],
     });
     createdPostIds.add(post.id);
 
@@ -210,6 +211,7 @@ describe("community validation", () => {
       title: "첫 게시글",
       text: "첫 게시글 본문입니다.",
       tags: [],
+      images: [],
     });
     const secondPost = await createFanPost(userId, {
       scope: "title",
@@ -219,6 +221,7 @@ describe("community validation", () => {
       title: "두 번째 게시글",
       text: "두 번째 게시글 본문입니다.",
       tags: [],
+      images: [],
     });
     createdPostIds.add(firstPost.id);
     createdPostIds.add(secondPost.id);

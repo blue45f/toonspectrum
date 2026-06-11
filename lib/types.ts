@@ -121,7 +121,7 @@ export interface UserReview {
   createdAt: string;
 }
 
-export type FanCafeScope = "title" | "author" | "pencafe";
+export type FanCafeScope = "title" | "author" | "pencafe" | "cafe";
 export type FanCafeScopeFilter = FanCafeScope | "all";
 export type FanCafePostKind = "talk" | "theory" | "fanart" | "cheer";
 
@@ -139,6 +139,7 @@ export interface ReviewReply {
   text: string;
   spoiler: boolean;
   createdAt: string;
+  deleted?: boolean; // 소프트 삭제 — 자리 표시("삭제된 댓글")로 렌더
   children?: ReviewReply[];
 }
 
@@ -149,6 +150,7 @@ export interface FanCafeReply {
   text: string;
   createdAt: string;
   parentId?: string | null;
+  deleted?: boolean; // 소프트 삭제 — 자리 표시("삭제된 댓글")로 렌더
   children?: FanCafeReply[];
 }
 
@@ -161,10 +163,27 @@ export interface FanCafePost {
   title: string;
   text: string;
   tags: string[];
+  images?: string[]; // 축소된 data-URL 첨부(팬아트)
   author: CommunityAuthor;
   createdAt: string;
   replyCount: number;
   replies?: FanCafeReply[];
+}
+
+// ── 장르 카페(소모임) ──
+export interface CommunityCafe {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  genre: string; // GENRES 중 하나 또는 ""(자유)
+  createdBy: string;
+  ownerName: string;
+  memberCount: number;
+  postCount: number;
+  createdAt: string;
+  viewerIsMember?: boolean;
+  viewerRole?: "owner" | "member" | null;
 }
 
 export interface FanCafeBoard {

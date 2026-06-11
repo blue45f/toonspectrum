@@ -1,14 +1,24 @@
-import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import {
+  createCafe,
   createFanPost,
   deleteFanPost,
+  deleteFanPostReply,
+  deleteReviewReply,
   createFanPostReply,
+  getCafeBySlug,
+  getFanPost,
+  isCafeMember,
+  joinCafe,
+  leaveCafe,
+  listCafes,
   listCommunityBoards,
   listFanPostReplies,
   listFanPosts,
   parseCommunityScopeFilter,
   parsePostKindOrNull,
   parsePostSort,
+  validateCafeInput,
   validatePostInput,
   validateReplyPayload,
   createReviewReply,
@@ -16,7 +26,8 @@ import {
 } from "../../../../../lib/server/community";
 import { getReviewsData } from "../../../../../lib/server/reviews";
 import { parseCommunitySort } from "../../../../../lib/community-ui";
-import type { FanCafeReply, ReviewReply } from "../../../../../lib/types";
+import { GENRES } from "../../../../../lib/taxonomy";
+import type { CommunityCafe, FanCafePost, FanCafeReply, ReviewReply } from "../../../../../lib/types";
 
 interface PostQuery {
   scope?: string | null;
@@ -118,7 +129,29 @@ export class CommunityService {
     if (parsed.error || !parsed.value) {
       throw new BadRequestException(parsed.error ?? "잘못된 요청");
     }
+    // 장르 카페 글은 가입 회원만 — 카페 존재·멤버십을 서버에서 강제하고 라벨 스푸핑을 차단.
+    if (parsed.value.scope === "cafe") {
+      const cafe = await getCafeBySlug(parsed.value.targetId, userId);
+      if (!cafe) throw new NotFoundException("카페를 찾을 수 없어요.");
+      if (!(await isCafeMember(userId, cafe.slug))) {
+        throw new ForbiddenException("카페에 가입한 회원만 글을 쓸 수 있어요.");
+      }
+      parsed.value.targetLabel = cafe.name;
+    }
     return createFanPost(userId, parsed.value);
+  }
+
+  // 토론 스레드 상세(답글 트리 포함). 숨김 글은 404.
+  async getPost(postId: string): Promise<FanCafePost> {
+    if (!postId) throw new BadRequestException("postId 필요");
+    let post: FanCafePost | null = null;
+    try {
+      post = await getFanPost(postId);
+    } catch {
+      throw new BadRequestException("토론 글을 불러오지 못했습니다.");
+    }
+    if (!post) throw new NotFoundException("토론 글을 찾을 수 없어요.");
+    return post;
   }
 
   async deletePost(postId: string, userId: string) {
@@ -127,6 +160,77 @@ export class CommunityService {
       return await deleteFanPost(userId, postId, false);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "글을 삭제하지 못했습니다.");
+    }
+  }
+
+  async deletePostReply(postId: string, replyId: string, userId: string) {
+    if (!postId || !replyId) throw new BadRequestException("postId/replyId 필요");
+    try {
+      return await deleteFanPostReply(userId, postId, replyId, false);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
+    }
+  }
+
+  async deleteReviewReply(reviewId: string, replyId: string, userId: string) {
+    if (!reviewId || !replyId) throw new BadRequestException("reviewId/replyId 필요");
+    try {
+      return await deleteReviewReply(userId, reviewId, replyId, false);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
+    }
+  }
+
+  // ── 장르 카페(소모임) ──────────────────────────────────────────────
+  async listCafes(genre: string | null, query: string | null, sortValue: string | null) {
+    const sort = parseCommunitySort(sortValue) === "recent" ? ("recent" as const) : ("popular" as const);
+    // DB 불가 시 빈 디렉토리로 폴백(500 방지) — 검증 오류는 그대로 던진다.
+    let items: CommunityCafe[] = [];
+    try {
+      items = await listCafes({ genre, query, sort });
+    } catch {
+      items = [];
+    }
+    return { items, meta: { sort, total: items.length, generatedAt: new Date().toISOString() } };
+  }
+
+  async getCafe(slug: string, viewerId: string | null) {
+    if (!slug) throw new BadRequestException("slug 필요");
+    let cafe: CommunityCafe | null = null;
+    try {
+      cafe = await getCafeBySlug(slug, viewerId);
+    } catch {
+      throw new BadRequestException("카페 정보를 불러오지 못했습니다.");
+    }
+    if (!cafe) throw new NotFoundException("카페를 찾을 수 없어요.");
+    return cafe;
+  }
+
+  async createCafe(body: unknown, userId: string) {
+    const parsed = validateCafeInput(body, GENRES);
+    if (parsed.error || !parsed.value) throw new BadRequestException(parsed.error ?? "카페 정보를 확인해 주세요.");
+    try {
+      return await createCafe(userId, parsed.value);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "카페를 만들지 못했습니다.");
+    }
+  }
+
+  async joinCafe(slug: string, userId: string) {
+    if (!slug) throw new BadRequestException("slug 필요");
+    try {
+      return await joinCafe(userId, slug);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "카페에 가입하지 못했습니다.");
+    }
+  }
+
+  async leaveCafe(slug: string, userId: string) {
+    if (!slug) throw new BadRequestException("slug 필요");
+    try {
+      return await leaveCafe(userId, slug);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "카페에서 탈퇴하지 못했습니다.");
     }
   }
 

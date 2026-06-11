@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
-import { and, desc, eq, ne, sql, type SQL, type Table } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql, type SQL, type Table } from "drizzle-orm";
 import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
 import {
   creatorCampaigns,
@@ -18,6 +18,7 @@ import {
   revenueLedger,
   users,
 } from "../../../../../lib/db";
+import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
 
 type AdminRole = "admin" | "creator" | "operator" | "user";
 type RevenueStatus = "pending" | "approved" | "paid" | "rejected" | "revoked";
@@ -342,6 +343,163 @@ export class AdminService {
     }
     if (!rows.length) throw new BadRequestException({ error: "대상 게시물을 찾을 수 없어요." });
     return { ok: true, id, hidden };
+  }
+
+  // ── 커뮤니티 모더레이션(/admin/community) ──────────────────────────────
+  // 숨김 글 포함 전체 게시글 목록 — 검색·스코프·노출 상태 필터.
+  async listCommunityPosts(
+    userId: string,
+    query: { scope?: string | null; q?: string | null; visibility?: string | null; limit?: number | string | null } = {}
+  ) {
+    await requireAdminUser(userId);
+    await ensureCommunityTables();
+
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const search = String(query.q ?? "").trim().toLowerCase();
+    const scope = String(query.scope ?? "").trim();
+    const visibility = query.visibility === "hidden" ? "hidden" : query.visibility === "visible" ? "visible" : "all";
+
+    const conds: SQL[] = [];
+    if (scope) conds.push(eq(fanPosts.scope, scope));
+    if (visibility === "hidden") conds.push(eq(fanPosts.hidden, true));
+    if (visibility === "visible") conds.push(eq(fanPosts.hidden, false));
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`;
+      const cond = or(
+        sql`lower(${fanPosts.title}) LIKE ${pattern} ESCAPE '\\'`,
+        sql`lower(${fanPosts.text}) LIKE ${pattern} ESCAPE '\\'`,
+        sql`lower(${fanPosts.targetLabel}) LIKE ${pattern} ESCAPE '\\'`,
+        sql`lower(coalesce(${users.name}, '')) LIKE ${pattern} ESCAPE '\\'`
+      );
+      if (cond) conds.push(cond);
+    }
+
+    let postQuery = db
+      .select({
+        id: fanPosts.id,
+        scope: fanPosts.scope,
+        targetId: fanPosts.targetId,
+        targetLabel: fanPosts.targetLabel,
+        kind: fanPosts.kind,
+        title: fanPosts.title,
+        text: fanPosts.text,
+        images: fanPosts.images,
+        hidden: fanPosts.hidden,
+        createdAt: fanPosts.createdAt,
+        authorId: users.id,
+        authorName: users.name,
+        authorEmail: users.email,
+        replyCount: sql<number>`(
+          SELECT count(*) FROM fan_post_reply r WHERE r."postId" = ${fanPosts.id}
+        )`.as("replyCount"),
+      })
+      .from(fanPosts)
+      .innerJoin(users, eq(fanPosts.userId, users.id))
+      .$dynamic();
+    if (conds.length > 0) {
+      const whereClause = conds.length === 1 ? conds[0] : and(...conds);
+      if (whereClause) postQuery = postQuery.where(whereClause);
+    }
+
+    const rows = await postQuery.orderBy(desc(fanPosts.createdAt)).limit(limit);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        scope: row.scope,
+        targetId: row.targetId,
+        targetLabel: row.targetLabel,
+        kind: row.kind,
+        title: row.title,
+        excerpt: String(row.text ?? "").slice(0, 160),
+        imageCount: Array.isArray(row.images) ? row.images.length : 0,
+        hidden: row.hidden,
+        createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+        author: { id: row.authorId, name: row.authorName, email: row.authorEmail },
+        replyCount: toNumber(row.replyCount),
+      })),
+      meta: { limit, visibility, scope: scope || "all", generatedAt: new Date().toISOString() },
+    };
+  }
+
+  // 게시글 완전 삭제(답글 FK cascade). 숨김(가역)과 구분되는 비가역 조치.
+  async deleteCommunityPost(userId: string, postId: string) {
+    const admin = await requireAdminUser(userId);
+    if (!postId) throw new BadRequestException({ error: "postId가 필요해요." });
+    const result = await deleteFanPost(admin.id, postId, true);
+    if (!result.deleted) throw new BadRequestException({ error: "대상 게시물을 찾을 수 없어요." });
+    return { ok: true, id: postId };
+  }
+
+  // 첨부만 제거(본문 보존) — 권리침해 이미지 신고 대응용.
+  async clearCommunityPostAttachments(userId: string, postId: string) {
+    await requireAdminUser(userId);
+    await ensureCommunityTables();
+    if (!postId) throw new BadRequestException({ error: "postId가 필요해요." });
+    const rows = await db.update(fanPosts).set({ images: [] }).where(eq(fanPosts.id, postId)).returning({ id: fanPosts.id });
+    if (!rows.length) throw new BadRequestException({ error: "대상 게시물을 찾을 수 없어요." });
+    return { ok: true, id: postId, imageCount: 0 };
+  }
+
+  // ── 회원 관리(/admin/members) ──────────────────────────────────────────
+  async listUsers(userId: string, query: { q?: string | null; limit?: number | string | null } = {}) {
+    await requireAdminUser(userId);
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const search = String(query.q ?? "").trim().toLowerCase();
+
+    let userQuery = db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        createdAt: users.createdAt,
+        postCount: sql<number>`(
+          SELECT count(*) FROM fan_post p WHERE p."userId" = ${users.id}
+        )`.as("postCount"),
+        reviewCount: sql<number>`(
+          SELECT count(*) FROM review r WHERE r."userId" = ${users.id}
+        )`.as("reviewCount"),
+      })
+      .from(users)
+      .$dynamic();
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`;
+      const cond = or(
+        sql`lower(coalesce(${users.name}, '')) LIKE ${pattern} ESCAPE '\\'`,
+        sql`lower(coalesce(${users.email}, '')) LIKE ${pattern} ESCAPE '\\'`
+      );
+      if (cond) userQuery = userQuery.where(cond);
+    }
+
+    const rows = await userQuery.orderBy(desc(users.createdAt)).limit(limit);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        role: normalizeRole(row.role),
+        createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+        postCount: toNumber(row.postCount),
+        reviewCount: toNumber(row.reviewCount),
+      })),
+      meta: { limit, generatedAt: new Date().toISOString() },
+    };
+  }
+
+  // 역할 변경 — 자기 자신은 변경 불가(콘솔 잠금 사고 방지).
+  async setUserRole(userId: string, targetUserId: string, roleValue: unknown) {
+    const admin = await requireAdminUser(userId);
+    const role = String(roleValue ?? "").toLowerCase();
+    if (!["user", "creator", "operator", "admin"].includes(role)) {
+      throw new BadRequestException({ error: "지원하지 않는 역할이에요." });
+    }
+    if (!targetUserId) throw new BadRequestException({ error: "대상 사용자가 필요해요." });
+    if (targetUserId === admin.id) {
+      throw new BadRequestException({ error: "자기 자신의 역할은 변경할 수 없어요." });
+    }
+    const rows = await db.update(users).set({ role }).where(eq(users.id, targetUserId)).returning({ id: users.id });
+    if (!rows.length) throw new BadRequestException({ error: "대상 사용자를 찾을 수 없어요." });
+    return { ok: true, id: targetUserId, role };
   }
 
   async getDashboard(userId: string, periodDays: number): Promise<DashboardResponse> {

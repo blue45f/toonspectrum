@@ -30,10 +30,8 @@ const PAYLOAD = {
 };
 
 describe("policy URL builders", () => {
-  it("points at the TermsDesk public API / public page for the webtoon-index org", () => {
-    expect(policyApiUrl("terms-of-service")).toBe(
-      "https://termsdesk.vercel.app/api/public/webtoon-index/policies/terms-of-service"
-    );
+  it("points policy fetches at the same-origin API proxy and source links at TermsDesk", () => {
+    expect(policyApiUrl("terms-of-service")).toBe("/api/legal/policies/terms-of-service");
     expect(policyPublicUrl("privacy-policy")).toBe(
       "https://termsdesk.vercel.app/p/webtoon-index/privacy-policy"
     );

@@ -98,6 +98,50 @@ export class AdminController {
     return this.adminService.setContentVisibility(uid, type, id, !!body.hidden);
   }
 
+  // ── 커뮤니티 모더레이션(/admin/community 분할 라우트) ──────────────────
+  @Get("community/posts")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listCommunityPosts(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { scope?: string; q?: string; visibility?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.listCommunityPosts(uid, query);
+  }
+
+  @Delete("community/posts/:id")
+  async deleteCommunityPost(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deleteCommunityPost(uid, id);
+  }
+
+  @Post("community/posts/:id/attachments/clear")
+  async clearCommunityPostAttachments(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.clearCommunityPostAttachments(uid, id);
+  }
+
+  // ── 회원 관리(/admin/members 분할 라우트) ──────────────────────────────
+  @Get("users")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listUsers(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { q?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.listUsers(uid, query);
+  }
+
+  @Post("users/:id/role")
+  async setUserRole(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { role?: unknown }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.setUserRole(uid, id, body.role);
+  }
+
   @Get("dashboard")
   @Header("Cache-Control", "no-store, max-age=0")
   async getDashboard(

@@ -1,6 +1,8 @@
 // TermsDesk(중앙 약관 게시 서비스)의 공개 API에서 게시 정본을 읽어 오는 순수 로직.
-// 무인증·CORS 전체 허용 엔드포인트라 브라우저에서 직접 호출한다.
+// 브라우저는 같은 출처 API 프록시(/api/legal/policies/:slug)를 호출하고,
+// 서버가 TermsDesk 공개 JSON을 대신 가져온다(CORS/프리플라이트 배포 차이 회피).
 // 본문은 마크다운/플레인텍스트가 섞일 수 있어 의존성 없이 최소 블록 파서로 렌더한다.
+import { apiPath } from "@/src/vite/api";
 
 export const TERMSDESK_BASE = "https://termsdesk.vercel.app";
 export const TERMSDESK_ORG_SLUG = "webtoon-index";
@@ -18,7 +20,7 @@ export interface PolicyDocument {
 
 /** JSON 엔드포인트(GET, 무인증). */
 export function policyApiUrl(slug: string): string {
-  return `${TERMSDESK_BASE}/api/public/${TERMSDESK_ORG_SLUG}/policies/${slug}`;
+  return apiPath(`/legal/policies/${slug}`);
 }
 
 /** 사람이 보는 TermsDesk 게시 페이지 — 에러 폴백·원문 확인 링크로 쓴다. */
