@@ -31,6 +31,9 @@ const TABS: { value: GalleryTab; label: string }[] = [
   { value: "following", label: "팔로잉" },
 ];
 
+const CREATOR_BOARD_HERO = "/assets/create/creator-board-hero.png";
+const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
+
 function isSort(value: string | null): value is WorkSort {
   return value === "recent" || value === "likes" || value === "views";
 }
@@ -82,7 +85,13 @@ function WorksTab({ sort, tag }: { sort: WorkSort; tag: string }) {
   if (works.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
-        <PenLine size={26} className="mx-auto mb-3 text-fg-3" />
+        <img
+          src={CREATOR_BOARD_EMPTY}
+          alt=""
+          className="mx-auto mb-5 aspect-square w-40 max-w-full rounded-2xl object-cover"
+          loading="lazy"
+          decoding="async"
+        />
         <p className="text-sm font-medium text-fg">
           {tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "아직 등록된 창작물이 없습니다."}
         </p>
@@ -291,75 +300,62 @@ export function CreateGalleryPage() {
 
   return (
     <Container size="wide" className="py-10">
-      <header className="mb-7 overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Sparkles size={14} /> CREATOR BOARD
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">창작 게시판</h1>
-            <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              직접 그린 컷툰과 업로드한 작품을 자유롭게 공유하는 공간입니다. 연재 시리즈를 만들고,
-              챌린지에 참여하고, 좋아하는 창작자를 팔로우해 보세요.
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Link
-              href="/create/challenges"
-              className={buttonClass({ variant: "outline", className: "gap-1.5" })}
-            >
-              <Trophy size={16} />
-              창작 챌린지
-            </Link>
-            <Link href="/studio" className={buttonClass({ variant: "solid", className: "gap-1.5" })}>
-              <PenLine size={16} />
-              창작 스튜디오로 만들기
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          {/* 탭: 전체 작품 / 시리즈 / 팔로잉 */}
-          <div role="tablist" aria-label="보기" className="flex flex-wrap gap-1.5">
-            {TABS.map((option) => {
-              const on = option.value === tab;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setParam("tab", option.value === "works" ? null : option.value)}
-                  className={cn(
-                    "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
-                    on
-                      ? "border-accent bg-accent text-on-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised"
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+      <header className="relative mb-7 overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 shadow-sm sm:p-6">
+        <img
+          src={CREATOR_BOARD_HERO}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.1_0.015_245/0.92)] via-[oklch(0.1_0.015_245/0.72)] to-[oklch(0.1_0.015_245/0.18)]" />
+        <div className="relative flex min-h-[230px] flex-col justify-between gap-7">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="eyebrow flex items-center gap-1.5 text-accent">
+                <Sparkles size={14} /> CREATOR BOARD
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">창작 게시판</h1>
+              <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-white/78">
+                직접 그린 컷툰과 업로드한 작품을 자유롭게 공유하는 공간입니다. 연재 시리즈를 만들고,
+                챌린지에 참여하고, 좋아하는 창작자를 팔로우해 보세요.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Link
+                href="/create/challenges"
+                className={buttonClass({
+                  variant: "outline",
+                  className: "gap-1.5 border-white/30 bg-white/10 text-white backdrop-blur-md hover:bg-white/20",
+                })}
+              >
+                <Trophy size={16} />
+                창작 챌린지
+              </Link>
+              <Link href="/studio" className={buttonClass({ variant: "solid", className: "gap-1.5" })}>
+                <PenLine size={16} />
+                창작 스튜디오로 만들기
+              </Link>
+            </div>
           </div>
 
-          {/* 정렬(작품·시리즈 탭에서만) */}
-          {tab !== "following" && (
-            <div role="tablist" aria-label="정렬" className="ml-1 flex flex-wrap gap-1.5 border-l border-line pl-3">
-              {SORTS.map((option) => {
-                const on = option.value === sort;
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/15 pt-4">
+            {/* 탭: 전체 작품 / 시리즈 / 팔로잉 */}
+            <div role="tablist" aria-label="보기" className="flex flex-wrap gap-1.5">
+              {TABS.map((option) => {
+                const on = option.value === tab;
                 return (
                   <button
                     key={option.value}
                     type="button"
                     role="tab"
                     aria-selected={on}
-                    onClick={() => setParam("sort", option.value)}
+                    onClick={() => setParam("tab", option.value === "works" ? null : option.value)}
                     className={cn(
-                      "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] transition-colors",
+                      "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] font-medium transition-colors",
                       on
-                        ? "border-accent/60 bg-accent-soft/55 text-fg"
-                        : "border-line bg-card text-fg-2 hover:bg-raised"
+                        ? "border-accent bg-accent text-on-accent"
+                        : "border-white/18 bg-white/10 text-white/78 backdrop-blur-md hover:bg-white/15"
                     )}
                   >
                     {option.label}
@@ -367,18 +363,44 @@ export function CreateGalleryPage() {
                 );
               })}
             </div>
-          )}
 
-          {tag && tab === "works" && (
-            <button
-              type="button"
-              onClick={() => setParam("tag", null)}
-              className="ml-auto inline-flex h-8 items-center gap-1 rounded-full border border-accent/50 bg-accent-soft/50 px-3 text-[0.8125rem] text-accent transition-colors hover:bg-accent-soft"
-            >
-              #{tag}
-              <X size={13} />
-            </button>
-          )}
+            {/* 정렬(작품·시리즈 탭에서만) */}
+            {tab !== "following" && (
+              <div role="tablist" aria-label="정렬" className="ml-1 flex flex-wrap gap-1.5 border-l border-white/15 pl-3">
+                {SORTS.map((option) => {
+                  const on = option.value === sort;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setParam("sort", option.value)}
+                      className={cn(
+                        "inline-flex h-8 items-center rounded-full border px-3.5 text-[0.8125rem] transition-colors",
+                        on
+                          ? "border-accent/70 bg-accent text-white"
+                          : "border-white/18 bg-white/10 text-white/78 backdrop-blur-md hover:bg-white/15"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {tag && tab === "works" && (
+              <button
+                type="button"
+                onClick={() => setParam("tag", null)}
+                className="ml-auto inline-flex h-8 items-center gap-1 rounded-full border border-accent/50 bg-accent-soft/70 px-3 text-[0.8125rem] text-white transition-colors hover:bg-accent-soft"
+              >
+                #{tag}
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

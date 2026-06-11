@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  adaptationsOf,
   allTitles,
   getCatalogState,
   replaceCatalogData,
 } from "../server/catalog-store";
+import { makeTitle } from "./fixtures";
 
 describe("runtime catalog store", () => {
   const originalTitles = allTitles();
@@ -31,6 +33,26 @@ describe("runtime catalog store", () => {
       titleCount: 0,
       seedFallback: false,
     });
+  });
+
+  it("원작→2차창작 색인을 로드 시 구성해 adaptationsOf 가 전체 스캔 없이 동작한다", () => {
+    const original = makeTitle({ id: "novel-1", type: "webnovel" });
+    const adaptation = makeTitle({ id: "toon-1", adaptedFrom: "novel-1" });
+    const unrelated = makeTitle({ id: "toon-2" });
+    replaceCatalogData([original, adaptation, unrelated], {
+      source: "database-snapshot",
+      sourceVersion: "adaptations-index-test",
+    });
+
+    expect(adaptationsOf(original).map((t) => t.id)).toEqual(["toon-1"]);
+    expect(adaptationsOf(adaptation)).toEqual([]);
+    // 반환 배열을 변형해도 내부 색인은 오염되지 않는다(방어적 복사)
+    adaptationsOf(original).pop();
+    expect(adaptationsOf(original)).toHaveLength(1);
+
+    // 카탈로그 교체 시 색인도 함께 재구성된다
+    replaceCatalogData([unrelated], { source: "database-snapshot", sourceVersion: "adaptations-rebuild" });
+    expect(adaptationsOf(original)).toEqual([]);
   });
 
   it("리뷰 파일 seed API를 런타임 카탈로그 저장소에 노출하지 않는다", async () => {

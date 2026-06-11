@@ -9,9 +9,10 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
 } from "@nestjs/common";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { CatalogService } from "./catalog.service";
 import { getAppConfig } from "../../../../../lib/server/app-config";
 
@@ -164,17 +165,18 @@ export class CatalogController {
   @Post("/catalog/ingest/run")
   @Header("Cache-Control", "no-store, max-age=0")
   async runCatalogIngest(
+    @Req() req: Request,
     @Body() body: CatalogIngestPayload,
     @Headers("x-catalog-ingest-token") token?: string,
     @Headers("x-user-id") userId?: string
   ) {
-    return this.catalogService.runCatalogIngest(body ?? {}, token, userId);
+    return this.catalogService.runCatalogIngest(body ?? {}, token, userId, clientKeyFromRequest(req));
   }
 
   @Post("/catalog/refresh")
   @Header("Cache-Control", "no-store, max-age=0")
-  async refreshCatalog(@Headers("x-catalog-ingest-token") token?: string) {
-    return this.catalogService.refreshCatalog(token);
+  async refreshCatalog(@Req() req: Request, @Headers("x-catalog-ingest-token") token?: string) {
+    return this.catalogService.refreshCatalog(token, clientKeyFromRequest(req));
   }
 
   @Get("/explore")
@@ -234,6 +236,15 @@ export class CatalogController {
     if (!data) throw new NotFoundException("not_found");
     return data;
   }
+}
+
+// 레이트리밋 키용 클라이언트 식별자. 주의: x-forwarded-for 맨 왼쪽은 위조 가능(베이스라인 한계,
+// lib/rate-limit.ts 의 clientIp와 동일한 전제) — 신뢰 프록시 뒤에서는 플랫폼 보장 IP로 교체할 것.
+function clientKeyFromRequest(req: Request): string {
+  const xff = req.headers["x-forwarded-for"];
+  const first = Array.isArray(xff) ? xff[0] : xff;
+  if (typeof first === "string" && first.trim()) return first.split(",")[0].trim();
+  return req.socket?.remoteAddress ?? "unknown";
 }
 
 function normalizeQueryMap(query: QueryMap): Record<string, string> {

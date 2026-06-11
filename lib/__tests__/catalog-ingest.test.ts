@@ -1,11 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  STALE_RUN_GRACE_MS,
   evaluateRegression,
   extractSourceCounts,
+  getCatalogIngestStatus,
   normalizeCatalogIngestConfig,
   parseCrawlerJsonPayload,
+  refreshCatalogIfChanged,
+  runCatalogIngest,
+  safeTokenEqual,
+  staleCatalogRunCutoff,
+  verifyCatalogIngestToken,
 } from "../server/catalog-ingest";
+import { isAdminUser } from "../server/app-config";
 import { buildCatalogSourcePlan } from "../server/catalog-sources";
+
+// Nest CatalogService(수동 ingest 경로) 검증용 부분 mock — 순수 함수(verify/normalize/…)는 실제 구현 유지,
+// DB/크롤 프로세스를 만지는 함수만 스텁한다. 서비스가 같은 모듈을 다른 상대경로로 import해도 동일 모듈로 적용된다.
+vi.mock("../server/catalog-ingest", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../server/catalog-ingest")>();
+  return {
+    ...original,
+    runCatalogIngest: vi.fn(),
+    getCatalogIngestStatus: vi.fn(),
+    refreshCatalogIfChanged: vi.fn(),
+    loadLatestCatalogSnapshotFromDb: vi.fn(),
+    reapStaleCatalogIngestRuns: vi.fn(async () => 0),
+  };
+});
+
+vi.mock("../server/app-config", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../server/app-config")>();
+  return { ...original, isAdminUser: vi.fn(async () => false) };
+});
 
 describe("catalog ingest helpers", () => {
   it("crawler stdout에서 JSON 페이로드를 안전하게 파싱한다", () => {
@@ -96,5 +123,209 @@ describe("catalog ingest 품질 게이트", () => {
     expect(extractSourceCounts({ sources: { naverWebtoon: 10, x: "nope" } })).toEqual({ naverWebtoon: 10 });
     expect(extractSourceCounts(null)).toBeNull();
     expect(extractSourceCounts({ sources: {} })).toBeNull();
+  });
+});
+
+describe("수동 ingest 토큰 검증(타이밍 세이프)", () => {
+  it("safeTokenEqual — 일치할 때만 true, 빈 값/비문자열은 항상 false", () => {
+    expect(safeTokenEqual("secret", "secret")).toBe(true);
+    expect(safeTokenEqual("secret", "Secret")).toBe(false);
+    expect(safeTokenEqual("secret", "secret-longer")).toBe(false);
+    expect(safeTokenEqual("secret", "")).toBe(false);
+    expect(safeTokenEqual("", "")).toBe(false);
+    expect(safeTokenEqual("secret", 123)).toBe(false);
+    expect(safeTokenEqual("secret", undefined)).toBe(false);
+  });
+
+  it("verifyCatalogIngestToken — 미설정이면 어떤 후보도 not-configured", () => {
+    expect(verifyCatalogIngestToken("")).toBe("not-configured");
+    expect(verifyCatalogIngestToken("", "")).toBe("not-configured");
+    expect(verifyCatalogIngestToken("", "anything")).toBe("not-configured");
+  });
+
+  it("verifyCatalogIngestToken — 헤더/바디 중 하나만 일치해도 ok, 모두 불일치면 invalid", () => {
+    expect(verifyCatalogIngestToken("tok", "tok", undefined)).toBe("ok");
+    expect(verifyCatalogIngestToken("tok", "", "tok")).toBe("ok");
+    expect(verifyCatalogIngestToken("tok", "nope", "wrong")).toBe("invalid");
+    expect(verifyCatalogIngestToken("tok")).toBe("invalid");
+  });
+
+  it("normalizeCatalogIngestConfig — 토큰을 트림하고 공백뿐이면 미설정 처리", () => {
+    expect(normalizeCatalogIngestConfig({ CATALOG_INGEST_TRIGGER_TOKEN: "  tok\n" }).triggerToken).toBe("tok");
+    expect(normalizeCatalogIngestConfig({ CATALOG_INGEST_TRIGGER_TOKEN: "   " }).triggerToken).toBe("");
+    expect(normalizeCatalogIngestConfig({}).triggerToken).toBe("");
+  });
+});
+
+describe("좀비 running 이력 정리 기준", () => {
+  it("staleCatalogRunCutoff — 타임아웃+유예보다 오래된 시각을 컷오프로 잡는다", () => {
+    const now = Date.UTC(2026, 5, 12, 0, 0, 0);
+    const cutoff = staleCatalogRunCutoff(600_000, now);
+    expect(cutoff.getTime()).toBe(now - 600_000 - STALE_RUN_GRACE_MS);
+  });
+});
+
+describe("CatalogService 수동 ingest 엔드포인트 경로", () => {
+  const ORIGINAL_TOKEN = process.env.CATALOG_INGEST_TRIGGER_TOKEN;
+  const ORIGINAL_MODE = process.env.CATALOG_INGEST_MODE;
+
+  afterEach(() => {
+    if (ORIGINAL_TOKEN == null) delete process.env.CATALOG_INGEST_TRIGGER_TOKEN;
+    else process.env.CATALOG_INGEST_TRIGGER_TOKEN = ORIGINAL_TOKEN;
+    if (ORIGINAL_MODE == null) delete process.env.CATALOG_INGEST_MODE;
+    else process.env.CATALOG_INGEST_MODE = ORIGINAL_MODE;
+    vi.clearAllMocks();
+  });
+
+  async function makeService(token: string | null) {
+    if (token == null) delete process.env.CATALOG_INGEST_TRIGGER_TOKEN;
+    else process.env.CATALOG_INGEST_TRIGGER_TOKEN = token;
+    process.env.CATALOG_INGEST_MODE = "off";
+    const { CatalogService } = await import("../../apps/api/src/modules/catalog/catalog.service");
+    // onModuleInit은 호출하지 않는다(스케줄러/카탈로그 로드 없이 수동 ingest 경로만 검증).
+    return new CatalogService();
+  }
+
+  const fakeResult = {
+    runId: "run-1",
+    status: "success" as const,
+    source: "crawl.mjs",
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    durationMs: 1000,
+    titleCount: 3,
+    runHash: "hash",
+    snapshotId: "snap-1",
+    duplicate: false,
+    message: "snapshot stored",
+    error: null,
+  };
+
+  it("토큰 미설정 + 비관리자 → 401(명확한 미구성 메시지)", async () => {
+    const service = await makeService(null);
+    const error = await service
+      .runCatalogIngest({ token: "anything" }, undefined, undefined, "rl-unset")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number; message: string });
+    expect(error?.getStatus()).toBe(401);
+    expect(error?.message).toContain("not configured");
+    expect(vi.mocked(runCatalogIngest)).not.toHaveBeenCalled();
+  });
+
+  it("잘못된 토큰 → 401, 올바른 헤더 토큰 → 실행", async () => {
+    const service = await makeService("tok-1");
+    const bad = await service
+      .runCatalogIngest({}, "wrong", undefined, "rl-bad")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number });
+    expect(bad?.getStatus()).toBe(401);
+    expect(vi.mocked(runCatalogIngest)).not.toHaveBeenCalled();
+
+    vi.mocked(runCatalogIngest).mockResolvedValueOnce(fakeResult);
+    const ok = await service.runCatalogIngest({}, "tok-1", undefined, "rl-good");
+    expect(ok.runId).toBe("run-1");
+    expect(vi.mocked(runCatalogIngest)).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredBy: "manual", requestedBy: "manual" })
+    );
+  });
+
+  it("body 토큰만으로도 인증된다", async () => {
+    const service = await makeService("tok-2");
+    vi.mocked(runCatalogIngest).mockResolvedValueOnce(fakeResult);
+    const result = await service.runCatalogIngest({ token: "tok-2", requestedBy: "cron" }, undefined, undefined, "rl-body");
+    expect(result.status).toBe("success");
+    expect(vi.mocked(runCatalogIngest)).toHaveBeenCalledWith(expect.objectContaining({ requestedBy: "cron" }));
+  });
+
+  it("관리자(x-user-id)는 토큰 없이 실행 가능", async () => {
+    const service = await makeService("tok-3");
+    vi.mocked(isAdminUser).mockResolvedValueOnce(true);
+    vi.mocked(runCatalogIngest).mockResolvedValueOnce(fakeResult);
+    const result = await service.runCatalogIngest({}, undefined, "admin-user", "rl-admin");
+    expect(result.runId).toBe("run-1");
+    expect(vi.mocked(isAdminUser)).toHaveBeenCalledWith("admin-user");
+  });
+
+  it("실행 중 재요청 → 409, 완료 후엔 다시 실행 가능", async () => {
+    const service = await makeService("tok-4");
+    let release: (value: typeof fakeResult) => void = () => undefined;
+    vi.mocked(runCatalogIngest).mockImplementationOnce(
+      () => new Promise((resolve) => { release = resolve; })
+    );
+
+    const first = service.runCatalogIngest({}, "tok-4", undefined, "rl-c1");
+    const conflict = await service
+      .runCatalogIngest({}, "tok-4", undefined, "rl-c2")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number });
+    expect(conflict?.getStatus()).toBe(409);
+
+    release(fakeResult);
+    await expect(first).resolves.toMatchObject({ runId: "run-1" });
+
+    vi.mocked(runCatalogIngest).mockResolvedValueOnce(fakeResult);
+    await expect(service.runCatalogIngest({}, "tok-4", undefined, "rl-c3")).resolves.toMatchObject({
+      status: "success",
+    });
+  });
+
+  it("크롤 실패 → 502(Bad Gateway)로 매핑되고 메시지가 보존된다", async () => {
+    const service = await makeService("tok-5");
+    vi.mocked(runCatalogIngest).mockRejectedValueOnce(new Error("crawler returned no valid titles"));
+    const error = await service
+      .runCatalogIngest({}, "tok-5", undefined, "rl-fail")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number; message: string });
+    expect(error?.getStatus()).toBe(502);
+    expect(error?.message).toContain("no valid titles");
+  });
+
+  it("같은 클라이언트가 1분에 5회 초과 호출하면 429", async () => {
+    const service = await makeService("tok-6");
+    vi.mocked(runCatalogIngest).mockResolvedValue(fakeResult);
+    for (let i = 0; i < 5; i++) {
+      await service.runCatalogIngest({}, "tok-6", undefined, "rl-burst");
+    }
+    const blocked = await service
+      .runCatalogIngest({}, "tok-6", undefined, "rl-burst")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number });
+    expect(blocked?.getStatus()).toBe(429);
+    // 다른 클라이언트 키는 영향 없음
+    await expect(service.runCatalogIngest({}, "tok-6", undefined, "rl-other")).resolves.toBeTruthy();
+  });
+
+  it("status — 스케줄러 정보(inProgress·nextRunAt·연속실패)를 합쳐 반환", async () => {
+    const service = await makeService("tok-7");
+    vi.mocked(getCatalogIngestStatus).mockResolvedValueOnce({
+      config: { mode: "off" },
+      sourcePlan: { enabled: [], pending: [] },
+      currentSnapshot: null,
+      catalogState: { titleCount: 0 },
+      recentRuns: [],
+      generatedAt: new Date().toISOString(),
+    } as unknown as Awaited<ReturnType<typeof getCatalogIngestStatus>>);
+
+    const status = await service.getCatalogIngestStatus();
+    expect(status.scheduler).toMatchObject({
+      running: false,
+      inProgress: false,
+      nextRunAt: null,
+      consecutiveFailures: 0,
+    });
+    expect(status.currentSnapshot).toBeNull();
+    expect(Array.isArray(status.recentRuns)).toBe(true);
+  });
+
+  it("refreshCatalog — 토큰 설정 시 불일치 401, 일치하면 핫 리로드 호출", async () => {
+    const service = await makeService("tok-8");
+    const bad = await service
+      .refreshCatalog("wrong", "rl-refresh-bad")
+      .then(() => null)
+      .catch((e: unknown) => e as { getStatus(): number });
+    expect(bad?.getStatus()).toBe(401);
+
+    vi.mocked(refreshCatalogIfChanged).mockResolvedValueOnce({ reloaded: false, snapshotId: null, titleCount: 0 });
+    await expect(service.refreshCatalog("tok-8", "rl-refresh-ok")).resolves.toMatchObject({ reloaded: false });
   });
 });

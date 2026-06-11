@@ -1,6 +1,9 @@
+import "reflect-metadata";
 import {
-  BadRequestException,
+  BadGatewayException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   OnModuleInit,
   UnauthorizedException,
@@ -15,7 +18,8 @@ import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } f
 import { isAdminUser } from "../../../../../lib/server/app-config";
 import { getAuthorData } from "../../../../../lib/server/author";
 import { getCalendarData } from "../../../../../lib/server/calendar";
-import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
+import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
+import { rateLimit } from "../../../../../lib/rate-limit";
 import { getExploreData } from "../../../../../lib/server/explore";
 import { getHomeData } from "../../../../../lib/server/home";
 import { getInsightsData } from "../../../../../lib/server/insights";
@@ -136,9 +140,12 @@ export class CatalogService implements OnModuleInit {
   }
 
   // 강제 리로드(엔드포인트용) — 변경 없으면 reloaded:false. 토큰 설정 시 일치 필요(reload는 read-only).
-  async refreshCatalog(headerToken?: string) {
-    if (this.ingestConfig.triggerToken && headerToken !== this.ingestConfig.triggerToken) {
-      throw new UnauthorizedException("invalid catalog ingest token");
+  async refreshCatalog(headerToken?: string, clientKey = "unknown") {
+    this.assertIngestRateLimit("refresh", clientKey, 10);
+    if (this.ingestConfig.triggerToken) {
+      if (verifyCatalogIngestToken(this.ingestConfig.triggerToken, headerToken) !== "ok") {
+        throw new UnauthorizedException("invalid catalog ingest token");
+      }
     }
     return refreshCatalogIfChanged();
   }
@@ -369,7 +376,9 @@ export class CatalogService implements OnModuleInit {
     };
   }
 
-  async runCatalogIngest(payload: IngestRunPayload, headerToken?: string, userId?: string) {
+  async runCatalogIngest(payload: IngestRunPayload, headerToken?: string, userId?: string, clientKey = "unknown") {
+    // 연타·토큰 무차별 대입 방지 — 인증 검사보다 먼저 적용해 실패 시도도 카운트한다.
+    this.assertIngestRateLimit("run", clientKey, 5);
     await this.assertIngestAuthorized(payload, headerToken, userId);
     return this.runCatalogIngestOnce({
       requestedBy: typeof payload.requestedBy === "string" ? payload.requestedBy : "manual",
@@ -378,16 +387,27 @@ export class CatalogService implements OnModuleInit {
     });
   }
 
+  // 인메모리 슬라이딩 윈도(1분) — lib/rate-limit 재사용. 한도 초과 시 429.
+  private assertIngestRateLimit(scope: string, clientKey: string, limit: number) {
+    if (!rateLimit(`catalog-ingest:${scope}:${clientKey}`, limit, 60_000)) {
+      throw new HttpException("too many catalog ingest requests; retry later", HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
   private async assertIngestAuthorized(payload: IngestRunPayload, headerToken?: string, userId?: string) {
-    // 관리자(x-user-id)는 ingest 토큰 없이도 수동 크롤을 트리거할 수 있다.
+    // 관리자(서명 세션이 검증된 x-user-id)는 ingest 토큰 없이도 수동 크롤을 트리거할 수 있다.
     if (userId && (await isAdminUser(userId))) return;
 
-    // 토큰 인증 경로(cron·비관리자 호출). 토큰 미설정 시 토큰 인증은 사용할 수 없다.
-    if (!this.ingestConfig.triggerToken) {
+    // 토큰 인증 경로(cron·비관리자 호출). 비교는 타이밍 세이프, 토큰 미설정 시 토큰 인증은 사용할 수 없다.
+    const verdict = verifyCatalogIngestToken(
+      this.ingestConfig.triggerToken,
+      typeof payload.token === "string" ? payload.token : "",
+      headerToken
+    );
+    if (verdict === "not-configured") {
       throw new UnauthorizedException("catalog ingest token is not configured");
     }
-    const bodyToken = typeof payload.token === "string" ? payload.token : "";
-    if (bodyToken !== this.ingestConfig.triggerToken && headerToken !== this.ingestConfig.triggerToken) {
+    if (verdict !== "ok") {
       throw new UnauthorizedException("invalid catalog ingest token");
     }
   }
@@ -402,7 +422,8 @@ export class CatalogService implements OnModuleInit {
       })
       .catch((error) => {
         this.consecutiveIngestFailures += 1;
-        throw new BadRequestException(error instanceof Error ? error.message : "catalog ingest failed");
+        // 크롤/적재 실패는 클라이언트 요청 문제(4xx)가 아니라 업스트림 수집 실패 → 502.
+        throw new BadGatewayException(error instanceof Error ? error.message : "catalog ingest failed");
       })
       .finally(() => {
         this.ingestInProgress = null;

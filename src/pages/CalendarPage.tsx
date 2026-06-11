@@ -17,7 +17,7 @@ import {
   applyTitleFilters,
   countActiveTitleFilters,
 } from "@/lib/title-filters";
-import type { PlatformId, Title } from "@/lib/types";
+import type { PlatformId, Title, TitleCard } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CalendarDays, CalendarPlus, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
@@ -29,12 +29,19 @@ interface CalendarResponse {
   todayCount: number;
   totalScheduled: number;
   platformCoverage: { id: PlatformId; label: string; color: string; count: number; share: number }[];
-  days: { day: string; items: Title[] }[];
+  // 정적 calendar.json 은 경량 카드(TitleCard)를 싣는다(시놉시스·보러가기 URL·평점분포 생략).
+  // API 폴백 모드의 풀 Title 도 TitleCard 상위집합이라 같은 타입으로 소비한다.
+  days: { day: string; items: TitleCard[] }[];
   generatedAt: string;
 }
 
+// 카드가 읽는 필드(추정 배지 판별·공용 필터·ICS 내보내기 포함)는 경량 카드에 모두 들어 있어
+// Title 을 요구하는 공용 헬퍼에 안전하게 전달한다(lib/catalog-slim.ts 슬리밍 규약 참조).
+const asTitle = (card: TitleCard) => card as unknown as Title;
+const asTitleList = (cards: TitleCard[]) => cards as unknown as Title[];
+
 // 캘린더 작품 행 — 데스크톱 7열 컬럼과 모바일 요일 목록에서 공용.
-function CalItem({ title, className }: { title: Title; className?: string }) {
+function CalItem({ title, className }: { title: TitleCard; className?: string }) {
   return (
     <Link
       href={`/title/${title.slug}`}
@@ -49,7 +56,7 @@ function CalItem({ title, className }: { title: Title; className?: string }) {
           {title.title}
         </span>
         <span className="flex items-center justify-between gap-1">
-          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
+          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(asTitle(title))} size="xs" />
           <AvailabilityDots availability={title.availability} max={2} />
         </span>
       </span>
@@ -92,7 +99,7 @@ export function CalendarPage() {
   const days = anyFilterActive
     ? rawDays.map((d) => ({
         day: d.day,
-        items: applyTitleFilters(d.items, filters, savedIds),
+        items: applyTitleFilters(asTitleList(d.items), filters, savedIds),
       }))
     : rawDays;
   const totalScheduled = anyFilterActive
@@ -106,7 +113,7 @@ export function CalendarPage() {
 
   // ICS 내보내기 대상: 현재 필터가 적용된 보드의 고유 작품. 같은 작품이 여러 요일에 보이면
   // VEVENT 1건으로 합치고 보드 버킷 요일을 RRULE BYDAY 다중으로 넣는다.
-  const exportable = new Map<string, { title: Title; days: string[] }>();
+  const exportable = new Map<string, { title: TitleCard; days: string[] }>();
   for (const { day, items } of days) {
     for (const title of items) {
       const entry = exportable.get(title.id);
@@ -117,7 +124,7 @@ export function CalendarPage() {
   const exportIcs = () => {
     if (exportable.size === 0) return;
     const events = [...exportable.values()].map(({ title, days: titleDays }) =>
-      titleToWeeklyIcsEvent(title, titleDays)
+      titleToWeeklyIcsEvent(asTitle(title), titleDays)
     );
     downloadIcs(
       buildWeeklyIcs(events, { calendarName: "툰스펙트럼 연재 캘린더" }),

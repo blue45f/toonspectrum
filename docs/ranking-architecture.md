@@ -50,8 +50,12 @@ The Vite client normally reads ranking data from static files or computes filter
   - 동일 hash면 새 스냅샷을 만들지 않고 메모리 카탈로그만 새로고침
   - 변경 hash면 기존 스냅샷을 `isCurrent=false`로 내리고 새 스냅샷을 current로 저장
 - 운영 API:
-  - `GET /api/catalog/ingest/status`: current snapshot, 최근 실행 이력, 다음 실행 예정 시각
-  - `POST /api/catalog/ingest/run`: 수동 실행. `CATALOG_INGEST_TRIGGER_TOKEN`이 설정되어 있어야 하며, `x-catalog-ingest-token` 또는 body token과 일치해야 합니다.
+  - `GET /api/catalog/ingest/status`: current snapshot, 최근 실행 이력(좀비 `running` 행은 자동 정리), 다음 실행 예정 시각, `sourcePlan`
+  - `POST /api/catalog/ingest/run`: 수동 실행. 두 가지 인증 경로가 있습니다.
+    - 관리자 세션: 서명된 `x-user-id` 헤더(관리자 콘솔 → 운영 탭의 "지금 크롤 실행" 버튼)
+    - 토큰: `x-catalog-ingest-token` 헤더 또는 body `token`이 `CATALOG_INGEST_TRIGGER_TOKEN`과 일치(타이밍 세이프 비교). 토큰 미설정 시 토큰 인증 경로는 401로 거부됩니다.
+    - 이미 실행 중이면 `409`, 같은 클라이언트가 분당 5회를 초과하면 `429`, 크롤/적재 실패는 `502`로 응답합니다.
+  - `POST /api/catalog/refresh`: DB current 스냅샷 기준 메모리 카탈로그 강제 핫 리로드(read-only). 토큰 설정 시 `x-catalog-ingest-token` 일치 필요.
 
 ### 환경 변수
 
@@ -59,12 +63,12 @@ The Vite client normally reads ranking data from static files or computes filter
   기본은 `off`. 운영에서 플랫폼별 허용 범위를 확인한 뒤 `fixed`로 켭니다.
 - `CATALOG_INGEST_INTERVAL_SECONDS` (기본 `1800`, 최소 `60`)  
   API 내부 카탈로그 수집 주기. 정적 운영에서는 `catalog:gen`/재배포 주기와 별도입니다.
-- `CATALOG_INGEST_TIMEOUT_MS` (기본 `180000`, 최대 `600000`)  
-  한 번의 크롤 작업 제한 시간.
-- `CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB`  
-  JSON stdout 최대 버퍼.
+- `CATALOG_INGEST_TIMEOUT_MS` (기본 `600000`, 범위 `30000`~`1800000`)  
+  한 번의 크롤 작업 하드 제한 시간. 크롤러에는 `timeout - 30s`의 소프트 예산(`WEBDEX_CRAWL_BUDGET_MS`)이 주입되어 스스로 정리 후 JSON을 내보내며, 하드 타임아웃에 도달한 프로세스는 SIGKILL로 종료됩니다(좀비 방지).
+- `CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB` (기본 `64`, 범위 `1`~`200`)  
+  JSON stdout 최대 버퍼. 기본 소스셋의 크롤 결과는 수십 MB라 너무 낮추면 maxBuffer 초과로 ingest가 실패합니다.
 - `CATALOG_INGEST_TRIGGER_TOKEN`  
-  수동 실행 필수 토큰. 미설정이면 수동 실행 API는 거부됩니다.
+  수동 실행 토큰(앞뒤 공백은 무시·타이밍 세이프 비교). 미설정이면 토큰 인증 경로는 거부되고, 관리자 세션(`x-user-id`) 경로만 사용할 수 있습니다.
 - `WEBDEX_CRAWL_DELAY_MS`, `WEBDEX_WEBTOON_CAP`, `WEBDEX_WEBTOON_DETAIL_CAP`, `WEBDEX_SERIES_BONUS_CAP`, `WEBDEX_KAKAO_WEBTOON_CAP`, `WEBDEX_LEZHIN_CAP`, `WEBDEX_WEBTOON_FINISHED_PAGES`, `WEBDEX_SERIES_PAGES_PER_GENRE`
   플랫폼별 호출량과 범위를 제한하는 크롤러 안전장치입니다.
   - `WEBDEX_WEBTOON_CAP`은 전체 색인 개수 제한입니다. 비워두면 공개 목록 전체를 색인합니다.
@@ -311,7 +315,7 @@ Live variables below are preserved for `lib/server/live.ts`, but current ranking
 - `WEBDEX_LEZHIN_CAP`
 - `WEBDEX_SOURCE_IDS`
 
-`apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 라이브 스케줄러를 시작해 초기 요청 전 캐시 예열을 수행합니다.
+`apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 카탈로그를 로드하고(번들 파일 우선, 폴백 DB 스냅샷), 설정에 따라 카탈로그 수집 스케줄러와 핫 리로드 폴링만 기동합니다. 라이브 랭킹 스케줄러는 기동하지 않습니다(`disableLive=true`).
 
 ## Quality gates
 

@@ -21,6 +21,19 @@ function buildByIdIndex(titles: readonly Title[]) {
   return byId;
 }
 
+// 원작 id → 2차창작 목록 — adaptationsOf 가 호출마다 전체(24k+)를 스캔하지 않도록
+// 로드 시 1회 색인한다(정적 빌드의 buildHome 패밀리 계산이 O(n²) → O(n)).
+function buildAdaptationsIndex(titles: readonly Title[]) {
+  const byOriginal = new Map<string, Title[]>();
+  for (const title of titles) {
+    if (!title.adaptedFrom) continue;
+    const arr = byOriginal.get(title.adaptedFrom);
+    if (arr) arr.push(title);
+    else byOriginal.set(title.adaptedFrom, [title]);
+  }
+  return byOriginal;
+}
+
 function normalizeCatalog(titles: unknown): Title[] {
   if (!Array.isArray(titles)) return [];
   return titles.filter((item): item is Title => {
@@ -41,6 +54,7 @@ function normalizeCatalog(titles: unknown): Title[] {
 
 let TITLE_REVISION_COUNTER = 1;
 let BY_ID = buildByIdIndex([]);
+let ADAPTATIONS_BY_ORIGINAL = buildAdaptationsIndex([]);
 let TITLES_INTERNAL: Title[] = [];
 
 let TITLES_META: CatalogState = {
@@ -55,6 +69,7 @@ let TITLES_META: CatalogState = {
 
 function rebuildIndexes(nextTitles: readonly Title[]) {
   BY_ID = buildByIdIndex(nextTitles);
+  ADAPTATIONS_BY_ORIGINAL = buildAdaptationsIndex(nextTitles);
 }
 
 export let TITLES: Title[] = TITLES_INTERNAL;
@@ -226,7 +241,9 @@ export function originalOf(t: Title): Title | undefined {
 }
 
 export function adaptationsOf(t: Title): Title[] {
-  return TITLES.filter((x) => x.adaptedFrom === t.id);
+  // 색인 결과는 내부 배열이므로 호출부 변형으로부터 보호하기 위해 복사본을 돌려준다.
+  const adaptations = ADAPTATIONS_BY_ORIGINAL.get(t.id);
+  return adaptations ? [...adaptations] : [];
 }
 
 export function activeTags(): { tag: string; count: number }[] {

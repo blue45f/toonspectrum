@@ -1,9 +1,9 @@
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import { desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, lt, notInArray } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
 import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "./catalog-store";
 import type { Title } from "../types";
@@ -82,13 +82,39 @@ export function normalizeCatalogIngestConfig(env: EnvLike = process.env): Catalo
     // ingest가 실패한다. 기본값을 넉넉히 잡아 정식 파이프라인이 기본 소스셋에서도 동작하게 한다.
     maxOutputMb: parseBoundedInt(env.CATALOG_INGEST_SCRIPT_MAX_OUTPUT_MB, 64, 1, 200),
     scriptPath: env.CATALOG_CRAWL_SCRIPT || path.join("scripts", "crawl.mjs"),
-    triggerToken: env.CATALOG_INGEST_TRIGGER_TOKEN || "",
+    // 트림 필수: env 파일의 후행 공백/개행이 토큰에 섞이면 정상 토큰이 거부되고,
+    // 공백뿐인 값이 '설정된 토큰'으로 살아나는 것도 막는다(공백 토큰 = 미설정).
+    triggerToken: (env.CATALOG_INGEST_TRIGGER_TOKEN ?? "").trim(),
     sourceIds: parseCatalogSourceIds(env.WEBDEX_SOURCE_IDS),
     // 직전 스냅샷 대비 이 비율 미만으로 총건수가 급감하면(force 아니면) 승격 거부 (0<r<=1)
     minRetainRatio: parseBoundedRatio(env.CATALOG_INGEST_MIN_RETAIN_RATIO, 0.6),
     refreshPollSeconds: parseBoundedInt(env.CATALOG_REFRESH_POLL_SECONDS, 60, 0, 3600),
     snapshotRetention: parseBoundedInt(env.CATALOG_SNAPSHOT_RETENTION, 5, 1, 100),
   };
+}
+
+// 토큰 비교(타이밍 세이프) — sha256 다이제스트끼리 비교해 길이 차이로 인한 조기 반환도 없앤다.
+export function safeTokenEqual(expected: string, provided: unknown): boolean {
+  if (!expected || typeof provided !== "string" || !provided) return false;
+  const a = createHash("sha256").update(expected).digest();
+  const b = createHash("sha256").update(provided).digest();
+  return timingSafeEqual(a, b);
+}
+
+export type CatalogIngestTokenVerdict = "ok" | "not-configured" | "invalid";
+
+// 수동 ingest 토큰 검증. 토큰 미설정이면 토큰 인증 자체를 사용할 수 없다("not-configured").
+// 후보(헤더/바디)를 모두 평가해 단락(short-circuit)으로 인한 타이밍 차이를 줄인다.
+export function verifyCatalogIngestToken(
+  expectedToken: string,
+  ...candidates: unknown[]
+): CatalogIngestTokenVerdict {
+  if (!expectedToken) return "not-configured";
+  let matched = false;
+  for (const candidate of candidates) {
+    if (safeTokenEqual(expectedToken, candidate)) matched = true;
+  }
+  return matched ? "ok" : "invalid";
 }
 
 // 직전 current 스냅샷 통계(총건수·소스별 count) vs 신규 payload 비교 — 순수 함수(테스트 용이)
@@ -275,8 +301,36 @@ export async function refreshCatalogIfChanged(): Promise<{
   return { reloaded: true, snapshotId: loadedSnapshotId, titleCount: result.titleCount };
 }
 
+// 좀비 이력 정리 기준: startedAt 이 (타임아웃 + 유예)보다 오래된 running 행은 살아 있을 수 없다.
+// 프로세스가 run 도중 크래시/재시작하면 행이 'running' 으로 영원히 남아 status·이력이 왜곡되므로 failed 로 마감한다.
+export const STALE_RUN_GRACE_MS = 120_000;
+
+export function staleCatalogRunCutoff(timeoutMs: number, now: number = Date.now()): Date {
+  return new Date(now - timeoutMs - STALE_RUN_GRACE_MS);
+}
+
+export async function reapStaleCatalogIngestRuns(
+  config: CatalogIngestConfig = normalizeCatalogIngestConfig(),
+  now: number = Date.now()
+): Promise<number> {
+  await ensureCatalogIngestSchema();
+  const reaped = await db
+    .update(catalogIngestRuns)
+    .set({
+      status: "failed",
+      finishedAt: new Date(now),
+      message: null,
+      error: "stale running run reaped: process likely exited mid-run",
+    })
+    .where(and(eq(catalogIngestRuns.status, "running"), lt(catalogIngestRuns.startedAt, staleCatalogRunCutoff(config.timeoutMs, now))))
+    .returning({ id: catalogIngestRuns.id });
+  return reaped.length;
+}
+
 export async function getCatalogIngestStatus(config = normalizeCatalogIngestConfig()) {
   await ensureCatalogIngestSchema();
+  // 죽은 프로세스가 남긴 'running' 이력을 정리해 상태 응답이 유령 실행을 보고하지 않게 한다(실패해도 조회는 계속).
+  await reapStaleCatalogIngestRuns(config).catch(() => 0);
   const [currentSnapshot] = await db
     .select()
     .from(catalogSnapshots)
@@ -328,6 +382,8 @@ export async function getCatalogIngestStatus(config = normalizeCatalogIngestConf
 export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): Promise<CatalogIngestRunResult> {
   const config = options.config ?? normalizeCatalogIngestConfig();
   await ensureCatalogIngestSchema();
+  // 새 실행 기록 전에 좀비 running 행을 정리(이력 정확성). 정리 실패가 실행을 막지는 않는다.
+  await reapStaleCatalogIngestRuns(config).catch(() => 0);
 
   const runId = randomUUID();
   const startedAt = new Date();
@@ -460,17 +516,22 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
   } catch (error) {
     const finishedAt = new Date();
     const message = error instanceof Error ? error.message : "unknown ingest error";
-    await db
-      .update(catalogIngestRuns)
-      .set({
-        status: "failed",
-        finishedAt,
-        durationMs: finishedAt.getTime() - startedAt.getTime(),
-        titleCount: 0,
-        message: null,
-        error: message,
-      })
-      .where(eq(catalogIngestRuns.id, runId));
+    try {
+      await db
+        .update(catalogIngestRuns)
+        .set({
+          status: "failed",
+          finishedAt,
+          durationMs: finishedAt.getTime() - startedAt.getTime(),
+          titleCount: 0,
+          message: null,
+          error: message,
+        })
+        .where(eq(catalogIngestRuns.id, runId));
+    } catch (updateError) {
+      // 이력 기록 실패(DB 장애 등)가 원인 에러를 가리면 안 된다 — 원래 실패 메시지를 그대로 던진다.
+      console.error("catalog ingest: failed to record run failure", updateError);
+    }
     throw new Error(message);
   }
 }
@@ -501,6 +562,9 @@ async function executeCrawler(config: CatalogIngestConfig): Promise<CatalogCrawl
     cwd: base,
     encoding: "utf8",
     timeout: config.timeoutMs,
+    // 우아한 종료는 소프트 예산(WEBDEX_CRAWL_BUDGET_MS)이 담당한다. 하드 타임아웃까지 온 프로세스는
+    // 이미 비정상이므로 SIGKILL 로 확실히 제거해 SIGTERM 무시로 인한 좀비/행을 방지한다.
+    killSignal: "SIGKILL",
     maxBuffer: config.maxOutputMb * 1024 * 1024,
     env: {
       ...process.env,

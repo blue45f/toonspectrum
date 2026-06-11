@@ -93,6 +93,20 @@ export interface Title {
   editorNote?: string; // 에디터 한줄평
 }
 
+// ── 정적 카탈로그 경량 카드 (additive) ─────────────────────────
+// public/data 의 목록형 산출물(catalog.json, ranking/*.json 의 items[].title,
+// calendar.json 의 days[].items)은 전송량을 줄이기 위해 상세 전용 필드를 생략/축약한
+// 카드를 담는다(lib/catalog-slim.ts 규약). Title 은 TitleCard 의 상위집합이라 그대로
+// 대입 가능 — API 폴백 모드의 풀 Title 응답도 같은 타입으로 소비할 수 있다.
+export type TitleCardStats = Omit<TitleStats, "ratingDist"> & {
+  ratingDist?: TitleStats["ratingDist"]; // 상세 전용 — detail 샤드 병합 후에만 존재
+};
+
+export type TitleCard = Omit<Title, "stats" | "synopsis"> & {
+  synopsis?: string; // 카드 노출용 축약 시놉시스(캘린더 카드는 생략, 상세는 샤드 원문 병합)
+  stats: TitleCardStats;
+};
+
 // 리뷰 표시 모델(시드 또는 DB 리뷰 공통 형태)
 export interface SeedReview {
   id: string;

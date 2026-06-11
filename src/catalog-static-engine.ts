@@ -1,7 +1,8 @@
 // Dynamic static-catalog engine. This module intentionally contains the heavy
 // catalog query/ranking logic and is lazy-loaded by catalog-static.ts only when
 // a request cannot be served from precomputed CDN files.
-import type { PlatformId, ReadState, Title } from "@/lib/types";
+import type { PlatformId, ReadState, Title, TitleCard } from "@/lib/types";
+import { detailShardFile, mergeDetailExtra, type DetailShardFile } from "@/lib/catalog-slim";
 import {
   activeTags,
   adaptationsOf,
@@ -25,10 +26,12 @@ function ensureCatalog(origFetch: typeof fetch): Promise<void> {
   if (!catalogPromise) {
     // 표준 HTTP 캐시(max-age=600, ETag 재검증) 사용 — force-cache 는 스냅샷 갱신(신규 작품·
     // 영상화 등)을 재방문자에게 무기한 숨기므로 쓰지 않는다. 세션 내 1회만 로드(catalogPromise 메모).
+    // catalog.json 은 경량 카드(TitleCard — 축약 시놉시스, url/ratingDist 없음)를 싣는다.
+    // 상세 전용 필드는 /data/detail/<bucket>.json 샤드에서 필요할 때 병합(loadDetailExtra).
     catalogPromise = origFetch("/data/catalog.json", { cache: "default" })
       .then((r) => {
         if (!r.ok) throw new Error(`catalog.json ${r.status}`);
-        return r.json() as Promise<Title[]>;
+        return r.json() as Promise<TitleCard[]>;
       })
       .then((titles) => {
         replaceCatalogData(titles, { source: "database-snapshot", sourceVersion: "static-catalog" });
@@ -39,6 +42,24 @@ function ensureCatalog(origFetch: typeof fetch): Promise<void> {
       });
   }
   return catalogPromise;
+}
+
+// 상세 샤드(시놉시스 원문·보러가기 URL·평점분포) — 버킷 단위 메모. 실패는 캐시하지 않아
+// 다음 요청에서 재시도하며, 샤드가 없어도 경량 카드만으로 우아하게 동작한다.
+const detailShardCache = new Map<string, Promise<DetailShardFile | null>>();
+function loadDetailExtra(titleId: string, origFetch: typeof fetch) {
+  const file = detailShardFile(titleId);
+  let shard = detailShardCache.get(file);
+  if (!shard) {
+    shard = origFetch(`/data/${file}`, { cache: "default" })
+      .then((r) => (r.ok ? (r.json() as Promise<DetailShardFile>) : null))
+      .catch(() => null);
+    detailShardCache.set(file, shard);
+    void shard.then((value) => {
+      if (value === null) detailShardCache.delete(file);
+    });
+  }
+  return shard.then((value) => value?.[titleId]);
 }
 
 // ── catalog.service 의 응답 조립 로직 복제(동일 shape 유지) ──────────────
@@ -142,8 +163,10 @@ function safeRatingDist(stats: Title["stats"]): [number, number, number, number,
 async function titleDetail(slug: string, origFetch: typeof fetch) {
   const raw = getTitle(slug);
   if (!raw) return NOT_FOUND;
-  // 손상된 평점 분포를 보정한 사본(원본 캐시는 변형하지 않음).
-  const title: Title = { ...raw, stats: { ...raw.stats, ratingDist: safeRatingDist(raw.stats) } };
+  // 경량 카드에 상세 샤드(시놉시스 원문·보러가기 URL·평점분포)를 병합하고,
+  // 손상된 평점 분포를 보정한 사본을 만든다(원본 캐시는 변형하지 않음).
+  const merged = mergeDetailExtra(raw, await loadDetailExtra(raw.id, origFetch).catch(() => undefined));
+  const title: Title = { ...merged, stats: { ...merged.stats, ratingDist: safeRatingDist(merged.stats) } };
   const similar = similarTitles(TITLES, title, 8);
   const original = originalOf(title) ?? title;
   const adaptations = adaptationsOf(original);

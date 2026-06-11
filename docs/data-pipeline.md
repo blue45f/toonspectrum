@@ -65,6 +65,25 @@ flowchart TD
 | ④ STATIC/API | 카탈로그 질의 + 표지 프록시 + 동적 API | `src/catalog-static.ts`, `apps/api/src/modules/catalog/catalog.controller.ts`, `catalog.service.ts` | 검색·탐색·랭킹 기본은 정적/클라이언트 계산. `/api/cover`는 호스트 allowlist 통과분만 referer 붙여 업스트림서 받아 바이트 검증 후 스트리밍. |
 | ⑤ 화면 | 정적/API fetch → 표지/카드 렌더 | `src/pages/*`, `components/title-poster.tsx`, `components/cover-image.tsx`, `vite.config.ts` | `coverImage`(=`/api/cover`)를 `<img>`로 렌더, 실패 시 타이포그래픽 폴백. |
 
+## 정적 산출물 구조 — 경량 카드 + 상세 샤드 (`lib/catalog-slim.ts`)
+
+`pnpm catalog:gen`이 만드는 `public/data/*`는 **목록 경로(카드·검색·랭킹·추천)가 읽는 필드만 담은
+경량 카드**와 **상세 전용 샤드**로 분리되어 있다. `apps/api/data/catalog.json.gz`(정규화 Title[] 교환
+포맷)와 DB `catalog_snapshot` 계약은 그대로다 — 슬리밍은 정적 산출 단계에서만 일어난다.
+
+| 산출물 | 내용 | 비고 |
+|---|---|---|
+| `catalog.json` | 전체 작품의 경량 카드(`TitleCard`) — 시놉시스는 카드 노출 한도(160자)로 축약, `availability[].url`·`stats.ratingDist` 제거 | 클라이언트 엔진(`src/catalog-static-engine.ts`) 입력. 24.6k 기준 원시 22.0→19.2MB |
+| `detail/<00–7f>.json` | 상세 전용 필드 샤드 — `{ [id]: { s: 시놉시스 원문, u: availability url 배열(순서 정렬), d: ratingDist } }`. id의 djb2 해시 % 128 버킷 | 상세/비교 화면에서 버킷 1개만 추가 fetch(원시 ~28KB, 압축 ~9KB) 후 `mergeDetailExtra`로 병합 |
+| `calendar.json` | `days[].items`가 경량 카드(시놉시스 제외) | 원시 2.08→1.62MB. API 폴백 모드의 풀 Title 응답과 동일 필드만 소비(CalendarPage) |
+| `ranking/*.json` | `items[].title`이 경량 카드(축약 시놉시스 포함) | rank-row·ranking-board·`explainScore`가 읽는 스칼라 stats는 전부 유지 |
+| `home.json`·`insights.json`·`tags.json`·`authors.json` | 변경 없음(이미 소형·사전계산) | insights는 ratingDist가 필요해 빌드 시 풀 데이터로 계산 |
+
+소비 규칙: 엔진의 `/api/titles/:slug`(상세)는 샤드를 병합한 풀 Title을 돌려주고, 비교 화면은 선택
+확정 시 상세 엔드포인트로 보강한다(`components/compare-view.tsx`). 샤드 fetch가 실패해도 경량 카드만으로
+우아하게 동작한다(보러가기 링크만 "준비 중" 표시). 캐싱은 `vercel.json`의 `/data/(.*)` 헤더와
+서비스워커 SWR 전략이 샤드까지 동일하게 커버한다.
+
 ## 수집 소스 (현재)
 
 - **실크롤(crawler) — 19개 슬롯**: 네이버웹툰, 네이버시리즈, 카카오웹툰, 카카오페이지, 레진, 리디, 문피아, 조아라, 노벨피아, 봄툰, 탑툰, 포스타입, 미스터블루, 코미코, 투믹스, 북큐브, 원스토리, 교보문고, 예스24.
