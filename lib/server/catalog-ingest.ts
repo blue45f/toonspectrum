@@ -30,8 +30,9 @@ export interface CatalogIngestConfig {
   sourceIds: ReturnType<typeof parseCatalogSourceIds>;
   minRetainRatio: number;
   // 폴링 핫 리로드 주기(초). 0이면 비활성(스케줄러 ingest의 in-process 갱신만).
+  // 파일 모드(기본)는 gz 파일 mtime/size 스탯 비교(무비용), 레거시 FORCE_DB 모드만 DB id 조회.
   refreshPollSeconds: number;
-  // 보존할 최신 스냅샷 개수(나머지 프루닝). 무한 증가(52MB/행) 방지.
+  // (레거시 FORCE_DB 전용) 보존할 최신 DB 스냅샷 개수(나머지 프루닝). 무한 증가(수십 MB/행) 방지.
   snapshotRetention: number;
 }
 

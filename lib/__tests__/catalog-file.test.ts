@@ -101,6 +101,28 @@ describe("catalog-file: 원자적 쓰기 + {titles,...} 래퍼 포맷", () => {
     expect(loaded?.sourceVersion).toBe("file:catalog.json.gz");
   });
 
+  it("runHash 없는 레거시 gz(기존 catalog:update 산출물)도 로드된다 — 폴링 id 는 스탯 태그로 폴백", async () => {
+    // 기존 파이프라인(crawl --json | gzip)이 만든 래퍼에는 runHash 가 없다.
+    const { gzipSync } = await import("node:zlib");
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(
+      gzPath,
+      gzipSync(
+        Buffer.from(
+          JSON.stringify({ titles: [makeTitle({ id: "legacy-1" })], count: 1, sourceVersion: "crawl/legacy" }),
+          "utf8"
+        )
+      )
+    );
+    const loaded = loadCatalogTitlesFromFile();
+    expect(loaded?.titles.map((t) => t.id)).toEqual(["legacy-1"]);
+    expect(loaded?.runHash).toBeNull();
+
+    const boot = loadLatestCatalogSnapshotFromFile();
+    expect(boot.loaded).toBe(true);
+    expect(boot.snapshotId).toMatch(/^file:catalog\.json\.gz@\d+$/);
+  });
+
   it("readCatalogFileSummary — runHash·titleCount·sources 를 요약하고 같은 스탯이면 캐시를 쓴다", () => {
     writeCatalogTitlesToFile({
       titles: [makeTitle({ id: "s-1" }), makeTitle({ id: "s-2" }), makeTitle({ id: "s-3" })],
