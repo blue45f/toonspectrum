@@ -2101,6 +2101,7 @@ export function StudioPage() {
   }, [workId]);
 
   useEffect(() => {
+    studioOptionalAssetsMountedRef.current = true;
     return () => {
       studioOptionalAssetsMountedRef.current = false;
     };
