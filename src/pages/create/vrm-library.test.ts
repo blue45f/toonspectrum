@@ -19,6 +19,14 @@ describe("VRM library helpers", () => {
       "크립토 (복셀봇)",
       "미빗 (블록맨)",
       "시드상 (마스코트)",
+      "시노",
+      "후미",
+      "카게 (다크)",
+      "헤라",
+      "하루",
+      "미오",
+      "노아",
+      "아리시아",
     ]);
     expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });

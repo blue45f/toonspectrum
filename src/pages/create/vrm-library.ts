@@ -38,6 +38,8 @@ type VrmThumbnailRecord = {
 
 // 기본 번들 VRM 캐릭터.
 // A-C는 pixiv VRoidPreset 조건, old beta 샘플 4종은 pixiv CC0 조건을 따른다.
+// 모델별 출처 URL·라이선스 요약은 public/vrm/LICENSES.md 참고
+// (신규 8종: madjin/vrm-samples의 VRoid 공식 샘플 + UniVRM Alicia Solid 테스트 모델).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -51,6 +53,14 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "cryptovoxel", name: "크립토 (복셀봇)", url: "/vrm/cryptovoxels.vrm" },
   { id: "meebit", name: "미빗 (블록맨)", url: "/vrm/meebit_09842.vrm" },
   { id: "seedsan", name: "시드상 (마스코트)", url: "/vrm/Seed_san.vrm" },
+  { id: "shino", name: "시노", url: "/vrm/Sendagaya_Shino.vrm" },
+  { id: "fumi", name: "후미", url: "/vrm/Sakurada_Fumiriya.vrm" },
+  { id: "kage", name: "카게 (다크)", url: "/vrm/Darkness_Shibu.vrm" },
+  { id: "hera", name: "헤라", url: "/vrm/HairSample_Female.vrm" },
+  { id: "haru", name: "하루", url: "/vrm/HairSample_Male.vrm" },
+  { id: "mio", name: "미오", url: "/vrm/fem_vroid.vrm" },
+  { id: "noa", name: "노아", url: "/vrm/masc_vroid.vrm" },
+  { id: "alicia", name: "아리시아", url: "/vrm/AliciaSolid.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,
