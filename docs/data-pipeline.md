@@ -1,9 +1,10 @@
 # 데이터 파이프라인 — 크롤 → 스냅샷 → 정적 카탈로그/API → 화면
 
 ToonSpectrum의 작품 데이터는 **하드코딩 seed가 아니라 검증 스냅샷**을 운영 소스로 사용합니다.
-공개 카탈로그를 크롤해 정규화한 뒤 `catalog.json.gz`와 `public/data/*.json` 정적 카탈로그를 만들고,
-리뷰·인증·커뮤니티 같은 동적 데이터만 API/DB가 담당합니다. `VITE_CATALOG_SOURCE=api` 또는 API 폴백
-경로에서는 같은 스냅샷을 Nest 런타임 카탈로그로 로드할 수 있습니다.
+공개 카탈로그를 크롤해 정규화한 뒤 `catalog.json.gz`(카탈로그의 **단일 운영 저장소 — 파일 전용**)와
+`public/data/*.json` 정적 카탈로그를 만들고, 리뷰·인증·커뮤니티 같은 동적 데이터만 API/DB가
+담당합니다. Nest API도 같은 gz 파일을 부팅 시 로드하고 파일 스탯 폴링으로 핫 리로드합니다 —
+카탈로그 경로에 DB 전송이 없습니다(DB `catalog_snapshot`은 `WEBDEX_CATALOG_FORCE_DB=1` 레거시 전용).
 
 ## 한눈에 보기 (Mermaid)
 
@@ -15,10 +16,11 @@ flowchart TD
     end
 
     SRC --> C["① CRAWL<br/>scripts/crawl.mjs + scripts/crawlers/*.mjs<br/>정규화 → Title[] · 표지 → /api/cover?u= · 제목 정규화 교차연결"]
-    C -->|stdout JSON| D["② SNAPSHOT<br/>pnpm ingest / catalog:update / cron<br/>품질 게이트(회귀 차단) → catalog.json.gz 또는 catalog_snapshot"]
-    D --> DB[("PostgreSQL — 로컬 docker(:55432) / Neon(원격)<br/>catalog_snapshot · isCurrent=true")]
-    D --> STATIC[("public/data/*.json<br/>catalog:gen · ranking 사전계산(disableLive)")]
-    DB -. API 폴백/핫 리로드 .-> E["③ catalog-store.ts<br/>메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)"]
+    C -->|stdout JSON| D["② SNAPSHOT(파일 전용)<br/>pnpm ingest / catalog:update / cron<br/>품질 게이트(회귀 차단) → catalog.json.gz 원자적 저장(tmp→rename)"]
+    D --> GZ[("catalog.json.gz<br/>apps/api/data · WEBDEX_CATALOG_FILE")]
+    D -. 실행 이력만(수 KB) .-> DB[("PostgreSQL — 동적 데이터 전용<br/>catalog_ingest_run (catalog_snapshot은 레거시 FORCE_DB)")]
+    GZ --> STATIC[("public/data/*.json<br/>catalog:gen · ranking 사전계산(disableLive)")]
+    GZ -. 부팅 로드 + mtime/size 스탯 폴링 핫 리로드 .-> E["③ catalog-store.ts<br/>메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)"]
     STATIC --> F["④ Vite 정적 카탈로그 엔진<br/>검색·탐색·랭킹은 CDN + 클라이언트 계산"]
     E --> API["④ NestJS API :4001<br/>동적 데이터 + API 카탈로그 폴백(disableLive)"]
     F --> G["⑤ Vite + React :5173<br/>useApiResource → TitlePoster / CoverImage"]
@@ -35,12 +37,13 @@ flowchart TD
    공개 카탈로그 fetch → Title[] 정규화 → 표지를 /api/cover?u= 로 치환 → 제목 정규화로 교차연결
         │ stdout JSON
         ▼
-② SNAPSHOT  catalog:update │ pnpm ingest │ cron │ POST /api/catalog/ingest/run
-   품질 게이트(총건수 급감·주요소스 붕괴 시 승격 거부) → catalog.json.gz 또는 catalog_snapshot
-        │  정적: public/data/*.json / 폴백 API: PostgreSQL catalog_snapshot
+② SNAPSHOT(파일 전용)  catalog:update │ pnpm ingest │ cron │ POST /api/catalog/ingest/run
+   품질 게이트(총건수 급감·주요소스 붕괴 시 승격 거부) → catalog.json.gz 원자적 저장(tmp→rename)
+   동일 runHash 면 다시 쓰지 않음 · 실행 이력만 DB catalog_ingest_run(수 KB) 기록
+        │  정적: public/data/*.json  /  API: 같은 gz 파일 (DB 스냅샷은 WEBDEX_CATALOG_FORCE_DB=1 레거시)
         ▼
-③ LOAD  lib/server/catalog-store.ts  (API 부팅 시 1회)
-   isCurrent=1 스냅샷 → 메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그)
+③ LOAD  lib/server/catalog-store.ts  (API 부팅 시 1회 + 파일 스탯 폴링 핫 리로드)
+   catalog.json.gz → 메모리 카탈로그 TITLES + 인덱스(BY_ID·작가·태그) · 없으면 빈 카탈로그
         ▼
 ④ STATIC/API
    public/data/*.json               ← 검색·탐색·랭킹 기본 경로(CDN + 클라이언트 계산)
@@ -60,8 +63,8 @@ flowchart TD
 | 단계 | 무엇 | 핵심 파일 | 비고 |
 |---|---|---|---|
 | ① 수집 | 공개 카탈로그 fetch → `Title[]` 정규화, 표지 URL → `/api/cover?u=` | `scripts/crawl.mjs`, `scripts/crawlers/*.mjs`, `scripts/crawlers/_shared.mjs`, `scripts/crawl-helpers.mjs` | `WEBDEX_SOURCE_IDS`로 소스 제한(`all` 가능). 제목 정규화(`norm`)로 교차연결/신규 분리. 선택된 crawler를 병렬/제한 호출로 실행. |
-| ② 스냅샷 | 크롤 JSON → 품질 게이트 → `catalog.json.gz`/`catalog_snapshot` 저장 | `lib/server/catalog-ingest.ts`, `scripts/ingest.mjs`, `scripts/build-static-catalog.ts` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 정적 운영은 `catalog:gen`으로 `public/data/*.json`을 생성. |
-| ③ 로드 | 정적 파일 또는 `isCurrent=1` 스냅샷 → 메모리 카탈로그 | `src/catalog-static.ts`, `lib/server/catalog-store.ts`, `lib/db/index.ts` | 기본 프론트는 CDN 정적 파일을 사용. API 폴백은 부팅 시 1회 로드 + 인덱스 구성. 스냅샷 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
+| ② 스냅샷 | 크롤 JSON → 품질 게이트 → `catalog.json.gz` **원자적 저장**(tmp→rename, 동일 runHash 스킵) | `lib/server/catalog-ingest.ts`, `lib/server/catalog-file.ts`, `scripts/ingest.mjs`, `scripts/build-static-catalog.ts` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 실행 이력만 DB `catalog_ingest_run`(수 KB). DB 스냅샷 적재는 `WEBDEX_CATALOG_FORCE_DB=1`/`ingest --db` 레거시. 정적 운영은 `catalog:gen`으로 `public/data/*.json`을 생성. |
+| ③ 로드 | gz 파일 → 메모리 카탈로그 (부팅 1회 + 파일 스탯 폴링 핫 리로드) | `src/catalog-static.ts`, `lib/server/catalog-store.ts`, `lib/server/catalog-file.ts` | 기본 프론트는 CDN 정적 파일을 사용. API는 부팅 시 gz 로드 + 인덱스 구성, `CATALOG_REFRESH_POLL_SECONDS`마다 mtime/size 비교(무비용). 파일 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
 | ④ STATIC/API | 카탈로그 질의 + 표지 프록시 + 동적 API | `src/catalog-static.ts`, `apps/api/src/modules/catalog/catalog.controller.ts`, `catalog.service.ts` | 검색·탐색·랭킹 기본은 정적/클라이언트 계산. `/api/cover`는 호스트 allowlist 통과분만 referer 붙여 업스트림서 받아 바이트 검증 후 스트리밍. |
 | ⑤ 화면 | 정적/API fetch → 표지/카드 렌더 | `src/pages/*`, `components/title-poster.tsx`, `components/cover-image.tsx`, `vite.config.ts` | `coverImage`(=`/api/cover`)를 `<img>`로 렌더, 실패 시 타이포그래픽 폴백. |
 
@@ -69,7 +72,7 @@ flowchart TD
 
 `pnpm catalog:gen`이 만드는 `public/data/*`는 **목록 경로(카드·검색·랭킹·추천)가 읽는 필드만 담은
 경량 카드**와 **상세 전용 샤드**로 분리되어 있다. `apps/api/data/catalog.json.gz`(정규화 Title[] 교환
-포맷)와 DB `catalog_snapshot` 계약은 그대로다 — 슬리밍은 정적 산출 단계에서만 일어난다.
+포맷 — `{titles,…}` 래퍼) 계약은 그대로다 — 슬리밍은 정적 산출 단계에서만 일어난다.
 
 | 산출물 | 내용 | 비고 |
 |---|---|---|
@@ -92,8 +95,12 @@ flowchart TD
 
 ## 설계 원칙
 
+- **역할 분리(비용)**: 카탈로그는 **파일 전용**(`catalog.json.gz`), DB는 **동적 데이터 전용**(리뷰·
+  커뮤니티·계정·창작 + ingest 실행 이력 수 KB). 24k편 ~22MB 스냅샷을 DB로 읽고 쓰다 Neon 전송
+  쿼터를 소진한 사고의 재발 방지(`docs/ARCH-DECISION-catalog-storage.md` v2).
 - **단일 연결**: `lib/db`는 `DATABASE_URL`(Neon 원격 또는 로컬 docker `:55432`)로 연결 →
-  크롤/ingest/API/drizzle-kit이 동일 DB를 사용. (libSQL 시절 cwd 상대 파일경로로 갈리던 split-brain은 연결 문자열 방식이라 해당 없음.)
+  ingest 이력/동적 API/drizzle-kit이 동일 DB를 사용. 풀은 슬림(`max 3`·유휴 10s 종료·
+  `allowExitOnIdle`)하게 잡아 Neon 컴퓨트가 유휴 시 잠들 수 있게 한다.
 - **정직성**: seed 없음. 스냅샷이 없으면 빈 카탈로그로 시작하고, 품질 게이트가 급감·붕괴 시 승격을 거부.
   제목·작가·장르·표지는 실수집, 비공개 보조 지표(일부 평점/조회/완독률 등)는 추정값으로 화면에 명시.
 - **표지 프록시**: 핫링크/CORS 회피. 허용 호스트(`pstatic.net`·`kakaocdn.net`·`ccdn.lezhin.com` +
@@ -104,19 +111,21 @@ flowchart TD
 
 ```bash
 pnpm crawl                       # 크롤러 JSON을 stdout으로 출력(적재 안 함)
-pnpm ingest                      # 크롤 후 catalog_snapshot 적재(기본 WEBDEX_SOURCE_IDS=all)
-pnpm ingest --from out.json      # 미리 크롤해 둔 JSON 적재(재크롤 없음)
+pnpm ingest                      # 크롤 후 catalog.json.gz 원자적 저장(기본 WEBDEX_SOURCE_IDS=all, DB 불필요)
+pnpm ingest --from out.json      # 미리 크롤해 둔 JSON 저장(재크롤 없음)
+pnpm ingest --db                 # (레거시) DB catalog_snapshot 적재 — FORCE_DB 운영 전용
 pnpm catalog:gen                 # apps/api/data/catalog.json.gz → public/data/*.json 생성
 pnpm dev:all                     # 웹앱(:5173) + API(:4001) 동시 실행 → 화면에서 확인
 ```
 
-> 원격(Neon) 적재: `.env.local`의 `DATABASE_URL`(Neon, `sslmode=require`)을 설정하면 크롤/ingest/API가 모두 원격 Postgres를 사용합니다. (`apps/api`는 `load-env`가 다른 import보다 먼저 `.env.local`을 로드.)
+> 카탈로그 ingest 에는 DB가 필요 없습니다. `.env.local`의 `DATABASE_URL`(Neon, `sslmode=require`)은 리뷰·커뮤니티 등 동적 API와 ingest 실행 이력에만 쓰입니다. (`apps/api`는 `load-env`가 다른 import보다 먼저 `.env.local`을 로드.)
 
-## 데이터 갱신 (정적 운영 + API 폴백)
+## 데이터 갱신 (정적 운영 + API 동기화)
 
-정적 운영에서는 `catalog.json.gz`를 갱신한 뒤 `pnpm catalog:gen`이 `public/data/*.json`을 다시 만들고, 배포/CDN 전파로 사용자 경로가 갱신됩니다. API 폴백 모드에서는 부팅 시 current DB 스냅샷을 메모리로 1회 로드하며, 외부 프로세스(`pnpm ingest`·cron·다른 인스턴스)가 새 스냅샷을 적재해도 **재시작 없이** 수렴합니다.
+정적 운영에서는 `catalog.json.gz`를 갱신한 뒤 `pnpm catalog:gen`이 `public/data/*.json`을 다시 만들고, 배포/CDN 전파로 사용자 경로가 갱신됩니다. API는 부팅 시 같은 gz 파일을 메모리로 1회 로드하며, 외부 프로세스(`pnpm ingest`·cron·다른 인스턴스)가 파일을 갱신해도 **재시작 없이** 수렴합니다.
 
-- **폴링 핫 리로드**: API가 `CATALOG_REFRESH_POLL_SECONDS`(기본 60초, 0=off)마다 DB의 current 스냅샷 id를 확인하고, 메모리에 로드된 것과 다르면 재로드(`refreshCatalogIfChanged`). Neon 풀러는 LISTEN/NOTIFY 미지원이라 폴링이 견고합니다.
+- **파일 스탯 폴링 핫 리로드**: API가 `CATALOG_REFRESH_POLL_SECONDS`(기본 60초, 0=off)마다 gz 파일의 mtime/size 를 확인하고(`refreshCatalogIfChanged` — syscall 1번, DB/네트워크 0), 바뀌었을 때만 gz 를 재로드합니다. 레거시 `WEBDEX_CATALOG_FORCE_DB=1` 모드에서만 기존 DB current 스냅샷 id 폴링이 동작합니다.
 - **강제 리로드 엔드포인트**: `POST /api/catalog/refresh`(토큰 설정 시 `x-catalog-ingest-token`) → `{ reloaded, snapshotId, titleCount }`. 적재 직후 즉시 반영하고 싶을 때.
-- **스냅샷 보존/프루닝**: 적재 시 최신 `CATALOG_SNAPSHOT_RETENTION`개(기본 5)만 남기고 오래된 스냅샷 삭제 — 스냅샷 1행이 수십 MB라 무한 증가 방지.
-- **주기 ingest**: `CATALOG_INGEST_MODE=fixed` + `CATALOG_INGEST_INTERVAL_SECONDS`로 API 내부 스케줄러가 크롤+적재(실패 시 지수 백오프). 이 경로는 in-process라 즉시 갱신됩니다.
+- **동일-hash 스킵**: ingest 가 직전과 같은 runHash 를 만들면 파일을 다시 쓰지 않습니다(mtime 보존 → 다른 인스턴스도 불필요한 재로드를 하지 않음). 레거시 모드의 스냅샷 보존/프루닝(`CATALOG_SNAPSHOT_RETENTION`)은 FORCE_DB에서만 의미가 있습니다.
+- **주기 ingest**: `CATALOG_INGEST_MODE=fixed` + `CATALOG_INGEST_INTERVAL_SECONDS`로 API 내부 스케줄러가 크롤+파일 저장(실패 시 지수 백오프). 이 경로는 in-process라 즉시 갱신됩니다.
+- **잔존 DB 스냅샷 정리**: 파일 전용 전환 후 남은 `catalog_snapshot` 대형 행은 `node scripts/db-prune-snapshots.mjs`(전부 삭제, `--keep-current`로 1행 보존)로 정리합니다 — DELETE는 행 본문을 전송하지 않아 Neon 쿼터에 안전.

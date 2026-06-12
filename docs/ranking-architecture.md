@@ -23,7 +23,7 @@ The Vite client normally reads ranking data from static files or computes filter
 
 ## 서버 카탈로그 갱신 구조
 
-작품 카탈로그는 `lib/data/titles.ts` 같은 하드코딩 seed를 운영 데이터의 주 저장소로 사용하지 않습니다. `lib/data/` seed 모듈은 제거했고, 운영 데이터는 크롤러가 만든 검증 스냅샷에서 나옵니다. 기본 사용자 경로는 `apps/api/data/catalog.json.gz`를 빌드 시 `public/data/*.json`으로 변환해 CDN에서 제공하는 정적 카탈로그입니다. Nest API는 번들 스냅샷을 먼저 로드하고, `WEBDEX_CATALOG_FORCE_DB=1`이거나 번들 파일이 없을 때 최신 `catalog_snapshot`으로 폴백합니다. 스냅샷이 없거나 파싱에 실패하면 빈 카탈로그로 남겨 잘못된 하드코딩 데이터가 노출되지 않게 합니다.
+작품 카탈로그는 `lib/data/titles.ts` 같은 하드코딩 seed를 운영 데이터의 주 저장소로 사용하지 않습니다. `lib/data/` seed 모듈은 제거했고, 운영 데이터는 크롤러가 만든 검증 스냅샷에서 나옵니다. 기본 사용자 경로는 `apps/api/data/catalog.json.gz`를 빌드 시 `public/data/*.json`으로 변환해 CDN에서 제공하는 정적 카탈로그입니다. Nest API도 같은 gz 파일(`WEBDEX_CATALOG_FILE` 재정의 가능)을 로드합니다 — **카탈로그는 파일 전용**이고, DB `catalog_snapshot` 읽기/쓰기는 `WEBDEX_CATALOG_FORCE_DB=1` 레거시 모드에서만 동작합니다. 파일이 없거나 파싱에 실패하면 빈 카탈로그로 남겨 잘못된 하드코딩 데이터가 노출되지 않게 합니다.
 
 랭킹에 없는 작품도 검색 가능해야 하므로 crawler는 두 레벨로 동작합니다.
 
@@ -31,31 +31,31 @@ The Vite client normally reads ranking data from static files or computes filter
 - **상세 레벨**: 호출량이 큰 상세 API는 상위 작품 또는 환경변수로 지정한 범위만 보강합니다.
 - 랭킹은 색인 전체에 산식을 적용합니다. 현재 활성 경로는 `disableLive=true`라 live 보정을 호출하지 않으며, live 어댑터는 별도 운영 경로로 재연결 가능한 보존 코드입니다.
 
-- 저장 테이블: `catalog_snapshot`
-  - `snapshot`: 정규화된 `Title[]` JSON
-  - `source`, `sourceVersion`, `titleCount`, `isCurrent`
-  - `metadata.runHash`, `runId`, `requestedBy`, `triggeredBy`
-- 실행 이력: `catalog_ingest_run`
+- 저장(기본): `apps/api/data/catalog.json.gz` 파일 — `{titles,…}` 래퍼 + `runHash`/`sourceVersion` 기록
+  - 레거시(`WEBDEX_CATALOG_FORCE_DB=1`)에서만 `catalog_snapshot` 테이블(`snapshot` Title[] JSON,
+    `isCurrent`, `metadata.runHash` 등)을 사용
+- 실행 이력: `catalog_ingest_run` (파일 모드에서도 DB 기록 — 행당 수 KB)
   - `running | success | failed | aborted`
-  - 실행 시간, 소요 시간, 작품 수, 에러 메시지, run hash
+  - 실행 시간, 소요 시간, 작품 수, 에러 메시지, run hash, 저장 위치(storage/catalogFile)
 - 서버 시작 흐름:
-  - `CatalogService.onModuleInit()`에서 번들 `apps/api/data/catalog.json.gz`를 먼저 로드
-  - 번들 파일이 없거나 강제 DB 모드면 최신 `catalog_snapshot.isCurrent=true`를 로드
-  - 스냅샷이 없으면 빈 런타임 카탈로그로 시작
+  - `CatalogService.onModuleInit()`에서 gz 파일(번들 또는 `WEBDEX_CATALOG_FILE`)을 로드
+  - `WEBDEX_CATALOG_FORCE_DB=1` 레거시 모드면 최신 `catalog_snapshot.isCurrent=true`를 로드
+  - 파일이 없으면 빈 런타임 카탈로그로 시작
+  - 갱신 감지는 파일 mtime/size 스탯 폴링(레거시 모드만 DB id 폴링)
   - 라이브 랭킹 스케줄러는 현재 API 서비스에서 기동하지 않고, 카탈로그 수집 스케줄러만 설정에 따라 실행
 - 수집 흐름:
   - `scripts/crawl.mjs --json --no-file` 실행
   - `WEBDEX_SOURCE_IDS` allowlist에 포함된 구현 소스만 실행
   - stdout JSON을 파싱해 `Title[]` 검증
-  - 동일 hash면 새 스냅샷을 만들지 않고 메모리 카탈로그만 새로고침
-  - 변경 hash면 기존 스냅샷을 `isCurrent=false`로 내리고 새 스냅샷을 current로 저장
+  - 동일 runHash면 파일을 다시 쓰지 않고 메모리 카탈로그만 새로고침
+  - 변경 hash면 gz 파일을 원자적으로 교체(tmp→rename)하고 메모리를 즉시 핫 리로드
 - 운영 API:
   - `GET /api/catalog/ingest/status`: current snapshot, 최근 실행 이력(좀비 `running` 행은 자동 정리), 다음 실행 예정 시각, `sourcePlan`
   - `POST /api/catalog/ingest/run`: 수동 실행. 두 가지 인증 경로가 있습니다.
     - 관리자 세션: 서명된 `x-user-id` 헤더(관리자 콘솔 → 운영 탭의 "지금 크롤 실행" 버튼)
     - 토큰: `x-catalog-ingest-token` 헤더 또는 body `token`이 `CATALOG_INGEST_TRIGGER_TOKEN`과 일치(타이밍 세이프 비교). 토큰 미설정 시 토큰 인증 경로는 401로 거부됩니다.
     - 이미 실행 중이면 `409`, 같은 클라이언트가 분당 5회를 초과하면 `429`, 크롤/적재 실패는 `502`로 응답합니다.
-  - `POST /api/catalog/refresh`: DB current 스냅샷 기준 메모리 카탈로그 강제 핫 리로드(read-only). 토큰 설정 시 `x-catalog-ingest-token` 일치 필요.
+  - `POST /api/catalog/refresh`: 카탈로그 파일(레거시 모드는 DB current 스냅샷) 기준 메모리 카탈로그 강제 핫 리로드(read-only). 토큰 설정 시 `x-catalog-ingest-token` 일치 필요.
 
 ### 환경 변수
 
@@ -146,7 +146,7 @@ The Vite client normally reads ranking data from static files or computes filter
 
 4. **출처와 산정 방식 공개**
    - 각 랭킹 응답은 `meta.source`, `meta.reliability`, `sourceStatuses`를 포함합니다.
-   - DB 스냅샷은 `sourceVersion`, `runHash`, `createdAt`을 보존해 어떤 데이터로 순위를 계산했는지 추적할 수 있습니다.
+   - 카탈로그 파일(레거시 모드는 DB 스냅샷)은 `sourceVersion`, `runHash`, 기록 시각을 보존해 어떤 데이터로 순위를 계산했는지 추적할 수 있습니다.
    - 공개되지 않는 수치(완독률, 평가 분포 등)는 추정값으로 표시하고, 실제 공개 수치와 혼동시키지 않습니다.
 
 5. **어댑터 승인 절차**
@@ -273,9 +273,9 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 ## Data boundaries
 
 - `apps/api/data/catalog.json.gz` and generated `public/data/*.json` are the default production catalog surfaces.
-- `catalog_snapshot` is the DB ingest/API fallback catalog source, not the default browser query path.
+- `catalog_snapshot` is a legacy DB catalog source used only under `WEBDEX_CATALOG_FORCE_DB=1`; the DB otherwise stores dynamic data (reviews, community, accounts, creator) plus small ingest run history.
 - `src/catalog-static.ts` is the default browser-side catalog query boundary.
-- `lib/server/catalog-store.ts` is the shared in-memory runtime catalog store populated from static or DB snapshots.
+- `lib/server/catalog-store.ts` is the shared in-memory runtime catalog store populated from the gz catalog file (legacy: DB snapshots).
 - `lib/server/*` is the server service boundary.
 - `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
 - `components/*` must not import runtime catalog globals such as `TITLES`; they must use static/API responses.
@@ -315,7 +315,7 @@ Live variables below are preserved for `lib/server/live.ts`, but current ranking
 - `WEBDEX_LEZHIN_CAP`
 - `WEBDEX_SOURCE_IDS`
 
-`apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 카탈로그를 로드하고(번들 파일 우선, 폴백 DB 스냅샷), 설정에 따라 카탈로그 수집 스케줄러와 핫 리로드 폴링만 기동합니다. 라이브 랭킹 스케줄러는 기동하지 않습니다(`disableLive=true`).
+`apps/api/src/modules/catalog/catalog.service.ts`는 서비스 시작 시 카탈로그 gz 파일을 로드하고(레거시 `WEBDEX_CATALOG_FORCE_DB=1`만 DB 스냅샷), 설정에 따라 카탈로그 수집 스케줄러와 파일 스탯 폴링 핫 리로드만 기동합니다. 라이브 랭킹 스케줄러는 기동하지 않습니다(`disableLive=true`).
 
 ## Quality gates
 

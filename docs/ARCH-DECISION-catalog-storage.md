@@ -1,5 +1,31 @@
 # 아키텍처 결정 — 카탈로그 저장/조회: **정적(CDN) 유지** (OCI 이전 후에도)
 
+## v2 (2026-06): 카탈로그 **파일 전용** + DB는 **UGC 전용** — 서버 경로까지 DB 스냅샷 제거
+
+### 배경(비용 근거: Neon 전송 쿼터 사고)
+v1 이후에도 서버 ingest/폴백 경로는 24k편 카탈로그 JSON(~22MB 텍스트)을 `catalog_snapshot`
+한 행으로 **통째로 쓰고 읽는** 구조였다. 크롤 1회당 쓰기 ~22MB + 폴백/검증 읽기 ~22MB가 누적되며
+**Neon 무료 플랜의 데이터 전송 쿼터를 실제로 소진**시키는 사고가 났다(리뷰·로그인 등 동적 기능까지 영향).
+
+### 결정
+**카탈로그는 파일 전용, DB는 동적 데이터(리뷰·커뮤니티·계정·창작) 전용.**
+
+- ingest(수동/주기/CLI)는 검증된 `Title[]`을 `apps/api/data/catalog.json.gz`(또는
+  `WEBDEX_CATALOG_FILE`)에 **원자적으로 저장**(tmp 쓰기 → rename)하고 메모리 카탈로그를 즉시
+  핫 리로드한다. 동일 runHash 면 파일을 다시 쓰지 않는다.
+- API 부팅은 **gz 파일 → 없으면 빈 카탈로그**. 갱신 감지는 DB 폴링 대신 **파일 mtime/size
+  스탯 폴링**(syscall 1번, 비용 0).
+- `catalog_ingest_run` 실행 이력(상태·건수·runHash·오류, 행당 수 KB)만 DB에 남긴다 — 수동 크롤
+  UI/status 가 소비.
+- DB `catalog_snapshot` 읽기/쓰기/DDL 은 `WEBDEX_CATALOG_FORCE_DB=1` **레거시 플래그**에서만
+  동작(롤백 가능성 보존). 잔존 대형 행은 `scripts/db-prune-snapshots.mjs` 로 정리한다.
+- 부수 조치: pg 풀 슬림화(`max 3`·`idleTimeout 10s`·`allowExitOnIdle` — Neon autosuspend 유도),
+  세션 사용자 조회 30초 마이크로캐시(요청당 SELECT 절감).
+
+### 효과(전송량)
+크롤 1회당 DB 전송 ~44MB(쓰기+읽기) → **~수 KB(실행 이력 1행)**. 부팅/핫리로드 시 DB 전송 0.
+
+
 ## 배경
 Neon 무료 데이터 전송 쿼터 초과로, 카탈로그(웹툰·웹소설 ~30k)를 DB 조회 → **정적 스냅샷**
 (`catalog.json.gz` → 빌드 시 `public/data/*.json` → Vercel CDN, 클라이언트 인메모리 검색/랭킹)으로

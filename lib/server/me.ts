@@ -11,6 +11,7 @@ import {
   collectionItems,
 } from "../db";
 import { fromDb } from "../api-helpers";
+import { invalidateSessionUser } from "./session";
 
 // 로그인 사용자의 전체 데이터를 클라이언트 하이드레이션 형태로 반환 (GET /api/me · POST /api/me/merge 공용)
 export async function loadMe(uid: string) {
@@ -127,5 +128,7 @@ export async function updateProfile(
     bio: users.bio,
   });
   if (!row) return { error: "사용자를 찾을 수 없어요." };
+  // 프로필 변경 즉시 세션 마이크로캐시 무효화 — 다음 요청부터 새 값을 읽는다.
+  invalidateSessionUser(uid);
   return { profile: row };
 }

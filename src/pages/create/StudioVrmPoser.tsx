@@ -8,6 +8,7 @@ import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pix
 import {
   deleteStoredVrmModel,
   getStoredVrmModel,
+  isUsableVrmAssetResponse,
   listVrmLibraryEntries,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
@@ -217,6 +218,7 @@ const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
 const d = THREE.MathUtils.degToRad;
+const HTML_FALLBACK_VRM_ERROR = "VRM 파일 대신 웹 페이지가 응답했습니다. 배포에 해당 .vrm 파일이 포함되어 있는지 확인해 주세요.";
 
 const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
@@ -998,7 +1000,25 @@ function disposeVrm(vrm: VRM) {
   VRMUtils.deepDispose(vrm.scene);
 }
 
-function loadVrmAsset(url: string) {
+function shouldPreflightVrmUrl(url: string) {
+  return typeof fetch === "function" && !url.startsWith("blob:") && !url.startsWith("data:");
+}
+
+async function assertLoadableVrmUrl(url: string) {
+  if (!shouldPreflightVrmUrl(url)) return;
+
+  const response = await fetch(url, { method: "HEAD", cache: "force-cache" });
+  if (!response.ok) {
+    throw new Error(`VRM 파일을 찾지 못했습니다. (${response.status})`);
+  }
+  if (!isUsableVrmAssetResponse(response)) {
+    throw new Error(HTML_FALLBACK_VRM_ERROR);
+  }
+}
+
+async function loadVrmAsset(url: string) {
+  await assertLoadableVrmUrl(url);
+
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
@@ -1291,6 +1311,11 @@ function createCharacterThumbnail(canvas: HTMLCanvasElement) {
 
 function getErrorMessage(caughtError: unknown, fallback: string) {
   return caughtError instanceof Error ? caughtError.message : fallback;
+}
+
+function getVrmLoadErrorMessage(caughtError: unknown) {
+  const message = getErrorMessage(caughtError, "VRM을 불러오지 못했습니다.");
+  return /Unexpected token '<'|<!doctype/i.test(message) ? HTML_FALLBACK_VRM_ERROR : message;
 }
 
 function applyCameraPreset(camera: THREE.Camera, preset: CameraPreset, invalidate: () => void) {
@@ -2899,7 +2924,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   function handleLoadFailure(requestId: number, caughtError: unknown) {
     if (requestId !== loadRequestRef.current) return;
-    setError(getErrorMessage(caughtError, "VRM을 불러오지 못했습니다."));
+    setError(getVrmLoadErrorMessage(caughtError));
     setStatus("error");
   }
 

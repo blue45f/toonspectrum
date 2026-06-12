@@ -2,12 +2,18 @@
 // 기본값은 전부 비활성(초반엔 전 기능 무료·광고 없음). 관리자만 켤 수 있다.
 import { eq } from "drizzle-orm";
 import { appSettings, db, dbClient, users } from "../db";
+import { getSessionUserCached } from "./session";
 
 // 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
+// 세션 마이크로캐시(TTL 30초) 적용: admin-authed 요청마다 나가던 users SELECT 를 흡수한다.
+// 역할 변경 경로는 invalidateSessionUser 로 즉시 무효화된다(admin.service·me 갱신 참조).
 export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
   try {
-  const [u] = await db.select({ role: users.role, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+  const u = await getSessionUserCached(userId, async (id) => {
+    const [row] = await db.select({ role: users.role, email: users.email }).from(users).where(eq(users.id, id)).limit(1);
+    return row ?? null;
+  });
   if (!u) return false;
   const role = String(u.role ?? "").toLowerCase();
   if (role === "admin" || role === "operator") return true;

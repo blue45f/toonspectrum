@@ -5,7 +5,13 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { and, desc, eq, lt, notInArray } from "drizzle-orm";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
-import { getCatalogState, loadCatalogSnapshot, resetCatalogToEmpty } from "./catalog-store";
+import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "./catalog-store";
+import {
+  loadCatalogTitlesFromFile,
+  readCatalogFileSummary,
+  statCatalogFile,
+  writeCatalogTitlesToFile,
+} from "./catalog-file";
 import type { Title } from "../types";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
 
@@ -66,9 +72,29 @@ export interface CatalogIngestRunOptions {
 type EnvLike = Partial<Record<string, string | undefined>>;
 
 const execSource = "crawl.mjs";
-let schemaReady = false;
-// 현재 메모리에 로드된 current 스냅샷 id — 폴링 핫 리로드의 변경 감지 기준.
+let runSchemaReady = false;
+let snapshotSchemaReady = false;
+// 레거시 FORCE_DB 모드: 현재 메모리에 로드된 current 스냅샷 id — DB 폴링 핫 리로드의 변경 감지 기준.
 let loadedSnapshotId: string | null = null;
+// 파일 모드: 메모리에 로드된 카탈로그 파일의 (경로, mtime, size) — 스탯 폴링의 변경 감지 기준.
+let loadedFileStat: { file: string; mtimeMs: number; size: number } | null = null;
+let loadedFileRunHash: string | null = null;
+
+// 카탈로그 저장 모드. 기본은 파일 전용(catalog.json.gz) — DB 전송 0.
+// Neon 무료 전송 쿼터 사고(스냅샷 행 ~22MB 를 읽고 쓰던 구조) 이후 DB catalog_snapshot 경로는
+// WEBDEX_CATALOG_FORCE_DB=1 레거시 플래그일 때만 동작한다(하위호환·롤백용).
+export function isCatalogForceDb(env: EnvLike = process.env): boolean {
+  return env.WEBDEX_CATALOG_FORCE_DB === "1";
+}
+
+// 파일 모드의 스냅샷 식별자: ingest 가 기록한 runHash, 없으면(수동 gzip 산출물) 파일 스탯 태그.
+function fileSnapshotId(): string | null {
+  if (loadedFileRunHash) return loadedFileRunHash;
+  if (loadedFileStat) {
+    return `file:${path.basename(loadedFileStat.file)}@${Math.round(loadedFileStat.mtimeMs)}`;
+  }
+  return null;
+}
 
 export function normalizeCatalogIngestConfig(env: EnvLike = process.env): CatalogIngestConfig {
   return {
@@ -189,23 +215,10 @@ export function parseCrawlerJsonPayload(stdout: string): CatalogCrawlerPayload {
   throw new Error("crawler stdout did not contain a valid catalog JSON payload");
 }
 
-export async function ensureCatalogIngestSchema() {
-  if (schemaReady) return;
-
-  await dbClient.execute(`
-    CREATE TABLE IF NOT EXISTS catalog_snapshot (
-      id TEXT PRIMARY KEY,
-      source TEXT NOT NULL,
-      "sourceVersion" TEXT,
-      "titleCount" INTEGER NOT NULL DEFAULT 0,
-      "isCurrent" BOOLEAN NOT NULL DEFAULT false,
-      snapshot TEXT NOT NULL,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot("isCurrent", "createdAt")`);
-  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot("createdAt")`);
+// 실행 이력(catalog_ingest_run, 행당 수 KB)은 파일 전용 모드에서도 계속 DB에 기록한다 —
+// 수동 크롤 UI(status/recentRuns)가 소비. 대형 catalog_snapshot DDL 은 레거시 경로에서만 보장.
+async function ensureIngestRunSchema() {
+  if (runSchemaReady) return;
 
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS catalog_ingest_run (
@@ -228,11 +241,75 @@ export async function ensureCatalogIngestSchema() {
   await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_created ON catalog_ingest_run("createdAt")`);
   await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_ingest_run_status ON catalog_ingest_run(status, "createdAt")`);
 
-  schemaReady = true;
+  runSchemaReady = true;
 }
 
+// 레거시 전용: catalog_snapshot DDL. DB 스냅샷을 실제로 읽고 쓰는 함수들만 호출한다.
+async function ensureLegacySnapshotSchema() {
+  if (snapshotSchemaReady) return;
+
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS catalog_snapshot (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      "sourceVersion" TEXT,
+      "titleCount" INTEGER NOT NULL DEFAULT 0,
+      "isCurrent" BOOLEAN NOT NULL DEFAULT false,
+      snapshot TEXT NOT NULL,
+      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_current ON catalog_snapshot("isCurrent", "createdAt")`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_catalog_snapshot_created ON catalog_snapshot("createdAt")`);
+
+  snapshotSchemaReady = true;
+}
+
+export async function ensureCatalogIngestSchema() {
+  await ensureIngestRunSchema();
+  // 파일 전용 모드에서는 스냅샷 테이블 DDL 자체를 건너뛴다(불필요한 DB 왕복/객체 생성 방지).
+  if (isCatalogForceDb()) await ensureLegacySnapshotSchema();
+}
+
+// ── 파일 모드 로드(기본) ──
+// 부팅 로드 순서: 번들/지정 gz 파일 → 없으면 빈 카탈로그(가짜 데이터 미노출). DB 왕복 없음.
+export function loadLatestCatalogSnapshotFromFile() {
+  const stat = statCatalogFile();
+  const result = stat ? loadCatalogTitlesFromFile() : null;
+  if (!stat || !result) {
+    resetCatalogToEmpty("no-catalog-file");
+    loadedFileStat = null;
+    loadedFileRunHash = null;
+    return {
+      loaded: false as const,
+      source: "empty",
+      titleCount: getCatalogState().titleCount,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+  const titles = replaceCatalogData(result.titles, {
+    source: "file-snapshot",
+    sourceVersion: result.sourceVersion,
+  });
+  loadedFileStat = stat;
+  loadedFileRunHash = result.runHash;
+  return {
+    loaded: true as const,
+    snapshotId: fileSnapshotId(),
+    file: stat.file,
+    source: "catalog-file",
+    sourceVersion: result.sourceVersion,
+    titleCount: titles.length,
+    createdAt: new Date(stat.mtimeMs).toISOString(),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+// 레거시 FORCE_DB 전용 — 스냅샷 행(~22MB)을 통째로 읽으므로 기본 경로에서는 호출하지 않는다.
 export async function loadLatestCatalogSnapshotFromDb() {
-  await ensureCatalogIngestSchema();
+  await ensureIngestRunSchema();
+  await ensureLegacySnapshotSchema();
   const [snapshot] = await db
     .select()
     .from(catalogSnapshots)
@@ -271,12 +348,12 @@ export async function loadLatestCatalogSnapshotFromDb() {
 }
 
 export function getLoadedSnapshotId() {
-  return loadedSnapshotId;
+  return isCatalogForceDb() ? loadedSnapshotId : fileSnapshotId();
 }
 
-// DB의 현재 current 스냅샷 id (가벼운 조회 — 폴링용).
+// 레거시 FORCE_DB 전용: DB의 현재 current 스냅샷 id (가벼운 조회 — DB 해시 폴링용).
 export async function getCurrentSnapshotIdFromDb(): Promise<string | null> {
-  await ensureCatalogIngestSchema();
+  await ensureLegacySnapshotSchema();
   const [row] = await db
     .select({ id: catalogSnapshots.id })
     .from(catalogSnapshots)
@@ -286,13 +363,43 @@ export async function getCurrentSnapshotIdFromDb(): Promise<string | null> {
   return row?.id ?? null;
 }
 
-// 무중단 핫 리로드: DB current 스냅샷이 메모리에 로드된 것과 다르면 재로드.
-// 외부 프로세스(CLI/cron/다른 인스턴스)가 ingest해도 재시작 없이 수렴한다.
+// 무중단 핫 리로드: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 카탈로그를 적재해도 재시작 없이 수렴.
+//  - 파일 모드(기본): gz 파일의 mtime/size 스탯만 비교(syscall 1번, DB·네트워크 0) → 변경 시에만 재로드.
+//  - 레거시 FORCE_DB: 기존 DB current 스냅샷 id 폴링.
+// POST /api/catalog/refresh 의 응답 계약({ reloaded, snapshotId, titleCount })은 그대로 유지한다.
 export async function refreshCatalogIfChanged(): Promise<{
   reloaded: boolean;
   snapshotId: string | null;
   titleCount: number;
 }> {
+  if (!isCatalogForceDb()) {
+    const stat = statCatalogFile();
+    if (!stat) {
+      // 파일이 (일시적으로) 없으면 서빙 연속성을 위해 메모리 카탈로그를 유지한다 — 비우지 않음.
+      return { reloaded: false, snapshotId: fileSnapshotId(), titleCount: getCatalogState().titleCount };
+    }
+    if (
+      loadedFileStat &&
+      loadedFileStat.file === stat.file &&
+      loadedFileStat.mtimeMs === stat.mtimeMs &&
+      loadedFileStat.size === stat.size
+    ) {
+      return { reloaded: false, snapshotId: fileSnapshotId(), titleCount: getCatalogState().titleCount };
+    }
+    const result = loadCatalogTitlesFromFile();
+    if (!result) {
+      // 읽기 실패(외부의 비원자적 쓰기/손상) — 직전 카탈로그 유지, 다음 폴링에서 재시도.
+      return { reloaded: false, snapshotId: fileSnapshotId(), titleCount: getCatalogState().titleCount };
+    }
+    const titles = replaceCatalogData(result.titles, {
+      source: "file-snapshot",
+      sourceVersion: result.sourceVersion,
+    });
+    loadedFileStat = stat;
+    loadedFileRunHash = result.runHash;
+    return { reloaded: true, snapshotId: fileSnapshotId(), titleCount: titles.length };
+  }
+
   const dbId = await getCurrentSnapshotIdFromDb();
   if (dbId === loadedSnapshotId) {
     return { reloaded: false, snapshotId: loadedSnapshotId, titleCount: getCatalogState().titleCount };
@@ -327,37 +434,87 @@ export async function reapStaleCatalogIngestRuns(
   return reaped.length;
 }
 
-export async function getCatalogIngestStatus(config = normalizeCatalogIngestConfig()) {
-  await ensureCatalogIngestSchema();
-  // 죽은 프로세스가 남긴 'running' 이력을 정리해 상태 응답이 유령 실행을 보고하지 않게 한다(실패해도 조회는 계속).
-  await reapStaleCatalogIngestRuns(config).catch(() => 0);
-  const [currentSnapshot] = await db
-    .select()
-    .from(catalogSnapshots)
-    .where(eq(catalogSnapshots.isCurrent, true))
-    .orderBy(desc(catalogSnapshots.createdAt))
-    .limit(1);
+// status 의 currentSnapshot — 파일 모드에서는 gz 파일 요약으로 같은 응답 구조를 채운다
+// (AdminOps UI 가 id·source·sourceVersion·titleCount·isCurrent·createdAt 를 소비).
+type CatalogStatusSnapshot = {
+  id: string;
+  source: string;
+  sourceVersion: string | null;
+  titleCount: number;
+  isCurrent: boolean;
+  createdAt: string | null;
+  metadata: unknown;
+};
 
-  const recentRuns = await db
-    .select()
-    .from(catalogIngestRuns)
-    .orderBy(desc(catalogIngestRuns.createdAt))
-    .limit(10);
+function currentSnapshotFromFile(): CatalogStatusSnapshot | null {
+  const summary = readCatalogFileSummary();
+  if (!summary) return null;
+  return {
+    id: summary.runHash ?? `file:${path.basename(summary.file)}@${Math.round(summary.mtimeMs)}`,
+    source: "catalog-file",
+    sourceVersion: summary.sourceVersion ?? `file:${path.basename(summary.file)}`,
+    titleCount: summary.titleCount,
+    isCurrent: true,
+    createdAt: new Date(summary.mtimeMs).toISOString(),
+    metadata: {
+      storage: "file",
+      file: summary.file,
+      runHash: summary.runHash,
+      sizeBytes: summary.size,
+      crawledAt: summary.crawledAt,
+      crawler: summary.sources ? { sources: summary.sources } : null,
+    },
+  };
+}
+
+export async function getCatalogIngestStatus(config = normalizeCatalogIngestConfig()) {
+  const forceDb = isCatalogForceDb();
+  let currentSnapshot: CatalogStatusSnapshot | null = null;
+  let recentRuns: (typeof catalogIngestRuns.$inferSelect)[] = [];
+
+  // 이력/레거시 스냅샷 조회는 DB 의존 — 파일 전용 운영에서 DB 가 잠들었거나 장애여도
+  // status 자체(파일 스냅샷·config·sourcePlan)는 응답해야 하므로 실패를 격리한다.
+  try {
+    await ensureCatalogIngestSchema();
+    // 죽은 프로세스가 남긴 'running' 이력을 정리해 상태 응답이 유령 실행을 보고하지 않게 한다(실패해도 조회는 계속).
+    await reapStaleCatalogIngestRuns(config).catch(() => 0);
+
+    if (forceDb) {
+      const [snapshot] = await db
+        .select()
+        .from(catalogSnapshots)
+        .where(eq(catalogSnapshots.isCurrent, true))
+        .orderBy(desc(catalogSnapshots.createdAt))
+        .limit(1);
+      currentSnapshot = snapshot
+        ? {
+            id: snapshot.id,
+            source: snapshot.source,
+            sourceVersion: snapshot.sourceVersion,
+            titleCount: snapshot.titleCount,
+            isCurrent: Boolean(snapshot.isCurrent),
+            createdAt: toIso(snapshot.createdAt),
+            metadata: parseMaybeJson(snapshot.metadata),
+          }
+        : null;
+    }
+
+    recentRuns = await db
+      .select()
+      .from(catalogIngestRuns)
+      .orderBy(desc(catalogIngestRuns.createdAt))
+      .limit(10);
+  } catch (error) {
+    console.error("catalog ingest status: run history unavailable", error);
+  }
+
+  if (!forceDb) currentSnapshot = currentSnapshotFromFile();
 
   return {
     config: withoutToken(config),
+    storage: forceDb ? "database" : "file",
     sourcePlan: buildCatalogSourcePlan(config.sourceIds),
-    currentSnapshot: currentSnapshot
-      ? {
-          id: currentSnapshot.id,
-          source: currentSnapshot.source,
-          sourceVersion: currentSnapshot.sourceVersion,
-          titleCount: currentSnapshot.titleCount,
-          isCurrent: Boolean(currentSnapshot.isCurrent),
-          createdAt: toIso(currentSnapshot.createdAt),
-          metadata: parseMaybeJson(currentSnapshot.metadata),
-        }
-      : null,
+    currentSnapshot,
     catalogState: getCatalogState(),
     recentRuns: recentRuns.map((run) => ({
       id: run.id,
@@ -415,12 +572,21 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
 
     const sourceVersion = payload.sourceVersion ?? `crawl/${new Date().toISOString()}`;
     const runHash = hashTitles(payload.titles);
-    const duplicate = await currentSnapshotHasHash(runHash);
+    const forceDb = isCatalogForceDb();
+    // 동일-hash 스킵 기준: 파일 모드는 현재 gz 파일의 runHash, 레거시는 DB current 스냅샷 metadata.
+    const fileSummary = forceDb ? null : readCatalogFileSummary();
+    const duplicate = forceDb
+      ? await currentSnapshotHasHash(runHash)
+      : Boolean(fileSummary?.runHash && fileSummary.runHash === runHash);
 
     // 품질 게이트: 신규 데이터가 아닌(중복도 아닌) 경우, 직전 current 대비 총건수 급감 또는 주요 소스
     // 붕괴면 승격을 거부한다(낡은 데이터를 부분 데이터로 덮어쓰지 않음). 빈자리를 seed/추정으로 채우지 않음.
     if (!duplicate && !options.force) {
-      const currentStats = await getCurrentSnapshotStats();
+      const currentStats = forceDb
+        ? await getCurrentSnapshotStats()
+        : fileSummary
+          ? { titleCount: fileSummary.titleCount, sources: fileSummary.sources }
+          : null;
       const regression = evaluateRegression(
         payload.titles.length,
         extractSourceCounts(payload.metadata),
@@ -459,23 +625,51 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
     }
 
     let snapshotId: string | null = null;
+    let catalogFile: string | null = fileSummary?.file ?? null;
     if (!duplicate || options.force) {
-      snapshotId = await persistCatalogSnapshot({
-        titles: payload.titles,
-        source: execSource,
-        sourceVersion,
-        runHash,
-        runId,
-        requestedBy,
-        triggeredBy,
-        metadata: payload.metadata,
-        retention: config.snapshotRetention,
-      });
+      if (forceDb) {
+        // 레거시: DB catalog_snapshot 승격(+보존 프루닝)
+        snapshotId = await persistCatalogSnapshot({
+          titles: payload.titles,
+          source: execSource,
+          sourceVersion,
+          runHash,
+          runId,
+          requestedBy,
+          triggeredBy,
+          metadata: payload.metadata,
+          retention: config.snapshotRetention,
+        });
+      } else {
+        // 파일 전용: gz 원자적 저장(tmp→rename). 동일 runHash 는 위에서 이미 스킵됨.
+        catalogFile = writeCatalogTitlesToFile({
+          titles: payload.titles,
+          sourceVersion,
+          runHash,
+          crawledAt: payload.crawledAt,
+          metadata: payload.metadata,
+          writtenBy: "catalog-ingest",
+        });
+        snapshotId = runHash; // 파일 모드의 스냅샷 식별자 = runHash
+      }
     }
 
-    const titleCount = loadCatalogSnapshot(payload.titles, sourceVersion, false).length;
+    // 메모리 카탈로그 즉시 핫 리로드(파일 모드는 file-snapshot 출처로 표기).
+    const titleCount = forceDb
+      ? loadCatalogSnapshot(payload.titles, sourceVersion, false).length
+      : replaceCatalogData(payload.titles, { source: "file-snapshot", sourceVersion }).length;
+    if (!forceDb) {
+      // 자기 자신의 쓰기(또는 동일-hash 확인)를 폴링이 다시 로드하지 않도록 스탯 기준점을 동기화.
+      loadedFileStat = statCatalogFile();
+      loadedFileRunHash = runHash;
+    }
     const finishedAt = new Date();
-    const message = duplicate && !options.force ? "unchanged snapshot; memory catalog refreshed" : "snapshot stored";
+    const message =
+      duplicate && !options.force
+        ? "unchanged snapshot; memory catalog refreshed"
+        : forceDb
+          ? "snapshot stored"
+          : "catalog file stored";
 
     await db
       .update(catalogIngestRuns)
@@ -494,6 +688,8 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
           duplicate,
           force: Boolean(options.force),
           snapshotId,
+          storage: forceDb ? "database" : "file",
+          catalogFile,
           scriptMetadata: payload.metadata ?? null,
         },
       })
@@ -576,6 +772,38 @@ async function executeCrawler(config: CatalogIngestConfig): Promise<CatalogCrawl
   return parseCrawlerJsonPayload(stdout);
 }
 
+// ── 파일 전용 저장(기본 경로) ──
+// 정규화 검증을 통과한 titles 를 gz 로 원자적으로 저장한다(tmp 쓰기 → rename).
+// 동일 runHash 면 파일을 다시 쓰지 않는다(기존 동일-hash 스킵 의미 유지 — mtime 도 보존되어
+// 다른 인스턴스의 스탯 폴링이 불필요하게 재로드하지 않는다).
+export function persistCatalogSnapshotToFile(input: {
+  titles: Title[];
+  sourceVersion: string;
+  runHash: string;
+  crawledAt?: string;
+  metadata?: unknown;
+  force?: boolean;
+}): { written: boolean; file: string } {
+  const summary = readCatalogFileSummary();
+  if (!input.force && summary?.runHash && summary.runHash === input.runHash) {
+    loadedFileRunHash = input.runHash;
+    loadedFileStat = statCatalogFile();
+    return { written: false, file: summary.file };
+  }
+  const file = writeCatalogTitlesToFile({
+    titles: input.titles,
+    sourceVersion: input.sourceVersion,
+    crawledAt: input.crawledAt,
+    metadata: input.metadata,
+    runHash: input.runHash,
+    writtenBy: "catalog-ingest",
+  });
+  loadedFileStat = statCatalogFile();
+  loadedFileRunHash = input.runHash;
+  return { written: true, file };
+}
+
+// 레거시 FORCE_DB 전용 — 스냅샷 행(~22MB)을 DB 에 쓴다. 기본(파일) 경로에서는 호출하지 않는다.
 async function persistCatalogSnapshot(input: {
   titles: Title[];
   source: string;
@@ -587,6 +815,7 @@ async function persistCatalogSnapshot(input: {
   metadata: unknown;
   retention?: number;
 }) {
+  await ensureLegacySnapshotSchema();
   const snapshotId = randomUUID();
   await db.transaction(async (tx) => {
     await tx.update(catalogSnapshots).set({ isCurrent: false }).where(eq(catalogSnapshots.isCurrent, true));
@@ -623,7 +852,9 @@ async function persistCatalogSnapshot(input: {
   return snapshotId;
 }
 
+// 레거시 FORCE_DB 전용 — 동일-hash 판정.
 async function currentSnapshotHasHash(runHash: string) {
+  await ensureLegacySnapshotSchema();
   const [snapshot] = await db
     .select({ metadata: catalogSnapshots.metadata })
     .from(catalogSnapshots)
@@ -636,8 +867,9 @@ async function currentSnapshotHasHash(runHash: string) {
     : false;
 }
 
-// 품질 게이트용: 직전 current 스냅샷의 총건수 + 소스별 count(metadata.crawler.sources) 조회
+// 품질 게이트용(레거시 FORCE_DB): 직전 current 스냅샷의 총건수 + 소스별 count(metadata.crawler.sources) 조회
 async function getCurrentSnapshotStats(): Promise<{ titleCount: number; sources: Record<string, number> | null } | null> {
+  await ensureLegacySnapshotSchema();
   const [snapshot] = await db
     .select({ titleCount: catalogSnapshots.titleCount, metadata: catalogSnapshots.metadata })
     .from(catalogSnapshots)

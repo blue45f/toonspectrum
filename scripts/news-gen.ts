@@ -530,7 +530,10 @@ function loadCatalogEntries(gzPath: string): NewsCatalogEntry[] {
 }
 
 async function runCli(): Promise<void> {
-  const gzPath = process.env.WEBDEX_CATALOG_GZ ?? path.join(ROOT, "apps/api/data/catalog.json.gz");
+  const gzPath =
+    process.env.WEBDEX_CATALOG_FILE ??
+    process.env.WEBDEX_CATALOG_GZ ??
+    path.join(ROOT, "apps/api/data/catalog.json.gz");
   const outFile = path.join(ROOT, "public", "data", "news.json");
   const titles = existsSync(gzPath) ? loadCatalogEntries(gzPath) : [];
   console.log(`뉴스 생성: ${NEWS_QUERIES.length}개 쿼리 (작품 매칭 카탈로그 ${titles.length}편)`);

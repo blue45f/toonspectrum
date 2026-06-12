@@ -9,8 +9,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { activeTags, getAuthorDirectory, getCatalogState, getTitle, loadCatalogSnapshot, TITLES } from "../../../../../lib/server/catalog-store";
-import { loadCatalogTitlesFromFile } from "../../../../../lib/server/catalog-file";
+import { activeTags, getAuthorDirectory, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
 import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { fromDb } from "../../../../../lib/api-helpers";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
@@ -18,7 +17,7 @@ import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } f
 import { isAdminUser } from "../../../../../lib/server/app-config";
 import { getAuthorData } from "../../../../../lib/server/author";
 import { getCalendarData } from "../../../../../lib/server/calendar";
-import { getCatalogIngestStatus, loadLatestCatalogSnapshotFromDb, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
+import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
 import { rateLimit } from "../../../../../lib/rate-limit";
 import { getExploreData } from "../../../../../lib/server/explore";
 import { getHomeData } from "../../../../../lib/server/home";
@@ -92,36 +91,33 @@ export class CatalogService implements OnModuleInit {
   private nextCatalogIngestAt: number | null = null;
   private consecutiveIngestFailures = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
-  private fileBacked = false;
 
   async onModuleInit() {
     try {
-      // 카탈로그는 번들된 정적 파일(apps/api/data/catalog.json.gz)에서 로드 — Neon 전송 0.
-      // 파일이 없거나 WEBDEX_CATALOG_FORCE_DB=1 이면 기존 DB 스냅샷으로 폴백(되돌리기 가능).
-      if (process.env.WEBDEX_CATALOG_FORCE_DB === "1" || !this.loadCatalogFromFile()) {
+      // 카탈로그는 파일 전용: 번들/지정 gz(apps/api/data/catalog.json.gz 또는 WEBDEX_CATALOG_FILE) →
+      // 없으면 빈 카탈로그. DB catalog_snapshot 읽기는 WEBDEX_CATALOG_FORCE_DB=1 레거시 모드에서만.
+      if (isCatalogForceDb()) {
         await loadLatestCatalogSnapshotFromDb();
+      } else {
+        const result = loadLatestCatalogSnapshotFromFile();
+        if (result.loaded) {
+          console.log(`catalog loaded from file (${result.titleCount} titles) — DB 전송 0`);
+        } else {
+          console.warn("catalog file missing; starting empty (pnpm ingest 또는 WEBDEX_CATALOG_FILE 확인)");
+        }
       }
     } catch (error) {
       console.error("catalog load failed; runtime catalog is empty until a successful load", error);
     }
     // 실시간(live) 랭킹 제거 — 스냅샷 기반 운영. 스케줄러 미가동(naver 실시간 페치 없음).
     this.scheduleNextCatalogIngest();
-    // 파일 기반이면 Neon 폴링 불필요(전송 절감). DB 기반일 때만 핫 리로드 폴링.
-    if (!this.fileBacked) this.startCatalogRefreshPoll();
+    // 갱신 감지 폴링: 파일 모드는 mtime/size 스탯 비교(무비용)라 항상 켠다.
+    // 레거시 FORCE_DB 모드에서만 기존 DB 해시 폴링이 동작한다(refreshCatalogIfChanged 내부 분기).
+    this.startCatalogRefreshPoll();
   }
 
-  private loadCatalogFromFile(): boolean {
-    const result = loadCatalogTitlesFromFile();
-    if (!result) return false;
-    const titles = loadCatalogSnapshot(result.titles, result.sourceVersion, false);
-    if (titles.length === 0) return false;
-    this.fileBacked = true;
-    console.log(`catalog loaded from file (${titles.length} titles) — Neon 전송 없음`);
-    return true;
-  }
-
-  // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 스냅샷을 ingest하면
-  // 재시작 없이 메모리 카탈로그를 갱신한다. Neon 풀러는 LISTEN/NOTIFY 미지원 → 폴링이 견고.
+  // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 카탈로그를 적재하면
+  // 재시작 없이 메모리 카탈로그를 갱신한다. 파일 모드는 스탯 폴링, 레거시 DB 모드는 id 폴링.
   private startCatalogRefreshPoll() {
     const seconds = this.ingestConfig.refreshPollSeconds;
     if (!seconds) return; // 0 = 비활성

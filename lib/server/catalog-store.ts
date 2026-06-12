@@ -1,6 +1,7 @@
 import type { Title, WorkType } from "../types";
 
-export type CatalogSource = "empty" | "database-snapshot" | "cli-ingest";
+// "file-snapshot": gz 카탈로그 파일(기본 운영 경로) · "database-snapshot": 레거시 FORCE_DB 모드 전용
+export type CatalogSource = "empty" | "file-snapshot" | "database-snapshot" | "cli-ingest";
 
 type CatalogState = {
   source: CatalogSource;

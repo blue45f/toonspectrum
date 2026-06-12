@@ -35,6 +35,21 @@ describe("runtime catalog store", () => {
     });
   });
 
+  it("파일 전용 운영의 file-snapshot 출처를 상태에 반영한다(gz 파일 로드 경로)", () => {
+    const next = replaceCatalogData([makeTitle({ id: "file-1" })], {
+      source: "file-snapshot",
+      sourceVersion: "file:catalog.json.gz",
+    });
+
+    expect(next).toHaveLength(1);
+    expect(getCatalogState()).toMatchObject({
+      source: "file-snapshot",
+      sourceVersion: "file:catalog.json.gz",
+      titleCount: 1,
+      seedFallback: false,
+    });
+  });
+
   it("원작→2차창작 색인을 로드 시 구성해 adaptationsOf 가 전체 스캔 없이 동작한다", () => {
     const original = makeTitle({ id: "novel-1", type: "webnovel" });
     const adaptation = makeTitle({ id: "toon-1", adaptedFrom: "novel-1" });

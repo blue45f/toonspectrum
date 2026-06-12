@@ -70,6 +70,15 @@ function isSampleVrmId(id: string) {
   return SAMPLE_VRMS.some((sample) => sample.id === id);
 }
 
+export function isUsableVrmAssetResponse(response: Pick<Response, "ok" | "headers">) {
+  if (!response.ok) return false;
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const contentDisposition = response.headers.get("content-disposition")?.toLowerCase() ?? "";
+
+  return !contentType.includes("text/html") && !/filename="?index\.html"?/.test(contentDisposition);
+}
+
 function createModelId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();

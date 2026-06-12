@@ -4,6 +4,8 @@ import {
   evaluateRegression,
   extractSourceCounts,
   getCatalogIngestStatus,
+  loadLatestCatalogSnapshotFromDb,
+  loadLatestCatalogSnapshotFromFile,
   normalizeCatalogIngestConfig,
   parseCrawlerJsonPayload,
   refreshCatalogIfChanged,
@@ -16,7 +18,7 @@ import { isAdminUser } from "../server/app-config";
 import { buildCatalogSourcePlan } from "../server/catalog-sources";
 
 // Nest CatalogService(수동 ingest 경로) 검증용 부분 mock — 순수 함수(verify/normalize/…)는 실제 구현 유지,
-// DB/크롤 프로세스를 만지는 함수만 스텁한다. 서비스가 같은 모듈을 다른 상대경로로 import해도 동일 모듈로 적용된다.
+// DB/크롤 프로세스·파일 로드를 만지는 함수만 스텁한다. 서비스가 같은 모듈을 다른 상대경로로 import해도 동일 모듈로 적용된다.
 vi.mock("../server/catalog-ingest", async (importOriginal) => {
   const original = await importOriginal<typeof import("../server/catalog-ingest")>();
   return {
@@ -25,6 +27,7 @@ vi.mock("../server/catalog-ingest", async (importOriginal) => {
     getCatalogIngestStatus: vi.fn(),
     refreshCatalogIfChanged: vi.fn(),
     loadLatestCatalogSnapshotFromDb: vi.fn(),
+    loadLatestCatalogSnapshotFromFile: vi.fn(),
     reapStaleCatalogIngestRuns: vi.fn(async () => 0),
   };
 });
@@ -168,12 +171,18 @@ describe("좀비 running 이력 정리 기준", () => {
 describe("CatalogService 수동 ingest 엔드포인트 경로", () => {
   const ORIGINAL_TOKEN = process.env.CATALOG_INGEST_TRIGGER_TOKEN;
   const ORIGINAL_MODE = process.env.CATALOG_INGEST_MODE;
+  const ORIGINAL_POLL = process.env.CATALOG_REFRESH_POLL_SECONDS;
+  const ORIGINAL_FORCE_DB = process.env.WEBDEX_CATALOG_FORCE_DB;
 
   afterEach(() => {
     if (ORIGINAL_TOKEN == null) delete process.env.CATALOG_INGEST_TRIGGER_TOKEN;
     else process.env.CATALOG_INGEST_TRIGGER_TOKEN = ORIGINAL_TOKEN;
     if (ORIGINAL_MODE == null) delete process.env.CATALOG_INGEST_MODE;
     else process.env.CATALOG_INGEST_MODE = ORIGINAL_MODE;
+    if (ORIGINAL_POLL == null) delete process.env.CATALOG_REFRESH_POLL_SECONDS;
+    else process.env.CATALOG_REFRESH_POLL_SECONDS = ORIGINAL_POLL;
+    if (ORIGINAL_FORCE_DB == null) delete process.env.WEBDEX_CATALOG_FORCE_DB;
+    else process.env.WEBDEX_CATALOG_FORCE_DB = ORIGINAL_FORCE_DB;
     vi.clearAllMocks();
   });
 
@@ -181,8 +190,10 @@ describe("CatalogService 수동 ingest 엔드포인트 경로", () => {
     if (token == null) delete process.env.CATALOG_INGEST_TRIGGER_TOKEN;
     else process.env.CATALOG_INGEST_TRIGGER_TOKEN = token;
     process.env.CATALOG_INGEST_MODE = "off";
+    // onModuleInit 검증 시 폴링 타이머가 생기지 않게 0(off)으로 고정.
+    process.env.CATALOG_REFRESH_POLL_SECONDS = "0";
     const { CatalogService } = await import("../../apps/api/src/modules/catalog/catalog.service");
-    // onModuleInit은 호출하지 않는다(스케줄러/카탈로그 로드 없이 수동 ingest 경로만 검증).
+    // 기본적으로 onModuleInit은 호출하지 않는다(부팅 분기 테스트만 명시 호출).
     return new CatalogService();
   }
 
@@ -327,5 +338,39 @@ describe("CatalogService 수동 ingest 엔드포인트 경로", () => {
 
     vi.mocked(refreshCatalogIfChanged).mockResolvedValueOnce({ reloaded: false, snapshotId: null, titleCount: 0 });
     await expect(service.refreshCatalog("tok-8", "rl-refresh-ok")).resolves.toMatchObject({ reloaded: false });
+  });
+
+  it("부팅(기본): 파일 로더만 호출되고 DB 스냅샷 로더는 호출되지 않는다 — 카탈로그 파일 전용", async () => {
+    delete process.env.WEBDEX_CATALOG_FORCE_DB;
+    const service = await makeService("tok-boot-file");
+    vi.mocked(loadLatestCatalogSnapshotFromFile).mockReturnValueOnce({
+      loaded: true,
+      snapshotId: "hash-x",
+      file: "/tmp/catalog.json.gz",
+      source: "catalog-file",
+      sourceVersion: "file:catalog.json.gz",
+      titleCount: 3,
+      createdAt: new Date().toISOString(),
+      generatedAt: new Date().toISOString(),
+    } as ReturnType<typeof loadLatestCatalogSnapshotFromFile>);
+
+    await service.onModuleInit();
+    expect(vi.mocked(loadLatestCatalogSnapshotFromFile)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(loadLatestCatalogSnapshotFromDb)).not.toHaveBeenCalled();
+  });
+
+  it("부팅(WEBDEX_CATALOG_FORCE_DB=1 레거시): DB 스냅샷 로더가 호출된다", async () => {
+    process.env.WEBDEX_CATALOG_FORCE_DB = "1";
+    const service = await makeService("tok-boot-db");
+    vi.mocked(loadLatestCatalogSnapshotFromDb).mockResolvedValueOnce({
+      loaded: false,
+      source: "empty",
+      titleCount: 0,
+      generatedAt: new Date().toISOString(),
+    } as Awaited<ReturnType<typeof loadLatestCatalogSnapshotFromDb>>);
+
+    await service.onModuleInit();
+    expect(vi.mocked(loadLatestCatalogSnapshotFromDb)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(loadLatestCatalogSnapshotFromFile)).not.toHaveBeenCalled();
   });
 });

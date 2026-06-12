@@ -19,6 +19,7 @@ import {
   users,
 } from "../../../../../lib/db";
 import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
+import { invalidateSessionUser } from "../../../../../lib/server/session";
 
 type AdminRole = "admin" | "creator" | "operator" | "user";
 type RevenueStatus = "pending" | "approved" | "paid" | "rejected" | "revoked";
@@ -499,6 +500,8 @@ export class AdminService {
     }
     const rows = await db.update(users).set({ role }).where(eq(users.id, targetUserId)).returning({ id: users.id });
     if (!rows.length) throw new BadRequestException({ error: "대상 사용자를 찾을 수 없어요." });
+    // 권한 변경 즉시 세션 마이크로캐시 무효화 — isAdminUser 가 다음 요청부터 새 역할을 본다.
+    invalidateSessionUser(targetUserId);
     return { ok: true, id: targetUserId, role };
   }
 
@@ -1054,6 +1057,7 @@ async function requireAdminUser(userId: string): Promise<{ id: string; name: str
 
   if (whitelist.has(email) && finalRole === "admin" && dbRole !== "admin") {
     await db.update(users).set({ role: "admin" }).where(eq(users.id, row.id));
+    invalidateSessionUser(row.id); // 화이트리스트 승격도 권한 변경 — 캐시 즉시 무효화.
   }
 
   if (!ADMIN_ROLES.has(finalRole)) {

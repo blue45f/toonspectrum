@@ -69,7 +69,11 @@ function buildDetailShards(titles: readonly Title[]): { files: DetailShardFile[]
 }
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SRC_GZ = process.env.WEBDEX_CATALOG_GZ ?? path.join(ROOT, "apps/api/data/catalog.json.gz");
+// WEBDEX_CATALOG_FILE 이 정식 이름(서버 런타임과 동일), WEBDEX_CATALOG_GZ 는 기존 호환 별칭.
+const SRC_GZ =
+  process.env.WEBDEX_CATALOG_FILE ??
+  process.env.WEBDEX_CATALOG_GZ ??
+  path.join(ROOT, "apps/api/data/catalog.json.gz");
 const OUT = path.join(ROOT, "public", "data");
 
 function loadTitles(): Title[] {
