@@ -3,6 +3,7 @@ import * as THREE from "three";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import { applyPoseToVrm, POSE_PRESETS } from "./StudioVrmPoser";
+import { NATURAL_IDLE_POSES, pickNaturalIdlePose } from "./studio-pose-presets";
 
 const MAX_Y_OFFSET = 0.20;
 const MAX_HEAD_AXIS_DEGREES = 12;
@@ -43,13 +44,17 @@ function createTestVrm() {
   const neck = addBone(bones, "neck", chest, [0, 0.28, 0]);
   addBone(bones, "head", neck, [0, 0.18, 0]);
 
-  const leftUpperArm = addBone(bones, "leftUpperArm", chest, [0.18, 0.13, 0]);
+  const leftShoulder = addBone(bones, "leftShoulder", chest, [0.06, 0.13, 0]);
+  const leftUpperArm = addBone(bones, "leftUpperArm", leftShoulder, [0.12, 0, 0]);
   const leftLowerArm = addBone(bones, "leftLowerArm", leftUpperArm, [0.34, -0.62, 0]);
-  addBone(bones, "leftHand", leftLowerArm, [0.14, -0.58, 0]);
+  const leftHand = addBone(bones, "leftHand", leftLowerArm, [0.14, -0.58, 0]);
+  addBone(bones, "leftIndexProximal", leftHand, [0.06, -0.07, 0]);
 
-  const rightUpperArm = addBone(bones, "rightUpperArm", chest, [-0.18, 0.13, 0]);
+  const rightShoulder = addBone(bones, "rightShoulder", chest, [-0.06, 0.13, 0]);
+  const rightUpperArm = addBone(bones, "rightUpperArm", rightShoulder, [-0.12, 0, 0]);
   const rightLowerArm = addBone(bones, "rightLowerArm", rightUpperArm, [-0.34, -0.62, 0]);
-  addBone(bones, "rightHand", rightLowerArm, [-0.14, -0.58, 0]);
+  const rightHand = addBone(bones, "rightHand", rightLowerArm, [-0.14, -0.58, 0]);
+  addBone(bones, "rightIndexProximal", rightHand, [-0.06, -0.07, 0]);
 
   const leftUpperLeg = addBone(bones, "leftUpperLeg", hips, [0.12, -0.08, 0]);
   const leftLowerLeg = addBone(bones, "leftLowerLeg", leftUpperLeg, [0.05, -0.76, 0]);
@@ -143,6 +148,39 @@ describe("StudioVrmPoser pose presets", () => {
     const awkwardOffsets = POSE_PRESETS.flatMap((pose) => (Math.abs(pose.yOffset ?? 0) > MAX_Y_OFFSET ? [`${pose.id}:yOffset:${pose.yOffset}`] : []));
 
     expect([...awkwardCoreRotations, ...awkwardOffsets]).toEqual([]);
+  });
+
+  it("applies natural idle spawn poses with visible left-right asymmetry", () => {
+    const { bones, vrm } = createTestVrm();
+
+    for (const idle of NATURAL_IDLE_POSES) {
+      expect(applyPoseToVrm(vrm, idle.bones, idle.yOffset ?? 0), `${idle.id} apply`).toBe(true);
+
+      const left = getBoneDirection(bones, "leftUpperArm", "leftLowerArm");
+      const right = getBoneDirection(bones, "rightUpperArm", "rightLowerArm");
+
+      // 팔은 자연스럽게 아래로 늘어진다.
+      expect(left.y, `${idle.id} left arm down`).toBeLessThan(-0.8);
+      expect(right.y, `${idle.id} right arm down`).toBeLessThan(-0.8);
+
+      // 좌우 비대칭: 오른팔을 미러링해도 왼팔과 1° 이상 어긋나야 한다.
+      const mirroredRight = new THREE.Vector3(-right.x, right.y, right.z);
+      const asymmetryDeg = THREE.MathUtils.radToDeg(left.angleTo(mirroredRight));
+      expect(asymmetryDeg, `${idle.id} arm asymmetry`).toBeGreaterThan(1);
+
+      // 어깨 내림(왼 -z / 오 +z)과 손가락 릴랙스 컬(왼 -z / 오 +z)이 실제로 적용된다.
+      expect(bones.leftShoulder!.rotation.z, `${idle.id} left shoulder drop`).toBeLessThan(0);
+      expect(bones.rightShoulder!.rotation.z, `${idle.id} right shoulder drop`).toBeGreaterThan(0);
+      expect(bones.leftIndexProximal!.rotation.z, `${idle.id} left finger curl`).toBeLessThan(0);
+      expect(bones.rightIndexProximal!.rotation.z, `${idle.id} right finger curl`).toBeGreaterThan(0);
+    }
+  });
+
+  it("picks spawn idle poses deterministically per model id", () => {
+    for (const id of ["sample-vrm", "alicia", "kage", "upload-123"]) {
+      expect(pickNaturalIdlePose(id).id).toBe(pickNaturalIdlePose(id).id);
+    }
+    expect(NATURAL_IDLE_POSES.map((pose) => pose.id)).toContain(pickNaturalIdlePose("sample-vrm").id);
   });
 
   it("offers calm comic-panel pose options with natural labels", () => {

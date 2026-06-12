@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
+import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
+
+// 2026-06 추가된 신규 번들 8종 — public/vrm/LICENSES.md 고지 대상.
+const NEW_BUNDLE_FILES = [
+  "Sendagaya_Shino.vrm",
+  "Sakurada_Fumiriya.vrm",
+  "Darkness_Shibu.vrm",
+  "HairSample_Female.vrm",
+  "HairSample_Male.vrm",
+  "fem_vroid.vrm",
+  "masc_vroid.vrm",
+  "AliciaSolid.vrm",
+] as const;
 
 describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
@@ -29,6 +41,41 @@ describe("VRM library helpers", () => {
       "아리시아",
     ]);
     expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
+  });
+
+  it("bundles 20 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(20);
+
+    const ids = SAMPLE_VRMS.map((sample) => sample.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    for (const sample of SAMPLE_VRMS) {
+      expect(sample.url, `${sample.id} url`).toMatch(/^\/vrm\/[A-Za-z0-9_.-]+\.vrm$/);
+    }
+
+    const urls = SAMPLE_VRMS.map((sample) => sample.url);
+    expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it("registers every newly bundled model in the sample list", () => {
+    const urls = new Set(SAMPLE_VRMS.map((sample) => sample.url));
+    for (const fileName of NEW_BUNDLE_FILES) {
+      expect(urls.has(`/vrm/${fileName}`), `missing sample entry for ${fileName}`).toBe(true);
+    }
+  });
+
+  it("documents all newly bundled models in public/vrm/LICENSES.md", () => {
+    const licensesPath = join(process.cwd(), "public", "vrm", "LICENSES.md");
+    expect(existsSync(licensesPath)).toBe(true);
+
+    const licenses = readFileSync(licensesPath, "utf8");
+    for (const fileName of NEW_BUNDLE_FILES) {
+      expect(licenses, `LICENSES.md missing ${fileName}`).toContain(fileName);
+    }
+    // 출처 저장소와 Alicia(니코니 솔리드) 라이선스 고지 링크가 명시되어야 한다.
+    expect(licenses).toContain("github.com/madjin/vrm-samples");
+    expect(licenses).toContain("github.com/vrm-c/UniVRM");
+    expect(licenses).toContain("3d.nicovideo.jp/alicia");
   });
 
   it("backs every bundled character with an actual local VRM asset", () => {
