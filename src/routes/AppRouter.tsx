@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { HomePage } from "@/src/pages/HomePage";
 import { NotFoundPage } from "@/src/pages/NotFoundPage";
@@ -55,69 +55,132 @@ function useRouteTitle(pathname: string) {
   }, [pathname]);
 }
 
+// ── 청크 로드 재시도 ──
+// 배포로 청크 해시가 바뀌면 이전 세션의 lazy import가 404로 실패한다. 그 경우 1회만
+// 자동 새로고침해 새 해시를 받아오고, 새로고침 후에도 같은 청크가 또 실패하면(2차)
+// 그대로 throw해 ErrorBoundary가 받게 한다. 가드는 sessionStorage 청크별 키로 추적한다.
+
+function hasReloadGuard(key: string): boolean {
+  try {
+    return window.sessionStorage.getItem(key) !== null;
+  } catch {
+    return true; // 저장소 차단 환경 — 추적이 불가하면 이미 리로드한 것으로 간주해 루프를 차단
+  }
+}
+
+function armReloadGuard(key: string): boolean {
+  try {
+    window.sessionStorage.setItem(key, "1");
+    return true;
+  } catch {
+    return false; // 가드를 세우지 못하면 리로드하지 않는다(무한 리로드 방지)
+  }
+}
+
+function clearReloadGuard(key: string) {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // 저장소 차단 환경 — 세워둔 가드도 없으므로 무시
+  }
+}
+
+function lazyRetry<T extends ComponentType<unknown>>(load: () => Promise<{ default: T }>, chunkId: string) {
+  return lazy(async () => {
+    const guardKey = `chunk-reload:${chunkId}`;
+    try {
+      const mod = await load();
+      clearReloadGuard(guardKey); // 성공 시 해제 — 다음 배포 실패 때 다시 1회 재시도할 수 있다
+      return mod;
+    } catch (error) {
+      // 이미 1회 리로드했거나 가드를 세울 수 없으면 그대로 던져 ErrorBoundary로 보낸다.
+      if (hasReloadGuard(guardKey) || !armReloadGuard(guardKey)) throw error;
+      window.location.reload(); // 가드를 유지한 채 새로고침 — 같은 청크의 자동 리로드를 1회로 제한
+      return await new Promise<never>(() => {}); // 리로드가 끝날 때까지 Suspense fallback 유지
+    }
+  });
+}
+
 // 라우트별 코드 분할 — 랜딩(HomePage)·404는 eager, 나머지는 lazy로 초기 번들에서 분리.
-// 페이지가 named export 라 default 로 매핑한다.
-const RankingPage = lazy(() => import("@/src/pages/RankingPage").then((m) => ({ default: m.RankingPage })));
-const SearchPage = lazy(() => import("@/src/pages/SearchPage").then((m) => ({ default: m.SearchPage })));
-const RecommendPage = lazy(() => import("@/src/pages/RecommendPage").then((m) => ({ default: m.RecommendPage })));
-const ExplorePage = lazy(() => import("@/src/pages/ExplorePage").then((m) => ({ default: m.ExplorePage })));
-const CalendarPage = lazy(() => import("@/src/pages/CalendarPage").then((m) => ({ default: m.CalendarPage })));
-const ReviewsPage = lazy(() => import("@/src/pages/ReviewsPage").then((m) => ({ default: m.ReviewsPage })));
-const CommunityPage = lazy(() => import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityPage })));
-const CommunityScopePage = lazy(() =>
-  import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityScopePage }))
+// 페이지가 named export 라 default 로 매핑하고, lazyRetry가 청크 로드 실패를 복구한다.
+const RankingPage = lazyRetry(() => import("@/src/pages/RankingPage").then((m) => ({ default: m.RankingPage })), "RankingPage");
+const SearchPage = lazyRetry(() => import("@/src/pages/SearchPage").then((m) => ({ default: m.SearchPage })), "SearchPage");
+const RecommendPage = lazyRetry(() => import("@/src/pages/RecommendPage").then((m) => ({ default: m.RecommendPage })), "RecommendPage");
+const ExplorePage = lazyRetry(() => import("@/src/pages/ExplorePage").then((m) => ({ default: m.ExplorePage })), "ExplorePage");
+const CalendarPage = lazyRetry(() => import("@/src/pages/CalendarPage").then((m) => ({ default: m.CalendarPage })), "CalendarPage");
+const ReviewsPage = lazyRetry(() => import("@/src/pages/ReviewsPage").then((m) => ({ default: m.ReviewsPage })), "ReviewsPage");
+const CommunityPage = lazyRetry(() => import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityPage })), "CommunityPage");
+const CommunityScopePage = lazyRetry(
+  () => import("@/src/pages/CommunityPage").then((m) => ({ default: m.CommunityScopePage })),
+  "CommunityScopePage"
 );
-const CafesPage = lazy(() => import("@/src/pages/community/CafesPage").then((m) => ({ default: m.CafesPage })));
-const CafeDetailPage = lazy(() =>
-  import("@/src/pages/community/CafeDetailPage").then((m) => ({ default: m.CafeDetailPage }))
+const CafesPage = lazyRetry(() => import("@/src/pages/community/CafesPage").then((m) => ({ default: m.CafesPage })), "CafesPage");
+const CafeDetailPage = lazyRetry(
+  () => import("@/src/pages/community/CafeDetailPage").then((m) => ({ default: m.CafeDetailPage })),
+  "CafeDetailPage"
 );
-const CommunityPostPage = lazy(() =>
-  import("@/src/pages/community/CommunityPostPage").then((m) => ({ default: m.CommunityPostPage }))
+const CommunityPostPage = lazyRetry(
+  () => import("@/src/pages/community/CommunityPostPage").then((m) => ({ default: m.CommunityPostPage })),
+  "CommunityPostPage"
 );
-const AdminCommunityPage = lazy(() =>
-  import("@/src/pages/admin/AdminCommunityPage").then((m) => ({ default: m.AdminCommunityPage }))
+const AdminCommunityPage = lazyRetry(
+  () => import("@/src/pages/admin/AdminCommunityPage").then((m) => ({ default: m.AdminCommunityPage })),
+  "AdminCommunityPage"
 );
-const AdminMembersPage = lazy(() =>
-  import("@/src/pages/admin/AdminMembersPage").then((m) => ({ default: m.AdminMembersPage }))
+const AdminMembersPage = lazyRetry(
+  () => import("@/src/pages/admin/AdminMembersPage").then((m) => ({ default: m.AdminMembersPage })),
+  "AdminMembersPage"
 );
-const LibraryPage = lazy(() => import("@/src/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
-const ComparePage = lazy(() => import("@/src/pages/ComparePage").then((m) => ({ default: m.ComparePage })));
-const RandomPage = lazy(() => import("@/src/pages/RandomPage").then((m) => ({ default: m.RandomPage })));
-const InsightsPage = lazy(() => import("@/src/pages/InsightsPage").then((m) => ({ default: m.InsightsPage })));
-const TitleDetailPage = lazy(() =>
-  import("@/src/pages/TitleDetailPage").then((m) => ({ default: m.TitleDetailPage }))
+const LibraryPage = lazyRetry(() => import("@/src/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })), "LibraryPage");
+const ComparePage = lazyRetry(() => import("@/src/pages/ComparePage").then((m) => ({ default: m.ComparePage })), "ComparePage");
+const RandomPage = lazyRetry(() => import("@/src/pages/RandomPage").then((m) => ({ default: m.RandomPage })), "RandomPage");
+const InsightsPage = lazyRetry(() => import("@/src/pages/InsightsPage").then((m) => ({ default: m.InsightsPage })), "InsightsPage");
+const TitleDetailPage = lazyRetry(
+  () => import("@/src/pages/TitleDetailPage").then((m) => ({ default: m.TitleDetailPage })),
+  "TitleDetailPage"
 );
-const AuthorPage = lazy(() => import("@/src/pages/AuthorPage").then((m) => ({ default: m.AuthorPage })));
-const UserProfilePage = lazy(() => import("@/src/pages/UserProfilePage").then((m) => ({ default: m.UserProfilePage })));
-const PencafePage = lazy(() => import("@/src/pages/PencafePage").then((m) => ({ default: m.PencafePage })));
-const AdminPage = lazy(() => import("@/src/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
-const FeedbackPage = lazy(() => import("@/src/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage })));
-const TagsPage = lazy(() => import("@/src/pages/TagsPage").then((m) => ({ default: m.TagsPage })));
-const AuthorsPage = lazy(() => import("@/src/pages/AuthorsPage").then((m) => ({ default: m.AuthorsPage })));
-const NewsPage = lazy(() => import("@/src/pages/NewsPage").then((m) => ({ default: m.NewsPage })));
-const SettingsPage = lazy(() => import("@/src/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
-const AboutPage = lazy(() => import("@/src/pages/AboutPage").then((m) => ({ default: m.AboutPage })));
-const GuidePage = lazy(() => import("@/src/pages/GuidePage").then((m) => ({ default: m.GuidePage })));
-const CopyrightPage = lazy(() => import("@/src/pages/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })));
-const TermsPage = lazy(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.TermsPage })));
-const PrivacyPage = lazy(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.PrivacyPage })));
-const ContactPage = lazy(() => import("@/src/pages/ContactPage").then((m) => ({ default: m.ContactPage })));
-const CreateGalleryPage = lazy(() =>
-  import("@/src/pages/create/CreateGalleryPage").then((m) => ({ default: m.CreateGalleryPage }))
+const AuthorPage = lazyRetry(() => import("@/src/pages/AuthorPage").then((m) => ({ default: m.AuthorPage })), "AuthorPage");
+const UserProfilePage = lazyRetry(
+  () => import("@/src/pages/UserProfilePage").then((m) => ({ default: m.UserProfilePage })),
+  "UserProfilePage"
 );
-const CreateWorkPage = lazy(() =>
-  import("@/src/pages/create/CreateWorkPage").then((m) => ({ default: m.CreateWorkPage }))
+const PencafePage = lazyRetry(() => import("@/src/pages/PencafePage").then((m) => ({ default: m.PencafePage })), "PencafePage");
+const AdminPage = lazyRetry(() => import("@/src/pages/AdminPage").then((m) => ({ default: m.AdminPage })), "AdminPage");
+const FeedbackPage = lazyRetry(() => import("@/src/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage })), "FeedbackPage");
+const TagsPage = lazyRetry(() => import("@/src/pages/TagsPage").then((m) => ({ default: m.TagsPage })), "TagsPage");
+const AuthorsPage = lazyRetry(() => import("@/src/pages/AuthorsPage").then((m) => ({ default: m.AuthorsPage })), "AuthorsPage");
+const NewsPage = lazyRetry(() => import("@/src/pages/NewsPage").then((m) => ({ default: m.NewsPage })), "NewsPage");
+const SettingsPage = lazyRetry(() => import("@/src/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })), "SettingsPage");
+const AboutPage = lazyRetry(() => import("@/src/pages/AboutPage").then((m) => ({ default: m.AboutPage })), "AboutPage");
+const GuidePage = lazyRetry(() => import("@/src/pages/GuidePage").then((m) => ({ default: m.GuidePage })), "GuidePage");
+const CopyrightPage = lazyRetry(
+  () => import("@/src/pages/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })),
+  "CopyrightPage"
 );
-const CreateSeriesPage = lazy(() =>
-  import("@/src/pages/create/CreateSeriesPage").then((m) => ({ default: m.CreateSeriesPage }))
+const TermsPage = lazyRetry(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.TermsPage })), "TermsPage");
+const PrivacyPage = lazyRetry(() => import("@/src/pages/legal/PolicyPage").then((m) => ({ default: m.PrivacyPage })), "PrivacyPage");
+const ContactPage = lazyRetry(() => import("@/src/pages/ContactPage").then((m) => ({ default: m.ContactPage })), "ContactPage");
+const CreateGalleryPage = lazyRetry(
+  () => import("@/src/pages/create/CreateGalleryPage").then((m) => ({ default: m.CreateGalleryPage })),
+  "CreateGalleryPage"
 );
-const CreateChallengesPage = lazy(() =>
-  import("@/src/pages/create/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage }))
+const CreateWorkPage = lazyRetry(
+  () => import("@/src/pages/create/CreateWorkPage").then((m) => ({ default: m.CreateWorkPage })),
+  "CreateWorkPage"
 );
-const StudioPage = lazy(() => import("@/src/pages/create/StudioPage").then((m) => ({ default: m.StudioPage })));
-const AccountPage = lazy(() => import("@/src/pages/AccountPage").then((m) => ({ default: m.AccountPage })));
-const AuthCallbackPage = lazy(() =>
-  import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage }))
+const CreateSeriesPage = lazyRetry(
+  () => import("@/src/pages/create/CreateSeriesPage").then((m) => ({ default: m.CreateSeriesPage })),
+  "CreateSeriesPage"
+);
+const CreateChallengesPage = lazyRetry(
+  () => import("@/src/pages/create/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage })),
+  "CreateChallengesPage"
+);
+const StudioPage = lazyRetry(() => import("@/src/pages/create/StudioPage").then((m) => ({ default: m.StudioPage })), "StudioPage");
+const AccountPage = lazyRetry(() => import("@/src/pages/AccountPage").then((m) => ({ default: m.AccountPage })), "AccountPage");
+const AuthCallbackPage = lazyRetry(
+  () => import("@/src/pages/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage })),
+  "AuthCallbackPage"
 );
 
 function RouteFallback() {
