@@ -62,6 +62,11 @@ interface RevenueSettlePayload {
   note?: unknown;
 }
 
+interface UserStatusPayload {
+  status?: unknown;
+  reason?: unknown;
+}
+
 @Controller("admin")
 export class AdminController {
   constructor(@Inject(AdminService) private readonly adminService: AdminService) {}
@@ -140,6 +145,26 @@ export class AdminController {
   ) {
     const uid = enforceUserOrError(userId);
     return this.adminService.setUserRole(uid, id, body.role);
+  }
+
+  @Post("users/:id/status")
+  async setUserStatus(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: UserStatusPayload
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.setUserStatus(uid, id, body.status, body.reason);
+  }
+
+  @Delete("users/:id")
+  async deleteUser(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { reason?: unknown } = {}
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deleteUser(uid, id, body.reason);
   }
 
   @Get("dashboard")

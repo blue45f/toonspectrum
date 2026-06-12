@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { accounts, db, users } from "../db";
+import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
 // ── 소셜 로그인(Google·Kakao·Naver) OAuth 2.0 인가-코드 흐름 ──
 // 실제 OAuth: 환경변수(client id/secret)가 있으면 동작. 없으면 데모 폴백(명확히 [데모] 표시)으로 대체.
@@ -19,6 +20,7 @@ export interface OAuthUser {
   email: string | null;
   image: string | null;
   role: string;
+  sessionVersion?: number | null;
 }
 
 interface ProviderConfig {
@@ -233,6 +235,7 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
 let oauthTablesReady: Promise<void> | null = null;
 export function ensureOAuthTables(): Promise<void> {
   oauthTablesReady ??= (async () => {
+    await ensureUserLifecycleSchema();
     const { dbClient } = await import("../db");
     await dbClient.execute(`CREATE TABLE IF NOT EXISTS "account" (
       "userId" text NOT NULL,
@@ -305,12 +308,15 @@ async function upsertOAuthUser(
   }
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const block = getUserAuthBlock(user);
+  if (block) throw new Error(block);
   return {
     id: userId,
     name: user?.name ?? name,
     email: user?.email ?? email,
     image: user?.image ?? profile.image ?? null,
     role: normalizeRole(user?.role),
+    sessionVersion: normalizeSessionVersion(user?.sessionVersion),
   };
 }
 
@@ -341,7 +347,7 @@ export async function createDemoUser(id: OAuthProviderId): Promise<OAuthUser> {
   } catch {
     // DB(Neon) 불가(쿼터/장애) 시에도 데모 체험은 가능해야 한다 — 영속화 없이 합성 데모 사용자 반환.
     // 세션은 클라이언트(localStorage)라 DB 행 없이도 로그인 체험이 동작한다.
-    return { id: `demo-${id}`, name: c.demoName, email: c.demoEmail, image: null, role: "user" };
+    return { id: `demo-${id}`, name: c.demoName, email: c.demoEmail, image: null, role: "user", sessionVersion: 1 };
   }
 }
 

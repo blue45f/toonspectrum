@@ -122,6 +122,14 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 }
 
 export async function signOut() {
+  const token = currentSession?.token;
+  if (token) {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "x-user-id": token },
+    }).catch(() => {});
+  }
   persistSession(null);
   return undefined;
 }

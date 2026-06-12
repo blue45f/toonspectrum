@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { db, collections, collectionItems, ratings, reviews, reviewLikes, reads, subscriptions } from "../../../../../lib/db";
-import { loadMe, updateProfile, type UpdateProfileInput } from "../../../../../lib/server/me";
+import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../../../../lib/server/me";
 
 type MergeMapValue = Record<string, unknown>;
 
@@ -234,6 +234,12 @@ export class MeService {
       input.image = payload.image === null ? null : String(payload.image ?? "");
     }
     const result = await updateProfile(uid, input);
+    if ("error" in result) throw new BadRequestException(result.error);
+    return result;
+  }
+
+  async deleteAccount(uid: string) {
+    const result = await deleteMyAccount(uid);
     if ("error" in result) throw new BadRequestException(result.error);
     return result;
   }

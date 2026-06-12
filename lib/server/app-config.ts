@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import { appSettings, db, dbClient, users } from "../db";
 import { getSessionUserCached } from "./session";
+import { ensureUserLifecycleSchema, normalizeUserAccountStatus } from "./user-lifecycle";
 
 // 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
 // 세션 마이크로캐시(TTL 30초) 적용: admin-authed 요청마다 나가던 users SELECT 를 흡수한다.
@@ -10,11 +11,17 @@ import { getSessionUserCached } from "./session";
 export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
   try {
+  await ensureUserLifecycleSchema();
   const u = await getSessionUserCached(userId, async (id) => {
-    const [row] = await db.select({ role: users.role, email: users.email }).from(users).where(eq(users.id, id)).limit(1);
+    const [row] = await db
+      .select({ role: users.role, email: users.email, status: users.status })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
     return row ?? null;
   });
   if (!u) return false;
+  if (normalizeUserAccountStatus(u.status) !== "active") return false;
   const role = String(u.role ?? "").toLowerCase();
   if (role === "admin" || role === "operator") return true;
   const whitelist = String(process.env.ADMIN_EMAILS ?? "")

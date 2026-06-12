@@ -71,6 +71,12 @@ export class MeController {
     return this.meService.updateProfile(uid, body);
   }
 
+  @Delete("account")
+  async deleteAccount(@Headers("x-user-id") userId: string | undefined) {
+    const uid = this.userIdFromHeader(userId);
+    return this.meService.deleteAccount(uid);
+  }
+
   @Post("review")
   async upsertReview(@Headers("x-user-id") userId: string | undefined, @Body() body: ReviewPayload) {
     const uid = this.userIdFromHeader(userId);

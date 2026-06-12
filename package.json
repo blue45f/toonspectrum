@@ -26,7 +26,13 @@
     "typecheck": "tsc -p tsconfig.json && pnpm --filter @webtoon-nest/api run typecheck",
     "test": "vitest run",
     "validate:architecture": "node scripts/validate-architecture.mjs",
-    "verify": "pnpm run validate:architecture && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:all"
+    "ci": "pnpm run validate:architecture && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:all",
+    "sonar": "sonar-scanner",
+    "lint:strict": "eslint --max-warnings=0",
+    "lint:ci": "pnpm run lint:strict",
+    "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
+    "verify": "pnpm run ci",
+    "verify:push": "pnpm run verify"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -82,7 +88,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix"
+      "eslint --max-warnings=0 --fix"
     ]
   }
 }

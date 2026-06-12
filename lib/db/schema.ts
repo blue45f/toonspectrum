@@ -22,6 +22,11 @@ export const users = pgTable("user", {
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
   role: text("role").notNull().default("user"),
+  status: text("status").notNull().default("active"), // active | suspended | deleted
+  sessionVersion: integer("sessionVersion").notNull().default(1), // 서버 로그아웃·정지·탈퇴 시 증가해 기존 토큰 무효화
+  suspendedAt: timestamp("suspendedAt", { mode: "date" }),
+  suspensionReason: text("suspensionReason"),
+  deletedAt: timestamp("deletedAt", { mode: "date" }),
   // 확장: 크리덴셜 로그인·프로필
   passwordHash: text("passwordHash"),
   avatar: text("avatar"), // 아바타 컬러 hex

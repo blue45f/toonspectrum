@@ -19,6 +19,12 @@ import {
 } from "../../../../../lib/server/oauth";
 import { getAppConfig } from "../../../../../lib/server/app-config";
 import { signSession } from "../../../../../lib/server/session";
+import {
+  ensureUserLifecycleSchema,
+  getUserAuthBlock,
+  normalizeSessionVersion,
+  revokeUserSessions,
+} from "../../../../../lib/server/user-lifecycle";
 
 interface AuthPayload {
   email?: unknown;
@@ -80,7 +86,7 @@ export class AuthController {
   oauthExchange(@Body() body: { token?: unknown }) {
     const user = consumeHandoff(typeof body?.token === "string" ? body.token : undefined);
     if (!user) throw new HttpException({ error: "만료되었거나 잘못된 로그인 토큰이에요." }, HttpStatus.UNAUTHORIZED);
-    return { ok: true, user, token: signSession(user.id) };
+    return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }
 
   // 데모 폴백 로그인 — 실제 제공자 미설정 시에만 허용. 명확히 [데모] 사용자.
@@ -92,12 +98,13 @@ export class AuthController {
     }
     enforceRateLimit(`oauth-demo:${clientIp(req)}`, 20, 10 * 60_000);
     const user = await createDemoUser(provider);
-    return { ok: true, user, demo: true, token: signSession(user.id) };
+    return { ok: true, user, demo: true, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }
 
   @Post("signup")
   async signup(@Body() body: AuthPayload, @Req() req: Request) {
     enforceRateLimit(`signup:${clientIp(req)}`, 5, 10 * 60_000);
+    await ensureUserLifecycleSchema();
 
     const email = normalizeEmail(body.email);
     const password = String(body.password ?? "");
@@ -120,6 +127,7 @@ export class AuthController {
   @Post("login")
   async login(@Body() body: AuthPayload, @Headers("x-forwarded-for") forwardedFor: string | undefined, @Req() req: Request) {
     enforceRateLimit(`login:${forwardedFor?.split(",")[0]?.trim() || clientIp(req)}`, 10, 10 * 60_000);
+    await ensureUserLifecycleSchema();
 
     const email = normalizeEmail(body.email);
     const password = String(body.password ?? "");
@@ -129,6 +137,8 @@ export class AuthController {
     if (!user || !verifyPassword(password, user.passwordHash)) {
       throw new HttpException({ error: "이메일 또는 비밀번호를 확인해 주세요." }, HttpStatus.UNAUTHORIZED);
     }
+    const block = getUserAuthBlock(user);
+    if (block) throw new HttpException({ error: block }, HttpStatus.FORBIDDEN);
 
     return {
       ok: true,
@@ -139,8 +149,14 @@ export class AuthController {
         image: user.image,
         role: normalizeRole(user.role),
       },
-      token: signSession(user.id),
+      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
     };
+  }
+
+  @Post("logout")
+  async logout(@Headers("x-user-id") userId?: string) {
+    if (userId) await revokeUserSessions(userId);
+    return { ok: true };
   }
 }
 

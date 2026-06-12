@@ -38,3 +38,15 @@ export async function updateMyProfile(payload: UpdateProfilePayload): Promise<Me
   if (!data?.profile) throw new Error("프로필을 저장하지 못했어요.");
   return data.profile;
 }
+
+export async function deleteMyAccount(): Promise<{ ok: true; deletedAt: string }> {
+  const res = await fetch("/api/me/account", {
+    method: "DELETE",
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  const data = await safeParseJson<{ ok?: boolean; deletedAt?: string }>(res);
+  if (!res.ok) throw new Error(resolveApiError(data, `계정을 탈퇴 처리하지 못했어요. (${res.status})`));
+  if (!data?.ok || !data.deletedAt) throw new Error("계정을 탈퇴 처리하지 못했어요.");
+  return { ok: true, deletedAt: data.deletedAt };
+}
