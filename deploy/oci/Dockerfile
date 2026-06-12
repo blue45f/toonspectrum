@@ -1,9 +1,9 @@
 # ToonSpectrum NestJS API — OCI Always-Free ARM(Ampere A1, arm64) 컨테이너.
-# node:22 는 arm64 멀티아치라 Ampere A1 에서 그대로 동작한다. 모노레포 루트가 빌드 컨텍스트:
+# node:24 는 arm64 멀티아치라 Ampere A1 에서 그대로 동작한다. 모노레포 루트가 빌드 컨텍스트:
 #   docker build -f deploy/oci/Dockerfile -t webdex-api .
 # (apps/api 는 tsc rootDir=레포루트 라 루트 lib/ 까지 컴파일 → 빌드 컨텍스트는 반드시 레포 루트)
 
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 COPY . .
@@ -12,7 +12,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm --filter @webtoon-nest/api build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 ENV NODE_ENV=production
