@@ -178,6 +178,8 @@ import { normalizeOutline, type Outline } from "./studio-outline";
 import { normalizeGlow, type Glow } from "./studio-glow";
 import { normalizeHalftone, type Halftone } from "./studio-halftone";
 import { normalizeGrain, type Grain } from "./studio-grain";
+import { normalizeBlurFx, type BlurFx } from "./studio-blur";
+import { normalizeDistort, type Distort } from "./studio-distort";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
@@ -193,6 +195,8 @@ import { StudioOutlinePanel } from "./StudioOutlinePanel";
 import { StudioGlowPanel } from "./StudioGlowPanel";
 import { StudioHalftonePanel } from "./StudioHalftonePanel";
 import { StudioGrainPanel } from "./StudioGrainPanel";
+import { StudioBlurPanel } from "./StudioBlurPanel";
+import { StudioDistortPanel } from "./StudioDistortPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -273,6 +277,8 @@ interface ImageEl {
   glow?: Glow;
   halftone?: Halftone;
   grain?: Grain;
+  blurFx?: BlurFx;
+  distort?: Distort;
 }
 interface TextEl {
   id: string;
@@ -8093,6 +8099,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Grain) => patchEl(selected.id, { grain: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { grain: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 흐림 갤러리 — 가우시안·모션·스핀·줌 블러. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioBlurPanel
+                    value={normalizeBlurFx(selected.blurFx)}
+                    onPatch={(patch: Partial<BlurFx>) =>
+                      patchEl(selected.id, {
+                        blurFx: normalizeBlurFx({ ...normalizeBlurFx(selected.blurFx), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: BlurFx) => patchEl(selected.id, { blurFx: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { blurFx: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 기하 왜곡 — 비틀기·물결·핀치·웨이브. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioDistortPanel
+                    value={normalizeDistort(selected.distort)}
+                    onPatch={(patch: Partial<Distort>) =>
+                      patchEl(selected.id, {
+                        distort: normalizeDistort({ ...normalizeDistort(selected.distort), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Distort) => patchEl(selected.id, { distort: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { distort: undefined } as Partial<El>)}
                   />
                 </div>
               )}
