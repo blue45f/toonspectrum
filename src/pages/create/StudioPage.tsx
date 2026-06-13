@@ -2,152 +2,6 @@ import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } 
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 
-// @ts-ignore
-Konva.Filters.Screentone = function (imageData: ImageData) {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  const size = 6;
-  
-  for (let y = 0; y < height; y += size) {
-    for (let x = 0; x < width; x += size) {
-      let totalLuminance = 0;
-      let count = 0;
-      for (let dy = 0; dy < size && y + dy < height; dy++) {
-        for (let dx = 0; dx < size && x + dx < width; dx++) {
-          const idx = ((y + dy) * width + (x + dx)) * 4;
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-          totalLuminance += lum;
-          count++;
-        }
-      }
-      
-      const avgLum = totalLuminance / count;
-      const radius = (1 - avgLum / 255) * (size / 2) * 1.2;
-      const cx = x + size / 2;
-      const cy = y + size / 2;
-      
-      for (let dy = 0; dy < size && y + dy < height; dy++) {
-        for (let dx = 0; dx < size && x + dx < width; dx++) {
-          const px = x + dx;
-          const py = y + dy;
-          const idx = (py * width + px) * 4;
-          
-          const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
-          if (dist < radius) {
-            data[idx] = 40;
-            data[idx + 1] = 40;
-            data[idx + 2] = 40;
-          } else {
-            data[idx] = 255;
-            data[idx + 1] = 255;
-            data[idx + 2] = 255;
-          }
-        }
-      }
-    }
-  }
-};
-
-// @ts-ignore
-Konva.Filters.Lineart = function (imageData: ImageData) {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  const src = new Uint8ClampedArray(data);
-  
-  const kernelX = [
-    [-1, 0, 1],
-    [-2, 0, 2],
-    [-1, 0, 1]
-  ];
-  const kernelY = [
-    [-1, -2, -1],
-    [ 0,  0,  0],
-    [ 1,  2,  1]
-  ];
-  
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      let pixelX = 0;
-      let pixelY = 0;
-      
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const idx = ((y + ky) * width + (x + kx)) * 4;
-          const val = 0.299 * src[idx] + 0.587 * src[idx + 1] + 0.114 * src[idx + 2];
-          pixelX += val * kernelX[ky + 1][kx + 1];
-          pixelY += val * kernelY[ky + 1][kx + 1];
-        }
-      }
-      
-      const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY);
-      const currentIdx = (y * width + x) * 4;
-      
-      if (magnitude > 45) {
-        data[currentIdx] = 0;
-        data[currentIdx + 1] = 0;
-        data[currentIdx + 2] = 0;
-        data[currentIdx + 3] = 255;
-      } else {
-        data[currentIdx] = 255;
-        data[currentIdx + 1] = 255;
-        data[currentIdx + 2] = 255;
-        data[currentIdx + 3] = 255;
-      }
-    }
-  }
-};
-
-// @ts-ignore
-Konva.Filters.Chromatic = function (imageData: ImageData) {
-  const data = imageData.data;
-  const width = imageData.width;
-  const height = imageData.height;
-  const offset = (this as any).attrs?.chromatic || 4;
-  const src = new Uint8ClampedArray(data);
-  
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-      const rx = Math.max(0, x - offset);
-      const ridx = (y * width + rx) * 4;
-      const bx = Math.min(width - 1, x + offset);
-      const bidx = (y * width + bx) * 4;
-      
-      data[idx] = src[ridx];
-      data[idx + 1] = src[idx + 1];
-      data[idx + 2] = src[bidx];
-    }
-  }
-};
-
-// @ts-ignore
-Konva.Filters.Posterize = function (imageData: ImageData) {
-  const data = imageData.data;
-  const levels = (this as any).attrs?.posterize || 4;
-  const step = 255 / (levels - 1);
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.round(data[i] / step) * step;
-    data[i + 1] = Math.round(data[i + 1] / step) * step;
-    data[i + 2] = Math.round(data[i + 2] / step) * step;
-  }
-};
-
-// @ts-ignore
-Konva.Filters.Noise = function (imageData: ImageData) {
-  const data = imageData.data;
-  const amount = (this as any).attrs?.noise || 20;
-  for (let i = 0; i < data.length; i += 4) {
-    const noiseVal = (Math.random() - 0.5) * amount * 2.55;
-    data[i] = Math.min(255, Math.max(0, data[i] + noiseVal));
-    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noiseVal));
-    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noiseVal));
-  }
-};
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
 import {
   AlignHorizontalJustifyCenter,
@@ -254,11 +108,15 @@ import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   EXPORT_SCALES,
-  JPEG_QUALITY,
+  EXPORT_FORMATS,
   MAX_CANVAS_DIM,
   canvasToBlob,
+  canCopyImageToClipboard,
+  copyCanvasToClipboard,
   downloadBlob,
+  exportFormatLabel,
   exportMimeType,
+  exportQuality,
   maxFittingScale,
   pageExportFileName,
   splitPagesForExport,
@@ -274,6 +132,31 @@ import {
   renameAsset,
   type StudioAsset,
 } from "./studio-asset-library";
+import {
+  registerStudioKonvaFilters,
+  buildImageFilters,
+  hasActiveImageFilters,
+  imageFilterCacheKey,
+} from "./studio-konva-filters";
+import {
+  isDefaultPageGrade,
+  normalizePageGrade,
+  pageGradeToCssFilter,
+  vignetteCss,
+  drawVignette,
+  type PageGrade,
+} from "./studio-filters";
+import {
+  readRecentColors,
+  storeRecentColors,
+  pushRecentColor,
+} from "./studio-color-palettes";
+import { StudioImageFilterPanel } from "./StudioImageFilterPanel";
+import { StudioPageGradePanel } from "./StudioPageGradePanel";
+import { StudioColorPopover } from "./StudioColorPopover";
+
+// 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
+registerStudioKonvaFilters(Konva);
 
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -303,6 +186,16 @@ interface ImageEl {
   chromatic?: number;
   posterize?: number;
   noise?: number;
+  // 포토샵급 보정 — Konva HSL/내장 필터 + studio-filters 커스텀 픽셀 필터로 적용.
+  saturation?: number; // 채도(-1..1, Konva HSL)
+  hue?: number; // 색조 회전(-180..180°)
+  temperature?: number; // 색온도(-100..100, 따뜻/차갑게)
+  sharpen?: number; // 선명도(0..1, 언샤프 마스크)
+  pixelate?: number; // 픽셀화(0..40)
+  invert?: boolean; // 색 반전
+  inkThreshold?: number; // 먹선 임계(0..1, 순흑/순백)
+  duotoneShadow?: string; // 듀오톤 어두운 색
+  duotoneHighlight?: string; // 듀오톤 밝은 색
 }
 interface TextEl {
   id: string;
@@ -1112,6 +1005,25 @@ function coverFitRect(containerW: number, containerH: number, imageW: number, im
   };
 }
 
+// 내보내기 캔버스에 페이지 색보정(그레이드)을 픽셀로 합성한다.
+// 미리보기는 CSS filter로 보여주지만 Stage.toCanvas는 원본 픽셀을 캡처하므로,
+// CSS와 동일한 filter 문자열을 2D 컨텍스트에 적용한 새 캔버스로 다시 그린 뒤 비네트를 얹는다.
+// 보정이 기본값이면 원본 캔버스를 그대로 돌려준다(추가 메모리 0).
+function bakeGradeIntoCanvas(src: HTMLCanvasElement, grade: PageGrade): HTMLCanvasElement {
+  if (isDefaultPageGrade(grade)) return src;
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return src;
+  const css = pageGradeToCssFilter(grade);
+  if (css) ctx.filter = css;
+  ctx.drawImage(src, 0, 0);
+  ctx.filter = "none";
+  drawVignette(ctx, out.width, out.height, grade.vignette);
+  return out;
+}
+
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
 function UrlImage({
   el,
@@ -1169,18 +1081,13 @@ function UrlImage({
     }
   }, [img, el.flipped, el.flippedY]);
 
-  const hasFilters = !!(
-    el.blur ||
-    el.brightness ||
-    el.contrast ||
-    el.grayscale ||
-    el.sepia ||
-    el.screentone ||
-    el.lineart ||
-    el.chromatic ||
-    el.posterize ||
-    el.noise
-  );
+  const hasFilters = hasActiveImageFilters(el);
+  // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
+  const built = buildImageFilters(el, Konva);
+  // react-konva filters prop 타입과 느슨하게 맞춘다(기존 코드와 동일하게 any 배열).
+  const filters: any[] = built.filters;
+  const filterAttrs = built.attrs;
+  const filterCacheKey = imageFilterCacheKey(el);
 
   useEffect(() => {
     const node = imageRef.current;
@@ -1192,41 +1099,9 @@ function UrlImage({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [
-    displayImg,
-    el.width,
-    el.height,
-    el.blur,
-    el.brightness,
-    el.contrast,
-    el.grayscale,
-    el.sepia,
-    el.screentone,
-    el.lineart,
-    el.chromatic,
-    el.posterize,
-    el.noise,
-    hasFilters,
-  ]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters]);
 
   if (!displayImg) return null;
-
-  const filters: any[] = [];
-  if (el.blur) filters.push(Konva.Filters.Blur);
-  if (el.brightness) filters.push(Konva.Filters.Brighten);
-  if (el.contrast) filters.push(Konva.Filters.Contrast);
-  if (el.grayscale) filters.push(Konva.Filters.Grayscale);
-  if (el.sepia) filters.push(Konva.Filters.Sepia);
-  // @ts-ignore
-  if (el.screentone) filters.push(Konva.Filters.Screentone);
-  // @ts-ignore
-  if (el.lineart) filters.push(Konva.Filters.Lineart);
-  // @ts-ignore
-  if (el.chromatic) filters.push(Konva.Filters.Chromatic);
-  // @ts-ignore
-  if (el.posterize) filters.push(Konva.Filters.Posterize);
-  // @ts-ignore
-  if (el.noise) filters.push(Konva.Filters.Noise);
 
   return (
     <KImage
@@ -1242,15 +1117,7 @@ function UrlImage({
       rotation={el.rotation}
       opacity={el.opacity ?? 1}
       filters={filters}
-      blurRadius={el.blur ?? 0}
-      brightness={el.brightness ?? 0}
-      contrast={el.contrast ?? 0}
-      // @ts-ignore
-      chromatic={el.chromatic ?? 0}
-      // @ts-ignore
-      posterize={el.posterize ?? 0}
-      // @ts-ignore
-      noise={el.noise ?? 0}
+      {...filterAttrs}
       draggable={draggable}
       dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
@@ -1565,6 +1432,7 @@ interface PageState {
   bg: string;
   bgGrad: string[] | null;
   canvasH: number;
+  grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
 }
 
 export function StudioPage() {
@@ -1603,6 +1471,9 @@ export function StudioPage() {
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
+  // 현재 페이지의 색보정(과거 저장본 안전 정규화) + 미리보기용 CSS filter 문자열.
+  const pageGrade = normalizePageGrade(activePage.grade);
+  const pageGradeCss = pageGradeToCssFilter(pageGrade);
 
   const hi = pagesHi;
   const history = pagesHistory;
@@ -1629,6 +1500,11 @@ export function StudioPage() {
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...patch } : p));
     commitPages(nextPages);
   }
+  // ── 페이지 색보정(그레이드) ──────────────────────────────────────────────
+  const patchPageGrade = (patch: Partial<PageGrade>) =>
+    updateActivePage({ grade: normalizePageGrade({ ...pageGrade, ...patch }) });
+  const applyPageGrade = (grade: PageGrade) => updateActivePage({ grade: normalizePageGrade(grade) });
+  const resetPageGrade = () => updateActivePage({ grade: undefined });
 
   // 줌/팬 드래그 상태
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -1664,6 +1540,26 @@ export function StudioPage() {
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [color, setColor] = useState("#7c5cfc");
+  // 최근 사용 색(색상 팝오버 공용) — 마운트 시 localStorage에서 복원, 선택 시 앞으로 갱신.
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      setRecentColors(readRecentColors(window.localStorage));
+    } catch {
+      // localStorage 접근 불가(시크릿/임베드)면 빈 목록 유지.
+    }
+  }, []);
+  const rememberColor = (c: string) => {
+    setRecentColors((prev) => {
+      const next = pushRecentColor(prev, c);
+      try {
+        storeRecentColors(window.localStorage, next);
+      } catch {
+        // 저장 실패는 무시(보조 기능).
+      }
+      return next;
+    });
+  };
   const [strokeWidth, setStrokeWidth] = useState(6);
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
   const [brushOpacity, setBrushOpacity] = useState(1);
@@ -3534,25 +3430,49 @@ export function StudioPage() {
       setIsExporting(false);
       return;
     }
-    // 투명 PNG: 배경 사각형을 잠시 숨겨 그린/구성한 콘텐츠만 추출(에셋 제작용). JPG는 투명도 미지원.
-    const transparent = exportTransparent && exportFormat === "png";
+    // 투명 내보내기: 배경 사각형을 잠시 숨겨 콘텐츠만 추출(에셋 제작용). PNG·WebP만 알파 지원, JPG는 불가.
+    const transparent = exportTransparent && exportFormat !== "jpg";
     const bgNode = transparent ? stage.findOne(".bg") : null;
     if (bgNode) {
       bgNode.hide();
       stage.batchDraw();
     }
     // 선택 배율로 내보내기(기본 2× — 720→1440px 폭). dataURL 대신 캔버스→Blob으로 대형 출력 메모리 절감.
-    const canvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
+    const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
+    // 미리보기에 적용된 페이지 색보정을 출력 픽셀에도 동일하게 합성(WYSIWYG).
+    const canvas = bakeGradeIntoCanvas(rawCanvas, pageGrade);
     if (bgNode) {
       bgNode.show();
       stage.batchDraw();
     }
     setIsExporting(false);
     try {
-      const blob = await canvasToBlob(canvas, exportMimeType(exportFormat), exportFormat === "jpg" ? JPEG_QUALITY : undefined);
+      const blob = await canvasToBlob(canvas, exportMimeType(exportFormat), exportQuality(exportFormat));
       downloadBlob(blob, pageExportFileName(title, exportFormat, transparent));
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지 내보내기에 실패했어요.");
+    }
+  }
+
+  // 현재 페이지를 클립보드에 이미지(PNG)로 복사 — 색보정 합성 후 ClipboardItem으로 기록.
+  async function handleCopyToClipboard() {
+    setExportMenuOpen(false);
+    setSelectedId(null);
+    setIsExporting(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const stage = stageRef.current;
+    if (!stage) {
+      setIsExporting(false);
+      return;
+    }
+    const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
+    const canvas = bakeGradeIntoCanvas(rawCanvas, pageGrade);
+    setIsExporting(false);
+    try {
+      await copyCanvasToClipboard(canvas);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "클립보드 복사에 실패했어요.");
     }
   }
 
@@ -3600,7 +3520,9 @@ export function StudioPage() {
         const stage = stageRef.current;
         if (!stage) continue;
 
-        pageCanvases.push(stage.toCanvas({ pixelRatio: scale / effScale }));
+        // 페이지별 색보정을 캡처 픽셀에 합성(스트립 각 칸이 미리보기와 동일하게 보이도록).
+        const rawPageCanvas = stage.toCanvas({ pixelRatio: scale / effScale });
+        pageCanvases.push(bakeGradeIntoCanvas(rawPageCanvas, normalizePageGrade(page.grade)));
       }
     } finally {
       // 원래 선택 페이지 복구
@@ -3647,7 +3569,7 @@ export function StudioPage() {
         const blob = await canvasToBlob(
           compositeCanvas,
           exportMimeType(exportFormat),
-          exportFormat === "jpg" ? JPEG_QUALITY : undefined
+          exportQuality(exportFormat)
         );
         downloadBlob(blob, stripExportFileName(title, exportFormat, { index: c, total: chunks.length }));
         // 연속 다운로드가 브라우저에서 차단되지 않게 한 박자 쉼
@@ -3769,7 +3691,7 @@ export function StudioPage() {
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-fg-2">포맷</span>
                   <div className="flex items-center gap-1">
-                    {(["png", "jpg"] as const).map((f) => (
+                    {EXPORT_FORMATS.map((f) => (
                       <button
                         key={f}
                         type="button"
@@ -3780,7 +3702,7 @@ export function StudioPage() {
                           exportFormat === f ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
                         )}
                       >
-                        {f.toUpperCase()}
+                        {exportFormatLabel(f)}
                       </button>
                     ))}
                   </div>
@@ -3790,19 +3712,36 @@ export function StudioPage() {
                     "mt-2.5 flex items-center gap-1.5 text-xs",
                     exportFormat === "jpg" ? "cursor-not-allowed text-fg-3 opacity-50" : "cursor-pointer text-fg-2"
                   )}
-                  title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명 PNG로 내보내기"}
+                  title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명하게 내보내기"}
                 >
                   <input
                     type="checkbox"
-                    checked={exportTransparent && exportFormat === "png"}
+                    checked={exportTransparent && exportFormat !== "jpg"}
                     disabled={exportFormat === "jpg"}
                     onChange={(e) => setExportTransparent(e.target.checked)}
                     className="size-3.5 accent-[var(--color-accent)] cursor-pointer disabled:cursor-not-allowed"
                   />
-                  투명 배경 (PNG)
+                  투명 배경 (PNG·WebP)
                 </label>
+                {canCopyImageToClipboard() && (
+                  <button
+                    type="button"
+                    onClick={handleCopyToClipboard}
+                    disabled={isExporting}
+                    className={cn(
+                      "mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50",
+                    )}
+                    title="현재 페이지를 클립보드에 이미지로 복사 (붙여넣기로 바로 사용)"
+                  >
+                    <Copy size={13} /> 클립보드로 복사
+                  </button>
+                )}
                 <p className="mt-2 text-[10px] tabular-nums text-fg-3">
-                  출력 폭 {(CANVAS_W * exportScale).toLocaleString()}px{exportFormat === "jpg" ? " · 품질 92%" : ""}
+                  출력 폭 {(CANVAS_W * exportScale).toLocaleString()}px
+                  {(() => {
+                    const q = exportQuality(exportFormat);
+                    return q !== undefined ? ` · 품질 ${Math.round(q * 100)}%` : "";
+                  })()}
                 </p>
               </div>
             )}
@@ -4631,10 +4570,16 @@ export function StudioPage() {
           <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
         </label>
         <span className="mx-0.5 h-5 w-px bg-line" />
-        <label className="inline-flex items-center gap-1.5 text-xs text-fg-3">
+        <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
           색
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
-        </label>
+          <StudioColorPopover
+            value={color}
+            onChange={setColor}
+            recentColors={recentColors}
+            onUseColor={rememberColor}
+            title="브러시·도형 색상"
+          />
+        </span>
         {tool === "draw" && (
           <div className="flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md">
             {/* Brush Presets Group */}
@@ -5027,6 +4972,9 @@ export function StudioPage() {
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
+          {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
+          <div className="relative" style={{ width: CANVAS_W * effScale, height: canvasH * effScale }}>
+          <div style={pageGradeCss ? { filter: pageGradeCss } : undefined}>
           <Stage
             ref={stageRef}
             width={CANVAS_W * effScale}
@@ -5854,6 +5802,14 @@ export function StudioPage() {
             )}
           </Stage>
           </div>
+          {pageGrade.vignette > 0 && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ background: vignetteCss(pageGrade.vignette) }}
+            />
+          )}
+          </div>
+          </div>
 
           {showQuickStart && (
             <QuickStartPanel
@@ -6144,6 +6100,16 @@ export function StudioPage() {
             </div>
           </div>
 
+          {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
+          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <StudioPageGradePanel
+              grade={pageGrade}
+              onPatch={patchPageGrade}
+              onApplyPreset={applyPageGrade}
+              onReset={resetPageGrade}
+            />
+          </div>
+
           {selected && (
             <div className="rounded-2xl border border-line bg-panel/40 p-3">
               <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
@@ -6368,10 +6334,16 @@ export function StudioPage() {
                   </div>
 
                   {selected.fill !== "transparent" && (
-                    <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                    <span className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                       말풍선색
-                      <input type="color" value={selected.fill} onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
-                    </label>
+                      <StudioColorPopover
+                        value={selected.fill}
+                        onChange={(c) => patchEl(selected.id, { fill: c } as Partial<El>)}
+                        recentColors={recentColors}
+                        onUseColor={rememberColor}
+                        title="말풍선 색상"
+                      />
+                    </span>
                   )}
 
                   <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
@@ -7469,141 +7441,13 @@ export function StudioPage() {
                 </div>
               )}
 
-              {/* 이미지 필터 효과 (코미포 스타일) */}
+              {/* 이미지 필터 효과 — 원클릭 프리셋 + 보정 슬라이더(StudioImageFilterPanel) */}
               {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
-                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">이미지 필터 효과</p>
-                  <div className="space-y-2">
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      블러 (흐림)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0}
-                          max={30}
-                          value={selected.blur ?? 0}
-                          onChange={(e) => patchEl(selected.id, { blur: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{selected.blur ?? 0}</span>
-                      </span>
-                    </label>
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      밝기 (Bright)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={-0.8}
-                          max={0.8}
-                          step={0.05}
-                          value={selected.brightness ?? 0}
-                          onChange={(e) => patchEl(selected.id, { brightness: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{Math.round((selected.brightness ?? 0) * 100)}</span>
-                      </span>
-                    </label>
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      대비 (Contrast)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={-80}
-                          max={80}
-                          value={selected.contrast ?? 0}
-                          onChange={(e) => patchEl(selected.id, { contrast: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{selected.contrast ?? 0}</span>
-                      </span>
-                    </label>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
-                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!selected.grayscale}
-                          onChange={(e) => patchEl(selected.id, { grayscale: e.target.checked } as Partial<El>)}
-                          className="size-3.5 accent-accent"
-                        />
-                        흑백
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!selected.sepia}
-                          onChange={(e) => patchEl(selected.id, { sepia: e.target.checked } as Partial<El>)}
-                          className="size-3.5 accent-accent"
-                        />
-                        세피아
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!(selected as any).screentone}
-                          onChange={(e) => patchEl(selected.id, { screentone: e.target.checked } as Partial<El>)}
-                          className="size-3.5 accent-accent"
-                        />
-                        스크린톤 (만화망점)
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!(selected as any).lineart}
-                          onChange={(e) => patchEl(selected.id, { lineart: e.target.checked } as Partial<El>)}
-                          className="size-3.5 accent-accent"
-                        />
-                        외곽선 (선화추출)
-                      </label>
-                    </div>
-
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2 mt-2">
-                      색수차 왜곡 (Chromatic)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0}
-                          max={12}
-                          step={1}
-                          value={(selected as any).chromatic ?? 0}
-                          onChange={(e) => patchEl(selected.id, { chromatic: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).chromatic ?? 0}px</span>
-                      </span>
-                    </label>
-
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      툰 쉐이딩 단계 (Toon)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0}
-                          max={8}
-                          step={1}
-                          value={(selected as any).posterize ?? 0}
-                          onChange={(e) => patchEl(selected.id, { posterize: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).posterize ?? 0}</span>
-                      </span>
-                    </label>
-
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      노이즈 (Noise)
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={(selected as any).noise ?? 0}
-                          onChange={(e) => patchEl(selected.id, { noise: Number(e.target.value) } as Partial<El>)}
-                          className="w-24 accent-accent cursor-pointer"
-                        />
-                        <span className="w-5 text-right text-[10px] tabular-nums text-fg-3">{(selected as any).noise ?? 0}%</span>
-                      </span>
-                    </label>
-                  </div>
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioImageFilterPanel
+                    values={selected}
+                    onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  />
                 </div>
               )}
 

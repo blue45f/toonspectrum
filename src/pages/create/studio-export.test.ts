@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EXPORT_FORMATS,
+  JPEG_QUALITY,
   MAX_CANVAS_DIM,
+  WEBP_QUALITY,
+  canCopyImageToClipboard,
+  copyCanvasToClipboard,
+  exportFormatLabel,
   exportMimeType,
+  exportQuality,
   maxFittingScale,
   pageExportFileName,
   splitPagesForExport,
@@ -14,6 +21,29 @@ describe("exportMimeType", () => {
   it("maps formats to canvas mime types", () => {
     expect(exportMimeType("png")).toBe("image/png");
     expect(exportMimeType("jpg")).toBe("image/jpeg");
+    expect(exportMimeType("webp")).toBe("image/webp");
+  });
+});
+
+describe("EXPORT_FORMATS", () => {
+  it("lists every supported format once", () => {
+    expect(EXPORT_FORMATS).toEqual(["png", "jpg", "webp"]);
+  });
+});
+
+describe("exportFormatLabel", () => {
+  it("returns a human label per format", () => {
+    expect(exportFormatLabel("png")).toBe("PNG");
+    expect(exportFormatLabel("jpg")).toBe("JPG");
+    expect(exportFormatLabel("webp")).toBe("WebP");
+  });
+});
+
+describe("exportQuality", () => {
+  it("returns the lossy quality only for jpg/webp", () => {
+    expect(exportQuality("png")).toBeUndefined();
+    expect(exportQuality("jpg")).toBe(JPEG_QUALITY);
+    expect(exportQuality("webp")).toBe(WEBP_QUALITY);
   });
 });
 
@@ -22,6 +52,7 @@ describe("pageExportFileName", () => {
     expect(pageExportFileName("내 컷툰", "png", false)).toBe("내 컷툰.png");
     expect(pageExportFileName("내 컷툰", "png", true)).toBe("내 컷툰-transparent.png");
     expect(pageExportFileName("  ", "jpg", false)).toBe("toonspectrum-comic.jpg");
+    expect(pageExportFileName("내 컷툰", "webp", false)).toBe("내 컷툰.webp");
   });
 });
 
@@ -34,6 +65,7 @@ describe("stripExportFileName", () => {
   it("appends a part suffix when split into multiple files", () => {
     expect(stripExportFileName("내 웹툰", "jpg", { index: 0, total: 3 })).toBe("내 웹툰-strip-1of3.jpg");
     expect(stripExportFileName("내 웹툰", "png", { index: 2, total: 3 })).toBe("내 웹툰-strip-3of3.png");
+    expect(stripExportFileName("내 웹툰", "webp", { index: 1, total: 3 })).toBe("내 웹툰-strip-2of3.webp");
   });
 });
 
@@ -97,5 +129,23 @@ describe("splitPagesForExport", () => {
         expect(stripTotalHeight(chunkHeights, 24, 3)).toBeLessThanOrEqual(MAX_CANVAS_DIM);
       }
     }
+  });
+});
+
+describe("canCopyImageToClipboard", () => {
+  it("returns a boolean without throwing in the node env", () => {
+    // node 환경엔 navigator/ClipboardItem이 없어 false가 기대값 — 호출 자체가 안전해야 한다.
+    const result = canCopyImageToClipboard();
+    expect(typeof result).toBe("boolean");
+    expect(result).toBe(false);
+  });
+});
+
+describe("copyCanvasToClipboard", () => {
+  it("rejects with the Korean unsupported message when clipboard image copy is unavailable", async () => {
+    // node 환경: canCopyImageToClipboard()가 false라 캔버스 없이도 가드에서 즉시 거부된다.
+    await expect(copyCanvasToClipboard(undefined as unknown as HTMLCanvasElement)).rejects.toThrow(
+      "이 브라우저는 이미지 클립보드 복사를 지원하지 않아요."
+    );
   });
 });

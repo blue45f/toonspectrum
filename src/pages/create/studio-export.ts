@@ -5,15 +5,35 @@
 export const EXPORT_SCALES = [1, 2, 3] as const;
 export type ExportScale = (typeof EXPORT_SCALES)[number];
 
-export type ExportFormat = "png" | "jpg";
+export type ExportFormat = "png" | "jpg" | "webp";
+
+// 포맷 선택 UI/순회용 — type ExportFormat과 동기 유지.
+export const EXPORT_FORMATS = ["png", "jpg", "webp"] as const;
 
 export const JPEG_QUALITY = 0.92;
+export const WEBP_QUALITY = 0.92;
 
 // 주요 브라우저 공통으로 안전한 캔버스 한 변 상한(px) — Safari/Chrome 보수값.
 export const MAX_CANVAS_DIM = 16384;
 
 export function exportMimeType(format: ExportFormat): string {
-  return format === "jpg" ? "image/jpeg" : "image/png";
+  if (format === "jpg") return "image/jpeg";
+  if (format === "webp") return "image/webp";
+  return "image/png";
+}
+
+// 포맷 표시 라벨(드롭다운 등).
+export function exportFormatLabel(format: ExportFormat): string {
+  if (format === "jpg") return "JPG";
+  if (format === "webp") return "WebP";
+  return "PNG";
+}
+
+// 손실 압축 포맷의 품질 인자 — PNG는 무손실이라 undefined(canvas.toBlob 기본).
+export function exportQuality(format: ExportFormat): number | undefined {
+  if (format === "jpg") return JPEG_QUALITY;
+  if (format === "webp") return WEBP_QUALITY;
+  return undefined;
 }
 
 // 단일 페이지 파일명 — 기존 규칙 유지: `<제목>[-transparent].<확장자>`.
@@ -101,4 +121,26 @@ export function downloadBlob(blob: Blob, filename: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+// 이미지 클립보드 복사 지원 여부 — navigator.clipboard + ClipboardItem 둘 다 필요(Firefox 등은 미지원).
+export function canCopyImageToClipboard(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !!navigator.clipboard &&
+    typeof (globalThis as { ClipboardItem?: unknown }).ClipboardItem !== "undefined"
+  );
+}
+
+// 현재 캔버스를 PNG로 클립보드에 복사 — 클립보드 이미지 포맷은 PNG가 가장 호환성이 높다.
+export async function copyCanvasToClipboard(canvas: HTMLCanvasElement): Promise<void> {
+  if (!canCopyImageToClipboard()) {
+    throw new Error("이 브라우저는 이미지 클립보드 복사를 지원하지 않아요.");
+  }
+  try {
+    const blob = await canvasToBlob(canvas, "image/png");
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  } catch {
+    throw new Error("이미지를 클립보드에 복사하지 못했어요. 다시 시도해주세요.");
+  }
 }
