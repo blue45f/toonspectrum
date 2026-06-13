@@ -8,6 +8,7 @@
  */
 
 import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
+import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -30,7 +31,28 @@ export type ImageFilterFields = {
   inkThreshold?: number;
   duotoneShadow?: string;
   duotoneHighlight?: string;
+  // 레벨 보정(studio-levels) — 입력/출력 검정·흰점 + 감마.
+  levelsBlack?: number;
+  levelsWhite?: number;
+  levelsGamma?: number;
+  levelsOutBlack?: number;
+  levelsOutWhite?: number;
 };
+
+// 이미지 요소의 레벨 필드 → studio-levels LevelsParams로 정규화.
+function levelsParamsOf(el: ImageFilterFields) {
+  return normalizeLevels({
+    blackPoint: el.levelsBlack,
+    whitePoint: el.levelsWhite,
+    gamma: el.levelsGamma,
+    outBlack: el.levelsOutBlack,
+    outWhite: el.levelsOutWhite,
+  });
+}
+// 레벨 보정이 항등(보정 없음)이 아니면 활성.
+function hasActiveLevels(el: ImageFilterFields): boolean {
+  return !isIdentityLevels(levelsParamsOf(el));
+}
 
 // 최소 Konva 형태(테스트에서 가짜 객체 주입 가능). Filters는 필터 함수 맵(Konva 내장 + 커스텀 혼재).
 // 실제 Konva.Filters(각 값이 Konva의 Filter 타입)와 테스트 가짜 객체를 모두 받기 위해 값 타입은 any로 둔다.
@@ -217,6 +239,8 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Duotone = function (this: FilterThis, imageData: StudioImageDataLike) {
     STUDIO_PIXEL_FILTERS.Duotone!(imageData, this.attrs ?? {});
   };
+  // 레벨 보정 — this.attrs의 levels* 값을 읽어 적용(studio-levels).
+  F.Levels = levelsKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -227,6 +251,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     isActiveNumber(el.contrast) ||
     el.grayscale ||
     el.sepia ||
+    hasActiveLevels(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -283,6 +308,15 @@ export function buildImageFilters(
   if (isActiveNumber(el.sharpen)) {
     filters.push(F.Sharpen!);
     attrs.sharpen = el.sharpen!;
+  }
+  if (hasActiveLevels(el)) {
+    filters.push(F.Levels!);
+    const lv = levelsParamsOf(el);
+    attrs.levelsBlack = lv.blackPoint;
+    attrs.levelsWhite = lv.whitePoint;
+    attrs.levelsGamma = lv.gamma;
+    attrs.levelsOutBlack = lv.outBlack;
+    attrs.levelsOutWhite = lv.outWhite;
   }
   if (el.grayscale) {
     filters.push(F.Grayscale as (imageData: StudioImageDataLike) => void);
@@ -355,5 +389,10 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.inkThreshold ?? null,
     el.duotoneShadow ?? null,
     el.duotoneHighlight ?? null,
+    el.levelsBlack ?? null,
+    el.levelsWhite ?? null,
+    el.levelsGamma ?? null,
+    el.levelsOutBlack ?? null,
+    el.levelsOutWhite ?? null,
   ]);
 }

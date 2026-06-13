@@ -159,6 +159,8 @@ import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { StudioTonePanel } from "./StudioTonePanel";
 import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
+import { normalizeLevels, type LevelsParams } from "./studio-levels";
+import { StudioLevelsPanel } from "./StudioLevelsPanel";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -201,6 +203,12 @@ interface ImageEl {
   inkThreshold?: number; // 먹선 임계(0..1, 순흑/순백)
   duotoneShadow?: string; // 듀오톤 어두운 색
   duotoneHighlight?: string; // 듀오톤 밝은 색
+  // 레벨 보정(Levels) — 입력/출력 검정·흰점 + 감마.
+  levelsBlack?: number;
+  levelsWhite?: number;
+  levelsGamma?: number;
+  levelsOutBlack?: number;
+  levelsOutWhite?: number;
 }
 interface TextEl {
   id: string;
@@ -335,7 +343,7 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string };
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -5623,9 +5631,9 @@ export function StudioPage() {
                 rotateEnabled
                 rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
                 rotationSnapTolerance={6}
-                keepRatio={selected?.type === "text" || selected?.type === "sticker"}
+                keepRatio={selected?.type === "text" || selected?.type === "sticker" || !!selected?.lockAspect}
                 enabledAnchors={
-                  selected?.type === "text" || selected?.type === "sticker"
+                  selected?.type === "text" || selected?.type === "sticker" || selected?.lockAspect
                     ? ["top-left", "top-right", "bottom-left", "bottom-right"]
                     : ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right", "top-center", "bottom-center"]
                 }
@@ -7062,6 +7070,18 @@ export function StudioPage() {
                 </label>
               )}
 
+              {(selected.type === "image" || selected.type === "bubble") && (
+                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                  비율 잠금 (변형 시 종횡비 유지)
+                  <input
+                    type="checkbox"
+                    checked={!!selected.lockAspect}
+                    onChange={(e) => patchEl(selected.id, { lockAspect: e.target.checked } as Partial<El>)}
+                    className="size-4 accent-accent cursor-pointer"
+                  />
+                </label>
+              )}
+
               {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                   혼합 모드 (Blend)
@@ -7526,6 +7546,47 @@ export function StudioPage() {
                   <StudioImageFilterPanel
                     values={selected}
                     onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 레벨 보정(Levels) — 입력/출력 검정·흰점 + 감마. ImageEl의 levels* 필드와 매핑. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioLevelsPanel
+                    value={normalizeLevels({
+                      blackPoint: selected.levelsBlack,
+                      whitePoint: selected.levelsWhite,
+                      gamma: selected.levelsGamma,
+                      outBlack: selected.levelsOutBlack,
+                      outWhite: selected.levelsOutWhite,
+                    })}
+                    onPatch={(patch) =>
+                      patchEl(selected.id, {
+                        ...(patch.blackPoint !== undefined ? { levelsBlack: patch.blackPoint } : {}),
+                        ...(patch.whitePoint !== undefined ? { levelsWhite: patch.whitePoint } : {}),
+                        ...(patch.gamma !== undefined ? { levelsGamma: patch.gamma } : {}),
+                        ...(patch.outBlack !== undefined ? { levelsOutBlack: patch.outBlack } : {}),
+                        ...(patch.outWhite !== undefined ? { levelsOutWhite: patch.outWhite } : {}),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(p: LevelsParams) =>
+                      patchEl(selected.id, {
+                        levelsBlack: p.blackPoint,
+                        levelsWhite: p.whitePoint,
+                        levelsGamma: p.gamma,
+                        levelsOutBlack: p.outBlack,
+                        levelsOutWhite: p.outWhite,
+                      } as Partial<El>)
+                    }
+                    onReset={() =>
+                      patchEl(selected.id, {
+                        levelsBlack: undefined,
+                        levelsWhite: undefined,
+                        levelsGamma: undefined,
+                        levelsOutBlack: undefined,
+                        levelsOutWhite: undefined,
+                      } as Partial<El>)
+                    }
                   />
                 </div>
               )}
