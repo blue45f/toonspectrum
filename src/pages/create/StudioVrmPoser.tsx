@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
@@ -24,6 +24,39 @@ import {
   type SharedAsset,
 } from "../../lib/creator-client";
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, type StudioExpressionPreset } from "./studio-pose-presets";
+import {
+  PROP_ATTACH_BONES,
+  PROP_BONE_LABELS,
+  PROP_CATEGORY_LABELS as VRM_PROP_CATEGORY_LABELS,
+  propsByCategory,
+  createPropInstance,
+  parseVrmProps,
+  serializeVrmProps,
+  buildPropObject,
+  propDefById,
+  type PropInstance,
+  type PropAttachBone,
+  type PropCategory,
+} from "./studio-vrm-props";
+import {
+  classifyMeshName,
+  COSTUME_SLOT_LABELS,
+  COSTUME_PALETTES,
+  tintColor,
+  parseCostumeState,
+  serializeCostume,
+  type CostumeState,
+  type CostumeSlot,
+} from "./studio-vrm-costume";
+import {
+  parseVrmPhysicsSettings,
+  DEFAULT_VRM_PHYSICS,
+  applyVrmSpringBonePhysics,
+  settleVrmPhysics,
+  countSpringBoneJoints,
+  PHYSICS_PREVIEW_MAX_DELTA,
+  type VrmPhysicsSettings,
+} from "./studio-vrm-physics";
 
 type StudioVrmPoserProps = {
   open: boolean;
@@ -1292,6 +1325,69 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
   });
 }
 
+/* ── 의상(costume) 메시 수집·리컬러·토글 ─────────────────────────────── */
+
+type CostumeMeshEntry = {
+  /** 직렬화·식별 키(노드 이름 우선, 비면 머티리얼 이름). */
+  key: string;
+  /** 표시용 이름. */
+  label: string;
+  slot: CostumeSlot;
+  mesh: THREE.Mesh;
+};
+
+// 원본 머티리얼 색(hex)을 메시별로 1회 캡처해 둔다(틴트는 항상 원본 기준 — 중첩 누적 방지).
+const costumeBaseColorCache = new WeakMap<THREE.Material, string>();
+
+function materialBaseHex(mat: THREE.Material): string {
+  const cached = costumeBaseColorCache.get(mat);
+  if (cached) return cached;
+  const color = (mat as unknown as { color?: THREE.Color }).color;
+  const hex = color ? `#${color.getHexString()}` : "#cccccc";
+  costumeBaseColorCache.set(mat, hex);
+  return hex;
+}
+
+/** 씬그래프를 순회해 의상 슬롯에 해당하는 메시를 수집한다(피부·얼굴·눈·머리 제외). */
+function collectCostumeMeshes(vrm: VRM): CostumeMeshEntry[] {
+  const entries: CostumeMeshEntry[] = [];
+  const seenKeys = new Set<string>();
+  vrm.scene.traverse((obj) => {
+    if (!(obj as THREE.Mesh).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const matNames = materials.map((m) => (m as THREE.Material | undefined)?.name).filter(Boolean) as string[];
+    const cls = classifyMeshName(mesh.name, ...matNames);
+    if (cls.slot === null || cls.protected !== null) return;
+    const key = mesh.name || matNames[0] || `mesh-${entries.length}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    // 원본 색 캡처
+    materials.forEach((m) => {
+      if (m) materialBaseHex(m as THREE.Material);
+    });
+    entries.push({ key, label: mesh.name || matNames[0] || "메시", slot: cls.slot, mesh });
+  });
+  return entries;
+}
+
+/** 수집된 의상 메시에 표시/숨김·리컬러 상태를 적용한다. */
+function applyCostumeState(entries: CostumeMeshEntry[], state: CostumeState) {
+  for (const entry of entries) {
+    entry.mesh.visible = !state.hidden.includes(entry.key);
+    const target = state.recolor[entry.key];
+    const materials = Array.isArray(entry.mesh.material) ? entry.mesh.material : [entry.mesh.material];
+    materials.forEach((m) => {
+      const mat = m as (THREE.Material & { color?: THREE.Color }) | undefined;
+      if (!mat || !mat.color) return;
+      const base = materialBaseHex(mat);
+      const next = target ? tintColor(base, target) : base;
+      mat.color.set(next);
+      mat.needsUpdate = true;
+    });
+  }
+}
+
 function getExpressionTone(name: string, vrm: VRM) {
   const expressionManager = vrm.expressionManager;
   if (!expressionManager) return "표정";
@@ -2403,6 +2499,36 @@ function SceneProp3D({
   );
 }
 
+/** 본 부착 소품(studio-vrm-props) 한 인스턴스를 humanoid 본에 포털로 부착한다. */
+function VrmPropAttachment({ vrm, instance }: { vrm: VRM; instance: PropInstance }) {
+  const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
+
+  useEffect(() => {
+    const node = vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
+    setBoneNode(node);
+  }, [vrm, instance.bone]);
+
+  const object = useMemo(() => {
+    const def = propDefById(instance.propId);
+    if (!def) return null;
+    return buildPropObject(THREE as unknown as Parameters<typeof buildPropObject>[0], def, instance.color) as unknown as THREE.Object3D;
+  }, [instance.color, instance.propId]);
+
+  useEffect(() => {
+    if (!object) return;
+    object.position.set(instance.position[0], instance.position[1], instance.position[2]);
+    object.rotation.set(
+      THREE.MathUtils.degToRad(instance.rotationDeg[0]),
+      THREE.MathUtils.degToRad(instance.rotationDeg[1]),
+      THREE.MathUtils.degToRad(instance.rotationDeg[2])
+    );
+    object.scale.setScalar(instance.scale);
+  }, [object, instance.position, instance.rotationDeg, instance.scale]);
+
+  if (!boneNode || !object) return null;
+  return createPortal(<primitive object={object} />, boneNode);
+}
+
 function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
   vrm.scene.rotation.y = baseRotationY + bodyRotation;
@@ -2416,6 +2542,7 @@ function VrmActor({
   expressionWeights,
   vrm,
   customColors,
+  physicsPreview,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -2423,6 +2550,7 @@ function VrmActor({
   expressionWeights: Record<string, number>;
   vrm: VRM;
   customColors: Record<string, string>;
+  physicsPreview: boolean;
 }) {
   useEffect(() => {
     applyPoseToVrm(vrm, customBones, customYOffset);
@@ -2441,7 +2569,9 @@ function VrmActor({
   }, [customColors, vrm]);
 
   useFrame((_, delta) => {
-    vrm.update(delta);
+    // 흔들림 미리보기: 매 프레임 스프링본을 갱신(델타 상한으로 폭주 방지).
+    // 정지 모드: delta 0으로 표정/제약만 동기화하고 스프링본은 정착 프레임에서 멈춘다.
+    vrm.update(physicsPreview ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA) : 0);
   });
 
   return <primitive object={vrm.scene} />;
@@ -2527,6 +2657,17 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
   const [savedPoses, setSavedPoses] = useState<CustomPose[]>([]);
   const [preserveExpression, setPreserveExpression] = useState(true);
+  // 본 부착 소품(studio-vrm-props) — 복수 부착 인스턴스.
+  const [vrmPropItems, setVrmPropItems] = useState<PropInstance[]>([]);
+  const [selectedVrmPropUid, setSelectedVrmPropUid] = useState<string | null>(null);
+  // 의상(studio-vrm-costume) — 토글/리컬러 상태 + 수집된 메시 목록.
+  const [costumeState, setCostumeState] = useState<CostumeState>({ hidden: [], recolor: {} });
+  const [costumeMeshes, setCostumeMeshes] = useState<CostumeMeshEntry[]>([]);
+  const [selectedCostumeKey, setSelectedCostumeKey] = useState<string | null>(null);
+  // 물리(studio-vrm-physics) — 스프링본 설정 + 미리보기/조인트 수.
+  const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
+  const [physicsPreview, setPhysicsPreview] = useState(false);
+  const [springJointCount, setSpringJointCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -2765,6 +2906,9 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setIsSharingPose(true);
     try {
       const { camera, gl, scene } = currentCapture;
+      if (!physicsPreview && countSpringBoneJoints(currentVrm) > 0) {
+        settleVrmPhysics(currentVrm);
+      }
       currentVrm.update(0);
       gl.render(scene, camera);
       const baseDataUrl = gl.domElement.toDataURL("image/png");
@@ -2775,7 +2919,11 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
         bones: customBones,
         expressionWeights: expressionWeights,
         customColors: customColors,
-        modelName: modelName
+        modelName: modelName,
+        // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
+        vrmProps: serializeVrmProps(vrmPropItems),
+        costume: serializeCostume(costumeState),
+        physics: vrmPhysics,
       };
 
       const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
@@ -2824,10 +2972,32 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
         setCustomColors(poseData.customColors);
       }
 
+      // 본 부착 소품·의상·물리 복원(옵셔널 — 없으면 빈/기본값).
+      const restoredProps = parseVrmProps(poseData.vrmProps).items;
+      setVrmPropItems(restoredProps);
+      setSelectedVrmPropUid(null);
+
+      const restoredCostume = parseCostumeState(poseData.costume);
+      setCostumeState(restoredCostume);
+      setSelectedCostumeKey(null);
+
+      const restoredPhysics = parseVrmPhysicsSettings(poseData.physics);
+      setVrmPhysics(restoredPhysics);
+      setPhysicsPreview(false);
+
       if (vrmRef.current) {
         applyPoseToVrm(vrmRef.current, poseData.bones || {}, poseData.yOffset ?? 0);
         applyExpressionWeightsToVrm(vrmRef.current, poseData.expressionWeights || {});
         applyVrmCustomColors(vrmRef.current, poseData.customColors || {});
+        const meshes = collectCostumeMeshes(vrmRef.current);
+        setCostumeMeshes(meshes);
+        applyCostumeState(meshes, restoredCostume);
+        const joints = countSpringBoneJoints(vrmRef.current);
+        setSpringJointCount(joints);
+        if (joints > 0) {
+          applyVrmSpringBonePhysics(vrmRef.current, restoredPhysics);
+          settleVrmPhysics(vrmRef.current);
+        }
       }
 
       setActivePoseId(`shared-${asset.id}`);
@@ -2875,6 +3045,14 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setActiveProps([]);
     setPropAttachments({});
     setSelectedPropId(null);
+    setVrmPropItems([]);
+    setSelectedVrmPropUid(null);
+    setCostumeState({ hidden: [], recolor: {} });
+    setCostumeMeshes([]);
+    setSelectedCostumeKey(null);
+    setVrmPhysics(DEFAULT_VRM_PHYSICS);
+    setPhysicsPreview(false);
+    setSpringJointCount(0);
   }, [open]);
 
   const loadModelRef = useRef(loadModelFromLibraryEntry);
@@ -2977,6 +3155,25 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       body: "#ffffff",
       face: "#ffffff",
     });
+    // 본 부착 소품 초기화.
+    setVrmPropItems([]);
+    setSelectedVrmPropUid(null);
+    // 의상 메시 수집 + 상태 초기화.
+    const meshes = collectCostumeMeshes(nextVrm);
+    setCostumeMeshes(meshes);
+    const freshCostume: CostumeState = { hidden: [], recolor: {} };
+    setCostumeState(freshCostume);
+    setSelectedCostumeKey(null);
+    applyCostumeState(meshes, freshCostume);
+    // 물리 초기화 + 정착(머리카락/치마 자연 정착).
+    setVrmPhysics(DEFAULT_VRM_PHYSICS);
+    setPhysicsPreview(false);
+    const joints = countSpringBoneJoints(nextVrm);
+    setSpringJointCount(joints);
+    if (joints > 0) {
+      applyVrmSpringBonePhysics(nextVrm, DEFAULT_VRM_PHYSICS);
+      settleVrmPhysics(nextVrm);
+    }
     setStatus("ready");
   }
 
@@ -3187,6 +3384,94 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setBodyRotation(d(Number(event.currentTarget.value)));
   }
 
+  // 미리보기를 끄면 흔들림을 즉시 정착시켜 정지 프레임으로 되돌린다.
+  useEffect(() => {
+    if (physicsPreview) return;
+    const current = vrmRef.current;
+    if (current && countSpringBoneJoints(current) > 0) {
+      settleVrmPhysics(current);
+    }
+  }, [physicsPreview]);
+
+  /* ── 의상 토글/리컬러 핸들러 ─────────────────────────────────────── */
+  function updateCostume(next: CostumeState) {
+    setCostumeState(next);
+    applyCostumeState(costumeMeshes, next);
+  }
+
+  function toggleCostumeMesh(key: string) {
+    const hidden = costumeState.hidden.includes(key)
+      ? costumeState.hidden.filter((k) => k !== key)
+      : [...costumeState.hidden, key];
+    updateCostume({ ...costumeState, hidden });
+  }
+
+  function recolorCostumeMesh(key: string, hex: string | null) {
+    const recolor = { ...costumeState.recolor };
+    if (hex) recolor[key] = hex.toLowerCase();
+    else delete recolor[key];
+    updateCostume({ ...costumeState, recolor });
+  }
+
+  function recolorCostumeSlot(slot: CostumeSlot, hex: string) {
+    const recolor = { ...costumeState.recolor };
+    for (const entry of costumeMeshes) {
+      if (entry.slot === slot) recolor[entry.key] = hex.toLowerCase();
+    }
+    updateCostume({ ...costumeState, recolor });
+  }
+
+  function resetCostume() {
+    updateCostume({ hidden: [], recolor: {} });
+    setSelectedCostumeKey(null);
+  }
+
+  /* ── 물리(스프링본) 핸들러 ──────────────────────────────────────── */
+  function updatePhysics(patch: Partial<VrmPhysicsSettings>) {
+    const next = parseVrmPhysicsSettings({ ...vrmPhysics, ...patch });
+    setVrmPhysics(next);
+    const current = vrmRef.current;
+    if (current && countSpringBoneJoints(current) > 0) {
+      applyVrmSpringBonePhysics(current, next);
+      if (!physicsPreview) settleVrmPhysics(current);
+    }
+  }
+
+  function resettlePhysics() {
+    const current = vrmRef.current;
+    if (current && countSpringBoneJoints(current) > 0) {
+      applyVrmSpringBonePhysics(current, vrmPhysics);
+      settleVrmPhysics(current);
+    }
+  }
+
+  function resetPhysics() {
+    setVrmPhysics(DEFAULT_VRM_PHYSICS);
+    setPhysicsPreview(false);
+    const current = vrmRef.current;
+    if (current && countSpringBoneJoints(current) > 0) {
+      applyVrmSpringBonePhysics(current, DEFAULT_VRM_PHYSICS);
+      settleVrmPhysics(current);
+    }
+  }
+
+  /* ── 본 부착 소품 핸들러 ────────────────────────────────────────── */
+  function addVrmProp(propId: string) {
+    const instance = createPropInstance(propId);
+    if (!instance) return;
+    setVrmPropItems((prev) => [...prev, instance]);
+    setSelectedVrmPropUid(instance.uid);
+  }
+
+  function updateVrmProp(uid: string, patch: Partial<PropInstance>) {
+    setVrmPropItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
+  }
+
+  function removeVrmProp(uid: string) {
+    setVrmPropItems((prev) => prev.filter((it) => it.uid !== uid));
+    setSelectedVrmPropUid((cur) => (cur === uid ? null : cur));
+  }
+
   function handleInsert() {
     const currentCapture = captureRef.current;
     const currentVrm = vrmRef.current;
@@ -3200,6 +3485,10 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     const { camera, gl, scene } = currentCapture;
     setIsCapturing(true);
     requestAnimationFrame(() => {
+      // 정지 컷: 캡처 직전 흔들림을 정착시켜 머리카락/치마가 가라앉은 프레임을 쓴다.
+      if (!physicsPreview && countSpringBoneJoints(currentVrm) > 0) {
+        settleVrmPhysics(currentVrm);
+      }
       currentVrm.update(0);
       gl.render(scene, camera);
       const dataUrl = gl.domElement.toDataURL("image/png");
@@ -3265,8 +3554,12 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                       expressionWeights={expressionWeights}
                       vrm={vrm}
                       customColors={customColors}
+                      physicsPreview={physicsPreview}
                     />
                   ) : null}
+                  {vrm
+                    ? vrmPropItems.map((item) => <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} />)
+                    : null}
                   {activeProps.map((propId) => {
                     const propDef = SCENE_PROPS.find((p) => p.id === propId);
                     if (!propDef) return null;
@@ -4174,6 +4467,349 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     </button>
                   ))}
                 </div>
+              </section>
+
+              {/* ── 본 부착 소품(손/머리/몸) ───────────────────────────── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Sparkles size={15} className="text-accent" aria-hidden />
+                  소품 부착 (손·머리·몸)
+                </h3>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  캐릭터의 손·머리·몸 관절에 소품을 부착합니다. 포즈를 바꿔도 관절을 따라 움직여요.
+                </p>
+                {(["hand", "head", "body"] as PropCategory[]).map((cat) => (
+                  <div key={cat} className="mb-3">
+                    <p className="mb-1.5 text-[0.65rem] font-bold text-fg-2">{VRM_PROP_CATEGORY_LABELS[cat]}</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {propsByCategory(cat).map((def) => (
+                        <button
+                          key={def.id}
+                          type="button"
+                          disabled={!vrm}
+                          title={def.hint}
+                          className="flex flex-col items-center gap-0.5 rounded-lg border border-line bg-card px-1 py-1.5 text-center text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40 transition-colors"
+                          onClick={() => addVrmProp(def.id)}
+                        >
+                          <span className="text-[0.55rem] font-semibold leading-tight">{def.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {vrmPropItems.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                    부착된 소품이 없습니다. 위에서 소품을 눌러 추가하세요.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[0.65rem] font-bold text-fg-2">부착된 소품 ({vrmPropItems.length})</p>
+                      <button
+                        type="button"
+                        className="text-[0.62rem] text-fg-3 hover:underline"
+                        onClick={() => {
+                          setVrmPropItems([]);
+                          setSelectedVrmPropUid(null);
+                        }}
+                      >
+                        전체 제거
+                      </button>
+                    </div>
+                    {vrmPropItems.map((item) => {
+                      const def = propDefById(item.propId);
+                      const isOpen = selectedVrmPropUid === item.uid;
+                      return (
+                        <div key={item.uid} className="rounded-lg border border-line bg-card/60">
+                          <div className="flex items-center gap-1.5 px-2 py-1.5">
+                            <button
+                              type="button"
+                              className="flex-1 text-left text-[0.68rem] font-semibold text-fg"
+                              onClick={() => setSelectedVrmPropUid(isOpen ? null : item.uid)}
+                            >
+                              {def?.label ?? item.propId}
+                              <span className="ml-1 text-[0.58rem] font-normal text-fg-3">
+                                · {PROP_BONE_LABELS[item.bone]}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded p-1 text-fg-3 hover:bg-raised hover:text-bad"
+                              title="제거"
+                              onClick={() => removeVrmProp(item.uid)}
+                            >
+                              <Trash2 size={13} aria-hidden />
+                            </button>
+                          </div>
+                          {isOpen && (
+                            <div className="space-y-2.5 border-t border-line/40 px-2.5 py-2.5">
+                              <div>
+                                <label className="mb-1 block text-[0.62rem] font-semibold text-fg-2">부착 부위</label>
+                                <select
+                                  className="w-full rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] text-fg"
+                                  value={item.bone}
+                                  onChange={(e) => updateVrmProp(item.uid, { bone: e.target.value as PropAttachBone })}
+                                >
+                                  {PROP_ATTACH_BONES.map((b) => (
+                                    <option key={b} value={b}>{PROP_BONE_LABELS[b]}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <p className="mb-1 text-[0.6rem] font-semibold text-fg-3">위치 (X / Y / Z)</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {([0, 1, 2] as const).map((axis) => (
+                                    <label key={axis} className="block text-[0.55rem] text-fg-3">
+                                      {"XYZ"[axis]}: {item.position[axis].toFixed(2)}
+                                      <input
+                                        type="range" min="-0.5" max="0.5" step="0.01"
+                                        className="w-full accent-accent h-1"
+                                        value={item.position[axis]}
+                                        onChange={(e) => {
+                                          const next = [...item.position] as [number, number, number];
+                                          next[axis] = Number(e.target.value);
+                                          updateVrmProp(item.uid, { position: next });
+                                        }}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="mb-1 text-[0.6rem] font-semibold text-fg-3">회전 (도)</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {([0, 1, 2] as const).map((axis) => (
+                                    <label key={axis} className="block text-[0.55rem] text-fg-3">
+                                      {"XYZ"[axis]}: {Math.round(item.rotationDeg[axis])}°
+                                      <input
+                                        type="range" min="-180" max="180"
+                                        className="w-full accent-accent h-1"
+                                        value={item.rotationDeg[axis]}
+                                        onChange={(e) => {
+                                          const next = [...item.rotationDeg] as [number, number, number];
+                                          next[axis] = Number(e.target.value);
+                                          updateVrmProp(item.uid, { rotationDeg: next });
+                                        }}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <label className="flex-1 text-[0.6rem] text-fg-3">
+                                  크기 {item.scale.toFixed(1)}x
+                                  <input
+                                    type="range" min="0.2" max="4" step="0.1"
+                                    className="w-full accent-accent h-1"
+                                    value={item.scale}
+                                    onChange={(e) => updateVrmProp(item.uid, { scale: Number(e.target.value) })}
+                                  />
+                                </label>
+                                {item.color !== null && (
+                                  <label className="flex flex-col items-center gap-0.5 text-[0.55rem] text-fg-3">
+                                    색상
+                                    <input
+                                      type="color"
+                                      value={item.color}
+                                      onChange={(e) => updateVrmProp(item.uid, { color: e.target.value })}
+                                      className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* ── 의상 분리 토글 / 리컬러 ─────────────────────────────── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Sliders size={15} className="text-accent" aria-hidden />
+                  의상 분리 · 부분 채색
+                </h3>
+                {costumeMeshes.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                    {vrm ? "이 모델은 의상 분리 정보가 없어요." : "모델을 먼저 불러오세요."}
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                      탐지된 의상 메시를 슬롯별로 표시/숨김 토글하거나 색을 바꿉니다. 피부·얼굴·머리는 보호됩니다.
+                    </p>
+                    {(Object.keys(COSTUME_SLOT_LABELS) as CostumeSlot[]).map((slot) => {
+                      const meshesInSlot = costumeMeshes.filter((m) => m.slot === slot);
+                      if (meshesInSlot.length === 0) return null;
+                      return (
+                        <div key={slot} className="mb-3 border-b border-line/35 pb-2.5 last:border-0">
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <p className="text-[0.66rem] font-bold text-fg-2">{COSTUME_SLOT_LABELS[slot]}</p>
+                            <div className="flex items-center gap-1">
+                              {COSTUME_PALETTES.slice(0, 6).map((pal) => (
+                                <button
+                                  key={pal.id}
+                                  type="button"
+                                  title={`${pal.label} (${COSTUME_SLOT_LABELS[slot]} 전체)`}
+                                  className="size-4 rounded-full border border-line/70"
+                                  style={{ backgroundColor: pal.color }}
+                                  onClick={() => recolorCostumeSlot(slot, pal.color)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            {meshesInSlot.map((entry) => {
+                              const hidden = costumeState.hidden.includes(entry.key);
+                              const recolor = costumeState.recolor[entry.key];
+                              const isOpen = selectedCostumeKey === entry.key;
+                              return (
+                                <div key={entry.key} className="rounded-lg border border-line bg-card/60 px-2 py-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      className={cx(
+                                        "rounded px-1.5 py-0.5 text-[0.58rem] font-semibold transition-colors",
+                                        hidden ? "bg-card text-fg-3 line-through" : "bg-accent-soft text-accent"
+                                      )}
+                                      onClick={() => toggleCostumeMesh(entry.key)}
+                                    >
+                                      {hidden ? "숨김" : "표시"}
+                                    </button>
+                                    <span className="flex-1 truncate text-[0.62rem] text-fg-2" title={entry.label}>
+                                      {entry.label}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="text-[0.58rem] text-fg-3 hover:underline"
+                                      onClick={() => setSelectedCostumeKey(isOpen ? null : entry.key)}
+                                    >
+                                      색상
+                                    </button>
+                                  </div>
+                                  {isOpen && (
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        value={recolor ?? "#ffffff"}
+                                        onChange={(e) => recolorCostumeMesh(entry.key, e.target.value)}
+                                        className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="rounded border border-line bg-card px-2 py-0.5 text-[0.58rem] text-fg-2 hover:bg-raised"
+                                        onClick={() => recolorCostumeMesh(entry.key, null)}
+                                      >
+                                        원래 색
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="mt-1 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised"
+                      onClick={resetCostume}
+                    >
+                      의상 초기화
+                    </button>
+                  </>
+                )}
+              </section>
+
+              {/* ── 흔들림 물리(스프링본) ──────────────────────────────── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <WandSparkles size={15} className="text-accent" aria-hidden />
+                  흔들림 물리 (머리카락·치마)
+                </h3>
+                {springJointCount === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                    {vrm ? "이 모델에는 흔들림 뼈 정보가 없어요." : "모델을 먼저 불러오세요."}
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                      흔들림 뼈 {springJointCount}개. 강도·중력·바람을 조절하면 정착된 정지 컷에 반영됩니다.
+                    </p>
+                    <div className="space-y-2.5">
+                      <label className="block text-[0.62rem] text-fg-2">
+                        <span className="flex justify-between"><span>흔들림 강도(탄성)</span><span>{vrmPhysics.stiffnessScale.toFixed(2)}</span></span>
+                        <input
+                          type="range" min="0" max="2" step="0.05"
+                          className="w-full accent-accent h-1"
+                          value={vrmPhysics.stiffnessScale}
+                          onChange={(e) => updatePhysics({ stiffnessScale: Number(e.target.value) })}
+                        />
+                      </label>
+                      <label className="block text-[0.62rem] text-fg-2">
+                        <span className="flex justify-between"><span>중력</span><span>{vrmPhysics.gravityScale.toFixed(2)}</span></span>
+                        <input
+                          type="range" min="0" max="2" step="0.05"
+                          className="w-full accent-accent h-1"
+                          value={vrmPhysics.gravityScale}
+                          onChange={(e) => updatePhysics({ gravityScale: Number(e.target.value) })}
+                        />
+                      </label>
+                      <label className="block text-[0.62rem] text-fg-2">
+                        <span className="flex justify-between"><span>바람 방향</span><span>{Math.round(vrmPhysics.windDirectionDeg)}°</span></span>
+                        <input
+                          type="range" min="-180" max="180"
+                          className="w-full accent-accent h-1"
+                          value={vrmPhysics.windDirectionDeg}
+                          onChange={(e) => updatePhysics({ windDirectionDeg: Number(e.target.value) })}
+                        />
+                      </label>
+                      <label className="block text-[0.62rem] text-fg-2">
+                        <span className="flex justify-between"><span>바람 세기</span><span>{vrmPhysics.windStrength.toFixed(2)}</span></span>
+                        <input
+                          type="range" min="0" max="2" step="0.05"
+                          className="w-full accent-accent h-1"
+                          value={vrmPhysics.windStrength}
+                          onChange={(e) => updatePhysics({ windStrength: Number(e.target.value) })}
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className={cx(
+                          CONTROL_BUTTON,
+                          "flex-1",
+                          physicsPreview
+                            ? "border-accent/55 bg-accent-soft text-accent"
+                            : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                        )}
+                        onClick={() => setPhysicsPreview((p) => !p)}
+                      >
+                        {physicsPreview ? "미리보기 끄기" : "흔들림 미리보기"}
+                      </button>
+                      <button
+                        type="button"
+                        className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                        onClick={resettlePhysics}
+                      >
+                        정착 다시
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-2 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised"
+                      onClick={resetPhysics}
+                    >
+                      물리 초기화
+                    </button>
+                  </>
+                )}
               </section>
 
               <section className="mt-4">
