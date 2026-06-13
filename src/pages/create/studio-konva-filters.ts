@@ -26,6 +26,8 @@ import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx, type BlurFx } fro
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort, type Distort } from "./studio-distort";
 import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize, type Stylize } from "./studio-stylize";
 import { lightKonvaFilter, normalizeLight, isIdentityLight, type Light } from "./studio-light";
+import { sketchKonvaFilter, normalizeSketch, isIdentitySketch, type Sketch } from "./studio-sketch";
+import { detailKonvaFilter, normalizeDetail, isIdentityDetail, type Detail } from "./studio-detail";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -74,6 +76,9 @@ export type ImageFilterFields = {
   // 스타일라이즈(studio-stylize) + 조명 효과(studio-light).
   stylize?: Stylize;
   light?: Light;
+  // 스케치/잉크(studio-sketch) + 디테일/샤픈(studio-detail).
+  sketch?: Sketch;
+  detail?: Detail;
 };
 
 // 하프톤이 항등(세기0)이 아니면 활성.
@@ -99,6 +104,14 @@ function hasActiveStylize(el: ImageFilterFields): boolean {
 // 조명 효과가 항등(세기0)이 아니면 활성.
 function hasActiveLight(el: ImageFilterFields): boolean {
   return !!el.light && !isIdentityLight(normalizeLight(el.light));
+}
+// 스케치/잉크가 항등(세기0)이 아니면 활성.
+function hasActiveSketch(el: ImageFilterFields): boolean {
+  return !!el.sketch && !isIdentitySketch(normalizeSketch(el.sketch));
+}
+// 디테일/샤픈이 항등(amount0)이 아니면 활성.
+function hasActiveDetail(el: ImageFilterFields): boolean {
+  return !!el.detail && !isIdentityDetail(normalizeDetail(el.detail));
 }
 
 // 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
@@ -386,6 +399,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Stylize = stylizeKonvaFilter;
   // 조명 효과 — this.attrs.ltType/ltIntensity/ltX/ltY/ltHue 적용(studio-light).
   F.Light = lightKonvaFilter;
+  // 스케치/잉크 — this.attrs.skType/skStrength/skDetail 적용(studio-sketch).
+  F.Sketch = sketchKonvaFilter;
+  // 디테일/샤픈 — this.attrs.dtType/dtAmount/dtRadius 적용(studio-detail).
+  F.Detail = detailKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -414,6 +431,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveDistort(el) ||
     hasActiveStylize(el) ||
     hasActiveLight(el) ||
+    hasActiveSketch(el) ||
+    hasActiveDetail(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -458,6 +477,14 @@ export function buildImageFilters(
     attrs.bfStrength = bf.strength;
     attrs.bfRadius = bf.radius;
     attrs.bfAngle = bf.angle;
+  }
+  // 디테일(하이패스/미디언/스마트샤픈) — 색·스타일라이즈 전에 원본 질감을 다듬는 컨디셔닝.
+  if (hasActiveDetail(el)) {
+    filters.push(F.Detail!);
+    const dt = normalizeDetail(el.detail);
+    attrs.dtType = dt.type;
+    attrs.dtAmount = dt.amount;
+    attrs.dtRadius = dt.radius;
   }
   // --- 색/톤 보정 먼저 ---
   if (isActiveNumber(el.brightness)) {
@@ -611,6 +638,14 @@ export function buildImageFilters(
     attrs.stStrength = st.strength;
     attrs.stDetail = st.detail;
   }
+  // 스케치/잉크(포토카피/크로스해치/스탬프/메조틴트) — 잉크 스타일화라 스타일라이즈 바로 뒤.
+  if (hasActiveSketch(el)) {
+    filters.push(F.Sketch!);
+    const sk = normalizeSketch(el.sketch);
+    attrs.skType = sk.type;
+    attrs.skStrength = sk.strength;
+    attrs.skDetail = sk.detail;
+  }
   // 글로우는 최종 밝은 영역에서 번지므로 늦게, 테두리는 실루엣 바깥에 그리므로 가장 마지막.
   if (hasActiveGlow(el)) {
     filters.push(F.Glow!);
@@ -690,5 +725,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.distort ?? null,
     el.stylize ?? null,
     el.light ?? null,
+    el.sketch ?? null,
+    el.detail ?? null,
   ]);
 }

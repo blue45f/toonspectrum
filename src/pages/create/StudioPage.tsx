@@ -182,6 +182,8 @@ import { normalizeBlurFx, type BlurFx } from "./studio-blur";
 import { normalizeDistort, type Distort } from "./studio-distort";
 import { normalizeStylize, type Stylize } from "./studio-stylize";
 import { normalizeLight, type Light } from "./studio-light";
+import { normalizeSketch, type Sketch } from "./studio-sketch";
+import { normalizeDetail, type Detail } from "./studio-detail";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
@@ -201,6 +203,8 @@ import { StudioBlurPanel } from "./StudioBlurPanel";
 import { StudioDistortPanel } from "./StudioDistortPanel";
 import { StudioStylizePanel } from "./StudioStylizePanel";
 import { StudioLightPanel } from "./StudioLightPanel";
+import { StudioSketchPanel } from "./StudioSketchPanel";
+import { StudioDetailPanel } from "./StudioDetailPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -285,6 +289,8 @@ interface ImageEl {
   distort?: Distort;
   stylize?: Stylize;
   light?: Light;
+  sketch?: Sketch;
+  detail?: Detail;
 }
 interface TextEl {
   id: string;
@@ -8165,6 +8171,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Light) => patchEl(selected.id, { light: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { light: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 디테일/샤픈 — 하이패스·미디언·스마트 샤픈. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioDetailPanel
+                    value={normalizeDetail(selected.detail)}
+                    onPatch={(patch: Partial<Detail>) =>
+                      patchEl(selected.id, {
+                        detail: normalizeDetail({ ...normalizeDetail(selected.detail), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Detail) => patchEl(selected.id, { detail: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { detail: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 스케치/잉크 — 포토카피·크로스해치·스탬프·메조틴트. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioSketchPanel
+                    value={normalizeSketch(selected.sketch)}
+                    onPatch={(patch: Partial<Sketch>) =>
+                      patchEl(selected.id, {
+                        sketch: normalizeSketch({ ...normalizeSketch(selected.sketch), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Sketch) => patchEl(selected.id, { sketch: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { sketch: undefined } as Partial<El>)}
                   />
                 </div>
               )}
