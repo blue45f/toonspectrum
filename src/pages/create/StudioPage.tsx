@@ -165,6 +165,10 @@ import { normalizeLevels, type LevelsParams } from "./studio-levels";
 import { StudioLevelsPanel } from "./StudioLevelsPanel";
 import { type LayerStylePatch } from "./studio-layer-styles";
 import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
+import { normalizeCurve, type CurvePoint } from "./studio-curves";
+import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
+import { StudioCurvePanel } from "./StudioCurvePanel";
+import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import {
   createLayerGroup,
   groupOfItem,
@@ -230,6 +234,9 @@ interface ImageEl {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   cornerRadius?: number;
+  // 톤 커브(Curves) + 컬러 밸런스(Color Balance).
+  curve?: CurvePoint[];
+  colorBalance?: ColorBalance;
 }
 interface TextEl {
   id: string;
@@ -7779,6 +7786,31 @@ export function StudioPage() {
                   <StudioLayerStylePanel
                     values={selected as LayerStylePatch}
                     onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 톤 커브 (Curves) — 점 드래그로 임의 톤 곡선을 만든다. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioCurvePanel
+                    points={normalizeCurve(selected.curve)}
+                    onChange={(pts: CurvePoint[]) => patchEl(selected.id, { curve: pts } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { curve: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 컬러 밸런스 — 그림자/중간톤/하이라이트별 색 이동(시네마틱 톤). */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioColorBalancePanel
+                    value={normalizeColorBalance(selected.colorBalance)}
+                    onPatch={(patch: Partial<ColorBalance>) =>
+                      patchEl(selected.id, {
+                        colorBalance: normalizeColorBalance({ ...normalizeColorBalance(selected.colorBalance), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(balance: ColorBalance) => patchEl(selected.id, { colorBalance: balance } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { colorBalance: undefined } as Partial<El>)}
                   />
                 </div>
               )}

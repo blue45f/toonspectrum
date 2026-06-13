@@ -9,6 +9,8 @@
 
 import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
 import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
+import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
+import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -37,7 +39,19 @@ export type ImageFilterFields = {
   levelsGamma?: number;
   levelsOutBlack?: number;
   levelsOutWhite?: number;
+  // 톤 커브(studio-curves) + 컬러 밸런스(studio-color-balance).
+  curve?: CurvePoint[];
+  colorBalance?: ColorBalance;
 };
+
+// 톤 커브가 항등(보정 없음)이 아니면 활성.
+function hasActiveCurve(el: ImageFilterFields): boolean {
+  return !!el.curve && !isIdentityCurve(normalizeCurve(el.curve));
+}
+// 컬러 밸런스가 항등이 아니면 활성.
+function hasActiveColorBalance(el: ImageFilterFields): boolean {
+  return !!el.colorBalance && !isIdentityColorBalance(normalizeColorBalance(el.colorBalance));
+}
 
 // 이미지 요소의 레벨 필드 → studio-levels LevelsParams로 정규화.
 function levelsParamsOf(el: ImageFilterFields) {
@@ -241,6 +255,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   };
   // 레벨 보정 — this.attrs의 levels* 값을 읽어 적용(studio-levels).
   F.Levels = levelsKonvaFilter;
+  // 톤 커브 — this.attrs.curvePoints(flat) 적용(studio-curves).
+  F.Curve = curveKonvaFilter;
+  // 컬러 밸런스 — this.attrs.cbShadows/cbMidtones/cbHighlights 적용(studio-color-balance).
+  F.ColorBalance = colorBalanceKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -252,6 +270,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     el.grayscale ||
     el.sepia ||
     hasActiveLevels(el) ||
+    hasActiveCurve(el) ||
+    hasActiveColorBalance(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -276,10 +296,10 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
 export function buildImageFilters(
   el: ImageFilterFields,
   konva: KonvaLike,
-): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string> } {
+): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string | number[]>} {
   const F = konva.Filters;
   const filters: Array<(imageData: StudioImageDataLike) => void> = [];
-  const attrs: Record<string, number | string> = {};
+  const attrs: Record<string, number | string | number[]> = {};
 
   // --- 색/톤 보정 먼저 ---
   if (isActiveNumber(el.brightness)) {
@@ -317,6 +337,17 @@ export function buildImageFilters(
     attrs.levelsGamma = lv.gamma;
     attrs.levelsOutBlack = lv.outBlack;
     attrs.levelsOutWhite = lv.outWhite;
+  }
+  if (hasActiveCurve(el)) {
+    filters.push(F.Curve!);
+    attrs.curvePoints = curveToFlat(normalizeCurve(el.curve));
+  }
+  if (hasActiveColorBalance(el)) {
+    filters.push(F.ColorBalance!);
+    const cb = normalizeColorBalance(el.colorBalance);
+    attrs.cbShadows = cb.shadows;
+    attrs.cbMidtones = cb.midtones;
+    attrs.cbHighlights = cb.highlights;
   }
   if (el.grayscale) {
     filters.push(F.Grayscale as (imageData: StudioImageDataLike) => void);
@@ -394,5 +425,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.levelsGamma ?? null,
     el.levelsOutBlack ?? null,
     el.levelsOutWhite ?? null,
+    el.curve ?? null,
+    el.colorBalance ?? null,
   ]);
 }
