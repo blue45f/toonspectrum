@@ -1,12 +1,14 @@
+import { ChevronRight, ListFilter } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { Container } from "@/components/section";
+
+import type { PlatformId } from "@/lib/types";
+import type { MouseEvent } from "react";
+
 import { RankingBoard } from "@/components/ranking-board";
 import { RankingMethod } from "@/components/ranking-method";
-import { RANK_AXES, type RankAxis } from "@/lib/ranking";
+import { Container } from "@/components/section";
 import { PLATFORM_LIST } from "@/lib/platforms";
-import type { PlatformId } from "@/lib/types";
-import { ChevronRight, ListFilter } from "lucide-react";
-import type { MouseEvent } from "react";
+import { RANK_AXES, type RankAxis } from "@/lib/ranking";
 
 export function RankingPage() {
   const [searchParams] = useSearchParams();

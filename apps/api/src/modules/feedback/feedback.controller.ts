@@ -12,9 +12,12 @@ import {
   Req,
   UnauthorizedException,
 } from "@nestjs/common";
-import type { Request } from "express";
+
 import { forwardInquiry } from "../../../../../lib/server/inquiry";
+
 import { FeedbackService } from "./feedback.service";
+
+import type { Request } from "express";
 
 interface ListQuery {
   category?: string | null;

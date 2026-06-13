@@ -1,6 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
+
 import { useApp, useHydrated } from "@/lib/store";
 
 // 19금 표지 게이트 — 미인증 시 블러 + 성인 인증 버튼. 인증되면 사라짐.
@@ -16,6 +17,9 @@ export function AdultOverlay({ compact = false, hasCover = true }: { compact?: b
   const showButton = hasCover && !compact;
 
   return (
+    // 프레젠테이션용 클릭 차단막 — 게이트 중 하단 카드/링크로 클릭이 전파되지 않게만 막는다.
+    // 호출 가능한 동작이 없는 마우스 전용 가드라 role/keydown은 의미가 없다(키보드는 전파시킬 클릭 자체가 없음).
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 rounded-[inherit] border border-[oklch(0.95_0.01_85/0.12)] bg-[oklch(0.14_0.012_70/0.74)] text-center backdrop-blur-xl"
       onClick={(e) => {

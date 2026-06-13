@@ -6,15 +6,16 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
 import {
   GRADIENT_MAP_PRESETS,
   isDefaultGradientMap,
   type GradientMap,
   type GradientStop,
 } from "./studio-gradient-map";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // 프리셋 칩 — 미니 그라디언트를 배경에 깔고 라벨은 가독성을 위해 그림자를 얹는다.
 const CHIP_CLASS =

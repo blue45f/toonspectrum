@@ -2,7 +2,7 @@
 // 스키마는 lib/db/schema.ts에 이미 존재(creatorWorks/creatorWorkLikes/creatorWorkComments) — 재정의하지 않는다.
 // 연재 시리즈·챌린지·팔로우(creatorSeries/creatorChallenges/creatorFollows)도 이 파일에서 함께 다룬다.
 import { and, asc, desc, eq, gt, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+
 import {
   creatorAssets,
   creatorChallenges,
@@ -15,6 +15,8 @@ import {
   dbPool,
   users,
 } from "../db";
+
+import type { SQL } from "drizzle-orm";
 
 const SORTS = new Set<CreatorWorkSort>(["recent", "likes", "views"]);
 const FORMATS = new Set<CreatorWorkFormat>(["cuttoon", "upload"]);

@@ -1,17 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { motion } from "motion/react";
-import Link from "@/src/compat/router-link";
-import type { Title } from "@/lib/types";
-import { TitlePoster } from "./title-poster";
-import { MiniPoster } from "./rank-row";
-import { GenreSpectrum } from "./ui/spectrum-bar";
-import { GenreChip } from "./ui/chip";
-import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
-import { statsAreEstimated } from "@/lib/estimate";
-import { cn, formatCount } from "@/lib/utils";
 import { Search, X, Swords, ArrowRight } from "lucide-react";
+import { motion } from "motion/react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+
+
+
+import { MiniPoster } from "./rank-row";
+import { TitlePoster } from "./title-poster";
+import { GenreChip } from "./ui/chip";
+import { GenreSpectrum } from "./ui/spectrum-bar";
+
+import type { Title } from "@/lib/types";
+
+import { statsAreEstimated } from "@/lib/estimate";
+import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
+import { cn, formatCount } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+
 
 type Metric = {
   label: string;
@@ -251,8 +257,8 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
                 const bWin = m.better === "high" && vb > va && !eitherEstimated;
 
                 // 비교 바 비중 계산
-                let pctA = 50;
-                let pctB = 50;
+                let pctA: number;
+                let pctB: number;
                 if (m.label === "별점") {
                   pctA = (va / 5) * 100;
                   pctB = (vb / 5) * 100;

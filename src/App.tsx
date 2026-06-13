@@ -1,15 +1,17 @@
 import { useEffect, useRef } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
+
+import { AppRouter } from "./routes/AppRouter";
+
+import { AgeGateModal } from "@/components/age-gate-modal";
 import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { StoreSync } from "@/components/auth/store-sync";
 import { CommandPaletteHost } from "@/components/command-palette-host";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { AgeGateModal } from "@/components/age-gate-modal";
-import { AppRouter } from "./routes/AppRouter";
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다.

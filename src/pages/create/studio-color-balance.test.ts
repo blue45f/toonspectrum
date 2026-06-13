@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   COLOR_BALANCE_PRESETS,
   COLOR_BALANCE_RANGE,

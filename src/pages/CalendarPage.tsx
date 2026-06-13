@@ -1,13 +1,17 @@
+import { CalendarDays, CalendarPlus, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
-import Link from "@/src/compat/router-link";
+import { useState } from "react";
+
+import { useApiResource } from "./use-api-resource";
+
+import type { PlatformId, Title, TitleCard } from "@/lib/types";
+
 import { AvailabilityDots } from "@/components/availability";
 import { MiniPoster } from "@/components/rank-row";
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { RatingInline } from "@/components/ui/stars";
-import { ErrorState } from "@/src/components/error-state";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { useRememberedFilters } from "@/lib/use-remembered-filters";
+import { buttonClass } from "@/components/ui/button-utils";
+import { RatingInline } from "@/components/ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
 import { buildWeeklyIcs, downloadIcs, titleToWeeklyIcsEvent } from "@/lib/ics";
 import { useSavedTitleIds } from "@/lib/store";
@@ -17,11 +21,12 @@ import {
   applyTitleFilters,
   countActiveTitleFilters,
 } from "@/lib/title-filters";
-import type { PlatformId, Title, TitleCard } from "@/lib/types";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
 import { cn } from "@/lib/utils";
-import { CalendarDays, CalendarPlus, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
-import { useApiResource } from "./use-api-resource";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+
+
 
 interface CalendarResponse {
   todayIdx: number;

@@ -1,6 +1,9 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+
 import { and, eq } from "drizzle-orm";
+
 import { accounts, db, users } from "../db";
+
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
 // ── 소셜 로그인(Google·Kakao·Naver) OAuth 2.0 인가-코드 흐름 ──
@@ -9,6 +12,19 @@ import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } 
 // 주의: 이 앱의 인증은 데모 수준(쿠키/서버세션 없음)이라 보안 경계가 약하다 — 실서비스 전 세션 강화 필요.
 
 export type OAuthProviderId = "google" | "kakao" | "naver";
+
+// OAuth 제공자 프로필 JSON: 키 형태를 고정할 수 없어 unknown 값 레코드로 표현.
+// 실제 사용처에서는 asRecord()로 중첩 객체를, str()로 문자열 필드를 안전하게 좁힌다.
+type JsonRecord = Record<string, unknown>;
+
+// unknown → 중첩 레코드(객체가 아니면 빈 객체)로 좁히기.
+function asRecord(value: unknown): JsonRecord {
+  return typeof value === "object" && value !== null ? (value as JsonRecord) : {};
+}
+// unknown → 문자열 또는 null(문자열이 아니면 null).
+function str(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
 
 // 카카오·네이버는 일단 데모 고정(실 OAuth 연동 보류) — 키가 설정돼 있어도 데모로 라우팅한다.
 // 실연동 재개 시 이 집합에서 제거하면 됨(키 설정 시 자동 oauth). Google 은 키 있으면 실연동.
@@ -201,33 +217,33 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
     signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`profile fetch failed (${res.status})`);
-  const raw = (await res.json()) as Record<string, any>;
+  const raw = (await res.json()) as JsonRecord;
   if (id === "google") {
     return {
       providerAccountId: String(raw.sub),
-      email: typeof raw.email === "string" ? raw.email.toLowerCase() : null,
-      name: raw.name ?? raw.given_name ?? null,
-      image: raw.picture ?? null,
+      email: str(raw.email)?.toLowerCase() ?? null,
+      name: str(raw.name) ?? str(raw.given_name),
+      image: str(raw.picture),
     };
   }
   if (id === "naver") {
     // 네이버: { resultcode, message, response: { id, email, name, nickname, profile_image } }
-    const r = raw.response ?? {};
+    const r = asRecord(raw.response);
     return {
       providerAccountId: String(r.id),
-      email: typeof r.email === "string" ? r.email.toLowerCase() : null,
-      name: r.name ?? r.nickname ?? null,
-      image: r.profile_image ?? null,
+      email: str(r.email)?.toLowerCase() ?? null,
+      name: str(r.name) ?? str(r.nickname),
+      image: str(r.profile_image),
     };
   }
   // kakao
-  const acc = raw.kakao_account ?? {};
-  const profile = acc.profile ?? raw.properties ?? {};
+  const acc = asRecord(raw.kakao_account);
+  const profile = asRecord(acc.profile ?? raw.properties);
   return {
     providerAccountId: String(raw.id),
-    email: typeof acc.email === "string" ? acc.email.toLowerCase() : null,
-    name: profile.nickname ?? null,
-    image: profile.profile_image_url ?? profile.profile_image ?? null,
+    email: str(acc.email)?.toLowerCase() ?? null,
+    name: str(profile.nickname),
+    image: str(profile.profile_image_url) ?? str(profile.profile_image),
   };
 }
 

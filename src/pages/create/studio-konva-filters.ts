@@ -7,27 +7,27 @@
  * 픽셀 수학과 상수는 studio-filters / 기존 StudioPage 구현 그대로(verbatim).
  */
 
-import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
-import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
-import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
-import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
-import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
-import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat, type SelectiveHsl } from "./studio-selective-hsl";
-import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance, type Vibrance } from "./studio-vibrance";
-import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat, type GradientMap } from "./studio-gradient-map";
-import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter, type PhotoFilter } from "./studio-photo-filter";
 import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
-import { clarityKonvaFilter, normalizeClarity, isIdentityClarity, type Clarity } from "./studio-clarity";
-import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad, type Outline } from "./studio-outline";
-import { glowKonvaFilter, normalizeGlow, isIdentityGlow, type Glow } from "./studio-glow";
-import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone, type Halftone } from "./studio-halftone";
-import { grainKonvaFilter, normalizeGrain, isIdentityGrain, type Grain } from "./studio-grain";
 import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx, type BlurFx } from "./studio-blur";
-import { distortKonvaFilter, normalizeDistort, isIdentityDistort, type Distort } from "./studio-distort";
-import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize, type Stylize } from "./studio-stylize";
-import { lightKonvaFilter, normalizeLight, isIdentityLight, type Light } from "./studio-light";
-import { sketchKonvaFilter, normalizeSketch, isIdentitySketch, type Sketch } from "./studio-sketch";
+import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
+import { clarityKonvaFilter, normalizeClarity, isIdentityClarity, type Clarity } from "./studio-clarity";
+import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
+import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
 import { detailKonvaFilter, normalizeDetail, isIdentityDetail, type Detail } from "./studio-detail";
+import { distortKonvaFilter, normalizeDistort, isIdentityDistort, type Distort } from "./studio-distort";
+import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
+import { glowKonvaFilter, normalizeGlow, isIdentityGlow, type Glow } from "./studio-glow";
+import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat, type GradientMap } from "./studio-gradient-map";
+import { grainKonvaFilter, normalizeGrain, isIdentityGrain, type Grain } from "./studio-grain";
+import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone, type Halftone } from "./studio-halftone";
+import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
+import { lightKonvaFilter, normalizeLight, isIdentityLight, type Light } from "./studio-light";
+import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad, type Outline } from "./studio-outline";
+import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter, type PhotoFilter } from "./studio-photo-filter";
+import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat, type SelectiveHsl } from "./studio-selective-hsl";
+import { sketchKonvaFilter, normalizeSketch, isIdentitySketch, type Sketch } from "./studio-sketch";
+import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize, type Stylize } from "./studio-stylize";
+import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance, type Vibrance } from "./studio-vibrance";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -178,14 +178,22 @@ function hasActiveLevels(el: ImageFilterFields): boolean {
   return !isIdentityLevels(levelsParamsOf(el));
 }
 
-// 최소 Konva 형태(테스트에서 가짜 객체 주입 가능). Filters는 필터 함수 맵(Konva 내장 + 커스텀 혼재).
-// 실제 Konva.Filters(각 값이 Konva의 Filter 타입)와 테스트 가짜 객체를 모두 받기 위해 값 타입은 any로 둔다.
-export type KonvaLike = {
-  Filters: Record<string, any>;
-};
-
 // Konva 필터 함수가 호출될 때의 `this` — node.attrs에서 보정 파라미터를 읽는다.
 type FilterThis = { attrs?: Record<string, unknown> };
+
+// Konva 필터 함수 시그니처(in-place로 StudioImageDataLike를 변형).
+type KonvaFilterFn = (imageData: StudioImageDataLike) => void;
+
+// 최소 Konva 형태(테스트에서 가짜 객체 주입 가능). Filters는 필터 함수 맵(Konva 내장 + 커스텀 혼재).
+// 값 타입은 unknown 인덱스 시그니처: 실제 Konva.Filters(값이 FilterFunction | string)도,
+// 테스트 가짜 객체도 그대로 대입된다(any 회피). 등록 후 호출되는 커스텀 필터 키는
+// KonvaFilterFn 으로 명시해 호출부(.call 등)가 좁혀 읽을 수 있게 한다.
+export type KonvaLike = {
+  Filters: {
+    [key: string]: unknown;
+    Temperature?: KonvaFilterFn;
+  };
+};
 
 // 보정값이 "활성"인지: 불리언은 truthy, 숫자는 0이 아니고 null/undefined가 아닐 때.
 function isActiveNumber(value: number | undefined): boolean {
@@ -458,7 +466,9 @@ export function buildImageFilters(
   el: ImageFilterFields,
   konva: KonvaLike,
 ): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string | number[]>; cachePad: number } {
-  const F = konva.Filters;
+  // 이 시점에 읽는 필터들은 모두 등록된 함수다(Konva 내장 + registerStudioKonvaFilters로 부착).
+  // unknown 인덱스 값을 필터 함수 맵으로 좁혀 읽는다.
+  const F = konva.Filters as Record<string, KonvaFilterFn>;
   const filters: Array<(imageData: StudioImageDataLike) => void> = [];
   const attrs: Record<string, number | string | number[]> = {};
 

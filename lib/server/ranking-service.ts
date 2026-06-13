@@ -1,5 +1,14 @@
-import { TITLES } from "./catalog-store";
 import { statsAreEstimated } from "../estimate";
+import { PLATFORM_LIST, PLATFORMS, PRICING_LABEL } from "../platforms";
+import {
+  PERIODS,
+  RANK_AXES,
+  rankBy,
+  rankablePoolSize,
+  type RankedTitle,
+  type RankAxis,
+  type RankPeriod,
+} from "../ranking";
 import {
   getLiveRanking,
   getLiveStatusSignals,
@@ -13,17 +22,10 @@ import {
   type LiveStatusResult,
   type LiveStatusSignal,
 } from "../server/live";
-import { PLATFORM_LIST, PLATFORMS, PRICING_LABEL } from "../platforms";
 import { GENRES } from "../taxonomy";
-import {
-  PERIODS,
-  RANK_AXES,
-  rankBy,
-  rankablePoolSize,
-  type RankedTitle,
-  type RankAxis,
-  type RankPeriod,
-} from "../ranking";
+
+import { TITLES } from "./catalog-store";
+
 import type { PlatformId, Pricing, SerialStatus, Title, WorkType } from "../types";
 
 export const DEFAULT_RANKING_LIMIT = 200;

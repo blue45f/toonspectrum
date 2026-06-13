@@ -14,8 +14,9 @@
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
-import type { StudioImageDataLike } from "./studio-filters";
 import { clampCoord, lumaAt, sobelMagnitude } from "./studio-pixel-utils";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---------------------------------------------------------------------------
 // 파라미터 타입·기본값·범위

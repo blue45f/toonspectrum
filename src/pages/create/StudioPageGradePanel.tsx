@@ -1,7 +1,7 @@
 // 페이지 전체 색보정 패널 — 페이지 그레이드(밝기/대비/채도/색조/세피아/흑백/비네트)
 // 슬라이더 + 무드 프리셋 칩. 표시 전용(로컬 상태 없음): 값은 grade로 받고 변경은 콜백으로 위임한다.
 import { RotateCcw } from "lucide-react";
-import { buttonClass } from "@/components/ui/button";
+
 import {
   isDefaultPageGrade,
   PAGE_GRADE_PRESETS,
@@ -9,6 +9,8 @@ import {
   type PageGrade,
   type PageGradePreset,
 } from "./studio-filters";
+
+import { buttonClass } from "@/components/ui/button-utils";
 
 // 슬라이더 한 줄 메타 — 표시 순서/라벨/읽기값 포맷을 한곳에 고정한다.
 type GradeRow = {

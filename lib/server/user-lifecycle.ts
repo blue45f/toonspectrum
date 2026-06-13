@@ -1,5 +1,7 @@
 import { eq, sql } from "drizzle-orm";
+
 import { accounts, db, dbClient, sessions, users } from "../db";
+
 import { getSessionUserCached, invalidateSessionUser } from "./session";
 
 export type UserAccountStatus = "active" | "suspended" | "deleted";

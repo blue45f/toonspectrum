@@ -1,19 +1,22 @@
-import { Container } from "@/components/section";
-import { Badge } from "@/components/ui/chip";
-import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
 import { AreaChart } from "./insights-components/area-chart";
 import { BarList } from "./insights-components/bar-list";
 import { CompareSplit } from "./insights-components/compare-split";
 import { Donut } from "./insights-components/donut";
 import { Panel } from "./insights-components/panel";
 import { TagCloud } from "./insights-components/tag-cloud";
-import { genreColor } from "@/lib/genre-color";
-import { CountUp } from "@/components/count-up";
+import { useApiResource } from "./use-api-resource";
+
 import type { getInsightsData } from "@/lib/server/insights";
+
+import { CountUp } from "@/components/count-up";
+import { Container } from "@/components/section";
+import { Badge } from "@/components/ui/chip";
+import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
+import { genreColor } from "@/lib/genre-color";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { formatCount, formatFull } from "@/lib/utils";
 import { ErrorState } from "@/src/components/error-state";
-import { useApiResource } from "./use-api-resource";
+
 
 type InsightsData = Awaited<ReturnType<typeof getInsightsData>>;
 

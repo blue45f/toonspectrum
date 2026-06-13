@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { useInView } from "@/components/use-in-view";
+import { cn } from "@/lib/utils";
 
 export interface BarListItem {
   label: string;

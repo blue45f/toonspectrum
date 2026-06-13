@@ -1,7 +1,9 @@
 // 런타임 앱 설정(app_setting 테이블). 광고형 수익화 on/off 등 토글을 관리한다.
 // 기본값은 전부 비활성(초반엔 전 기능 무료·광고 없음). 관리자만 켤 수 있다.
 import { eq } from "drizzle-orm";
+
 import { appSettings, db, dbClient, users } from "../db";
+
 import { getSessionUserCached } from "./session";
 import { ensureUserLifecycleSchema, normalizeUserAccountStatus } from "./user-lifecycle";
 

@@ -1,4 +1,5 @@
 import { Star } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 const SIZES = { xs: 11, sm: 13, md: 16, lg: 22 } as const;

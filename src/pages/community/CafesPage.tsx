@@ -1,14 +1,17 @@
+import { Coffee, Plus, Search, Sparkles, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Coffee, Plus, Search, Sparkles, UsersRound } from "lucide-react";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { GENRES } from "@/lib/taxonomy";
-import { useApp, useHydrated } from "@/lib/store";
-import { cn, relativeDate } from "@/lib/utils";
+
 import type { CommunityCafe } from "@/lib/types";
+
+import { Container } from "@/components/section";
+import { resolveApiError, safeParseJson } from "@/lib/http-safe";
+import { useApp, useHydrated } from "@/lib/store";
+import { GENRES } from "@/lib/taxonomy";
+import { cn, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+
 
 const CAFE_NAME_MAX = 40;
 const CAFE_DESCRIPTION_MAX = 300;

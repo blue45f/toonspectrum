@@ -1,5 +1,3 @@
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
 import {
   Search,
   Compass,
@@ -12,6 +10,9 @@ import {
   ArrowRight,
   MapPin,
 } from "lucide-react";
+
+import { Container } from "@/components/section";
+import Link from "@/src/compat/router-link";
 
 // 사이트 소개·튜토리얼 페이지(/about) — 처음 온 사람에게 툰스펙트럼이 무엇이고 무엇을 할 수 있는지,
 // 어떻게 쓰는지 한 화면에서 안내한다.

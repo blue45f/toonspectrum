@@ -1,6 +1,7 @@
 import "./compat/storage-migrate"; // 반드시 최상단 — 스토어 hydrate 전에 레거시 키 이관
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+
 import App from "./App";
 import { installStaticCatalog } from "./catalog-static";
 import "./styles/globals.css";

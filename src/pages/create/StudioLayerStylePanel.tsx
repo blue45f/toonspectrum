@@ -6,15 +6,16 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
 import {
   LAYER_STYLE_PRESETS,
   LAYER_STYLE_RANGES,
   layerStyleResetPatch,
   type LayerStylePatch,
 } from "./studio-layer-styles";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // input[type=color]는 빈 값 불가 — 그림자 색 미지정 시 보여줄 폴백(검정).
 const SHADOW_FALLBACK_COLOR = "#000000";

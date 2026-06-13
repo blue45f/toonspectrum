@@ -2,6 +2,7 @@
 // 순수 검증 테스트는 항상 실행되고, DB가 있는 환경에서만 통합 테스트가 돈다.
 import { inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
 import { creatorFollows, creatorSeries, creatorWorks, db, dbClient, users } from "../db";
 import {
   SEED_CHALLENGES,
@@ -21,6 +22,7 @@ import {
   validateFollowPair,
   validateSeriesInput,
 } from "../server/creator";
+
 import { retryOnDeadlock } from "./db-test-utils";
 
 const createdUserIds = new Set<string>();

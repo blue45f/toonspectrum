@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { StudioPanelChip } from "./studio-panel-ui";
 import {
   BLURFX_ANGLE_RANGE,
   BLURFX_PRESETS,
@@ -20,6 +17,10 @@ import {
   type BlurFx,
   type BlurFxType,
 } from "./studio-blur";
+import { StudioPanelChip } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(세기 0..100·반경 1..40·각도 0..360 정수 수용).
 // 각도 행은 label에 title(모션 전용 안내)을 달아야 해서 StudioSliderRow(공용)로 대체하지 않고 로컬 클래스를 유지한다.

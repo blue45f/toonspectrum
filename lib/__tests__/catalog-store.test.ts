@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   adaptationsOf,
   allTitles,
   getCatalogState,
   replaceCatalogData,
 } from "../server/catalog-store";
+
 import { makeTitle } from "./fixtures";
 
 describe("runtime catalog store", () => {

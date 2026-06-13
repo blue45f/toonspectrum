@@ -1,14 +1,17 @@
+import { ArrowLeft, Coffee, Crown, DoorOpen, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowLeft, Coffee, Crown, DoorOpen, UserPlus } from "lucide-react";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
+
+import type { CommunityCafe } from "@/lib/types";
+
 import { FanCafePanel } from "@/components/fan-cafe-panel";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { Container } from "@/components/section";
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 import { useApp } from "@/lib/store";
 import { relativeDate } from "@/lib/utils";
-import type { CommunityCafe } from "@/lib/types";
+import Link from "@/src/compat/router-link";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+
 
 // 장르 카페 상세(/community/cafes/:slug) — 카페 소개 + 가입/탈퇴 + 게시판(fan-cafe-panel 재사용).
 // 글 작성은 가입 회원에게만 열리고, 미가입자는 composeLock으로 가입 액션을 안내한다.

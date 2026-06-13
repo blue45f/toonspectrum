@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_SKETCH,
   SKETCH_DETAIL_RANGE,
@@ -12,7 +14,6 @@ import {
   type Sketch,
   type SketchType,
 } from "./studio-sketch";
-import { type StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

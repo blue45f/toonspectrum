@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "@/src/compat/router-link";
-import { useSession, signOut } from "@/src/compat/auth-session";
-import { AuthModal } from "./auth-modal";
 import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
+
+import { AuthModal } from "./auth-modal";
+
 import { resolveSignupAvatarImage } from "@/lib/avatar";
-import { adminFetch, type AdminMe } from "@/src/components/admin/admin-client";
 import { useT } from "@/lib/i18n";
 import { keepInlineText } from "@/lib/utils";
+import { useSession, signOut } from "@/src/compat/auth-session-store";
+import Link from "@/src/compat/router-link";
+import { adminFetch, type AdminMe } from "@/src/components/admin/admin-client";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;

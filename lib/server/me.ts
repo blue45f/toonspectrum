@@ -1,4 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
+
+import { fromDb } from "../api-helpers";
 import {
   db,
   users,
@@ -10,7 +12,7 @@ import {
   collections,
   collectionItems,
 } from "../db";
-import { fromDb } from "../api-helpers";
+
 import { invalidateSessionUser } from "./session";
 import { ensureUserLifecycleSchema, normalizeUserAccountStatus, softDeleteUserAccount } from "./user-lifecycle";
 

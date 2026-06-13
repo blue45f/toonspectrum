@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+
 import { searchTitles, suggest, sortTitles } from "../search";
+
 import { makeTitle } from "./fixtures";
 
 const titles = [

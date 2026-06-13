@@ -1,8 +1,9 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+
 import {
   adminFetch,
   centsToWon,
@@ -12,7 +13,8 @@ import {
   type AdminApiError,
   type Campaign,
 } from "./admin-client";
-import { AdminNotice, AdminSpinner, Field, adminButtonClass, adminInputClass } from "./admin-ui";
+import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
 
 const campaignFormSchema = z.object({
   creatorId: z.string().trim().min(1, "크리에이터 ID와 제목은 필수예요."),

@@ -14,7 +14,9 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
+
 import { universeFor } from "../lib/title-universe";
+
 import type { Title } from "../lib/types";
 
 const SITE = process.env.WEBDEX_SITE_URL ?? "https://toonspectrum.vercel.app";
@@ -154,7 +156,7 @@ async function main() {
   }
 
   // 2) 새 영상화 (manifest 대비)
-  let prevManifest: Record<string, string> = {};
+  let prevManifest: Record<string, string>;
   try {
     prevManifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, string>;
   } catch {

@@ -11,6 +11,7 @@
  */
 
 import { boxBlurRgb } from "./studio-image-blur";
+
 import type { StudioImageDataLike } from "./studio-filters";
 
 // ---------------------------------------------------------------------------

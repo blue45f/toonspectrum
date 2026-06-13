@@ -1,15 +1,19 @@
+import { ArrowLeft, MessageCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Trash2 } from "lucide-react";
-import Link from "@/src/compat/router-link";
+
+import type { FanCafePost } from "@/lib/types";
+
+import { FanPostImages, FanPostReplySection } from "@/components/fan-cafe-panel";
+import { KIND_LABEL } from "@/components/fan-cafe-utils";
 import { Container } from "@/components/section";
-import { FanPostImages, FanPostReplySection, KIND_LABEL } from "@/components/fan-cafe-panel";
-import { useApiResource } from "@/src/pages/use-api-resource";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { COMMUNITY_SCOPE_LABEL, getCommunityScopeTargetLink } from "@/lib/community-ui";
 import { useApp } from "@/lib/store";
 import { relativeDate } from "@/lib/utils";
-import type { FanCafePost } from "@/lib/types";
+import Link from "@/src/compat/router-link";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { useApiResource } from "@/src/pages/use-api-resource";
+
 
 // 토론 스레드 상세 — 목록 카드에서 진입하는 분할 라우트(/community/post/:id).
 // 글 전문 + 첨부 + 답글 트리를 한 화면에 모으고, 보드(작품/작가/펜카페/카페)로 돌아가는 길을 연다.

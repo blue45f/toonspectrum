@@ -1,9 +1,13 @@
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/lib/ranking";
-import { PLATFORMS } from "@/lib/platforms";
-import type { PlatformId } from "@/lib/types";
 import { Scale, Sigma, Gauge, ShieldCheck, ArrowRight } from "lucide-react";
+
+import type { PlatformId } from "@/lib/types";
+
+import { Container } from "@/components/section";
+import { PLATFORMS } from "@/lib/platforms";
+import { RANK_AXES, PLATFORM_REACH_WEIGHT } from "@/lib/ranking";
+import Link from "@/src/compat/router-link";
+
+
 
 // 랭킹 산정 방식 공개 페이지(/guide) — 투명 산식을 사람이 읽을 수 있게 풀어 설명한다.
 // 산식·도달가중·축 목록은 lib/ranking.ts 의 단일 출처를 그대로 읽어와 코드와 어긋나지 않게 한다.

@@ -1,14 +1,18 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CheckCircle2, Clock, MessageSquare, MessagesSquare, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Container } from "@/components/section";
-import { InquiryForm } from "@/components/inquiry-form";
-import { Button, buttonClass } from "@/components/ui/button";
-import { useApp, useHydrated } from "@/lib/store";
+
 import type { FeedbackCategory, FeedbackPost, FeedbackReply, FeedbackStatus } from "@/lib/types";
+
+import { InquiryForm } from "@/components/inquiry-form";
+import { Container } from "@/components/section";
+import { Button } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
+import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, MessageSquare, MessagesSquare, RefreshCw, ShieldCheck } from "lucide-react";
+
 
 const CATEGORY_LABEL: Record<FeedbackCategory, string> = {
   question: "질문",
@@ -187,8 +191,8 @@ export function FeedbackPage() {
             ) : userId ? (
               <form onSubmit={onSubmit} className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-xs text-fg-3">분류</label>
-                  <select {...register("category")} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50">
+                  <label htmlFor="feedback-category" className="mb-1 block text-xs text-fg-3">분류</label>
+                  <select id="feedback-category" {...register("category")} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50">
                     <option value="question">질문 (Q&amp;A)</option>
                     <option value="idea">의견·제안</option>
                     <option value="bug">버그신고</option>
@@ -203,7 +207,7 @@ export function FeedbackPage() {
                   {errors.text && <p className="mt-1 text-[0.7rem] text-bad">{errors.text.message}</p>}
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-fg-3">태그 (선택, 최대 5개)</label>
+                  <label htmlFor="feedback-tags" className="mb-1 block text-xs text-fg-3">태그 (선택, 최대 5개)</label>
                   {composeTags.length > 0 && (
                     <div className="mb-1.5 flex flex-wrap gap-1">
                       {composeTags.map((t) => (
@@ -219,6 +223,7 @@ export function FeedbackPage() {
                     </div>
                   )}
                   <input
+                    id="feedback-tags"
                     value={tagDraft}
                     onChange={(e) => setTagDraft(e.target.value)}
                     onKeyDown={(e) => {

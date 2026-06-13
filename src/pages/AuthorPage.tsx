@@ -1,16 +1,19 @@
+import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
-import Link from "@/src/compat/router-link";
+
+import { NotFoundPage } from "./NotFoundPage";
+import { useApiResource } from "./use-api-resource";
+
+import type { Title } from "@/lib/types";
+
 import { FanCafePanel } from "@/components/fan-cafe-panel";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { GenreChip } from "@/components/ui/chip";
 import { Stars } from "@/components/ui/stars";
-import { ErrorState } from "@/src/components/error-state";
-import type { Title } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { PenLine } from "lucide-react";
-import { NotFoundPage } from "./NotFoundPage";
-import { useApiResource } from "./use-api-resource";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
 import { useMetaDescription } from "@/src/hooks/use-document-title";
 
 interface AuthorResponse {

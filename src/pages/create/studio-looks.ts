@@ -11,19 +11,20 @@
  * Konva/DOM 의존 없음 — StudioPage와 단위 테스트가 함께 쓴다. 전부 순수·결정적(랜덤 없음).
  */
 
-import type { ImageFilterFields } from "./studio-konva-filters";
-import { normalizeCurve } from "./studio-curves";
-import { normalizeColorBalance } from "./studio-color-balance";
-import { normalizePhotoFilter } from "./studio-photo-filter";
-import { normalizeVibrance } from "./studio-vibrance";
-import { normalizeGradientMap } from "./studio-gradient-map";
-import { normalizeHalftone } from "./studio-halftone";
-import { normalizeGrain } from "./studio-grain";
-import { normalizeGlow } from "./studio-glow";
-import { normalizeStylize } from "./studio-stylize";
-import { normalizeLight } from "./studio-light";
-import { normalizeSketch } from "./studio-sketch";
 import { normalizeClarity } from "./studio-clarity";
+import { normalizeColorBalance } from "./studio-color-balance";
+import { normalizeCurve } from "./studio-curves";
+import { normalizeGlow } from "./studio-glow";
+import { normalizeGradientMap } from "./studio-gradient-map";
+import { normalizeGrain } from "./studio-grain";
+import { normalizeHalftone } from "./studio-halftone";
+import { normalizeLight } from "./studio-light";
+import { normalizePhotoFilter } from "./studio-photo-filter";
+import { normalizeSketch } from "./studio-sketch";
+import { normalizeStylize } from "./studio-stylize";
+import { normalizeVibrance } from "./studio-vibrance";
+
+import type { ImageFilterFields } from "./studio-konva-filters";
 
 // ---------------------------------------------------------------------------
 // 타입 — 룩 카테고리와 룩 자체

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
 import { Container } from "@/components/section";
 
 const FAN_CAFE_ACTIVITY_STORAGE_KEY = "webtoon-index-fan-cafe-activity-log-v1";
@@ -156,6 +157,7 @@ export function TermsPage() {
             <label key={check.id} className="flex cursor-pointer gap-3 rounded-xl border border-line bg-card/65 p-3 transition-colors hover:border-line-strong">
               <input
                 type="checkbox"
+                aria-label={check.title}
                 checked={checkedIds.includes(check.id)}
                 onChange={(event) => toggleCheck(check.id, event.target.checked)}
                 className="mt-1 size-4 accent-[var(--color-accent)]"

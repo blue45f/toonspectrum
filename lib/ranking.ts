@@ -1,5 +1,6 @@
-import type { Title, WorkType, PlatformId } from "./types";
 import { statsAreEstimated } from "./estimate";
+
+import type { Title, WorkType, PlatformId } from "./types";
 
 export type RankAxis =
   | "popular" // 실시간 인기

@@ -6,11 +6,8 @@
  * 어느 밴드를 편집 중인지(selectedBand)만 로컬 상태로 들고, 보정값 자체는 상위가 소유한다.
  * StudioPage에서 분리한 프레젠테이션 컴포넌트.
  */
-import { useState } from "react";
 import { RotateCcw } from "lucide-react";
-
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 import {
   HSL_BAND_CENTER,
@@ -22,6 +19,10 @@ import {
   type HslBand,
   type SelectiveHsl,
 } from "./studio-selective-hsl";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(-100..100 수용).
 const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";

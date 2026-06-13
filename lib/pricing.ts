@@ -8,8 +8,9 @@
 //  - 카카오페이지/웹툰: 캐시 1:1.2(10,000캐시=12,000원), 기다리면 무료 + 빨리보기 캐시.
 //  - 문피아/조아라/노벨피아 등 웹소설: 회차 100원대.
 //  - 교보/예스24: 전자책 단행본(권당 구매) — 회차 모델과 달라 별도 표기.
-import type { Availability, Pricing, PlatformId } from "./types";
 import { PLATFORMS } from "./platforms";
+
+import type { Availability, Pricing, PlatformId } from "./types";
 
 export interface PlatformCost {
   platformId: PlatformId;

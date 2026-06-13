@@ -1,39 +1,43 @@
+import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
+
+import { NotFoundPage } from "./NotFoundPage";
+import { useApiResource } from "./use-api-resource";
+
+import type { SeedReview, Title } from "@/lib/types";
+
 import { AdaptationGraph } from "@/components/adaptation-graph";
-import { TitleOst } from "@/components/title-ost";
-import { TitleExternal } from "@/components/title-external";
-import { ScoreBreakdown } from "@/components/score-breakdown";
-import { mergedUniverse } from "@/lib/title-universe";
 import { AuthorLine } from "@/components/author-line";
-import Link from "@/src/compat/router-link";
 import { AvailabilityRouter } from "@/components/availability";
-import { PriceCompare } from "@/components/price-compare";
 import { CollectionAdd } from "@/components/collection-add";
+import { CoverImage } from "@/components/cover-image";
 import { FanCafePanel } from "@/components/fan-cafe-panel";
+import { PriceCompare } from "@/components/price-compare";
 import { ReadStateSelector } from "@/components/read-state";
 import { ReviewCard } from "@/components/review-card";
 import { ReviewForm } from "@/components/review-form";
+import { ScoreBreakdown } from "@/components/score-breakdown";
 import { Rail, Section, Container } from "@/components/section";
-import { SubscribeButton } from "@/components/subscribe-button";
 import { ShareButton } from "@/components/share-button";
-import { TitleFanWorks } from "@/components/title-fan-works";
+import { SubscribeButton } from "@/components/subscribe-button";
 import { TitleCard } from "@/components/title-card";
+import { TitleExternal } from "@/components/title-external";
+import { TitleFanWorks } from "@/components/title-fan-works";
+import { TitleOst } from "@/components/title-ost";
 import { TitlePoster } from "@/components/title-poster";
-import { CoverImage } from "@/components/cover-image";
 import { Badge, GenreChip } from "@/components/ui/chip";
 import { DistributionBars, GenreSpectrum, MeterBar } from "@/components/ui/spectrum-bar";
 import { Stars } from "@/components/ui/stars";
 import { statsAreEstimated } from "@/lib/estimate";
+import { useApp } from "@/lib/store";
 import { AGE_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/lib/taxonomy";
-import type { SeedReview, Title } from "@/lib/types";
+import { mergedUniverse } from "@/lib/title-universe";
 import { formatCount } from "@/lib/utils";
-import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
-import { NotFoundPage } from "./NotFoundPage";
+import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
-import { useApiResource } from "./use-api-resource";
-import { useApp } from "@/lib/store";
-import { useEffect } from "react";
+
 
 interface TitleDetailResponse {
   title: Title;

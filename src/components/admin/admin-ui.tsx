@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+
 import { cn } from "@/lib/utils";
 
 export const adminInputClass =
@@ -68,14 +69,5 @@ export function StatusBadge({ status }: { status: string }) {
     <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[0.7rem] font-medium", tone)}>
       {status}
     </span>
-  );
-}
-
-export function adminButtonClass(variant: "accent" | "ghost" | "danger" = "ghost") {
-  return cn(
-    "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50",
-    variant === "accent" && "bg-accent text-on-accent hover:bg-accent-2",
-    variant === "ghost" && "border border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
-    variant === "danger" && "border border-bad/40 text-bad hover:bg-bad/10"
   );
 }

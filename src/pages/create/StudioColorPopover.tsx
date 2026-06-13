@@ -1,15 +1,18 @@
 // 재사용 색상 선택기 — 스와치 트리거 + 팝오버(네이티브 컬러/헥스 입력, 스포이드,
 // 최근 색, 큐레이션 팔레트 탭). 로컬 UI 상태(열림/선택 팔레트)만 가지는 표시 컴포넌트.
 // 브라우저 앱 안에서만 도는 컴포넌트라 document/window 직접 접근 OK(테스트 대상 아님).
-import { useEffect, useRef, useState } from "react";
 import { Pipette, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+
 import {
   isValidHexColor,
   normalizeHexColor,
   STUDIO_PALETTES,
   type StudioPalette,
 } from "./studio-color-palettes";
+
+import { cn } from "@/lib/utils";
+
 
 // EyeDropper는 일부 브라우저에만 있는 실험적 API — 타입 정의가 없어 좁은 형태만 선언한다.
 type EyeDropperResult = { sRGBHex: string };

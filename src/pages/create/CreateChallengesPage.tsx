@@ -1,12 +1,16 @@
 // 창작 챌린지 — 진행중 주제 카드(D-day) + 챌린지별 참여작 그리드 (툰스푼 창작 작업실 스타일).
+import { ArrowLeft, CalendarClock, PenLine, Sparkles, Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import Link from "@/src/compat/router-link";
+
+import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
+
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn, formatCount } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { cn, formatCount } from "@/lib/utils";
 import {
   challengeDday,
   getChallenge,
@@ -14,8 +18,7 @@ import {
   type ChallengeSummary,
   type WorkSummary,
 } from "@/src/lib/creator-client";
-import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
-import { ArrowLeft, CalendarClock, PenLine, Sparkles, Trophy, Users } from "lucide-react";
+
 
 // 마감 D-day 칩 — 마감 임박(3일 이내)은 경고 톤.
 function DdayChip({ endsAt }: { endsAt: string | null }) {

@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
+
+import { ErrorBoundary } from "@/src/components/error-boundary";
 import { HomePage } from "@/src/pages/HomePage";
 import { NotFoundPage } from "@/src/pages/NotFoundPage";
-import { ErrorBoundary } from "@/src/components/error-boundary";
 
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
 // /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.

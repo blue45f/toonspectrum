@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+
 import {
   adminFetch,
   formatNum,
@@ -8,7 +9,9 @@ import {
   type RevenueResponse,
   type RevenueStatus,
 } from "./admin-client";
-import { AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge, adminButtonClass } from "./admin-ui";
+import { AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
+
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: RevenueStatus | "all"; label: string }[] = [

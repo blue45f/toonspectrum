@@ -1,7 +1,9 @@
-import { TITLES, activeTags } from "./catalog-store";
-import { searchTitles, type SearchFilters, type SortKey } from "../search";
 import { PLATFORMS } from "../platforms";
+import { searchTitles, type SearchFilters, type SortKey } from "../search";
 import { GENRES } from "../taxonomy";
+
+import { TITLES, activeTags } from "./catalog-store";
+
 import type { AgeRating, PlatformId, SerialStatus, Title, WorkType } from "../types";
 
 export type ExploreSearchParams = Record<string, string | undefined>;

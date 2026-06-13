@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_LIGHT,
   LIGHT_HUE_RANGE,
@@ -14,7 +16,6 @@ import {
   type Light,
   type LightType,
 } from "./studio-light";
-import { type StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

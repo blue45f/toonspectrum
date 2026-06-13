@@ -1,4 +1,4 @@
-/* eslint-disable no-undef -- Vercel Node CJS 서버리스 함수 */
+ 
 // 작품 상세(/title/:slug) SNS 공유용 — 크롤러(카카오/페북/트위터 등)에는 작품별 OG 메타를
 // 주입한 HTML을, 사람에게는 평소 SPA 셸을 그대로 준다(추가 지연 없음).
 const fs = require("fs");

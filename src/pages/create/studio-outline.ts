@@ -14,8 +14,9 @@
  * 전부 순수·결정적(랜덤 없음).
  */
 
-import type { StudioImageDataLike } from "./studio-filters";
 import { hexToRgb } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---------------------------------------------------------------------------
 // 파라미터 타입·기본값·범위

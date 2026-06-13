@@ -1,8 +1,9 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Pencil, X } from "lucide-react";
+
 import {
   adminFetch,
   centsToWon,
@@ -12,7 +13,8 @@ import {
   type AdminApiError,
   type Plan,
 } from "./admin-client";
-import { AdminNotice, AdminSpinner, Field, adminButtonClass, adminInputClass } from "./admin-ui";
+import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
 
 const planFormSchema = z.object({
   code: z.string().trim().min(1, "코드와 이름은 필수예요."),

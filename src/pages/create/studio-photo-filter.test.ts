@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_PHOTO_FILTER,
   PHOTO_FILTER_DENSITY_RANGE,
@@ -9,7 +11,6 @@ import {
   photoFilterKonvaFilter,
   type PhotoFilter,
 } from "./studio-photo-filter";
-import { type StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

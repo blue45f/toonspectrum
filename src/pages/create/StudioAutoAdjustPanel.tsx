@@ -6,15 +6,16 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
 import {
   AUTO_ADJUST_PRESETS,
   AUTO_STRENGTH_RANGE,
   isIdentityAutoAdjust,
   type AutoAdjust,
 } from "./studio-auto-adjust";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(100% 수용).
 const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";

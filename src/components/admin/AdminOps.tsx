@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
 import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
 import { adminFetch, formatNum, type AdminApiError } from "./admin-client";
-import { AdminNotice, AdminSpinner, adminButtonClass } from "./admin-ui";
-import { getAuthToken } from "@/src/compat/auth-session";
+import { AdminNotice, AdminSpinner } from "./admin-ui";
+import { adminButtonClass } from "./admin-ui-utils";
+
+import { getAuthToken } from "@/src/compat/auth-session-store";
 
 interface AppConfig {
   monetizationEnabled: boolean;

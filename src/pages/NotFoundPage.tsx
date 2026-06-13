@@ -1,6 +1,6 @@
-import Link from "@/src/compat/router-link";
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
+import Link from "@/src/compat/router-link";
 
 export function NotFoundPage() {
   return (

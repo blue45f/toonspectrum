@@ -1,5 +1,6 @@
-import { RANK_AXES, type RankAxis } from "@/lib/ranking";
 import { Flag, Flame, FunctionSquare, Gem, Heart, Info, Sprout, Star, TrendingUp, Waves, type LucideIcon } from "lucide-react";
+
+import { RANK_AXES, type RankAxis } from "@/lib/ranking";
 
 const AXIS_ICONS: Record<RankAxis, LucideIcon> = {
   popular: Flame,

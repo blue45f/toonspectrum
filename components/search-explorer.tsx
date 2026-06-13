@@ -1,16 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { SortKey } from "@/lib/search";
-import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib/types";
-import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
-import { PLATFORM_LIST } from "@/lib/platforms";
-import { Segmented } from "./ui/segmented";
-import { Select } from "./ui/select";
-import { GenreChip, TagChip } from "./ui/chip";
-import { buttonClass } from "./ui/button";
-import { cn } from "@/lib/utils";
-import { useSavedTitleIds } from "@/lib/store";
 import {
   Search,
   SlidersHorizontal,
@@ -25,7 +14,22 @@ import {
   Clock3,
   Bookmark,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import { TitleCard, TitleRow } from "./title-card";
+import { buttonClass } from "./ui/button-utils";
+import { GenreChip, TagChip } from "./ui/chip";
+import { Segmented } from "./ui/segmented";
+import { Select } from "./ui/select";
+
+import type { SortKey } from "@/lib/search";
+import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib/types";
+
+import { PLATFORM_LIST } from "@/lib/platforms";
+import { useSavedTitleIds } from "@/lib/store";
+import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
+import { cn } from "@/lib/utils";
+
 
 const SORTS: { value: SortKey; label: string }[] = [
   { value: "relevance", label: "관련도" },

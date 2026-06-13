@@ -3,17 +3,22 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+
 import { and, desc, eq, lt, notInArray } from "drizzle-orm";
+
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
-import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "./catalog-store";
+
 import {
   loadCatalogTitlesFromFile,
   readCatalogFileSummary,
   statCatalogFile,
   writeCatalogTitlesToFile,
 } from "./catalog-file";
-import type { Title } from "../types";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
+import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "./catalog-store";
+
+import type { Title } from "../types";
+
 
 const execFileAsync = promisify(execFile);
 
@@ -344,7 +349,9 @@ export async function loadLatestCatalogSnapshotFromDb() {
     };
   } catch (error) {
     resetCatalogToEmpty("invalid-db-snapshot");
-    throw new Error(`catalog snapshot parse failed: ${error instanceof Error ? error.message : "unknown"}`);
+    throw new Error(`catalog snapshot parse failed: ${error instanceof Error ? error.message : "unknown"}`, {
+      cause: error,
+    });
   }
 }
 
@@ -729,7 +736,7 @@ export async function runCatalogIngest(options: CatalogIngestRunOptions = {}): P
       // 이력 기록 실패(DB 장애 등)가 원인 에러를 가리면 안 된다 — 원래 실패 메시지를 그대로 던진다.
       console.error("catalog ingest: failed to record run failure", updateError);
     }
-    throw new Error(message);
+    throw new Error(message, { cause: error });
   }
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   hasActiveLayerStyle,
   LAYER_STYLE_PRESETS,

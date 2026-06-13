@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_GRADIENT_MAP,
   GRADIENT_MAP_PRESETS,
@@ -12,7 +14,6 @@ import {
   type GradientMap,
   type GradientStop,
 } from "./studio-gradient-map";
-import { type StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

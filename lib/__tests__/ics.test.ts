@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+
 import { buildWeeklyIcs, titleToWeeklyIcsEvent } from "../ics";
+
 import { makeTitle } from "./fixtures";
 
 // 2026-06-10T03:00:00Z = 2026-06-10(수) 12:00 KST — DTSTART/DTSTAMP 결정성용 고정 시각

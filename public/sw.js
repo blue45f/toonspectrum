@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+ 
 const CACHE_NAME = 'webtoon-index-pwa-v3'
 const COVER_CACHE_NAME = 'webtoon-index-covers-v1'
 const COVER_CACHE_LIMIT = 300

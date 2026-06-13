@@ -1,7 +1,9 @@
-import type { Title } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { AdultOverlay } from "./adult-overlay";
 import { CoverImage } from "./cover-image";
+
+import type { Title } from "@/lib/types";
+
+import { cn } from "@/lib/utils";
 
 const SIZE = {
   sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.58rem]", wm: "text-[3.8rem]" },

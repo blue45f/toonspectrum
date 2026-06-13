@@ -1,8 +1,9 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useSyncExternalStore } from "react";
+
 import type { ReadState, UserReview } from "./types";
 
 // 로그인 시 변경을 DB API로 write-through (게스트는 localStorage만)

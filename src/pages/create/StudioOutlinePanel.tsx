@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
 import {
   isIdentityOutline,
   OUTLINE_OPACITY_RANGE,
@@ -17,6 +14,10 @@ import {
   OUTLINE_WIDTH_RANGE,
   type Outline,
 } from "./studio-outline";
+import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 export function StudioOutlinePanel({
   value,

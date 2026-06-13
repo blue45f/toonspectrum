@@ -1,8 +1,5 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import Link from "@/src/compat/router-link";
-import { usePathname } from "@/src/compat/navigation";
 import {
   Search,
   Library,
@@ -18,10 +15,15 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { cn, keepInlineText } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useEffect, useId, useRef, useState } from "react";
+
 import { AuthMenu } from "./auth/auth-menu";
 import { ToonSpectrumMark } from "./visual-marks";
+
+import { useT } from "@/lib/i18n";
+import { cn, keepInlineText } from "@/lib/utils";
+import { usePathname } from "@/src/compat/navigation";
+import Link from "@/src/compat/router-link";
 
 const NAV = [
   { label: "홈", i18n: "nav.home", href: "/", icon: Home, exact: true },

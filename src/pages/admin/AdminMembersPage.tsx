@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
 import { ArrowLeft, Ban, RefreshCw, RotateCcw, Search, UserX, UsersRound } from "lucide-react";
-import Link from "@/src/compat/router-link";
+import { useEffect, useState } from "react";
+
 import { Container } from "@/components/section";
-import { useAdminGate, AdminGateFallback } from "@/src/components/admin/admin-gate";
-import { adminFetch, formatNum, type AdminApiError } from "@/src/components/admin/admin-client";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { adminFetch, formatNum, type AdminApiError } from "@/src/components/admin/admin-client";
+import { AdminGateFallback } from "@/src/components/admin/admin-gate";
+import { useAdminGate } from "@/src/components/admin/admin-gate-state";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
 
 interface MemberRow {
   id: string;

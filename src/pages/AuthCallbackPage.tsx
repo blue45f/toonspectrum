@@ -1,9 +1,10 @@
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { Container } from "@/components/section";
+import { completeOAuthLogin } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
-import { completeOAuthLogin } from "@/src/compat/auth-session";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 type Phase = "working" | "done" | "error";
 

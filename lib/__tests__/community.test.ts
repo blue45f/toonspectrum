@@ -1,5 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
 import {
   getCommunityScopeTargetLink,
   parseCommunityScope,
@@ -19,6 +20,7 @@ import {
   validateReplyText,
 } from "../server/community";
 import { GENRES } from "../taxonomy";
+
 import { retryOnDeadlock } from "./db-test-utils";
 
 const createdUserIds = new Set<string>();

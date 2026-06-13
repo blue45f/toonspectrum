@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+
 import { CompareView } from "@/components/compare-view";
 import { Container } from "@/components/section";
 

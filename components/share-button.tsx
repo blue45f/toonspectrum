@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import { Share2, Check, Link2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 // 작품 공유 버튼 — 모바일은 OS 공유 시트(navigator.share, 카카오/인스타 등), 데스크톱은 링크 복사 + X/페북.

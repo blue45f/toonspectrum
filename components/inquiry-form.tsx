@@ -1,5 +1,7 @@
-import { useId, useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
+import { useId, useState } from "react";
+
+import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 import {
   INQUIRY_BODY_MAX,
   INQUIRY_CATEGORIES,
@@ -7,7 +9,6 @@ import {
   validateInquiryInput,
   type InquiryCategory,
 } from "@/lib/inquiry";
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 
 // 인앱 문의 폼 — /contact·/feedback 공용. 자체 API(/api/support/inquiries)가 검증·허니팟 처리 후
 // TermsDesk 비공개 문의함으로 전달한다(공개 게시판과 달리 본문이 외부에 노출되지 않음).

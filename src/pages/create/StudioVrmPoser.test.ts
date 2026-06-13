@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
 import * as THREE from "three";
+import { describe, expect, it } from "vitest";
+
+import { NATURAL_IDLE_POSES, pickNaturalIdlePose } from "./studio-pose-presets";
+import { applyPoseToVrm, POSE_PRESETS } from "./studio-vrm-poser-utils";
+
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
-import { applyPoseToVrm, POSE_PRESETS } from "./StudioVrmPoser";
-import { NATURAL_IDLE_POSES, pickNaturalIdlePose } from "./studio-pose-presets";
 
 const MAX_Y_OFFSET = 0.20;
 const MAX_HEAD_AXIS_DEGREES = 12;

@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import {
   HALFTONE_ANGLE_RANGE,
   HALFTONE_DOT_RANGE,
@@ -18,6 +15,10 @@ import {
   isIdentityHalftone,
   type Halftone,
 } from "./studio-halftone";
+import { PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // 모드 토글 정의 — CMYK 4채널 컬러 망점 / 휘도 단일 흑색 망점.
 const HALFTONE_MODE_OPTIONS: { mode: Halftone["mode"]; label: string; tip: string }[] = [

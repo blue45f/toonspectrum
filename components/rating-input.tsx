@@ -1,25 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+
 import { useApp, type RatingScale } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 const SCALE_LABEL: Record<RatingScale, string> = {
   star: "별점",
   ten: "10점",
   hundred: "100점",
 };
-
-// 0~5(store) → 표시 스케일
-export function toScale(v: number, scale: RatingScale): string {
-  if (scale === "ten") return (v * 2).toFixed(1).replace(/\.0$/, "");
-  if (scale === "hundred") return String(Math.round(v * 20));
-  return v.toFixed(1);
-}
-export function scaleMax(scale: RatingScale): string {
-  return scale === "ten" ? "10" : scale === "hundred" ? "100" : "5";
-}
 
 export function ScaleSwitcher({ className }: { className?: string }) {
   const scale = useApp((s) => s.ratingScale);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { CANVAS_W } from "./studio-assets";
 import { PANEL_LAYOUTS } from "./studio-panel-layouts";
 

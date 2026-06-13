@@ -1,6 +1,7 @@
 // 창작 스튜디오 키보드 단축키 도움말 — "?" 키 또는 단축키 버튼으로 토글.
 // StudioPage 내부 상태에 의존하지 않는 자체완결 모달(open/onClose만 받음).
 import { X } from "lucide-react";
+import { useEffect } from "react";
 
 interface ShortcutRow {
   keys: string;
@@ -47,17 +48,36 @@ const GROUPS: ShortcutGroup[] = [
 ];
 
 export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // Escape 로 닫기 (키보드 접근성) — open 일 때만 동작.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
+    // 클릭으로 닫히는 백드롭(presentational). 키보드 닫기는 Escape(위 useEffect)와 onKeyDown으로 제공한다.
+    // 전체화면 백드롭을 포커스 가능한 위젯으로 만들면 UX가 나빠지므로 no-static-element-interactions 만 한정 비활성화.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="키보드 단축키"
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
     >
+      {/* dialog 패널의 onClick은 백드롭으로의 클릭 전파만 막는 가드라 호출 동작이 없다. */}
+      {/* 키보드 닫기는 Escape(useEffect)와 닫기 버튼으로 제공되므로 패널엔 키 리스너가 필요 없다. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         className="w-full max-w-md rounded-2xl border border-line bg-panel p-4 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="키보드 단축키"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">

@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   DISTORT_AMOUNT_RANGE,
   DISTORT_PRESETS,
@@ -19,6 +16,10 @@ import {
   type Distort,
   type DistortType,
 } from "./studio-distort";
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // 세기·스케일 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 스케일은 scale).
 // 세기는 양극(-100..100)이라 readout에 부호를 붙이고, 스케일은 단극(1..50)이라 값만 표시한다.

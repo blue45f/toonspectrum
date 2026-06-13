@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession } from "@/src/compat/auth-session";
+
 import { useApp, useHydrated } from "@/lib/store";
+import { useSession } from "@/src/compat/auth-session-store";
 
 // 세션 ↔ 스토어 동기화: 로그인 시 userId 설정 + DB 데이터 하이드레이션, 로그아웃 시 해제
 export function StoreSync() {

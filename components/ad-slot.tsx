@@ -1,6 +1,7 @@
-import { useAppConfig } from "@/src/hooks/use-app-config";
-import { cn } from "@/lib/utils";
 import { Megaphone } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { useAppConfig } from "@/src/hooks/use-app-config";
 
 interface AdSlotProps {
   label?: string;

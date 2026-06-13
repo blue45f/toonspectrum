@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   PROP_ATTACH_BONES,
   VRM_PROPS,

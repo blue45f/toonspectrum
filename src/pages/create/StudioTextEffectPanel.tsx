@@ -6,10 +6,11 @@
  */
 import { RotateCcw, Type } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
+import { TEXT_FX_PRESETS, textFxResetPatch, type TextFxPatch } from "./studio-text-effects";
+
+import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
-import { TEXT_FX_PRESETS, textFxResetPatch, type TextFxPatch } from "./studio-text-effects";
 
 // 칩 기본 스타일 — StudioImageFilterPanel과 동일한 하우스 칩.
 const CHIP_CLASS =

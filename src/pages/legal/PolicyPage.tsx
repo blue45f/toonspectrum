@@ -1,9 +1,6 @@
-import { Fragment, useEffect, useState } from "react";
 import { ExternalLink, FileCheck2 } from "lucide-react";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { ErrorState } from "@/src/components/error-state";
+import { Fragment, useEffect, useState } from "react";
+
 import {
   fetchPolicyDocument,
   formatPolicyDate,
@@ -16,6 +13,12 @@ import {
   type PolicyDocument,
   type PolicySlug,
 } from "./policy-content";
+
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+import { ErrorState } from "@/src/components/error-state";
+
 
 // 이용약관(/terms)·개인정보처리방침(/privacy).
 // 외부 리다이렉트 대신 TermsDesk 공개 API에서 게시 정본을 받아 내부에서 렌더하고,

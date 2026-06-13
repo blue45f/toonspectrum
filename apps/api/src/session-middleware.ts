@@ -1,6 +1,7 @@
-import type { Request, Response, NextFunction } from "express";
 import { verifySessionToken } from "../../../lib/server/session";
 import { isSessionAllowed } from "../../../lib/server/user-lifecycle";
+
+import type { Request, Response, NextFunction } from "express";
 
 // 모든 요청에서 x-user-id 헤더를 '서명 세션 토큰'으로 검증해 실제 userId로 치환한다.
 // 검증 실패(위조·만료·레거시 평문 id)면 헤더를 제거해 미인증으로 처리한다.

@@ -1,13 +1,18 @@
 "use client";
 
-import Link from "@/src/compat/router-link";
-import type { Title } from "@/lib/types";
-import { type MediaAdaptation, MEDIA_KIND_LABEL, mediaThumb, mediaLink } from "@/lib/title-universe";
-import { MiniPoster } from "./rank-row";
-import { TYPE_LABEL } from "@/lib/taxonomy";
-import { cn } from "@/lib/utils";
-import { useInView } from "./use-in-view";
 import { Tv, Film, Sparkles, Play } from "lucide-react";
+
+import { MiniPoster } from "./rank-row";
+import { useInView } from "./use-in-view";
+
+import type { Title } from "@/lib/types";
+
+import { TYPE_LABEL } from "@/lib/taxonomy";
+import { type MediaAdaptation, MEDIA_KIND_LABEL, mediaThumb, mediaLink } from "@/lib/title-universe";
+import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+
+
 
 const EXT_ICON: Record<MediaAdaptation["kind"], typeof Tv> = {
   drama: Tv,

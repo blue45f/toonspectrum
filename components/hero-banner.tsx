@@ -1,18 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
-import Link from "@/src/compat/router-link";
-import type { Title } from "@/lib/types";
+import useEmblaCarousel from "embla-carousel-react";
+import { Sparkles, ChevronLeft, ChevronRight, ArrowRight, Pause, Play } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+import { AvailabilityDots } from "./availability";
 import { TitlePoster } from "./title-poster";
 import { GenreChip } from "./ui/chip";
 import { RatingInline } from "./ui/stars";
-import { AvailabilityDots } from "./availability";
+
+import type { Title } from "@/lib/types";
+
 import { statsAreEstimated } from "@/lib/estimate";
-import { formatCount } from "@/lib/utils";
 import { genreColor } from "@/lib/genre-color";
-import { Sparkles, ChevronLeft, ChevronRight, ArrowRight, Pause, Play } from "lucide-react";
+import { formatCount } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+
 
 const AUTOPLAY_MS = 5500;
 

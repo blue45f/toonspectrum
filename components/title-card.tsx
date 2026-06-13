@@ -1,15 +1,18 @@
-import Link from "@/src/compat/router-link";
-import type { Title } from "@/lib/types";
-import { useIsBookmarked } from "@/lib/store";
-import { TitlePoster } from "./title-poster";
-import { AvailabilityDots, PlatformTags, bestPricing } from "./availability";
+import { AvailabilityDots, PlatformTags } from "./availability";
+import { bestPricing } from "./availability-utils";
 import { BookmarkButton } from "./bookmark-button";
+import { TitlePoster } from "./title-poster";
+import { GenreChip } from "./ui/chip";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { RatingInline } from "./ui/stars";
-import { GenreChip } from "./ui/chip";
-import { STATUS_LABEL } from "@/lib/taxonomy";
+
+import type { Title } from "@/lib/types";
+
 import { statsAreEstimated } from "@/lib/estimate";
+import { useIsBookmarked } from "@/lib/store";
+import { STATUS_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 // 표준 그리드 카드 — 포스터 + 메타.
 // feature: 그리드의 리드 카드(가로 에디토리얼 레이아웃, 2칸 span).

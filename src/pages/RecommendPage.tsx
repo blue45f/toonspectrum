@@ -1,4 +1,5 @@
 import { useSearchParams } from "react-router-dom";
+
 import { RecommendView } from "@/components/recommend-view";
 import { Container } from "@/components/section";
 import { GENRES } from "@/lib/taxonomy";

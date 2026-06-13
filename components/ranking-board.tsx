@@ -1,34 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import Link from "@/src/compat/router-link";
-import {
-  RANK_AXES,
-  PERIODS,
-  axisMeta,
-  rankingItemListJsonLd,
-  type RankedTitle,
-  type RankAxis,
-  type RankPeriod,
-} from "@/lib/ranking";
-import { useJsonLd } from "@/src/hooks/use-document-title";
-import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
-import { useSavedTitleIds } from "@/lib/store";
-import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
-import { useRememberedFilters } from "@/lib/use-remembered-filters";
-import { TitleFilterPanel } from "./title-filter-panel";
-import { GENRES } from "@/lib/taxonomy";
-import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import { PLATFORM_LIST, PLATFORMS } from "@/lib/platforms";
-import { RankRow, MiniPoster } from "./rank-row";
-import { TitleCard } from "./title-card";
-import { PlatformTags } from "./availability";
-import { PlatformMark } from "./visual-marks";
-import { RatingInline } from "./ui/stars";
-import { Segmented } from "./ui/segmented";
-import { Select } from "./ui/select";
-import { statsAreEstimated } from "@/lib/estimate";
-import { cn, formatCount } from "@/lib/utils";
 import {
   AlertCircle,
   BookOpen,
@@ -52,6 +23,38 @@ import {
   TrendingUp,
   Waves,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+
+import { PlatformTags } from "./availability";
+import { RankRow, MiniPoster } from "./rank-row";
+import { TitleCard } from "./title-card";
+import { TitleFilterPanel } from "./title-filter-panel";
+import { Segmented } from "./ui/segmented";
+import { Select } from "./ui/select";
+import { RatingInline } from "./ui/stars";
+import { PlatformMark } from "./visual-marks";
+
+import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
+
+import { statsAreEstimated } from "@/lib/estimate";
+import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
+import { PLATFORM_LIST, PLATFORMS } from "@/lib/platforms";
+import {
+  RANK_AXES,
+  PERIODS,
+  axisMeta,
+  rankingItemListJsonLd,
+  type RankedTitle,
+  type RankAxis,
+  type RankPeriod,
+} from "@/lib/ranking";
+import { useSavedTitleIds } from "@/lib/store";
+import { GENRES } from "@/lib/taxonomy";
+import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
+import { cn, formatCount } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { useJsonLd } from "@/src/hooks/use-document-title";
 
 type View = "list" | "poster" | "compact";
 type LoadState = "loading" | "ready" | "refreshing" | "error";

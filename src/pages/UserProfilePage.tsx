@@ -1,14 +1,19 @@
+import { BookOpen, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+
+import { useApiResource } from "./use-api-resource";
+
+import type { SeedReview, Title } from "@/lib/types";
+
 import { ReviewCard } from "@/components/review-card";
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
 import { Stars } from "@/components/ui/stars";
-import { ErrorState } from "@/src/components/error-state";
 import { useApp } from "@/lib/store";
-import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
 import { cn, formatCount } from "@/lib/utils";
-import type { SeedReview, Title } from "@/lib/types";
+import { ErrorState } from "@/src/components/error-state";
+import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
 import {
   getCreatorProfile,
   listSeries,
@@ -19,8 +24,7 @@ import {
   type WorkSummary,
 } from "@/src/lib/creator-client";
 import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/src/pages/create/creator-community-ui";
-import { BookOpen, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
-import { useApiResource } from "./use-api-resource";
+
 
 // 회원 공개 프로필 — 리뷰 카드의 작성자명을 누르면 오는 /u/:userId.
 // 리뷰는 기존 /api/reviews 응답(피드+통계)을 userId로 필터해 그대로 재사용하고,

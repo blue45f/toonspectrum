@@ -1,8 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
-
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
 import {
   AlignHorizontalJustifyCenter,
   AlignVerticalJustifyCenter,
@@ -61,35 +57,19 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } from "react";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+
+import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
-  createWork,
-  getWork,
-  getCurrentUserId,
-  updateWork,
-  listSharedAssets,
-  publishAsset,
-  generateAsset,
-  deleteSharedAsset,
-  markSharedAssetUsed,
-  type GeneratedAssetQuality,
-  type GeneratedAssetSize,
-  type SharedAsset,
-} from "@/src/lib/creator-client";
-import {
-  BRUSH_PRESETS,
-  gpenSegmentWidths,
-  processFreehandPoints,
-  processPencilPoints,
-  screentoneDotRadius,
-  screentoneDotsForStroke,
-  smoothStrokePoints,
-  stabilizePoint,
-  STABILIZER_MAX,
-} from "./studio-brush";
-import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
+  saveAsset,
+  listAssets,
+  deleteAsset,
+  renameAsset,
+  type StudioAsset,
+} from "./studio-asset-library";
 import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
@@ -106,10 +86,31 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
+import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
+import { normalizeBlurFx, type BlurFx } from "./studio-blur";
+import {
+  BRUSH_PRESETS,
+  gpenSegmentWidths,
+  processFreehandPoints,
+  processPencilPoints,
+  screentoneDotRadius,
+  screentoneDotsForStroke,
+  smoothStrokePoints,
+  stabilizePoint,
+  STABILIZER_MAX,
+} from "./studio-brush";
+import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { svgToDataUrl } from "./studio-characters";
-import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
-import { StudioStickerGrid } from "./studio-sticker-grid";
-import { createCanvasImageElement } from "./studio-image-placement";
+import { normalizeClarity, type Clarity } from "./studio-clarity";
+import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
+import {
+  readRecentColors,
+  storeRecentColors,
+  pushRecentColor,
+} from "./studio-color-palettes";
+import { normalizeCurve, type CurvePoint } from "./studio-curves";
+import { normalizeDetail, type Detail } from "./studio-detail";
+import { normalizeDistort, type Distort } from "./studio-distort";
 import {
   EXPORT_SCALES,
   EXPORT_FORMATS,
@@ -130,20 +131,6 @@ import {
   type ExportScale,
 } from "./studio-export";
 import {
-  saveAsset,
-  listAssets,
-  deleteAsset,
-  renameAsset,
-  type StudioAsset,
-} from "./studio-asset-library";
-import {
-  registerStudioKonvaFilters,
-  buildImageFilters,
-  hasActiveImageFilters,
-  imageFilterCacheKey,
-  type ImageFilterFields,
-} from "./studio-konva-filters";
-import {
   isDefaultPageGrade,
   normalizePageGrade,
   pageGradeToCssFilter,
@@ -151,65 +138,20 @@ import {
   drawVignette,
   type PageGrade,
 } from "./studio-filters";
-import {
-  readRecentColors,
-  storeRecentColors,
-  pushRecentColor,
-} from "./studio-color-palettes";
-import { StudioImageFilterPanel } from "./StudioImageFilterPanel";
-import { StudioPageGradePanel } from "./StudioPageGradePanel";
-import { StudioColorPopover } from "./StudioColorPopover";
-import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
-import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
-import { StudioTonePanel } from "./StudioTonePanel";
-import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
-import { normalizeLevels, type LevelsParams } from "./studio-levels";
-import { StudioLevelsPanel } from "./StudioLevelsPanel";
-import { type LayerStylePatch } from "./studio-layer-styles";
-import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
-import { normalizeCurve, type CurvePoint } from "./studio-curves";
-import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
-import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
-import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
-import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
-import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
-import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
-import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
-import { normalizeClarity, type Clarity } from "./studio-clarity";
-import { normalizeOutline, type Outline } from "./studio-outline";
 import { normalizeGlow, type Glow } from "./studio-glow";
-import { normalizeHalftone, type Halftone } from "./studio-halftone";
+import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
+import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { normalizeGrain, type Grain } from "./studio-grain";
-import { normalizeBlurFx, type BlurFx } from "./studio-blur";
-import { normalizeDistort, type Distort } from "./studio-distort";
-import { normalizeStylize, type Stylize } from "./studio-stylize";
-import { normalizeLight, type Light } from "./studio-light";
-import { normalizeSketch, type Sketch } from "./studio-sketch";
-import { normalizeDetail, type Detail } from "./studio-detail";
-import { looksResetPatch, extractFilterFields, type StudioLook } from "./studio-looks";
-import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
-import { StudioTextPathPanel } from "./StudioTextPathPanel";
-import { StudioCurvePanel } from "./StudioCurvePanel";
-import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
-import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
-import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
-import { StudioVibrancePanel } from "./StudioVibrancePanel";
-import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
-import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
-import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
-import { StudioClarityPanel } from "./StudioClarityPanel";
-import { StudioOutlinePanel } from "./StudioOutlinePanel";
-import { StudioGlowPanel } from "./StudioGlowPanel";
-import { StudioHalftonePanel } from "./StudioHalftonePanel";
-import { StudioGrainPanel } from "./StudioGrainPanel";
-import { StudioBlurPanel } from "./StudioBlurPanel";
-import { StudioDistortPanel } from "./StudioDistortPanel";
-import { StudioStylizePanel } from "./StudioStylizePanel";
-import { StudioLightPanel } from "./StudioLightPanel";
-import { StudioSketchPanel } from "./StudioSketchPanel";
-import { StudioDetailPanel } from "./StudioDetailPanel";
-import { StudioLooksPanel } from "./StudioLooksPanel";
-import { ClipMaskGroup } from "./ClipMaskGroup";
+import { normalizeHalftone, type Halftone } from "./studio-halftone";
+import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  registerStudioKonvaFilters,
+  buildImageFilters,
+  hasActiveImageFilters,
+  imageFilterCacheKey,
+  type ImageFilterFields,
+} from "./studio-konva-filters";
+import { type LayerStylePatch } from "./studio-layer-styles";
 import {
   createLayerGroup,
   groupOfItem,
@@ -220,7 +162,67 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
+import { normalizeLevels, type LevelsParams } from "./studio-levels";
+import { normalizeLight, type Light } from "./studio-light";
+import { looksResetPatch, extractFilterFields, type StudioLook } from "./studio-looks";
 import { resizableNodeProps, textNodeProps } from "./studio-node-props";
+import { normalizeOutline, type Outline } from "./studio-outline";
+import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
+import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
+import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
+import { normalizeSketch, type Sketch } from "./studio-sketch";
+import { StudioStickerGrid } from "./studio-sticker-grid";
+import { normalizeStylize, type Stylize } from "./studio-stylize";
+import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
+import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
+import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
+import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
+import { StudioBlurPanel } from "./StudioBlurPanel";
+import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
+import { StudioClarityPanel } from "./StudioClarityPanel";
+import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
+import { StudioColorPopover } from "./StudioColorPopover";
+import { StudioCurvePanel } from "./StudioCurvePanel";
+import { StudioDetailPanel } from "./StudioDetailPanel";
+import { StudioDistortPanel } from "./StudioDistortPanel";
+import { StudioGlowPanel } from "./StudioGlowPanel";
+import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
+import { StudioGrainPanel } from "./StudioGrainPanel";
+import { StudioHalftonePanel } from "./StudioHalftonePanel";
+import { StudioImageFilterPanel } from "./StudioImageFilterPanel";
+import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
+import { StudioLevelsPanel } from "./StudioLevelsPanel";
+import { StudioLightPanel } from "./StudioLightPanel";
+import { StudioLooksPanel } from "./StudioLooksPanel";
+import { StudioOutlinePanel } from "./StudioOutlinePanel";
+import { StudioPageGradePanel } from "./StudioPageGradePanel";
+import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
+import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
+import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
+import { StudioSketchPanel } from "./StudioSketchPanel";
+import { StudioStylizePanel } from "./StudioStylizePanel";
+import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
+import { StudioTextPathPanel } from "./StudioTextPathPanel";
+import { StudioTonePanel } from "./StudioTonePanel";
+import { StudioVibrancePanel } from "./StudioVibrancePanel";
+
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  createWork,
+  getWork,
+  getCurrentUserId,
+  updateWork,
+  listSharedAssets,
+  publishAsset,
+  generateAsset,
+  deleteSharedAsset,
+  markSharedAssetUsed,
+  type GeneratedAssetQuality,
+  type GeneratedAssetSize,
+  type SharedAsset,
+} from "@/src/lib/creator-client";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -1185,8 +1187,9 @@ function UrlImage({
   const hasFilters = hasActiveImageFilters(el);
   // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
   const built = buildImageFilters(el, Konva);
-  // react-konva filters prop 타입과 느슨하게 맞춘다(기존 코드와 동일하게 any 배열).
-  const filters: any[] = built.filters;
+  // react-konva filters prop 타입(Konva.NodeConfig["filters"])과 맞춘다.
+  const filters: NonNullable<Konva.NodeConfig["filters"]> =
+    built.filters as NonNullable<Konva.NodeConfig["filters"]>;
   const filterAttrs = built.attrs;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
   const filterCacheKey = imageFilterCacheKey(el);
@@ -3275,7 +3278,7 @@ export function StudioPage() {
       if (!pos) return;
       setSelectedId(null);
       
-      const rawPressure = (e.evt as any).pressure;
+      const rawPressure = (e.evt as { pressure?: number }).pressure;
       const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
       const basePressure = hasHardwarePressure ? rawPressure : 0.8;
       const pressure = Math.pow(basePressure, pressureCurve);
@@ -3337,10 +3340,10 @@ export function StudioPage() {
     const kind = current.kind ?? "freehand";
     let next: DrawEl;
     if (kind === "freehand") {
-      const rawPressure = (e.evt as any).pressure;
+      const rawPressure = (e.evt as { pressure?: number }).pressure;
       const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
-      
-      let pressure = 0.5;
+
+      let pressure: number;
       if (hasHardwarePressure && !useVelocityPressure) {
         pressure = Math.pow(rawPressure, pressureCurve);
       } else if (useVelocityPressure && current.points.length >= 2) {
@@ -4553,7 +4556,7 @@ export function StudioPage() {
                 </div>
                 <select
                   value={assetSortOrder}
-                  onChange={(e) => setAssetSortOrder(e.target.value as any)}
+                  onChange={(e) => setAssetSortOrder(e.target.value as "newest" | "name" | "size")}
                   className="rounded-lg border border-line bg-card px-1.5 py-1 text-[0.65rem] text-fg-2 outline-none focus:border-accent transition-colors cursor-pointer"
                 >
                   <option value="newest">최신순</option>
@@ -4609,6 +4612,7 @@ export function StudioPage() {
                               value={renamingAssetName}
                               onChange={(e) => setRenamingAssetName(e.target.value)}
                               className="w-full min-w-0 rounded border border-accent bg-panel px-1 py-0.5 text-[0.55rem] text-fg-1 outline-none"
+                              // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opens only on user action (rename click); focusing it immediately is correct edit-on-demand UX
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -5017,7 +5021,18 @@ export function StudioPage() {
               return (
                 <div
                   key={p.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${idx + 1}페이지 선택`}
+                  aria-pressed={isActive}
                   onClick={() => setCurrentPageId(p.id)}
+                  onKeyDown={(e) => {
+                    // 카드 자체에 포커스가 있을 때만 활성화(중첩 버튼의 키 입력은 방해하지 않음).
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      setCurrentPageId(p.id);
+                    }
+                  }}
                   className={cn(
                     "flex min-w-[100px] lg:min-w-0 lg:w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
                     isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card"
@@ -5139,6 +5154,7 @@ export function StudioPage() {
           )}
 
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며, 실제 상호작용은 내부 Konva Stage가 담당하고 키보드 패닝은 document keydown(Space)에서 처리한다 */}
           <div
             ref={wrapRef}
             onMouseDown={onWrapMouseDown}
@@ -5245,7 +5261,10 @@ export function StudioPage() {
                   ? { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height }
                   : null;
                 const wrapClip = (node: ReactNode) => {
-                  const composite = opts.compositeOverride ?? ((el.blendMode as any) || "source-over");
+                  const composite = (opts.compositeOverride ??
+                    (el.blendMode || "source-over")) as NonNullable<
+                    Konva.NodeConfig["globalCompositeOperation"]
+                  >;
                   return clip ? (
                     <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height} globalCompositeOperation={composite}>
                       {node}
@@ -6127,6 +6146,7 @@ export function StudioPage() {
               <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4">
                 <p className="mb-2 text-sm font-medium text-fg">텍스트 편집</p>
                 <textarea
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- 텍스트 편집 모달은 사용자 액션으로만 열리며, 열릴 때 입력란에 포커스를 주는 것이 올바른 모달 a11y 패턴
                   autoFocus
                   value={editing.value}
                   onChange={(e) => setEditing({ ...editing, value: e.target.value })}
@@ -6196,18 +6216,18 @@ export function StudioPage() {
                 })}
               </div>
             </div>
-            <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-              높이
+            <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
+              <span>높이</span>
               <span className="flex items-center gap-1">
-                <button type="button" onClick={() => setCanvasH((h) => Math.max(480, h - 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                <button type="button" aria-label="높이 240px 줄이기" onClick={() => setCanvasH((h) => Math.max(480, h - 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
                   −
                 </button>
-                <span className="numeral w-12 text-center text-xs">{canvasH}</span>
-                <button type="button" onClick={() => setCanvasH((h) => Math.min(6000, h + 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                <span className="numeral w-12 text-center text-xs" aria-label={`높이 ${canvasH}px`}>{canvasH}</span>
+                <button type="button" aria-label="높이 240px 늘리기" onClick={() => setCanvasH((h) => Math.min(6000, h + 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
                   +
                 </button>
               </span>
-            </label>
+            </div>
             <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               패널 여백 (Gutter)
               <span className="flex items-center gap-1.5">
@@ -6947,7 +6967,7 @@ export function StudioPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic" = "normal";
+                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic";
                                   if (isBold) {
                                     nextStyle = isItalic ? "italic" : "normal";
                                   } else {
@@ -6966,7 +6986,7 @@ export function StudioPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic" = "normal";
+                                  let nextStyle: "normal" | "bold" | "italic" | "bold italic";
                                   if (isItalic) {
                                     nextStyle = isBold ? "bold" : "normal";
                                   } else {
@@ -7653,6 +7673,7 @@ export function StudioPage() {
                     </span>
                     <input
                       type="range"
+                      aria-label="분할 비율"
                       min={20}
                       max={80}
                       step={5}
@@ -8422,16 +8443,16 @@ export function StudioPage() {
                   <p className="text-xs font-semibold text-fg-3">대칭 자 (Symmetry)</p>
                   
                   <div className="grid grid-cols-4 gap-1">
-                    {[
+                    {([
                       { id: "none", label: "없음" },
                       { id: "vertical", label: "세로" },
                       { id: "horizontal", label: "가로" },
                       { id: "radial", label: "방사" },
-                    ].map((type) => (
+                    ] as const).map((type) => (
                       <button
                         key={type.id}
                         type="button"
-                        onClick={() => setSymmetryType(type.id as any)}
+                        onClick={() => setSymmetryType(type.id)}
                         className={cn(
                           "rounded py-1 text-[0.62rem] font-semibold border transition-colors cursor-pointer",
                           symmetryType === type.id
@@ -8588,7 +8609,32 @@ export function StudioPage() {
             <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">미니맵 / 네비게이터</p>
             <div className="flex justify-center bg-background/30 rounded-xl p-2 border border-line/50">
               <div
+                role="button"
+                tabIndex={0}
+                aria-label="미니맵: 클릭한 위치로 캔버스 이동, 방향키로 스크롤"
                 onClick={onMinimapClick}
+                onKeyDown={(e) => {
+                  const wrap = wrapRef.current;
+                  if (!wrap) return;
+                  const stepX = wrap.clientWidth / 4;
+                  const stepY = wrap.clientHeight / 4;
+                  if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    wrap.scrollLeft -= stepX;
+                  } else if (e.key === "ArrowRight") {
+                    e.preventDefault();
+                    wrap.scrollLeft += stepX;
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    wrap.scrollTop -= stepY;
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    wrap.scrollTop += stepY;
+                  } else {
+                    return;
+                  }
+                  updateScrollPos();
+                }}
                 style={{
                   width: "120px",
                   height: `${Math.round(120 * (canvasH / CANVAS_W))}px`,
@@ -8682,6 +8728,8 @@ export function StudioPage() {
       </Suspense>
 
       {contextMenu.visible && (
+        // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"

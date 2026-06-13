@@ -1,5 +1,5 @@
 // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — 서명 세션 토큰을 x-user-id 헤더로 전달(서버 검증).
-import { getAuthToken } from "@/src/compat/auth-session";
+import { getAuthToken } from "@/src/compat/auth-session-store";
 
 export interface AdminMe {
   id: string;

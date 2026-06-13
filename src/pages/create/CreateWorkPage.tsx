@@ -1,28 +1,3 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { CoverImage } from "@/components/cover-image";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/pages/NotFoundPage";
-import { useApp } from "@/lib/store";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
-import {
-  deleteWork,
-  getWork,
-  listChallenges,
-  listComments,
-  listSeries,
-  postComment,
-  toggleWorkLike,
-  updateWork,
-  type ChallengeSummary,
-  type SeriesSummary,
-  type WorkComment,
-  type WorkDetail,
-} from "@/src/lib/creator-client";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -38,6 +13,32 @@ import {
   Trash2,
   Trophy,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { CoverImage } from "@/components/cover-image";
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button-utils";
+import { useApp } from "@/lib/store";
+import { cn, formatCount, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import {
+  deleteWork,
+  getWork,
+  listChallenges,
+  listComments,
+  listSeries,
+  postComment,
+  toggleWorkLike,
+  updateWork,
+  type ChallengeSummary,
+  type SeriesSummary,
+  type WorkComment,
+  type WorkDetail,
+} from "@/src/lib/creator-client";
+import { NotFoundPage } from "@/src/pages/NotFoundPage";
 
 const MAX_COMMENT_LENGTH = 700;
 

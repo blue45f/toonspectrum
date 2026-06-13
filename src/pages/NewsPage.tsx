@@ -1,10 +1,13 @@
-import { useState } from "react";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { ErrorState } from "@/src/components/error-state";
-import { cn, relativeDate } from "@/lib/utils";
 import { BookOpen, ExternalLink, Newspaper, Search } from "lucide-react";
+import { useState } from "react";
+
 import { useApiResource } from "./use-api-resource";
+
+import { Container } from "@/components/section";
+import { cn, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+
 
 // 카테고리는 scripts/news-gen.ts 의 NewsCategory 와 동일 키 — 정적 JSON 경계라 타입만 복제.
 type NewsCategory = "industry" | "adaptation" | "event" | "novel" | "title";

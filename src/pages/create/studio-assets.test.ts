@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { filterAssetsByLabel, filterBgSceneSections } from "./studio-assets";
 
 describe("studio-assets picker search helpers", () => {

@@ -5,12 +5,9 @@
  * 로컬 상태는 드래그 중인 점 인덱스(drag) 하나뿐 — 나머지는 부모가 소유하는 표시 컴포넌트.
  * 좌표 변환은 svgRef의 getBoundingClientRect로 CSS 스케일을 보정한다(브라우저 전용, 테스트 대상 아님).
  */
+import { RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { RotateCcw } from "lucide-react";
-
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 import {
   addCurvePoint,
@@ -21,6 +18,10 @@ import {
   removeCurvePoint,
   type CurvePoint,
 } from "./studio-curves";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // SVG 기하 — 정사각 플롯. PAD만큼 안쪽 여백을 두고 150x150 영역에 0..255 도메인을 매핑한다.
 const SIZE = 170;

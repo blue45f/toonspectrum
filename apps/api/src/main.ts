@@ -1,8 +1,9 @@
 import "./load-env"; // 반드시 첫 import — lib/db가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
-import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
+
 import { AppModule } from "./app.module";
 import { sessionAuth } from "./session-middleware";
 

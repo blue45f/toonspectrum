@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useApp, useHydrated } from "@/lib/store";
-import type { Title } from "@/lib/types";
+
 import { Section, Rail } from "./section";
 import { TitleCard } from "./title-card";
+
+import type { Title } from "@/lib/types";
+
+import { useApp, useHydrated } from "@/lib/store";
 
 // 개인화 홈 섹션 — 스토어에 기록이 있을 때만 렌더(신규 방문자엔 영향 없음).
 // 작품 데이터는 기록이 있을 때만 지연 로드하여 초기 번들 경량화 유지.

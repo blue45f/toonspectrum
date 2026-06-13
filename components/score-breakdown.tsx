@@ -1,7 +1,10 @@
-import Link from "@/src/compat/router-link";
-import type { Title } from "@/lib/types";
-import { explainScore, axisMeta, type RankAxis } from "@/lib/ranking";
 import { Sigma, ArrowUpRight } from "lucide-react";
+
+import type { Title } from "@/lib/types";
+
+import { explainScore, axisMeta, type RankAxis } from "@/lib/ranking";
+import Link from "@/src/compat/router-link";
+
 
 // "왜 이 점수인가" 투명성 카드 — 한 축의 점수 기여 요인을 사람이 읽게 분해.
 // 랭킹 산식을 작품 단위로 보이게 하는 차별점(투명성) 표면. 데이터는 lib/ranking.explainScore 단일 출처.

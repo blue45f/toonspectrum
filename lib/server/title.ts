@@ -1,10 +1,13 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { TITLES, getTitle, originalOf, adaptationsOf } from "./catalog-store";
-import { similarTitles } from "../recommend";
-import { db, reviewLikes, reviews, users } from "../db";
-import type { SeedReview } from "../types";
+
 import { fromDb } from "../api-helpers";
-import type { Title } from "../types";
+import { db, reviewLikes, reviews, users } from "../db";
+import { similarTitles } from "../recommend";
+
+import { TITLES, getTitle, originalOf, adaptationsOf } from "./catalog-store";
+
+import type { SeedReview, Title  } from "../types";
+
 
 async function getTitleDbReviews(titleId: string): Promise<SeedReview[]> {
   try {

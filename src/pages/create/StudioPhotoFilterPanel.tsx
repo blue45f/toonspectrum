@@ -7,7 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
 
 import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
 import {
@@ -16,6 +15,8 @@ import {
   PHOTO_FILTER_PRESETS,
   type PhotoFilter,
 } from "./studio-photo-filter";
+
+import { buttonClass } from "@/components/ui/button-utils";
 
 export function StudioPhotoFilterPanel({
   value,

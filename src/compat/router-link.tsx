@@ -38,6 +38,8 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(function LinkCompat(
   const { prefetch, scroll, ...linkProps } = props;
   const replaceFlag = replace || ((prefetch !== undefined || scroll !== undefined) && false);
   if (isExternalHref(to) || linkProps.target) {
+    // 제네릭 Link 래퍼 — 콘텐츠(children)는 호출부가 linkProps에 담아 전달한다.
+    // eslint-disable-next-line jsx-a11y/anchor-has-content
     return <a ref={ref} href={to} {...linkProps} />;
   }
   return <RouterLink ref={ref} to={to} replace={replaceFlag} {...linkProps} />;

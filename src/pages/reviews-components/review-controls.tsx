@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "@/src/compat/navigation";
-import { cn } from "@/lib/utils";
 import { EyeOff, Eye } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { useRouter, useSearchParams, usePathname } from "@/src/compat/navigation";
 
 export type ReviewSort = "recent" | "likes" | "high" | "low";
 

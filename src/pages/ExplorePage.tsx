@@ -1,12 +1,17 @@
-import Link from "@/src/compat/router-link";
+import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
+import { useApiResource } from "./use-api-resource";
+
+import type { SortKey } from "@/lib/search";
+import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
+
 import { AdSlot } from "@/components/ad-slot";
 import { Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { ErrorState } from "@/src/components/error-state";
 import { genreBorder, genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import type { SortKey } from "@/lib/search";
 import { useSavedTitleIds } from "@/lib/store";
 import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
 import {
@@ -15,11 +20,9 @@ import {
   titleFiltersToParams,
   type TitleFilterState,
 } from "@/lib/title-filters";
-import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useApiResource } from "./use-api-resource";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
 
 type ExploreParams = Record<string, string | undefined>;
 

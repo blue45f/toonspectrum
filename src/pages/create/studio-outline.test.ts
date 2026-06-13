@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_OUTLINE,
   OUTLINE_OPACITY_RANGE,
@@ -11,7 +13,6 @@ import {
   outlineKonvaFilter,
   type Outline,
 } from "./studio-outline";
-import { type StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

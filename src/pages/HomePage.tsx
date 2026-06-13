@@ -1,20 +1,26 @@
-import Link from "@/src/compat/router-link";
-import { AdaptationGraph } from "@/components/adaptation-graph";
+import { ArrowRight, Layers, LayoutTemplate, MessageCircle, Palette, PersonStanding, Search } from "lucide-react";
+
+import { useApiResource } from "./use-api-resource";
+
+import type { Title } from "@/lib/types";
+
 import { AdSlot } from "@/components/ad-slot";
+import { AdaptationGraph } from "@/components/adaptation-graph";
 import { CountUp } from "@/components/count-up";
 import { HeroBanner } from "@/components/hero-banner";
 import { HomePersonal } from "@/components/home-personal";
 import { OpenSearchButton } from "@/components/open-search-button";
 import { Rail, Section, Container } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
-import { buttonClass } from "@/components/ui/button";
-import { ErrorState } from "@/src/components/error-state";
+import { buttonClass } from "@/components/ui/button-utils";
 import { GenreSpectrum } from "@/components/ui/spectrum-bar";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
-import type { Title } from "@/lib/types";
-import { ArrowRight, Layers, LayoutTemplate, MessageCircle, Palette, PersonStanding, Search } from "lucide-react";
-import { useApiResource } from "./use-api-resource";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+
+
+
 
 interface HomeResponse {
   featured: Title[];

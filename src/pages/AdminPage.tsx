@@ -1,14 +1,16 @@
-import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import Link from "@/src/compat/router-link";
+import { useState } from "react";
+
 import { Container } from "@/components/section";
-import { useAdminGate, AdminGateFallback } from "@/src/components/admin/admin-gate";
+import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { AdminGateFallback } from "@/src/components/admin/admin-gate";
+import { useAdminGate } from "@/src/components/admin/admin-gate-state";
+import { AdminCampaigns } from "@/src/components/admin/AdminCampaigns";
 import { AdminDashboard } from "@/src/components/admin/AdminDashboard";
+import { AdminOps } from "@/src/components/admin/AdminOps";
 import { AdminPlans } from "@/src/components/admin/AdminPlans";
 import { AdminRevenue } from "@/src/components/admin/AdminRevenue";
-import { AdminCampaigns } from "@/src/components/admin/AdminCampaigns";
-import { AdminOps } from "@/src/components/admin/AdminOps";
-import { cn } from "@/lib/utils";
 
 const TABS = [
   { key: "dashboard", label: "대시보드" },

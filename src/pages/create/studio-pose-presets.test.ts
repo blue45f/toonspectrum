@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { VRMHumanBoneName } from "@pixiv/three-vrm";
+
 import {
   EXPRESSION_PRESETS,
   EXTRA_POSE_PRESETS,
@@ -15,7 +15,9 @@ import {
   type PoseVec3,
   type StudioPosePreset,
 } from "./studio-pose-presets";
-import { POSE_PRESETS } from "./StudioVrmPoser";
+import { POSE_PRESETS } from "./studio-vrm-poser-utils";
+
+import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 
 const toDegrees = (radians: number) => (radians * 180) / Math.PI;
 

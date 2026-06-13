@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { and, desc, eq, ne, or, sql, type SQL, type Table } from "drizzle-orm";
-import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
+
 import {
   creatorCampaigns,
   creatorProfiles,
@@ -18,6 +18,7 @@ import {
   revenueLedger,
   users,
 } from "../../../../../lib/db";
+import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
 import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
 import { invalidateSessionUser } from "../../../../../lib/server/session";
 import {

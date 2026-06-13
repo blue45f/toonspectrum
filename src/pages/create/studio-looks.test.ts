@@ -1,4 +1,13 @@
 import { describe, expect, it } from "vitest";
+
+import { normalizeClarity } from "./studio-clarity";
+import { normalizeColorBalance } from "./studio-color-balance";
+import { normalizeCurve } from "./studio-curves";
+import { normalizeGlow } from "./studio-glow";
+import { normalizeGradientMap } from "./studio-gradient-map";
+import { normalizeGrain } from "./studio-grain";
+import { normalizeHalftone } from "./studio-halftone";
+import { normalizeLight } from "./studio-light";
 import {
   LOOK_FILTER_KEYS,
   STUDIO_LOOKS,
@@ -7,19 +16,12 @@ import {
   type StudioLook,
   type StudioLookCategory,
 } from "./studio-looks";
-import type { ImageFilterFields } from "./studio-konva-filters";
-import { normalizeCurve } from "./studio-curves";
-import { normalizeColorBalance } from "./studio-color-balance";
 import { normalizePhotoFilter } from "./studio-photo-filter";
-import { normalizeVibrance } from "./studio-vibrance";
-import { normalizeGradientMap } from "./studio-gradient-map";
-import { normalizeHalftone } from "./studio-halftone";
-import { normalizeGrain } from "./studio-grain";
-import { normalizeGlow } from "./studio-glow";
-import { normalizeStylize } from "./studio-stylize";
-import { normalizeLight } from "./studio-light";
 import { normalizeSketch } from "./studio-sketch";
-import { normalizeClarity } from "./studio-clarity";
+import { normalizeStylize } from "./studio-stylize";
+import { normalizeVibrance } from "./studio-vibrance";
+
+import type { ImageFilterFields } from "./studio-konva-filters";
 
 // 유효 카테고리 집합 — 룩 category 검증용.
 const VALID_CATEGORIES: StudioLookCategory[] = ["만화", "시네마틱", "빈티지", "감성", "흑백", "실험"];

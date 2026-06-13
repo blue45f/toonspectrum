@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { PANEL_LABEL_ROW, PANEL_READOUT_CLASS, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   GRAIN_AMOUNT_RANGE,
   GRAIN_PRESETS,
@@ -19,6 +16,10 @@ import {
   type Grain,
   type GrainType,
 } from "./studio-grain";
+import { PANEL_LABEL_ROW, PANEL_READOUT_CLASS, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // 세기·크기 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 크기는 size).
 const GRAIN_SLIDERS: { key: "amount" | "size"; label: string; range: { min: number; max: number; step: number } }[] = [
@@ -102,7 +103,8 @@ export function StudioGrainPanel({
       </div>
 
       {/* 시드 — "새 시드"는 결정적으로 다음 시드를 뽑는다(Math.random 없음, 같은 시드=같은 노이즈). */}
-      <label className={PANEL_LABEL_ROW}>
+      {/* 연결할 폼 컨트롤이 없는 헤딩+액션 행이므로 label 대신 div 사용(칩 버튼이 자체 접근명 보유). */}
+      <div className={PANEL_LABEL_ROW}>
         시드(Seed)
         <span className="flex items-center gap-1.5">
           <StudioPanelChip
@@ -113,7 +115,7 @@ export function StudioGrainPanel({
           </StudioPanelChip>
           <span className={PANEL_READOUT_CLASS}>{value.seed}</span>
         </span>
-      </label>
+      </div>
     </div>
   );
 }

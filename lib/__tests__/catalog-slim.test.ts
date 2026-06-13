@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   buildDetailExtra,
   detailShardBucket,
@@ -11,8 +12,10 @@ import {
   toListTitle,
   truncateSynopsis,
 } from "../catalog-slim";
-import type { Title, TitleStats } from "../types";
+
 import { makeTitle } from "./fixtures";
+
+import type { Title, TitleStats } from "../types";
 
 describe("catalog-slim — 정적 카탈로그 경량화 규약", () => {
   const longSynopsis = `${"기다리던 외전이 돌아왔다. ".repeat(20)}끝.`;

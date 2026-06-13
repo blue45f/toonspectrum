@@ -1,14 +1,17 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, Trash2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useApp, useHydrated } from "@/lib/store";
+
 import { RatingInput, ScaleSwitcher } from "./rating-input";
 import { Button } from "./ui/button";
+
+import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { Check, Trash2, AlertTriangle } from "lucide-react";
+
 
 const SUGGESTED = [
   "몰입감",

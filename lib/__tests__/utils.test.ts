@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { kstDayOfWeek, formatCount, clamp } from "../utils";
 
 describe("kstDayOfWeek", () => {

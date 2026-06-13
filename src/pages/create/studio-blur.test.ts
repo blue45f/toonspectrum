@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   BLURFX_ANGLE_RANGE,
   BLURFX_PRESETS,

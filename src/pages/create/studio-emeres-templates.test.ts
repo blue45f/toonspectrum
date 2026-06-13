@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   EMERES_CATEGORIES,
   EMERES_DEFAULT_OPACITY,

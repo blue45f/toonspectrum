@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { normalizeAssetName, createAssetRecord } from "./studio-asset-library";
 
 describe("studio-asset-library pure helpers", () => {

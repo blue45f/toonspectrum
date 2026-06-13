@@ -1,5 +1,6 @@
-import Link from "@/src/compat/router-link";
 import { ToonSpectrumMark } from "./visual-marks";
+
+import Link from "@/src/compat/router-link";
 
 const TERMSDESK_BASE = "https://termsdesk.vercel.app";
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.

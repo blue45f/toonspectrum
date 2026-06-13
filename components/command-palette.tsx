@@ -1,16 +1,23 @@
 "use client";
 
 import { Command } from "cmdk";
-import { useEffect, useState } from "react";
-import { useRouter } from "@/src/compat/navigation";
-import { useApp } from "@/lib/store";
-import type { Title } from "@/lib/types";
-import { TYPE_LABEL } from "@/lib/taxonomy";
-import { RatingInline } from "./ui/stars";
-import { statsAreEstimated } from "@/lib/estimate";
 import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock, Shuffle } from "lucide-react";
-import { genreColor } from "@/lib/genre-color";
+import { useEffect, useState } from "react";
+
 import { MiniPoster } from "./rank-row";
+import { RatingInline } from "./ui/stars";
+
+import type { Title } from "@/lib/types";
+
+import { statsAreEstimated } from "@/lib/estimate";
+import { genreColor } from "@/lib/genre-color";
+import { useApp } from "@/lib/store";
+import { TYPE_LABEL } from "@/lib/taxonomy";
+import { useRouter } from "@/src/compat/navigation";
+
+
+
+
 
 const QUICK = [
   { label: "통합 검색", href: "/search", icon: Search, hint: "작품·작가·태그" },

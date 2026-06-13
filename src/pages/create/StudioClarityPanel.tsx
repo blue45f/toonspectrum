@@ -7,9 +7,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
-import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   CLARITY_PRESETS,
   CLARITY_RANGE,
@@ -17,6 +14,10 @@ import {
   isIdentityClarity,
   type Clarity,
 } from "./studio-clarity";
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·범위. 키마다 범위가 달라(clarity -100..100, dehaze 0..100)
 // 각 행이 자기 range를 들고 다닌다. readout은 둘 다 정수.

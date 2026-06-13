@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+
 import { similarity, buildTasteProfile, recommendForTaste } from "../recommend";
+
 import { makeTitle } from "./fixtures";
 
 describe("similarity", () => {

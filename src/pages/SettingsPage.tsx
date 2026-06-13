@@ -1,15 +1,16 @@
 "use client";
 
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+
 import { Container } from "@/components/section";
-import { useApp, useHydrated, type RatingScale } from "@/lib/store";
 import { useI18n, type Lang } from "@/lib/i18n";
+import { useApp, useHydrated, type RatingScale } from "@/lib/store";
 import {
   getRememberFlag,
   setRememberFlag,
   clearAllRememberedFilters,
 } from "@/lib/use-remembered-filters";
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock } from "lucide-react";
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: "ko", label: "한국어" },

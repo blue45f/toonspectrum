@@ -1,4 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+
+import { parseCommunitySort } from "../../../../../lib/community-ui";
 import {
   createCafe,
   createFanPost,
@@ -25,8 +27,8 @@ import {
   listReviewReplies,
 } from "../../../../../lib/server/community";
 import { getReviewsData } from "../../../../../lib/server/reviews";
-import { parseCommunitySort } from "../../../../../lib/community-ui";
 import { GENRES } from "../../../../../lib/taxonomy";
+
 import type { CommunityCafe, FanCafePost, FanCafeReply, ReviewReply } from "../../../../../lib/types";
 
 interface PostQuery {
@@ -87,7 +89,7 @@ export class CommunityService {
     const sort = parseCommunitySort(sortValue);
     const safeLimit = parseLimit(limitValue);
     // DB(Neon) 불가 시 빈 목록으로 우아하게 폴백 — 팬카페가 500 대신 빈 디렉토리로 뜬다.
-    let boards: Awaited<ReturnType<typeof listCommunityBoards>> = [];
+    let boards: Awaited<ReturnType<typeof listCommunityBoards>>;
     try {
       boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
     } catch {
@@ -144,7 +146,7 @@ export class CommunityService {
   // 토론 스레드 상세(답글 트리 포함). 숨김 글은 404.
   async getPost(postId: string): Promise<FanCafePost> {
     if (!postId) throw new BadRequestException("postId 필요");
-    let post: FanCafePost | null = null;
+    let post: FanCafePost | null;
     try {
       post = await getFanPost(postId);
     } catch {
@@ -185,7 +187,7 @@ export class CommunityService {
   async listCafes(genre: string | null, query: string | null, sortValue: string | null) {
     const sort = parseCommunitySort(sortValue) === "recent" ? ("recent" as const) : ("popular" as const);
     // DB 불가 시 빈 디렉토리로 폴백(500 방지) — 검증 오류는 그대로 던진다.
-    let items: CommunityCafe[] = [];
+    let items: CommunityCafe[];
     try {
       items = await listCafes({ genre, query, sort });
     } catch {
@@ -196,7 +198,7 @@ export class CommunityService {
 
   async getCafe(slug: string, viewerId: string | null) {
     if (!slug) throw new BadRequestException("slug 필요");
-    let cafe: CommunityCafe | null = null;
+    let cafe: CommunityCafe | null;
     try {
       cafe = await getCafeBySlug(slug, viewerId);
     } catch {

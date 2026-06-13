@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   buildImageFilters,
   hasActiveImageFilters,
@@ -7,6 +8,7 @@ import {
   type ImageFilterFields,
   type KonvaLike,
 } from "./studio-konva-filters";
+
 import type { StudioImageDataLike } from "./studio-filters";
 
 // 내장 필터 스텁을 가진 가짜 konva — node 없이 순수 검증.

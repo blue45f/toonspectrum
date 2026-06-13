@@ -6,9 +6,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
 import { DUOTONE_PRESETS } from "./studio-color-palettes";
 import {
   IMAGE_ADJUSTMENT_RANGES,
@@ -16,6 +13,10 @@ import {
   imageFilterResetPatch,
   type ImageFilterPatch,
 } from "./studio-filters";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
+
 
 // 듀오톤 토글 ON 기본 색쌍(어둠=남색, 빛=분홍).
 const DUOTONE_DEFAULT_SHADOW = "#1a1a40";

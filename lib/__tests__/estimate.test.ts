@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+
 import { statsAreEstimated } from "../estimate";
+
 import { makeTitle } from "./fixtures";
 
 describe("statsAreEstimated", () => {

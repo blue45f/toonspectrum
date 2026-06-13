@@ -1,9 +1,13 @@
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { ErrorState } from "@/src/components/error-state";
-import { genreTint, genreBorder, genreColor } from "@/lib/genre-color";
 import { Hash } from "lucide-react";
+
 import { useApiResource } from "./use-api-resource";
+
+import { Container } from "@/components/section";
+import { genreTint, genreBorder, genreColor } from "@/lib/genre-color";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+
+
 
 interface TagsResponse {
   tags: { tag: string; count: number }[];

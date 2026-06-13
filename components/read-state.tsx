@@ -1,9 +1,12 @@
 "use client";
 
-import { useApp, useHydrated } from "@/lib/store";
-import type { ReadState } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { Bookmark, BookOpen, CheckCircle2, XCircle } from "lucide-react";
+
+import type { ReadState } from "@/lib/types";
+
+import { useApp, useHydrated } from "@/lib/store";
+import { cn } from "@/lib/utils";
+
 
 const OPTS: { state: ReadState; label: string; icon: typeof Bookmark }[] = [
   { state: "want", label: "관심", icon: Bookmark },

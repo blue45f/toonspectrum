@@ -1,7 +1,7 @@
 // 내 정보(/api/me) 프로필 갱신 전용 fetch 헬퍼.
 // 인증은 기존 세션 스킴(localStorage → x-user-id 헤더)을 재사용한다(creator-client 와 동일).
-import { getAuthToken } from "@/src/compat/auth-session";
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
+import { getAuthToken } from "@/src/compat/auth-session-store";
 
 export interface MeProfile {
   id: string;

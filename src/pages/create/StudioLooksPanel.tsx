@@ -7,9 +7,10 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
-
 import { STUDIO_LOOKS, type StudioLook, type StudioLookCategory } from "./studio-looks";
+
+import { buttonClass } from "@/components/ui/button-utils";
+
 
 // StudioGrainPanel과 동일한 칩 스타일 — 룩 칩에 재사용한다.
 const CHIP_CLASS =

@@ -1,6 +1,8 @@
-import type { Title } from "@/lib/types";
-import { Section } from "./section";
 import { Newspaper, BookText, Mic, Search, ArrowUpRight } from "lucide-react";
+
+import { Section } from "./section";
+
+import type { Title } from "@/lib/types";
 
 // 작품 관련 외부 정보 — 크롤·호스팅 불가한 상세 줄거리·뉴스·작가 인터뷰를 '있는 곳'으로 링크아웃.
 // 저작권 안전: 본문/내용을 가져오지 않고 검색·문서 페이지로 연결만. 모든 작품에 자동 적용(큐레이션 불필요).

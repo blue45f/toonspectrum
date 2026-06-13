@@ -1,10 +1,14 @@
 // 창작 커뮤니티 공용 UI — 작품 카드(시리즈/챌린지 배지), 시리즈 카드, 시리즈 폼, 아바타.
 // CreateGalleryPage · CreateSeriesPage · CreateChallengesPage · UserProfilePage 에서 재사용한다.
+import { BookOpen, Eye, Heart, Layers, MessageCircle, PenLine, Trophy } from "lucide-react";
 import { useState } from "react";
-import Link from "@/src/compat/router-link";
-import { buttonClass } from "@/components/ui/button";
+
+import { FORMAT_LABEL, SERIES_STATUS_LABEL } from "./creator-community-utils";
+
 import { CoverImage } from "@/components/cover-image";
+import { buttonClass } from "@/components/ui/button-utils";
 import { cn, formatCount, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 import {
   createSeries,
   updateSeries,
@@ -13,17 +17,7 @@ import {
   type SeriesSummary,
   type WorkSummary,
 } from "@/src/lib/creator-client";
-import { BookOpen, Eye, Heart, Layers, MessageCircle, PenLine, Trophy } from "lucide-react";
 
-export const FORMAT_LABEL: Record<WorkSummary["format"], string> = {
-  cuttoon: "컷툰",
-  upload: "업로드",
-};
-
-export const SERIES_STATUS_LABEL: Record<SeriesStatus, string> = {
-  ongoing: "연재중",
-  completed: "완결",
-};
 
 // 아바타 컬러 hex → 그라디언트 원형 + 이니셜 (review-card 패턴 재사용)
 export function AuthorAvatar({

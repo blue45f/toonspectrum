@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 // 창작 표면(/create·/studio) 노출 불변식 — 차별화 표면이 사이트맵 색인이나

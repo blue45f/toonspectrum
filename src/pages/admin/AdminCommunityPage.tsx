@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, ImageOff, MessagesSquare, RefreshCw, Search, Trash2 } from "lucide-react";
-import Link from "@/src/compat/router-link";
+import { useEffect, useState } from "react";
+
+import type { FanCafeScopeFilter } from "@/lib/types";
+
 import { Container } from "@/components/section";
-import { useAdminGate, AdminGateFallback } from "@/src/components/admin/admin-gate";
-import { adminFetch, type AdminApiError } from "@/src/components/admin/admin-client";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/lib/community-ui";
 import { cn, relativeDate } from "@/lib/utils";
-import type { FanCafeScopeFilter } from "@/lib/types";
+import Link from "@/src/compat/router-link";
+import { adminFetch, type AdminApiError } from "@/src/components/admin/admin-client";
+import { AdminGateFallback } from "@/src/components/admin/admin-gate";
+import { useAdminGate } from "@/src/components/admin/admin-gate-state";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+
 
 interface ModerationPost {
   id: string;

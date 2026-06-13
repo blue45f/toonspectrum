@@ -5,8 +5,6 @@
  * StudioPage에서 분리한 순수 프레젠테이션 컴포넌트(상태 없음, props만 읽는다).
  * 검색어 필터는 상위에서 제어 — query로 라벨을 거르고, 결과 없는 카테고리는 헤더째 생략한다.
  */
-import { cn } from "@/lib/utils";
-
 import {
   TONE_PRESETS,
   toneCategoryLabel,
@@ -14,6 +12,9 @@ import {
   type ToneCategory,
   type TonePreset,
 } from "./studio-tones";
+
+import { cn } from "@/lib/utils";
+
 
 // 카테고리 표시 순서 고정 — 옅은 망점부터 선·그라데이션·교차선 순으로 읽힌다.
 const CATEGORY_ORDER: ToneCategory[] = ["dot", "line", "gradient", "crosshatch"];

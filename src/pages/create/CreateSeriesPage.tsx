@@ -1,16 +1,4 @@
 // 연재 시리즈 상세 — 회차 목록(episodeNo 순) + 첫화부터/최신화 보기 + 소유자 관리.
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { CoverImage } from "@/components/cover-image";
-import { ErrorState } from "@/src/components/error-state";
-import { NotFoundPage } from "@/src/pages/NotFoundPage";
-import { useDocumentTitle } from "@/src/hooks/use-document-title";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
-import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/src/lib/creator-client";
-import { AuthorAvatar, SERIES_STATUS_LABEL, SeriesForm } from "./creator-community-ui";
 import {
   ArrowLeft,
   BookOpen,
@@ -24,6 +12,22 @@ import {
   SkipForward,
   Trash2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
+import { SERIES_STATUS_LABEL } from "./creator-community-utils";
+
+import { CoverImage } from "@/components/cover-image";
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button-utils";
+import { cn, formatCount, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/src/lib/creator-client";
+import { NotFoundPage } from "@/src/pages/NotFoundPage";
+
 
 // 회차 행 — 목록형(웹툰 회차 리스트 스타일).
 function EpisodeRow({ episode }: { episode: WorkSummary }) {

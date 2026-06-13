@@ -1,19 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import Link from "@/src/compat/router-link";
-import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
-import { CoverImage } from "@/components/cover-image";
-import { ErrorState } from "@/src/components/error-state";
-import { AvatarUploader } from "@/components/avatar-uploader";
-import { cn, formatCount, relativeDate } from "@/lib/utils";
-import { useApp, useHydrated } from "@/lib/store";
-import { useSession, getAuthToken, signOut } from "@/src/compat/auth-session";
-import { AuthModal } from "@/components/auth/auth-modal";
-import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/lib/creator-client";
-import { deleteMyAccount, updateMyProfile } from "@/src/lib/me-client";
 import {
   Bookmark,
   BookOpen,
@@ -29,6 +15,21 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+
+import { AuthModal } from "@/components/auth/auth-modal";
+import { AvatarUploader } from "@/components/avatar-uploader";
+import { CoverImage } from "@/components/cover-image";
+import { Container } from "@/components/section";
+import { buttonClass } from "@/components/ui/button-utils";
+import { useApp, useHydrated } from "@/lib/store";
+import { cn, formatCount, relativeDate } from "@/lib/utils";
+import { useSession, getAuthToken, signOut } from "@/src/compat/auth-session-store";
+import Link from "@/src/compat/router-link";
+import { ErrorState } from "@/src/components/error-state";
+import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/lib/creator-client";
+import { deleteMyAccount, updateMyProfile } from "@/src/lib/me-client";
 
 type Tab = "posts" | "activity" | "profile";
 const TABS: { id: Tab; label: string }[] = [
