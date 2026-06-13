@@ -47,6 +47,7 @@ import {
   Redo2,
   Send,
   SlidersHorizontal,
+  Grid2x2,
   Smile,
   Sparkles,
   Square,
@@ -154,6 +155,10 @@ import {
 import { StudioImageFilterPanel } from "./StudioImageFilterPanel";
 import { StudioPageGradePanel } from "./StudioPageGradePanel";
 import { StudioColorPopover } from "./StudioColorPopover";
+import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
+import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
+import { StudioTonePanel } from "./StudioTonePanel";
+import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -331,7 +336,7 @@ interface SpeedLinesEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -2202,6 +2207,7 @@ export function StudioPage() {
   // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
   const [fxSearchQuery, setFxSearchQuery] = useState("");
   const [fxPickerSection, setFxPickerSection] = useState<FxPickerSection>("all");
+  const [toneSearchQuery, setToneSearchQuery] = useState("");
   const [bgSceneSearchQuery, setBgSceneSearchQuery] = useState("");
   const [bgSceneGenreFilter, setBgSceneGenreFilter] = useState("all");
 
@@ -2896,6 +2902,19 @@ export function StudioPage() {
         horizontalInset: 100,
       })
     );
+  }
+  // 만화 스크린톤 — 톤 SVG를 이미지 엘리먼트로 추가(이미지 머신 재사용: 패널 클립·필터·변형).
+  // 패널이 선택돼 있으면 그 칸을 덮도록(클립되어 깔끔히 채움), 아니면 기본 크기로 중앙 배치.
+  function addTone(svg: string) {
+    setMenu(null);
+    const src = toneDataUrl(svg);
+    if (selected?.type === "frame") {
+      addEl({ id: uid(), type: "image", src, x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: 0, opacity: 0.9 });
+    } else {
+      const w = TONE_DEFAULT_SIZE.width;
+      const h = TONE_DEFAULT_SIZE.height;
+      addEl({ id: uid(), type: "image", src, x: Math.round((CANVAS_W - w) / 2), y: Math.max(24, Math.round(canvasH / 2 - h / 2)), width: w, height: h, rotation: 0, opacity: 0.9 });
+    }
   }
   // 이메레스(툰스푼 스타일) — 스케치 밑그림을 반투명+잠금 레이어로 깔고 바로 펜 모드로 전환.
   // 패널이 선택돼 있으면 그 칸 안에 맞춰 넣고, 아니면 캔버스 중앙에 배치한다.
@@ -3951,6 +3970,41 @@ export function StudioPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div ref={menu === "tone" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "tone" ? null : "tone")} aria-haspopup="menu" aria-expanded={menu === "tone"} className={toolBtn(menu === "tone")}>
+            <Grid2x2 size={14} /> 톤
+          </button>
+          {menu === "tone" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
+              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
+              </p>
+              <div className="relative mb-2">
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <input
+                  type="text"
+                  placeholder="톤 검색 (망점·선·교차선...)"
+                  value={toneSearchQuery}
+                  onChange={(e) => setToneSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                />
+                {toneSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setToneSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+              <div className="max-h-72 overflow-y-auto pr-1">
+                <StudioTonePanel onPick={(svg) => addTone(svg)} query={toneSearchQuery} />
               </div>
             </div>
           )}
@@ -5936,6 +5990,26 @@ export function StudioPage() {
                 />
               ))}
             </div>
+            {/* 그라디언트 배경 프리셋 — 세로 그라데이션으로 페이지 배경을 칠한다(웹툰 시간대·무드). */}
+            <div className="mt-2">
+              <p className="mb-1 text-[0.62rem] font-medium text-fg-3">그라디언트 배경</p>
+              <div className="flex flex-wrap gap-1.5">
+                {GRADIENT_PRESETS.map((g) => {
+                  const [c0, c1] = gradientToBgGrad(g);
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setBgGrad(gradientToBgGrad(g))}
+                      title={g.tip}
+                      aria-label={`그라디언트 ${g.label}`}
+                      className="h-6 w-6 rounded-md border border-line"
+                      style={{ background: `linear-gradient(${c0}, ${c1})` }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
             <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               높이
               <span className="flex items-center gap-1">
@@ -6179,7 +6253,7 @@ export function StudioPage() {
                   글자색
                   <input
                     type="color"
-                    value={selected.type === "text" ? selected.fill : selected.textFill}
+                    value={(selected.type === "text" ? selected.fill : selected.textFill) || "#16100c"}
                     onChange={(e) => patchEl(selected.id, (selected.type === "text" ? { fill: e.target.value } : { textFill: e.target.value }) as Partial<El>)}
                     className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                   />
@@ -6729,6 +6803,11 @@ export function StudioPage() {
                     </div>
                   </div>
                 </>
+              )}
+              {selected.type === "text" && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5">
+                  <StudioTextEffectPanel onApply={(patch) => patchEl(selected.id, patch as Partial<El>)} />
+                </div>
               )}
               {selected.type === "text" && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
