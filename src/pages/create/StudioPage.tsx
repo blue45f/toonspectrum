@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } 
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Konva from "konva";
 
-import { Stage, Layer, Rect, Text as KText, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
 import {
   AlignHorizontalJustifyCenter,
   AlignVerticalJustifyCenter,
@@ -176,6 +176,8 @@ import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
 import { normalizeClarity, type Clarity } from "./studio-clarity";
 import { normalizeOutline, type Outline } from "./studio-outline";
 import { normalizeGlow, type Glow } from "./studio-glow";
+import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
+import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
@@ -293,6 +295,7 @@ interface TextEl {
   gradientColorStart?: string;
   gradientColorEnd?: string;
   gradientDirection?: "vertical" | "horizontal";
+  textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
 }
 interface BubbleEl {
   id: string;
@@ -5368,6 +5371,49 @@ export function StudioPage() {
                   );
                 if (el.type === "draw")
                   return wrapClip(<StudioDrawNode key={el.id} el={el} />);
+                if (el.type === "text" && el.textPath && !isFlatTextPath(normalizeTextPath(el.textPath)))
+                  return wrapClip(
+                    <KTextPath
+                      key={el.id}
+                      ref={setRef}
+                      text={el.text}
+                      x={el.x}
+                      y={el.y}
+                      data={buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize)}
+                      fontSize={el.fontSize}
+                      fill={el.fillType === "gradient" ? (el.gradientColorStart ?? "#ff3b30") : el.fill}
+                      stroke={el.stroke}
+                      strokeWidth={el.strokeWidth ?? 0}
+                      fillAfterStrokeEnabled
+                      lineJoin="round"
+                      rotation={el.rotation}
+                      opacity={el.opacity ?? 1}
+                      fontFamily={el.font ?? "Pretendard, sans-serif"}
+                      fontStyle={el.fontStyle ?? "bold"}
+                      align={el.align ?? "left"}
+                      letterSpacing={el.letterSpacing ?? 0}
+                      shadowColor={el.shadowColor}
+                      shadowBlur={el.shadowBlur}
+                      shadowOffsetX={el.shadowOffsetX}
+                      shadowOffsetY={el.shadowOffsetY}
+                      shadowOpacity={el.shadowOpacity}
+                      shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
+                      draggable={draggable}
+                      dragBoundFunc={snapBoundFunc}
+                      onMouseDown={onSelect}
+                      onTap={onSelect}
+                      onDblClick={() => startEditText(el.id)}
+                      onDblTap={() => startEditText(el.id)}
+                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      onTransformEnd={(e) => {
+                        const node = e.target;
+                        const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                      }}
+                    />
+                  );
                 if (el.type === "text")
                   return wrapClip(
                     <KText
@@ -7024,6 +7070,21 @@ export function StudioPage() {
               {selected.type === "text" && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5">
                   <StudioTextEffectPanel onApply={(patch) => patchEl(selected.id, patch as Partial<El>)} />
+                </div>
+              )}
+              {/* 곡선 텍스트 — 아치/물결/원형 경로(Konva TextPath). */}
+              {selected.type === "text" && (
+                <div className="mt-2.5 border-t border-line/40 pt-2.5">
+                  <StudioTextPathPanel
+                    value={normalizeTextPath(selected.textPath)}
+                    onPatch={(patch: Partial<TextPathConfig>) =>
+                      patchEl(selected.id, {
+                        textPath: normalizeTextPath({ ...normalizeTextPath(selected.textPath), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: TextPathConfig) => patchEl(selected.id, { textPath: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { textPath: undefined } as Partial<El>)}
+                  />
                 </div>
               )}
               {selected.type === "text" && (
