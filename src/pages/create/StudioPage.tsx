@@ -161,6 +161,8 @@ import { StudioTonePanel } from "./StudioTonePanel";
 import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
 import { normalizeLevels, type LevelsParams } from "./studio-levels";
 import { StudioLevelsPanel } from "./StudioLevelsPanel";
+import { type LayerStylePatch } from "./studio-layer-styles";
+import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -209,6 +211,13 @@ interface ImageEl {
   levelsGamma?: number;
   levelsOutBlack?: number;
   levelsOutWhite?: number;
+  // 레이어 스타일(그림자/글로우/둥근 모서리) — Konva.Image 네이티브 속성.
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  cornerRadius?: number;
 }
 interface TextEl {
   id: string;
@@ -1131,6 +1140,13 @@ function UrlImage({
       opacity={el.opacity ?? 1}
       filters={filters}
       {...filterAttrs}
+      shadowColor={el.shadowColor}
+      shadowEnabled={!!el.shadowColor}
+      shadowBlur={el.shadowBlur ?? 0}
+      shadowOffsetX={el.shadowOffsetX ?? 0}
+      shadowOffsetY={el.shadowOffsetY ?? 0}
+      shadowOpacity={el.shadowOpacity ?? 1}
+      cornerRadius={el.cornerRadius ?? 0}
       draggable={draggable}
       dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
@@ -7587,6 +7603,15 @@ export function StudioPage() {
                         levelsOutWhite: undefined,
                       } as Partial<El>)
                     }
+                  />
+                </div>
+              )}
+              {/* 레이어 스타일 — 드롭 섀도/글로우/둥근 모서리(Konva.Image 네이티브). */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioLayerStylePanel
+                    values={selected as LayerStylePatch}
+                    onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
                   />
                 </div>
               )}
