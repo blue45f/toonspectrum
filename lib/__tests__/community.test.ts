@@ -19,6 +19,7 @@ import {
   validateReplyText,
 } from "../server/community";
 import { GENRES } from "../taxonomy";
+import { retryOnDeadlock } from "./db-test-utils";
 
 const createdUserIds = new Set<string>();
 const createdPostIds = new Set<string>();
@@ -26,15 +27,15 @@ const createdReplyIds = new Set<string>();
 
 async function cleanupCommunityRecords() {
   if (createdReplyIds.size > 0) {
-    await db.delete(fanPostReplies).where(inArray(fanPostReplies.id, [...createdReplyIds]));
+    await retryOnDeadlock(() => db.delete(fanPostReplies).where(inArray(fanPostReplies.id, [...createdReplyIds])));
     createdReplyIds.clear();
   }
   if (createdPostIds.size > 0) {
-    await db.delete(fanPosts).where(inArray(fanPosts.id, [...createdPostIds]));
+    await retryOnDeadlock(() => db.delete(fanPosts).where(inArray(fanPosts.id, [...createdPostIds])));
     createdPostIds.clear();
   }
   if (createdUserIds.size > 0) {
-    await db.delete(users).where(inArray(users.id, [...createdUserIds]));
+    await retryOnDeadlock(() => db.delete(users).where(inArray(users.id, [...createdUserIds])));
     createdUserIds.clear();
   }
 }

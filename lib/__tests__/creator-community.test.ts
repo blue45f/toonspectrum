@@ -21,6 +21,7 @@ import {
   validateFollowPair,
   validateSeriesInput,
 } from "../server/creator";
+import { retryOnDeadlock } from "./db-test-utils";
 
 const createdUserIds = new Set<string>();
 const createdWorkIds = new Set<string>();
@@ -29,19 +30,23 @@ const createdSeriesIds = new Set<string>();
 async function cleanupCreatorRecords() {
   if (createdUserIds.size > 0) {
     // 팔로우는 복합 PK — 테스트 사용자 기준으로 제거(작품·시리즈는 FK cascade가 아닌 명시 삭제).
-    await db.delete(creatorFollows).where(inArray(creatorFollows.followerId, [...createdUserIds]));
-    await db.delete(creatorFollows).where(inArray(creatorFollows.creatorId, [...createdUserIds]));
+    await retryOnDeadlock(() =>
+      db.delete(creatorFollows).where(inArray(creatorFollows.followerId, [...createdUserIds])),
+    );
+    await retryOnDeadlock(() =>
+      db.delete(creatorFollows).where(inArray(creatorFollows.creatorId, [...createdUserIds])),
+    );
   }
   if (createdWorkIds.size > 0) {
-    await db.delete(creatorWorks).where(inArray(creatorWorks.id, [...createdWorkIds]));
+    await retryOnDeadlock(() => db.delete(creatorWorks).where(inArray(creatorWorks.id, [...createdWorkIds])));
     createdWorkIds.clear();
   }
   if (createdSeriesIds.size > 0) {
-    await db.delete(creatorSeries).where(inArray(creatorSeries.id, [...createdSeriesIds]));
+    await retryOnDeadlock(() => db.delete(creatorSeries).where(inArray(creatorSeries.id, [...createdSeriesIds])));
     createdSeriesIds.clear();
   }
   if (createdUserIds.size > 0) {
-    await db.delete(users).where(inArray(users.id, [...createdUserIds]));
+    await retryOnDeadlock(() => db.delete(users).where(inArray(users.id, [...createdUserIds])));
     createdUserIds.clear();
   }
 }
