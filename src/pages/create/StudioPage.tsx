@@ -27,6 +27,8 @@ import {
   FlipHorizontal2,
   FlipVertical2,
   Folder,
+  FolderPlus,
+  FolderMinus,
   Upload,
   Image as ImageIcon,
   Download,
@@ -163,6 +165,16 @@ import { normalizeLevels, type LevelsParams } from "./studio-levels";
 import { StudioLevelsPanel } from "./StudioLevelsPanel";
 import { type LayerStylePatch } from "./studio-layer-styles";
 import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
+import {
+  createLayerGroup,
+  groupOfItem,
+  isEffectivelyHidden,
+  isEffectivelyLocked,
+  setItemGroup,
+  ungroupItems,
+  buildLayerTree,
+  type LayerGroup,
+} from "./studio-layers";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -352,7 +364,7 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean };
+type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -1462,6 +1474,7 @@ interface PageState {
   bgGrad: string[] | null;
   canvasH: number;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
+  groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
 }
 
 export function StudioPage() {
@@ -1503,6 +1516,8 @@ export function StudioPage() {
   // 현재 페이지의 색보정(과거 저장본 안전 정규화) + 미리보기용 CSS filter 문자열.
   const pageGrade = normalizePageGrade(activePage.grade);
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
+  // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
+  const groups = activePage.groups ?? [];
 
   const hi = pagesHi;
   const history = pagesHistory;
@@ -2377,6 +2392,112 @@ export function StudioPage() {
     setSelectedId(el.id);
     setTool("select");
   }
+  // ── 레이어 그룹(폴더) ─────────────────────────────────────────────────────
+  // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
+  function addLayerGroup(seedElId?: string) {
+    const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
+    const nextElements = seedElId ? (setItemGroup(elements, seedElId, g.id) as El[]) : elements;
+    updateActivePage({ groups: [...groups, g], elements: nextElements });
+  }
+  function renameLayerGroup(groupId: string, name: string) {
+    updateActivePage({ groups: groups.map((g) => (g.id === groupId ? { ...g, name } : g)) });
+  }
+  function toggleGroupFlag(groupId: string, flag: "hidden" | "locked" | "collapsed") {
+    updateActivePage({ groups: groups.map((g) => (g.id === groupId ? { ...g, [flag]: !g[flag] } : g)) });
+  }
+  // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
+  function deleteLayerGroup(groupId: string) {
+    updateActivePage({
+      elements: ungroupItems(elements, groupId) as El[],
+      groups: groups.filter((g) => g.id !== groupId),
+    });
+  }
+  // 요소를 그룹에 넣기/빼기(연속성 유지). groupId=undefined면 그룹에서 제거.
+  function assignElementToGroup(elId: string, groupId: string | undefined) {
+    updateActivePage({ elements: setItemGroup(elements, elId, groupId) as El[] });
+  }
+  // 레이어 패널 한 행(요소). dimmed=소속 그룹이 숨김/잠금이라 흐리게.
+  const layerRow = (el: El, dimmed: boolean) => {
+    const i = elements.indexOf(el);
+    return (
+      <li
+        key={el.id}
+        className={cn(
+          "flex items-center gap-1 rounded-lg border px-1.5 py-1",
+          el.id === selectedId ? "border-accent/60 bg-accent-soft/40" : "border-line",
+          dimmed && "opacity-50"
+        )}
+      >
+        <button
+          type="button"
+          disabled={el.locked}
+          onClick={() => {
+            setTool("select");
+            setSelectedId(el.id);
+          }}
+          className={cn(
+            "min-w-0 flex-1 truncate text-left text-xs disabled:cursor-default",
+            el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
+          )}
+          title={elementLabel(el)}
+        >
+          {el.clipBelow ? "⤵ " : ""}
+          {elementLabel(el)}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const willLock = !el.locked;
+            patchEl(el.id, { locked: willLock } as Partial<El>);
+            if (willLock && selectedId === el.id) setSelectedId(null);
+          }}
+          className={cn("grid size-6 place-items-center rounded hover:bg-raised", el.locked ? "text-accent" : "text-fg-3")}
+          aria-label={el.locked ? "레이어 잠금 해제" : "레이어 잠금"}
+          title={el.locked ? "잠금 해제" : "잠금"}
+        >
+          {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
+          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+          aria-label={el.hidden ? "레이어 표시" : "레이어 숨김"}
+          title={el.hidden ? "표시" : "숨김"}
+        >
+          {el.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => moveLayer(el.id, "up")}
+          disabled={i === elements.length - 1}
+          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+          aria-label="위로"
+          title="위로"
+        >
+          <ChevronUp size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={() => moveLayer(el.id, "down")}
+          disabled={i === 0}
+          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+          aria-label="아래로"
+          title="아래로"
+        >
+          <ChevronDown size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={() => removeById(el.id)}
+          className="grid size-6 place-items-center rounded text-bad hover:bg-raised"
+          aria-label="레이어 삭제"
+          title="삭제"
+        >
+          <Trash2 size={13} />
+        </button>
+      </li>
+    );
+  };
 
   // ── 페이지 관련 명령 조작 ──────────────────────────────────────────────
   function addPage() {
@@ -5125,19 +5246,34 @@ export function StudioPage() {
                   ))}
                 </Group>
               )}
-              {elements.map((el) => {
-                if (el.hidden) return null; // 숨긴 레이어는 렌더/내보내기에서 제외
-                const draggable = tool === "select" && !el.locked;
-                const onSelect = () => tool === "select" && !el.locked && setSelectedId(el.id);
+              {elements.map((el, idx) => {
+                if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+                const locked = isEffectivelyLocked(el, groups);
+                const draggable = tool === "select" && !locked;
+                const onSelect = () => tool === "select" && !locked && setSelectedId(el.id);
                 const setRef = (n: Konva.Node | null) => {
                   nodeRefs.current[el.id] = n;
                 };
-                // 패널 내부 콘텐츠 클리핑: 들어간 패널 영역으로 잘라낸다(noClip이면 해제).
-                const clipFrame = el.noClip ? null : containingPanel(el, elements);
+                // 패널 내부 콘텐츠 클리핑(들어간 패널 영역) + 클리핑 마스크(바로 아래 레이어 영역). 둘 다면 교집합.
+                const panelClip = el.noClip ? null : containingPanel(el, elements);
+                const belowEl = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
+                const belowClip = belowEl ? elBounds(belowEl) : null;
+                let clip: { x: number; y: number; width: number; height: number } | null = null;
+                if (panelClip && belowClip) {
+                  const x = Math.max(panelClip.x, belowClip.x);
+                  const y = Math.max(panelClip.y, belowClip.y);
+                  const right = Math.min(panelClip.x + panelClip.width, belowClip.x + belowClip.w);
+                  const bottom = Math.min(panelClip.y + panelClip.height, belowClip.y + belowClip.h);
+                  clip = { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
+                } else if (panelClip) {
+                  clip = { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height };
+                } else if (belowClip) {
+                  clip = { x: belowClip.x, y: belowClip.y, width: belowClip.w, height: belowClip.h };
+                }
                 const wrapClip = (node: ReactNode) => {
                   const composite = (el.blendMode as any) || "source-over";
-                  return clipFrame ? (
-                    <Group key={el.id} clipX={clipFrame.x} clipY={clipFrame.y} clipWidth={clipFrame.width} clipHeight={clipFrame.height} globalCompositeOperation={composite}>
+                  return clip ? (
+                    <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height} globalCompositeOperation={composite}>
                       {node}
                     </Group>
                   ) : (
@@ -7098,6 +7234,37 @@ export function StudioPage() {
                 </label>
               )}
 
+              {/* 클리핑 마스크 — 바로 아래 레이어 영역으로 잘라낸다(채색·톤을 밑그림 안에 가두기). */}
+              <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2" title="바로 아래 레이어의 영역 안으로만 보이게 잘라냅니다(채색·톤 가두기).">
+                아래 레이어에 클리핑
+                <input
+                  type="checkbox"
+                  checked={!!selected.clipBelow}
+                  onChange={(e) => patchEl(selected.id, { clipBelow: e.target.checked } as Partial<El>)}
+                  className="size-4 accent-accent cursor-pointer"
+                />
+              </label>
+
+              {/* 레이어 그룹 지정 */}
+              <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                그룹
+                <select
+                  value={groupOfItem(selected, groups)?.id ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__new__") addLayerGroup(selected.id);
+                    else assignElementToGroup(selected.id, v || undefined);
+                  }}
+                  className="rounded border border-line bg-card px-2 py-1 text-xs text-fg focus-visible:outline focus-visible:outline-accent cursor-pointer max-w-[8.5rem] truncate"
+                >
+                  <option value="">그룹 없음</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                  <option value="__new__">+ 새 그룹</option>
+                </select>
+              </label>
+
               {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                   혼합 모드 (Blend)
@@ -7998,91 +8165,82 @@ export function StudioPage() {
 
           {elements.length > 0 && (
             <div className="rounded-2xl border border-line bg-panel/40 p-3">
-              <p className="mb-2 text-xs font-semibold text-fg-3">레이어 ({elements.length})</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold text-fg-3">레이어 ({elements.length})</p>
+                <button
+                  type="button"
+                  onClick={() => addLayerGroup(selectedId ?? undefined)}
+                  className="flex items-center gap-1 rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.6rem] text-fg-2 hover:bg-raised transition-colors"
+                  title="새 레이어 그룹(폴더). 선택한 레이어가 있으면 그 안에 넣어요."
+                >
+                  <FolderPlus size={12} /> 그룹
+                </button>
+              </div>
               <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-1">
-                {elements.map((_, ri) => {
-                  const i = elements.length - 1 - ri; // 위(앞) 레이어부터 표시
-                  const el = elements[i];
-                  return (
-                    <li
-                      key={el.id}
-                      className={cn(
-                        "flex items-center gap-1 rounded-lg border px-1.5 py-1",
-                        el.id === selectedId ? "border-accent/60 bg-accent-soft/40" : "border-line"
+                {buildLayerTree(elements.slice().reverse(), groups).map((node) =>
+                  node.kind === "group" ? (
+                    <li key={node.group.id} className="rounded-lg border border-line/70 bg-card/30">
+                      <div className="flex items-center gap-1 px-1.5 py-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupFlag(node.group.id, "collapsed")}
+                          className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised"
+                          aria-label={node.group.collapsed ? "그룹 펼치기" : "그룹 접기"}
+                          title={node.group.collapsed ? "펼치기" : "접기"}
+                        >
+                          {node.group.collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = window.prompt("그룹 이름", node.group.name);
+                            if (name != null && name.trim()) renameLayerGroup(node.group.id, name.trim());
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-[0.7rem] font-semibold text-fg-2"
+                          title="이름 변경"
+                        >
+                          <Folder size={12} className="shrink-0 text-accent" />
+                          <span className="truncate">{node.group.name}</span>
+                          <span className="shrink-0 text-fg-4">({node.items.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupFlag(node.group.id, "hidden")}
+                          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+                          aria-label={node.group.hidden ? "그룹 표시" : "그룹 숨김"}
+                          title={node.group.hidden ? "표시" : "숨김"}
+                        >
+                          {node.group.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupFlag(node.group.id, "locked")}
+                          className={cn("grid size-6 place-items-center rounded hover:bg-raised", node.group.locked ? "text-accent" : "text-fg-3")}
+                          aria-label={node.group.locked ? "그룹 잠금 해제" : "그룹 잠금"}
+                          title={node.group.locked ? "잠금 해제" : "잠금"}
+                        >
+                          {node.group.locked ? <Lock size={13} /> : <LockOpen size={13} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteLayerGroup(node.group.id)}
+                          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+                          aria-label="그룹 해제"
+                          title="그룹 해제 (레이어는 보존)"
+                        >
+                          <FolderMinus size={13} />
+                        </button>
+                      </div>
+                      {!node.group.collapsed && (
+                        <ul className="flex flex-col gap-1 border-t border-line/40 px-1.5 py-1 pl-3">
+                          {node.items.map((el) => layerRow(el, !!node.group.hidden || !!node.group.locked))}
+                        </ul>
                       )}
-                    >
-                      <button
-                        type="button"
-                        disabled={el.locked}
-                        onClick={() => {
-                          setTool("select");
-                          setSelectedId(el.id);
-                        }}
-                        className={cn(
-                          "min-w-0 flex-1 truncate text-left text-xs disabled:cursor-default",
-                          el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
-                        )}
-                        title={elementLabel(el)}
-                      >
-                        {elementLabel(el)}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const willLock = !el.locked;
-                          patchEl(el.id, { locked: willLock } as Partial<El>);
-                          if (willLock && selectedId === el.id) setSelectedId(null);
-                        }}
-                        className={cn(
-                          "grid size-6 place-items-center rounded hover:bg-raised",
-                          el.locked ? "text-accent" : "text-fg-3"
-                        )}
-                        aria-label={el.locked ? "레이어 잠금 해제" : "레이어 잠금"}
-                        title={el.locked ? "잠금 해제" : "잠금"}
-                      >
-                        {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
-                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
-                        aria-label={el.hidden ? "레이어 표시" : "레이어 숨김"}
-                        title={el.hidden ? "표시" : "숨김"}
-                      >
-                        {el.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveLayer(el.id, "up")}
-                        disabled={i === elements.length - 1}
-                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
-                        aria-label="위로"
-                        title="위로"
-                      >
-                        <ChevronUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveLayer(el.id, "down")}
-                        disabled={i === 0}
-                        className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
-                        aria-label="아래로"
-                        title="아래로"
-                      >
-                        <ChevronDown size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeById(el.id)}
-                        className="grid size-6 place-items-center rounded text-bad hover:bg-raised"
-                        aria-label="레이어 삭제"
-                        title="삭제"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </li>
-                  );
-                })}
+                  ) : (
+                    layerRow(node.item, false)
+                  )
+                )}
               </ul>
             </div>
           )}
@@ -8105,7 +8263,7 @@ export function StudioPage() {
               >
                 {/* Render panels/frames */}
                 {elements.map((el) => {
-                  if (el.hidden) return null;
+                  if (isEffectivelyHidden(el, groups)) return null;
                   const bounds = elBounds(el);
                   const pctX = (bounds.x / CANVAS_W) * 100;
                   const pctY = (bounds.y / canvasH) * 100;
