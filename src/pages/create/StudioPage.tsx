@@ -174,6 +174,8 @@ import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
 import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
 import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
 import { normalizeClarity, type Clarity } from "./studio-clarity";
+import { normalizeOutline, type Outline } from "./studio-outline";
+import { normalizeGlow, type Glow } from "./studio-glow";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
@@ -183,6 +185,8 @@ import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
 import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
 import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
 import { StudioClarityPanel } from "./StudioClarityPanel";
+import { StudioOutlinePanel } from "./StudioOutlinePanel";
+import { StudioGlowPanel } from "./StudioGlowPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -259,6 +263,8 @@ interface ImageEl {
   photoFilter?: PhotoFilter;
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
+  outline?: Outline;
+  glow?: Glow;
 }
 interface TextEl {
   id: string;
@@ -1150,6 +1156,7 @@ function UrlImage({
   // react-konva filters prop 타입과 느슨하게 맞춘다(기존 코드와 동일하게 any 배열).
   const filters: any[] = built.filters;
   const filterAttrs = built.attrs;
+  const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
   const filterCacheKey = imageFilterCacheKey(el);
 
   useEffect(() => {
@@ -1158,11 +1165,12 @@ function UrlImage({
     if (displayImg) {
       node.clearCache();
       if (hasFilters) {
-        node.cache();
+        // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
+        node.cache(cachePad > 0 ? { offset: cachePad } : undefined);
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, cachePad]);
 
   if (!displayImg) return null;
 
@@ -7958,6 +7966,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Clarity) => patchEl(selected.id, { clarity: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { clarity: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 글로우/블룸 — 밝은 영역의 빛 번짐. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioGlowPanel
+                    value={normalizeGlow(selected.glow)}
+                    onPatch={(patch: Partial<Glow>) =>
+                      patchEl(selected.id, {
+                        glow: normalizeGlow({ ...normalizeGlow(selected.glow), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Glow) => patchEl(selected.id, { glow: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { glow: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 스티커 테두리 — 실루엣 바깥 색 외곽선(투명 배경 캐릭터용). */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioOutlinePanel
+                    value={normalizeOutline(selected.outline)}
+                    onPatch={(patch: Partial<Outline>) =>
+                      patchEl(selected.id, {
+                        outline: normalizeOutline({ ...normalizeOutline(selected.outline), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Outline) => patchEl(selected.id, { outline: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { outline: undefined } as Partial<El>)}
                   />
                 </div>
               )}

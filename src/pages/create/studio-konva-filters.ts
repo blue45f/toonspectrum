@@ -18,6 +18,8 @@ import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat, type G
 import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter, type PhotoFilter } from "./studio-photo-filter";
 import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
 import { clarityKonvaFilter, normalizeClarity, isIdentityClarity, type Clarity } from "./studio-clarity";
+import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad, type Outline } from "./studio-outline";
+import { glowKonvaFilter, normalizeGlow, isIdentityGlow, type Glow } from "./studio-glow";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -56,7 +58,18 @@ export type ImageFilterFields = {
   photoFilter?: PhotoFilter;
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
+  outline?: Outline;
+  glow?: Glow;
 };
+
+// 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
+function hasActiveOutline(el: ImageFilterFields): boolean {
+  return !!el.outline && !isIdentityOutline(normalizeOutline(el.outline));
+}
+// 글로우가 항등(세기0)이 아니면 활성.
+function hasActiveGlow(el: ImageFilterFields): boolean {
+  return !!el.glow && !isIdentityGlow(normalizeGlow(el.glow));
+}
 
 // 자동 보정이 항등(none/강도0)이 아니면 활성.
 function hasActiveAutoAdjust(el: ImageFilterFields): boolean {
@@ -318,6 +331,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.AutoAdjust = autoAdjustKonvaFilter;
   // 선명도/디테일 — this.attrs.clarity/dehaze 적용(studio-clarity).
   F.Clarity = clarityKonvaFilter;
+  // 스티커 테두리 — this.attrs.outlineColor/outlineWidth/outlineOpacity 적용(studio-outline). 캐시 offset 패딩 필요.
+  F.Outline = outlineKonvaFilter;
+  // 글로우/블룸 — this.attrs.glowStrength/glowSize/glowThreshold/glowColor 적용(studio-glow).
+  F.Glow = glowKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -338,6 +355,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActivePhotoFilter(el) ||
     hasActiveAutoAdjust(el) ||
     hasActiveClarity(el) ||
+    hasActiveOutline(el) ||
+    hasActiveGlow(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -362,7 +381,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
 export function buildImageFilters(
   el: ImageFilterFields,
   konva: KonvaLike,
-): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string | number[]>} {
+): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string | number[]>; cachePad: number } {
   const F = konva.Filters;
   const filters: Array<(imageData: StudioImageDataLike) => void> = [];
   const attrs: Record<string, number | string | number[]> = {};
@@ -494,8 +513,26 @@ export function buildImageFilters(
     filters.push(F.Pixelate as (imageData: StudioImageDataLike) => void);
     attrs.pixelSize = Math.max(1, Math.round(el.pixelate!));
   }
+  // 글로우는 최종 밝은 영역에서 번지므로 늦게, 테두리는 실루엣 바깥에 그리므로 가장 마지막.
+  if (hasActiveGlow(el)) {
+    filters.push(F.Glow!);
+    const gl = normalizeGlow(el.glow);
+    attrs.glowStrength = gl.strength;
+    attrs.glowSize = gl.size;
+    attrs.glowThreshold = gl.threshold;
+    attrs.glowColor = gl.color;
+  }
+  let cachePad = 0;
+  if (hasActiveOutline(el)) {
+    filters.push(F.Outline!);
+    const ol = normalizeOutline(el.outline);
+    attrs.outlineColor = ol.color;
+    attrs.outlineWidth = ol.width;
+    attrs.outlineOpacity = ol.opacity;
+    cachePad = outlineCachePad(ol); // 테두리가 실루엣 밖으로 자라도록 캐시 offset 패딩.
+  }
 
-  return { filters, attrs };
+  return { filters, attrs, cachePad };
 }
 
 /**
@@ -537,5 +574,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.photoFilter ?? null,
     el.autoAdjust ?? null,
     el.clarity ?? null,
+    el.outline ?? null,
+    el.glow ?? null,
   ]);
 }
