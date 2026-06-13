@@ -204,10 +204,27 @@ export interface ThreeLike {
   Mesh: new (geometry: unknown, material: unknown) => ThreeObject;
   MeshStandardMaterial: new (params: { color?: unknown; roughness?: number; metalness?: number; side?: unknown }) => unknown;
   BoxGeometry: new (w: number, h: number, d: number) => unknown;
-  CylinderGeometry: new (rt: number, rb: number, h: number, seg?: number) => unknown;
-  SphereGeometry: new (r: number, ws?: number, hs?: number) => unknown;
+  CylinderGeometry: new (
+    rt: number,
+    rb: number,
+    h: number,
+    seg?: number,
+    heightSeg?: number,
+    openEnded?: boolean,
+    thetaStart?: number,
+    thetaLength?: number
+  ) => unknown;
+  SphereGeometry: new (
+    r: number,
+    ws?: number,
+    hs?: number,
+    phiStart?: number,
+    phiLength?: number,
+    thetaStart?: number,
+    thetaLength?: number
+  ) => unknown;
   ConeGeometry: new (r: number, h: number, seg?: number) => unknown;
-  TorusGeometry: new (r: number, tube: number, rs?: number, ts?: number) => unknown;
+  TorusGeometry: new (r: number, tube: number, rs?: number, ts?: number, arc?: number) => unknown;
   Color: new (hex: string) => unknown;
   DoubleSide: unknown;
 }
