@@ -26,6 +26,7 @@ import { PlatformTags } from "./availability";
 import { PlatformMark } from "./visual-marks";
 import { RatingInline } from "./ui/stars";
 import { Segmented } from "./ui/segmented";
+import { Select } from "./ui/select";
 import { statsAreEstimated } from "@/lib/estimate";
 import { cn, formatCount } from "@/lib/utils";
 import {
@@ -619,47 +620,41 @@ export function RankingBoard({
             </span>
           </div>
 
-          <select
+          <Select
             value={genre}
-            onChange={(e) => setGenre(e.target.value)}
-            className="h-10 min-w-36 rounded-lg border border-line bg-card px-2.5 text-sm text-fg-2 outline-none transition-colors focus:border-accent/50"
-            aria-label="장르 필터"
-          >
-            <option value="all">전체 장르</option>
-            {GENRES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 transition-colors focus-within:border-accent/50">
+            onValueChange={setGenre}
+            ariaLabel="장르 필터"
+            triggerClassName="h-10 min-w-36 rounded-lg border border-line bg-card px-2.5 text-sm text-fg-2"
+            options={[
+              { value: "all", label: "전체 장르" },
+              ...GENRES.map((g) => ({ value: g, label: g })),
+            ]}
+          />
+          <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 transition-colors focus-within:border-accent/50">
             <span className="whitespace-nowrap text-fg-3">플랫폼</span>
-            <select
-              value={platform}
-              onChange={(event) => setPlatform(event.target.value as PlatformId | "all")}
-              className="min-w-28 border-none bg-transparent text-sm font-medium text-fg outline-none"
-              aria-label="플랫폼 필터"
-            >
-              {(() => {
-                // 카탈로그에 실존하는 플랫폼만 노출(빈 플랫폼 옵션 방지). 커버리지 미수신 시 전체 노출.
-                const present = rankingMeta?.availablePlatforms;
-                const items =
-                  present && present.length
-                    ? PLATFORM_FILTER_ITEMS.filter(
-                        (item) =>
-                          item.value === "all" ||
-                          item.value === platform ||
-                          present.includes(item.value as PlatformId)
-                      )
-                    : PLATFORM_FILTER_ITEMS;
-                return items.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ));
-              })()}
-            </select>
-          </label>
+            {(() => {
+              // 카탈로그에 실존하는 플랫폼만 노출(빈 플랫폼 옵션 방지). 커버리지 미수신 시 전체 노출.
+              const present = rankingMeta?.availablePlatforms;
+              const items =
+                present && present.length
+                  ? PLATFORM_FILTER_ITEMS.filter(
+                      (item) =>
+                        item.value === "all" ||
+                        item.value === platform ||
+                        present.includes(item.value as PlatformId)
+                    )
+                  : PLATFORM_FILTER_ITEMS;
+              return (
+                <Select
+                  value={platform}
+                  onValueChange={(value) => setPlatform(value as PlatformId | "all")}
+                  ariaLabel="플랫폼 필터"
+                  triggerClassName="min-w-28 text-sm font-medium text-fg"
+                  options={items.map((item) => ({ value: item.value, label: item.label }))}
+                />
+              );
+            })()}
+          </div>
           <Segmented
             size="sm"
             value={status}

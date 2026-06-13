@@ -6,6 +6,7 @@ import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib
 import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { Segmented } from "./ui/segmented";
+import { Select } from "./ui/select";
 import { GenreChip, TagChip } from "./ui/chip";
 import { buttonClass } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -627,18 +628,13 @@ export function SearchExplorer({
               {activeCount > 0 && <span className="ml-0.5 text-accent">{mobileCount}</span>}
             </button>
 
-            <select
+            <Select
               value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              className="h-8 rounded-lg border border-line bg-card px-2.5 text-[0.8125rem] text-fg-2 outline-none transition-colors focus:border-accent/50"
-              aria-label="정렬 기준"
-            >
-              {SORTS.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setSort(value as SortKey)}
+              ariaLabel="정렬 기준"
+              triggerClassName="h-8 rounded-lg border border-line bg-card px-2.5 text-[0.8125rem] text-fg-2"
+              options={SORTS.map((entry) => ({ value: entry.value, label: entry.label }))}
+            />
 
             <button
               type="button"
