@@ -20,6 +20,8 @@ import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust, type 
 import { clarityKonvaFilter, normalizeClarity, isIdentityClarity, type Clarity } from "./studio-clarity";
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad, type Outline } from "./studio-outline";
 import { glowKonvaFilter, normalizeGlow, isIdentityGlow, type Glow } from "./studio-glow";
+import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone, type Halftone } from "./studio-halftone";
+import { grainKonvaFilter, normalizeGrain, isIdentityGrain, type Grain } from "./studio-grain";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -60,7 +62,18 @@ export type ImageFilterFields = {
   clarity?: Clarity;
   outline?: Outline;
   glow?: Glow;
+  halftone?: Halftone;
+  grain?: Grain;
 };
+
+// 하프톤이 항등(세기0)이 아니면 활성.
+function hasActiveHalftone(el: ImageFilterFields): boolean {
+  return !!el.halftone && !isIdentityHalftone(normalizeHalftone(el.halftone));
+}
+// 그레인이 항등(세기0)이 아니면 활성.
+function hasActiveGrain(el: ImageFilterFields): boolean {
+  return !!el.grain && !isIdentityGrain(normalizeGrain(el.grain));
+}
 
 // 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
 function hasActiveOutline(el: ImageFilterFields): boolean {
@@ -335,6 +348,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Outline = outlineKonvaFilter;
   // 글로우/블룸 — this.attrs.glowStrength/glowSize/glowThreshold/glowColor 적용(studio-glow).
   F.Glow = glowKonvaFilter;
+  // 컬러 하프톤 — this.attrs.htDot/htAngle/htMode/htStrength 적용(studio-halftone).
+  F.Halftone = halftoneKonvaFilter;
+  // 그레인/텍스처 — this.attrs.grainType/grainAmount/grainSize/grainSeed 적용(studio-grain).
+  F.Grain = grainKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -357,6 +374,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveClarity(el) ||
     hasActiveOutline(el) ||
     hasActiveGlow(el) ||
+    hasActiveHalftone(el) ||
+    hasActiveGrain(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -513,6 +532,23 @@ export function buildImageFilters(
     filters.push(F.Pixelate as (imageData: StudioImageDataLike) => void);
     attrs.pixelSize = Math.max(1, Math.round(el.pixelate!));
   }
+  // 하프톤(망점) → 그레인(질감) → 글로우 → 테두리 순으로 스타일라이즈를 마무리한다.
+  if (hasActiveHalftone(el)) {
+    filters.push(F.Halftone!);
+    const ht = normalizeHalftone(el.halftone);
+    attrs.htDot = ht.dotSize;
+    attrs.htAngle = ht.angle;
+    attrs.htMode = ht.mode;
+    attrs.htStrength = ht.strength;
+  }
+  if (hasActiveGrain(el)) {
+    filters.push(F.Grain!);
+    const gr = normalizeGrain(el.grain);
+    attrs.grainType = gr.type;
+    attrs.grainAmount = gr.amount;
+    attrs.grainSize = gr.size;
+    attrs.grainSeed = gr.seed;
+  }
   // 글로우는 최종 밝은 영역에서 번지므로 늦게, 테두리는 실루엣 바깥에 그리므로 가장 마지막.
   if (hasActiveGlow(el)) {
     filters.push(F.Glow!);
@@ -576,5 +612,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.clarity ?? null,
     el.outline ?? null,
     el.glow ?? null,
+    el.halftone ?? null,
+    el.grain ?? null,
   ]);
 }

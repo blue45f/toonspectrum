@@ -1,0 +1,147 @@
+/**
+ * Studio Grain Panel
+ * 선택된 이미지의 그레인/텍스처(Grain) 오버레이 인스펙터 — 원클릭 질감 프리셋 +
+ * 질감 종류(필름/종이/주사선/도트) 선택 + 세기·크기 슬라이더 + 결정적 시드 재생성.
+ * studio-grain 엔진의 Grain을 props로 읽고 onPatch/onApplyPreset/onReset으로만 쓴다.
+ * StudioPage에서 분리한 순수 프레젠테이션 컴포넌트(상태 없음).
+ */
+import { RotateCcw } from "lucide-react";
+
+import { buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+import {
+  GRAIN_AMOUNT_RANGE,
+  GRAIN_PRESETS,
+  GRAIN_SIZE_RANGE,
+  GRAIN_TYPES,
+  isIdentityGrain,
+  type Grain,
+  type GrainType,
+} from "./studio-grain";
+
+// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(세기 0..100·크기 1..8 정수 수용).
+const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
+const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
+const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
+const CHIP_CLASS =
+  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
+
+// 세기·크기 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 크기는 size).
+const GRAIN_SLIDERS: { key: "amount" | "size"; label: string; range: { min: number; max: number; step: number } }[] = [
+  { key: "amount", label: "세기", range: GRAIN_AMOUNT_RANGE },
+  { key: "size", label: "크기", range: GRAIN_SIZE_RANGE },
+];
+
+// 시드 결정적 변환(선형 합동 생성기 1스텝) — Math.random 없이 같은 시드는 항상 같은 다음 값.
+// %10000으로 음수가 나올 수 있어 +10000 후 다시 %10000으로 0..9999 양수로 고정한다.
+function nextSeed(seed: number): number {
+  return (((seed * 1103515245 + 12345) % 10000) + 10000) % 10000;
+}
+
+export function StudioGrainPanel({
+  value,
+  onPatch,
+  onApplyPreset,
+  onReset,
+}: {
+  value: Grain;
+  onPatch: (patch: Partial<Grain>) => void;
+  onApplyPreset: (v: Grain) => void;
+  onReset: () => void;
+}): React.ReactElement {
+  // 항등(세기 0)이면 리셋 비활성 + 어떤 프리셋 칩도 활성으로 표시하지 않는다(빈 프리셋 없음).
+  const isIdentity = isIdentityGrain(value);
+
+  return (
+    <div className="space-y-2">
+      {/* 헤더 + 항등 복귀 */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">그레인/텍스처 (Grain)</p>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={isIdentity}
+          className={buttonClass({ size: "sm", variant: "quiet" })}
+          title="그레인/텍스처를 제거하고 원본으로 되돌립니다."
+        >
+          <RotateCcw className="size-3.5" />
+          원본으로
+        </button>
+      </div>
+
+      {/* 원클릭 질감 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
+      <div className="flex flex-wrap gap-1.5">
+        {GRAIN_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => onApplyPreset(preset.value)}
+            title={preset.tip}
+            className={CHIP_CLASS}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 질감 종류 선택 — 현재 종류를 활성으로 강조, 누르면 type만 패치(세기·크기·시드 유지). */}
+      <div className="flex flex-wrap gap-1.5">
+        {GRAIN_TYPES.map((t) => {
+          const active = t.id === value.type;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onPatch({ type: t.id as GrainType })}
+              title={`질감을 "${t.label}"로 바꿉니다.`}
+              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 세기·크기 슬라이더 — 범위는 GRAIN_AMOUNT_RANGE·GRAIN_SIZE_RANGE에서. */}
+      <div className="space-y-2">
+        {GRAIN_SLIDERS.map(({ key, label, range }) => {
+          const current = value[key];
+          return (
+            <label key={key} className={LABEL_ROW}>
+              {label}
+              <span className="flex items-center gap-1.5">
+                <input
+                  type="range"
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  value={current}
+                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
+                  className={RANGE_CLASS}
+                />
+                <span className={READOUT_CLASS}>{current}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      {/* 시드 — "새 시드"는 결정적으로 다음 시드를 뽑는다(Math.random 없음, 같은 시드=같은 노이즈). */}
+      <label className={LABEL_ROW}>
+        시드(Seed)
+        <span className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onPatch({ seed: nextSeed(value.seed) })}
+            className={CHIP_CLASS}
+            title="노이즈 패턴을 결정적으로 다시 뽑습니다(같은 시드는 같은 무늬)."
+          >
+            새 시드
+          </button>
+          <span className={READOUT_CLASS}>{value.seed}</span>
+        </span>
+      </label>
+    </div>
+  );
+}

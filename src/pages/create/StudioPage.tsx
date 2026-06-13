@@ -176,6 +176,8 @@ import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
 import { normalizeClarity, type Clarity } from "./studio-clarity";
 import { normalizeOutline, type Outline } from "./studio-outline";
 import { normalizeGlow, type Glow } from "./studio-glow";
+import { normalizeHalftone, type Halftone } from "./studio-halftone";
+import { normalizeGrain, type Grain } from "./studio-grain";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
@@ -189,6 +191,8 @@ import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
 import { StudioClarityPanel } from "./StudioClarityPanel";
 import { StudioOutlinePanel } from "./StudioOutlinePanel";
 import { StudioGlowPanel } from "./StudioGlowPanel";
+import { StudioHalftonePanel } from "./StudioHalftonePanel";
+import { StudioGrainPanel } from "./StudioGrainPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -267,6 +271,8 @@ interface ImageEl {
   clarity?: Clarity;
   outline?: Outline;
   glow?: Glow;
+  halftone?: Halftone;
+  grain?: Grain;
 }
 interface TextEl {
   id: string;
@@ -8057,6 +8063,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Outline) => patchEl(selected.id, { outline: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { outline: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 컬러 하프톤 — CMYK 망점 인쇄 룩. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioHalftonePanel
+                    value={normalizeHalftone(selected.halftone)}
+                    onPatch={(patch: Partial<Halftone>) =>
+                      patchEl(selected.id, {
+                        halftone: normalizeHalftone({ ...normalizeHalftone(selected.halftone), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Halftone) => patchEl(selected.id, { halftone: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { halftone: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 그레인/텍스처 — 필름 그레인·종이·주사선 오버레이. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioGrainPanel
+                    value={normalizeGrain(selected.grain)}
+                    onPatch={(patch: Partial<Grain>) =>
+                      patchEl(selected.id, {
+                        grain: normalizeGrain({ ...normalizeGrain(selected.grain), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Grain) => patchEl(selected.id, { grain: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { grain: undefined } as Partial<El>)}
                   />
                 </div>
               )}
