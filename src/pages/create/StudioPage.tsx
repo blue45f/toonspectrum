@@ -168,9 +168,13 @@ import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
 import { normalizeCurve, type CurvePoint } from "./studio-curves";
 import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
 import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
+import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
+import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
+import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
+import { StudioVibrancePanel } from "./StudioVibrancePanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -237,10 +241,12 @@ interface ImageEl {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   cornerRadius?: number;
-  // 톤 커브(Curves) + 컬러 밸런스(Color Balance) + 채널 믹서(Channel Mixer).
+  // 톤 커브(Curves) + 컬러 밸런스(Color Balance) + 채널 믹서(Channel Mixer) + 선택 색상(HSL) + 생동감(Vibrance).
   curve?: CurvePoint[];
   colorBalance?: ColorBalance;
   channelMixer?: ChannelMixer;
+  selectiveHsl?: SelectiveHsl;
+  vibrance?: Vibrance;
 }
 interface TextEl {
   id: string;
@@ -7850,6 +7856,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(mixer: ChannelMixer) => patchEl(selected.id, { channelMixer: mixer } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { channelMixer: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 선택 색상(HSL) — 특정 색 대역의 색조/채도/명도 조정. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioSelectiveHslPanel
+                    value={normalizeSelectiveHsl(selected.selectiveHsl)}
+                    onPatch={(patch: Partial<SelectiveHsl>) =>
+                      patchEl(selected.id, {
+                        selectiveHsl: normalizeSelectiveHsl({ ...normalizeSelectiveHsl(selected.selectiveHsl), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: SelectiveHsl) => patchEl(selected.id, { selectiveHsl: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { selectiveHsl: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 생동감(Vibrance) — 저채도 우선 채도 보정 + 전체 채도. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioVibrancePanel
+                    value={normalizeVibrance(selected.vibrance)}
+                    onPatch={(patch: Partial<Vibrance>) =>
+                      patchEl(selected.id, {
+                        vibrance: normalizeVibrance({ ...normalizeVibrance(selected.vibrance), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Vibrance) => patchEl(selected.id, { vibrance: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { vibrance: undefined } as Partial<El>)}
                   />
                 </div>
               )}

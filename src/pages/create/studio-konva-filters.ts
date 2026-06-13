@@ -12,6 +12,8 @@ import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-l
 import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
 import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
+import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat, type SelectiveHsl } from "./studio-selective-hsl";
+import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance, type Vibrance } from "./studio-vibrance";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -44,7 +46,18 @@ export type ImageFilterFields = {
   curve?: CurvePoint[];
   colorBalance?: ColorBalance;
   channelMixer?: ChannelMixer;
+  selectiveHsl?: SelectiveHsl;
+  vibrance?: Vibrance;
 };
+
+// 선택 색상(HSL)이 항등이 아니면 활성.
+function hasActiveSelectiveHsl(el: ImageFilterFields): boolean {
+  return !!el.selectiveHsl && !isIdentitySelectiveHsl(normalizeSelectiveHsl(el.selectiveHsl));
+}
+// 생동감(Vibrance)이 항등이 아니면 활성.
+function hasActiveVibrance(el: ImageFilterFields): boolean {
+  return !!el.vibrance && !isIdentityVibrance(normalizeVibrance(el.vibrance));
+}
 
 // 톤 커브가 항등(보정 없음)이 아니면 활성.
 function hasActiveCurve(el: ImageFilterFields): boolean {
@@ -267,6 +280,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.ColorBalance = colorBalanceKonvaFilter;
   // 채널 믹서 — this.attrs.channelMixer(flat 13) 적용(studio-channel-mixer).
   F.ChannelMixer = channelMixerKonvaFilter;
+  // 선택 색상(HSL) — this.attrs.selectiveHsl(flat 24) 적용(studio-selective-hsl).
+  F.SelectiveHsl = selectiveHslKonvaFilter;
+  // 생동감 — this.attrs.vibrance/vibranceSat 적용(studio-vibrance).
+  F.Vibrance = vibranceKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -281,6 +298,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveCurve(el) ||
     hasActiveColorBalance(el) ||
     hasActiveChannelMixer(el) ||
+    hasActiveSelectiveHsl(el) ||
+    hasActiveVibrance(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -362,6 +381,16 @@ export function buildImageFilters(
     filters.push(F.ChannelMixer!);
     attrs.channelMixer = channelMixerToFlat(normalizeChannelMixer(el.channelMixer));
   }
+  if (hasActiveSelectiveHsl(el)) {
+    filters.push(F.SelectiveHsl!);
+    attrs.selectiveHsl = selectiveHslToFlat(normalizeSelectiveHsl(el.selectiveHsl));
+  }
+  if (hasActiveVibrance(el)) {
+    filters.push(F.Vibrance!);
+    const vb = normalizeVibrance(el.vibrance);
+    attrs.vibrance = vb.vibrance;
+    attrs.vibranceSat = vb.saturation;
+  }
   if (el.grayscale) {
     filters.push(F.Grayscale as (imageData: StudioImageDataLike) => void);
   }
@@ -441,5 +470,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.curve ?? null,
     el.colorBalance ?? null,
     el.channelMixer ?? null,
+    el.selectiveHsl ?? null,
+    el.vibrance ?? null,
   ]);
 }
