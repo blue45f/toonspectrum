@@ -172,6 +172,8 @@ import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl
 import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
 import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
 import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
+import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
+import { normalizeClarity, type Clarity } from "./studio-clarity";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
@@ -179,6 +181,8 @@ import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
 import { StudioVibrancePanel } from "./StudioVibrancePanel";
 import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
 import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
+import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
+import { StudioClarityPanel } from "./StudioClarityPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -253,6 +257,8 @@ interface ImageEl {
   vibrance?: Vibrance;
   gradientMap?: GradientMap;
   photoFilter?: PhotoFilter;
+  autoAdjust?: AutoAdjust;
+  clarity?: Clarity;
 }
 interface TextEl {
   id: string;
@@ -7922,6 +7928,36 @@ export function StudioPage() {
                       patchEl(selected.id, { gradientMap: normalizeGradientMap({ stops }) } as Partial<El>);
                     }}
                     onReset={() => patchEl(selected.id, { gradientMap: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 자동 보정 — 히스토그램 기반 원클릭 대비/톤/색/화이트밸런스. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioAutoAdjustPanel
+                    value={normalizeAutoAdjust(selected.autoAdjust)}
+                    onPatch={(patch: Partial<AutoAdjust>) =>
+                      patchEl(selected.id, {
+                        autoAdjust: normalizeAutoAdjust({ ...normalizeAutoAdjust(selected.autoAdjust), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: AutoAdjust) => patchEl(selected.id, { autoAdjust: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { autoAdjust: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 선명도/디테일 — 로컬 대비(클래리티) + 안개 제거. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioClarityPanel
+                    value={normalizeClarity(selected.clarity)}
+                    onPatch={(patch: Partial<Clarity>) =>
+                      patchEl(selected.id, {
+                        clarity: normalizeClarity({ ...normalizeClarity(selected.clarity), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Clarity) => patchEl(selected.id, { clarity: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { clarity: undefined } as Partial<El>)}
                   />
                 </div>
               )}
