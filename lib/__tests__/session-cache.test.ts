@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  SESSION_TOKEN_TTL_MS,
   SESSION_USER_CACHE_MAX_ENTRIES,
   SESSION_USER_CACHE_TTL_MS,
   clearSessionUserCache,
@@ -8,6 +9,7 @@ import {
   sessionUserCacheSize,
   signSession,
   verifySession,
+  verifySessionToken,
 } from "../server/session";
 
 // 세션 마이크로캐시 — 요청마다 나가던 users SELECT(예: isAdminUser)를 TTL 30초로 흡수하는 계층.
@@ -111,11 +113,19 @@ describe("session user micro-cache", () => {
 });
 
 describe("서명 세션 토큰(기존 시그니처 유지)", () => {
-  it("sign → verify 라운드트립, 변조 토큰은 거부", () => {
-    const token = signSession("user-123");
+  it("sign → verify 라운드트립, 변조 토큰과 레거시 토큰은 거부", () => {
+    const token = signSession("user-123", 7);
     expect(verifySession(token)).toBe("user-123");
+    expect(verifySessionToken(token)).toMatchObject({ userId: "user-123", sessionVersion: 7 });
     expect(verifySession(`${token}x`)).toBeNull();
     expect(verifySession("user-123")).toBeNull(); // 레거시 평문 id 거부
+    expect(verifySession("user-123.fake-signature")).toBeNull(); // v1 결정적 토큰도 거부
     expect(verifySession(null)).toBeNull();
+  });
+
+  it("만료된 v2 토큰은 거부한다", () => {
+    const token = signSession("user-expired", 1, 0);
+    expect(verifySessionToken(token, SESSION_TOKEN_TTL_MS - 1)).toMatchObject({ userId: "user-expired" });
+    expect(verifySessionToken(token, SESSION_TOKEN_TTL_MS + 1)).toBeNull();
   });
 });

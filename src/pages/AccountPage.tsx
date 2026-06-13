@@ -10,10 +10,10 @@ import { ErrorState } from "@/src/components/error-state";
 import { AvatarUploader } from "@/components/avatar-uploader";
 import { cn, formatCount, relativeDate } from "@/lib/utils";
 import { useApp, useHydrated } from "@/lib/store";
-import { useSession, getAuthToken } from "@/src/compat/auth-session";
+import { useSession, getAuthToken, signOut } from "@/src/compat/auth-session";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/lib/creator-client";
-import { updateMyProfile } from "@/src/lib/me-client";
+import { deleteMyAccount, updateMyProfile } from "@/src/lib/me-client";
 import {
   Bookmark,
   BookOpen,
@@ -27,6 +27,7 @@ import {
   MessageCircle,
   Check,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 type Tab = "posts" | "activity" | "profile";
@@ -317,6 +318,7 @@ function ProfileTab() {
   const [bio, setBio] = useState("");
   const [image, setImage] = useState<string | null>(user?.image ?? null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -351,6 +353,20 @@ function ProfileTab() {
       setError(err instanceof Error ? err.message : "프로필을 저장하지 못했어요.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    if (!window.confirm("계정을 탈퇴 처리할까요? 프로필과 로그인 정보가 삭제되고 현재 세션이 만료됩니다.")) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteMyAccount();
+      await signOut();
+      window.location.assign("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "계정을 탈퇴 처리하지 못했어요.");
+      setDeleting(false);
     }
   };
 
@@ -414,7 +430,7 @@ function ProfileTab() {
         <button
           type="button"
           onClick={onSave}
-          disabled={saving || nameInvalid}
+          disabled={saving || deleting || nameInvalid}
           className={buttonClass({ variant: "solid", className: "gap-1.5" })}
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <Check size={16} /> : null}
@@ -422,6 +438,22 @@ function ProfileTab() {
         </button>
         {nameInvalid && <span className="text-xs text-fg-3">이름을 입력해 주세요.</span>}
       </div>
+
+      <section className="rounded-2xl border border-bad/30 bg-bad/5 p-5">
+        <h2 className="text-sm font-semibold text-fg">계정 탈퇴</h2>
+        <p className="mt-1.5 text-[0.78rem] leading-relaxed text-fg-3">
+          프로필과 로그인 정보가 삭제되고 기존 세션이 만료됩니다. 작성한 글과 댓글은 탈퇴한 사용자로 남습니다.
+        </p>
+        <button
+          type="button"
+          onClick={onDeleteAccount}
+          disabled={saving || deleting}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-bad/45 px-3 py-2 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+          {deleting ? "처리 중..." : "계정 탈퇴"}
+        </button>
+      </section>
     </div>
   );
 }

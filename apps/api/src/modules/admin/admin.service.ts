@@ -20,8 +20,15 @@ import {
 } from "../../../../../lib/db";
 import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
 import { invalidateSessionUser } from "../../../../../lib/server/session";
+import {
+  ensureUserLifecycleSchema,
+  normalizeUserAccountStatus,
+  setUserLifecycleStatus,
+  type UserAccountStatus,
+} from "../../../../../lib/server/user-lifecycle";
 
 type AdminRole = "admin" | "creator" | "operator" | "user";
+type MemberStatus = UserAccountStatus;
 type RevenueStatus = "pending" | "approved" | "paid" | "rejected" | "revoked";
 type RevenueStatusFilter = RevenueStatus | "all";
 
@@ -61,6 +68,7 @@ type DashboardResponse = {
 };
 
 const ADMIN_ROLES = new Set<AdminRole>(["admin", "operator"]);
+const MEMBER_STATUSES = new Set<MemberStatus>(["active", "suspended", "deleted"]);
 const REVENUE_STATUSES: ReadonlyArray<RevenueStatus> = ["pending", "approved", "paid", "rejected", "revoked"];
 const REVENUE_STATUS_SET = new Set<RevenueStatus>(REVENUE_STATUSES);
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -443,6 +451,7 @@ export class AdminService {
 
   // ── 회원 관리(/admin/members) ──────────────────────────────────────────
   async listUsers(userId: string, query: { q?: string | null; limit?: number | string | null } = {}) {
+    await ensureUserLifecycleSchema();
     await requireAdminUser(userId);
     const limit = parsePositiveInt(query.limit, 50, 1, 200);
     const search = String(query.q ?? "").trim().toLowerCase();
@@ -453,6 +462,10 @@ export class AdminService {
         name: users.name,
         email: users.email,
         role: users.role,
+        status: users.status,
+        suspendedAt: users.suspendedAt,
+        suspensionReason: users.suspensionReason,
+        deletedAt: users.deletedAt,
         createdAt: users.createdAt,
         postCount: sql<number>`(
           SELECT count(*) FROM fan_post p WHERE p."userId" = ${users.id}
@@ -479,6 +492,10 @@ export class AdminService {
         name: row.name,
         email: row.email,
         role: normalizeRole(row.role),
+        status: normalizeUserAccountStatus(row.status),
+        suspendedAt: row.suspendedAt ? new Date(row.suspendedAt).toISOString() : null,
+        suspensionReason: row.suspensionReason ?? null,
+        deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
         createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
         postCount: toNumber(row.postCount),
         reviewCount: toNumber(row.reviewCount),
@@ -503,6 +520,44 @@ export class AdminService {
     // 권한 변경 즉시 세션 마이크로캐시 무효화 — isAdminUser 가 다음 요청부터 새 역할을 본다.
     invalidateSessionUser(targetUserId);
     return { ok: true, id: targetUserId, role };
+  }
+
+  async setUserStatus(userId: string, targetUserId: string, statusValue: unknown, reasonValue?: unknown) {
+    const admin = await requireAdminUser(userId);
+    const status = parseMemberStatus(statusValue);
+    if (!status || status === "deleted") {
+      throw new BadRequestException({ error: "지원하지 않는 회원 상태예요." });
+    }
+    if (!targetUserId) throw new BadRequestException({ error: "대상 사용자가 필요해요." });
+    if (targetUserId === admin.id) {
+      throw new BadRequestException({ error: "자기 자신의 상태는 변경할 수 없어요." });
+    }
+    const row = await setUserLifecycleStatus(targetUserId, status, parseString(reasonValue, "", 300));
+    if (!row) throw new BadRequestException({ error: "대상 사용자를 찾을 수 없어요." });
+    return {
+      ok: true,
+      id: targetUserId,
+      status: normalizeUserAccountStatus(row.status),
+      suspendedAt: row.suspendedAt ? new Date(row.suspendedAt).toISOString() : null,
+      suspensionReason: row.suspensionReason ?? null,
+      deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
+    };
+  }
+
+  async deleteUser(userId: string, targetUserId: string, reasonValue?: unknown) {
+    const admin = await requireAdminUser(userId);
+    if (!targetUserId) throw new BadRequestException({ error: "대상 사용자가 필요해요." });
+    if (targetUserId === admin.id) {
+      throw new BadRequestException({ error: "자기 자신은 삭제할 수 없어요." });
+    }
+    const row = await setUserLifecycleStatus(targetUserId, "deleted", parseString(reasonValue, "admin soft delete", 300));
+    if (!row) throw new BadRequestException({ error: "대상 사용자를 찾을 수 없어요." });
+    return {
+      ok: true,
+      id: targetUserId,
+      status: "deleted",
+      deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
+    };
   }
 
   async getDashboard(userId: string, periodDays: number): Promise<DashboardResponse> {
@@ -1040,14 +1095,18 @@ export class AdminService {
 }
 
 async function requireAdminUser(userId: string): Promise<{ id: string; name: string | null; email: string | null; role: AdminRole }> {
+  await ensureUserLifecycleSchema();
   const [row] = await db
-    .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, status: users.status })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
 
   if (!row) {
     throw new ForbiddenException("사용자 정보를 확인할 수 없습니다.");
+  }
+  if (normalizeUserAccountStatus(row.status) !== "active") {
+    throw new ForbiddenException("비활성 계정은 관리자 권한을 사용할 수 없습니다.");
   }
 
   const dbRole = normalizeRole(row.role);
@@ -1194,6 +1253,11 @@ function parseRevenueStatus(value: unknown): RevenueStatus | null {
   return REVENUE_STATUS_SET.has(parsed as RevenueStatus) ? (parsed as RevenueStatus) : null;
 }
 
+function parseMemberStatus(value: unknown): MemberStatus | null {
+  const parsed = String(value ?? "").toLowerCase();
+  return MEMBER_STATUSES.has(parsed as MemberStatus) ? (parsed as MemberStatus) : null;
+}
+
 function statusLabel(status: RevenueStatus) {
   if (status === "pending") return "대기";
   if (status === "approved") return "승인";
@@ -1316,6 +1380,7 @@ async function countDistinctActiveUsers(from: number) {
 
 async function ensureAdminSchema() {
   if (adminSchemaReady) return;
+  await ensureUserLifecycleSchema();
 
   const userInfo = await dbClient.execute({
     sql: `SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,

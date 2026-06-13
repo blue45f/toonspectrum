@@ -68,7 +68,7 @@ const eslintConfig = defineConfig([
       ...tseslint.configs.recommended.rules,
       "no-undef": "off",
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "error",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
@@ -85,7 +85,7 @@ const eslintConfig = defineConfig([
     },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
       'react-compiler/react-compiler': 'error'
     }
   }]);
