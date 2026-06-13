@@ -11,6 +11,7 @@ import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters
 import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
 import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
 import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
+import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -39,9 +40,10 @@ export type ImageFilterFields = {
   levelsGamma?: number;
   levelsOutBlack?: number;
   levelsOutWhite?: number;
-  // 톤 커브(studio-curves) + 컬러 밸런스(studio-color-balance).
+  // 톤 커브(studio-curves) + 컬러 밸런스(studio-color-balance) + 채널 믹서(studio-channel-mixer).
   curve?: CurvePoint[];
   colorBalance?: ColorBalance;
+  channelMixer?: ChannelMixer;
 };
 
 // 톤 커브가 항등(보정 없음)이 아니면 활성.
@@ -51,6 +53,10 @@ function hasActiveCurve(el: ImageFilterFields): boolean {
 // 컬러 밸런스가 항등이 아니면 활성.
 function hasActiveColorBalance(el: ImageFilterFields): boolean {
   return !!el.colorBalance && !isIdentityColorBalance(normalizeColorBalance(el.colorBalance));
+}
+// 채널 믹서가 항등이 아니면 활성.
+function hasActiveChannelMixer(el: ImageFilterFields): boolean {
+  return !!el.channelMixer && !isIdentityChannelMixer(normalizeChannelMixer(el.channelMixer));
 }
 
 // 이미지 요소의 레벨 필드 → studio-levels LevelsParams로 정규화.
@@ -259,6 +265,8 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Curve = curveKonvaFilter;
   // 컬러 밸런스 — this.attrs.cbShadows/cbMidtones/cbHighlights 적용(studio-color-balance).
   F.ColorBalance = colorBalanceKonvaFilter;
+  // 채널 믹서 — this.attrs.channelMixer(flat 13) 적용(studio-channel-mixer).
+  F.ChannelMixer = channelMixerKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -272,6 +280,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveLevels(el) ||
     hasActiveCurve(el) ||
     hasActiveColorBalance(el) ||
+    hasActiveChannelMixer(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -348,6 +357,10 @@ export function buildImageFilters(
     attrs.cbShadows = cb.shadows;
     attrs.cbMidtones = cb.midtones;
     attrs.cbHighlights = cb.highlights;
+  }
+  if (hasActiveChannelMixer(el)) {
+    filters.push(F.ChannelMixer!);
+    attrs.channelMixer = channelMixerToFlat(normalizeChannelMixer(el.channelMixer));
   }
   if (el.grayscale) {
     filters.push(F.Grayscale as (imageData: StudioImageDataLike) => void);
@@ -427,5 +440,6 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.levelsOutWhite ?? null,
     el.curve ?? null,
     el.colorBalance ?? null,
+    el.channelMixer ?? null,
   ]);
 }

@@ -167,8 +167,11 @@ import { type LayerStylePatch } from "./studio-layer-styles";
 import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
 import { normalizeCurve, type CurvePoint } from "./studio-curves";
 import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
+import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
+import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
+import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
   groupOfItem,
@@ -234,9 +237,10 @@ interface ImageEl {
   shadowOffsetY?: number;
   shadowOpacity?: number;
   cornerRadius?: number;
-  // 톤 커브(Curves) + 컬러 밸런스(Color Balance).
+  // 톤 커브(Curves) + 컬러 밸런스(Color Balance) + 채널 믹서(Channel Mixer).
   curve?: CurvePoint[];
   colorBalance?: ColorBalance;
+  channelMixer?: ChannelMixer;
 }
 interface TextEl {
   id: string;
@@ -5253,32 +5257,25 @@ export function StudioPage() {
                   ))}
                 </Group>
               )}
-              {elements.map((el, idx) => {
-                if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+              {(() => {
+                // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
+                // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
+                const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
-                const draggable = tool === "select" && !locked;
-                const onSelect = () => tool === "select" && !locked && setSelectedId(el.id);
-                const setRef = (n: Konva.Node | null) => {
-                  nodeRefs.current[el.id] = n;
-                };
-                // 패널 내부 콘텐츠 클리핑(들어간 패널 영역) + 클리핑 마스크(바로 아래 레이어 영역). 둘 다면 교집합.
+                const draggable = !opts.asMask && tool === "select" && !locked;
+                const onSelect = opts.asMask ? () => {} : () => tool === "select" && !locked && setSelectedId(el.id);
+                const setRef = opts.asMask
+                  ? () => {}
+                  : (n: Konva.Node | null) => {
+                      nodeRefs.current[el.id] = n;
+                    };
+                // 패널 내부 콘텐츠 클리핑(들어간 패널 영역). 아래 레이어 클리핑 마스크는 ClipMaskGroup이 알파로 처리한다.
                 const panelClip = el.noClip ? null : containingPanel(el, elements);
-                const belowEl = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
-                const belowClip = belowEl ? elBounds(belowEl) : null;
-                let clip: { x: number; y: number; width: number; height: number } | null = null;
-                if (panelClip && belowClip) {
-                  const x = Math.max(panelClip.x, belowClip.x);
-                  const y = Math.max(panelClip.y, belowClip.y);
-                  const right = Math.min(panelClip.x + panelClip.width, belowClip.x + belowClip.w);
-                  const bottom = Math.min(panelClip.y + panelClip.height, belowClip.y + belowClip.h);
-                  clip = { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
-                } else if (panelClip) {
-                  clip = { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height };
-                } else if (belowClip) {
-                  clip = { x: belowClip.x, y: belowClip.y, width: belowClip.w, height: belowClip.h };
-                }
+                const clip = panelClip
+                  ? { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height }
+                  : null;
                 const wrapClip = (node: ReactNode) => {
-                  const composite = (el.blendMode as any) || "source-over";
+                  const composite = opts.compositeOverride ?? ((el.blendMode as any) || "source-over");
                   return clip ? (
                     <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height} globalCompositeOperation={composite}>
                       {node}
@@ -5783,7 +5780,34 @@ export function StudioPage() {
                     />
                   </Group>
                 );
-              })}
+                };
+                return elements.map((el, idx) => {
+                  if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+                  const base = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
+                  if (base && !isEffectivelyHidden(base, groups)) {
+                    // 알파 정밀 클리핑: 베이스 사본(마스크) + 자식(source-in)을 캐시 그룹에 담아 베이스 알파로만 자른다.
+                    const ck = [
+                      el.id,
+                      base.id,
+                      imageFilterCacheKey(el as ImageEl),
+                      imageFilterCacheKey(base as ImageEl),
+                      (el as { src?: string }).src ?? "",
+                      (base as { src?: string }).src ?? "",
+                      JSON.stringify(elBounds(el)),
+                      JSON.stringify(elBounds(base)),
+                      (el as { rotation?: number }).rotation ?? 0,
+                      (base as { rotation?: number }).rotation ?? 0,
+                    ].join("|");
+                    return (
+                      <ClipMaskGroup key={el.id} cacheKey={ck}>
+                        {renderEl(base, idx - 1, { asMask: true })}
+                        {renderEl(el, idx, { compositeOverride: "source-in" })}
+                      </ClipMaskGroup>
+                    );
+                  }
+                  return renderEl(el, idx);
+                });
+              })()}
               {draft && <StudioDrawNode el={draft} />}
               <Transformer
                 ref={trRef}
@@ -7811,6 +7835,21 @@ export function StudioPage() {
                     }
                     onApplyPreset={(balance: ColorBalance) => patchEl(selected.id, { colorBalance: balance } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { colorBalance: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 채널 믹서 — RGB 채널 재조합(흑백 변환·채널 스왑·적외선). */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioChannelMixerPanel
+                    value={normalizeChannelMixer(selected.channelMixer)}
+                    onPatch={(patch: Partial<ChannelMixer>) =>
+                      patchEl(selected.id, {
+                        channelMixer: normalizeChannelMixer({ ...normalizeChannelMixer(selected.channelMixer), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(mixer: ChannelMixer) => patchEl(selected.id, { channelMixer: mixer } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { channelMixer: undefined } as Partial<El>)}
                   />
                 </div>
               )}
