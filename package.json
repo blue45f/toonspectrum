@@ -32,7 +32,9 @@
     "lint:ci": "pnpm run lint:strict",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
     "verify": "pnpm run ci",
-    "verify:push": "pnpm run verify"
+    "verify:push": "pnpm run verify",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx lib/db/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
