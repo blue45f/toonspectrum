@@ -8,19 +8,14 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-import { StudioSliderRow } from "./studio-panel-ui";
+import { StudioSliderRow, StudioSwatchChip } from "./studio-panel-ui";
 import {
   isIdentityPhotoFilter,
   PHOTO_FILTER_DENSITY_RANGE,
   PHOTO_FILTER_PRESETS,
   type PhotoFilter,
 } from "./studio-photo-filter";
-
-// 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
-const CHIP_CLASS =
-  "flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 export function StudioPhotoFilterPanel({
   value,
@@ -55,25 +50,16 @@ export function StudioPhotoFilterPanel({
 
       {/* 원클릭 색조 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 스와치는 프리셋 색으로 칠한다. */}
       <div className="flex flex-wrap gap-1.5">
-        {PHOTO_FILTER_PRESETS.map((preset) => {
-          const active = preset.id === "none" && isIdentity;
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => onApplyPreset(preset.value)}
-              title={preset.tip}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              <span
-                aria-hidden
-                className="size-2.5 rounded-full border border-line/60"
-                style={{ backgroundColor: preset.value.color }}
-              />
-              {preset.label}
-            </button>
-          );
-        })}
+        {PHOTO_FILTER_PRESETS.map((preset) => (
+          <StudioSwatchChip
+            key={preset.id}
+            color={preset.value.color}
+            label={preset.label}
+            active={preset.id === "none" && isIdentity}
+            title={preset.tip}
+            onClick={() => onApplyPreset(preset.value)}
+          />
+        ))}
       </div>
 
       {/* 필터 색 — input[type=color]는 빈 값 불가라 항상 #rrggbb를 들고 있다. */}

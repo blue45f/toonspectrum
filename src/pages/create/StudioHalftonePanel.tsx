@@ -8,9 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-import { PANEL_CHIP_CLASS, PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
+import { PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import {
   HALFTONE_ANGLE_RANGE,
   HALFTONE_DOT_RANGE,
@@ -82,21 +81,16 @@ export function StudioHalftonePanel({
       <label className={PANEL_LABEL_ROW}>
         모드
         <span className="flex items-center gap-1.5">
-          {HALFTONE_MODE_OPTIONS.map(({ mode, label, tip }) => {
-            const active = value.mode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onPatch({ mode })}
-                aria-pressed={active}
-                title={tip}
-                className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-              >
-                {label}
-              </button>
-            );
-          })}
+          {HALFTONE_MODE_OPTIONS.map(({ mode, label, tip }) => (
+            <StudioToggleChip
+              key={mode}
+              active={value.mode === mode}
+              onClick={() => onPatch({ mode })}
+              title={tip}
+            >
+              {label}
+            </StudioToggleChip>
+          ))}
         </span>
       </label>
 

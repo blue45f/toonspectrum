@@ -38,6 +38,62 @@ export function StudioPanelChip({
   );
 }
 
+// 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
+export const PANEL_SWATCH_CHIP_CLASS =
+  "flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
+
+// 색 스와치 + 라벨을 한 칩에 담는 프리셋 칩. swatch 는 color 로 칠하고, active 면 강조 테두리로 표시한다.
+export function StudioSwatchChip({
+  color,
+  label,
+  active = false,
+  title,
+  onClick,
+}: {
+  color: string;
+  label: ReactNode;
+  active?: boolean;
+  title?: string;
+  onClick: () => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={cn(PANEL_SWATCH_CHIP_CLASS, active && "border-accent bg-raised text-fg")}
+    >
+      <span aria-hidden className="size-2.5 rounded-full border border-line/60" style={{ backgroundColor: color }} />
+      {label}
+    </button>
+  );
+}
+
+// aria-pressed 를 가진 토글/세그먼트 칩 한 개. 단일 on/off(글로우 원색) 또는 다중 모드 선택(하프톤)에 모두 쓴다.
+export function StudioToggleChip({
+  active,
+  title,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  title?: string;
+  onClick: () => void;
+  children: ReactNode;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={title}
+      className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-raised text-fg")}
+    >
+      {children}
+    </button>
+  );
+}
+
 // 라벨 + 레인지 슬라이더 + 우측 readout 한 줄. readout 미지정 시 value 를 그대로 표시한다.
 export function StudioSliderRow({
   label,

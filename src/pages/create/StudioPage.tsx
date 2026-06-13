@@ -108,6 +108,7 @@ import {
 } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
+import { StudioStickerGrid } from "./studio-sticker-grid";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   EXPORT_SCALES,
@@ -219,6 +220,7 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
+import { resizableNodeProps, textNodeProps } from "./studio-node-props";
 
 // 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
 registerStudioKonvaFilters(Konva);
@@ -1226,19 +1228,7 @@ function UrlImage({
       shadowOffsetY={el.shadowOffsetY ?? 0}
       shadowOpacity={el.shadowOpacity ?? 1}
       cornerRadius={el.cornerRadius ?? 0}
-      draggable={draggable}
-      dragBoundFunc={dragBoundFunc}
-      onMouseDown={onSelect}
-      onTap={onSelect}
-      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
-      onTransformEnd={(e) => {
-        const node = e.target;
-        const w = Math.max(20, node.width() * node.scaleX());
-        const h = Math.max(20, node.height() * node.scaleY());
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
-      }}
+      {...resizableNodeProps<Partial<ImageEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
     />
   );
 }
@@ -1440,19 +1430,7 @@ function FocusLinesNode({
       strokeWidth={el.strokeWidth ?? 2.5}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
-      draggable={draggable}
-      dragBoundFunc={dragBoundFunc}
-      onMouseDown={onSelect}
-      onTap={onSelect}
-      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
-      onTransformEnd={(e) => {
-        const node = e.target;
-        const w = Math.max(20, node.width() * node.scaleX());
-        const h = Math.max(20, node.height() * node.scaleY());
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
-      }}
+      {...resizableNodeProps<Partial<FocusLinesEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
     />
   );
 }
@@ -1510,19 +1488,7 @@ function SpeedLinesNode({
       strokeWidth={el.strokeWidth ?? 2.5}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
-      draggable={draggable}
-      dragBoundFunc={dragBoundFunc}
-      onMouseDown={onSelect}
-      onTap={onSelect}
-      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
-      onTransformEnd={(e) => {
-        const node = e.target;
-        const w = Math.max(20, node.width() * node.scaleX());
-        const h = Math.max(20, node.height() * node.scaleY());
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
-      }}
+      {...resizableNodeProps<Partial<SpeedLinesEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
     />
   );
 }
@@ -4410,67 +4376,13 @@ export function StudioPage() {
                 </p>
               )}
               {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 스티커</p>
-                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    {fxComicFiltered.map((sticker) => (
-                      <button
-                        key={sticker.id}
-                        type="button"
-                        title={sticker.label}
-                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                      >
-                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                        </div>
-                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
               )}
               {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">동물·캐릭터</p>
-                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    {fxCreatureFiltered.map((sticker) => (
-                      <button
-                        key={sticker.id}
-                        type="button"
-                        title={sticker.label}
-                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                      >
-                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                        </div>
-                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
               )}
               {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">소품·오브젝트</p>
-                  <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    {fxPropFiltered.map((sticker) => (
-                      <button
-                        key={sticker.id}
-                        type="button"
-                        title={sticker.label}
-                        onClick={() => addFxOverlay(sticker.svg, sticker.width, sticker.height)}
-                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                      >
-                        <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-                          <img src={svgToDataUrl(sticker.svg)} alt={sticker.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                        </div>
-                        <span className="mt-0.5 block w-full truncate text-center text-[0.55rem] text-fg-3">{sticker.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
               )}
               {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
                 <>
@@ -5427,13 +5339,7 @@ export function StudioPage() {
                       shadowOffsetY={el.shadowOffsetY}
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
-                      draggable={draggable}
-                      dragBoundFunc={snapBoundFunc}
-                      onMouseDown={onSelect}
-                      onTap={onSelect}
-                      onDblClick={() => startEditText(el.id)}
-                      onDblTap={() => startEditText(el.id)}
-                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target;
                         const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
@@ -5474,13 +5380,7 @@ export function StudioPage() {
                       shadowOffsetY={el.shadowOffsetY}
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
-                      draggable={draggable}
-                      dragBoundFunc={snapBoundFunc}
-                      onMouseDown={onSelect}
-                      onTap={onSelect}
-                      onDblClick={() => startEditText(el.id)}
-                      onDblTap={() => startEditText(el.id)}
-                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target as Konva.Text;
                         const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
@@ -5502,13 +5402,7 @@ export function StudioPage() {
                       fontSize={el.fontSize}
                       rotation={el.rotation}
                       opacity={el.opacity ?? 1}
-                      draggable={draggable}
-                      dragBoundFunc={snapBoundFunc}
-                      onMouseDown={onSelect}
-                      onTap={onSelect}
-                      onDblClick={() => startEditText(el.id)}
-                      onDblTap={() => startEditText(el.id)}
-                      onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
+                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target as Konva.Text;
                         const fs = Math.max(16, Math.round(el.fontSize * node.scaleX()));

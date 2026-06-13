@@ -230,6 +230,36 @@ function diagonalOf(width: number, height: number): number {
 }
 
 /**
+ * 광원 픽셀 순회 공통 루프 — 각 픽셀에서 인덱스 i, 세기×알파 k(=intensity*alpha/255)를 구하고
+ * 완전 투명/비조명(k<=0)은 건너뛴 뒤, 광원 기준 오프셋(dx=x-sx, dy=y-sy)으로 falloffAt를 호출해
+ * 그 falloff를 addLight로 SCREEN 가산한다. 종류별로 다른 건 falloff 계산뿐이다.
+ */
+function forEachLitPixel(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  sx: number,
+  sy: number,
+  intensity: number,
+  lr: number,
+  lg: number,
+  lb: number,
+  falloffAt: (x: number, y: number, dx: number, dy: number) => number
+): void {
+  for (let y = 0; y < height; y++) {
+    const dy = y - sy;
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const k = intensity * (data[i + 3]! / 255); // 세기×알파
+      if (k <= 0) continue; // 완전 투명 등은 손대지 않음
+      const dx = x - sx;
+      const falloff = falloffAt(x, y, dx, dy);
+      addLight(data, i, falloff, k, lr, lg, lb);
+    }
+  }
+}
+
+/**
  * 렌즈 플레어 — 광원에 밝은 방사 코어(가까울수록 1) + 광원에서 화면중심 방향으로
  * 직선을 따라 흩뿌린 3개의 옅은 고스트 디스크. 각 디스크는 자기 중심에 가까울수록 밝다(부드러운 가우시안형).
  * 코어 반경/고스트 반경은 대각선에 비례. 픽셀별로 코어+고스트 falloff의 합을 SCREEN으로 얹는다.
@@ -307,19 +337,11 @@ function applyLightLeak(
 ): void {
   const diag = diagonalOf(width, height);
   const reach = diag * 0.9; // 누출이 거의 사라지는 거리
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      const k = intensity * (data[i + 3]! / 255);
-      if (k <= 0) continue;
-      const dx = x - sx;
-      const dy = y - sy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // 광원 근처는 1, reach 부근에서 0으로 부드럽게.
-      const falloff = 1 - smoothstep(0, reach, dist);
-      addLight(data, i, falloff, k, lr, lg, lb);
-    }
-  }
+  forEachLitPixel(data, width, height, sx, sy, intensity, lr, lg, lb, (_x, _y, dx, dy) => {
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // 광원 근처는 1, reach 부근에서 0으로 부드럽게.
+    return 1 - smoothstep(0, reach, dist);
+  });
 }
 
 // 광선 다발 수(sunburst) — 각도 패턴 주기. 짝수여도 무방.
@@ -344,25 +366,17 @@ function applySunburst(
   const diag = diagonalOf(width, height);
   const reach = diag * 0.85; // 광선이 사라지는 거리
   const coreR = diag * 0.06; // 광선 무관 밝은 코어 반경
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      const k = intensity * (data[i + 3]! / 255);
-      if (k <= 0) continue;
-      const dx = x - sx;
-      const dy = y - sy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // 방사 감쇠(광원 1 → reach 0).
-      const radial = 1 - smoothstep(0, reach, dist);
-      // 각도 광선 패턴(0..1) — 광원 정점에서는 각도가 불안정하므로 코어로 가린다.
-      const ang = Math.atan2(dy, dx);
-      const ray = (Math.cos(SUNBURST_RAYS * ang) + 1) / 2; // 0..1
-      // 광선 변조 밝기 + 코어 보강.
-      const core = dist < coreR ? 1 - dist / coreR : 0;
-      const falloff = radial * (0.5 + 0.5 * ray) + core;
-      addLight(data, i, falloff, k, lr, lg, lb);
-    }
-  }
+  forEachLitPixel(data, width, height, sx, sy, intensity, lr, lg, lb, (_x, _y, dx, dy) => {
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // 방사 감쇠(광원 1 → reach 0).
+    const radial = 1 - smoothstep(0, reach, dist);
+    // 각도 광선 패턴(0..1) — 광원 정점에서는 각도가 불안정하므로 코어로 가린다.
+    const ang = Math.atan2(dy, dx);
+    const ray = (Math.cos(SUNBURST_RAYS * ang) + 1) / 2; // 0..1
+    // 광선 변조 밝기 + 코어 보강.
+    const core = dist < coreR ? 1 - dist / coreR : 0;
+    return radial * (0.5 + 0.5 * ray) + core;
+  });
 }
 
 /**

@@ -174,6 +174,37 @@ export function applyDistort(img: StudioImageDataLike, d: Distort): void {
 }
 
 /**
+ * 중심 기준 역매핑 공통 루프 — 목적지 픽셀마다 중심 오프셋(dx,dy)·반지름 r을 구해
+ * mapSrc(x,y,dx,dy,r)에 위임한다. mapSrc가 [sx,sy]를 주면 그 좌표를, null이면
+ * 변위 없음(원본 x,y)을 이중선형 샘플링한다. 중심·항등 분기는 각 mapSrc가 null로 표현해
+ * 종류별 가드(r===0 / r>=maxR 등)를 그대로 보존한다. 알파 포함 4채널 보간.
+ */
+function remapAroundCenter(
+  src: Uint8ClampedArray,
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  mapSrc: (x: number, y: number, dx: number, dy: number, r: number) => [number, number] | null
+): void {
+  for (let y = 0; y < height; y++) {
+    const dy = y - cy;
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      const di = (y * width + x) * 4;
+      const mapped = mapSrc(x, y, dx, dy, r);
+      if (mapped === null) {
+        sampleBilinear(src, width, height, x, y, data, di);
+      } else {
+        sampleBilinear(src, width, height, mapped[0], mapped[1], data, di);
+      }
+    }
+  }
+}
+
+/**
  * 비틀기(twirl) — 중심을 축으로 소용돌이. 반지름 r의 감쇠 f=max(0,1-r/maxR)로
  * 회전각 오프셋 angleOffset = a·π·f 를 만든다(중심 r=0과 가장자리 r=maxR에서 f=0 → 고정).
  * 원본 각도 srcAngle = destAngle - angleOffset. 부호로 CW/CCW가 갈린다.
@@ -189,26 +220,15 @@ function distortTwirl(
   const cy = height / 2;
   const maxR = Math.min(width, height) / 2;
   const a = d.amount / 100;
-  for (let y = 0; y < height; y++) {
-    const dy = y - cy;
-    for (let x = 0; x < width; x++) {
-      const dx = x - cx;
-      const r = Math.sqrt(dx * dx + dy * dy);
-      const di = (y * width + x) * 4;
-      // maxR 밖(또는 0)은 회전 없음 → 원본 좌표 그대로.
-      if (maxR <= 0 || r >= maxR) {
-        sampleBilinear(src, width, height, x, y, data, di);
-        continue;
-      }
-      const f = 1 - r / maxR; // 중심 1, 가장자리 0
-      const angleOffset = a * Math.PI * f;
-      const destAngle = Math.atan2(dy, dx);
-      const srcAngle = destAngle - angleOffset;
-      const sx = cx + r * Math.cos(srcAngle);
-      const sy = cy + r * Math.sin(srcAngle);
-      sampleBilinear(src, width, height, sx, sy, data, di);
-    }
-  }
+  remapAroundCenter(src, data, width, height, cx, cy, (x, y, dx, dy, r) => {
+    // maxR 밖(또는 0)은 회전 없음 → 원본 좌표 그대로.
+    if (maxR <= 0 || r >= maxR) return null;
+    const f = 1 - r / maxR; // 중심 1, 가장자리 0
+    const angleOffset = a * Math.PI * f;
+    const destAngle = Math.atan2(dy, dx);
+    const srcAngle = destAngle - angleOffset;
+    return [cx + r * Math.cos(srcAngle), cy + r * Math.sin(srcAngle)];
+  });
 }
 
 /**
@@ -226,24 +246,13 @@ function distortRipple(
   const cy = height / 2;
   const a = d.amount / 100;
   const scale = d.scale;
-  for (let y = 0; y < height; y++) {
-    const dy = y - cy;
-    for (let x = 0; x < width; x++) {
-      const dx = x - cx;
-      const r = Math.sqrt(dx * dx + dy * dy);
-      const di = (y * width + x) * 4;
-      if (r === 0) {
-        // 중심은 방향이 없어 그대로 샘플(진동량 0).
-        sampleBilinear(src, width, height, x, y, data, di);
-        continue;
-      }
-      const srcR = r + Math.sin(r / scale) * a * scale;
-      const ratio = srcR / r; // 같은 방향으로 반지름만 스케일.
-      const sx = cx + dx * ratio;
-      const sy = cy + dy * ratio;
-      sampleBilinear(src, width, height, sx, sy, data, di);
-    }
-  }
+  remapAroundCenter(src, data, width, height, cx, cy, (_x, _y, dx, dy, r) => {
+    // 중심은 방향이 없어 그대로 샘플(진동량 0).
+    if (r === 0) return null;
+    const srcR = r + Math.sin(r / scale) * a * scale;
+    const ratio = srcR / r; // 같은 방향으로 반지름만 스케일.
+    return [cx + dx * ratio, cy + dy * ratio];
+  });
 }
 
 /**
@@ -261,26 +270,15 @@ function distortPinch(
   const cy = height / 2;
   const maxR = Math.min(width, height) / 2;
   const a = d.amount / 100;
-  for (let y = 0; y < height; y++) {
-    const dy = y - cy;
-    for (let x = 0; x < width; x++) {
-      const dx = x - cx;
-      const r = Math.sqrt(dx * dx + dy * dy);
-      const di = (y * width + x) * 4;
-      if (r === 0 || maxR <= 0) {
-        // 중심은 변위 0 → 그대로.
-        sampleBilinear(src, width, height, x, y, data, di);
-        continue;
-      }
-      const falloff = 1 - r / maxR; // 중심 1, 가장자리 0(가장자리는 덜 변형)
-      let srcR = r * (1 + a * falloff);
-      if (srcR < 0) srcR = 0; // 반지름 음수 방지
-      const ratio = srcR / r;
-      const sx = cx + dx * ratio;
-      const sy = cy + dy * ratio;
-      sampleBilinear(src, width, height, sx, sy, data, di);
-    }
-  }
+  remapAroundCenter(src, data, width, height, cx, cy, (_x, _y, dx, dy, r) => {
+    // 중심은 변위 0 → 그대로.
+    if (r === 0 || maxR <= 0) return null;
+    const falloff = 1 - r / maxR; // 중심 1, 가장자리 0(가장자리는 덜 변형)
+    let srcR = r * (1 + a * falloff);
+    if (srcR < 0) srcR = 0; // 반지름 음수 방지
+    const ratio = srcR / r;
+    return [cx + dx * ratio, cy + dy * ratio];
+  });
 }
 
 /**

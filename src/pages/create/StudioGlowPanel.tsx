@@ -8,9 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-import { StudioPanelChip, StudioSliderRow, PANEL_LABEL_ROW, PANEL_CHIP_CLASS } from "./studio-panel-ui";
+import { StudioPanelChip, StudioSliderRow, StudioToggleChip, PANEL_LABEL_ROW } from "./studio-panel-ui";
 import {
   GLOW_PRESETS,
   GLOW_SIZE_RANGE,
@@ -102,15 +101,13 @@ export function StudioGlowPanel({
       <label className={PANEL_LABEL_ROW}>
         글로우 색
         <span className="flex items-center gap-1.5">
-          <button
-            type="button"
+          <StudioToggleChip
+            active={isAuto}
             onClick={() => onPatch({ color: isAuto ? COLOR_FALLBACK : "auto" })}
-            aria-pressed={isAuto}
             title="켜면 밝은 영역의 원래 색으로, 끄면 지정한 단색으로 빛을 번지게 합니다."
-            className={cn(PANEL_CHIP_CLASS, isAuto && "border-accent bg-raised text-fg")}
           >
             원색(auto)
-          </button>
+          </StudioToggleChip>
           {!isAuto && (
             <input
               type="color"

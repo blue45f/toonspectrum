@@ -291,30 +291,32 @@ function applyMotion(
 const RADIAL_SAMPLES = 12;
 
 /**
- * 스핀 — 이미지 중심을 축으로 픽셀의 극좌표 각도를 ±radius도 흔들며 같은 반지름을 K점 평균.
- * 중심 픽셀은 반지름 0이라 거의 불변. 양선형 샘플(가장자리 클램프). 원본과 t 블렌드. 알파 보존.
+ * 중심 기준 방사 샘플 블러 공통 루프(spin/zoom 공유) — 각 픽셀에서 중심 오프셋(px,py)을 구해
+ * K점(f=-1..1)에 대해 coordAt(px,py,f)가 주는 원본 좌표를 양선형 샘플·평균한 뒤 원본과 t 블렌드한다.
+ * 중심·스케일·표본 분포·평균·블렌드·알파 보존이 모두 동일하고, 종류별로 다른 건 좌표 매핑뿐이다.
  */
-function applySpin(data: Uint8ClampedArray, width: number, height: number, radius: number, t: number): void {
+function radialSampleBlend(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  t: number,
+  coordAt: (px: number, py: number, f: number) => [number, number]
+): void {
   const src = new Uint8ClampedArray(data); // 원본 스냅샷
-  const cx = (width - 1) / 2;
-  const cy = (height - 1) / 2;
-  const maxRad = (radius * Math.PI) / 180; // ±각도 범위(라디안)
   const K = RADIAL_SAMPLES;
   const sampleAt = new Float32Array(3);
   for (let y = 0; y < height; y++) {
     const py = y - cy;
     for (let x = 0; x < width; x++) {
       const px = x - cx;
-      const dist = Math.sqrt(px * px + py * py);
-      const baseAng = Math.atan2(py, px);
       let sr = 0;
       let sg = 0;
       let sb = 0;
       for (let s = 0; s < K; s++) {
         const f = (s / (K - 1)) * 2 - 1; // -1..1
-        const ang = baseAng + f * maxRad;
-        const sx = cx + Math.cos(ang) * dist;
-        const sy = cy + Math.sin(ang) * dist;
+        const [sx, sy] = coordAt(px, py, f);
         sampleBilinear(src, width, height, sx, sy, sampleAt);
         sr += sampleAt[0]!;
         sg += sampleAt[1]!;
@@ -332,42 +334,33 @@ function applySpin(data: Uint8ClampedArray, width: number, height: number, radiu
 }
 
 /**
+ * 스핀 — 이미지 중심을 축으로 픽셀의 극좌표 각도를 ±radius도 흔들며 같은 반지름을 K점 평균.
+ * 중심 픽셀은 반지름 0이라 거의 불변. 양선형 샘플(가장자리 클램프). 원본과 t 블렌드. 알파 보존.
+ */
+function applySpin(data: Uint8ClampedArray, width: number, height: number, radius: number, t: number): void {
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  const maxRad = (radius * Math.PI) / 180; // ±각도 범위(라디안)
+  radialSampleBlend(data, width, height, cx, cy, t, (px, py, f) => {
+    const dist = Math.sqrt(px * px + py * py);
+    const baseAng = Math.atan2(py, px);
+    const ang = baseAng + f * maxRad;
+    return [cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist];
+  });
+}
+
+/**
  * 줌 — 이미지 중심에서 방사 직선을 따라 거리 배율 [1-radius/100, 1+radius/100]을 K점 평균(돌진 잔상).
  * 중심 픽셀은 배율을 곱해도 제자리라 거의 불변. 양선형 샘플(가장자리 클램프). 원본과 t 블렌드. 알파 보존.
  */
 function applyZoom(data: Uint8ClampedArray, width: number, height: number, radius: number, t: number): void {
-  const src = new Uint8ClampedArray(data); // 원본 스냅샷
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
   const span = radius / 100; // 배율 흔들림 폭(±)
-  const K = RADIAL_SAMPLES;
-  const sampleAt = new Float32Array(3);
-  for (let y = 0; y < height; y++) {
-    const py = y - cy;
-    for (let x = 0; x < width; x++) {
-      const px = x - cx;
-      let sr = 0;
-      let sg = 0;
-      let sb = 0;
-      for (let s = 0; s < K; s++) {
-        const f = (s / (K - 1)) * 2 - 1; // -1..1
-        const scale = 1 + f * span; // 1-span..1+span
-        const sx = cx + px * scale;
-        const sy = cy + py * scale;
-        sampleBilinear(src, width, height, sx, sy, sampleAt);
-        sr += sampleAt[0]!;
-        sg += sampleAt[1]!;
-        sb += sampleAt[2]!;
-      }
-      const j = (y * width + x) * 4;
-      const br = sr / K;
-      const bg = sg / K;
-      const bb = sb / K;
-      data[j] = src[j]! + (br - src[j]!) * t;
-      data[j + 1] = src[j + 1]! + (bg - src[j + 1]!) * t;
-      data[j + 2] = src[j + 2]! + (bb - src[j + 2]!) * t;
-    }
-  }
+  radialSampleBlend(data, width, height, cx, cy, t, (px, py, f) => {
+    const scale = 1 + f * span; // 1-span..1+span
+    return [cx + px * scale, cy + py * scale];
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@
  */
 
 import type { StudioImageDataLike } from "./studio-filters";
+import { clampCoord, lumaAt, sobelMagnitude } from "./studio-pixel-utils";
 
 // ---------------------------------------------------------------------------
 // 파라미터 타입·기본값·범위
@@ -82,23 +83,8 @@ export function isIdentitySketch(s: Sketch): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// 좌표·휘도 유틸 — 스냅샷 읽기를 공유한다(가장자리 클램프, 비유한 좌표 0 고정).
+// 잉크 블렌드 유틸 — 좌표·휘도 헬퍼는 studio-pixel-utils 공유.
 // ---------------------------------------------------------------------------
-
-// 좌표를 [0, n-1]로 클램프. 비유한(NaN/±Infinity)은 0으로 고정해
-// Math.floor(NaN) 인덱싱이 데이터(특히 알파)를 0으로 뭉개는 버그를 막는다.
-function clampCoord(v: number, n: number): number {
-  if (!Number.isFinite(v)) return 0;
-  if (v < 0) return 0;
-  const max = n - 1;
-  return v > max ? max : v;
-}
-
-// 스냅샷에서 (x,y) 픽셀의 Rec.601 휘도(0..255)를 읽는다. 좌표는 호출 전 클램프 가정.
-function lumaAt(src: Uint8ClampedArray, width: number, x: number, y: number): number {
-  const i = (y * width + x) * 4;
-  return 0.299 * src[i]! + 0.587 * src[i + 1]! + 0.114 * src[i + 2]!;
-}
 
 // 한 픽셀 i를 잉크 톤(ink, 0..255 회색)으로 alpha-scaled 블렌드한다.
 // a = (src 알파/255)*t 라서 완전 투명(alpha 0) 픽셀은 기여 0 → 원본 RGB 유지(헤일로 방지).
@@ -169,19 +155,8 @@ function applyPhotocopy(data: Uint8ClampedArray, width: number, height: number, 
     for (let x = 0; x < width; x++) {
       const xm = clampCoord(x - 1, width);
       const xp = clampCoord(x + 1, width);
-      // 3x3 이웃 휘도(거리 1).
-      const tl = lumaAt(src, width, xm, ym);
-      const tc = lumaAt(src, width, x, ym);
-      const tr = lumaAt(src, width, xp, ym);
-      const ml = lumaAt(src, width, xm, y);
-      const mr = lumaAt(src, width, xp, y);
-      const bl = lumaAt(src, width, xm, yp);
-      const bc = lumaAt(src, width, x, yp);
-      const br = lumaAt(src, width, xp, yp);
-      // 소벨 수평/수직 기울기 → 크기(mag).
-      const gx = tr + 2 * mr + br - (tl + 2 * ml + bl);
-      const gy = bl + 2 * bc + br - (tl + 2 * tc + tr);
-      const mag = Math.sqrt(gx * gx + gy * gy);
+      // 소벨 기울기 크기(거리 1 3x3 이웃).
+      const mag = sobelMagnitude(src, width, xm, x, xp, ym, y, yp);
       // 잉크값: mag가 thr 이상이면 0(검정), thr-soft 이하면 255(흰 바탕), 사이는 선형.
       let ink: number;
       if (mag >= thr) ink = 0;

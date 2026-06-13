@@ -14,6 +14,7 @@
  */
 
 import type { StudioImageDataLike } from "./studio-filters";
+import { clampCoord, lumaAt, sobelMagnitude } from "./studio-pixel-utils";
 
 // ---------------------------------------------------------------------------
 // 파라미터 타입·기본값·범위
@@ -83,22 +84,30 @@ export function isIdentityStylize(s: Stylize): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// 좌표·휘도 유틸 — 스냅샷 읽기를 공유한다(가장자리 클램프, 비유한 좌표 0 고정).
+// 블렌드 유틸 — alpha-scaled 채널 블렌드(좌표·휘도 헬퍼는 studio-pixel-utils 공유).
 // ---------------------------------------------------------------------------
 
-// 좌표를 [0, n-1]로 클램프. 비유한(NaN/±Infinity)은 0으로 고정해
-// Math.floor(NaN) 인덱싱이 데이터(특히 알파)를 0으로 뭉개는 버그를 막는다.
-function clampCoord(v: number, n: number): number {
-  if (!Number.isFinite(v)) return 0;
-  if (v < 0) return 0;
-  const max = n - 1;
-  return v > max ? max : v;
+// 픽셀 i의 r/g/b를 채널별 목표값(tr,tg,tb)으로 alpha-scaled 블렌드한다.
+// a = (base 알파/255)*t — 완전 투명(alpha 0) 픽셀은 기여 0 → 원본 RGB 유지(헤일로 방지).
+// base는 읽기·쓰기 같은 배열일 수도(solarize), 스냅샷 src를 base로 줄 수도(emboss 등) 있다.
+function blendRgbInto(
+  data: Uint8ClampedArray,
+  base: Uint8ClampedArray,
+  i: number,
+  tr: number,
+  tg: number,
+  tb: number,
+  t: number
+): void {
+  const a = (base[i + 3]! / 255) * t;
+  data[i] = base[i]! + (tr - base[i]!) * a;
+  data[i + 1] = base[i + 1]! + (tg - base[i + 1]!) * a;
+  data[i + 2] = base[i + 2]! + (tb - base[i + 2]!) * a;
 }
 
-// 스냅샷에서 (x,y) 픽셀의 Rec.601 휘도(0..255)를 읽는다. 좌표는 호출 전 클램프 가정.
-function lumaAt(src: Uint8ClampedArray, width: number, x: number, y: number): number {
-  const i = (y * width + x) * 4;
-  return 0.299 * src[i]! + 0.587 * src[i + 1]! + 0.114 * src[i + 2]!;
+// 단일 회색값 v를 r/g/b 세 채널에 동일하게 alpha-scaled 블렌드(릴리프·외곽선 등 회색 톤 효과용).
+function blendGrayInto(data: Uint8ClampedArray, src: Uint8ClampedArray, i: number, v: number, t: number): void {
+  blendRgbInto(data, src, i, v, v, v, t);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,10 +182,7 @@ function applyEmboss(data: Uint8ClampedArray, width: number, height: number, det
       const v = acc + 128; // 128 회색 기준 양각(Uint8ClampedArray가 0..255 클램프)
       const i = (y * width + x) * 4;
       // 투명 픽셀은 효과를 더하지 않는다 — 알파 비율로 블렌드 강도를 줄인다.
-      const a = (src[i + 3]! / 255) * t;
-      data[i] = src[i]! + (v - src[i]!) * a;
-      data[i + 1] = src[i + 1]! + (v - src[i + 1]!) * a;
-      data[i + 2] = src[i + 2]! + (v - src[i + 2]!) * a;
+      blendGrayInto(data, src, i, v, t);
     }
   }
 }
@@ -195,26 +201,12 @@ function applyFindEdges(data: Uint8ClampedArray, width: number, height: number, 
     for (let x = 0; x < width; x++) {
       const xm = clampCoord(x - d, width);
       const xp = clampCoord(x + d, width);
-      // 3x3 이웃 휘도(거리 d).
-      const tl = lumaAt(src, width, xm, ym);
-      const tc = lumaAt(src, width, x, ym);
-      const tr = lumaAt(src, width, xp, ym);
-      const ml = lumaAt(src, width, xm, y);
-      const mr = lumaAt(src, width, xp, y);
-      const bl = lumaAt(src, width, xm, yp);
-      const bc = lumaAt(src, width, x, yp);
-      const br = lumaAt(src, width, xp, yp);
-      // 소벨 수평/수직 기울기.
-      const gx = tr + 2 * mr + br - (tl + 2 * ml + bl);
-      const gy = bl + 2 * bc + br - (tl + 2 * tc + tr);
-      const mag = Math.sqrt(gx * gx + gy * gy);
+      // 소벨 기울기 크기(거리 d 3x3 이웃).
+      const mag = sobelMagnitude(src, width, xm, x, xp, ym, y, yp);
       const v = 255 - mag; // 밝은 바탕에 어두운 선(Uint8ClampedArray가 0..255 클램프)
       const i = (y * width + x) * 4;
       // 투명 픽셀(alpha 0)은 흰 바탕(v=255)으로 새지 않도록 알파 비율로 블렌드 강도를 줄인다(헤일로 방지).
-      const a = (src[i + 3]! / 255) * t;
-      data[i] = src[i]! + (v - src[i]!) * a;
-      data[i + 1] = src[i + 1]! + (v - src[i + 1]!) * a;
-      data[i + 2] = src[i + 2]! + (v - src[i + 2]!) * a;
+      blendGrayInto(data, src, i, v, t);
     }
   }
 }
@@ -239,10 +231,7 @@ function applySolarize(data: Uint8ClampedArray, width: number, height: number, d
     const sg = g > threshold ? 255 - g : g;
     const sb = b > threshold ? 255 - b : b;
     // 투명 픽셀은 톤 반전을 적용하지 않는다(알파 비율로 블렌드 강도 조절).
-    const a = (data[i + 3]! / 255) * t;
-    data[i] = r + (sr - r) * a;
-    data[i + 1] = g + (sg - g) * a;
-    data[i + 2] = b + (sb - b) * a;
+    blendRgbInto(data, data, i, sr, sg, sb, t);
   }
 }
 
@@ -307,10 +296,7 @@ function applyOilPaint(data: Uint8ClampedArray, width: number, height: number, d
       const ob = sumB[best]! / c;
       const i = (y * width + x) * 4;
       // 투명 픽셀은 평탄화를 적용하지 않는다(알파 비율로 블렌드 강도 조절).
-      const a = (src[i + 3]! / 255) * t;
-      data[i] = src[i]! + (or - src[i]!) * a;
-      data[i + 1] = src[i + 1]! + (og - src[i + 1]!) * a;
-      data[i + 2] = src[i + 2]! + (ob - src[i + 2]!) * a;
+      blendRgbInto(data, src, i, or, og, ob, t);
     }
   }
 }
