@@ -140,6 +140,7 @@ import {
   buildImageFilters,
   hasActiveImageFilters,
   imageFilterCacheKey,
+  type ImageFilterFields,
 } from "./studio-konva-filters";
 import {
   isDefaultPageGrade,
@@ -184,6 +185,7 @@ import { normalizeStylize, type Stylize } from "./studio-stylize";
 import { normalizeLight, type Light } from "./studio-light";
 import { normalizeSketch, type Sketch } from "./studio-sketch";
 import { normalizeDetail, type Detail } from "./studio-detail";
+import { looksResetPatch, extractFilterFields, type StudioLook } from "./studio-looks";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
@@ -205,6 +207,7 @@ import { StudioStylizePanel } from "./StudioStylizePanel";
 import { StudioLightPanel } from "./StudioLightPanel";
 import { StudioSketchPanel } from "./StudioSketchPanel";
 import { StudioDetailPanel } from "./StudioDetailPanel";
+import { StudioLooksPanel } from "./StudioLooksPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -1645,6 +1648,8 @@ export function StudioPage() {
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
+  const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [color, setColor] = useState("#7c5cfc");
@@ -7865,6 +7870,23 @@ export function StudioPage() {
                 </div>
               )}
 
+              {/* 원클릭 룩 — 여러 필터를 묶은 큐레이티드 프리셋 + 필터 복사/붙여넣기/전체 초기화. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioLooksPanel
+                    onApplyLook={(look: StudioLook) =>
+                      patchEl(selected.id, { ...looksResetPatch(), ...look.patch } as Partial<El>)
+                    }
+                    onCopy={() => setFilterClipboard(extractFilterFields(selected))}
+                    onPaste={() => {
+                      if (filterClipboard)
+                        patchEl(selected.id, { ...looksResetPatch(), ...filterClipboard } as Partial<El>);
+                    }}
+                    onResetAll={() => patchEl(selected.id, looksResetPatch() as Partial<El>)}
+                    canPaste={!!filterClipboard}
+                  />
+                </div>
+              )}
               {/* 이미지 필터 효과 — 원클릭 프리셋 + 보정 슬라이더(StudioImageFilterPanel) */}
               {selected.type === "image" && (
                 <div className="mt-3 border-t border-line/50 pt-3">
