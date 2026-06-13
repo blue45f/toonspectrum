@@ -8,8 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   DISTORT_AMOUNT_RANGE,
   DISTORT_PRESETS,
@@ -19,13 +19,6 @@ import {
   type Distort,
   type DistortType,
 } from "./studio-distort";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(양극 세기 -100..100·스케일 1..50 정수 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 세기·스케일 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 스케일은 scale).
 // 세기는 양극(-100..100)이라 readout에 부호를 붙이고, 스케일은 단극(1..50)이라 값만 표시한다.
@@ -78,34 +71,24 @@ export function StudioDistortPanel({
       {/* 원클릭 왜곡 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
       <div className="flex flex-wrap gap-1.5">
         {DISTORT_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => onApplyPreset(preset.value)}
-            title={preset.tip}
-            className={CHIP_CLASS}
-          >
+          <StudioPanelChip key={preset.id} onClick={() => onApplyPreset(preset.value)} title={preset.tip}>
             {preset.label}
-          </button>
+          </StudioPanelChip>
         ))}
       </div>
 
       {/* 왜곡 종류 선택 — 현재 종류를 활성으로 강조, 누르면 type만 패치(세기·스케일 유지). */}
       <div className="flex flex-wrap gap-1.5">
-        {DISTORT_TYPES.map((t) => {
-          const active = t.id === value.type;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onPatch({ type: t.id as DistortType })}
-              title={`왜곡을 "${t.label}"로 바꿉니다.`}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        {DISTORT_TYPES.map((t) => (
+          <StudioPanelChip
+            key={t.id}
+            active={t.id === value.type}
+            onClick={() => onPatch({ type: t.id as DistortType })}
+            title={`왜곡을 "${t.label}"로 바꿉니다.`}
+          >
+            {t.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 세기·스케일 슬라이더 — 범위는 DISTORT_AMOUNT_RANGE·DISTORT_SCALE_RANGE에서. 세기는 양극이라 부호 표시. */}
@@ -113,21 +96,16 @@ export function StudioDistortPanel({
         {DISTORT_SLIDERS.map(({ key, label, range, signed }) => {
           const current = value[key];
           return (
-            <label key={key} className={LABEL_ROW}>
-              {label}
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={range.step}
-                  value={current}
-                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                  className={RANGE_CLASS}
-                />
-                <span className={READOUT_CLASS}>{signed ? formatSigned(current) : current}</span>
-              </span>
-            </label>
+            <StudioSliderRow
+              key={key}
+              label={label}
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              value={current}
+              onChange={(n) => onPatch({ [key]: n })}
+              readout={signed ? formatSigned(current) : current}
+            />
           );
         })}
       </div>
