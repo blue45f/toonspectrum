@@ -10,6 +10,7 @@ import { RotateCcw } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { PANEL_CHIP_CLASS, PANEL_LABEL_ROW, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   HALFTONE_ANGLE_RANGE,
   HALFTONE_DOT_RANGE,
@@ -18,13 +19,6 @@ import {
   isIdentityHalftone,
   type Halftone,
 } from "./studio-halftone";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다.
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 모드 토글 정의 — CMYK 4채널 컬러 망점 / 휘도 단일 흑색 망점.
 const HALFTONE_MODE_OPTIONS: { mode: Halftone["mode"]; label: string; tip: string }[] = [
@@ -78,20 +72,14 @@ export function StudioHalftonePanel({
       {/* 원클릭 코믹 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등 프리셋이 없어 항등 상태엔 활성 칩 없음. */}
       <div className="flex flex-wrap gap-1.5">
         {HALFTONE_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => onApplyPreset(preset.value)}
-            title={preset.tip}
-            className={CHIP_CLASS}
-          >
+          <StudioPanelChip key={preset.id} onClick={() => onApplyPreset(preset.value)} title={preset.tip}>
             {preset.label}
-          </button>
+          </StudioPanelChip>
         ))}
       </div>
 
-      {/* 망점 모드 — CMYK 컬러 / 흑백 토글. 현재 모드 칩을 활성으로 표시. */}
-      <label className={LABEL_ROW}>
+      {/* 망점 모드 — CMYK 컬러 / 흑백 토글. 현재 모드 칩을 활성으로 표시. aria-pressed가 필요해 칩 버튼은 그대로 둔다. */}
+      <label className={PANEL_LABEL_ROW}>
         모드
         <span className="flex items-center gap-1.5">
           {HALFTONE_MODE_OPTIONS.map(({ mode, label, tip }) => {
@@ -103,7 +91,7 @@ export function StudioHalftonePanel({
                 onClick={() => onPatch({ mode })}
                 aria-pressed={active}
                 title={tip}
-                className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
+                className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-raised text-fg")}
               >
                 {label}
               </button>
@@ -115,24 +103,21 @@ export function StudioHalftonePanel({
       {/* 점 크기·각도·세기 슬라이더 — 범위는 HALFTONE_*_RANGE에서. */}
       <div className="space-y-2">
         {HALFTONE_SLIDERS.map(({ key, label, range, unit }) => (
-          <label key={key} className={LABEL_ROW}>
-            {label}
-            <span className="flex items-center gap-1.5">
-              <input
-                type="range"
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                value={value[key] as number}
-                onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                className={RANGE_CLASS}
-              />
-              <span className={READOUT_CLASS}>
+          <StudioSliderRow
+            key={key}
+            label={label}
+            min={range.min}
+            max={range.max}
+            step={range.step}
+            value={value[key] as number}
+            onChange={(n) => onPatch({ [key]: n })}
+            readout={
+              <>
                 {value[key]}
                 {unit}
-              </span>
-            </span>
-          </label>
+              </>
+            }
+          />
         ))}
       </div>
     </div>

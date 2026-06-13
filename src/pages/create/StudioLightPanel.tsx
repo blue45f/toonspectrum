@@ -8,8 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   LIGHT_HUE_RANGE,
   LIGHT_INTENSITY_RANGE,
@@ -21,13 +21,6 @@ import {
   type Light,
   type LightType,
 } from "./studio-light";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(세기 0..100·X·Y 0..100·색상 0..360 정수 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 세기·X·Y·색상 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 intensity, 위치는 x·y, 광색은 hue).
 const LIGHT_SLIDERS: {
@@ -75,58 +68,39 @@ export function StudioLightPanel({
       {/* 원클릭 광원 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
       <div className="flex flex-wrap gap-1.5">
         {LIGHT_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => onApplyPreset(preset.value)}
-            title={preset.tip}
-            className={CHIP_CLASS}
-          >
+          <StudioPanelChip key={preset.id} onClick={() => onApplyPreset(preset.value)} title={preset.tip}>
             {preset.label}
-          </button>
+          </StudioPanelChip>
         ))}
       </div>
 
       {/* 광원 종류 선택 — 현재 종류를 활성으로 강조, 누르면 type만 패치(세기·X·Y·색상 유지). */}
       <div className="flex flex-wrap gap-1.5">
-        {LIGHT_TYPES.map((t) => {
-          const active = t.id === value.type;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onPatch({ type: t.id as LightType })}
-              title={`광원을 "${t.label}"로 바꿉니다.`}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        {LIGHT_TYPES.map((t) => (
+          <StudioPanelChip
+            key={t.id}
+            active={t.id === value.type}
+            onClick={() => onPatch({ type: t.id as LightType })}
+            title={`광원을 "${t.label}"로 바꿉니다.`}
+          >
+            {t.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 세기·X·Y·색상 슬라이더 — 범위는 LIGHT_INTENSITY_RANGE·LIGHT_X_RANGE·LIGHT_Y_RANGE·LIGHT_HUE_RANGE에서. */}
       <div className="space-y-2">
-        {LIGHT_SLIDERS.map(({ key, label, range }) => {
-          const current = value[key];
-          return (
-            <label key={key} className={LABEL_ROW}>
-              {label}
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={range.step}
-                  value={current}
-                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                  className={RANGE_CLASS}
-                />
-                <span className={READOUT_CLASS}>{current}</span>
-              </span>
-            </label>
-          );
-        })}
+        {LIGHT_SLIDERS.map(({ key, label, range }) => (
+          <StudioSliderRow
+            key={key}
+            label={label}
+            min={range.min}
+            max={range.max}
+            step={range.step}
+            value={value[key]}
+            onChange={(n) => onPatch({ [key]: n })}
+          />
+        ))}
       </div>
     </div>
   );

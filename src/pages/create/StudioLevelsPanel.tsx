@@ -7,8 +7,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   DEFAULT_LEVELS,
   isIdentityLevels,
@@ -16,13 +16,6 @@ import {
   LEVELS_RANGES,
   type LevelsParams,
 } from "./studio-levels";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(255/감마 1.40 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·readout 포맷(감마만 소수 2자리, 나머지는 정수).
 const LEVELS_SLIDERS: { key: keyof LevelsParams; label: string; gamma?: boolean }[] = [
@@ -66,20 +59,16 @@ export function StudioLevelsPanel({
 
       {/* 원클릭 톤 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}
       <div className="flex flex-wrap gap-1.5">
-        {LEVELS_PRESETS.map((preset) => {
-          const active = preset.id === "identity" && isIdentity;
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => onApplyPreset(preset.params)}
-              title={preset.tip}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
+        {LEVELS_PRESETS.map((preset) => (
+          <StudioPanelChip
+            key={preset.id}
+            active={preset.id === "identity" && isIdentity}
+            onClick={() => onApplyPreset(preset.params)}
+            title={preset.tip}
+          >
+            {preset.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 입력 검정/흰점 · 중간톤 감마 · 출력 하한/상한 슬라이더 — 범위는 LEVELS_RANGES에서. */}
@@ -88,21 +77,16 @@ export function StudioLevelsPanel({
           const range = LEVELS_RANGES[key];
           const current = value[key] ?? DEFAULT_LEVELS[key];
           return (
-            <label key={key} className={LABEL_ROW}>
-              {label}
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={range.step}
-                  value={current}
-                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                  className={RANGE_CLASS}
-                />
-                <span className={READOUT_CLASS}>{gamma ? current.toFixed(2) : current}</span>
-              </span>
-            </label>
+            <StudioSliderRow
+              key={key}
+              label={label}
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              value={current}
+              onChange={(n) => onPatch({ [key]: n })}
+              readout={gamma ? current.toFixed(2) : current}
+            />
           );
         })}
       </div>

@@ -10,6 +10,7 @@ import { RotateCcw } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { StudioPanelChip, StudioSliderRow, PANEL_LABEL_ROW, PANEL_CHIP_CLASS } from "./studio-panel-ui";
 import {
   GLOW_PRESETS,
   GLOW_SIZE_RANGE,
@@ -18,13 +19,6 @@ import {
   isIdentityGlow,
   type Glow,
 } from "./studio-glow";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다.
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // color가 "auto"(원색)일 때 색 입력에 보여줄 폴백 — 단색으로 전환하면 흰색에서 시작.
 const COLOR_FALLBACK = "#ffffff";
@@ -71,48 +65,41 @@ export function StudioGlowPanel({
 
       {/* 원클릭 빛 번짐 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}
       <div className="flex flex-wrap gap-1.5">
-        {GLOW_PRESETS.map((preset) => {
-          const active = preset.id === "none" && isIdentity;
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => onApplyPreset(preset.value)}
-              title={preset.tip}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
+        {GLOW_PRESETS.map((preset) => (
+          <StudioPanelChip
+            key={preset.id}
+            active={preset.id === "none" && isIdentity}
+            onClick={() => onApplyPreset(preset.value)}
+            title={preset.tip}
+          >
+            {preset.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 세기·번짐·임계 슬라이더 — 범위는 GLOW_*_RANGE에서. */}
       <div className="space-y-2">
         {GLOW_SLIDERS.map(({ key, label, range, unit }) => (
-          <label key={key} className={LABEL_ROW}>
-            {label}
-            <span className="flex items-center gap-1.5">
-              <input
-                type="range"
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                value={value[key] as number}
-                onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                className={RANGE_CLASS}
-              />
-              <span className={READOUT_CLASS}>
+          <StudioSliderRow
+            key={key}
+            label={label}
+            min={range.min}
+            max={range.max}
+            step={range.step}
+            value={value[key] as number}
+            onChange={(n) => onPatch({ [key]: n })}
+            readout={
+              <>
                 {value[key]}
                 {unit}
-              </span>
-            </span>
-          </label>
+              </>
+            }
+          />
         ))}
       </div>
 
-      {/* 글로우 색 — "원색(auto)" 토글, 끄면 단색 input[type=color]로 직접 지정. */}
-      <label className={LABEL_ROW}>
+      {/* 글로우 색 — "원색(auto)" 토글, 끄면 단색 input[type=color]로 직접 지정. (range가 아니라 공용 SliderRow 미적용) */}
+      <label className={PANEL_LABEL_ROW}>
         글로우 색
         <span className="flex items-center gap-1.5">
           <button
@@ -120,7 +107,7 @@ export function StudioGlowPanel({
             onClick={() => onPatch({ color: isAuto ? COLOR_FALLBACK : "auto" })}
             aria-pressed={isAuto}
             title="켜면 밝은 영역의 원래 색으로, 끄면 지정한 단색으로 빛을 번지게 합니다."
-            className={cn(CHIP_CLASS, isAuto && "border-accent bg-raised text-fg")}
+            className={cn(PANEL_CHIP_CLASS, isAuto && "border-accent bg-raised text-fg")}
           >
             원색(auto)
           </button>

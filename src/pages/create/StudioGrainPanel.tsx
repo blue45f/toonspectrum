@@ -8,8 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
+import { PANEL_LABEL_ROW, PANEL_READOUT_CLASS, StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   GRAIN_AMOUNT_RANGE,
   GRAIN_PRESETS,
@@ -19,13 +19,6 @@ import {
   type Grain,
   type GrainType,
 } from "./studio-grain";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(세기 0..100·크기 1..8 정수 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 세기·크기 슬라이더 정의 — 표시 순서·한글 라벨·범위(세기는 amount, 크기는 size).
 const GRAIN_SLIDERS: { key: "amount" | "size"; label: string; range: { min: number; max: number; step: number } }[] = [
@@ -73,73 +66,52 @@ export function StudioGrainPanel({
       {/* 원클릭 질감 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
       <div className="flex flex-wrap gap-1.5">
         {GRAIN_PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={() => onApplyPreset(preset.value)}
-            title={preset.tip}
-            className={CHIP_CLASS}
-          >
+          <StudioPanelChip key={preset.id} onClick={() => onApplyPreset(preset.value)} title={preset.tip}>
             {preset.label}
-          </button>
+          </StudioPanelChip>
         ))}
       </div>
 
       {/* 질감 종류 선택 — 현재 종류를 활성으로 강조, 누르면 type만 패치(세기·크기·시드 유지). */}
       <div className="flex flex-wrap gap-1.5">
-        {GRAIN_TYPES.map((t) => {
-          const active = t.id === value.type;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onPatch({ type: t.id as GrainType })}
-              title={`질감을 "${t.label}"로 바꿉니다.`}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        {GRAIN_TYPES.map((t) => (
+          <StudioPanelChip
+            key={t.id}
+            active={t.id === value.type}
+            onClick={() => onPatch({ type: t.id as GrainType })}
+            title={`질감을 "${t.label}"로 바꿉니다.`}
+          >
+            {t.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 세기·크기 슬라이더 — 범위는 GRAIN_AMOUNT_RANGE·GRAIN_SIZE_RANGE에서. */}
       <div className="space-y-2">
-        {GRAIN_SLIDERS.map(({ key, label, range }) => {
-          const current = value[key];
-          return (
-            <label key={key} className={LABEL_ROW}>
-              {label}
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={range.step}
-                  value={current}
-                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                  className={RANGE_CLASS}
-                />
-                <span className={READOUT_CLASS}>{current}</span>
-              </span>
-            </label>
-          );
-        })}
+        {GRAIN_SLIDERS.map(({ key, label, range }) => (
+          <StudioSliderRow
+            key={key}
+            label={label}
+            min={range.min}
+            max={range.max}
+            step={range.step}
+            value={value[key]}
+            onChange={(n) => onPatch({ [key]: n })}
+          />
+        ))}
       </div>
 
       {/* 시드 — "새 시드"는 결정적으로 다음 시드를 뽑는다(Math.random 없음, 같은 시드=같은 노이즈). */}
-      <label className={LABEL_ROW}>
+      <label className={PANEL_LABEL_ROW}>
         시드(Seed)
         <span className="flex items-center gap-1.5">
-          <button
-            type="button"
+          <StudioPanelChip
             onClick={() => onPatch({ seed: nextSeed(value.seed) })}
-            className={CHIP_CLASS}
             title="노이즈 패턴을 결정적으로 다시 뽑습니다(같은 시드는 같은 무늬)."
           >
             새 시드
-          </button>
-          <span className={READOUT_CLASS}>{value.seed}</span>
+          </StudioPanelChip>
+          <span className={PANEL_READOUT_CLASS}>{value.seed}</span>
         </span>
       </label>
     </div>

@@ -10,6 +10,7 @@ import { RotateCcw } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { StudioSliderRow } from "./studio-panel-ui";
 import {
   isIdentityPhotoFilter,
   PHOTO_FILTER_DENSITY_RANGE,
@@ -17,10 +18,7 @@ import {
   type PhotoFilter,
 } from "./studio-photo-filter";
 
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(100% 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
+// 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
 const CHIP_CLASS =
   "flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
@@ -90,21 +88,15 @@ export function StudioPhotoFilterPanel({
       </label>
 
       {/* 농도(density) 슬라이더 — 범위는 PHOTO_FILTER_DENSITY_RANGE에서. 0이면 항등. */}
-      <label className={LABEL_ROW}>
-        농도 (Density)
-        <span className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={PHOTO_FILTER_DENSITY_RANGE.min}
-            max={PHOTO_FILTER_DENSITY_RANGE.max}
-            step={PHOTO_FILTER_DENSITY_RANGE.step}
-            value={value.density}
-            onChange={(e) => onPatch({ density: Number(e.target.value) })}
-            className={RANGE_CLASS}
-          />
-          <span className={READOUT_CLASS}>{value.density}%</span>
-        </span>
-      </label>
+      <StudioSliderRow
+        label="농도 (Density)"
+        min={PHOTO_FILTER_DENSITY_RANGE.min}
+        max={PHOTO_FILTER_DENSITY_RANGE.max}
+        step={PHOTO_FILTER_DENSITY_RANGE.step}
+        value={value.density}
+        onChange={(n) => onPatch({ density: n })}
+        readout={`${value.density}%`}
+      />
 
       {/* 광도 유지 — 켜면 색조 적용 후 픽셀 밝기를 원본 휘도로 되돌린다. */}
       <label className="flex items-center gap-1.5 text-xs text-fg-2 cursor-pointer">

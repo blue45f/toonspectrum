@@ -8,8 +8,8 @@
 import { RotateCcw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
+import { StudioPanelChip, StudioSliderRow } from "./studio-panel-ui";
 import {
   CLARITY_PRESETS,
   CLARITY_RANGE,
@@ -17,13 +17,6 @@ import {
   isIdentityClarity,
   type Clarity,
 } from "./studio-clarity";
-
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(-100..100 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
-const CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
 // 슬라이더 정의 — 표시 순서·한글 라벨·범위. 키마다 범위가 달라(clarity -100..100, dehaze 0..100)
 // 각 행이 자기 range를 들고 다닌다. readout은 둘 다 정수.
@@ -65,20 +58,16 @@ export function StudioClarityPanel({
 
       {/* 원클릭 선명도 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}
       <div className="flex flex-wrap gap-1.5">
-        {CLARITY_PRESETS.map((preset) => {
-          const active = preset.id === "neutral" && isIdentity;
-          return (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => onApplyPreset(preset.value)}
-              title={preset.tip}
-              className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
+        {CLARITY_PRESETS.map((preset) => (
+          <StudioPanelChip
+            key={preset.id}
+            active={preset.id === "neutral" && isIdentity}
+            onClick={() => onApplyPreset(preset.value)}
+            title={preset.tip}
+          >
+            {preset.label}
+          </StudioPanelChip>
+        ))}
       </div>
 
       {/* 선명도·안개 제거 슬라이더 — 범위는 각 행의 range에서, readout은 정수. */}
@@ -86,21 +75,16 @@ export function StudioClarityPanel({
         {CLARITY_SLIDERS.map(({ key, label, range }) => {
           const current = value[key] ?? 0;
           return (
-            <label key={key} className={LABEL_ROW}>
-              {label}
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={range.step}
-                  value={current}
-                  onChange={(e) => onPatch({ [key]: Number(e.target.value) })}
-                  className={RANGE_CLASS}
-                />
-                <span className={READOUT_CLASS}>{current}</span>
-              </span>
-            </label>
+            <StudioSliderRow
+              key={key}
+              label={label}
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              value={current}
+              onChange={(n) => onPatch({ [key]: n })}
+              readout={current}
+            />
           );
         })}
       </div>

@@ -10,6 +10,7 @@ import { RotateCcw } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { StudioSliderRow } from "./studio-panel-ui";
 import {
   isIdentityOutline,
   OUTLINE_OPACITY_RANGE,
@@ -18,10 +19,7 @@ import {
   type Outline,
 } from "./studio-outline";
 
-// 공용 라벨 + 슬라이더 한 줄. 우측 readout은 항상 같은 폭으로 정렬한다(30px/100% 수용).
-const LABEL_ROW = "flex items-center justify-between gap-2 text-xs text-fg-2";
-const RANGE_CLASS = "w-24 accent-accent cursor-pointer";
-const READOUT_CLASS = "w-8 text-right text-[10px] tabular-nums text-fg-3";
+// 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
 const CHIP_CLASS =
   "flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
@@ -91,38 +89,26 @@ export function StudioOutlinePanel({
       </label>
 
       {/* 굵기(width) 슬라이더 — 범위는 OUTLINE_WIDTH_RANGE에서. 0이면 항등. */}
-      <label className={LABEL_ROW}>
-        굵기 (Width)
-        <span className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={OUTLINE_WIDTH_RANGE.min}
-            max={OUTLINE_WIDTH_RANGE.max}
-            step={OUTLINE_WIDTH_RANGE.step}
-            value={value.width}
-            onChange={(e) => onPatch({ width: Number(e.target.value) })}
-            className={RANGE_CLASS}
-          />
-          <span className={READOUT_CLASS}>{value.width}px</span>
-        </span>
-      </label>
+      <StudioSliderRow
+        label="굵기 (Width)"
+        min={OUTLINE_WIDTH_RANGE.min}
+        max={OUTLINE_WIDTH_RANGE.max}
+        step={OUTLINE_WIDTH_RANGE.step}
+        value={value.width}
+        onChange={(n) => onPatch({ width: n })}
+        readout={`${value.width}px`}
+      />
 
       {/* 불투명도(opacity) 슬라이더 — 범위는 OUTLINE_OPACITY_RANGE에서. 0이면 항등. */}
-      <label className={LABEL_ROW}>
-        불투명도 (Opacity)
-        <span className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={OUTLINE_OPACITY_RANGE.min}
-            max={OUTLINE_OPACITY_RANGE.max}
-            step={OUTLINE_OPACITY_RANGE.step}
-            value={value.opacity}
-            onChange={(e) => onPatch({ opacity: Number(e.target.value) })}
-            className={RANGE_CLASS}
-          />
-          <span className={READOUT_CLASS}>{value.opacity}%</span>
-        </span>
-      </label>
+      <StudioSliderRow
+        label="불투명도 (Opacity)"
+        min={OUTLINE_OPACITY_RANGE.min}
+        max={OUTLINE_OPACITY_RANGE.max}
+        step={OUTLINE_OPACITY_RANGE.step}
+        value={value.opacity}
+        onChange={(n) => onPatch({ opacity: n })}
+        readout={`${value.opacity}%`}
+      />
 
       {/* 안내 — 테두리는 실루엣 바깥으로 자라므로 투명 배경에서 효과가 또렷하다. */}
       <p className="text-[0.6rem] leading-relaxed text-fg-3">투명 배경 이미지(캐릭터·스티커)에서 잘 보여요.</p>
