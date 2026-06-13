@@ -180,6 +180,8 @@ import { normalizeHalftone, type Halftone } from "./studio-halftone";
 import { normalizeGrain, type Grain } from "./studio-grain";
 import { normalizeBlurFx, type BlurFx } from "./studio-blur";
 import { normalizeDistort, type Distort } from "./studio-distort";
+import { normalizeStylize, type Stylize } from "./studio-stylize";
+import { normalizeLight, type Light } from "./studio-light";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { StudioTextPathPanel } from "./StudioTextPathPanel";
 import { StudioCurvePanel } from "./StudioCurvePanel";
@@ -197,6 +199,8 @@ import { StudioHalftonePanel } from "./StudioHalftonePanel";
 import { StudioGrainPanel } from "./StudioGrainPanel";
 import { StudioBlurPanel } from "./StudioBlurPanel";
 import { StudioDistortPanel } from "./StudioDistortPanel";
+import { StudioStylizePanel } from "./StudioStylizePanel";
+import { StudioLightPanel } from "./StudioLightPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -279,6 +283,8 @@ interface ImageEl {
   grain?: Grain;
   blurFx?: BlurFx;
   distort?: Distort;
+  stylize?: Stylize;
+  light?: Light;
 }
 interface TextEl {
   id: string;
@@ -8129,6 +8135,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Distort) => patchEl(selected.id, { distort: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { distort: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 스타일라이즈 — 엠보스·외곽선·솔라리·유화. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioStylizePanel
+                    value={normalizeStylize(selected.stylize)}
+                    onPatch={(patch: Partial<Stylize>) =>
+                      patchEl(selected.id, {
+                        stylize: normalizeStylize({ ...normalizeStylize(selected.stylize), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Stylize) => patchEl(selected.id, { stylize: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { stylize: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 조명 효과 — 렌즈 플레어·라이트릭·햇살·광선. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioLightPanel
+                    value={normalizeLight(selected.light)}
+                    onPatch={(patch: Partial<Light>) =>
+                      patchEl(selected.id, {
+                        light: normalizeLight({ ...normalizeLight(selected.light), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: Light) => patchEl(selected.id, { light: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { light: undefined } as Partial<El>)}
                   />
                 </div>
               )}

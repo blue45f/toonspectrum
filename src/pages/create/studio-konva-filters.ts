@@ -24,6 +24,8 @@ import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone, type Halfto
 import { grainKonvaFilter, normalizeGrain, isIdentityGrain, type Grain } from "./studio-grain";
 import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx, type BlurFx } from "./studio-blur";
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort, type Distort } from "./studio-distort";
+import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize, type Stylize } from "./studio-stylize";
+import { lightKonvaFilter, normalizeLight, isIdentityLight, type Light } from "./studio-light";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -69,6 +71,9 @@ export type ImageFilterFields = {
   // 흐림 갤러리(studio-blur) + 기하 왜곡(studio-distort).
   blurFx?: BlurFx;
   distort?: Distort;
+  // 스타일라이즈(studio-stylize) + 조명 효과(studio-light).
+  stylize?: Stylize;
+  light?: Light;
 };
 
 // 하프톤이 항등(세기0)이 아니면 활성.
@@ -86,6 +91,14 @@ function hasActiveBlurFx(el: ImageFilterFields): boolean {
 // 기하 왜곡이 항등(amount0)이 아니면 활성.
 function hasActiveDistort(el: ImageFilterFields): boolean {
   return !!el.distort && !isIdentityDistort(normalizeDistort(el.distort));
+}
+// 스타일라이즈가 항등(세기0)이 아니면 활성.
+function hasActiveStylize(el: ImageFilterFields): boolean {
+  return !!el.stylize && !isIdentityStylize(normalizeStylize(el.stylize));
+}
+// 조명 효과가 항등(세기0)이 아니면 활성.
+function hasActiveLight(el: ImageFilterFields): boolean {
+  return !!el.light && !isIdentityLight(normalizeLight(el.light));
 }
 
 // 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
@@ -369,6 +382,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.BlurFx = blurFxKonvaFilter;
   // 기하 왜곡 — this.attrs.dsType/dsAmount/dsScale 적용(studio-distort).
   F.Distort = distortKonvaFilter;
+  // 스타일라이즈 — this.attrs.stType/stStrength/stDetail 적용(studio-stylize).
+  F.Stylize = stylizeKonvaFilter;
+  // 조명 효과 — this.attrs.ltType/ltIntensity/ltX/ltY/ltHue 적용(studio-light).
+  F.Light = lightKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -395,6 +412,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveGrain(el) ||
     hasActiveBlurFx(el) ||
     hasActiveDistort(el) ||
+    hasActiveStylize(el) ||
+    hasActiveLight(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -584,6 +603,14 @@ export function buildImageFilters(
     attrs.grainSize = gr.size;
     attrs.grainSeed = gr.seed;
   }
+  // 스타일라이즈(엠보스/외곽선/솔라리/유화) — 톤·질감 위에 얹는 스타일 변환.
+  if (hasActiveStylize(el)) {
+    filters.push(F.Stylize!);
+    const st = normalizeStylize(el.stylize);
+    attrs.stType = st.type;
+    attrs.stStrength = st.strength;
+    attrs.stDetail = st.detail;
+  }
   // 글로우는 최종 밝은 영역에서 번지므로 늦게, 테두리는 실루엣 바깥에 그리므로 가장 마지막.
   if (hasActiveGlow(el)) {
     filters.push(F.Glow!);
@@ -592,6 +619,16 @@ export function buildImageFilters(
     attrs.glowSize = gl.size;
     attrs.glowThreshold = gl.threshold;
     attrs.glowColor = gl.color;
+  }
+  // 조명 효과(렌즈 플레어/햇살/라이트릭/광선) — 가산광이라 거의 마지막에 얹는다(테두리 직전).
+  if (hasActiveLight(el)) {
+    filters.push(F.Light!);
+    const lt = normalizeLight(el.light);
+    attrs.ltType = lt.type;
+    attrs.ltIntensity = lt.intensity;
+    attrs.ltX = lt.x;
+    attrs.ltY = lt.y;
+    attrs.ltHue = lt.hue;
   }
   let cachePad = 0;
   if (hasActiveOutline(el)) {
@@ -651,5 +688,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.grain ?? null,
     el.blurFx ?? null,
     el.distort ?? null,
+    el.stylize ?? null,
+    el.light ?? null,
   ]);
 }
