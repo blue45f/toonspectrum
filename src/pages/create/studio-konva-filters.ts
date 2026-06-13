@@ -14,6 +14,8 @@ import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance,
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
 import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat, type SelectiveHsl } from "./studio-selective-hsl";
 import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance, type Vibrance } from "./studio-vibrance";
+import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat, type GradientMap } from "./studio-gradient-map";
+import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter, type PhotoFilter } from "./studio-photo-filter";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
 export type ImageFilterFields = {
@@ -48,7 +50,18 @@ export type ImageFilterFields = {
   channelMixer?: ChannelMixer;
   selectiveHsl?: SelectiveHsl;
   vibrance?: Vibrance;
+  gradientMap?: GradientMap;
+  photoFilter?: PhotoFilter;
 };
+
+// 그라디언트 맵은 설정되면 항상 활성(기본 흑→백도 흑백 변환이므로).
+function hasActiveGradientMap(el: ImageFilterFields): boolean {
+  return !!el.gradientMap;
+}
+// 포토 필터는 농도 > 0이면 활성.
+function hasActivePhotoFilter(el: ImageFilterFields): boolean {
+  return !!el.photoFilter && !isIdentityPhotoFilter(normalizePhotoFilter(el.photoFilter));
+}
 
 // 선택 색상(HSL)이 항등이 아니면 활성.
 function hasActiveSelectiveHsl(el: ImageFilterFields): boolean {
@@ -284,6 +297,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.SelectiveHsl = selectiveHslKonvaFilter;
   // 생동감 — this.attrs.vibrance/vibranceSat 적용(studio-vibrance).
   F.Vibrance = vibranceKonvaFilter;
+  // 그라디언트 맵 — this.attrs.gradientMap(flat) 적용(studio-gradient-map).
+  F.GradientMap = gradientMapKonvaFilter;
+  // 포토 필터 — this.attrs.pfColor/pfDensity/pfPreserve 적용(studio-photo-filter).
+  F.PhotoFilter = photoFilterKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -300,6 +317,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveChannelMixer(el) ||
     hasActiveSelectiveHsl(el) ||
     hasActiveVibrance(el) ||
+    hasActiveGradientMap(el) ||
+    hasActivePhotoFilter(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -391,6 +410,17 @@ export function buildImageFilters(
     attrs.vibrance = vb.vibrance;
     attrs.vibranceSat = vb.saturation;
   }
+  if (hasActivePhotoFilter(el)) {
+    filters.push(F.PhotoFilter!);
+    const pf = normalizePhotoFilter(el.photoFilter);
+    attrs.pfColor = pf.color;
+    attrs.pfDensity = pf.density;
+    attrs.pfPreserve = pf.preserveLuminosity ? 1 : 0;
+  }
+  if (hasActiveGradientMap(el)) {
+    filters.push(F.GradientMap!);
+    attrs.gradientMap = gradientMapToFlat(normalizeGradientMap(el.gradientMap));
+  }
   if (el.grayscale) {
     filters.push(F.Grayscale as (imageData: StudioImageDataLike) => void);
   }
@@ -472,5 +502,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.channelMixer ?? null,
     el.selectiveHsl ?? null,
     el.vibrance ?? null,
+    el.gradientMap ?? null,
+    el.photoFilter ?? null,
   ]);
 }

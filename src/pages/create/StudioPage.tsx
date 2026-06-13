@@ -170,11 +170,15 @@ import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance
 import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
 import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
+import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
+import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
 import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
 import { StudioVibrancePanel } from "./StudioVibrancePanel";
+import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
+import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
   createLayerGroup,
@@ -247,6 +251,8 @@ interface ImageEl {
   channelMixer?: ChannelMixer;
   selectiveHsl?: SelectiveHsl;
   vibrance?: Vibrance;
+  gradientMap?: GradientMap;
+  photoFilter?: PhotoFilter;
 }
 interface TextEl {
   id: string;
@@ -7886,6 +7892,36 @@ export function StudioPage() {
                     }
                     onApplyPreset={(v: Vibrance) => patchEl(selected.id, { vibrance: v } as Partial<El>)}
                     onReset={() => patchEl(selected.id, { vibrance: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 포토 필터 — 따뜻/차가운 색 오버레이(광도 유지). */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioPhotoFilterPanel
+                    value={normalizePhotoFilter(selected.photoFilter)}
+                    onPatch={(patch: Partial<PhotoFilter>) =>
+                      patchEl(selected.id, {
+                        photoFilter: normalizePhotoFilter({ ...normalizePhotoFilter(selected.photoFilter), ...patch }),
+                      } as Partial<El>)
+                    }
+                    onApplyPreset={(v: PhotoFilter) => patchEl(selected.id, { photoFilter: v } as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { photoFilter: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+              {/* 그라디언트 맵 — 휘도를 멀티스톱 색 그라디언트로 매핑. */}
+              {selected.type === "image" && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioGradientMapPanel
+                    value={normalizeGradientMap(selected.gradientMap)}
+                    onApplyPreset={(m: GradientMap) => patchEl(selected.id, { gradientMap: m } as Partial<El>)}
+                    onEditStopColor={(i: number, color: string) => {
+                      const cur = normalizeGradientMap(selected.gradientMap);
+                      const stops = cur.stops.map((s, j) => (j === i ? { ...s, color } : s));
+                      patchEl(selected.id, { gradientMap: normalizeGradientMap({ stops }) } as Partial<El>);
+                    }}
+                    onReset={() => patchEl(selected.id, { gradientMap: undefined } as Partial<El>)}
                   />
                 </div>
               )}
