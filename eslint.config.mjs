@@ -1,4 +1,4 @@
-import { base, react, plugin, defineConfig } from '@heejun/eslint-config'
+import { base, react, plugin, boundaries, defineConfig } from '@heejun/eslint-config'
 import js from '@eslint/js'
 import { globalIgnores } from 'eslint/config'
 import globals from 'globals'
@@ -51,6 +51,49 @@ export default defineConfig(
       'react-hooks/immutability': 'off',
       'react-hooks/incompatible-library': 'off',
     },
+  },
+
+  // src/ 계층 경계 — 개발가이드의 app/domains/shared/infrastructure 4계층.
+  // ToonSpectrum 은 Vite 앱이 레포 루트라 계층은 src/ 아래에만 둔다(루트 components/·lib/ 는
+  // 대규모 공용 트리라 이번 패스에서 물리 이동하지 않고 boundaries files 스코프 밖으로 남긴다
+  // = 분류되지 않으므로 강제 대상 아님). src/ 안의 compat/components/hooks/styles 와
+  // 횡단 카탈로그 엔진(catalog-static*)은 shared 로 매핑한다.
+  ...boundaries({
+    files: ['src/**/*.{ts,tsx}'],
+    elements: [
+      { type: 'app', pattern: 'src/app/**/*', mode: 'full' },
+      { type: 'domains', pattern: 'src/domains/*/**/*', mode: 'full' },
+      {
+        type: 'shared',
+        pattern: 'src/{components,hooks,styles,compat,catalog-static,catalog-static-engine}*/**/*',
+        mode: 'full',
+      },
+      { type: 'shared', pattern: 'src/catalog-static*.ts', mode: 'full' },
+      { type: 'infrastructure', pattern: 'src/infrastructure/**/*', mode: 'full' },
+    ],
+    rules: [
+      { from: ['app'], allow: ['app', 'domains', 'shared', 'infrastructure'] },
+      { from: ['domains'], allow: ['domains', 'shared', 'infrastructure'] },
+      { from: ['infrastructure'], allow: ['shared', 'infrastructure'] },
+      { from: ['shared'], allow: ['shared'] },
+    ],
+  }),
+  // boundaries 는 TS 임포트를 분류하려면 리졸버가 필요하다(없으면 조용히 no-op).
+  // 루트 tsconfig.json 의 paths(@/* -> ./*)로 @/src/* 별칭을 해석한다.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    settings: {
+      'import/resolver': { typescript: { project: 'tsconfig.json' }, node: true },
+    },
+  },
+  // 기술부채 완화(차기 패스에서 정리 예정). 페이지 중심으로 자란 앱이라 계층 결합이 광범위하다:
+  // - infrastructure/use-api-resource 는 매핑상 infra 지만 React 훅이라 도메인 페이지가 직접 쓴다.
+  // - shared(compat/auth) 는 인증 부트스트랩에서 infrastructure(api 클라이언트)를 오케스트레이션한다.
+  // 이들을 strict 계층으로 분리하는 것은 SiteHeader·CommandPalette 같은 루트 공용 컴포넌트까지
+  // 얽힌 대규모 리팩터라 이번 도메인화 범위 밖이다. 순수 shared(hooks·styles)는 계속 strict.
+  {
+    files: ['src/infrastructure/use-api-resource.ts', 'src/compat/**/*.{ts,tsx}'],
+    rules: { 'boundaries/element-types': 'off' },
   },
 
   // apps/api — NestJS (Node). 데코레이터 + 빈 생성자/클래스 관용.

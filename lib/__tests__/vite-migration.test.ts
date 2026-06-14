@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { appRoutes } from "../../src/routes/route-manifest";
-import { apiPath } from "../../src/vite/api";
+import { appRoutes } from "../../src/app/routes/route-manifest";
+import { apiPath } from "../../src/infrastructure/api";
 
 describe("vite migration", () => {
   it("declares the primary product routes in the Vite router manifest", () => {
@@ -41,7 +41,7 @@ describe("vite migration", () => {
   });
 
   it("loads the command palette implementation lazily from a lightweight app host", () => {
-    const app = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
+    const app = readFileSync(join(process.cwd(), "src/app/App.tsx"), "utf8");
     const host = readFileSync(join(process.cwd(), "components/command-palette-host.tsx"), "utf8");
 
     expect(app).toContain("@/components/command-palette-host");
@@ -50,7 +50,7 @@ describe("vite migration", () => {
   });
 
   it("keeps optional Studio asset packs out of the Studio route entry chunk", () => {
-    const studio = readFileSync(join(process.cwd(), "src/pages/create/StudioPage.tsx"), "utf8");
+    const studio = readFileSync(join(process.cwd(), "src/domains/creator/StudioPage.tsx"), "utf8");
     const optionalAssetModules = [
       "studio-bg-scenes",
       "studio-bg-scenes-extra",
@@ -67,7 +67,7 @@ describe("vite migration", () => {
 
   it("keeps studio-only Google Fonts out of the global render-blocking stylesheet", () => {
     const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
-    const studio = readFileSync(join(process.cwd(), "src/pages/create/StudioPage.tsx"), "utf8");
+    const studio = readFileSync(join(process.cwd(), "src/domains/creator/StudioPage.tsx"), "utf8");
     const studioOnlyFamilies = [
       "Black+Han+Sans",
       "East+Sea+Dokdo",

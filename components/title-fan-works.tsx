@@ -7,7 +7,7 @@ import { CoverImage } from "@/components/cover-image";
 import { Section } from "@/components/section";
 import { cn, formatCount } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
-import { listWorks, type WorkSummary } from "@/src/lib/creator-client";
+import { listWorks, type WorkSummary } from "@/src/infrastructure/creator-client";
 
 // 작품 상세의 "팬 창작" 섹션 — 이 웹툰(titleId)에 연결된 사용자 창작물 + 스튜디오 바로가기.
 export function TitleFanWorks({ titleId }: { titleId: string }) {

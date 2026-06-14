@@ -10,7 +10,7 @@ import { useT } from "@/lib/i18n";
 import { keepInlineText } from "@/lib/utils";
 import { useSession, signOut } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
-import { adminFetch, type AdminMe } from "@/src/components/admin/admin-client";
+import { adminFetch, type AdminMe } from "@/src/domains/admin/components/admin-client";
 
 function safeProfileImageSrc(value: string | null | undefined): string | null {
   if (!value) return null;

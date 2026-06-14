@@ -21,7 +21,7 @@ describe("sitemap static routes", () => {
 });
 
 describe("home creator funnel", () => {
-  const home = readFileSync(join(process.cwd(), "src/pages/HomePage.tsx"), "utf8");
+  const home = readFileSync(join(process.cwd(), "src/domains/catalog/HomePage.tsx"), "utf8");
 
   it("links the landing page to the creator studio and the creator board", () => {
     expect(home).toContain('href="/studio"');

@@ -30,7 +30,7 @@ describe("design token discipline", () => {
   });
 
   it("renders the skip link with theme tokens so contrast holds in both themes", () => {
-    const app = read("src/App.tsx");
+    const app = read("src/app/App.tsx");
 
     expect(app).not.toContain("bg-white");
     expect(app).not.toContain("#1a1410");
