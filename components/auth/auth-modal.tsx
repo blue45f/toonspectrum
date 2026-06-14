@@ -17,8 +17,39 @@ import {
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { signIn } from "@/src/compat/auth-session-store";
+import { signIn, signInWithGoogleIdToken } from "@/src/compat/auth-session-store";
 
+
+// Google Identity Services(GIS) 클라이언트 — accounts.google.com/gsi/client 가 주입하는 전역.
+// 우리가 쓰는 표면(initialize/renderButton)만 최소 선언한다.
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme?: "outline" | "filled_blue" | "filled_black";
+              size?: "large" | "medium" | "small";
+              text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+              shape?: "rectangular" | "pill" | "circle" | "square";
+              width?: number | string;
+            }
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
+type ProviderInfo = { label?: string; mode?: string; clientId?: string };
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -32,6 +63,73 @@ function DemoTag({ dark }: { dark?: boolean }) {
       데모
     </span>
   );
+}
+
+// GIS(Google Identity Services) 스크립트를 1회 로드. 동시 호출은 같은 Promise 를 공유한다.
+const GIS_SRC = "https://accounts.google.com/gsi/client";
+let gisLoader: Promise<void> | null = null;
+function loadGis(): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (window.google?.accounts?.id) return Promise.resolve();
+  gisLoader ??= new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("gis load failed")));
+      if (window.google?.accounts?.id) resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = GIS_SRC;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => {
+      gisLoader = null; // 재시도 허용
+      reject(new Error("gis load failed"));
+    };
+    document.head.appendChild(s);
+  });
+  return gisLoader;
+}
+
+// 실연동 Google: GIS 공식 버튼을 렌더하고, credential(ID 토큰)을 서버로 보내 로그인 완료.
+function GoogleGisButton({ clientId, onSuccess, onError }: { clientId: string; onSuccess: () => void; onError: (msg: string) => void }) {
+  const holderRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGis()
+      .then(() => {
+        if (cancelled || !holderRef.current || !window.google?.accounts?.id) return;
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (resp: { credential?: string }) => {
+            if (!resp?.credential) {
+              onError("구글 로그인 응답이 비어 있어요.");
+              return;
+            }
+            void signInWithGoogleIdToken(resp.credential).then((r) => {
+              if (r.ok) onSuccess();
+              else onError("구글 로그인에 실패했어요. 다시 시도해 주세요.");
+            });
+          },
+        });
+        window.google.accounts.id.renderButton(holderRef.current, {
+          theme: "outline",
+          size: "large",
+          width: 320,
+          text: "continue_with",
+          shape: "rectangular",
+        });
+      })
+      .catch(() => onError("구글 로그인을 불러오지 못했어요."));
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, onSuccess, onError]);
+
+  return <div ref={holderRef} className="flex justify-center" />;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -55,7 +153,7 @@ type AuthFormValues = z.infer<typeof authSchema>;
 
 export function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [providers, setProviders] = useState<Record<string, { label?: string; mode?: string }>>({});
+  const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
   const [err, setErr] = useState("");
   const [imageErr, setImageErr] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -392,15 +490,20 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                     {providers.kakao.mode === "demo" && <DemoTag dark />}
                   </button>
                 )}
-                {providers.google && (
-                  <button
-                    onClick={() => signIn("google")}
-                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
-                  >
-                    Google로 계속하기
-                    {providers.google.mode === "demo" && <DemoTag />}
-                  </button>
-                )}
+                {providers.google &&
+                  (providers.google.mode === "oauth" && providers.google.clientId ? (
+                    // 실연동 Google: GIS 공식 버튼(ID 토큰 흐름) — 리다이렉트 없이 모달에서 로그인.
+                    <GoogleGisButton clientId={providers.google.clientId} onSuccess={onClose} onError={setErr} />
+                  ) : (
+                    // 데모 폴백(client id 미설정): 기존 리다이렉트 흐름.
+                    <button
+                      onClick={() => signIn("google")}
+                      className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
+                    >
+                      Google로 계속하기
+                      {providers.google.mode === "demo" && <DemoTag />}
+                    </button>
+                  ))}
                 {providers.naver && (
                   <button
                     onClick={() => signIn("naver")}

@@ -1,15 +1,19 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
+import { OAuth2Client } from "google-auth-library";
 
 import { accounts, db, users } from "../db";
 
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
-// ── 소셜 로그인(Google·Kakao·Naver) OAuth 2.0 인가-코드 흐름 ──
-// 실제 OAuth: 환경변수(client id/secret)가 있으면 동작. 없으면 데모 폴백(명확히 [데모] 표시)으로 대체.
-// 세션은 기존 스킴(localStorage + x-user-id 헤더)과 동일하게 사용자 객체를 프론트로 핸드오프한다.
-// 주의: 이 앱의 인증은 데모 수준(쿠키/서버세션 없음)이라 보안 경계가 약하다 — 실서비스 전 세션 강화 필요.
+// ── 소셜 로그인(Google·Kakao·Naver) ──
+// Google: GIS(Google Identity Services) ID 토큰 흐름. 프론트가 받은 ID 토큰을 google-auth-library
+//   verifyIdToken 으로 서버 검증(서명·aud·iss·exp)해 신원을 확정한다(인가-코드 교환 불필요).
+//   하위 호환: 기존 인가-코드 콜백 경로(handleOAuthCallback)도 키 설정 시 그대로 동작한다.
+// Kakao·Naver: 실 앱키(REST API key / client secret) 가 없어 의도적으로 데모 고정(DEMO_ONLY_PROVIDERS).
+//   실연동 재개 시 외부 앱키 발급 후 이 집합에서 제거하면 인가-코드 흐름으로 동작한다.
+// 세션은 서명 JWT(lib/server/session.ts) 로 발급되고 x-user-id 헤더로 전송된다.
 
 export type OAuthProviderId = "google" | "kakao" | "naver";
 
@@ -108,14 +112,29 @@ export function isOAuthProvider(value: string): value is OAuthProviderId {
 export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
   if (DEMO_ONLY_PROVIDERS.has(id)) return "demo";
   const c = providerConfig(id);
+  // Google 은 GIS(ID 토큰) 흐름이라 client id 만 있으면 실연동(클라이언트 시크릿 불필요).
+  if (id === "google") return c.clientId ? "oauth" : "demo";
   return c.clientId && c.clientSecret ? "oauth" : "demo";
+}
+
+export interface AuthProviderInfo {
+  label: string;
+  mode: "oauth" | "demo";
+  // GIS 버튼 렌더용 — google 실연동(oauth) 시에만 client id 를 노출(공개해도 안전한 값).
+  clientId?: string;
 }
 
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
 // 제공자 노출 — google 은 항상, kakao/naver 는 관리자 설정(앱 config)으로 켜야 노출(기본 off).
 export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
-  const out: Record<string, { label: string; mode: "oauth" | "demo" }> = {
-    google: { label: "Google", mode: providerMode("google") },
+  const googleMode = providerMode("google");
+  const out: Record<string, AuthProviderInfo> = {
+    google: {
+      label: "Google",
+      mode: googleMode,
+      // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출(없으면 데모 버튼).
+      ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
+    },
   };
   if (opts?.kakao) out.kakao = { label: "카카오", mode: providerMode("kakao") };
   if (opts?.naver) out.naver = { label: "네이버", mode: providerMode("naver") };
@@ -348,6 +367,47 @@ export async function handleOAuthCallback(id: OAuthProviderId, code: string): Pr
   if (!accessToken) throw new Error("no access_token");
   const profile = await fetchProfile(id, accessToken);
   return upsertOAuthUser(id, profile, tokens);
+}
+
+// ── Google Identity Services(GIS): ID 토큰 검증 ──
+// 프론트(GIS 버튼)가 받은 ID 토큰을 서버에서 검증한다. 인가-코드/토큰 교환이 없어
+// client secret 이 필요 없고, 기존 GOOGLE_OAUTH_CLIENT_ID 를 audience 로 재사용한다.
+export function googleClientId(): string | undefined {
+  return providerConfig("google").clientId;
+}
+
+// google-auth-library OAuth2Client 는 JWK(구글 공개키)를 내부 캐시한다 — 모듈 수명 동안 재사용.
+let googleVerifier: OAuth2Client | null = null;
+function getGoogleVerifier(): OAuth2Client {
+  googleVerifier ??= new OAuth2Client();
+  return googleVerifier;
+}
+
+// ID 토큰 → 정규화 프로필. 서명·만료·aud(우리 client id)·iss(accounts.google.com) 를 모두 검증한다.
+export async function verifyGoogleIdToken(idToken: string): Promise<NormalizedProfile> {
+  const audience = googleClientId();
+  if (!audience) throw new Error("google client id not configured");
+  if (!idToken || typeof idToken !== "string") throw new Error("missing id_token");
+
+  const ticket = await getGoogleVerifier().verifyIdToken({ idToken, audience });
+  const payload = ticket.getPayload();
+  if (!payload?.sub) throw new Error("invalid id_token payload");
+  // iss 는 google-auth-library 가 검증하지만 방어적으로 한 번 더 확인.
+  if (payload.iss !== "accounts.google.com" && payload.iss !== "https://accounts.google.com") {
+    throw new Error("invalid issuer");
+  }
+  return {
+    providerAccountId: payload.sub,
+    email: payload.email ? payload.email.toLowerCase() : null,
+    name: payload.name ?? payload.given_name ?? null,
+    image: payload.picture ?? null,
+  };
+}
+
+// GIS 로그인 처리: ID 토큰 검증 → user/account upsert. (kakao/naver 는 데모이므로 google 전용)
+export async function handleGoogleIdToken(idToken: string): Promise<OAuthUser> {
+  const profile = await verifyGoogleIdToken(idToken);
+  return upsertOAuthUser("google", profile, { id_token: idToken });
 }
 
 // 데모 폴백: 실제 제공자 연동 없이 명확히 [데모] 표시된 사용자 생성/재사용.

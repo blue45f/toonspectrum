@@ -9,6 +9,7 @@ import {
   buildAuthorizeUrl,
   consumeHandoff,
   createDemoUser,
+  handleGoogleIdToken,
   handleOAuthCallback,
   isOAuthProvider,
   issueHandoff,
@@ -81,6 +82,23 @@ export class AuthController {
     } catch {
       return res.redirect(`${web}/auth/callback#error=oauth_failed`);
     }
+  }
+
+  // GIS(Google Identity Services) ID 토큰 로그인 — 프론트 GIS 버튼이 받은 ID 토큰을 서버 검증.
+  // 인가-코드/리다이렉트 없이 직접 세션을 발급한다(서명·aud·iss·exp 는 google-auth-library 가 검증).
+  @Post("oauth/google/id-token")
+  async oauthGoogleIdToken(@Body() body: { idToken?: unknown; credential?: unknown }, @Req() req: Request) {
+    // GIS 콜백은 필드명이 credential — idToken 도 함께 허용한다.
+    const idToken = typeof body?.idToken === "string" ? body.idToken : typeof body?.credential === "string" ? body.credential : "";
+    if (!idToken) throw new BadRequestException({ error: "ID 토큰이 필요해요." });
+    enforceRateLimit(`oauth-google-idtoken:${clientIp(req)}`, 30, 10 * 60_000);
+    let user;
+    try {
+      user = await handleGoogleIdToken(idToken);
+    } catch {
+      throw new HttpException({ error: "구글 로그인 검증에 실패했어요." }, HttpStatus.UNAUTHORIZED);
+    }
+    return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }
 
   // 핸드오프 토큰 → 사용자 객체(프론트가 세션 저장). 1회용.
