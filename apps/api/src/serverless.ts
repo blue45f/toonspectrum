@@ -5,6 +5,7 @@ import { json, urlencoded } from "express";
 
 import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { validateEnv } from "./config/env";
 import { sessionAuth } from "./session-middleware";
 
 import type { Express } from "express";
@@ -15,6 +16,8 @@ import type { Express } from "express";
 let appPromise: Promise<Express> | null = null;
 
 async function create(): Promise<Express> {
+  // env 검증(NON-FATAL) — 콜드 부팅당 1회. 실패해도 throw 하지 않고 경고만(main.ts와 동일).
+  validateEnv();
   // 기본 본문 파서(100kb) 대신 직접 등록(main.ts와 동일) — 스튜디오/커뮤니티 첨부가 data-URL
   // 이미지를 JSON으로 보내므로 서버리스에서도 한도를 키운다(미러 누락 시 프로덕션만 413).
   const app = await NestFactory.create(AppModule, { logger: ["error", "warn"], bodyParser: false });
