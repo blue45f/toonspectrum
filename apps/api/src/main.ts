@@ -1,10 +1,10 @@
 import "./load-env"; // 반드시 첫 import — lib/db가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
 import { sessionAuth } from "./session-middleware";
+import { ZodValidationPipe } from "./common/zod-validation.pipe";
 
 async function bootstrap() {
   // 기본 본문 파서(100kb) 대신 직접 등록 — 창작 스튜디오가 data-URL 이미지(페이지/문서)를 전송하므로 한도를 키운다.
@@ -13,13 +13,8 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api");
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      stopAtFirstError: true,
-    })
-  );
+  // 표준 Zod 검증 파이프. createZodDto DTO 만 검증하고 그 외(@Body() body: unknown)는 통과.
+  app.useGlobalPipes(new ZodValidationPipe());
 
   // PaaS(Render/Railway/Fly 등)는 PORT를 주입한다. 로컬은 NEST_API_PORT, 둘 다 없으면 4001.
   const port = Number(process.env.PORT ?? process.env.NEST_API_PORT ?? "4001");
