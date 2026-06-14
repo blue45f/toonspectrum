@@ -1,8 +1,10 @@
-// 창작 게시판(/api/creator) 전용 타입 + fetch 헬퍼.
+// 창작 게시판(/api/creator) 전용 타입 + ky 헬퍼.
 // 인증은 기존 세션 스킴(localStorage "toonspectrum-auth-session" → x-user-id 헤더)을 그대로 재사용한다.
+// 공유 ky 클라이언트(api)의 beforeRequest 훅이 x-user-id 를 자동 주입하므로 호출부는 헤더를 안 넘긴다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
-import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { getAuthUserId, getAuthToken } from "@/src/compat/auth-session-store";
+import { ensureArray } from "@/lib/http-safe";
+import { getAuthUserId } from "@/src/compat/auth-session-store";
+import { api, toApiError } from "@/src/infrastructure/api";
 
 export type WorkFormat = "cuttoon" | "upload";
 
@@ -87,24 +89,23 @@ export interface CreateWorkInput {
 
 export type UpdateWorkInput = Partial<CreateWorkInput>;
 
-const BASE = "/api/creator";
+// api 래퍼는 "/api" 이후 경로를 받는다(내부에서 apiPath 가 "/api" 를 붙임).
+const BASE = "/creator";
 
 // 현재 로그인 사용자 id(없으면 null). 세션 훅/유틸을 재사용한다 — 새 storage key 금지.
 export function getCurrentUserId(): string | null {
   return getAuthUserId();
 }
 
-function authHeaders(json: boolean): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (json) headers["Content-Type"] = "application/json";
-  const token = getAuthToken();
-  if (token) headers["x-user-id"] = token; // 서명 세션 토큰(서버 검증)
-  return headers;
-}
-
-async function readOrThrow<T>(res: Response, fallback: string): Promise<T> {
-  const data = await safeParseJson<T>(res);
-  if (!res.ok) throw new Error(resolveApiError(data, `${fallback} (${res.status})`));
+// ky HTTPError 를 fallback 메시지로 감싸 throw 한다(기존 readOrThrow 의 에러 텍스트 유지).
+// data == null(빈 본문)이면 fallback 으로 throw — 기존 동작과 동일.
+async function callOrThrow<T>(run: () => Promise<T>, fallback: string): Promise<T> {
+  let data: T;
+  try {
+    data = await run();
+  } catch (err) {
+    throw await toApiError(err, fallback);
+  }
   if (data == null) throw new Error(fallback);
   return data;
 }
@@ -122,90 +123,63 @@ export async function listWorks(
   params: WorkListParams = {},
   signal?: AbortSignal
 ): Promise<WorkSummary[]> {
-  const search = new URLSearchParams();
-  if (params.titleId) search.set("titleId", params.titleId);
-  if (params.userId) search.set("userId", params.userId);
-  if (params.sort) search.set("sort", params.sort);
-  if (params.tag) search.set("tag", params.tag);
-  if (params.seriesId) search.set("seriesId", params.seriesId);
-  if (params.challengeId) search.set("challengeId", params.challengeId);
-  const qs = search.toString();
-  const res = await fetch(`${BASE}/works${qs ? `?${qs}` : ""}`, {
-    cache: "no-store",
-    headers: authHeaders(false), // x-user-id 전송 → 본인 목록일 때 초안·비공개도 표시
-    signal,
-  });
-  const data = await readOrThrow<unknown>(res, "창작물 목록을 불러오지 못했습니다.");
+  // x-user-id 전송(공유 클라이언트 훅) → 본인 목록일 때 초안·비공개도 표시.
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/works`, { params: { ...params }, signal }),
+    "창작물 목록을 불러오지 못했습니다."
+  );
   return unwrapWorks(data);
 }
 
 export async function getWork(id: string, signal?: AbortSignal): Promise<WorkDetail> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  return readOrThrow<WorkDetail>(res, "창작물을 불러오지 못했습니다.");
+  return callOrThrow(
+    () => api.get<WorkDetail>(`${BASE}/works/${encodeURIComponent(id)}`, { signal }),
+    "창작물을 불러오지 못했습니다."
+  );
 }
 
 export async function createWork(input: CreateWorkInput): Promise<WorkSummary> {
-  const res = await fetch(`${BASE}/works`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<WorkSummary>(res, "창작물을 등록하지 못했습니다.");
+  return callOrThrow(
+    () => api.post<WorkSummary>(`${BASE}/works`, input),
+    "창작물을 등록하지 못했습니다."
+  );
 }
 
 export async function updateWork(id: string, input: UpdateWorkInput): Promise<WorkSummary> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<WorkSummary>(res, "창작물을 수정하지 못했습니다.");
+  return callOrThrow(
+    () => api.patch<WorkSummary>(`${BASE}/works/${encodeURIComponent(id)}`, input),
+    "창작물을 수정하지 못했습니다."
+  );
 }
 
 export async function deleteWork(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    cache: "no-store",
-    headers: authHeaders(false),
-  });
-  if (!res.ok) {
-    const data = await safeParseJson<unknown>(res);
-    throw new Error(resolveApiError(data, `창작물을 삭제하지 못했습니다. (${res.status})`));
+  try {
+    await api.delete(`${BASE}/works/${encodeURIComponent(id)}`);
+  } catch (err) {
+    throw await toApiError(err, "창작물을 삭제하지 못했습니다.");
   }
 }
 
 export async function toggleWorkLike(id: string): Promise<{ liked: boolean; likes: number }> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}/like`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(false),
-  });
-  return readOrThrow<{ liked: boolean; likes: number }>(res, "좋아요를 처리하지 못했습니다.");
+  return callOrThrow(
+    () => api.post<{ liked: boolean; likes: number }>(`${BASE}/works/${encodeURIComponent(id)}/like`),
+    "좋아요를 처리하지 못했습니다."
+  );
 }
 
 export async function listComments(id: string, signal?: AbortSignal): Promise<WorkComment[]> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}/comments`, {
-    cache: "no-store",
-    signal,
-  });
-  const data = await readOrThrow<unknown>(res, "댓글을 불러오지 못했습니다.");
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { signal }),
+    "댓글을 불러오지 못했습니다."
+  );
   return ensureArray<WorkComment>(data);
 }
 
 export async function postComment(id: string, text: string): Promise<WorkComment> {
-  const res = await fetch(`${BASE}/works/${encodeURIComponent(id)}/comments`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify({ text }),
-  });
-  return readOrThrow<WorkComment>(res, "댓글을 등록하지 못했습니다.");
+  return callOrThrow(
+    () => api.post<WorkComment>(`${BASE}/works/${encodeURIComponent(id)}/comments`, { text }),
+    "댓글을 등록하지 못했습니다."
+  );
 }
 
 // ── 공유 에셋(회원이 올려 모두가 재사용) ──────────────────────────────
@@ -254,56 +228,41 @@ export async function listSharedAssets(
   params: { mine?: boolean; limit?: number; offset?: number } = {},
   signal?: AbortSignal
 ): Promise<SharedAsset[]> {
-  const search = new URLSearchParams();
-  if (params.mine) search.set("mine", "1");
-  if (params.limit) search.set("limit", String(params.limit));
-  if (params.offset) search.set("offset", String(params.offset));
-  const qs = search.toString();
-  const res = await fetch(`${BASE}/assets${qs ? `?${qs}` : ""}`, {
-    cache: "no-store",
-    headers: authHeaders(false), // x-user-id 전송 → isOwner 판정/내 공유 필터
-    signal,
-  });
-  const data = await readOrThrow<unknown>(res, "공유 에셋을 불러오지 못했습니다.");
+  // x-user-id 전송(공유 클라이언트 훅) → isOwner 판정/내 공유 필터. mine 은 서버 호환을 위해 "1" 로 보낸다.
+  const data = await callOrThrow(
+    () =>
+      api.get<unknown>(`${BASE}/assets`, {
+        params: { mine: params.mine ? "1" : undefined, limit: params.limit, offset: params.offset },
+        signal,
+      }),
+    "공유 에셋을 불러오지 못했습니다."
+  );
   return ensureArray<SharedAsset>(data);
 }
 
 export async function publishAsset(input: PublishAssetInput): Promise<SharedAsset> {
-  const res = await fetch(`${BASE}/assets`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<SharedAsset>(res, "에셋을 공유하지 못했습니다.");
+  return callOrThrow(() => api.post<SharedAsset>(`${BASE}/assets`, input), "에셋을 공유하지 못했습니다.");
 }
 
 export async function generateAsset(input: GenerateAssetInput): Promise<GeneratedAsset> {
-  const res = await fetch(`${BASE}/assets/generate`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<GeneratedAsset>(res, "이미지를 생성하지 못했습니다.");
+  return callOrThrow(
+    () => api.post<GeneratedAsset>(`${BASE}/assets/generate`, input),
+    "이미지를 생성하지 못했습니다."
+  );
 }
 
 export async function deleteSharedAsset(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/assets/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    cache: "no-store",
-    headers: authHeaders(false),
-  });
-  if (!res.ok) {
-    const data = await safeParseJson<unknown>(res);
-    throw new Error(resolveApiError(data, `에셋을 삭제하지 못했습니다. (${res.status})`));
+  try {
+    await api.delete(`${BASE}/assets/${encodeURIComponent(id)}`);
+  } catch (err) {
+    throw await toApiError(err, "에셋을 삭제하지 못했습니다.");
   }
 }
 
 // 사용(삽입) 시 다운로드 카운트 증가 — best-effort, 실패해도 무시.
 export async function markSharedAssetUsed(id: string): Promise<void> {
   try {
-    await fetch(`${BASE}/assets/${encodeURIComponent(id)}/use`, { method: "POST", cache: "no-store" });
+    await api.post(`${BASE}/assets/${encodeURIComponent(id)}/use`);
   } catch {
     // ignore
   }
@@ -346,57 +305,36 @@ export async function listSeries(
   params: { userId?: string; sort?: SeriesSort } = {},
   signal?: AbortSignal
 ): Promise<SeriesSummary[]> {
-  const search = new URLSearchParams();
-  if (params.userId) search.set("userId", params.userId);
-  if (params.sort) search.set("sort", params.sort);
-  const qs = search.toString();
-  const res = await fetch(`${BASE}/series${qs ? `?${qs}` : ""}`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  const data = await readOrThrow<unknown>(res, "시리즈 목록을 불러오지 못했습니다.");
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/series`, { params: { ...params }, signal }),
+    "시리즈 목록을 불러오지 못했습니다."
+  );
   return ensureArray<SeriesSummary>(data);
 }
 
 export async function getSeries(id: string, signal?: AbortSignal): Promise<SeriesDetail> {
-  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  return readOrThrow<SeriesDetail>(res, "시리즈를 불러오지 못했습니다.");
+  return callOrThrow(
+    () => api.get<SeriesDetail>(`${BASE}/series/${encodeURIComponent(id)}`, { signal }),
+    "시리즈를 불러오지 못했습니다."
+  );
 }
 
 export async function createSeries(input: SeriesInput): Promise<SeriesSummary> {
-  const res = await fetch(`${BASE}/series`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<SeriesSummary>(res, "시리즈를 만들지 못했습니다.");
+  return callOrThrow(() => api.post<SeriesSummary>(`${BASE}/series`, input), "시리즈를 만들지 못했습니다.");
 }
 
 export async function updateSeries(id: string, input: Partial<SeriesInput>): Promise<SeriesSummary> {
-  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    cache: "no-store",
-    headers: authHeaders(true),
-    body: JSON.stringify(input),
-  });
-  return readOrThrow<SeriesSummary>(res, "시리즈를 수정하지 못했습니다.");
+  return callOrThrow(
+    () => api.patch<SeriesSummary>(`${BASE}/series/${encodeURIComponent(id)}`, input),
+    "시리즈를 수정하지 못했습니다."
+  );
 }
 
 export async function deleteSeries(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/series/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    cache: "no-store",
-    headers: authHeaders(false),
-  });
-  if (!res.ok) {
-    const data = await safeParseJson<unknown>(res);
-    throw new Error(resolveApiError(data, `시리즈를 삭제하지 못했습니다. (${res.status})`));
+  try {
+    await api.delete(`${BASE}/series/${encodeURIComponent(id)}`);
+  } catch (err) {
+    throw await toApiError(err, "시리즈를 삭제하지 못했습니다.");
   }
 }
 
@@ -420,18 +358,18 @@ export interface ChallengeDetail extends ChallengeSummary {
 }
 
 export async function listChallenges(signal?: AbortSignal): Promise<ChallengeSummary[]> {
-  const res = await fetch(`${BASE}/challenges`, { cache: "no-store", signal });
-  const data = await readOrThrow<unknown>(res, "챌린지 목록을 불러오지 못했습니다.");
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/challenges`, { signal }),
+    "챌린지 목록을 불러오지 못했습니다."
+  );
   return ensureArray<ChallengeSummary>(data);
 }
 
 export async function getChallenge(key: string, signal?: AbortSignal): Promise<ChallengeDetail> {
-  const res = await fetch(`${BASE}/challenges/${encodeURIComponent(key)}`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  return readOrThrow<ChallengeDetail>(res, "챌린지를 불러오지 못했습니다.");
+  return callOrThrow(
+    () => api.get<ChallengeDetail>(`${BASE}/challenges/${encodeURIComponent(key)}`, { signal }),
+    "챌린지를 불러오지 못했습니다."
+  );
 }
 
 // 마감 D-day — 음수면 마감 지남, null이면 상시. (UI 표기용 순수 헬퍼)
@@ -457,30 +395,27 @@ export interface CreatorProfile {
 }
 
 export async function getCreatorProfile(userId: string, signal?: AbortSignal): Promise<CreatorProfile> {
-  const res = await fetch(`${BASE}/users/${encodeURIComponent(userId)}/profile`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  return readOrThrow<CreatorProfile>(res, "프로필을 불러오지 못했습니다.");
+  return callOrThrow(
+    () => api.get<CreatorProfile>(`${BASE}/users/${encodeURIComponent(userId)}/profile`, { signal }),
+    "프로필을 불러오지 못했습니다."
+  );
 }
 
 export async function toggleFollow(creatorId: string): Promise<{ following: boolean; followers: number }> {
-  const res = await fetch(`${BASE}/users/${encodeURIComponent(creatorId)}/follow`, {
-    method: "POST",
-    cache: "no-store",
-    headers: authHeaders(false),
-  });
-  return readOrThrow<{ following: boolean; followers: number }>(res, "팔로우를 처리하지 못했습니다.");
+  return callOrThrow(
+    () =>
+      api.post<{ following: boolean; followers: number }>(
+        `${BASE}/users/${encodeURIComponent(creatorId)}/follow`
+      ),
+    "팔로우를 처리하지 못했습니다."
+  );
 }
 
 // 팔로잉 피드 — 팔로우한 창작자의 최신 작품(로그인 필요).
 export async function listFollowingFeed(signal?: AbortSignal): Promise<WorkSummary[]> {
-  const res = await fetch(`${BASE}/feed/following`, {
-    cache: "no-store",
-    headers: authHeaders(false),
-    signal,
-  });
-  const data = await readOrThrow<unknown>(res, "팔로잉 피드를 불러오지 못했습니다.");
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/feed/following`, { signal }),
+    "팔로잉 피드를 불러오지 못했습니다."
+  );
   return unwrapWorks(data);
 }

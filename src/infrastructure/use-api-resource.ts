@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { api } from "@/src/infrastructure/api";
+
 export function useApiResource<T>(url: string | null, errorMessage: string) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(Boolean(url));
@@ -22,17 +24,20 @@ export function useApiResource<T>(url: string | null, errorMessage: string) {
     setError(null);
     setNotFound(false);
 
-    fetch(url, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((response) => {
+    // 전체 URL 그대로 호출(api.raw = prefix 없는 ky). 404 는 notFound, 그 외 에러는 errorMessage 로 처리.
+    api
+      .raw(url, {
+        cache: "no-store",
+        signal: controller.signal,
+        throwHttpErrors: false,
+      })
+      .then(async (response) => {
         if (response.status === 404) {
           setNotFound(true);
           return null;
         }
         if (!response.ok) throw new Error(errorMessage);
-        return response.json() as Promise<T>;
+        return (await response.json()) as T;
       })
       .then((payload) => {
         if (!alive) return;

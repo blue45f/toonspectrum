@@ -6,6 +6,7 @@ import { AdminNotice, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
 import { getAuthToken } from "@/src/compat/auth-session-store";
+import { api, getApiErrorMessage, httpStatus } from "@/src/infrastructure/api";
 
 interface AppConfig {
   monetizationEnabled: boolean;
@@ -197,27 +198,19 @@ function ManualIngest({ uid, onSettled }: { uid: string; onSettled?: () => void 
     setError(null);
     setResult(null);
     try {
-      const res = await fetch("/api/catalog/ingest/run", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "x-user-id": getAuthToken() ?? uid, "Content-Type": "application/json" },
-        body: JSON.stringify({ requestedBy: "admin" }),
-      });
-      if (!res.ok) {
-        let message = `요청 실패 (${res.status})`;
-        try {
-          const data = await res.json();
-          if (data?.error || data?.message) message = String(data.error ?? data.message);
-        } catch {
-          /* ignore */
-        }
-        if (res.status === 409) message = "이미 크롤이 실행 중이에요. 잠시 후 상태를 새로고침해 주세요.";
-        if (res.status === 429) message = "요청이 너무 잦아요. 1분 뒤 다시 시도해 주세요.";
-        throw new Error(message);
-      }
-      setResult((await res.json()) as IngestRunResult);
+      // 크롤은 수 분 걸릴 수 있다(공유 클라이언트 timeout:false). x-user-id 는 토큰 우선, 없으면 레거시 uid.
+      const result = await api.post<IngestRunResult>(
+        "/catalog/ingest/run",
+        { requestedBy: "admin" },
+        { headers: { "x-user-id": getAuthToken() ?? uid } }
+      );
+      setResult(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "크롤 실행에 실패했어요");
+      const status = httpStatus(e);
+      let message = await getApiErrorMessage(e, "크롤 실행에 실패했어요");
+      if (status === 409) message = "이미 크롤이 실행 중이에요. 잠시 후 상태를 새로고침해 주세요.";
+      if (status === 429) message = "요청이 너무 잦아요. 1분 뒤 다시 시도해 주세요.";
+      setError(message);
     } finally {
       setRunning(false);
       onSettled?.();
@@ -302,11 +295,9 @@ function IngestStatusPanel({ reloadToken = 0 }: { reloadToken?: number }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/catalog/ingest/status", { cache: "no-store" });
-      if (!res.ok) throw new Error(`요청 실패 (${res.status})`);
-      setStatus((await res.json()) as IngestStatus);
+      setStatus(await api.get<IngestStatus>("/catalog/ingest/status"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "수집 상태를 불러오지 못했어요");
+      setError(await getApiErrorMessage(e, "수집 상태를 불러오지 못했어요"));
     } finally {
       setLoading(false);
     }

@@ -5,8 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { Container } from "@/components/section";
 import { completeOAuthLogin } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
+import { api, apiPath } from "@/src/infrastructure/api";
 
 type Phase = "working" | "done" | "error";
+
+type OAuthResult = { user?: { id?: string } | null; token?: string | null; error?: string } | null;
 
 const ERROR_LABEL: Record<string, string> = {
   bad_state: "보안 검증에 실패했어요. 다시 시도해 주세요.",
@@ -54,19 +57,22 @@ export function AuthCallbackPage() {
       }
       try {
         if (params.t) {
-          const res = await fetch("/api/auth/oauth/exchange", {
+          const res = await api.raw(apiPath("/auth/oauth/exchange"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: params.t }),
+            throwHttpErrors: false,
+            json: { token: params.t },
           });
-          const data = await res.json().catch(() => null);
+          const data = await res.json<OAuthResult>().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "exchange-failed");
           finish(data.user, data.token, false);
           return;
         }
         if (params.demo && (params.demo === "google" || params.demo === "kakao" || params.demo === "naver")) {
-          const res = await fetch(`/api/auth/oauth/${params.demo}/demo`, { method: "POST" });
-          const data = await res.json().catch(() => null);
+          const res = await api.raw(apiPath(`/auth/oauth/${params.demo}/demo`), {
+            method: "POST",
+            throwHttpErrors: false,
+          });
+          const data = await res.json<OAuthResult>().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "demo-failed");
           finish(data.user, data.token, true);
           return;

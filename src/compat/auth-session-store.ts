@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react";
 
+import { api, apiPath } from "@/src/infrastructure/api";
+
 export type Session = {
   user: {
     id?: string;
@@ -56,13 +58,11 @@ export async function signIn(provider?: string, options?: Record<string, unknown
     };
   }
 
-  const response = await fetch("/api/auth/login", {
+  // 로그인 실패(비-2xx)도 정상 흐름으로 { ok:false, error } 를 돌려주므로 ky 예외를 끄고 Response 를 직접 다룬다.
+  const response = await api.raw(apiPath("/auth/login"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: options?.email,
-      password: options?.password,
-    }),
+    throwHttpErrors: false,
+    json: { email: options?.email, password: options?.password },
   });
   const payload = (await response.json().catch(() => null)) as
     | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
@@ -89,11 +89,14 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 export async function signOut() {
   const token = currentSession?.token;
   if (token) {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      cache: "no-store",
-      headers: { "x-user-id": token },
-    }).catch(() => {});
+    await api
+      .raw(apiPath("/auth/logout"), {
+        method: "POST",
+        cache: "no-store",
+        throwHttpErrors: false,
+        headers: { "x-user-id": token },
+      })
+      .catch(() => {});
   }
   persistSession(null);
   return undefined;

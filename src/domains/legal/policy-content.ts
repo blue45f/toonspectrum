@@ -2,7 +2,7 @@
 // 브라우저는 같은 출처 API 프록시(/api/legal/policies/:slug)를 호출하고,
 // 서버가 TermsDesk 공개 JSON을 대신 가져온다(CORS/프리플라이트 배포 차이 회피).
 // 본문은 마크다운/플레인텍스트가 섞일 수 있어 의존성 없이 최소 블록 파서로 렌더한다.
-import { apiPath } from "@/src/infrastructure/api";
+import { api, apiPath, httpStatus } from "@/src/infrastructure/api";
 
 export const TERMSDESK_BASE = "https://termsdesk.vercel.app";
 export const TERMSDESK_ORG_SLUG = "webtoon-index";
@@ -43,9 +43,17 @@ export function formatPolicyDate(iso: string | null): string | null {
 
 /** 게시 정본을 가져와 화면에 필요한 필드만 검증·정규화한다. 형식이 어긋나면 throw. */
 export async function fetchPolicyDocument(slug: string, signal?: AbortSignal): Promise<PolicyDocument> {
-  const response = await fetch(policyApiUrl(slug), { cache: "no-store", signal });
-  if (!response.ok) throw new Error(`policy_fetch_failed:${response.status}`);
-  const payload = (await response.json()) as Record<string, unknown> | null;
+  let payload: Record<string, unknown> | null;
+  try {
+    payload = await api.get<Record<string, unknown> | null>(`/legal/policies/${slug}`, {
+      cache: "no-store",
+      signal,
+    });
+  } catch (err) {
+    const status = httpStatus(err);
+    if (status !== null) throw new Error(`policy_fetch_failed:${status}`, { cause: err });
+    throw err;
+  }
   if (
     !payload ||
     typeof payload.body !== "string" ||

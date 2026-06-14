@@ -46,17 +46,19 @@ describe("fetchPolicyDocument", () => {
 
   it("fetches the JSON endpoint fresh and normalizes the payload", async () => {
     const mockFetch = vi.fn(
-      async () => new Response(JSON.stringify(PAYLOAD), { status: 200 })
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify(PAYLOAD), { status: 200 })
     );
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
     const doc = await fetchPolicyDocument("terms-of-service");
 
+    // ky 는 globalThis.fetch 를 Request 객체로 호출한다 — URL/캐시 정책이 보존됐는지 Request 로 검증.
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith(
-      policyApiUrl("terms-of-service"),
-      expect.objectContaining({ cache: "no-store" })
-    );
+    const request = mockFetch.mock.calls[0]![0] as unknown as Request;
+    expect(request).toBeInstanceOf(Request);
+    expect(new URL(request.url).pathname).toBe(policyApiUrl("terms-of-service"));
+    expect(request.cache).toBe("no-store");
     expect(doc).toEqual({
       policySlug: "terms-of-service",
       name: "이용약관",

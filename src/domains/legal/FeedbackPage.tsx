@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 
 const CATEGORY_LABEL: Record<FeedbackCategory, string> = {
@@ -33,8 +34,9 @@ const composeSchema = z.object({
 });
 type ComposeValues = z.infer<typeof composeSchema>;
 
-function authHeaders(token: string | null): Record<string, string> {
-  return token ? { "Content-Type": "application/json", "x-user-id": token } : { "Content-Type": "application/json" };
+// ky 가 json 본문의 Content-Type 을 자동 설정하므로 인증 토큰(x-user-id)만 헤더로 넘긴다.
+function authHeaders(token: string | null): Record<string, string> | undefined {
+  return token ? { "x-user-id": token } : undefined;
 }
 
 function timeAgo(iso: string): string {
@@ -77,13 +79,16 @@ export function FeedbackPage() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams();
-    if (category !== "all") params.set("category", category);
-    if (status !== "all") params.set("status", status);
-    if (tagFilter) params.set("tag", tagFilter);
-    fetch(`/api/feedback/posts?${params.toString()}`, { cache: "no-store", signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("load_failed"))))
-      .then((data: { items: FeedbackPost[] }) => {
+    api
+      .get<{ items: FeedbackPost[] }>("/feedback/posts", {
+        params: {
+          category: category !== "all" ? category : undefined,
+          status: status !== "all" ? status : undefined,
+          tag: tagFilter || undefined,
+        },
+        signal: controller.signal,
+      })
+      .then((data) => {
         if (alive) setPosts(data.items ?? []);
       })
       .catch(() => alive && setError("게시판을 불러오지 못했어요."))
@@ -96,18 +101,17 @@ export function FeedbackPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     if (!userId) return;
-    const res = await fetch("/api/feedback/posts", {
-      method: "POST",
-      headers: authHeaders(sessionToken),
-      body: JSON.stringify({ ...values, tags: composeTags }),
-    });
-    if (res.ok) {
+    try {
+      await api.post(
+        "/feedback/posts",
+        { ...values, tags: composeTags },
+        { headers: authHeaders(sessionToken) }
+      );
       reset({ category: values.category, title: "", text: "" });
       setComposeTags([]);
       setRefreshTick((t) => t + 1);
-    } else {
-      const body = await res.json().catch(() => ({}));
-      setError(body?.error ?? "글을 등록하지 못했어요.");
+    } catch (err) {
+      setError(await getApiErrorMessage(err, "글을 등록하지 못했어요."));
     }
   });
 
@@ -342,9 +346,9 @@ function PostThread({ postId, userId }: { postId: string; userId: string | null 
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/feedback/posts/${postId}/replies`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: FeedbackReply[]) => alive && setReplies(Array.isArray(data) ? data : []))
+    api
+      .get<FeedbackReply[]>(`/feedback/posts/${postId}/replies`)
+      .then((data) => alive && setReplies(Array.isArray(data) ? data : []))
       .catch(() => {});
     return () => {
       alive = false;
@@ -354,15 +358,14 @@ function PostThread({ postId, userId }: { postId: string; userId: string | null 
   const send = async () => {
     if (!userId || !text.trim()) return;
     setSending(true);
-    const res = await fetch(`/api/feedback/posts/${postId}/replies`, {
-      method: "POST",
-      headers: authHeaders(sessionToken),
-      body: JSON.stringify({ text }),
-    });
-    setSending(false);
-    if (res.ok) {
+    try {
+      await api.post(`/feedback/posts/${postId}/replies`, { text }, { headers: authHeaders(sessionToken) });
       setText("");
       setTick((t) => t + 1);
+    } catch {
+      // 전송 실패 시 조용히 무시(기존 동작과 동일 — !res.ok 면 상태 변경 없음).
+    } finally {
+      setSending(false);
     }
   };
 

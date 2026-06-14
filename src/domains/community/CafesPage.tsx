@@ -5,12 +5,12 @@ import { useNavigate } from "react-router-dom";
 import type { CommunityCafe } from "@/lib/types";
 
 import { Container } from "@/components/section";
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 import { useApp, useHydrated } from "@/lib/store";
 import { GENRES } from "@/lib/taxonomy";
 import { cn, relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { api, getApiErrorMessage } from "@/src/infrastructure/api";
 
 
 const CAFE_NAME_MAX = 40;
@@ -54,17 +54,15 @@ export function CafesPage() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ sort });
-    if (genre) params.set("genre", genre);
-    if (queryText) params.set("q", queryText);
-    fetch(`/api/community/cafes?${params.toString()}`, { cache: "no-store", signal: controller.signal })
-      .then(async (res) => {
-        const data = await safeParseJson<unknown>(res);
-        if (!res.ok) throw new Error(resolveApiError(data, "카페 목록을 불러오지 못했습니다."));
-        const payload = (data ?? {}) as { items?: unknown };
-        return Array.isArray(payload.items) ? (payload.items as CommunityCafe[]) : [];
+    api
+      .get<{ items?: unknown }>("/community/cafes", {
+        params: { sort, genre: genre || undefined, q: queryText || undefined },
+        signal: controller.signal,
       })
-      .then((items) => setCafes(items))
+      .then((data) => {
+        const items = Array.isArray(data?.items) ? (data.items as CommunityCafe[]) : [];
+        setCafes(items);
+      })
       .catch((err) => {
         if ((err as Error).name !== "AbortError") setError("카페 목록을 불러오지 못했습니다.");
       })
@@ -79,25 +77,18 @@ export function CafesPage() {
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await fetch("/api/community/cafes", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json", "x-user-id": sessionToken },
-        body: JSON.stringify({ name, description, genre: composeGenre }),
-      });
-      const data = await safeParseJson<unknown>(res);
-      if (!res.ok) {
-        setCreateError(resolveApiError(data, "카페를 만들지 못했습니다."));
-        return;
-      }
-      const created = data as CommunityCafe;
+      const created = await api.post<CommunityCafe>(
+        "/community/cafes",
+        { name, description, genre: composeGenre },
+        { headers: { "x-user-id": sessionToken } }
+      );
       if (!created?.slug) {
         setCreateError("카페 생성 응답이 유효하지 않습니다.");
         return;
       }
       navigate(`/community/cafes/${encodeURIComponent(created.slug)}`);
-    } catch {
-      setCreateError("카페를 만들지 못했습니다.");
+    } catch (err) {
+      setCreateError(await getApiErrorMessage(err, "카페를 만들지 못했습니다."));
     } finally {
       setCreating(false);
     }

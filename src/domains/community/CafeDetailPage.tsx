@@ -11,6 +11,7 @@ import { useApp } from "@/lib/store";
 import { relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { api, apiPath, getApiErrorMessage } from "@/src/infrastructure/api";
 
 
 // 장르 카페 상세(/community/cafes/:slug) — 카페 소개 + 가입/탈퇴 + 게시판(fan-cafe-panel 재사용).
@@ -37,11 +38,13 @@ export function CafeDetailPage() {
     setLoading(true);
     setError(null);
     setNotFound(false);
-    fetch(`/api/community/cafes/${encodeURIComponent(slug)}`, {
-      cache: "no-store",
-      signal: controller.signal,
-      headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
-    })
+    api
+      .raw(apiPath(`/community/cafes/${encodeURIComponent(slug)}`), {
+        cache: "no-store",
+        signal: controller.signal,
+        throwHttpErrors: false,
+        headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
+      })
       .then(async (res) => {
         if (res.status === 404) {
           setNotFound(true);
@@ -68,20 +71,17 @@ export function CafeDetailPage() {
     if (action === "leave" && !window.confirm("이 카페에서 탈퇴할까요?")) return;
     setMembershipBusy(true);
     setMembershipError(null);
+    const fallback = action === "join" ? "가입하지 못했습니다." : "탈퇴하지 못했습니다.";
+    const path = `/community/cafes/${encodeURIComponent(slug)}/membership`;
+    const opts = { headers: { "x-user-id": sessionToken } };
     try {
-      const res = await fetch(`/api/community/cafes/${encodeURIComponent(slug)}/membership`, {
-        method: action === "join" ? "POST" : "DELETE",
-        cache: "no-store",
-        headers: { "x-user-id": sessionToken },
-      });
-      const data = await safeParseJson<unknown>(res);
-      if (!res.ok) {
-        setMembershipError(resolveApiError(data, action === "join" ? "가입하지 못했습니다." : "탈퇴하지 못했습니다."));
-        return;
-      }
-      setCafe(data as CommunityCafe);
-    } catch {
-      setMembershipError(action === "join" ? "가입하지 못했습니다." : "탈퇴하지 못했습니다.");
+      const data =
+        action === "join"
+          ? await api.post<CommunityCafe>(path, undefined, opts)
+          : await api.delete<CommunityCafe>(path, opts);
+      setCafe(data);
+    } catch (err) {
+      setMembershipError(await getApiErrorMessage(err, fallback));
     } finally {
       setMembershipBusy(false);
     }

@@ -12,6 +12,7 @@ import { useApp } from "@/lib/store";
 import { relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import { api } from "@/src/infrastructure/api";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 
 
@@ -90,16 +91,9 @@ export function CommunityPostPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, {
-        method: "DELETE",
-        cache: "no-store",
+      await api.delete(`/community/posts/${encodeURIComponent(post.id)}`, {
         headers: { "x-user-id": sessionToken },
       });
-      if (!res.ok) {
-        setDeleteError("글을 삭제하지 못했습니다.");
-        setDeleting(false);
-        return;
-      }
       navigate(boardHref, { replace: true });
     } catch {
       setDeleteError("글을 삭제하지 못했습니다.");

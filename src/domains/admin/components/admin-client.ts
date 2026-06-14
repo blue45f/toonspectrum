@@ -1,5 +1,6 @@
 // 관리자 API(Nest /api/admin/*) 공용 클라이언트 — 서명 세션 토큰을 x-user-id 헤더로 전달(서버 검증).
 import { getAuthToken } from "@/src/compat/auth-session-store";
+import { api, HTTPError } from "@/src/infrastructure/api";
 
 export interface AdminMe {
   id: string;
@@ -88,27 +89,36 @@ export class AdminApiError extends Error {
 }
 
 export async function adminFetch<T>(path: string, uid: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/admin${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "x-user-id": getAuthToken() ?? uid, // 서명 토큰 우선(없으면 레거시 uid → 서버가 거부)
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    let message = `요청 실패 (${res.status})`;
-    try {
-      const data = await res.json();
-      if (data?.error || data?.message) message = String(data.error ?? data.message);
-    } catch {
-      /* ignore */
-    }
-    throw new AdminApiError(res.status, message);
+  // 서명 토큰 우선(없으면 레거시 uid → 서버가 거부). 헤더를 직접 지정하므로 공유 훅은 덮어쓰지 않는다.
+  const headers: Record<string, string> = {
+    "x-user-id": getAuthToken() ?? uid,
+    ...(init?.body ? { "Content-Type": "application/json" } : {}),
+  };
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => (headers[key] = value));
   }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  try {
+    const res = await api.raw(`/api/admin${path}`, {
+      method: (init?.method ?? "GET") as never,
+      cache: "no-store",
+      body: init?.body as BodyInit | null | undefined,
+      headers,
+    });
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  } catch (err) {
+    if (err instanceof HTTPError) {
+      let message = `요청 실패 (${err.response.status})`;
+      const data = err.data;
+      if (data && typeof data === "object") {
+        const { error, message: msg } = data as { error?: unknown; message?: unknown };
+        if (error || msg) message = String(error ?? msg);
+      }
+      throw new AdminApiError(err.response.status, message);
+    }
+    throw err;
+  }
 }
 
 // 표시 보조 — cents ↔ 원

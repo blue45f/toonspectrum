@@ -25,9 +25,10 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn, formatCount, relativeDate } from "@/lib/utils";
-import { useSession, getAuthToken, signOut } from "@/src/compat/auth-session-store";
+import { useSession, signOut } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
+import { api } from "@/src/infrastructure/api";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/src/infrastructure/creator-client";
 import { deleteMyAccount, updateMyProfile } from "@/src/infrastructure/me-client";
 
@@ -327,9 +328,10 @@ function ProfileTab() {
   useEffect(() => {
     if (!user?.id) return;
     let alive = true;
-    fetch("/api/me", { cache: "no-store", headers: { "x-user-id": getAuthToken() ?? "" } })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { profile?: { name?: string | null; bio?: string | null; image?: string | null } } | null) => {
+    // x-user-id 는 공유 ky 훅이 세션 토큰으로 자동 주입한다. 베스트에포트라 실패는 무시.
+    api
+      .get<{ profile?: { name?: string | null; bio?: string | null; image?: string | null } }>("/me")
+      .then((data) => {
         if (!alive || !data?.profile) return;
         setName((prev) => prev || data.profile?.name || "");
         setBio((prev) => prev || data.profile?.bio || "");
