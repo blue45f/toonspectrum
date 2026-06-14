@@ -5,7 +5,6 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  OnModuleInit,
   UnauthorizedException,
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
@@ -27,6 +26,7 @@ import { getRankingData, getRankingHealth } from "../../../../../lib/server/rank
 import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
 
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../../lib/types";
+import type { OnModuleInit } from "@nestjs/common";
 
 type QueryRecord = Record<string, string>;
 
