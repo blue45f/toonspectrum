@@ -2,7 +2,11 @@
 // catalog query/ranking logic and is lazy-loaded by catalog-static.ts only when
 // a request cannot be served from precomputed CDN files.
 import type { PlatformId, ReadState, Title, TitleCard } from "@/lib/types";
+
 import { detailShardFile, mergeDetailExtra, type DetailShardFile } from "@/lib/catalog-slim";
+import { buildTasteProfile, recommendForTaste, similarTitles } from "@/lib/recommend";
+import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "@/lib/search";
+import { getAuthorData } from "@/lib/server/author";
 import {
   activeTags,
   adaptationsOf,
@@ -12,11 +16,8 @@ import {
   replaceCatalogData,
   TITLES,
 } from "@/lib/server/catalog-store";
-import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "@/lib/search";
-import { buildTasteProfile, recommendForTaste, similarTitles } from "@/lib/recommend";
 import { getExploreData } from "@/lib/server/explore";
 import { getRankingData } from "@/lib/server/ranking-service";
-import { getAuthorData } from "@/lib/server/author";
 
 const JSON_HEADERS = { "content-type": "application/json" };
 const NOT_FOUND = Symbol("not-found");

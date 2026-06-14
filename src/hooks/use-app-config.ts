@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { api } from "@/src/infrastructure/api";
+
 // 런타임 앱 설정(GET /api/config). 광고형 수익화 on/off 등 전역 토글을 읽는다.
 // 기본값은 전부 비활성(수익화 OFF = 광고 없음). 관리자가 켜기 전까지 아무것도 노출하지 않는다.
 export interface AppConfig {
@@ -16,11 +18,8 @@ let inflight: Promise<AppConfig> | null = null;
 function loadAppConfig(): Promise<AppConfig> {
   if (cached) return Promise.resolve(cached);
   if (inflight) return inflight;
-  inflight = fetch("/api/config", { cache: "no-store" })
-    .then((response) => {
-      if (!response.ok) throw new Error("failed to load app config");
-      return response.json() as Promise<Partial<AppConfig>>;
-    })
+  inflight = api
+    .get<Partial<AppConfig>>("/config")
     .then((payload) => {
       cached = {
         ...DEFAULTS,

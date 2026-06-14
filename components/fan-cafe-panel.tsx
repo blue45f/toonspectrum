@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenText,
   ImagePlus,
@@ -16,12 +15,14 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import Link from "@/src/compat/router-link";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+
+import { KIND_LABEL } from "./fan-cafe-utils";
+
 import type { FanCafePost, FanCafePostKind, FanCafeReply, FanCafeScopeFilter } from "@/lib/types";
-import { useApp } from "@/lib/store";
-import { cn, relativeDate } from "@/lib/utils";
-import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { ATTACHMENT_MAX_COUNT, fileToAttachmentDataUrl } from "@/lib/image-attach";
+
+
 import {
   COMMUNITY_SORT_OPTIONS,
   COMMUNITY_SORT_LABEL,
@@ -29,13 +30,11 @@ import {
   COMMUNITY_SCOPE_LABEL_WITH_ALL,
   FAN_CAFE_SCOPE_COPY,
 } from "@/lib/community-ui";
-
-export const KIND_LABEL: Record<FanCafePostKind, string> = {
-  talk: "잡담",
-  theory: "해석",
-  fanart: "팬아트",
-  cheer: "응원",
-};
+import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
+import { ATTACHMENT_MAX_COUNT, fileToAttachmentDataUrl } from "@/lib/image-attach";
+import { useApp } from "@/lib/store";
+import { cn, relativeDate } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 const TAG_CHIP_LIMIT = 10;
 const FAN_CAFE_REPLY_MAX_LENGTH = 700;

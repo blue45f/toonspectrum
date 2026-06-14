@@ -1,6 +1,11 @@
 "use client";
 
+import { Music, ExternalLink } from "lucide-react";
+
+import { Section } from "./section";
+
 import type { Title } from "@/lib/types";
+
 import {
   mergedUniverse,
   ostThumb,
@@ -9,8 +14,6 @@ import {
   ostSpotifyUrl,
   OST_KIND_LABEL,
 } from "@/lib/title-universe";
-import { Section } from "./section";
-import { Music, ExternalLink } from "lucide-react";
 
 // 작품 OST·주제가 섹션 — 유니버스 데이터가 있을 때만 렌더.
 // 저작권 안전: 음원/영상을 임베드·재생·저장하지 않는다. 곡 정보(사실)와 공식 영상 썸네일만 보여주고

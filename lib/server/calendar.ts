@@ -1,8 +1,10 @@
-import { TITLES } from "./catalog-store";
 import { PLATFORMS } from "../platforms";
 import { WEEK_DAYS } from "../taxonomy";
-import type { PlatformId, Title } from "../types";
 import { kstDayOfWeek } from "../utils";
+
+import { TITLES } from "./catalog-store";
+
+import type { PlatformId, Title } from "../types";
 
 const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
 

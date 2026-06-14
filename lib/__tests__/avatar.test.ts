@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   AVATAR_PRESETS,
   MAX_AVATAR_IMAGE_BYTES,

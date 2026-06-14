@@ -1,18 +1,21 @@
 "use client";
 
+import { Sparkles, Wand2, Shuffle, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useApp, useHydrated, useSavedTitleIds } from "@/lib/store";
-import { GENRES } from "@/lib/taxonomy";
-import type { PlatformId, Title } from "@/lib/types";
-import { TitleCard } from "./title-card";
+
 import { MiniPoster } from "./rank-row";
 import { Section, Rail } from "./section";
+import { TitleCard } from "./title-card";
+
+import type { PlatformId, Title } from "@/lib/types";
+
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { useRememberedFilters } from "@/lib/use-remembered-filters";
-import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
 import { genreColor } from "@/lib/genre-color";
+import { useApp, useHydrated, useSavedTitleIds } from "@/lib/store";
+import { GENRES } from "@/lib/taxonomy";
+import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
+import { useRememberedFilters } from "@/lib/use-remembered-filters";
 import { cn } from "@/lib/utils";
-import { Sparkles, Wand2, Shuffle, SlidersHorizontal } from "lucide-react";
 
 interface RecommendPayload {
   pickedRecs: Title[];
@@ -296,7 +299,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setSelectedFormat(opt.value as any)}
+                      onClick={() => setSelectedFormat(opt.value as "all" | "webtoon" | "webnovel")}
                       className={cn(
                         "flex-1 rounded-xl border p-3 text-xs font-semibold transition-all cursor-pointer",
                         selectedFormat === opt.value
@@ -321,7 +324,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setSelectedStatus(opt.value as any)}
+                      onClick={() => setSelectedStatus(opt.value as "all" | "ongoing" | "completed")}
                       className={cn(
                         "flex-1 rounded-xl border p-3 text-xs font-semibold transition-all cursor-pointer",
                         selectedStatus === opt.value

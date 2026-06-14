@@ -1,7 +1,8 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
 
 interface Props {
   children: ReactNode;

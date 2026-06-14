@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { isAdminUser } from "../server/app-config";
 import {
   STALE_RUN_GRACE_MS,
   evaluateRegression,
@@ -14,7 +16,6 @@ import {
   staleCatalogRunCutoff,
   verifyCatalogIngestToken,
 } from "../server/catalog-ingest";
-import { isAdminUser } from "../server/app-config";
 import { buildCatalogSourcePlan } from "../server/catalog-sources";
 
 // Nest CatalogService(수동 ingest 경로) 검증용 부분 mock — 순수 함수(verify/normalize/…)는 실제 구현 유지,

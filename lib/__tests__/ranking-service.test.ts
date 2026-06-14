@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
+
 import {
   getRankingData,
   normalizeRankingParams,
   shouldFetchLiveSignals,
   type LiveRankingFetcher,
 } from "../server/ranking-service";
-import type { LiveRankingResult } from "../server/live";
+
 import { makeTitle } from "./fixtures";
+
+import type { LiveRankingResult } from "../server/live";
 
 function query(values: Record<string, string | undefined>) {
   return {

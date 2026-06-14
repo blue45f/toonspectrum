@@ -1,9 +1,10 @@
-import { TITLES, adaptationsOf, activeTags } from "./catalog-store";
 import { PLATFORM_LIST } from "../platforms";
-import { GENRES, WEEK_DAYS } from "../taxonomy";
 import { rankBy } from "../ranking";
 import { sortTitles } from "../search";
+import { GENRES, WEEK_DAYS } from "../taxonomy";
 import { kstDayOfWeek } from "../utils";
+
+import { TITLES, adaptationsOf, activeTags } from "./catalog-store";
 import { getReviewGlobalStats } from "./reviews";
 
 const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];

@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { cn } from "@/lib/utils";
 import { useId } from "react";
+
+import { cn } from "@/lib/utils";
 
 export interface SegItem<T extends string> {
   value: T;
@@ -18,7 +19,7 @@ function handleTabKeys<T extends string>(
   onChange: (v: T) => void
 ) {
   const idx = items.findIndex((it) => it.value === value);
-  let next = -1;
+  let next: number;
   if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % items.length;
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + items.length) % items.length;
   else if (e.key === "Home") next = 0;

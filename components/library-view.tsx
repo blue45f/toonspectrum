@@ -1,20 +1,25 @@
 "use client";
 
+import { Sparkles, Plus, Trash2, Pencil, Check, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import Link from "@/src/compat/router-link";
-import { useApp, useHydrated } from "@/lib/store";
-import type { ReadState, Title } from "@/lib/types";
-import { UnderlineTabs, Segmented } from "./ui/segmented";
-import { TitleCard } from "./title-card";
+
 import { MiniPoster } from "./rank-row";
-import { Stars, RatingInline } from "./ui/stars";
+import { TitleCard } from "./title-card";
+import { UnderlineTabs, Segmented } from "./ui/segmented";
 import { MeterBar } from "./ui/spectrum-bar";
+import { Stars, RatingInline } from "./ui/stars";
+import { CollectionIcon } from "./visual-marks";
+import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
+
+import type { ReadState, Title } from "@/lib/types";
+
+
 import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
+import { useApp, useHydrated } from "@/lib/store";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
-import { Sparkles, Plus, Trash2, Pencil, Check, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
-import { COLLECTION_ICON_OPTIONS, CollectionIcon } from "./visual-marks";
+import Link from "@/src/compat/router-link";
 
 type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
 const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
@@ -574,6 +579,9 @@ function CollectionsTab({
                     <div className="min-w-0">
                       {editingId === c.id ? (
                         <input
+                          // 이름 변경(rename) 모드 진입이라는 명시적 사용자 액션으로만 마운트되는
+                          // 인라인 편집 입력이라 열릴 때 포커스 이동이 적절하다(페이지 로드 시 포커스 탈취 아님).
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
                           autoFocus
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}

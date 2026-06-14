@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 // 표지 <img> 래퍼 — CDN 링크가 만료/404 되면 깨진 이미지 박스 대신 폴백(그라디언트+글리프)으로 전환.

@@ -1,15 +1,17 @@
-import { useState } from "react";
-import Link from "@/src/compat/router-link";
-import { type RankedTitle, explainScore, type RankAxis } from "@/lib/ranking";
-import { cn, formatCount } from "@/lib/utils";
-import { RatingInline } from "./ui/stars";
-import { GenreChip } from "./ui/chip";
-import { PlatformTags } from "./availability";
-import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { ChevronUp, ChevronDown, Minus, HelpCircle, Sparkles } from "lucide-react";
+import { useState } from "react";
+
 import { AdultOverlay } from "./adult-overlay";
+import { PlatformTags } from "./availability";
 import { CoverImage } from "./cover-image";
+import { GenreChip } from "./ui/chip";
+import { RatingInline } from "./ui/stars";
+
 import { statsAreEstimated } from "@/lib/estimate";
+import { type RankedTitle, explainScore, type RankAxis } from "@/lib/ranking";
+import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
+import { cn, formatCount } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 // 미니 표지 썸네일
 export function MiniPoster({

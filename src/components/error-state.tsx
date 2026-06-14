@@ -1,5 +1,6 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { buttonClass } from "@/components/ui/button";
+
+import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 // 데이터 로드 실패 시 페이지들이 공통으로 쓰는 에러 안내 + 재시도 블록.

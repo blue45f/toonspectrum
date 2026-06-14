@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { replaceCatalogData } from "../server/catalog-store";
+
 import { rankBy } from "../ranking";
-import type { Title } from "../types";
+import { replaceCatalogData } from "../server/catalog-store";
+
 import { makeTitle } from "./fixtures";
+
+import type { Title } from "../types";
+
 
 // 교차-플랫폼 인기 백분위(popularityPercentile)는 카탈로그 로드 시 replaceCatalogData 안에서 계산된다.
 // 내부 함수(computeCrossPlatformPopularity/platformPopSignal)는 비공개이므로 공개 진입점으로 검증한다.

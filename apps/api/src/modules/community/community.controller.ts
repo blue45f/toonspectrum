@@ -14,8 +14,10 @@ import {
   HttpException,
   HttpStatus,
 } from "@nestjs/common";
-import type { Request } from "express";
+
 import { CommunityService } from "./community.service";
+
+import type { Request } from "express";
 
 interface ReviewQuery {
   sort?: string | null;

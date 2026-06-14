@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { cn } from "@/lib/utils";
-import { buttonClass } from "@/components/ui/button";
-import { resolveSignupAvatarImage } from "@/lib/avatar";
 import { Camera, Trash2, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
+
+import { buttonClass } from "@/components/ui/button-utils";
+import { resolveSignupAvatarImage } from "@/lib/avatar";
+import { cn } from "@/lib/utils";
 
 // 클라이언트에서 이미지를 정사각 webp dataURL 로 다운스케일. (서버 PATCH 부하/한도 보호)
 const MAX_DIMENSION = 256; // px (정사각 한 변)

@@ -1,7 +1,9 @@
-import { getTitle } from "./catalog-store";
-import type { PlatformId, SerialStatus } from "../types";
 import { PLATFORMS } from "../platforms";
 import { kstDayOfWeek } from "../utils";
+
+import { getTitle } from "./catalog-store";
+
+import type { PlatformId, SerialStatus } from "../types";
 
 type CacheEntry<T> = { signature: string; fetchedAt: number; expiresAt: number; result: T };
 

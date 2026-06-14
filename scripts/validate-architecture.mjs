@@ -30,8 +30,8 @@ for (const file of requiredPaths) {
   if (!exists(file)) issues.push(`missing file: ${file}`);
 }
 
-// Root Vite app entry points (index.html -> src/main.tsx).
-const requiredEntries = ["index.html", "src/main.tsx", "vite.config.ts"];
+// Root Vite app entry points (index.html -> src/app/main.tsx).
+const requiredEntries = ["index.html", "src/app/main.tsx", "vite.config.ts"];
 for (const entry of requiredEntries) {
   if (!exists(entry)) issues.push(`missing app entry: ${entry}`);
 }

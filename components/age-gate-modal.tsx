@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+
 import { useApp, useHydrated } from "@/lib/store";
 
 // 스팀식 자가 연령 확인 — 생년월일 1회 입력 → 만 19세 이상이면 19금 표지 블러 해제(브라우저 저장).
@@ -19,6 +20,16 @@ export function AgeGateModal() {
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
   const [denied, setDenied] = useState(false);
+
+  // Escape 로 닫기 (키보드 접근성) — open 일 때만 동작.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
 
   if (!hydrated || !open) return null;
 
@@ -38,15 +49,25 @@ export function AgeGateModal() {
   const clearDenied = () => setDenied(false);
 
   return (
+    // 클릭으로 닫히는 백드롭(presentational). 키보드 닫기는 Escape(위 useEffect)로 제공하며
+    // onKeyDown(Escape)도 함께 둔다. 전체화면 백드롭을 포커스 가능한 위젯으로 만들면 UX가
+    // 나빠지므로 role/tabIndex 대신 no-static-element-interactions 만 한정 비활성화한다.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-[oklch(0.12_0.012_70/0.72)] p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="agegate-title"
       onClick={close}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") close();
+      }}
     >
+      {/* dialog 패널의 onClick은 백드롭으로의 클릭 전파만 막는 가드라 호출 동작이 없다. */}
+      {/* 키보드 닫기는 Escape(useEffect)로 제공되므로 패널엔 키 리스너가 필요 없다. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         className="w-full max-w-sm rounded-2xl border border-line bg-panel p-6 text-left shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agegate-title"
         onClick={(e) => e.stopPropagation()}
       >
         <ShieldCheck className="text-accent" size={26} />

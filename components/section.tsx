@@ -1,7 +1,9 @@
-import Link from "@/src/compat/router-link";
-import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
-import { buttonClass } from "./ui/button";
+
+import { buttonClass } from "./ui/button-utils";
+
+import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 export function Section({
   eyebrow,

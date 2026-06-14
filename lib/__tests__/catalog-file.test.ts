@@ -2,7 +2,9 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } 
 import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   loadCatalogTitlesFromFile,
   readCatalogFileSummary,
@@ -18,6 +20,7 @@ import {
   refreshCatalogIfChanged,
 } from "../server/catalog-ingest";
 import { allTitles, getCatalogState, replaceCatalogData } from "../server/catalog-store";
+
 import { makeTitle } from "./fixtures";
 
 // 카탈로그 파일 전용 경로(쓰기·스탯 폴링·핫 리로드)는 실제 fs 로 검증한다 — DB mock 불필요(전송 0 설계).

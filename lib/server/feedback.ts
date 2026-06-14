@@ -1,7 +1,8 @@
 // 사이트 Q&A·의견 게시판 서버 로직 — community.ts 패턴을 따른다(검증·트리·ensure-schema).
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+
 import { db, dbClient, feedbackPosts, feedbackReplies, users } from "../db";
+
 import type {
   CommunityAuthor,
   FeedbackCategory,
@@ -10,6 +11,7 @@ import type {
   FeedbackReply,
   FeedbackStatus,
 } from "../types";
+import type { SQL } from "drizzle-orm";
 
 const CATEGORIES = new Set<FeedbackCategory>(["question", "idea", "bug"]);
 const SORTS = new Set<"recent" | "active">(["recent", "active"]);

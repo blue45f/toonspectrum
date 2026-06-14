@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import Link from "@/src/compat/router-link";
 import { Heart, EyeOff } from "lucide-react";
-import type { SeedReview, Title } from "@/lib/types";
-import { Stars } from "./ui/stars";
+import { useState } from "react";
+
+import { ReviewReplies } from "./review-replies";
 import { Badge } from "./ui/chip";
+import { Stars } from "./ui/stars";
+
+import type { SeedReview, Title } from "@/lib/types";
+
+
+
 import { useApp, useHydrated } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
-import { ReviewReplies } from "./review-replies";
+import Link from "@/src/compat/router-link";
+
 
 const PROGRESS_TONE: Record<string, "good" | "accent" | "neutral" | "bad"> = {
   완독: "good",

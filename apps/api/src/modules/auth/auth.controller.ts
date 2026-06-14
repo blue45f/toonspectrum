@@ -1,9 +1,10 @@
 import { BadRequestException, Body, Controller, Get, Headers, HttpException, HttpStatus, Param, Post, Query, Req, Res } from "@nestjs/common";
-import type { Request, Response } from "express";
 import { eq } from "drizzle-orm";
-import { db, users } from "../../../../../lib/db";
+
 import { hashPassword, verifyPassword } from "../../../../../lib/auth-crypto";
 import { resolveSignupAvatar, resolveSignupAvatarImage } from "../../../../../lib/avatar";
+import { db, users } from "../../../../../lib/db";
+import { getAppConfig } from "../../../../../lib/server/app-config";
 import {
   buildAuthorizeUrl,
   consumeHandoff,
@@ -17,7 +18,6 @@ import {
   verifyState,
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
-import { getAppConfig } from "../../../../../lib/server/app-config";
 import { signSession } from "../../../../../lib/server/session";
 import {
   ensureUserLifecycleSchema,
@@ -25,6 +25,8 @@ import {
   normalizeSessionVersion,
   revokeUserSessions,
 } from "../../../../../lib/server/user-lifecycle";
+
+import type { Request, Response } from "express";
 
 interface AuthPayload {
   email?: unknown;

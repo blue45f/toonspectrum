@@ -1,4 +1,10 @@
 // 전 페이지 공용 필터 패널 — 표시할 facet을 선택해 렌더(캘린더/탐색/추천/랭킹 공용).
+import { Bookmark, Check, SlidersHorizontal, X } from "lucide-react";
+
+import type { PlatformId } from "@/lib/types";
+import type { ReactNode } from "react";
+
+import { PLATFORMS } from "@/lib/platforms";
 import { GENRES, TAGS } from "@/lib/taxonomy";
 import {
   AGE_OPTIONS,
@@ -10,11 +16,9 @@ import {
   countActiveTitleFilters,
   type TitleFilterState,
 } from "@/lib/title-filters";
-import { PLATFORMS } from "@/lib/platforms";
-import type { PlatformId } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Bookmark, Check, SlidersHorizontal, X } from "lucide-react";
-import type { ReactNode } from "react";
+
+
 
 export type FilterFacet =
   | "saved"

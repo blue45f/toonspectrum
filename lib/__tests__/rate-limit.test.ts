@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { rateLimit, clientIp } from "../rate-limit";
 
 describe("rateLimit", () => {

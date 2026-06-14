@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { allTitles, getCatalogState, replaceCatalogData } from "../server/catalog-store";
+
 import { getCalendarData } from "../server/calendar";
+import { allTitles, getCatalogState, replaceCatalogData } from "../server/catalog-store";
+
 import { makeTitle } from "./fixtures";
 
 describe("calendar data", () => {

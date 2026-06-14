@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { issueState, verifyState, isOAuthProvider, providerMode, listAuthProviders } from "../server/oauth";
 
 describe("OAuth signed state (CSRF 방어)", () => {

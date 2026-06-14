@@ -10,11 +10,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
-import { GENRES, WEEK_DAYS } from "../lib/taxonomy";
-import { PLATFORM_LIST } from "../lib/platforms";
-import { rankBy, RANK_AXES } from "../lib/ranking";
-import { sortTitles } from "../lib/search";
-import { kstDayOfWeek } from "../lib/utils";
 import {
   buildDetailExtra,
   detailShardBucket,
@@ -24,6 +19,10 @@ import {
   toListTitle,
   type DetailShardFile,
 } from "../lib/catalog-slim";
+import { PLATFORM_LIST } from "../lib/platforms";
+import { rankBy, RANK_AXES } from "../lib/ranking";
+import { sortTitles } from "../lib/search";
+import { getCalendarData } from "../lib/server/calendar";
 import {
   activeTags,
   adaptationsOf,
@@ -31,10 +30,13 @@ import {
   replaceCatalogData,
   TITLES,
 } from "../lib/server/catalog-store";
-import { getCalendarData } from "../lib/server/calendar";
 import { getInsightsData } from "../lib/server/insights";
 import { getRankingData } from "../lib/server/ranking-service";
+import { GENRES, WEEK_DAYS } from "../lib/taxonomy";
+import { kstDayOfWeek } from "../lib/utils";
+
 import { readFileIfExists, writeNews } from "./news-gen";
+
 import type { Title } from "../lib/types";
 
 const RANK_TYPES = ["all", "webtoon", "webnovel"];

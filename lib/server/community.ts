@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+
 import {
   communityCafeMembers,
   communityCafes,
@@ -11,6 +11,7 @@ import {
   users,
 } from "../db";
 import { validateAttachmentImages } from "../image-attach";
+
 import type {
   CommunityCafe,
   FanCafePost,
@@ -22,6 +23,7 @@ import type {
   FanCafeBoard,
   ReviewReply,
 } from "../types";
+import type { SQL } from "drizzle-orm";
 
 export interface ValidatedFanPostInput {
   scope: FanCafeScope;
@@ -328,7 +330,7 @@ function replyDepthErrorMessage(reason: "missing" | "cycle" | "exceed") {
 
 function buildTagFilterCondition(tag: string) {
   const normalized = normalizeTagFilter(tag);
-  const quotedPattern = `%\"${escapeLikePattern(normalized)}\"%`;
+  const quotedPattern = `%"${escapeLikePattern(normalized)}"%`;
   const hashtagPattern = `%#${escapeLikePattern(normalized)}%`;
   return or(
     sql`lower(${fanPosts.tags}) LIKE ${quotedPattern} ESCAPE '\\'`,

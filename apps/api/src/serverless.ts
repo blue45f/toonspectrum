@@ -2,10 +2,12 @@ import "./load-env"; // 첫 import — lib/db가 DATABASE_URL 읽기 전 주입(
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
-import type { Express } from "express";
+
 import { AppModule } from "./app.module";
-import { sessionAuth } from "./session-middleware";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { sessionAuth } from "./session-middleware";
+
+import type { Express } from "express";
 
 // Vercel 서버리스용 — 콜드 컨테이너당 1회 부팅 후 캐시(웜 인스턴스 재사용).
 // 기본 platform-express 어댑터로 생성 → init() → 내부 Express 인스턴스를 핸들러로 반환.

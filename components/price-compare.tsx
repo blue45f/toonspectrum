@@ -1,7 +1,9 @@
+import { Coins, Crown, Eye } from "lucide-react";
+
 import type { Availability } from "@/lib/types";
+
 import { comparePlatformCosts, formatWon } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
-import { Coins, Crown, Eye } from "lucide-react";
 
 // 플랫폼간 가격 비교표 — 같은 작품의 보기/소장 비용을 플랫폼별로 비교(추정·예시).
 export function PriceCompare({ availability }: { availability: Availability[] }) {

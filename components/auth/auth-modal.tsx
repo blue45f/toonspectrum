@@ -1,13 +1,14 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { signIn } from "@/src/compat/auth-session";
-import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+import { ToonSpectrumMark } from "../visual-marks";
+
 import {
   AVATAR_PRESETS,
   MAX_AVATAR_IMAGE_BYTES,
@@ -15,7 +16,9 @@ import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
-import { ToonSpectrumMark } from "../visual-marks";
+import { cn } from "@/lib/utils";
+import { signIn } from "@/src/compat/auth-session-store";
+
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {

@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { genreColor, genreTint, genreBorder } from "@/lib/genre-color";
+import { cn } from "@/lib/utils";
 
 // 장르 스펙트럼 칩 — 장르별 고유 hue 틴트
 export function GenreChip({

@@ -8,8 +8,9 @@
 // 표현한다. DATE 타입은 타임존이 없어 UTC DTSTART에서 생기는 KST 자정↔UTC 전날 요일
 // 어긋남(BYDAY 불일치) 문제도 피한다.
 
-import { WEEK_DAYS } from "./taxonomy";
 import { PLATFORMS } from "./platforms";
+import { WEEK_DAYS } from "./taxonomy";
+
 import type { Title } from "./types";
 
 // 주간 반복 일정 1건 (작품 1편 = VEVENT 1건, 다요일 연재는 BYDAY 다중으로 합침)

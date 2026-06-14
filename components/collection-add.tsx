@@ -1,10 +1,13 @@
 "use client";
 
+import { FolderHeart, Check, Plus } from "lucide-react";
 import { useState } from "react";
+
+import { CollectionIcon } from "./visual-marks";
+import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
+
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { FolderHeart, Check, Plus } from "lucide-react";
-import { COLLECTION_ICON_OPTIONS, CollectionIcon } from "./visual-marks";
 
 const DEFAULT_COLLECTION_ICON = COLLECTION_ICON_OPTIONS[0].value;
 

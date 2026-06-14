@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { constants as zlibConstants, gunzipSync, gzipSync } from "node:zlib";
+
 import type { Title } from "../types";
 
 const CANDIDATES = ["apps/api/data/catalog.json.gz", "data/catalog.json.gz", "catalog.json.gz"];

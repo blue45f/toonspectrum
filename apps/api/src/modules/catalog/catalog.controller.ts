@@ -12,9 +12,12 @@ import {
   Req,
   Res,
 } from "@nestjs/common";
-import type { Request, Response } from "express";
-import { CatalogService } from "./catalog.service";
+
 import { getAppConfig } from "../../../../../lib/server/app-config";
+
+import { CatalogService } from "./catalog.service";
+
+import type { Request, Response } from "express";
 
 type QueryMap = Record<string, string | string[] | undefined>;
 

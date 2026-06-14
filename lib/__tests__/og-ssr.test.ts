@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-// CJS handler를 require로 가져옵니다.
-const ogHandler = require("../../api/og.js");
+// CJS handler(module.exports = fn)를 default import 로 가져옵니다(Vitest CJS interop).
+import ogHandler from "../../api/og.js";
 
 describe("api/og.js SSRF and SSR Meta Injection", () => {
   let originalFetch: typeof fetch;
