@@ -21,6 +21,7 @@ import { AuthMenu } from "./auth/auth-menu";
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { useT } from "@/lib/i18n";
+import { useUi } from "@/lib/ui-store";
 import { cn, keepInlineText } from "@/lib/utils";
 import { usePathname } from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
@@ -53,7 +54,7 @@ export function SiteHeader() {
   const isActive = useActive();
   const pathname = usePathname();
   const t = useT();
-  const openSearch = () => window.dispatchEvent(new Event("toonspectrum:search"));
+  const openSearch = useUi((s) => s.openCommandPalette);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
