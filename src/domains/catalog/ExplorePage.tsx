@@ -449,9 +449,20 @@ export function ExplorePage() {
             )}
           </>
         ) : (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
+          <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
             <p className="text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
-            <p className="mt-1 text-xs text-fg-3">장르나 태그 필터를 조금 넓혀보세요.</p>
+            <p className="mt-1 text-xs text-fg-3">
+              {hasFilter ? "필터를 조금 넓히거나 초기화해 보세요." : "다른 장르나 태그로 탐색해 보세요."}
+            </p>
+            {hasFilter && (
+              <Link
+                href="/explore"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+              >
+                <RotateCcw size={14} />
+                필터 초기화
+              </Link>
+            )}
           </div>
         )}
       </Container>
