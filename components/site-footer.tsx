@@ -38,6 +38,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "웹툰·웹소설 소식", href: "/news" },
       { label: "서비스 소개", href: "/about" },
       { label: "랭킹 산정 방식", href: "/guide" },
+      { label: "디자인 시스템", href: "/design" },
       { label: "설정", href: "/settings" },
     ],
   },
