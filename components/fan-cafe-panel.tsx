@@ -178,7 +178,7 @@ export function FanCafePanel({
   function appendDemoActivity(action: string, label: string, detail?: string) {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
+      const raw = globalThis.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       const current = Array.isArray(parsed) ? parsed : [];
       const next = [
@@ -193,7 +193,7 @@ export function FanCafePanel({
           targetLabel,
         },
       ].slice(-20);
-      window.localStorage.setItem(FAN_CAFE_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
+      globalThis.localStorage.setItem(FAN_CAFE_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // Demo activity is optional; storage failures should not block the UI.
     }
@@ -247,7 +247,7 @@ export function FanCafePanel({
   useEffect(() => {
     return () => {
       if (postPulseTimerRef.current) {
-        window.clearTimeout(postPulseTimerRef.current);
+        globalThis.clearTimeout(postPulseTimerRef.current);
         postPulseTimerRef.current = null;
       }
     };
@@ -258,7 +258,7 @@ export function FanCafePanel({
     postsRequestSignatureRef.current = requestSignature;
 
     const controller = new AbortController();
-    const resetTimer = window.setTimeout(() => {
+    const resetTimer = globalThis.setTimeout(() => {
       if (controller.signal.aborted) return;
       setLoading(true);
       setError(null);
@@ -312,7 +312,7 @@ export function FanCafePanel({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => {
-      window.clearTimeout(resetTimer);
+      globalThis.clearTimeout(resetTimer);
       controller.abort();
     };
   }, [apiQuery, authHeaders, queryText, refreshTick, requestSignature, sort]);
@@ -812,7 +812,7 @@ function FanPostCard({
   const [deleting, setDeleting] = useState(false);
   async function handleDelete() {
     if (!userId || deleting) return;
-    if (!window.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
+    if (!globalThis.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, {
@@ -1021,7 +1021,7 @@ export function FanPostReplySection({
   }, [replyAutoRefreshEnabled]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       replyRefreshControllerRef.current?.abort();
       setIsLoadingReplies(true);
       setError(null);
@@ -1059,7 +1059,7 @@ export function FanPostReplySection({
         });
     }, 0);
     return () => {
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       replyRefreshControllerRef.current?.abort();
     };
     // onCountChange는 부모 setState라 참조 변동이 잦다 — postId/tick 기준으로만 재요청한다.
@@ -1148,7 +1148,7 @@ export function FanPostReplySection({
   // 본인 답글 삭제 — 하위 답글이 있으면 서버가 소프트 삭제(자리 표시)로 남긴다.
   async function deleteReply(replyId: string) {
     if (!userId || !sessionToken) return;
-    if (!window.confirm("이 댓글을 삭제할까요?")) return;
+    if (!globalThis.confirm("이 댓글을 삭제할까요?")) return;
     setError(null);
     try {
       const res = await fetch(

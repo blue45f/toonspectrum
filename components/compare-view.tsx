@@ -13,6 +13,7 @@ import { GenreSpectrum } from "./ui/spectrum-bar";
 
 import type { Title } from "@/lib/types";
 
+import { computeCompareVerdict } from "@/lib/compare-verdict";
 import { statsAreEstimated } from "@/lib/estimate";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { cn, formatCount } from "@/lib/utils";
@@ -251,6 +252,9 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
           transition={{ duration: 0.3 }}
           className="space-y-6"
         >
+          {/* 종합 우세 판정 — 추정값이 끼면 우열을 가리지 않는다(별점·조회 보정값 보호) */}
+          {!eitherEstimated && <VerdictBanner a={a} b={b} />}
+
           {/* 주요 수치 대조 패널 */}
           <div className="overflow-hidden rounded-2xl border border-line bg-panel/40 backdrop-blur-sm p-2 sm:p-4">
             <h3 className="mb-4 px-2 text-xs font-bold text-fg-3 uppercase tracking-wider">주요 지표 비교분석</h3>
@@ -365,6 +369,50 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
         </motion.div>
       )}
     </motion.div>
+  );
+}
+
+function VerdictBanner({ a, b }: { a: Title; b: Title }) {
+  const verdict = computeCompareVerdict(a, b);
+  if (verdict.total === 0) return null;
+
+  const tie = verdict.winner === "tie";
+  const winnerTitle = verdict.winner === "a" ? a : verdict.winner === "b" ? b : null;
+  const winnerWins = verdict.winner === "a" ? verdict.aWins : verdict.bWins;
+  const loserWins = verdict.winner === "a" ? verdict.bWins : verdict.aWins;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-accent/35 bg-accent-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="eyebrow text-accent">종합 우세</p>
+        {tie ? (
+          <p className="mt-1 text-pretty text-sm font-semibold text-fg">
+            막상막하예요 — 주요 지표 {verdict.total}개가 {verdict.aWins} : {verdict.bWins}로 팽팽합니다.
+          </p>
+        ) : (
+          <p className="mt-1 text-pretty text-sm font-semibold text-fg">
+            <span className="text-accent">{winnerTitle?.title}</span>이(가) 주요 지표 {verdict.total}개 중{" "}
+            <span className="numeral">{winnerWins}</span>개에서 앞섭니다
+            <span className="font-normal text-fg-3">
+              {" "}
+              ({winnerWins} : {loserWins}
+              {verdict.ties > 0 ? `, 무승부 ${verdict.ties}` : ""})
+            </span>
+            .
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-1.5">
+        {(verdict.winner === "b" ? verdict.bLabels : verdict.aLabels).slice(0, 4).map((label) => (
+          <span
+            key={`w-${label}`}
+            className="rounded-full border border-accent/40 bg-card/60 px-2.5 py-0.5 text-[0.7rem] font-medium text-accent"
+          >
+            {label} 우세
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

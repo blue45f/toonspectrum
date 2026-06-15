@@ -22,6 +22,12 @@ import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 
 type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
+type RatedSort = "high" | "low" | "title";
+const RATED_SORTS: { value: RatedSort; label: string }[] = [
+  { value: "high", label: "별점 높은순" },
+  { value: "low", label: "별점 낮은순" },
+  { value: "title", label: "가나다순" },
+];
 const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
 const READ_TABS: { value: ReadState; label: string }[] = [
   { value: "want", label: "관심" },
@@ -99,6 +105,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [readTab, setReadTab] = useState<ReadState>("want");
+  const [ratedSort, setRatedSort] = useState<RatedSort>("high");
   const [titlesById, setTitlesById] = useState<Record<string, Title>>({});
   const [profile, setProfile] = useState<TasteProfile>(EMPTY_PROFILE);
   const [recs, setRecs] = useState<TasteRec[]>([]);
@@ -167,7 +174,15 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   }
 
   const readIds = Object.entries(reads);
-  const ratedIds = Object.entries(ratings).sort((a, b) => b[1] - a[1]);
+  const ratedEntries = Object.entries(ratings);
+  const ratedIds = [...ratedEntries].sort((a, b) => {
+    if (ratedSort === "title") {
+      const nameA = titlesById[a[0]]?.title ?? "";
+      const nameB = titlesById[b[0]]?.title ?? "";
+      return nameA.localeCompare(nameB, "ko-KR");
+    }
+    return ratedSort === "low" ? a[1] - b[1] : b[1] - a[1];
+  });
 
   const counts: Record<ReadState, number> = { want: 0, reading: 0, done: 0, dropped: 0 };
   readIds.forEach(([, st]) => (counts[st] = (counts[st] ?? 0) + 1));
@@ -266,7 +281,19 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
               cta={{ label: "평가하러 가기", href: "/ranking" }}
             />
           ) : (
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-fg-3">
+                  평가한 작품 <span className="numeral text-fg">{ratedIds.length}</span>편
+                </span>
+                <Segmented
+                  value={ratedSort}
+                  onChange={setRatedSort}
+                  items={RATED_SORTS}
+                  size="sm"
+                />
+              </div>
+              <div className="flex flex-col gap-2.5">
               {ratedIds.map(([id, r]) => {
                 const t = titlesById[id];
                 if (!t) return null;
@@ -295,6 +322,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                   </Link>
                 );
               })}
+              </div>
             </div>
           )}
         </div>
