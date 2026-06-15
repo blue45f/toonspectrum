@@ -133,7 +133,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   });
 
   const remove = async (c: Campaign) => {
-    if (!window.confirm(`캠페인 “${c.title}”을(를) 삭제할까요?`)) return;
+    if (!globalThis.confirm(`캠페인 “${c.title}”을(를) 삭제할까요?`)) return;
     try {
       await adminFetch(`/campaigns/${encodeURIComponent(c.id)}`, uid, { method: "DELETE" });
       load();

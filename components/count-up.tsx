@@ -17,7 +17,7 @@ export function CountUp({
   const [n, setN] = useState(0);
 
   useEffect(() => {
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const dur = reduce ? 0 : duration; // reduced-motion 이면 즉시 (첫 프레임에 완료)
     let raf = 0;
     let start = 0;

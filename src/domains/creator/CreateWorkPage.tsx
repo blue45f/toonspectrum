@@ -379,7 +379,7 @@ export function CreateWorkPage() {
 
   async function onDelete() {
     if (!work || deleting) return;
-    if (!window.confirm("이 창작물을 삭제할까요? 되돌릴 수 없습니다.")) return;
+    if (!globalThis.confirm("이 창작물을 삭제할까요? 되돌릴 수 없습니다.")) return;
     setDeleting(true);
     setActionError(null);
     try {

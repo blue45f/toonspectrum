@@ -22,7 +22,7 @@ export function apiPath(path: string): string {
 // 브라우저는 location.origin 으로, (테스트 등) 비브라우저 환경은 localhost 폴백으로 해석한다.
 // apiPath() 가 이미 절대 URL(VITE_API_BASE 가 절대값일 때)을 만들면 그 값이 baseUrl 보다 우선한다.
 function resolveBaseUrl(): string {
-  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+  if (typeof window !== "undefined" && globalThis.location?.origin) return globalThis.location.origin;
   return "http://localhost";
 }
 

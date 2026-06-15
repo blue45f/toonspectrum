@@ -11,7 +11,7 @@ export function OpenSearchButton({
     <button
       type="button"
       className={className}
-      onClick={() => window.dispatchEvent(new Event("toonspectrum:search"))}
+      onClick={() => globalThis.dispatchEvent(new Event("toonspectrum:search"))}
     >
       {children}
     </button>

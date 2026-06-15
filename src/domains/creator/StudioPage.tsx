@@ -555,7 +555,7 @@ const QUICK_SAMPLE_MARGIN = 24;
 function readQuickStartDismissed() {
   if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(QUICK_START_DISMISSED_KEY) === "1";
+    return globalThis.localStorage.getItem(QUICK_START_DISMISSED_KEY) === "1";
   } catch {
     return false;
   }
@@ -564,7 +564,7 @@ function readQuickStartDismissed() {
 function storeQuickStartDismissed() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(QUICK_START_DISMISSED_KEY, "1");
+    globalThis.localStorage.setItem(QUICK_START_DISMISSED_KEY, "1");
   } catch {
     // localStorage may be unavailable in private or embedded browser contexts.
   }
@@ -1059,7 +1059,7 @@ function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
     reader.onload = () => {
-      const img = new window.Image();
+      const img = new globalThis.Image();
       img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
       img.onload = () => {
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
@@ -1079,7 +1079,7 @@ function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
 
 function downscaleDataUrl(dataUrl: string, maxW: number, quality = 0.72) {
   return new Promise<string>((resolve) => {
-    const img = new window.Image();
+    const img = new globalThis.Image();
     img.onerror = () => resolve(dataUrl);
     img.onload = () => {
       const scale = Math.min(1, maxW / img.width);
@@ -1148,7 +1148,7 @@ function UrlImage({
   const imageRef = useRef<Konva.Image | null>(null);
 
   useEffect(() => {
-    const im = new window.Image();
+    const im = new globalThis.Image();
     im.src = el.src;
     im.onload = () => setImg(im);
     return () => {
@@ -1261,7 +1261,7 @@ function FramePanel({
       return;
     }
     let alive = true;
-    const im = new window.Image();
+    const im = new globalThis.Image();
     im.onload = () => {
       if (alive) setImg(im);
     };
@@ -1626,7 +1626,7 @@ export function StudioPage() {
   const [recentColors, setRecentColors] = useState<string[]>([]);
   useEffect(() => {
     try {
-      setRecentColors(readRecentColors(window.localStorage));
+      setRecentColors(readRecentColors(globalThis.localStorage));
     } catch {
       // localStorage 접근 불가(시크릿/임베드)면 빈 목록 유지.
     }
@@ -1635,7 +1635,7 @@ export function StudioPage() {
     setRecentColors((prev) => {
       const next = pushRecentColor(prev, c);
       try {
-        storeRecentColors(window.localStorage, next);
+        storeRecentColors(globalThis.localStorage, next);
       } catch {
         // 저장 실패는 무시(보조 기능).
       }
@@ -1692,8 +1692,8 @@ export function StudioPage() {
       setScale(Math.min(1, w / CANVAS_W));
     };
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    globalThis.addEventListener("resize", measure);
+    return () => globalThis.removeEventListener("resize", measure);
   }, []);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
@@ -1739,11 +1739,11 @@ export function StudioPage() {
         setIsPanning(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("keyup", handleKeyUp);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      globalThis.removeEventListener("keydown", handleKeyDown);
+      globalThis.removeEventListener("keyup", handleKeyUp);
     };
   }, [isSpacePressed, editing]);
 
@@ -1765,11 +1765,11 @@ export function StudioPage() {
     const wrap = wrapRef.current;
     if (!wrap) return;
     wrap.addEventListener("scroll", updateScrollPos);
-    window.addEventListener("resize", updateScrollPos);
+    globalThis.addEventListener("resize", updateScrollPos);
     const timer = setTimeout(updateScrollPos, 150);
     return () => {
       wrap.removeEventListener("scroll", updateScrollPos);
-      window.removeEventListener("resize", updateScrollPos);
+      globalThis.removeEventListener("resize", updateScrollPos);
       clearTimeout(timer);
     };
   }, [elements, canvasH, scale, zoom]);
@@ -1969,8 +1969,8 @@ export function StudioPage() {
         setContextMenu((prev) => ({ ...prev, visible: false }));
       }
     };
-    window.addEventListener("click", handleCloseMenu);
-    return () => window.removeEventListener("click", handleCloseMenu);
+    globalThis.addEventListener("click", handleCloseMenu);
+    return () => globalThis.removeEventListener("click", handleCloseMenu);
   }, [contextMenu.visible]);
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -1999,8 +1999,8 @@ export function StudioPage() {
     const handlePointerDown = (e: PointerEvent) => {
       if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
     };
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
+    globalThis.addEventListener("pointerdown", handlePointerDown);
+    return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [exportMenuOpen]);
 
   // 툴바 드롭다운(템플릿·배경 씬·말풍선·효과·내 에셋) 바깥 클릭시 닫기.
@@ -2011,8 +2011,8 @@ export function StudioPage() {
     const handlePointerDown = (e: PointerEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
     };
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
+    globalThis.addEventListener("pointerdown", handlePointerDown);
+    return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [menu]);
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
@@ -2710,13 +2710,13 @@ export function StudioPage() {
     setTool("select");
     setMenu(null);
     dismissQuickStart();
-    window.requestAnimationFrame(() => {
+    globalThis.requestAnimationFrame(() => {
       publishRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       titleInputRef.current?.focus({ preventScroll: true });
     });
   }
   function startFromExample() {
-    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
+    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
 
     const frames = createQuickSampleFrames();
     const firstFrame = frames[0];
@@ -2893,8 +2893,8 @@ export function StudioPage() {
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
   }, []);
 
   // 클립보드 이미지 붙여넣기(⌘V): 스크린샷·외부 그림을 바로 캔버스에 추가.
@@ -2927,8 +2927,8 @@ export function StudioPage() {
   });
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => pasteRef.current(e);
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
+    globalThis.addEventListener("paste", onPaste);
+    return () => globalThis.removeEventListener("paste", onPaste);
   }, []);
 
   // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
@@ -3198,7 +3198,7 @@ export function StudioPage() {
 
   function applyTemplate(tpl: TemplateSpec) {
     setMenu(null);
-    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
+    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
@@ -3210,7 +3210,7 @@ export function StudioPage() {
   // 코미Po!식 정형 컷 레이아웃 — 패널 프레임(+말풍선 시드)을 한 번에 배치.
   function applyPanelLayout(layout: PanelLayoutPreset) {
     setMenu(null);
-    if (elements.length > 0 && !window.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
+    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
     setCanvasH(layout.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
@@ -3689,14 +3689,14 @@ export function StudioPage() {
       const fitScale = maxFittingScale(pageHeights, spacing, scale);
       const plannedParts = splitPagesForExport(pageHeights, spacing, scale).length;
       if (fitScale !== null) {
-        wantSplit = window.confirm(
+        wantSplit = globalThis.confirm(
           `${scale}×로 한 장에 합치면 브라우저 캔버스 한계(약 ${MAX_CANVAS_DIM.toLocaleString()}px)를 넘어요.\n` +
             `확인: ${plannedParts}개 파일로 나눠 저장 / 취소: ${fitScale}×로 낮춰 한 파일로 저장`
         );
         if (!wantSplit) scale = fitScale;
       } else {
         if (
-          !window.confirm(
+          !globalThis.confirm(
             `페이지가 길어 ${scale}× 한 파일로는 저장할 수 없어요.\n${plannedParts}개 파일로 나눠 저장할까요?`
           )
         ) {
@@ -5109,7 +5109,7 @@ export function StudioPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (pages.length <= 1) return;
-                        if (window.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
+                        if (globalThis.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
                           deletePage(p.id);
                         }
                       }}
@@ -8552,7 +8552,7 @@ export function StudioPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            const name = window.prompt("그룹 이름", node.group.name);
+                            const name = globalThis.prompt("그룹 이름", node.group.name);
                             if (name != null && name.trim()) renameLayerGroup(node.group.id, name.trim());
                           }}
                           className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-[0.7rem] font-semibold text-fg-2"

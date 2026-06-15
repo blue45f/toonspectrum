@@ -21,14 +21,14 @@ export function useRouter() {
     push: (href: string, options?: NavigateOptions) => {
       navigate(href);
       if (options?.scroll === false) return;
-      window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+      globalThis.requestAnimationFrame(() => globalThis.scrollTo({ top: 0, left: 0 }));
     },
     replace: (href: string, options?: NavigateOptions) => {
       navigate(href, { replace: true });
       if (options?.scroll === false) return;
-      window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+      globalThis.requestAnimationFrame(() => globalThis.scrollTo({ top: 0, left: 0 }));
     },
-    refresh: () => window.location.reload(),
+    refresh: () => globalThis.location.reload(),
     prefetch: async () => undefined,
   };
 }
@@ -38,6 +38,6 @@ export function notFound(): never {
 }
 
 export function redirect(href: string): never {
-  window.location.assign(href);
+  globalThis.location.assign(href);
   throw new Error(`redirect:${href}`);
 }

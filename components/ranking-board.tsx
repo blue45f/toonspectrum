@@ -485,11 +485,11 @@ export function RankingBoard({
     }
 
     load();
-    const timer = window.setInterval(() => load(true), pollIntervalMs);
+    const timer = globalThis.setInterval(() => load(true), pollIntervalMs);
     return () => {
       alive = false;
       controller.abort();
-      window.clearInterval(timer);
+      globalThis.clearInterval(timer);
     };
   }, [pollIntervalMs, query, refreshKey]);
 
@@ -503,8 +503,8 @@ export function RankingBoard({
       setRefreshCountdown(Math.max(0, Math.floor((nextRefreshAt - Date.now()) / 1000)));
     };
     tick();
-    const t = window.setInterval(tick, 1000);
-    return () => window.clearInterval(t);
+    const t = globalThis.setInterval(tick, 1000);
+    return () => globalThis.clearInterval(t);
   }, [nextRefreshAt]);
 
   const isLoading = state === "loading";

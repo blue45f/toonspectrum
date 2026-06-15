@@ -12,6 +12,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { FeedbackWidget } from "@/src/components/feedback/FeedbackWidget";
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다.
@@ -20,7 +21,7 @@ function ScrollToTop() {
   const isFirstRender = useRef(true);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0 });
+    globalThis.scrollTo({ top: 0, left: 0 });
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
@@ -55,6 +56,10 @@ export default function App() {
             <ThemeSwitcher />
             <LanguageSwitcher />
           </div>
+          {/* 피드백 위젯: SurveyDesk 엔드포인트가 설정된 경우에만 마운트(미설정 기본값이면 앱에 무영향). */}
+          {import.meta.env.VITE_SURVEYDESK_URL && (
+            <FeedbackWidget appId="toonspectrum" endpoint={import.meta.env.VITE_SURVEYDESK_URL} />
+          )}
         </MotionProvider>
       </AuthSessionProvider>
     </BrowserRouter>

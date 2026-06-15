@@ -20,7 +20,7 @@ const ERROR_LABEL: Record<string, string> = {
 };
 
 function parseHash(): Record<string, string> {
-  const raw = typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+  const raw = typeof window !== "undefined" ? globalThis.location.hash.replace(/^#/, "") : "";
   return Object.fromEntries(new URLSearchParams(raw));
 }
 
@@ -46,7 +46,7 @@ export function AuthCallbackPage() {
       setDemo(isDemo);
       setPhase("done");
       setMessage(isDemo ? "데모 계정으로 로그인했어요." : "로그인되었어요.");
-      window.setTimeout(() => navigate("/", { replace: true }), isDemo ? 1400 : 700);
+      globalThis.setTimeout(() => navigate("/", { replace: true }), isDemo ? 1400 : 700);
     };
 
     async function run() {

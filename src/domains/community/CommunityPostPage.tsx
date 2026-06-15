@@ -87,7 +87,7 @@ export function CommunityPostPage() {
 
   async function deletePost() {
     if (!sessionToken || deleting || !post) return;
-    if (!window.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
+    if (!globalThis.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
     setDeleting(true);
     setDeleteError(null);
     try {

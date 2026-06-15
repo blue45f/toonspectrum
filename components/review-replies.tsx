@@ -132,7 +132,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
 
   async function deleteReply(replyId: string) {
     if (!userId || !sessionToken) return;
-    if (!window.confirm("이 답글을 삭제할까요?")) return;
+    if (!globalThis.confirm("이 답글을 삭제할까요?")) return;
     setError(null);
     try {
       const res = await fetch(

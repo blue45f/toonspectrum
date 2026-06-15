@@ -50,7 +50,7 @@ const readFanCafeActivityLog = (): FanCafeActivityLog[] => {
   if (typeof window === "undefined") return [];
 
   try {
-    const raw = window.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -74,7 +74,7 @@ const readTermsChecklist = (): TermsDemoCheckId[] => {
   if (typeof window === "undefined") return [];
 
   try {
-    const raw = window.localStorage.getItem(TERMS_DEMO_CHECKLIST_STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(TERMS_DEMO_CHECKLIST_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -88,7 +88,7 @@ const writeTermsChecklist = (items: TermsDemoCheckId[]) => {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(TERMS_DEMO_CHECKLIST_STORAGE_KEY, JSON.stringify(items));
+    globalThis.localStorage.setItem(TERMS_DEMO_CHECKLIST_STORAGE_KEY, JSON.stringify(items));
   } catch {
     // Local persistence is optional for this demo checklist.
   }

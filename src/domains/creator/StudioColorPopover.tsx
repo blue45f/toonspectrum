@@ -61,9 +61,9 @@ export function StudioColorPopover({
     const node = rootRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
-    setAlignRight(rect.left > window.innerWidth / 2);
+    setAlignRight(rect.left > globalThis.innerWidth / 2);
     // 팝오버 예상 높이(~340px)가 아래로 넘치고 위에 공간이 있으면 위로 펼친다.
-    setDropUp(rect.bottom + 340 > window.innerHeight && rect.top > 340);
+    setDropUp(rect.bottom + 340 > globalThis.innerHeight && rect.top > 340);
   }, [open]);
 
   // 팝오버 열림 동안 바깥 mousedown이면 닫는다. 닫힐 때 리스너 정리.

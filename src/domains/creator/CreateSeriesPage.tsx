@@ -120,7 +120,7 @@ export function CreateSeriesPage() {
 
   async function onDelete() {
     if (!series || deleting) return;
-    if (!window.confirm("이 시리즈를 삭제할까요? 회차 작품들은 시리즈에서만 분리되고 삭제되지 않습니다.")) return;
+    if (!globalThis.confirm("이 시리즈를 삭제할까요? 회차 작품들은 시리즈에서만 분리되고 삭제되지 않습니다.")) return;
     setDeleting(true);
     setActionError(null);
     try {

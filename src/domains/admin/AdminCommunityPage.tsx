@@ -125,7 +125,7 @@ function ModerationBoard({ uid }: { uid: string }) {
   }
 
   function clearAttachments(post: ModerationPost) {
-    if (!window.confirm(`이 글의 첨부 이미지 ${post.imageCount}장을 모두 제거할까요? (본문은 유지)`)) return;
+    if (!globalThis.confirm(`이 글의 첨부 이미지 ${post.imageCount}장을 모두 제거할까요? (본문은 유지)`)) return;
     void run(post.id, async () => {
       await adminFetch(`/community/posts/${encodeURIComponent(post.id)}/attachments/clear`, uid, { method: "POST" });
       setPosts((current) => current.map((item) => (item.id === post.id ? { ...item, imageCount: 0 } : item)));
@@ -133,7 +133,7 @@ function ModerationBoard({ uid }: { uid: string }) {
   }
 
   function deletePost(post: ModerationPost) {
-    if (!window.confirm(`"${post.title}" 글을 완전히 삭제할까요? 답글도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    if (!globalThis.confirm(`"${post.title}" 글을 완전히 삭제할까요? 답글도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
     void run(post.id, async () => {
       await adminFetch(`/community/posts/${encodeURIComponent(post.id)}`, uid, { method: "DELETE" });
       setPosts((current) => current.filter((item) => item.id !== post.id));

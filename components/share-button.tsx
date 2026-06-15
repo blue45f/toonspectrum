@@ -11,7 +11,7 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
 
   const url =
     typeof window !== "undefined"
-      ? `${window.location.origin}/title/${encodeURIComponent(slug)}`
+      ? `${globalThis.location.origin}/title/${encodeURIComponent(slug)}`
       : `/title/${encodeURIComponent(slug)}`;
   const shareText = `${title} · 툰스펙트럼`;
 

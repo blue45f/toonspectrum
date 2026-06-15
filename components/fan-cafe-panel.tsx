@@ -233,12 +233,12 @@ export function FanCafePanel({
   useEffect(() => {
     if (!postPulse) return;
     if (postPulseTimerRef.current) {
-      window.clearTimeout(postPulseTimerRef.current);
+      globalThis.clearTimeout(postPulseTimerRef.current);
     }
-    postPulseTimerRef.current = window.setTimeout(() => setPostPulse(0), 5500);
+    postPulseTimerRef.current = globalThis.setTimeout(() => setPostPulse(0), 5500);
     return () => {
       if (postPulseTimerRef.current) {
-        window.clearTimeout(postPulseTimerRef.current);
+        globalThis.clearTimeout(postPulseTimerRef.current);
         postPulseTimerRef.current = null;
       }
     };

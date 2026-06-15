@@ -1,6 +1,6 @@
 // onestory (원스토리 북스) 웹툰 크롤러.
 // 소스: https://onestory.co.kr/display/rank/webtoon/<menuKey> 의 HTML 안에 박힌
-//       window.__PRELOADED_STATE__ (JSON). robots.txt 가 /display/ 를 Allow 하며
+//       globalThis.__PRELOADED_STATE__ (JSON). robots.txt 가 /display/ 를 Allow 하며
 //       /api · /tpl 은 건드리지 않는다. 데스크톱 UA, 장르 메뉴별 1회씩만 요청(소량).
 // 아이템: state.displayProduct.productList[] — prodNm/artistNm/prodId/thumbnailImageUrl 등.
 import {
@@ -36,11 +36,11 @@ const MENUS = [
   ["DP26004", "스릴러"], // 스릴러
 ];
 
-// HTML 안의 window.__PRELOADED_STATE__ = {...} 를 중괄호 균형으로 안전 추출.
+// HTML 안의 globalThis.__PRELOADED_STATE__ = {...} 를 중괄호 균형으로 안전 추출.
 // (JSON 본문에 </script> 가 섞여 있어 정규식 non-greedy 매칭은 깨진다.)
 function extractPreloadedState(html) {
   const s = String(html || "");
-  const mi = s.indexOf("window.__PRELOADED_STATE__");
+  const mi = s.indexOf("globalThis.__PRELOADED_STATE__");
   if (mi < 0) return null;
   const from = s.indexOf("{", mi);
   if (from < 0) return null;

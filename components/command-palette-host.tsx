@@ -15,11 +15,11 @@ export function CommandPaletteHost() {
       }
     };
     const onOpen = () => setOpen(true);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("toonspectrum:search", onOpen);
+    globalThis.addEventListener("keydown", onKey);
+    globalThis.addEventListener("toonspectrum:search", onOpen);
     return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("toonspectrum:search", onOpen);
+      globalThis.removeEventListener("keydown", onKey);
+      globalThis.removeEventListener("toonspectrum:search", onOpen);
     };
   }, []);
 

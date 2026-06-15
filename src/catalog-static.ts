@@ -58,14 +58,14 @@ function usesStaticCatalogEngine(pathname: string): boolean {
 }
 
 export function installStaticCatalog(): void {
-  if (!STATIC_MODE || typeof window === "undefined" || (window.fetch as { __toonspectrumStatic?: boolean }).__toonspectrumStatic) return;
-  const origFetch = window.fetch.bind(window);
+  if (!STATIC_MODE || typeof window === "undefined" || (globalThis.fetch as { __toonspectrumStatic?: boolean }).__toonspectrumStatic) return;
+  const origFetch = globalThis.fetch.bind(window);
 
   const patched: typeof fetch = async (input, init) => {
     let pathname: string;
     let sp: URLSearchParams;
     try {
-      const u = new URL(toUrl(input), window.location.origin);
+      const u = new URL(toUrl(input), globalThis.location.origin);
       pathname = u.pathname;
       sp = u.searchParams;
     } catch {
@@ -94,5 +94,5 @@ export function installStaticCatalog(): void {
   };
 
   (patched as { __toonspectrumStatic?: boolean }).__toonspectrumStatic = true;
-  window.fetch = patched;
+  globalThis.fetch = patched;
 }

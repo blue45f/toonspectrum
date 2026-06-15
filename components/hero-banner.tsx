@@ -47,7 +47,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
   // 동작 최소화 선호 시 자동회전을 멈춰 둔다(WCAG 2.3 / 모션 민감 사용자 배려).
   useEffect(() => {
     if (!emblaApi || typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       emblaApi.plugins().autoplay?.stop();
       setIsPlaying(false);
     }

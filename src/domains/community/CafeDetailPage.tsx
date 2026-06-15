@@ -68,7 +68,7 @@ export function CafeDetailPage() {
 
   async function changeMembership(action: "join" | "leave") {
     if (!sessionToken || membershipBusy) return;
-    if (action === "leave" && !window.confirm("이 카페에서 탈퇴할까요?")) return;
+    if (action === "leave" && !globalThis.confirm("이 카페에서 탈퇴할까요?")) return;
     setMembershipBusy(true);
     setMembershipError(null);
     const fallback = action === "join" ? "가입하지 못했습니다." : "탈퇴하지 못했습니다.";

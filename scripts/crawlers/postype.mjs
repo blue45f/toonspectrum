@@ -1,4 +1,4 @@
-// Postype 크롤러 — SSR HTML(self.__next_f.push 페이로드)에서 시리즈 카탈로그를 수집한다.
+// Postype 크롤러 — SSR HTML(globalThis.__next_f.push 페이로드)에서 시리즈 카탈로그를 수집한다.
 // 출처: https://www.postype.com/@<handle>/series (path 페이지네이션 ?page=N — robots 허용).
 // 채널 핸들은 공개 sitemap(/sitemap.xml → /sitemap/posts/posts-*.xml, robots 허용)에서 수확한다.
 // 표지는 d3mcojo3jv0dbr.cloudfront.net (catalog.controller allowlist 등록 호스트), coverProxy()로 프록시.
@@ -40,7 +40,7 @@ const MAX_CHANNEL_FETCHES = 400; // 채널 series 요청 상한.
 const MAX_HANDLES_SCAN = 900; // 핸들 후보 스캔 상한.
 const SITEMAP_INDEX = `${ORIGIN}/sitemap.xml`;
 
-// self.__next_f.push([1,"...escaped..."]) 문자열 페이로드를 모두 이어붙여 디코드한다.
+// globalThis.__next_f.push([1,"...escaped..."]) 문자열 페이로드를 모두 이어붙여 디코드한다.
 function decodeNextPayload(html) {
   const re = /self\.__next_f\.push\(\[1,\s*"((?:[^"\\]|\\.)*)"\]\)/g;
   let m;

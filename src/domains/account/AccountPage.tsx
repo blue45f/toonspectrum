@@ -351,7 +351,7 @@ function ProfileTab() {
       await updateMyProfile({ name: name.trim(), bio: bio.trim(), image });
       setSaved(true);
       // 사이트 헤더/메뉴 아바타 반영을 위해 페이지를 새로고침(세션 객체는 localStorage 기반이라 직접 갱신 불가).
-      setTimeout(() => window.location.reload(), 600);
+      setTimeout(() => globalThis.location.reload(), 600);
     } catch (err) {
       setError(err instanceof Error ? err.message : "프로필을 저장하지 못했어요.");
     } finally {
@@ -360,13 +360,13 @@ function ProfileTab() {
   };
 
   const onDeleteAccount = async () => {
-    if (!window.confirm("계정을 탈퇴 처리할까요? 프로필과 로그인 정보가 삭제되고 현재 세션이 만료됩니다.")) return;
+    if (!globalThis.confirm("계정을 탈퇴 처리할까요? 프로필과 로그인 정보가 삭제되고 현재 세션이 만료됩니다.")) return;
     setDeleting(true);
     setError(null);
     try {
       await deleteMyAccount();
       await signOut();
-      window.location.assign("/");
+      globalThis.location.assign("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "계정을 탈퇴 처리하지 못했어요.");
       setDeleting(false);

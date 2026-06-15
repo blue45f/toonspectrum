@@ -112,7 +112,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   async function changeRole(member: MemberRow, role: string) {
     if (busyId || role === member.role || member.status === "deleted") return;
     const roleLabel = ROLES.find((item) => item.value === role)?.label ?? role;
-    if (!window.confirm(`${member.name ?? member.email ?? member.id} 님의 역할을 "${roleLabel}"(으)로 바꿀까요?`)) return;
+    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} 님의 역할을 "${roleLabel}"(으)로 바꿀까요?`)) return;
     setBusyId(member.id);
     setActionError(null);
     try {
@@ -132,10 +132,10 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
     if (busyId || member.status === status || member.status === "deleted") return;
     const reason =
       status === "suspended"
-        ? window.prompt(`${member.name ?? member.email ?? member.id} 님을 정지하는 사유를 입력해 주세요.`, member.suspensionReason ?? "")
+        ? globalThis.prompt(`${member.name ?? member.email ?? member.id} 님을 정지하는 사유를 입력해 주세요.`, member.suspensionReason ?? "")
         : "";
     if (status === "suspended" && reason === null) return;
-    if (status === "active" && !window.confirm(`${member.name ?? member.email ?? member.id} 님의 계정을 복구할까요?`)) return;
+    if (status === "active" && !globalThis.confirm(`${member.name ?? member.email ?? member.id} 님의 계정을 복구할까요?`)) return;
     setBusyId(member.id);
     setActionError(null);
     try {
@@ -165,8 +165,8 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
 
   async function deleteMember(member: MemberRow) {
     if (busyId || member.status === "deleted") return;
-    if (!window.confirm(`${member.name ?? member.email ?? member.id} 님을 탈퇴 처리할까요? 되돌릴 수 없습니다.`)) return;
-    const reason = window.prompt("탈퇴 처리 사유를 입력해 주세요.", "admin soft delete");
+    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} 님을 탈퇴 처리할까요? 되돌릴 수 없습니다.`)) return;
+    const reason = globalThis.prompt("탈퇴 처리 사유를 입력해 주세요.", "admin soft delete");
     if (reason === null) return;
     setBusyId(member.id);
     setActionError(null);

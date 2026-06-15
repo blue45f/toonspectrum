@@ -25,10 +25,10 @@ export function SessionProvider({ children, session = null }: { children: ReactN
       if (event.key === SESSION_KEY) emitSession(readStoredSession());
     };
     listeners.add(listener);
-    window.addEventListener("storage", onStorage);
+    globalThis.addEventListener("storage", onStorage);
     return () => {
       listeners.delete(listener);
-      window.removeEventListener("storage", onStorage);
+      globalThis.removeEventListener("storage", onStorage);
     };
   }, []);
 

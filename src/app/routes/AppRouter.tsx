@@ -63,7 +63,7 @@ function useRouteTitle(pathname: string) {
 
 function hasReloadGuard(key: string): boolean {
   try {
-    return window.sessionStorage.getItem(key) !== null;
+    return globalThis.sessionStorage.getItem(key) !== null;
   } catch {
     return true; // 저장소 차단 환경 — 추적이 불가하면 이미 리로드한 것으로 간주해 루프를 차단
   }
@@ -71,7 +71,7 @@ function hasReloadGuard(key: string): boolean {
 
 function armReloadGuard(key: string): boolean {
   try {
-    window.sessionStorage.setItem(key, "1");
+    globalThis.sessionStorage.setItem(key, "1");
     return true;
   } catch {
     return false; // 가드를 세우지 못하면 리로드하지 않는다(무한 리로드 방지)
@@ -80,7 +80,7 @@ function armReloadGuard(key: string): boolean {
 
 function clearReloadGuard(key: string) {
   try {
-    window.sessionStorage.removeItem(key);
+    globalThis.sessionStorage.removeItem(key);
   } catch {
     // 저장소 차단 환경 — 세워둔 가드도 없으므로 무시
   }
@@ -96,7 +96,7 @@ function lazyRetry<T extends ComponentType<unknown>>(load: () => Promise<{ defau
     } catch (error) {
       // 이미 1회 리로드했거나 가드를 세울 수 없으면 그대로 던져 ErrorBoundary로 보낸다.
       if (hasReloadGuard(guardKey) || !armReloadGuard(guardKey)) throw error;
-      window.location.reload(); // 가드를 유지한 채 새로고침 — 같은 청크의 자동 리로드를 1회로 제한
+      globalThis.location.reload(); // 가드를 유지한 채 새로고침 — 같은 청크의 자동 리로드를 1회로 제한
       return await new Promise<never>(() => {}); // 리로드가 끝날 때까지 Suspense fallback 유지
     }
   });

@@ -1532,8 +1532,8 @@ export async function ensureDefaultChallenges(): Promise<void> {
           slug: def.slug,
           title: def.title,
           theme: def.theme,
-          startsAt: window.startsAt,
-          endsAt: window.endsAt,
+          startsAt: globalThis.startsAt,
+          endsAt: globalThis.endsAt,
           createdAt: now,
         })
         .onConflictDoNothing();
@@ -1553,7 +1553,7 @@ export async function ensureDefaultChallenges(): Promise<void> {
     const window = seedChallengeWindow(def, now);
     await db
       .update(creatorChallenges)
-      .set({ startsAt: window.startsAt, endsAt: window.endsAt })
+      .set({ startsAt: globalThis.startsAt, endsAt: globalThis.endsAt })
       .where(and(eq(creatorChallenges.slug, def.slug), lt(creatorChallenges.endsAt, now)));
   }
 }

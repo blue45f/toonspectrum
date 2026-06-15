@@ -57,10 +57,10 @@ export function ClipMaskGroup({
       node.getLayer()?.batchDraw();
     };
     recache();
-    const timers = [120, 350, 700, 1200].map((ms) => window.setTimeout(recache, ms));
+    const timers = [120, 350, 700, 1200].map((ms) => globalThis.setTimeout(recache, ms));
     return () => {
       cancelled = true;
-      timers.forEach((t) => window.clearTimeout(t));
+      timers.forEach((t) => globalThis.clearTimeout(t));
     };
   }, [cacheKey]);
 

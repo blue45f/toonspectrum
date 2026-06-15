@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
 /**
  * 요소가 뷰포트에 처음 들어오면 한 번만 true 로 전환되는 reveal 게이트.

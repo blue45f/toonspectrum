@@ -45,7 +45,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
   // 백엔드가 설정 여부에 따라 실제 제공자 또는 데모 폴백(/auth/callback#demo=)으로 분기한다.
   if (provider === "google" || provider === "kakao" || provider === "naver") {
     const url = `/api/auth/oauth/${provider}/start`;
-    if (typeof window !== "undefined") window.location.assign(url);
+    if (typeof window !== "undefined") globalThis.location.assign(url);
     return { ok: true, error: null, status: 0, url };
   }
 
@@ -123,7 +123,7 @@ export function getAuthToken() {
 export function readStoredSession(): Session {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
+    const raw = globalThis.localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
     return parsed?.user?.id ? parsed : null;
@@ -135,8 +135,8 @@ export function readStoredSession(): Session {
 export function persistSession(session: Session) {
   currentSession = session?.user?.id ? session : null;
   if (typeof window !== "undefined") {
-    if (currentSession) window.localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
-    else window.localStorage.removeItem(SESSION_KEY);
+    if (currentSession) globalThis.localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+    else globalThis.localStorage.removeItem(SESSION_KEY);
   }
   emitSession(currentSession);
 }

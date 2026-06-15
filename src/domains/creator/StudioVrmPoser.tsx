@@ -1852,7 +1852,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   }, []);
 
   function handleSavePose() {
-    const label = window.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
+    const label = globalThis.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
     if (!label) return;
     const newPose: CustomPose = {
       id: `custom-${Date.now()}`,
@@ -1868,7 +1868,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   function handleDeletePose(id: string, e: MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
-    if (!window.confirm("이 커스텀 포즈를 삭제할까요?")) return;
+    if (!globalThis.confirm("이 커스텀 포즈를 삭제할까요?")) return;
     const next = savedPoses.filter((p) => p.id !== id);
     setSavedPoses(next);
     localStorage.setItem("studio_custom_poses", JSON.stringify(next));
@@ -1999,7 +1999,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
             return;
           }
           
-          if (window.confirm(`${validPoses.length}개의 포즈를 가져올까요? (기존 포즈에 추가됩니다)`)) {
+          if (globalThis.confirm(`${validPoses.length}개의 포즈를 가져올까요? (기존 포즈에 추가됩니다)`)) {
             const sanitized = validPoses.map((p) => ({
               ...p,
               id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -2045,7 +2045,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       return;
     }
 
-    const title = window.prompt("서버에 공유할 포즈의 이름을 입력해주세요 (최대 30자):");
+    const title = globalThis.prompt("서버에 공유할 포즈의 이름을 입력해주세요 (최대 30자):");
     if (!title) return;
 
     if (title.length > 30) {
@@ -2162,7 +2162,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
 
   async function handleDeleteSharedPose(asset: SharedAsset, e: MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
-    if (!window.confirm(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 서버에서 삭제하시겠습니까?`)) {
+    if (!globalThis.confirm(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 서버에서 삭제하시겠습니까?`)) {
       return;
     }
     try {
