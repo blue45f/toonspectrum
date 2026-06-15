@@ -1,13 +1,15 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import { ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useApp, useHydrated } from "@/lib/store";
 
 // 스팀식 자가 연령 확인 — 생년월일 1회 입력 → 만 19세 이상이면 19금 표지 블러 해제(브라우저 저장).
 // 생년월일은 네이티브 date picker 대신 년/월/일 드롭다운으로 받는다(과거 연도 선택이 훨씬 쉬움).
 // 신원 확인이 아닌 자가 확인. 19+ 표지 배지(시각 표시)는 인증과 무관하게 유지된다.
+// 모달 셸은 Radix Dialog(포커스 트랩·Escape·백드롭 클릭·aria-modal)로 제공 — 시각은 기존 OKLCH 토큰 그대로.
 const SELECT_CLASS =
   "w-full rounded-lg border border-line bg-raised px-2.5 py-2 text-sm text-fg focus:border-accent/60 focus:outline-none";
 
@@ -21,17 +23,7 @@ export function AgeGateModal() {
   const [day, setDay] = useState("");
   const [denied, setDenied] = useState(false);
 
-  // Escape 로 닫기 (키보드 접근성) — open 일 때만 동작.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, close]);
-
-  if (!hydrated || !open) return null;
+  if (!hydrated) return null;
 
   const now = new Date();
   const curYear = now.getFullYear();
@@ -49,107 +41,93 @@ export function AgeGateModal() {
   const clearDenied = () => setDenied(false);
 
   return (
-    // 클릭으로 닫히는 백드롭(presentational). 키보드 닫기는 Escape(위 useEffect)로 제공하며
-    // onKeyDown(Escape)도 함께 둔다. 전체화면 백드롭을 포커스 가능한 위젯으로 만들면 UX가
-    // 나빠지므로 role/tabIndex 대신 no-static-element-interactions 만 한정 비활성화한다.
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-[oklch(0.12_0.012_70/0.72)] p-4 backdrop-blur-sm"
-      onClick={close}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") close();
-      }}
-    >
-      {/* dialog 패널의 onClick은 백드롭으로의 클릭 전파만 막는 가드라 호출 동작이 없다. */}
-      {/* 키보드 닫기는 Escape(useEffect)로 제공되므로 패널엔 키 리스너가 필요 없다. */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
-      <div
-        className="w-full max-w-sm rounded-2xl border border-line bg-panel p-6 text-left shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="agegate-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <ShieldCheck className="text-accent" size={26} />
-        <h2 id="agegate-title" className="mt-3 font-display text-lg font-bold text-fg">
-          연령 확인
-        </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-fg-3">
-          19금 콘텐츠 표지를 보려면 생년월일을 선택하세요. 만 19세 이상만 열람할 수 있어요. 입력값은 이
-          브라우저에만 저장되며 서버로 전송되지 않습니다.
-        </p>
-        <span className="mt-4 block text-xs font-medium text-fg-2">생년월일</span>
-        <div className="mt-1.5 grid grid-cols-[1.3fr_1fr_1fr] gap-2">
-          <select
-            aria-label="출생 연도"
-            value={year}
-            onChange={(e) => {
-              setYear(e.target.value);
-              clearDenied();
-            }}
-            className={SELECT_CLASS}
-          >
-            <option value="">연도</option>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="출생 월"
-            value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              clearDenied();
-            }}
-            className={SELECT_CLASS}
-          >
-            <option value="">월</option>
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {m}월
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="출생 일"
-            value={day}
-            onChange={(e) => {
-              setDay(e.target.value);
-              clearDenied();
-            }}
-            className={SELECT_CLASS}
-          >
-            <option value="">일</option>
-            {days.map((d) => (
-              <option key={d} value={d}>
-                {d}일
-              </option>
-            ))}
-          </select>
-        </div>
-        {denied && (
-          <p className="mt-2 text-xs font-medium text-bad">만 19세 미만은 19금 콘텐츠를 볼 수 없어요.</p>
-        )}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={close}
-            className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!complete}
-            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            확인
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(next) => !next && close()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-panel p-6 text-left shadow-2xl focus:outline-none"
+        >
+          <ShieldCheck className="text-accent" size={26} />
+          <Dialog.Title className="mt-3 font-display text-lg font-bold text-fg">연령 확인</Dialog.Title>
+          <p className="mt-1.5 text-sm leading-relaxed text-fg-3">
+            19금 콘텐츠 표지를 보려면 생년월일을 선택하세요. 만 19세 이상만 열람할 수 있어요. 입력값은 이
+            브라우저에만 저장되며 서버로 전송되지 않습니다.
+          </p>
+          <span className="mt-4 block text-xs font-medium text-fg-2">생년월일</span>
+          <div className="mt-1.5 grid grid-cols-[1.3fr_1fr_1fr] gap-2">
+            <select
+              aria-label="출생 연도"
+              value={year}
+              onChange={(e) => {
+                setYear(e.target.value);
+                clearDenied();
+              }}
+              className={SELECT_CLASS}
+            >
+              <option value="">연도</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}년
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="출생 월"
+              value={month}
+              onChange={(e) => {
+                setMonth(e.target.value);
+                clearDenied();
+              }}
+              className={SELECT_CLASS}
+            >
+              <option value="">월</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {m}월
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="출생 일"
+              value={day}
+              onChange={(e) => {
+                setDay(e.target.value);
+                clearDenied();
+              }}
+              className={SELECT_CLASS}
+            >
+              <option value="">일</option>
+              {days.map((d) => (
+                <option key={d} value={d}>
+                  {d}일
+                </option>
+              ))}
+            </select>
+          </div>
+          {denied && (
+            <p className="mt-2 text-xs font-medium text-bad">만 19세 미만은 19금 콘텐츠를 볼 수 없어요.</p>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
+              >
+                취소
+              </button>
+            </Dialog.Close>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!complete}
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              확인
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

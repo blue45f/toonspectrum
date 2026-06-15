@@ -26,7 +26,8 @@ export function ErrorState({
     >
       <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
       <p className="text-sm font-medium text-fg">{title}</p>
-      <p className="mt-1 text-xs text-fg-3">{message ?? "응답 데이터가 비어 있습니다."}</p>
+      {/* 틴트된 에러 표면 위에서 본문 대비 확보 — fg-3은 이 배경에서 흐릿함 → fg-2 */}
+      <p className="mt-1 text-sm text-fg-2">{message ?? "응답 데이터가 비어 있습니다."}</p>
       {onRetry && (
         <button
           type="button"

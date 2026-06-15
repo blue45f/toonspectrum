@@ -31,6 +31,10 @@ services:
       # OAuth state 서명 키 — Render가 자동 생성.
       - key: AUTH_STATE_SECRET
         generateValue: true
+      # 세션 JWT(HS256) 서명 키 — Render가 자동 생성. 미설정 시 AUTH_STATE_SECRET 폴백.
+      # (운영에서 둘 다 없으면 토큰 발급이 거부되어 약한 폴백 비밀로의 세션 위조를 차단한다.)
+      - key: AUTH_SESSION_SECRET
+        generateValue: true
       # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
       - key: CATALOG_INGEST_TRIGGER_TOKEN
         generateValue: true
@@ -39,14 +43,20 @@ services:
         sync: false
       - key: WEB_APP_BASE_URL
         sync: false
-      # 소셜 로그인 실연동 키(미설정 시 데모 폴백으로 동작).
+      # Google 실연동: GIS(ID 토큰) 흐름이라 CLIENT ID 만 있으면 동작(시크릿 불필요).
       - key: GOOGLE_OAUTH_CLIENT_ID
         sync: false
+      # (선택) 레거시 인가-코드 redirect 폴백에서만 사용.
       - key: GOOGLE_OAUTH_CLIENT_SECRET
         sync: false
+      # 카카오·네이버는 외부 앱키 발급 전까지 데모 고정(키를 채워도 DEMO_ONLY_PROVIDERS 제거 전엔 데모).
       - key: KAKAO_REST_API_KEY
         sync: false
       - key: KAKAO_CLIENT_SECRET
+        sync: false
+      - key: NAVER_OAUTH_CLIENT_ID
+        sync: false
+      - key: NAVER_OAUTH_CLIENT_SECRET
         sync: false
       # 관리자 이메일 화이트리스트(선택).
       - key: ADMIN_EMAILS

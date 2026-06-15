@@ -28,6 +28,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/authors": "작가별 보기",
   "/news": "웹툰·웹소설 소식",
   "/about": "소개",
+  "/design": "디자인 시스템",
   "/guide": "랭킹 산정 방식",
   "/settings": "설정",
   "/admin": "관리자 콘솔",
@@ -154,6 +155,10 @@ const NewsPage = lazyRetry(() => import("@/src/domains/catalog/NewsPage").then((
 const SettingsPage = lazyRetry(() => import("@/src/domains/account/SettingsPage").then((m) => ({ default: m.SettingsPage })), "SettingsPage");
 const AboutPage = lazyRetry(() => import("@/src/domains/legal/AboutPage").then((m) => ({ default: m.AboutPage })), "AboutPage");
 const GuidePage = lazyRetry(() => import("@/src/domains/catalog/GuidePage").then((m) => ({ default: m.GuidePage })), "GuidePage");
+const DesignSystemPage = lazyRetry(
+  () => import("@/src/domains/legal/DesignSystemPage").then((m) => ({ default: m.DesignSystemPage })),
+  "DesignSystemPage"
+);
 const CopyrightPage = lazyRetry(
   () => import("@/src/domains/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })),
   "CopyrightPage"
@@ -184,14 +189,23 @@ const AuthCallbackPage = lazyRetry(
   "AuthCallbackPage"
 );
 
+// 라우트 로딩 폴백 — 스피너 대신 스켈레톤(DESIGN.md: "스켈레톤 로딩, 스피너 금지").
+// 페이지의 대략적 골격(헤더 + 카드 그리드)을 미리 그려 레이아웃 점프와 빈 화면 깜빡임을 줄인다.
+// skeleton 유틸은 토큰화된 shimmer라 prefers-reduced-motion 전역 가드를 그대로 따른다.
 function RouteFallback() {
   return (
-    <div
-      className="flex min-h-[60vh] items-center justify-center"
-      role="status"
-      aria-label="불러오는 중"
-    >
-      <span className="size-6 animate-spin rounded-full border-2 border-line border-t-accent" />
+    <div className="mx-auto w-full max-w-[1180px] px-4 py-10 sm:px-6" role="status" aria-label="불러오는 중">
+      <div className="flex flex-col gap-3">
+        <span className="skeleton h-3 w-24" />
+        <span className="skeleton h-9 w-2/3 max-w-md" />
+        <span className="skeleton h-4 w-1/2 max-w-sm" />
+      </div>
+      <div className="mt-8 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <span key={i} className="skeleton aspect-[3/4] w-full rounded-2xl" />
+        ))}
+      </div>
+      <span className="sr-only">불러오는 중</span>
     </div>
   );
 }
@@ -226,6 +240,7 @@ export function AppRouter() {
           <Route path="/news" element={<NewsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/design" element={<DesignSystemPage />} />
           <Route path="/guide" element={<GuidePage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

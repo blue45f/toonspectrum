@@ -2,9 +2,11 @@ import "./load-env"; // 첫 import — lib/db가 DATABASE_URL 읽기 전 주입(
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
+import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { validateEnv } from "./config/env";
 import { sessionAuth } from "./session-middleware";
 
 import type { Express } from "express";
@@ -15,9 +17,12 @@ import type { Express } from "express";
 let appPromise: Promise<Express> | null = null;
 
 async function create(): Promise<Express> {
+  // env 검증(NON-FATAL) — 콜드 부팅당 1회. 실패해도 throw 하지 않고 경고만(main.ts와 동일).
+  validateEnv();
   // 기본 본문 파서(100kb) 대신 직접 등록(main.ts와 동일) — 스튜디오/커뮤니티 첨부가 data-URL
   // 이미지를 JSON으로 보내므로 서버리스에서도 한도를 키운다(미러 누락 시 프로덕션만 413).
-  const app = await NestFactory.create(AppModule, { logger: ["error", "warn"], bodyParser: false });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
+  app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(main.ts와 동일)
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)

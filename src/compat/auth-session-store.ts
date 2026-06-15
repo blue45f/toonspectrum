@@ -40,9 +40,28 @@ export function useSession(): SessionContextValue {
   return useContext(SessionContext);
 }
 
+// GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을
+// 서버에서 검증해 세션을 확정한다. 리다이렉트 없이 모달에서 바로 로그인 완료.
+export async function signInWithGoogleIdToken(idToken: string) {
+  const response = await api.raw(apiPath("/auth/oauth/google/id-token"), {
+    method: "POST",
+    throwHttpErrors: false,
+    json: { idToken },
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
+    | null;
+  if (!response.ok || !payload?.user) {
+    return { ok: false, error: payload?.error ?? "auth-failed", status: response.status };
+  }
+  persistSession({ user: payload.user, token: payload.token ?? null });
+  return { ok: true, error: null, status: response.status };
+}
+
 export async function signIn(provider?: string, options?: Record<string, unknown>) {
   // 소셜 로그인(Google·Kakao): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
   // 백엔드가 설정 여부에 따라 실제 제공자 또는 데모 폴백(/auth/callback#demo=)으로 분기한다.
+  // (Google 실연동은 GIS 버튼 → signInWithGoogleIdToken 경로를 사용; 이 리다이렉트는 데모/code-flow 폴백.)
   if (provider === "google" || provider === "kakao" || provider === "naver") {
     const url = `/api/auth/oauth/${provider}/start`;
     if (typeof window !== "undefined") globalThis.location.assign(url);

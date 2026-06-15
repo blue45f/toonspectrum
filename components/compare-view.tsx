@@ -215,10 +215,15 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-[1fr_auto_1fr]">
+      <div
+        className="grid grid-cols-2 gap-6 sm:grid-cols-[1fr_auto_1fr]"
+        role="status"
+        aria-label="작품 비교 불러오는 중"
+      >
         <div className="skeleton aspect-[3/4] rounded-2xl" />
-        <div className="flex items-center justify-center py-20">
-          <div className="size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        {/* 스피너 대신 스켈레톤 'VS' 칩 — 양옆 표지와 톤을 맞춰 로딩 상태를 일관되게(DESIGN.md). */}
+        <div className="hidden items-center justify-center sm:flex">
+          <span className="skeleton size-12 rounded-full" />
         </div>
         <div className="skeleton aspect-[3/4] rounded-2xl" />
       </div>

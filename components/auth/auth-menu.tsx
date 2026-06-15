@@ -1,5 +1,6 @@
 "use client";
 
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -7,7 +8,7 @@ import { AuthModal } from "./auth-modal";
 
 import { resolveSignupAvatarImage } from "@/lib/avatar";
 import { useT } from "@/lib/i18n";
-import { keepInlineText } from "@/lib/utils";
+import { cn, keepInlineText } from "@/lib/utils";
 import { useSession, signOut } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { adminFetch, type AdminMe } from "@/src/domains/admin/components/admin-client";
@@ -24,10 +25,13 @@ function safeProfileImageSrc(value: string | null | undefined): string | null {
   }
 }
 
+// 메뉴 항목 공통 스타일 — 기존 hover/focus-visible 시각을 Radix data-[highlighted]로 매핑(키보드/마우스 동일).
+const ITEM_CLASS =
+  "flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 outline-none transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg data-[highlighted]:bg-raised data-[highlighted]:text-fg";
+
 export function AuthMenu() {
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(false);
-  const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const t = useT();
   const uid = session?.user?.id;
@@ -73,63 +77,56 @@ export function AuthMenu() {
   const u = session.user;
   const initial = (u.name ?? u.email ?? "U").charAt(0).toUpperCase();
   const imageSrc = safeProfileImageSrc(u.image);
+  const showAdmin = (u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin;
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent transition-transform active:scale-95"
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label="계정 메뉴"
       >
         {imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : initial}
-      </button>
-      {open && (
-        <>
-          <button className="fixed inset-0 z-10" aria-label="닫기" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-xl border border-line-strong bg-panel shadow-xl shadow-[oklch(0.1_0.02_70/0.42)]">
-            <div className="border-b border-line px-4 py-3">
-              <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
-              <p className="truncate text-xs text-fg-3">{u.email}</p>
-            </div>
-            {((u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin) && (
-              <Link
-                href="/admin"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
-              >
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          className="z-50 w-52 overflow-hidden rounded-xl border border-line-strong bg-panel shadow-xl shadow-[oklch(0.1_0.02_70/0.42)] data-[state=open]:animate-[fade-up_0.16s_var(--ease-out-expo)_both]"
+        >
+          <div className="border-b border-line px-4 py-3">
+            <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
+            <p className="truncate text-xs text-fg-3">{u.email}</p>
+          </div>
+          {showAdmin && (
+            <DropdownMenu.Item asChild>
+              <Link href="/admin" className={ITEM_CLASS}>
                 <Shield size={15} /> 관리자 콘솔
               </Link>
-            )}
-            <Link
-              href="/me"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
-            >
+            </DropdownMenu.Item>
+          )}
+          <DropdownMenu.Item asChild>
+            <Link href="/me" className={ITEM_CLASS}>
               <UserRound size={15} /> 내 정보
             </Link>
-            <Link
-              href="/library"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
-            >
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/library" className={ITEM_CLASS}>
               <Library size={15} /> {t("nav.library")}
             </Link>
-            <Link
-              href="/settings"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg focus-visible:outline-none"
-            >
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/settings" className={ITEM_CLASS}>
               <SettingsIcon size={15} /> 설정
             </Link>
-            <button
-              onClick={() => signOut()}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-bad focus-visible:bg-raised focus-visible:text-bad focus-visible:outline-none"
-            >
-              <LogOut size={15} /> 로그아웃
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={() => signOut()}
+            className={cn(ITEM_CLASS, "hover:text-bad focus-visible:text-bad data-[highlighted]:text-bad")}
+          >
+            <LogOut size={15} /> 로그아웃
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

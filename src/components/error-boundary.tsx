@@ -45,7 +45,8 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
             <p className="text-sm font-medium text-fg">이 화면을 표시하는 중 문제가 발생했어요.</p>
-            <p className="mt-1 text-xs text-fg-3">다시 시도하거나 홈으로 이동해 주세요.</p>
+            {/* 틴트된 에러 표면 위 본문 대비 확보(fg-3 → fg-2) */}
+            <p className="mt-1 text-sm text-fg-2">다시 시도하거나 홈으로 이동해 주세요.</p>
             <div className="mt-5 flex items-center justify-center gap-2">
               <button
                 type="button"

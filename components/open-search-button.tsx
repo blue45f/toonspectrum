@@ -1,5 +1,7 @@
 "use client";
 
+import { useUi } from "@/lib/ui-store";
+
 export function OpenSearchButton({
   children,
   className,
@@ -7,12 +9,9 @@ export function OpenSearchButton({
   children: React.ReactNode;
   className?: string;
 }) {
+  const openCommandPalette = useUi((s) => s.openCommandPalette);
   return (
-    <button
-      type="button"
-      className={className}
-      onClick={() => globalThis.dispatchEvent(new Event("toonspectrum:search"))}
-    >
+    <button type="button" className={className} onClick={openCommandPalette}>
       {children}
     </button>
   );

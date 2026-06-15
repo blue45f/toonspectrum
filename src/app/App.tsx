@@ -12,7 +12,8 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { FeedbackWidget } from "@/src/components/feedback/FeedbackWidget";
+import { AppQueryProvider } from "@/src/infrastructure/query-provider";
+import { AppQueryProvider } from "@/src/infrastructure/query-provider";
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다.
@@ -35,33 +36,31 @@ function ScrollToTop() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthSessionProvider>
-        <MotionProvider>
-          <StoreSync />
-          <ScrollToTop />
-          <a
-            href="#main-content"
-            className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
-          >
-            본문으로 건너뛰기
-          </a>
-          <SiteHeader />
-          <main id="main-content" tabIndex={-1} className="min-h-screen pb-20 outline-none md:pb-0">
-            <AppRouter />
-          </main>
-          <SiteFooter />
-          <CommandPaletteHost />
-          <AgeGateModal />
-          <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
-            <ThemeSwitcher />
-            <LanguageSwitcher />
-          </div>
-          {/* 피드백 위젯: SurveyDesk 엔드포인트가 설정된 경우에만 마운트(미설정 기본값이면 앱에 무영향). */}
-          {import.meta.env.VITE_SURVEYDESK_URL && (
-            <FeedbackWidget appId="toonspectrum" endpoint={import.meta.env.VITE_SURVEYDESK_URL} />
-          )}
-        </MotionProvider>
-      </AuthSessionProvider>
+      <AppQueryProvider>
+        <AuthSessionProvider>
+          <MotionProvider>
+            <StoreSync />
+            <ScrollToTop />
+            <a
+              href="#main-content"
+              className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
+            >
+              본문으로 건너뛰기
+            </a>
+            <SiteHeader />
+            <main id="main-content" tabIndex={-1} className="min-h-screen pb-20 outline-none md:pb-0">
+              <AppRouter />
+            </main>
+            <SiteFooter />
+            <CommandPaletteHost />
+            <AgeGateModal />
+            <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
+              <ThemeSwitcher />
+              <LanguageSwitcher />
+            </div>
+          </MotionProvider>
+        </AuthSessionProvider>
+      </AppQueryProvider>
     </BrowserRouter>
   );
 }
