@@ -76,7 +76,6 @@ import {
   BUBBLE_STYLE_PRESETS,
   CANVAS_W,
   EFFECT_EMOJIS,
-  SFX_PRESETS,
   TEMPLATES,
   filterAssetsByLabel,
   filterBgSceneSections,
@@ -128,8 +127,8 @@ import {
   stripExportFileName,
   stripTotalHeight,
   type ExportFormat,
-  type ExportScale,
 } from "./studio-export";
+import { EXPORT_PRESETS, planStripSlices, recommendScale, validateExport, type ExportPreset } from "./studio-export-presets";
 import {
   isDefaultPageGrade,
   normalizePageGrade,
@@ -169,13 +168,16 @@ import { resizableNodeProps, textNodeProps } from "./studio-node-props";
 import { normalizeOutline, type Outline } from "./studio-outline";
 import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
 import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
+import { SCENE_TEMPLATE_CATEGORIES, SCENE_TEMPLATES, type SceneSeed } from "./studio-scene-templates";
 import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
+import { SFX_CATEGORIES, createSfxTextConfig, searchSfx, type SfxPreset } from "./studio-sfx-presets";
 import { normalizeSketch, type Sketch } from "./studio-sketch";
 import { StudioStickerGrid } from "./studio-sticker-grid";
 import { normalizeStylize, type Stylize } from "./studio-stylize";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
 import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
+import { episodeLengthLabel, safeAreaMargin, webtoonWidthGuides } from "./studio-webtoon-guides";
 import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
 import { StudioBlurPanel } from "./StudioBlurPanel";
 import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
@@ -434,7 +436,7 @@ interface SpeedLinesEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -1595,6 +1597,8 @@ export function StudioPage() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(40);
+  // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
+  const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
 
   // 템플릿 및 여백 관리 상태
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
@@ -1988,9 +1992,12 @@ export function StudioPage() {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [exportScale, setExportScale] = useState<ExportScale>(2);
+  // 배율은 플랫폼 규격(폭 690·800·1440…)에 맞추면 소수가 될 수 있어 number로 둔다.
+  const [exportScale, setExportScale] = useState<number>(2);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const [exportTransparent, setExportTransparent] = useState(false);
+  // 선택한 플랫폼 내보내기 규격(없으면 null = 자유 배율).
+  const [exportPresetId, setExportPresetId] = useState<string | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // 내보내기 옵션 팝오버 바깥 클릭시 닫기
@@ -2291,7 +2298,7 @@ export function StudioPage() {
   const fxQuery = fxSearchQuery.trim().toLowerCase();
   const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
     fxPickerSection === "all" || fxPickerSection === section;
-  const fxSfxFiltered = fxQuery ? SFX_PRESETS.filter((s) => s.text.toLowerCase().includes(fxQuery)) : SFX_PRESETS;
+  const fxSfxFiltered = searchSfx(fxSearchQuery);
   const fxEmojisFiltered = fxQuery ? [] : EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
   const fxComicFiltered = filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery);
   const fxCreatureFiltered = filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery);
@@ -3006,22 +3013,19 @@ export function StudioPage() {
     const [cx, cy] = spawnCenter();
     addEl({ id: uid(), type: "sticker", text: emoji, x: cx - 40, y: cy - 40, fontSize: 96, rotation: 0 });
   }
-  function addSfx(text: string, fill: string) {
+  // 효과음 프리셋 삽입 — studio-sfx-presets의 무드별 스타일(색·외곽선·그라디언트·기울기)을
+  // 그대로 적용한다. 위치만 중앙으로 잡고 나머지 시각 필드는 createSfxTextConfig가 채운다.
+  function addSfxPreset(preset: SfxPreset) {
     setMenu(null);
     const [cx, cy] = spawnCenter();
-    addEl({
-      id: uid(),
-      type: "text",
-      text,
-      x: cx - 80,
-      y: cy - 50,
-      width: 220,
-      fontSize: 88,
-      fill,
-      stroke: "#16100c",
-      strokeWidth: 7,
-      rotation: -6,
-    });
+    addEl({ id: uid(), type: "text", ...createSfxTextConfig(preset, cx - 110, cy - 50) });
+  }
+  // 플랫폼 내보내기 규격 적용 — 권장 폭에 맞춰 배율을 잡고, 현재 포맷이 허용되지 않으면
+  // 권장 포맷으로 바꾼다. "원본 유지"(width 0)는 배율을 건드리지 않는다.
+  function applyExportPreset(preset: ExportPreset) {
+    setExportPresetId(preset.id);
+    if (!preset.allowedFormats.includes(exportFormat)) setExportFormat(preset.recommendedFormat);
+    if (preset.width > 0) setExportScale(recommendScale(CANVAS_W, preset));
   }
   function addBgScene(bg: StudioBgScene) {
     setMenu(null);
@@ -3141,6 +3145,16 @@ export function StudioPage() {
     setSelectedId(null);
     setTool("draw");
     setDrawMode("pen");
+  }
+  // 장면 템플릿 삽입 — 프레임·말풍선·효과를 한 번에 깐다(코미포/툰스푼 "한 번에" 발상).
+  // 시드는 [0,720] 폭 안에서 좌상단 원점 기준 배치되므로 originX=0(전폭), originY는 현재 보기 부근.
+  function addSceneTemplate(template: (typeof SCENE_TEMPLATES)[number]) {
+    setMenu(null);
+    const [, cy] = spawnCenter();
+    const originY = Math.max(20, Math.round(cy - 240));
+    const newEls = template.build(0, originY).map((s: SceneSeed): El => ({ ...s, id: uid() }));
+    commit([...elements, ...newEls]);
+    setTool("select");
   }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
@@ -3870,7 +3884,27 @@ export function StudioPage() {
               <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
             </button>
             {exportMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1.5 w-60 rounded-xl border border-line bg-panel p-3 shadow-xl">
+              <div className="absolute right-0 top-full z-30 mt-1.5 w-72 rounded-xl border border-line bg-panel p-3 shadow-xl">
+                <div className="mb-2.5">
+                  <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
+                  <div className="flex flex-wrap gap-1">
+                    {EXPORT_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyExportPreset(p)}
+                        aria-pressed={exportPresetId === p.id}
+                        title={p.note}
+                        className={cn(
+                          "h-7 rounded-lg border px-2 text-[0.68rem] font-semibold transition-colors",
+                          exportPresetId === p.id ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-fg-2">배율</span>
                   <div className="flex items-center gap-1">
@@ -3878,7 +3912,10 @@ export function StudioPage() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setExportScale(s)}
+                        onClick={() => {
+                          setExportScale(s);
+                          setExportPresetId(null);
+                        }}
                         aria-pressed={exportScale === s}
                         className={cn(
                           "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
@@ -3945,6 +3982,34 @@ export function StudioPage() {
                     return q !== undefined ? ` · 품질 ${Math.round(q * 100)}%` : "";
                   })()}
                 </p>
+                {(() => {
+                  const preset = exportPresetId ? EXPORT_PRESETS.find((p) => p.id === exportPresetId) : null;
+                  if (!preset) return null;
+                  const outW = Math.round(CANVAS_W * exportScale);
+                  const outH = Math.round(canvasH * exportScale);
+                  const v = validateExport({ width: outW, height: outH, format: exportFormat }, preset);
+                  const maxH = preset.maxImageHeight;
+                  const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
+                  return (
+                    <div className="mt-2 space-y-1">
+                      {v.warnings.map((w) => (
+                        <p key={w.code} className="rounded-md border border-warn/40 bg-warn/10 px-2 py-1 text-[10px] leading-snug text-warn">
+                          ⚠ {w.message}
+                        </p>
+                      ))}
+                      {slices && maxH !== undefined && (
+                        <p className="rounded-md border border-line bg-card px-2 py-1 text-[10px] leading-snug text-fg-3">
+                          규격 높이 {maxH.toLocaleString()}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
+                        </p>
+                      )}
+                      {v.ok && !slices && (
+                        <p className="rounded-md border border-good/40 bg-good/10 px-2 py-1 text-[10px] leading-snug text-good">
+                          {preset.label} 규격에 맞아요.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -4277,6 +4342,43 @@ export function StudioPage() {
             </div>
           )}
         </div>
+        <div ref={menu === "scene" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "scene" ? null : "scene")} aria-haspopup="menu" aria-expanded={menu === "scene"} className={toolBtn(menu === "scene")}>
+            <Sparkles size={14} /> 장면
+          </button>
+          {menu === "scene" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
+              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
+              </p>
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                {SCENE_TEMPLATE_CATEGORIES.map((cat) => {
+                  const items = SCENE_TEMPLATES.filter((t) => t.category === cat.id);
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={cat.id}>
+                      <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
+                      <div className="grid gap-1">
+                        {items.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => addSceneTemplate(t)}
+                            className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
+                          >
+                            <span className="block text-xs font-semibold text-fg">{t.label}</span>
+                            <span className="block text-[0.62rem] text-fg-3">{t.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -4347,9 +4449,10 @@ export function StudioPage() {
                   <div className="mb-2 flex flex-wrap gap-1">
                     {fxSfxFiltered.map((s) => (
                       <button
-                        key={s.text}
+                        key={s.id}
                         type="button"
-                        onClick={() => addSfx(s.text, s.fill)}
+                        onClick={() => addSfxPreset(s)}
+                        title={`${s.label} · ${SFX_CATEGORIES.find((c) => c.id === s.category)?.label ?? ""}`}
                         className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
                       >
                         {s.text}
@@ -5243,6 +5346,27 @@ export function StudioPage() {
                   ))}
                 </Group>
               )}
+              {showWebtoonGuides &&
+                (() => {
+                  const safe = safeAreaMargin(CANVAS_W);
+                  return (
+                    <Group listening={false}>
+                      {/* 세이프영역(모바일 뷰어에서 잘릴 수 있는 양옆 여백) 음영 */}
+                      <Rect x={0} y={0} width={safe.left} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
+                      <Rect x={CANVAS_W - safe.right} y={0} width={safe.right} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
+                      {/* 플랫폼 표준 연재폭 가이드선 */}
+                      {webtoonWidthGuides(CANVAS_W).map((g) => (
+                        <Line
+                          key={`wg-${g.pos}-${g.label}`}
+                          points={[g.pos, 0, g.pos, canvasH]}
+                          stroke="rgba(70, 150, 255, 0.55)"
+                          strokeWidth={1 / effScale}
+                          dash={[6 / effScale, 6 / effScale]}
+                        />
+                      ))}
+                    </Group>
+                  );
+                })()}
               {(() => {
                 // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
@@ -6283,6 +6407,30 @@ export function StudioPage() {
                   )}
                 </div>
               </label>
+
+              <label className="flex items-center justify-between text-xs text-fg-2">
+                웹툰 규격 가이드
+                <input
+                  type="checkbox"
+                  checked={showWebtoonGuides}
+                  onChange={(e) => setShowWebtoonGuides(e.target.checked)}
+                  className="size-3.5 accent-accent"
+                />
+              </label>
+              {showWebtoonGuides && (
+                <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.62rem] leading-snug text-fg-3">
+                  {(() => {
+                    const len = episodeLengthLabel(canvasH);
+                    return (
+                      <>
+                        <span className="font-semibold text-fg-2">{len.label}</span> · {len.tier}
+                        <br />
+                        파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* 작가 가이드선 (Artist Guidelines) */}
               <div className="pt-2 border-t border-line/35 space-y-2">
