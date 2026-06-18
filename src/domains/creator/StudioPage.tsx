@@ -109,6 +109,7 @@ import {
 } from "./studio-color-palettes";
 import { normalizeCurve, type CurvePoint } from "./studio-curves";
 import { normalizeDetail, type Detail } from "./studio-detail";
+import { dialogueToBubbles } from "./studio-dialogue";
 import { normalizeDistort, type Distort } from "./studio-distort";
 import {
   EXPORT_SCALES,
@@ -1599,6 +1600,8 @@ export function StudioPage() {
   const [gridSize, setGridSize] = useState(40);
   // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
+  // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
+  const [dialogueScript, setDialogueScript] = useState("");
 
   // 템플릿 및 여백 관리 상태
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
@@ -3156,6 +3159,16 @@ export function StudioPage() {
     commit([...elements, ...newEls]);
     setTool("select");
   }
+  // 대사 스크립트 일괄 삽입 — 여러 줄을 화자별 좌/우 말풍선으로 자동 배치(웹툰 제작 시간 단축).
+  function addDialogueBubbles() {
+    const seeds = dialogueToBubbles(dialogueScript, { canvasWidth: CANVAS_W, startY: 80 });
+    if (seeds.length === 0) return;
+    const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
+    commit([...elements, ...newEls]);
+    setDialogueScript("");
+    setMenu(null);
+    setTool("select");
+  }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
     if (tpl.id === "blank") {
@@ -4387,18 +4400,44 @@ export function StudioPage() {
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
-            <div className="absolute left-0 top-full z-30 mt-1 grid w-44 gap-1 rounded-xl border border-line bg-panel p-2 shadow-lg">
-              {BUBBLE_VARIANTS.map((v) => (
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <div className="grid gap-1">
+                {BUBBLE_VARIANTS.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => addBubble(v.id)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                  >
+                    <span className="text-base">{v.sample}</span>
+                    <span className="font-medium text-fg">{v.label}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 border-t border-line pt-2">
+                <p className="mb-1 text-[0.66rem] font-medium text-fg-3">대사 한 번에</p>
+                <p className="mb-1.5 text-[0.6rem] leading-snug text-fg-4">
+                  한 줄에 한 대사. <span className="text-fg-3">이름: 대사</span>로 화자 지정(좌/우 자동), <span className="text-fg-3">(지문)</span>은 나레이션.
+                </p>
+                <textarea
+                  value={dialogueScript}
+                  onChange={(e) => setDialogueScript(e.target.value)}
+                  placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
+                  rows={4}
+                  className="w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent/50"
+                />
                 <button
-                  key={v.id}
                   type="button"
-                  onClick={() => addBubble(v.id)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                  onClick={addDialogueBubbles}
+                  disabled={!dialogueScript.trim()}
+                  className={cn(
+                    "mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
+                    dialogueScript.trim() ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-4"
+                  )}
                 >
-                  <span className="text-base">{v.sample}</span>
-                  <span className="font-medium text-fg">{v.label}</span>
+                  말풍선으로 한 번에 넣기
                 </button>
-              ))}
+              </div>
             </div>
           )}
         </div>
