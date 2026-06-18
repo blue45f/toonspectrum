@@ -37,6 +37,7 @@
     "db:seed": "tsx lib/db/seed.ts"
   },
   "dependencies": {
+    "@heejun/deskcloud": "^0.1.0",
     "@hookform/resolvers": "^5.4.0",
     "@libsql/client": "^0.17.3",
     "@pixiv/three-vrm": "^3.5.3",

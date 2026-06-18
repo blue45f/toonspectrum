@@ -8,6 +8,7 @@ packages:
 minimumReleaseAgeExclude:
   - node-releases
   - '@heejun/eslint-config@4.0.0'
+  - '@heejun/deskcloud@0.1.0'
 
 # 빌드 스크립트 실행을 명시 승인(pnpm 11 strict: 미승인 시 ERR_PNPM_IGNORED_BUILDS로 install 실패).
 # sibling(pettography) 패턴: onlyBuiltDependencies(array) + allowBuilds(map) 둘 다.
