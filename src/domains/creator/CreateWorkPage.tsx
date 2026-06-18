@@ -16,6 +16,10 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { readWorkFx } from "./studio-motion-fx";
+import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
+import { WorkFxPanel } from "./WorkFxPanel";
+
 import { CoverImage } from "@/components/cover-image";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
@@ -572,28 +576,18 @@ export function CreateWorkPage() {
             }}
           />
         )}
+
+        {/* 작성자 전용: 효과툰(배경음악·스크롤 모션·분위기) 설정 — doc.fx에 저장 */}
+        {work.isOwner && (
+          <WorkFxPanel
+            work={work}
+            onUpdated={(doc) => setWork((current) => (current ? { ...current, doc } : current))}
+          />
+        )}
       </header>
 
-      {/* 세로 웹툰 스크롤 — 페이지 이미지를 풀 너비로 이어 붙인다. */}
-      <div className="mb-8 overflow-hidden rounded-2xl border border-line bg-[oklch(0.13_0.006_70)]">
-        {work.pages.length === 0 ? (
-          <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
-        ) : (
-          work.pages.map((page, index) => (
-            <CoverImage
-              key={`${page}-${index}`}
-              src={page}
-              alt={`${work.title} ${index + 1}컷`}
-              className="block w-full"
-              fallback={
-                <span className="grid aspect-[3/4] w-full place-items-center bg-raised/40 text-xs text-fg-3">
-                  이미지를 불러올 수 없습니다.
-                </span>
-              }
-            />
-          ))
-        )}
-      </div>
+      {/* 세로 웹툰 스크롤 — 효과툰 리더(스크롤 모션·분위기·BGM, doc.fx 기반) */}
+      <WebtoonFxPlayer pages={work.pages} fx={readWorkFx(work.doc)} title={work.title} />
 
       {/* 시리즈 회차 내비게이션 — 이전화/시리즈 목록/다음화 */}
       {work.series && (
