@@ -95,8 +95,16 @@ export function SiteHeader() {
           {/* 로고 */}
           <Link href="/" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap pr-2">
             <ToonSpectrumMark className="transition-transform duration-150 group-hover:scale-105" />
-            <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
-              툰스펙트럼
+            <span className="flex items-center gap-1.5">
+              <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
+                툰스펙트럼
+              </span>
+              <span
+                className="rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent"
+                title="베타 서비스 — 데이터·기능이 변경될 수 있습니다"
+              >
+                beta
+              </span>
             </span>
           </Link>
 
