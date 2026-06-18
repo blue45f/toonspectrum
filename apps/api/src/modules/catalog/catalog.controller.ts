@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common";
 
 import { getAppConfig } from "../../../../../lib/server/app-config";
+import { coverImagePolicy } from "../../../../../lib/server/cover-policy";
 
 import { CatalogService } from "./catalog.service";
 
@@ -63,6 +64,9 @@ export class CatalogController {
 
   @Get("/cover")
   async proxyCover(@Query("u") rawUrl: string | undefined, @Res() res: Response) {
+    // 표지 정책이 off 면(저작권 킬스위치) 제3자 표지를 일절 중계하지 않는다 — 이미 배포·캐시된
+    // 정적 JSON 의 /api/cover URL 도 여기서 무력화되고, 클라이언트는 타이포그래픽 커버로 폴백한다.
+    if (coverImagePolicy() === "off") return res.status(404).send("cover image disabled");
     if (!rawUrl) return res.status(400).send("missing u");
 
     let url: URL;
@@ -77,9 +81,10 @@ export class CatalogController {
     try {
       let upstream: globalThis.Response | null = null;
       for (let hop = 0; hop < 4; hop++) {
+        // Referer 를 플랫폼 도메인으로 위조하지 않는다(핫링크 보호 우회 금지). 원본 CDN 이
+        // 핫링크를 거부하면 그 거부를 존중해 표지를 표시하지 않고 타이포그래픽 커버로 폴백한다.
         const response = await fetch(url.toString(), {
           headers: {
-            Referer: coverRefererFor(url.hostname),
             "User-Agent": COVER_USER_AGENT,
             Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
           },
@@ -114,9 +119,9 @@ export class CatalogController {
         return res.status(415).send("not an image");
       }
       res.setHeader("Content-Type", sniffed ?? headerType);
-      // 표지 URL은 내용 주소(u=업스트림 고유 URL)라 바뀌면 URL도 바뀐다 → 길게 캐시(브라우저 30일,
-      // 엣지 30일, immutable). 가장 많이 요청되는 리소스라 재방문/재렌더 트래픽을 크게 줄인다.
-      res.setHeader("Cache-Control", "public, max-age=2592000, s-maxage=2592000, immutable");
+      // 표지는 제3자 저작물이라 권리침해 신고·정책 변경(킬스위치) 시 빠르게 빠져야 한다 →
+      // immutable 을 쓰지 않고 재검증 가능한 캐시로 둔다(브라우저 1시간·엣지 1일·SWR 1일).
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400");
       return res.status(200).send(body);
     } catch {
       return res.status(502).send("fetch failed");
@@ -288,22 +293,3 @@ function sniffImageType(buf: Buffer): string | null {
   return null;
 }
 
-function coverRefererFor(hostname: string) {
-  if (/ridicdn/.test(hostname)) return "https://ridibooks.com/";
-  if (/munpia/.test(hostname)) return "https://www.munpia.com/";
-  if (/joara/.test(hostname)) return "https://www.joara.com/";
-  if (/cloudfront/.test(hostname)) return "https://www.postype.com/";
-  if (/mrblue/.test(hostname)) return "https://www.mrblue.com/";
-  if (/bookcube/.test(hostname)) return "https://www.bookcube.com/";
-  if (/onestore|onestory/.test(hostname)) return "https://onestory.co.kr/";
-  if (/yes24/.test(hostname)) return "https://www.yes24.com/";
-  if (/novelpia/.test(hostname)) return "https://novelpia.com/";
-  if (/balcony\.studio/.test(hostname)) return "https://www.bomtoon.com/";
-  if (/toptoon/.test(hostname)) return "https://toptoon.com/";
-  if (/toomics/.test(hostname)) return "https://www.toomics.com/";
-  if (/kyobobook/.test(hostname)) return "https://www.kyobobook.co.kr/";
-  if (/comico/.test(hostname)) return "https://www.comico.kr/";
-  if (/lezhin/.test(hostname)) return "https://www.lezhin.com/";
-  if (/dn-img-page\.kakao/.test(hostname)) return "https://page.kakao.com/";
-  return /kakao/.test(hostname) ? "https://webtoon.kakao.com/" : "https://comic.naver.com/";
-}

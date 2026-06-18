@@ -202,9 +202,10 @@ function writeSitemap(): void {
     "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
     "/about", "/guide", "/news", "/create", "/contact",
   ];
-  // thin-content 방지를 위해 '표지+평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
-  // 품질 게이트를 유지하면서 기존 5000편 대비 색인 커버리지를 넓힌다.
-  const topTitles = TITLES.filter((t) => t.coverImage && t.stats.ratingCount > 0)
+  // thin-content 방지를 위해 '평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
+  // 표지 유무에 의존하지 않는다(표지 정책 off·19+ 제거와 무관하게 동작). 성인(19+) 작품은
+  // 검색엔진에 노출하지 않는다(미성년 검색 유입 차단).
+  const topTitles = TITLES.filter((t) => t.ageRating !== "19" && t.stats.ratingCount > 0)
     .sort((a, b) => b.stats.views - a.stats.views)
     .slice(0, 15000);
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

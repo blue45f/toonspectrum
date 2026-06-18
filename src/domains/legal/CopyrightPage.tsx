@@ -11,9 +11,18 @@ export function CopyrightPage() {
         <section>
           <h2 className="mb-2 text-base font-bold text-fg">콘텐츠 출처와 원칙</h2>
           <p>
-            툰스펙트럼은 여러 국내 웹툰·웹소설 플랫폼의 <strong className="text-fg">공개 카탈로그에서 수집한 메타데이터</strong>(제목·작가·장르·표지 등)를
-            정리해 보여주는 <strong className="text-fg">색인·발견 서비스</strong>입니다. 작품 본편(이미지·텍스트)은 저장·재배포하지 않으며,
+            툰스펙트럼은 여러 국내 웹툰·웹소설 플랫폼의 <strong className="text-fg">공개 카탈로그에서 수집한 메타데이터</strong>(제목·작가·장르 등)를
+            정리해 보여주는 <strong className="text-fg">색인·발견 서비스</strong>입니다. 작품 본편(회차 이미지·텍스트)은 저장·재배포하지 않으며,
             열람은 각 원 플랫폼으로의 링크를 통해서만 이루어집니다.
+          </p>
+        </section>
+        <section>
+          <h2 className="mb-2 text-base font-bold text-fg">표지 이미지</h2>
+          <p>
+            표지는 작품 식별을 돕기 위한 썸네일로, 가능한 경우 원 플랫폼 표지를 출처 링크와 함께
+            <strong className="text-fg"> 인용·표시</strong>합니다. 기본 표지는 자체 제작한 타이포그래픽 커버이며, 권리자 요청이나
+            운영 정책에 따라 실제 표지 표시는 <strong className="text-fg">즉시 전체 비활성화</strong>할 수 있습니다. 성인(만 19세+)
+            작품의 표지는 본인확인 없이 노출하지 않으며 타이포그래픽 커버로 대체합니다.
           </p>
         </section>
         <section>
@@ -32,14 +41,14 @@ export function CopyrightPage() {
           </p>
         </section>
         <section>
-          <h2 className="mb-2 text-base font-bold text-fg">권리 침해 신고</h2>
+          <h2 className="mb-2 text-base font-bold text-fg">권리 침해 신고 (Notice &amp; Takedown)</h2>
           <p>
-            게재된 정보가 귀하의 권리를 침해한다고 판단되시면 아래로 연락 주세요. 확인 후 신속히 수정·비노출
-            조치하겠습니다.
+            게재된 메타데이터·표지가 귀하의 권리를 침해한다고 판단되시면 아래 이메일로 작품명·해당 URL·권리 근거를
+            함께 보내 주세요. 접수 확인 후 <strong className="text-fg">영업일 기준 48시간 이내</strong>에 해당 항목을 수정·비노출
+            처리하고 결과를 회신드립니다.
           </p>
           <p className="mt-2">
-            이메일: <a className="text-accent underline underline-offset-2" href="mailto:blue45f@gmail.com">blue45f@gmail.com</a> ·
-            전화: <a className="text-accent underline underline-offset-2" href="tel:01038734197">010-3873-4197</a>
+            이메일: <a className="text-accent underline underline-offset-2" href="mailto:blue45f@gmail.com">blue45f@gmail.com</a>
           </p>
         </section>
       </div>

@@ -1,3 +1,5 @@
+import { applyCoverPolicy } from "./cover-policy";
+
 import type { Title, WorkType } from "../types";
 
 // "file-snapshot": gz 카탈로그 파일(기본 운영 경로) · "database-snapshot": 레거시 FORCE_DB 모드 전용
@@ -126,6 +128,8 @@ export function replaceCatalogData(
   } = {}
 ): Title[] {
   const normalized = normalizeCatalog(incoming);
+  // 저작권·청소년보호: 성인(19+) 표지는 항상, 정책 off 면 전체 표지를 제거한다(정적·런타임·라이브 공통).
+  applyCoverPolicy(normalized);
   computeCrossPlatformPopularity(normalized);
   TITLES_INTERNAL = normalized;
   TITLES = TITLES_INTERNAL;
