@@ -13,6 +13,10 @@ export default defineConfig(
     '**/*.d.ts',
     '**/*.tsbuildinfo',
     '**/*.config.{js,mjs,cjs,ts}',
+    // 벤더링 단일 파일 위젯(상류 desk/SurveyDesk 레포에서 유지) — 호스트 앱 strict 린트 대상 외.
+    // 소스를 이 레포에서 편집하지 않으므로(복붙 동기화), 게이트는 ignore 로 통과시킨다.
+    '**/components/deskcloud/**',
+    '**/components/feedback/**',
   ]),
 
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).

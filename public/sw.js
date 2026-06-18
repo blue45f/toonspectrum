@@ -30,12 +30,12 @@ const cacheCover = (request, response) => {
 
 // Precache '/' so the offline navigation fallback below has a shell even for
 // routes that were deep-linked into and never visited while online.
-globalThis.addEventListener('install', (event) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.add('/')))
-  globalThis.skipWaiting()
+  self.skipWaiting()
 })
 
-globalThis.addEventListener('activate', (event) => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
@@ -46,11 +46,11 @@ globalThis.addEventListener('activate', (event) => {
             .map((key) => caches.delete(key)),
         ),
       )
-      .then(() => globalThis.clients.claim()),
+      .then(() => self.clients.claim()),
   )
 })
 
-globalThis.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
 
@@ -68,7 +68,7 @@ globalThis.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(request.url)
-  if (url.origin !== globalThis.location.origin) return
+  if (url.origin !== self.location.origin) return
 
   // Hashed bundles are immutable (vercel.json: max-age=31536000, immutable) — cache-first.
   if (url.pathname.startsWith('/assets/')) {

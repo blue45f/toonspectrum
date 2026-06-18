@@ -12,7 +12,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { AppQueryProvider } from "@/src/infrastructure/query-provider";
+import { DeskCloudMounts } from "@/src/components/deskcloud/DeskCloudMounts";
 import { AppQueryProvider } from "@/src/infrastructure/query-provider";
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
@@ -58,6 +58,8 @@ export default function App() {
               <ThemeSwitcher />
               <LanguageSwitcher />
             </div>
+            {/* DeskCloud 위젯(각 desk env URL 게이팅 — 미설정 시 비활성) */}
+            <DeskCloudMounts />
           </MotionProvider>
         </AuthSessionProvider>
       </AppQueryProvider>
