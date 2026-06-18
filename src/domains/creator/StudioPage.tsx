@@ -27,6 +27,7 @@ import {
   FolderMinus,
   Upload,
   Image as ImageIcon,
+  Bookmark,
   Download,
   Share2,
   Globe,
@@ -101,6 +102,7 @@ import {
 import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { svgToDataUrl } from "./studio-characters";
 import { normalizeClarity, type Clarity } from "./studio-clarity";
+import { listClips, removeClip, saveClip, type StudioClip } from "./studio-clips";
 import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
 import {
   readRecentColors,
@@ -437,7 +439,7 @@ interface SpeedLinesEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -1602,6 +1604,8 @@ export function StudioPage() {
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
   // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
   const [dialogueScript, setDialogueScript] = useState("");
+  // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
+  const [clips, setClips] = useState<StudioClip[]>([]);
 
   // 템플릿 및 여백 관리 상태
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
@@ -1636,6 +1640,14 @@ export function StudioPage() {
       setRecentColors(readRecentColors(globalThis.localStorage));
     } catch {
       // localStorage 접근 불가(시크릿/임베드)면 빈 목록 유지.
+    }
+  }, []);
+  // 저장된 클립 복원(마운트 시 1회).
+  useEffect(() => {
+    try {
+      setClips(listClips(globalThis.localStorage));
+    } catch {
+      // localStorage 접근 불가면 빈 목록 유지.
     }
   }, []);
   const rememberColor = (c: string) => {
@@ -3169,6 +3181,48 @@ export function StudioPage() {
     setMenu(null);
     setTool("select");
   }
+  // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
+  function shiftEl(el: El, dx: number, dy: number): El {
+    return el.type === "draw"
+      ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
+      : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
+  }
+  // 선택 요소(그룹이면 그룹 전체)를 원점 기준으로 정규화해 재사용 클립으로 저장.
+  function saveSelectionAsClip() {
+    if (!selected) return;
+    const members = selected.groupId
+      ? elements.filter((e) => e.groupId === selected.groupId)
+      : [selected];
+    const minX = Math.min(...members.map((m) => elBounds(m).x));
+    const minY = Math.min(...members.map((m) => elBounds(m).y));
+    const els = members.map((m) => shiftEl(m, -minX, -minY));
+    const fallbackName =
+      members.length > 1 ? "내 장면 클립" : selected.type === "bubble" ? "말풍선 클립" : "내 클립";
+    const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
+    if (!name) return;
+    setClips(saveClip(globalThis.localStorage, { id: uid(), name, createdAt: Date.now(), els }));
+    setMenu("clip");
+  }
+  // 클립을 캔버스에 삽입 — 새 id·새 그룹으로 화면 중앙 부근에 배치.
+  function insertClip(clip: StudioClip) {
+    const [cx, cy] = spawnCenter();
+    const groupMap = new Map<string, string>();
+    const newEls = (clip.els as El[]).map((e) => {
+      let groupId = e.groupId;
+      if (groupId) {
+        if (!groupMap.has(groupId)) groupMap.set(groupId, uid());
+        groupId = groupMap.get(groupId);
+      }
+      return { ...shiftEl(e, cx - 120, cy - 120), id: uid(), groupId, hidden: false, locked: false };
+    });
+    if (newEls.length === 0) return;
+    commit([...elements, ...newEls]);
+    setMenu(null);
+    setTool("select");
+  }
+  function deleteClip(id: string) {
+    setClips(removeClip(globalThis.localStorage, id));
+  }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
     if (tpl.id === "blank") {
@@ -4389,6 +4443,57 @@ export function StudioPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+        </div>
+        <div ref={menu === "clip" ? menuRef : undefined} className="relative">
+          <button type="button" onClick={() => setMenu(menu === "clip" ? null : "clip")} aria-haspopup="menu" aria-expanded={menu === "clip"} className={toolBtn(menu === "clip")}>
+            <Bookmark size={14} /> 클립
+          </button>
+          {menu === "clip" && (
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
+              <button
+                type="button"
+                onClick={saveSelectionAsClip}
+                disabled={!selected}
+                className={cn(
+                  "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
+                  selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-4"
+                )}
+                title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
+              >
+                + 선택을 클립으로 저장
+              </button>
+              {clips.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-4">
+                  저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                  {clips.map((c) => (
+                    <div key={c.id} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => insertClip(c)}
+                        className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
+                        title="이 클립을 캔버스에 넣기"
+                      >
+                        {c.name}
+                        <span className="ml-1 text-[0.6rem] text-fg-4">{(c.els as unknown[]).length}개</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteClip(c.id)}
+                        aria-label={`${c.name} 클립 삭제`}
+                        className="shrink-0 text-fg-4 transition-colors hover:text-bad"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
