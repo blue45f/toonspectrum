@@ -13,9 +13,15 @@ minimumReleaseAgeExclude:
 # sibling(pettography) 패턴: onlyBuiltDependencies(array) + allowBuilds(map) 둘 다.
 onlyBuiltDependencies:
   - "@nestjs/core"
+  - "@sentry/cli"
+  - "@swc/core"
   - esbuild
+  - protobufjs
   - unrs-resolver
 allowBuilds:
   "@nestjs/core": true
+  '@sentry/cli': true
+  '@swc/core': true
   esbuild: true
+  protobufjs: true
   unrs-resolver: true
