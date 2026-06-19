@@ -30,9 +30,11 @@
     "sonar": "sonar-scanner",
     "lint:strict": "eslint --max-warnings=0",
     "lint:ci": "pnpm run lint:strict",
+    "audit:security": "pnpm audit --audit-level high --ignore GHSA-2p57-rm9w-gvfp",
+    "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
     "verify": "pnpm run ci",
-    "verify:push": "pnpm run verify",
+    "verify:push": "pnpm run verify && pnpm run lint:security",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx lib/db/seed.ts"
   },
@@ -97,8 +99,8 @@
     "tsx": "^4.20.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.60.0",
-    "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
