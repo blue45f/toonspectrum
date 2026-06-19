@@ -2168,6 +2168,18 @@ export function StudioPage() {
   const [draft, setDraft] = useState<DrawEl | null>(null);
   // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  // 스냅 가이드 갱신 — 값이 같으면 같은 참조를 유지해 드래그 매 프레임마다 StudioPage 전체가
+  // 리렌더되지 않게 한다(성능: 드래그 중 가이드는 대부분 그대로라 리렌더를 크게 줄인다).
+  const applyGuides = (x: number[], y: number[]) => {
+    setGuides((prev) =>
+      prev.x.length === x.length &&
+      prev.y.length === y.length &&
+      prev.x.every((v, i) => v === x[i]) &&
+      prev.y.every((v, i) => v === y[i])
+        ? prev
+        : { x, y }
+    );
+  };
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
@@ -3879,7 +3891,7 @@ export function StudioPage() {
     }
 
     if (!snapEnabled) {
-      setGuides({ x: [], y: [] });
+      applyGuides([], []);
       return;
     }
 
@@ -3946,10 +3958,10 @@ export function StudioPage() {
       }
     if (dx !== 0) node.x(node.x() + dx);
     if (dy !== 0) node.y(node.y() + dy);
-    setGuides({ x: gx != null ? [gx] : [], y: gy != null ? [gy] : [] });
+    applyGuides(gx != null ? [gx] : [], gy != null ? [gy] : []);
   }
   function onStageDragEnd() {
-    setGuides({ x: [], y: [] });
+    applyGuides([], []);
     // 그룹 이동 확정: 끈 노드의 총 이동량(delta)을 선택된 좌표형 요소 모두에 한 번에 커밋.
     const g = groupDragRef.current;
     groupDragRef.current = null;
