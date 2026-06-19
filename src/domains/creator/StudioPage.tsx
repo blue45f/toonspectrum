@@ -102,6 +102,7 @@ import {
   stabilizePoint,
   STABILIZER_MAX,
 } from "./studio-brush";
+import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { svgToDataUrl } from "./studio-characters";
 import { normalizeClarity, type Clarity } from "./studio-clarity";
@@ -6248,7 +6249,6 @@ export function StudioPage() {
                 const showTail = tailDir !== "none";
 
                 // 테마별 파라미터 사전 계산
-                let themeOffset = 3;
                 let tHeightWithTheme = tHeight;
                 let borderRatio = 0.08;
 
@@ -6256,7 +6256,6 @@ export function StudioPage() {
                   bStroke = el.stroke ?? "#2d2d2d";
                   bStrokeW = el.strokeWidth ?? 1.8;
                   bRadius = 24;
-                  themeOffset = 2;
                   tHeightWithTheme = tHeight - 10;
                   borderRatio = 0.08;
                 } else if (webtoonTheme === "vivid") {
@@ -6269,49 +6268,8 @@ export function StudioPage() {
                     bShadowOpacity = 0.12;
                     bShadowOffset = { x: 2, y: 3 };
                   }
-                  themeOffset = 2;
                   tHeightWithTheme = tHeight - 14;
                   borderRatio = 0.06;
-                }
-
-                // tailDirection에 따른 bTailPoints 좌표 계산
-                let bTailPoints: number[] = [];
-                if (tailDirection === "bottom") {
-                  bTailPoints = [
-                    el.width * Math.max(0.1, tXRatio - borderRatio),
-                    el.height - themeOffset,
-                    el.width * tXRatio,
-                    el.height + tHeightWithTheme,
-                    el.width * Math.min(0.9, tXRatio + borderRatio),
-                    el.height - themeOffset
-                  ];
-                } else if (tailDirection === "top") {
-                  bTailPoints = [
-                    el.width * Math.max(0.1, tXRatio - borderRatio),
-                    themeOffset,
-                    el.width * tXRatio,
-                    -tHeightWithTheme,
-                    el.width * Math.min(0.9, tXRatio + borderRatio),
-                    themeOffset
-                  ];
-                } else if (tailDirection === "left") {
-                  bTailPoints = [
-                    themeOffset,
-                    el.height * Math.max(0.1, tXRatio - borderRatio),
-                    -tHeightWithTheme,
-                    el.height * tXRatio,
-                    themeOffset,
-                    el.height * Math.min(0.9, tXRatio + borderRatio)
-                  ];
-                } else if (tailDirection === "right") {
-                  bTailPoints = [
-                    el.width - themeOffset,
-                    el.height * Math.max(0.1, tXRatio - borderRatio),
-                    el.width + tHeightWithTheme,
-                    el.height * tXRatio,
-                    el.width - themeOffset,
-                    el.height * Math.min(0.9, tXRatio + borderRatio)
-                  ];
                 }
 
                 const flipTailX = (pts: number[]) => {
@@ -6322,7 +6280,18 @@ export function StudioPage() {
                   return pts;
                 };
 
-                const speechTailPts = flipTailX(bTailPoints);
+                // 본체+꼬리를 단일 path로(이음새 없는 매끈한 말풍선). 위치는 기존 tXRatio/flip을 보존.
+                const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
+                const bubbleTailSpec: BubbleTailSpec | null = showTail
+                  ? {
+                      direction: tailDirection,
+                      ratio: tailDir === "right" && tailIsVertical ? 1 - tXRatio : tXRatio,
+                      length: Math.max(8, tHeightWithTheme),
+                      base: (tailIsVertical ? el.width : el.height) * borderRatio * 2,
+                      side: "center",
+                    }
+                  : null;
+                const speechPathData = bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
 
                 let baseScaredTailPts: number[] = [];
                 if (tailDirection === "bottom") {
@@ -6450,27 +6419,14 @@ export function StudioPage() {
                         {thoughtEllipses}
                       </>
                     ) : el.variant === "whisper" ? (
-                      <>
-                        <Rect
-                          width={el.width}
-                          height={el.height}
-                          fill={el.fill}
-                          cornerRadius={bRadius}
-                          stroke={bStroke}
-                          strokeWidth={bStrokeW}
-                          dash={[8, 5]}
-                        />
-                        {showTail && (
-                          <Line
-                            points={speechTailPts}
-                            closed
-                            fill={el.fill}
-                            stroke={bStroke}
-                            strokeWidth={bStrokeW}
-                            dash={[8, 5]}
-                          />
-                        )}
-                      </>
+                      <Path
+                        data={speechPathData}
+                        fill={el.fill}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        lineJoin="round"
+                        dash={[8, 5]}
+                      />
                     ) : el.variant === "scared" ? (
                       <>
                         <Rect
@@ -6565,18 +6521,13 @@ export function StudioPage() {
                     ) : el.variant === "box" ? (
                       <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
                     ) : (
-                      <>
-                        <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={bRadius} stroke={bStroke} strokeWidth={bStrokeW} />
-                        {showTail && (
-                          <Line
-                            points={speechTailPts}
-                            closed
-                            fill={el.fill}
-                            stroke={bStroke}
-                            strokeWidth={bStrokeW}
-                          />
-                        )}
-                      </>
+                      <Path
+                        data={speechPathData}
+                        fill={el.fill}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        lineJoin="round"
+                      />
                     )}
                     <KText
                       text={el.vertical ? formatVerticalText(el.text) : el.text}
