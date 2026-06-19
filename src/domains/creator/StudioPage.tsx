@@ -520,6 +520,11 @@ function elBounds(el: El): { x: number; y: number; w: number; h: number } {
   return { x: el.x, y: el.y, w: el.width, h: el.height }; // image · bubble · frame
 }
 
+// 두 사각형이 겹치는지(마퀴 다중선택 판정).
+function rectsIntersect(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
 // 요소가 "들어가야 할" 패널(중심이 패널 안 + 패널보다 크게 넘치지 않음). 없으면 null.
 // 전체 배경처럼 패널보다 훨씬 큰 요소는 제외해 백드롭이 한 칸에 갇히지 않게 한다.
 function containingPanel(el: El, all: El[]): FrameEl | null {
@@ -1718,6 +1723,14 @@ export function StudioPage() {
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
+  const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
+  const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  // 단일 선택이 생기면 마퀴 다중선택은 해제(상호 배타).
+  useEffect(() => {
+    if (selectedId) setMarqueeIds([]);
+  }, [selectedId]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
@@ -2555,19 +2568,25 @@ export function StudioPage() {
     }
   }
 
-  // 트랜스포머를 선택 노드에 부착.
+  // 트랜스포머를 선택 노드(또는 마퀴 다중선택 노드들)에 부착.
   useEffect(() => {
     const tr = trRef.current;
     if (!tr) return;
-    const selLocked = elements.find((e) => e.id === selectedId)?.locked;
-    const node = selectedId && tool === "select" && !selLocked ? nodeRefs.current[selectedId] : null;
-    if (node) {
-      tr.nodes([node]);
-    } else {
+    if (tool !== "select") {
       tr.nodes([]);
+    } else if (marqueeIds.length > 0) {
+      const nodes = marqueeIds
+        .filter((id) => !elements.find((e) => e.id === id)?.locked)
+        .map((id) => nodeRefs.current[id])
+        .filter((n): n is Konva.Node => !!n);
+      tr.nodes(nodes);
+    } else {
+      const selLocked = elements.find((e) => e.id === selectedId)?.locked;
+      const node = selectedId && !selLocked ? nodeRefs.current[selectedId] : null;
+      tr.nodes(node ? [node] : []);
     }
     tr.getLayer()?.batchDraw();
-  }, [selectedId, tool, elements]);
+  }, [selectedId, marqueeIds, tool, elements]);
 
   // 요소 변경을 히스토리에 커밋.
   function commit(nextElements: El[]) {
@@ -2933,6 +2952,12 @@ export function StudioPage() {
     if (selectedId === id) setSelectedId(null);
   }
   function removeSelected() {
+    if (marqueeIds.length > 0) {
+      const dl = new Set(marqueeIds);
+      commit(elements.filter((e) => !(dl.has(e.id) && !e.locked)));
+      setMarqueeIds([]);
+      return;
+    }
     if (!selectedId || selected?.locked) return;
     removeById(selectedId);
   }
@@ -2946,6 +2971,28 @@ export function StudioPage() {
     commit(next);
   }
   function duplicateSelected() {
+    if (marqueeIds.length > 0) {
+      const mv = new Set(marqueeIds);
+      const copies: El[] = [];
+      const newIds: string[] = [];
+      for (const e of elements) {
+        if (!mv.has(e.id)) continue;
+        const id = uid();
+        newIds.push(id);
+        copies.push(
+          e.type === "draw"
+            ? { ...e, id, points: e.points.map((v) => v + 16), hidden: false, locked: false }
+            : ({ ...e, id, x: (e as { x: number }).x + 16, y: (e as { y: number }).y + 16, hidden: false, locked: false } as El)
+        );
+      }
+      if (copies.length) {
+        commit([...elements, ...copies]);
+        setMarqueeIds(newIds);
+        setSelectedId(null);
+        setTool("select");
+      }
+      return;
+    }
     if (!selected) return;
     const copy: El =
       selected.type === "draw"
@@ -2956,6 +3003,18 @@ export function StudioPage() {
     setTool("select");
   }
   function nudgeSelected(dx: number, dy: number) {
+    if (marqueeIds.length > 0) {
+      const mv = new Set(marqueeIds);
+      const next = elements.map((e) =>
+        !(mv.has(e.id) && !e.locked)
+          ? e
+          : e.type === "draw"
+            ? ({ ...e, points: e.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
+            : ({ ...e, x: (e as { x: number }).x + dx, y: (e as { y: number }).y + dy } as El)
+      );
+      commitCoalesced(next, "nudge-multi");
+      return;
+    }
     if (!selected || selected.locked) return;
     const id = selected.id;
     const next = elements.map((e) =>
@@ -3046,7 +3105,7 @@ export function StudioPage() {
       } else if (mod && e.key === "0") {
         e.preventDefault();
         setZoom(1);
-      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
         removeSelected();
       } else if (e.key === "?") {
@@ -3059,8 +3118,11 @@ export function StudioPage() {
           // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
           menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
           setMenu(null);
-        } else setSelectedId(null);
-      } else if (selectedId && e.key.startsWith("Arrow")) {
+        } else {
+          setSelectedId(null);
+          setMarqueeIds([]);
+        }
+      } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
@@ -3622,10 +3684,34 @@ export function StudioPage() {
       setDraft(next);
       return;
     }
-    // 선택 모드: 빈 영역 클릭 시 선택 해제.
-    if (e.target === e.target.getStage() || e.target.name() === "bg") setSelectedId(null);
+    // 선택 모드: 빈 영역에서 드래그하면 마퀴(PPT식 박스) 다중선택, 그냥 클릭이면 선택 해제.
+    if (e.target === e.target.getStage() || e.target.name() === "bg") {
+      setSelectedId(null);
+      setMarqueeIds([]);
+      if (!isSpacePressed) {
+        const pos = e.target.getStage()?.getRelativePointerPosition();
+        if (pos) {
+          marqueeStartRef.current = { x: pos.x, y: pos.y };
+          setMarqueeRect(null);
+        }
+      }
+    }
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // 마퀴 드래그 중이면 선택 박스를 갱신한다.
+    if (marqueeStartRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const s = marqueeStartRef.current;
+        setMarqueeRect({
+          x: Math.min(s.x, pos.x),
+          y: Math.min(s.y, pos.y),
+          w: Math.abs(pos.x - s.x),
+          h: Math.abs(pos.y - s.y),
+        });
+      }
+      return;
+    }
     // 브러시 커서 프리뷰: 드로잉 모드에선 포인터 위치에 브러시 크기 원을 따라 그린다.
     // (React 상태를 거치지 않고 Konva 노드를 직접 갱신 — hover 중 리렌더 없음)
     if (tool === "draw") {
@@ -3710,6 +3796,18 @@ export function StudioPage() {
     setDraft(next);
   }
   function onStageUp() {
+    // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
+    if (marqueeStartRef.current) {
+      const rect = marqueeRect;
+      marqueeStartRef.current = null;
+      setMarqueeRect(null);
+      if (rect && rect.w > 3 && rect.h > 3) {
+        const ids = elements.filter((el) => !el.hidden && rectsIntersect(rect, elBounds(el))).map((el) => el.id);
+        setMarqueeIds(ids);
+        setSelectedId(null);
+      }
+      return;
+    }
     if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
       let finished = drawingRef.current;
       // 손떨림 보정 2단계: 프리핸드 스트로크 확정 시 이동평균 스무딩(점 개수·필압 정렬 보존).
@@ -5746,6 +5844,37 @@ export function StudioPage() {
             </div>
           )}
 
+          {/* 마퀴 다중선택 액션바 */}
+          {marqueeIds.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs">
+              <span className="font-semibold text-accent">{marqueeIds.length}개 선택됨</span>
+              <span className="text-fg-3">· 방향키로 이동 · 모서리로 크기·회전</span>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={duplicateSelected}
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+                >
+                  복제
+                </button>
+                <button
+                  type="button"
+                  onClick={removeSelected}
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised"
+                >
+                  삭제
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarqueeIds([])}
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+                >
+                  해제
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
           {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며, 실제 상호작용은 내부 Konva Stage가 담당하고 키보드 패닝은 document keydown(Space)에서 처리한다 */}
           <div
@@ -6462,6 +6591,20 @@ export function StudioPage() {
                   strokeWidth={1.25 / effScale}
                   dash={drawMode === "eraser" ? [4 / effScale, 3 / effScale] : undefined}
                   opacity={0.9}
+                />
+              </Layer>
+            )}
+            {!isExporting && marqueeRect && (
+              <Layer listening={false}>
+                <Rect
+                  x={marqueeRect.x}
+                  y={marqueeRect.y}
+                  width={marqueeRect.w}
+                  height={marqueeRect.h}
+                  fill="rgba(90,140,255,0.12)"
+                  stroke="rgba(90,140,255,0.85)"
+                  strokeWidth={1 / effScale}
+                  dash={[4 / effScale, 4 / effScale]}
                 />
               </Layer>
             )}
