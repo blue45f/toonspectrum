@@ -6250,15 +6250,18 @@ export function StudioPage() {
                     />
                   );
                 // bubble
-                let bStroke = el.stroke ?? "#16100c";
-                let bStrokeW = el.strokeWidth ?? 3;
+                // 외곽선 두께: 사용자 지정 우선, 없으면 말풍선 평균크기 3단계(작을수록 가늘게).
+                const avgSize = (el.width + el.height) / 2;
+                let bStroke = el.stroke ?? "#1f1a16"; // 순흑 대신 따뜻한 잉크색
+                let bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 2.5 : avgSize < 500 ? 3 : 3.5);
                 let bRadius = 18;
-                let bShadowColor = el.shadowColor !== undefined ? el.shadowColor : undefined;
-                let bShadowBlur = el.shadowBlur !== undefined ? el.shadowBlur : 0;
-                let bShadowOpacity = el.shadowOpacity !== undefined ? el.shadowOpacity : 0;
+                // 그림자: 사용자 지정 없으면 테마별 기본값(종이 위에 살짝 뜬 미세 그림자).
+                let bShadowColor = el.shadowColor !== undefined ? el.shadowColor : "rgba(0, 0, 0, 0.2)";
+                let bShadowBlur = el.shadowBlur !== undefined ? el.shadowBlur : 5;
+                let bShadowOpacity = el.shadowOpacity !== undefined ? el.shadowOpacity : 0.16;
                 let bShadowOffset = el.shadowOffsetX !== undefined && el.shadowOffsetY !== undefined
                   ? { x: el.shadowOffsetX, y: el.shadowOffsetY }
-                  : undefined;
+                  : { x: 1, y: 2 };
                 const tXRatio = el.tailXRatio ?? 0.35;
                 const tHeight = el.tailHeight ?? 30;
                 const tailDir = el.tail ?? "left";
@@ -6271,22 +6274,28 @@ export function StudioPage() {
 
                 if (webtoonTheme === "soft") {
                   bStroke = el.stroke ?? "#2d2d2d";
-                  bStrokeW = el.strokeWidth ?? 1.8;
+                  bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.5 : avgSize < 500 ? 1.8 : 2);
                   bRadius = 24;
                   tHeightWithTheme = tHeight - 10;
                   borderRatio = 0.08;
+                  if (el.shadowColor === undefined) {
+                    bShadowColor = "rgba(0, 0, 0, 0.1)";
+                    bShadowBlur = 5;
+                    bShadowOpacity = 0.16;
+                    bShadowOffset = { x: 1, y: 2 };
+                  }
                 } else if (webtoonTheme === "vivid") {
                   bStroke = el.stroke ?? "#444444";
-                  bStrokeW = el.strokeWidth ?? 1.0;
+                  bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.2 : avgSize < 500 ? 1.5 : 1.8);
                   bRadius = Math.min(el.width, el.height) / 2;
+                  tHeightWithTheme = tHeight - 14;
+                  borderRatio = 0.06;
                   if (el.shadowColor === undefined) {
                     bShadowColor = "black";
                     bShadowBlur = 8;
-                    bShadowOpacity = 0.12;
+                    bShadowOpacity = 0.16;
                     bShadowOffset = { x: 2, y: 3 };
                   }
-                  tHeightWithTheme = tHeight - 14;
-                  borderRatio = 0.06;
                 }
 
                 const flipTailX = (pts: number[]) => {
@@ -6298,17 +6307,30 @@ export function StudioPage() {
                 };
 
                 // 본체+꼬리를 단일 path로(이음새 없는 매끈한 말풍선). 위치는 기존 tXRatio/flip을 보존.
+                // 꼬리 길이·밑동을 말풍선 최소변 기준으로 정규화 — 작은 말풍선의 과대 꼬리/큰 말풍선의 빈약 꼬리 방지.
                 const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
+                const bMinDim = Math.min(el.width, el.height);
+                const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeightWithTheme), bMinDim * 0.3));
+                const bTailBase = Math.max(bMinDim * 0.1, (tailIsVertical ? el.width : el.height) * borderRatio * 1.8);
                 const bubbleTailSpec: BubbleTailSpec | null = showTail
                   ? {
                       direction: tailDirection,
                       ratio: tailDir === "right" && tailIsVertical ? 1 - tXRatio : tXRatio,
-                      length: Math.max(8, tHeightWithTheme),
-                      base: (tailIsVertical ? el.width : el.height) * borderRatio * 2,
+                      length: bTailLen,
+                      base: bTailBase,
                       side: "center",
                     }
                   : null;
                 const speechPathData = bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
+                // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히).
+                const bubbleLineHeight =
+                  el.lineHeight ?? (el.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
+                const bubbleLetterSpacing = webtoonTheme === "vivid" ? 0 : 0.3;
+                // 안쪽 여백: 글자 크기 비례(좌우 대칭, 상<하로 시각 중심 보정).
+                const bFs = el.fontSize ?? 24;
+                const bHPad = Math.max(12, Math.round(bFs * 0.6));
+                const bVPadTop = Math.max(8, Math.round(bFs * 0.48));
+                const bVPadBot = Math.max(10, Math.round(bFs * 0.64));
 
                 let baseScaredTailPts: number[] = [];
                 if (tailDirection === "bottom") {
@@ -6442,6 +6464,7 @@ export function StudioPage() {
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
                         lineJoin="round"
+                        lineCap="round"
                         dash={[8, 5]}
                       />
                     ) : el.variant === "scared" ? (
@@ -6544,21 +6567,23 @@ export function StudioPage() {
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
                         lineJoin="round"
+                        lineCap="round"
                       />
                     )}
                     <KText
                       text={el.vertical ? formatVerticalText(el.text) : el.text}
-                      width={el.width - 36}
-                      height={el.height - 24}
-                      x={18}
-                      y={12}
-                      fontSize={el.fontSize ?? 24}
+                      width={Math.max(8, el.width - bHPad * 2)}
+                      height={Math.max(8, el.height - (bVPadTop + bVPadBot))}
+                      x={bHPad}
+                      y={bVPadTop}
+                      fontSize={bFs}
                       fontFamily={el.font ?? "Pretendard, sans-serif"}
                       fontStyle={el.fontStyle ?? "bold"}
                       fill={el.textFill}
                       align={el.align ?? "center"}
                       verticalAlign="middle"
-                      lineHeight={el.lineHeight ?? 1.1}
+                      lineHeight={bubbleLineHeight}
+                      letterSpacing={bubbleLetterSpacing}
                     />
                   </Group>
                 );

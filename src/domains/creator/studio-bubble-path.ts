@@ -37,16 +37,21 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
     return roundedRect(w, h, r);
   }
   const dir = tail.direction;
-  const sideShift = tail.side === "left" ? -tail.base * 0.35 : tail.side === "right" ? tail.base * 0.35 : 0;
+  // 꼬리 끝 기울기(화자 방향). 0.45로 키워 더 자연스러운 lean(현재 호출은 side:center라 시각변화 없음, 선반영).
+  const sideShift = tail.side === "left" ? -tail.base * 0.45 : tail.side === "right" ? tail.base * 0.45 : 0;
+  // 꼬리 밑동이 둥근 모서리 직선구간 안에 들도록 안전 마진(곡률 충돌 방지).
+  const safe = r * 0.8;
+  // 테이퍼: 밑동→끝 변을 직선 대신 이차베지어로 본체 쪽 0.55 지점으로 당겨 코미포/클립스튜디오식 부드러운 수렴.
+  const TAPER = 0.55;
 
   if (dir === "bottom" || dir === "top") {
-    const center = clamp(w * tail.ratio, r + tail.base / 2, w - r - tail.base / 2);
+    const center = clamp(w * tail.ratio, r + tail.base / 2 + safe, w - r - tail.base / 2 - safe);
     const b1 = center - tail.base / 2;
     const b2 = center + tail.base / 2;
-    const tip = clamp(center + sideShift, r, w - r);
+    const tip = clamp(center + sideShift, r + safe, w - r - safe);
     if (dir === "bottom") {
       const ty = h + tail.length;
-      // 상단(좌→우)·우변·하단(우→꼬리→좌)·좌변
+      const cy = h + (ty - h) * TAPER;
       return [
         `M ${N(r)} 0`,
         `H ${N(w - r)}`,
@@ -54,8 +59,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
         `V ${N(h - r)}`,
         `A ${N(r)} ${N(r)} 0 0 1 ${N(w - r)} ${N(h)}`,
         `H ${N(b2)}`,
-        `L ${N(tip)} ${N(ty)}`,
-        `L ${N(b1)} ${N(h)}`,
+        `Q ${N((b2 + tip) / 2)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+        `Q ${N((tip + b1) / 2)} ${N(cy)} ${N(b1)} ${N(h)}`,
         `H ${N(r)}`,
         `A ${N(r)} ${N(r)} 0 0 1 0 ${N(h - r)}`,
         `V ${N(r)}`,
@@ -65,11 +70,12 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
     }
     // top
     const ty = -tail.length;
+    const cy = ty * TAPER; // 본체변(0)→tip 사이 0.55 지점
     return [
       `M ${N(r)} 0`,
       `H ${N(b1)}`,
-      `L ${N(tip)} ${N(ty)}`,
-      `L ${N(b2)} 0`,
+      `Q ${N((b1 + tip) / 2)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+      `Q ${N((tip + b2) / 2)} ${N(cy)} ${N(b2)} 0`,
       `H ${N(w - r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 ${N(w)} ${N(r)}`,
       `V ${N(h - r)}`,
@@ -83,13 +89,13 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
   }
 
   // left / right
-  const center = clamp(h * tail.ratio, r + tail.base / 2, h - r - tail.base / 2);
+  const center = clamp(h * tail.ratio, r + tail.base / 2 + safe, h - r - tail.base / 2 - safe);
   const b1 = center - tail.base / 2;
   const b2 = center + tail.base / 2;
-  const tip = clamp(center + sideShift, r, h - r);
+  const tip = clamp(center + sideShift, r + safe, h - r - safe);
   if (dir === "left") {
     const tx = -tail.length;
-    // 좌변에서 꼬리: 상단→우변→하단→좌변(아래→꼬리→위)
+    const cx = tx * TAPER;
     return [
       `M ${N(r)} 0`,
       `H ${N(w - r)}`,
@@ -99,8 +105,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
       `H ${N(r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 0 ${N(h - r)}`,
       `V ${N(b2)}`,
-      `L ${N(tx)} ${N(tip)}`,
-      `L 0 ${N(b1)}`,
+      `Q ${N(cx)} ${N((b2 + tip) / 2)} ${N(tx)} ${N(tip)}`,
+      `Q ${N(cx)} ${N((tip + b1) / 2)} 0 ${N(b1)}`,
       `V ${N(r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 ${N(r)} 0`,
       "Z",
@@ -108,13 +114,14 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
   }
   // right
   const tx = w + tail.length;
+  const cx = w + (tx - w) * TAPER;
   return [
     `M ${N(r)} 0`,
     `H ${N(w - r)}`,
     `A ${N(r)} ${N(r)} 0 0 1 ${N(w)} ${N(r)}`,
     `V ${N(b1)}`,
-    `L ${N(tx)} ${N(tip)}`,
-    `L ${N(w)} ${N(b2)}`,
+    `Q ${N(cx)} ${N((b1 + tip) / 2)} ${N(tx)} ${N(tip)}`,
+    `Q ${N(cx)} ${N((tip + b2) / 2)} ${N(w)} ${N(b2)}`,
     `V ${N(h - r)}`,
     `A ${N(r)} ${N(r)} 0 0 1 ${N(w - r)} ${N(h)}`,
     `H ${N(r)}`,
