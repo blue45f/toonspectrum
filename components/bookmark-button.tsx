@@ -3,6 +3,7 @@
 import { Bookmark } from "lucide-react";
 
 import { useApp, useHydrated } from "@/lib/store";
+import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 
 export function BookmarkButton({
@@ -28,7 +29,11 @@ export function BookmarkButton({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setRead(titleId, active ? null : "want");
+        const next = active ? null : "want";
+        setRead(titleId, next);
+        toast(next ? "관심 작품에 담았어요" : "관심을 해제했어요", {
+          tone: next ? "success" : "default",
+        });
       }}
       className={cn(
         "grid place-items-center rounded-lg border backdrop-blur-md transition-all duration-150 ease-out-expo active:scale-90",

@@ -26,7 +26,8 @@ import type { SortKey } from "@/lib/search";
 import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib/types";
 
 import { PLATFORM_LIST } from "@/lib/platforms";
-import { useSavedTitleIds } from "@/lib/store";
+import { normalizeQuery } from "@/lib/recent-searches";
+import { useApp, useSavedTitleIds } from "@/lib/store";
 import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 
@@ -155,6 +156,11 @@ export function SearchExplorer({
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
 
+  const recentSearches = useApp((s) => s.recentSearches);
+  const recordRecentSearch = useApp((s) => s.addRecentSearch);
+  const removeRecentSearch = useApp((s) => s.removeRecentSearch);
+  const clearRecentSearches = useApp((s) => s.clearRecentSearches);
+
   const query = useMemo(() => {
     const params = new URLSearchParams({ sort });
     if (q) params.set("q", q);
@@ -200,6 +206,8 @@ export function SearchExplorer({
         setTopTags(data.topTags);
         setCatalog(data.catalog ?? null);
         setLimit(24);
+        // 결과가 있는 검색어만 최근 검색어로 기록(오타·빈 검색은 제외). 정규화·중복 제거는 스토어가 담당.
+        if (normalizeQuery(q) && data.items.length > 0) recordRecentSearch(q);
       })
       .catch(() => {
         if (!alive) return;
@@ -216,7 +224,8 @@ export function SearchExplorer({
       alive = false;
       controller.abort();
     };
-  }, [query, retryKey]);
+    // q 는 query 문자열에 이미 포함돼 별도 재실행을 만들지 않는다(최근 검색어 기록에만 참조).
+  }, [query, retryKey, q, recordRecentSearch]);
 
   const savedIds = useSavedTitleIds();
   const visibleResults = savedOnly ? results.filter((title) => savedIds.has(title.id)) : results;
@@ -688,6 +697,48 @@ export function SearchExplorer({
             <span className="truncate">{loading ? "로딩 중" : typeSummary}</span>
           </div>
 
+          {/* 최근 검색어 — 입력이 비었을 때만 노출, 칩 클릭으로 즉시 복귀(각 칩은 개별 삭제 가능). */}
+          {!q && recentSearches.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-3">
+              <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-fg-3">
+                <Clock3 size={13} />
+                최근 검색
+              </span>
+              {recentSearches.map((entry) => (
+                <span
+                  key={entry}
+                  className="group inline-flex items-center overflow-hidden rounded-full border border-line bg-card text-[0.72rem] text-fg-2 transition-colors hover:border-line-strong"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQ(entry);
+                      if (sort === "popular") setSort("relevance");
+                    }}
+                    className="py-1 pl-2.5 pr-1.5 font-medium transition-colors hover:text-fg"
+                  >
+                    {entry}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeRecentSearch(entry)}
+                    aria-label={`최근 검색어 "${entry}" 삭제`}
+                    className="grid h-full place-items-center py-1 pl-0.5 pr-2 text-fg-3 transition-colors hover:text-bad"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={clearRecentSearches}
+                className="ml-0.5 rounded-full px-2 py-1 text-[0.72rem] text-fg-3 underline-offset-2 transition-colors hover:text-fg hover:underline"
+              >
+                전체 지우기
+              </button>
+            </div>
+          )}
+
           {catalog && (
             <div className="mt-4 grid gap-2 border-t border-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
@@ -788,15 +839,52 @@ export function SearchExplorer({
         ) : !hasResult ? (
           <div className="mt-10 rounded-xl border border-dashed border-line bg-card/40 px-5 py-12 text-center">
             <p className="text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
-            <p className="mt-1 text-sm text-fg-3">필터를 줄이거나 검색어를 바꿔보세요.</p>
-            {activeCount > 0 && (
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-3 text-sm text-accent underline underline-offset-2"
-              >
-                필터 전체 초기화
-              </button>
+            <p className="mt-1 text-sm text-fg-3">
+              {q ? "검색어를 바꾸거나 필터를 줄여보세요." : "필터를 줄이거나 다른 조건으로 찾아보세요."}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                >
+                  <X size={14} />
+                  검색어 지우기
+                </button>
+              )}
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="text-sm text-accent underline underline-offset-2"
+                >
+                  필터 전체 초기화
+                </button>
+              )}
+            </div>
+            {q && recentSearches.filter((entry) => entry !== q).length > 0 && (
+              <div className="mt-5 border-t border-line/70 pt-4">
+                <p className="mb-2 inline-flex items-center gap-1 text-[0.72rem] font-medium text-fg-3">
+                  <Clock3 size={13} />
+                  최근 검색에서 다시 찾기
+                </p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {recentSearches
+                    .filter((entry) => entry !== q)
+                    .slice(0, 6)
+                    .map((entry) => (
+                      <button
+                        key={entry}
+                        type="button"
+                        onClick={() => setQ(entry)}
+                        className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                      >
+                        {entry}
+                      </button>
+                    ))}
+                </div>
+              </div>
             )}
           </div>
         ) : (

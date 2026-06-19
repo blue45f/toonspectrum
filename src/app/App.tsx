@@ -6,12 +6,14 @@ import { AppRouter } from "./routes/AppRouter";
 import { AgeGateModal } from "@/components/age-gate-modal";
 import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { StoreSync } from "@/components/auth/store-sync";
+import { BackToTop } from "@/components/back-to-top";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { ToastHost } from "@/components/toast-host";
 import { AuthProvider } from "@/lib/firebaseAuth";
 import { DeskCloudMounts } from "@/src/components/deskcloud-native/DeskCloudMounts";
 import { AppQueryProvider } from "@/src/infrastructure/query-provider";
@@ -57,6 +59,8 @@ export default function App() {
             <SiteFooter />
             <CommandPaletteHost />
             <AgeGateModal />
+            <BackToTop />
+            <ToastHost />
             <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
               <ThemeSwitcher />
               <LanguageSwitcher />

@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+import { addRecentSearch, removeRecentSearch } from "./recent-searches";
+
 import type { ReadState, UserReview } from "./types";
 
 // 로그인 시 변경을 DB API로 write-through (게스트는 localStorage만)
@@ -47,6 +49,10 @@ interface AppState {
   recentlyViewed: string[]; // 최근 본 작품 titleId (최신순, 브라우저 저장)
   addRecentlyViewed: (titleId: string) => void;
   clearRecentlyViewed: () => void;
+  recentSearches: string[]; // 최근 검색어(최신순, 브라우저 저장) — 검색 입력이 비었을 때 빠른 복귀
+  addRecentSearch: (query: string) => void;
+  removeRecentSearch: (query: string) => void;
+  clearRecentSearches: () => void;
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
   setUserId: (id: string | null) => void;
@@ -90,6 +96,7 @@ export const useApp = create<AppState>()(
       ageGateOpen: false,
       collections: seedCollections,
       recentlyViewed: [],
+      recentSearches: [],
       ratingScale: "star",
       userId: null,
       sessionToken: null,
@@ -196,6 +203,12 @@ export const useApp = create<AppState>()(
         set((s) => ({ recentlyViewed: [titleId, ...s.recentlyViewed.filter((id) => id !== titleId)].slice(0, 24) }));
       },
       clearRecentlyViewed: () => set({ recentlyViewed: [] }),
+      // 최근 검색어 — 순수 헬퍼로 정규화·중복 제거·상한을 적용(부수효과 없음, 단위 테스트 가능).
+      addRecentSearch: (query) =>
+        set((s) => ({ recentSearches: addRecentSearch(s.recentSearches, query) })),
+      removeRecentSearch: (query) =>
+        set((s) => ({ recentSearches: removeRecentSearch(s.recentSearches, query) })),
+      clearRecentSearches: () => set({ recentSearches: [] }),
       renameCollection: (id, name) => {
         const clean = name.trim();
         if (!clean) return;
@@ -231,6 +244,7 @@ export const useApp = create<AppState>()(
           subscriptions: {},
           collections: seedCollections,
           recentlyViewed: [],
+          recentSearches: [],
         }),
     }),
     {

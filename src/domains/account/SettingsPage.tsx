@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 import { Container } from "@/components/section";
@@ -91,10 +91,13 @@ export function SettingsPage() {
   const hydrateFromServer = useApp((s) => s.hydrateFromServer);
   const recentCount = useApp((s) => s.recentlyViewed.length);
   const clearRecentlyViewed = useApp((s) => s.clearRecentlyViewed);
+  const recentSearchCount = useApp((s) => s.recentSearches.length);
+  const clearRecentSearches = useApp((s) => s.clearRecentSearches);
 
   const [remember, setRemember] = useState(false);
   const [filtersCleared, setFiltersCleared] = useState(false);
   const [recentCleared, setRecentCleared] = useState(false);
+  const [searchesCleared, setSearchesCleared] = useState(false);
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [imported, setImported] = useState(false);
@@ -311,6 +314,29 @@ export function SettingsPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <Clock size={14} /> 기록 지우기
+            </button>
+          )}
+        </Row>
+        <Row
+          icon={SearchX}
+          title="최근 검색어 지우기"
+          desc={`검색 화면에 표시되는 최근 검색어를 지웁니다.${recentSearchCount > 0 ? ` (현재 ${recentSearchCount}개)` : ""}`}
+        >
+          {searchesCleared ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
+              <Check size={14} /> 지움
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={recentSearchCount === 0}
+              onClick={() => {
+                clearRecentSearches();
+                setSearchesCleared(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <SearchX size={14} /> 검색어 지우기
             </button>
           )}
         </Row>

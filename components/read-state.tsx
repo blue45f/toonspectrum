@@ -5,6 +5,7 @@ import { Bookmark, BookOpen, CheckCircle2, XCircle } from "lucide-react";
 import type { ReadState } from "@/lib/types";
 
 import { useApp, useHydrated } from "@/lib/store";
+import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 
 
@@ -27,7 +28,13 @@ export function ReadStateSelector({ titleId, className }: { titleId: string; cla
         return (
           <button
             key={o.state}
-            onClick={() => setRead(titleId, active ? null : o.state)}
+            onClick={() => {
+              const next = active ? null : o.state;
+              setRead(titleId, next);
+              toast(next ? `'${o.label}'(으)로 표시했어요` : `'${o.label}' 표시를 해제했어요`, {
+                tone: next ? "success" : "default",
+              });
+            }}
             aria-pressed={active}
             className={cn(
               "flex flex-col items-center gap-1.5 rounded-xl border py-2.5 text-xs font-medium transition-colors duration-150",
