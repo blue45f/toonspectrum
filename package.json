@@ -52,6 +52,7 @@
     "drizzle-orm": "^0.45.2",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
+    "firebase": "^12.15.0",
     "google-auth-library": "^10.7.0",
     "konva": "^10.3.0",
     "ky": "^2.0.2",

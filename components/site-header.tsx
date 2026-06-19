@@ -18,6 +18,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenu } from "./auth/auth-menu";
+import { MemberAuthControl } from "./auth/member-auth-control";
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { useT } from "@/lib/i18n";
@@ -166,6 +167,8 @@ export function SiteHeader() {
                 {keepInlineText(t("nav.library"))}
               </span>
             </Link>
+            {/* 통합 회원 로그인(Firebase 이메일/게스트) — 기존 세션 AuthMenu 와 별개로 추가 */}
+            <MemberAuthControl />
             <AuthMenu />
 
             {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}

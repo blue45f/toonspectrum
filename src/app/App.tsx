@@ -12,6 +12,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AuthProvider } from "@/lib/firebaseAuth";
 import { DeskCloudMounts } from "@/src/components/deskcloud-native/DeskCloudMounts";
 import { AppQueryProvider } from "@/src/infrastructure/query-provider";
 
@@ -38,6 +39,8 @@ export default function App() {
     <BrowserRouter>
       <AppQueryProvider>
         <AuthSessionProvider>
+          {/* 통합 로그인(Firebase Auth) — 기존 세션 로그인과 별개로 추가. 헤더의 회원 로그인 진입점이 소비. */}
+          <AuthProvider>
           <MotionProvider>
             <StoreSync />
             <ScrollToTop />
@@ -61,6 +64,7 @@ export default function App() {
             {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
             <DeskCloudMounts />
           </MotionProvider>
+          </AuthProvider>
         </AuthSessionProvider>
       </AppQueryProvider>
     </BrowserRouter>

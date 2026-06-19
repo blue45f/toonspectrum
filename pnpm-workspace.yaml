@@ -17,12 +17,14 @@ onlyBuiltDependencies:
   - "@sentry/cli"
   - "@swc/core"
   - esbuild
-  - protobufjs
   - unrs-resolver
+# firebase 웹 SDK 의 @firebase/util / protobufjs 는 postinstall 빌드 스크립트가 런타임에 불필요해
+# 명시적으로 거부(false)한다 — pnpm 11 strict 의 ERR_PNPM_IGNORED_BUILDS 를 깨끗하게 억제(fleet 컨벤션).
 allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
   "@nestjs/core": true
   '@sentry/cli': true
   '@swc/core': true
   esbuild: true
-  protobufjs: true
   unrs-resolver: true
