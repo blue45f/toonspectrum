@@ -6347,20 +6347,27 @@ export function StudioPage() {
                 const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
                 const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
 
+                // 생각 말풍선 꼬리: 큰→중간→작은 3단 구름방울(코미포식). 외곽선은 본체보다 살짝 얇게.
+                const thoughtSW = bStrokeW * 0.8;
+                const tBubble = (x: number, y: number, rx: number, ry: number, key: string) => (
+                  <Ellipse key={key} x={x} y={y} radiusX={rx} radiusY={ry} fill={el.fill} stroke={bStroke} strokeWidth={thoughtSW} />
+                );
                 let thoughtEllipses = null;
                 if (showTail) {
                   if (tailDirection === "bottom") {
                     thoughtEllipses = (
                       <>
-                        <Ellipse x={thoughtBigX} y={el.height + 12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Ellipse x={thoughtSmallX} y={el.height + 32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        {tBubble(thoughtBigX, el.height + 14, 14, 11, "a")}
+                        {tBubble(thoughtBigX, el.height + 32, 10, 8, "b")}
+                        {tBubble(thoughtSmallX, el.height + 54, 6, 5, "c")}
                       </>
                     );
                   } else if (tailDirection === "top") {
                     thoughtEllipses = (
                       <>
-                        <Ellipse x={thoughtBigX} y={-12} radiusX={13} radiusY={10} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Ellipse x={thoughtSmallX} y={-32} radiusX={8} radiusY={7} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        {tBubble(thoughtBigX, -14, 14, 11, "a")}
+                        {tBubble(thoughtBigX, -32, 10, 8, "b")}
+                        {tBubble(thoughtSmallX, -54, 6, 5, "c")}
                       </>
                     );
                   } else if (tailDirection === "left") {
@@ -6368,8 +6375,9 @@ export function StudioPage() {
                     const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
                     thoughtEllipses = (
                       <>
-                        <Ellipse x={-12} y={bigY} radiusX={10} radiusY={13} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Ellipse x={-32} y={smallY} radiusX={7} radiusY={8} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        {tBubble(-14, bigY, 11, 14, "a")}
+                        {tBubble(-32, bigY, 8, 10, "b")}
+                        {tBubble(-54, smallY, 5, 6, "c")}
                       </>
                     );
                   } else if (tailDirection === "right") {
@@ -6377,8 +6385,9 @@ export function StudioPage() {
                     const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
                     thoughtEllipses = (
                       <>
-                        <Ellipse x={el.width + 12} y={bigY} radiusX={10} radiusY={13} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
-                        <Ellipse x={el.width + 32} y={smallY} radiusX={7} radiusY={8} fill={el.fill} stroke={bStroke} strokeWidth={bStrokeW} />
+                        {tBubble(el.width + 14, bigY, 11, 14, "a")}
+                        {tBubble(el.width + 32, bigY, 8, 10, "b")}
+                        {tBubble(el.width + 54, smallY, 5, 6, "c")}
                       </>
                     );
                   }
@@ -6436,14 +6445,15 @@ export function StudioPage() {
                       <Star
                         x={el.width / 2}
                         y={el.height / 2}
-                        numPoints={18}
-                        innerRadius={44}
-                        outerRadius={62}
-                        scaleX={el.width / 124}
-                        scaleY={el.height / 124}
+                        numPoints={20}
+                        innerRadius={36}
+                        outerRadius={68}
+                        scaleX={el.width / 136}
+                        scaleY={el.height / 136}
                         fill={el.fill}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
+                        lineJoin="round"
                       />
                     ) : el.variant === "thought" ? (
                       <>
@@ -6520,14 +6530,15 @@ export function StudioPage() {
                       <Star
                         x={el.width / 2}
                         y={el.height / 2}
-                        numPoints={14}
-                        innerRadius={36}
-                        outerRadius={58}
-                        scaleX={el.width / 116}
-                        scaleY={el.height / 116}
+                        numPoints={22}
+                        innerRadius={28}
+                        outerRadius={64}
+                        scaleX={el.width / 160}
+                        scaleY={el.height / 160}
                         fill={el.fill}
-                        stroke="#dc2626"
-                        strokeWidth={3.5}
+                        stroke={webtoonTheme === "soft" ? "#dc2626" : webtoonTheme === "vivid" ? "#7f1d1d" : "#991b1b"}
+                        strokeWidth={Math.max(bStrokeW, 3.5)}
+                        lineJoin="round"
                       />
                     ) : el.variant === "phone" ? (
                       <>
@@ -6535,7 +6546,7 @@ export function StudioPage() {
                           width={el.width}
                           height={el.height}
                           fill={el.fill}
-                          cornerRadius={12}
+                          cornerRadius={webtoonTheme === "soft" ? 10 : webtoonTheme === "vivid" ? 6 : 8}
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
                         />
@@ -6559,7 +6570,7 @@ export function StudioPage() {
                         scaleY={el.height / 24}
                       />
                     ) : el.variant === "box" ? (
-                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={3} stroke={bStroke} strokeWidth={bStrokeW} />
+                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={webtoonTheme === "soft" ? 6 : webtoonTheme === "vivid" ? 3 : 4} stroke={bStroke} strokeWidth={bStrokeW} />
                     ) : (
                       <Path
                         data={speechPathData}
