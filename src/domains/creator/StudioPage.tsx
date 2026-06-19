@@ -9,6 +9,9 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
   ChevronUp,
   Circle,
   Copy,
@@ -1669,6 +1672,9 @@ export function StudioPage() {
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
   // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
   const [dialogueScript, setDialogueScript] = useState("");
+  // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
 
@@ -5444,14 +5450,48 @@ export function StudioPage() {
           >
             맞춤
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              const anyOpen = leftPanelOpen || rightPanelOpen;
+              setLeftPanelOpen(!anyOpen);
+              setRightPanelOpen(!anyOpen);
+            }}
+            aria-pressed={!leftPanelOpen && !rightPanelOpen}
+            className={cn(toolBtn(!leftPanelOpen && !rightPanelOpen), "hidden h-8 gap-1 px-2 text-[10px] font-semibold lg:inline-flex")}
+            title="집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
+          >
+            <Maximize2 size={12} /> 넓게
+          </button>
         </div>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        {/* 왼쪽: 페이지 목록 사이드바 */}
-        <div className="w-full lg:w-44 flex-shrink-0 flex flex-col gap-2 rounded-2xl border border-line bg-panel/20 p-3">
+        {/* 왼쪽: 페이지 목록 사이드바 (접으면 얇은 레일로) */}
+        {!leftPanelOpen && (
+          <button
+            type="button"
+            onClick={() => setLeftPanelOpen(true)}
+            className="hidden w-7 flex-shrink-0 flex-col items-center gap-2 rounded-2xl border border-line bg-panel/20 py-3 text-fg-3 transition-colors hover:bg-raised lg:flex"
+            title="페이지 목록 펼치기"
+          >
+            <ChevronRight size={14} />
+            <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">페이지</span>
+          </button>
+        )}
+        <div className={cn("w-full lg:w-44 flex-shrink-0 flex flex-col gap-2 rounded-2xl border border-line bg-panel/20 p-3", !leftPanelOpen && "lg:hidden")}>
           <div className="flex items-center justify-between border-b border-line/50 pb-2">
-            <span className="text-xs font-bold text-fg-2">페이지 목록</span>
+            <span className="flex items-center gap-1 text-xs font-bold text-fg-2">
+              <button
+                type="button"
+                onClick={() => setLeftPanelOpen(false)}
+                className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
+                title="페이지 목록 접기"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              페이지 목록
+            </span>
             <button
               type="button"
               onClick={addPage}
@@ -6641,8 +6681,29 @@ export function StudioPage() {
           )}
         </div>
 
-        {/* 사이드: 속성 + 게시 정보 */}
-        <aside className="flex flex-col gap-4">
+        {/* 사이드: 속성 + 게시 정보 (접으면 얇은 레일로) */}
+        {!rightPanelOpen && (
+          <button
+            type="button"
+            onClick={() => setRightPanelOpen(true)}
+            className="hidden w-7 flex-shrink-0 flex-col items-center gap-2 rounded-2xl border border-line bg-panel/40 py-3 text-fg-3 transition-colors hover:bg-raised lg:flex"
+            title="속성 패널 펼치기"
+          >
+            <ChevronLeft size={14} />
+            <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">속성</span>
+          </button>
+        )}
+        <aside className={cn("flex flex-col gap-4", !rightPanelOpen && "lg:hidden")}>
+          <div className="hidden justify-end lg:flex">
+            <button
+              type="button"
+              onClick={() => setRightPanelOpen(false)}
+              className="inline-flex items-center gap-0.5 rounded text-[0.62rem] text-fg-3 transition-colors hover:text-fg"
+              title="속성 패널 접기"
+            >
+              접기 <ChevronRight size={13} />
+            </button>
+          </div>
           <div className="rounded-2xl border border-line bg-panel/40 p-3">
             <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
