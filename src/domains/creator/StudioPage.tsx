@@ -1727,6 +1727,8 @@ export function StudioPage() {
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  // 다중선택 그룹 이동 — 끄는 노드의 시작·직전 위치로 나머지 선택 노드에 이동량을 함께 적용.
+  const groupDragRef = useRef<{ id: string; x0: number; y0: number; lastX: number; lastY: number } | null>(null);
   // 단일 선택이 생기면 마퀴 다중선택은 해제(상호 배타).
   useEffect(() => {
     if (selectedId) setMarqueeIds([]);
@@ -3838,6 +3840,42 @@ export function StudioPage() {
     const layer = node.getLayer();
     if (!layer) return;
 
+    // 다중선택 그룹 이동: 끄는 노드(좌표형)의 이동량을 나머지 선택 노드에 실시간 적용(draw·잠금 제외).
+    // Konva 노드엔 id가 없어(선택은 nodeRefs 맵 사용) nodeRefs 역방향 조회로 요소 id를 찾는다.
+    let draggedId: string | null = null;
+    for (const k in nodeRefs.current) {
+      if (nodeRefs.current[k] === node) {
+        draggedId = k;
+        break;
+      }
+    }
+    if (draggedId && marqueeIds.length > 1 && marqueeIds.includes(draggedId)) {
+      const draggedEl = elements.find((el) => el.id === draggedId);
+      if (draggedEl && draggedEl.type !== "draw" && !draggedEl.locked) {
+        const g = groupDragRef.current;
+        if (!g || g.id !== draggedId) {
+          groupDragRef.current = { id: draggedId, x0: node.x(), y0: node.y(), lastX: node.x(), lastY: node.y() };
+        } else {
+          const ddx = node.x() - g.lastX;
+          const ddy = node.y() - g.lastY;
+          if (ddx !== 0 || ddy !== 0) {
+            for (const id of marqueeIds) {
+              if (id === draggedId) continue;
+              const oel = elements.find((el) => el.id === id);
+              if (!oel || oel.type === "draw" || oel.locked) continue;
+              const other = nodeRefs.current[id];
+              if (other) {
+                other.x(other.x() + ddx);
+                other.y(other.y() + ddy);
+              }
+            }
+            g.lastX = node.x();
+            g.lastY = node.y();
+          }
+        }
+      }
+    }
+
     if (!snapEnabled) {
       setGuides({ x: [], y: [] });
       return;
@@ -3910,6 +3948,25 @@ export function StudioPage() {
   }
   function onStageDragEnd() {
     setGuides({ x: [], y: [] });
+    // 그룹 이동 확정: 끈 노드의 총 이동량(delta)을 선택된 좌표형 요소 모두에 한 번에 커밋.
+    const g = groupDragRef.current;
+    groupDragRef.current = null;
+    if (g && marqueeIds.length > 1) {
+      const dnode = nodeRefs.current[g.id];
+      if (dnode) {
+        const dx = dnode.x() - g.x0;
+        const dy = dnode.y() - g.y0;
+        if (dx !== 0 || dy !== 0) {
+          const mv = new Set(marqueeIds);
+          const next = elements.map((el) =>
+            !mv.has(el.id) || el.locked || el.type === "draw"
+              ? el
+              : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El)
+          );
+          commit(next);
+        }
+      }
+    }
   }
 
   function startEditText(id: string) {
