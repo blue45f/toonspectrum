@@ -3,8 +3,11 @@ import { describe, it, expect } from "vitest";
 import {
   AMBIENT_PRESETS,
   DEFAULT_WORK_FX,
+  EMPHASIS_PRESETS,
   REVEAL_PRESETS,
   buildAmbientParticles,
+  cutFx,
+  emphasisAnimation,
   findAmbientPreset,
   hasAnyFx,
   readWorkFx,
@@ -58,6 +61,57 @@ describe("hasAnyFx", () => {
     expect(hasAnyFx({ ...DEFAULT_WORK_FX, ambient: "rain" })).toBe(true);
     expect(hasAnyFx({ ...DEFAULT_WORK_FX, bgmMood: "calm" })).toBe(true);
     expect(hasAnyFx({ ...DEFAULT_WORK_FX, bgmUrl: "http://x" })).toBe(true);
+  });
+
+  it("컷별 강조/리빌이 있으면 true", () => {
+    expect(hasAnyFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "", emphasis: "shake" }] })).toBe(true);
+    expect(hasAnyFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "zoom-in", emphasis: "none" }] })).toBe(true);
+    expect(hasAnyFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "", emphasis: "none" }] })).toBe(false);
+  });
+});
+
+describe("컷별 효과(cuts)", () => {
+  it("readWorkFx는 cuts 배열을 정규화한다", () => {
+    const fx = readWorkFx({ fx: { cuts: [{ reveal: "fade-up", emphasis: "shake" }, { reveal: "bad", emphasis: "nope" }, 42] } });
+    expect(fx.cuts).toHaveLength(3);
+    expect(fx.cuts[0]).toEqual({ reveal: "fade-up", emphasis: "shake" });
+    expect(fx.cuts[1]).toEqual({ reveal: "", emphasis: "none" }); // 잘못된 값은 기본
+    expect(fx.cuts[2]).toEqual({ reveal: "", emphasis: "none" }); // 객체 아님
+  });
+
+  it("cuts가 없으면 빈 배열", () => {
+    expect(readWorkFx({ fx: {} }).cuts).toEqual([]);
+  });
+
+  it("cutFx: 컷별 reveal이 비면 작품 기본 reveal 상속", () => {
+    const fx = { ...DEFAULT_WORK_FX, reveal: "zoom-in", cuts: [{ reveal: "", emphasis: "shake" }] };
+    expect(cutFx(fx, 0)).toEqual({ reveal: "zoom-in", emphasis: "shake" });
+  });
+
+  it("cutFx: 컷별 reveal이 있으면 그걸 사용", () => {
+    const fx = { ...DEFAULT_WORK_FX, reveal: "zoom-in", cuts: [{ reveal: "slide-in", emphasis: "none" }] };
+    expect(cutFx(fx, 0).reveal).toBe("slide-in");
+  });
+
+  it("cutFx: 범위 밖 인덱스는 작품 기본 + 강조 없음", () => {
+    const fx = { ...DEFAULT_WORK_FX, reveal: "fade", cuts: [] };
+    expect(cutFx(fx, 5)).toEqual({ reveal: "fade", emphasis: "none" });
+  });
+});
+
+describe("emphasisAnimation", () => {
+  it("none/미지정은 null", () => {
+    expect(emphasisAnimation("none")).toBeNull();
+    expect(emphasisAnimation("xxx")).toBeNull();
+  });
+
+  it("강조 프리셋은 키프레임+옵션을 돌려준다", () => {
+    for (const p of EMPHASIS_PRESETS.filter((e) => e.id !== "none")) {
+      const a = emphasisAnimation(p.id);
+      expect(a).not.toBeNull();
+      expect(a!.keyframes.length).toBeGreaterThanOrEqual(2);
+      expect(a!.options.duration).toBeGreaterThan(0);
+    }
   });
 });
 

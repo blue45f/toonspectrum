@@ -9,8 +9,10 @@ import { useState } from "react";
 import { BGM_MOODS } from "./studio-bgm";
 import {
   AMBIENT_PRESETS,
+  EMPHASIS_PRESETS,
   REVEAL_PRESETS,
   readWorkFx,
+  type WorkCutFx,
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
@@ -33,6 +35,16 @@ export function WorkFxPanel({
 
   const patch = (p: Partial<WorkFxSettings>) => setFx((prev) => ({ ...prev, ...p }));
 
+  const cutCount = work.pages.length;
+  const cutAt = (index: number): WorkCutFx => fx.cuts[index] ?? { reveal: "", emphasis: "none" };
+  // 컷별 효과 갱신 — cuts 배열을 페이지 수만큼 채워두고 해당 인덱스만 바꾼다.
+  const patchCut = (index: number, p: Partial<WorkCutFx>) =>
+    setFx((prev) => {
+      const cuts: WorkCutFx[] = Array.from({ length: cutCount }, (_, i) => prev.cuts[i] ?? { reveal: "", emphasis: "none" });
+      cuts[index] = { ...cuts[index], ...p };
+      return { ...prev, cuts };
+    });
+
   async function save() {
     if (saving) return;
     setSaving(true);
@@ -50,10 +62,12 @@ export function WorkFxPanel({
     }
   }
 
+  const cutFxCount = fx.cuts.filter((c) => (c.reveal && c.reveal !== "none") || c.emphasis !== "none").length;
   const summary = [
     fx.bgmMood || fx.bgmUrl ? "BGM" : null,
     fx.reveal !== "none" ? "모션" : null,
     fx.ambient !== "none" ? "분위기" : null,
+    cutFxCount > 0 ? `컷효과 ${cutFxCount}` : null,
   ].filter(Boolean);
 
   return (
@@ -130,6 +144,50 @@ export function WorkFxPanel({
               ))}
             </select>
           </label>
+
+          {cutCount > 0 && (
+            <div className="rounded-lg border border-line bg-panel/40 px-2.5 py-2">
+              <p className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">컷별 효과 (선택)</p>
+              <p className="mb-2 text-[0.62rem] leading-snug text-fg-4">
+                특정 컷만 다르게 연출해요. 등장 효과는 비워두면 작품 기본을 따르고, 강조는 그 컷이 보일 때 한 번 재생돼요.
+              </p>
+              <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                {Array.from({ length: cutCount }, (_, i) => {
+                  const c = cutAt(i);
+                  return (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="numeral w-9 shrink-0 text-[0.66rem] text-fg-3">{i + 1}컷</span>
+                      <select
+                        value={c.reveal}
+                        onChange={(e) => patchCut(i, { reveal: e.target.value })}
+                        className="h-8 min-w-0 flex-1 rounded-md border border-line bg-canvas px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
+                        aria-label={`${i + 1}컷 등장 효과`}
+                      >
+                        <option value="">등장: 기본</option>
+                        {REVEAL_PRESETS.filter((p) => p.id !== "none").map((p) => (
+                          <option key={p.id} value={p.id}>
+                            등장: {p.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={c.emphasis}
+                        onChange={(e) => patchCut(i, { emphasis: e.target.value })}
+                        className="h-8 min-w-0 flex-1 rounded-md border border-line bg-canvas px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
+                        aria-label={`${i + 1}컷 강조 효과`}
+                      >
+                        {EMPHASIS_PRESETS.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            강조: {p.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {(fx.bgmMood || fx.bgmUrl) && (
             <label className="flex items-center gap-2 text-xs text-fg-2">

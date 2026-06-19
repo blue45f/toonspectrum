@@ -375,6 +375,9 @@ interface FrameEl {
   stroke?: string;
   strokeWidth?: number;
   dashStyle?: "solid" | "dashed";
+  // 사선/비정형 패널 — 프레임 로컬좌표(x,y 기준) 쿼드 폴리곤 [x0,y0,x1,y1,x2,y2,x3,y3].
+  // 있으면 사각형 대신 이 폴리곤으로 클립·채움·테두리를 그린다.
+  points?: number[];
 }
 interface StickerEl {
   id: string;
@@ -1305,16 +1308,25 @@ function FramePanel({
 
   const fit = img ? coverFitRect(el.width, el.height, img.naturalWidth || img.width, img.naturalHeight || img.height) : null;
   const borderInset = fStrokeW / 2;
+  // 사선/비정형 패널: 쿼드(8수) 폴리곤이면 폴리곤 클립·채움·테두리로 그린다.
+  const poly = el.points && el.points.length >= 6 ? el.points : null;
+  const clipProps = poly
+    ? {
+        clipFunc: (ctx: Konva.Context) => {
+          ctx.beginPath();
+          ctx.moveTo(poly[0], poly[1]);
+          for (let i = 2; i < poly.length; i += 2) ctx.lineTo(poly[i], poly[i + 1]);
+          ctx.closePath();
+        },
+      }
+    : { clipX: 0, clipY: 0, clipWidth: el.width, clipHeight: el.height };
 
   return (
     <Group
       ref={innerRef}
       x={el.x}
       y={el.y}
-      clipX={0}
-      clipY={0}
-      clipWidth={el.width}
-      clipHeight={el.height}
+      {...clipProps}
       draggable={draggable}
       dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
@@ -1322,14 +1334,23 @@ function FramePanel({
       onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
       onTransformEnd={(e) => {
         const node = e.target as Konva.Group;
-        const w = Math.max(40, el.width * node.scaleX());
-        const h = Math.max(40, el.height * node.scaleY());
+        const sx = node.scaleX();
+        const sy = node.scaleY();
+        const w = Math.max(40, el.width * sx);
+        const h = Math.max(40, el.height * sy);
         node.scaleX(1);
         node.scaleY(1);
-        onChange({ x: node.x(), y: node.y(), width: w, height: h });
+        // 폴리곤도 같은 비율로 스케일해 형태 유지.
+        const patch: Partial<FrameEl> = { x: node.x(), y: node.y(), width: w, height: h };
+        if (poly) patch.points = poly.map((v, i) => v * (i % 2 === 0 ? sx : sy));
+        onChange(patch);
       }}
     >
-      <Rect width={el.width} height={el.height} fill={el.bgColor ?? "#ffffff"} />
+      {poly ? (
+        <Line points={poly} closed fill={el.bgColor ?? "#ffffff"} />
+      ) : (
+        <Rect width={el.width} height={el.height} fill={el.bgColor ?? "#ffffff"} />
+      )}
       {img && fit ? (
         <KImage
           image={img}
@@ -1339,22 +1360,35 @@ function FramePanel({
           height={fit.height}
         />
       ) : null}
-      {fStrokeW > 0 && (
-        <Rect
-          x={borderInset}
-          y={borderInset}
-          width={Math.max(0, el.width - fStrokeW)}
-          height={Math.max(0, el.height - fStrokeW)}
-          stroke={fStroke}
-          strokeWidth={fStrokeW}
-          cornerRadius={Math.max(0, fRadius - borderInset)}
-          shadowColor={fShadowColor}
-          shadowBlur={fShadowBlur}
-          shadowOpacity={fShadowOpacity}
-          shadowOffset={fShadowOffset}
-          dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
-        />
-      )}
+      {fStrokeW > 0 &&
+        (poly ? (
+          <Line
+            points={poly}
+            closed
+            stroke={fStroke}
+            strokeWidth={fStrokeW}
+            shadowColor={fShadowColor}
+            shadowBlur={fShadowBlur}
+            shadowOpacity={fShadowOpacity}
+            shadowOffset={fShadowOffset}
+            dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
+          />
+        ) : (
+          <Rect
+            x={borderInset}
+            y={borderInset}
+            width={Math.max(0, el.width - fStrokeW)}
+            height={Math.max(0, el.height - fStrokeW)}
+            stroke={fStroke}
+            strokeWidth={fStrokeW}
+            cornerRadius={Math.max(0, fRadius - borderInset)}
+            shadowColor={fShadowColor}
+            shadowBlur={fShadowBlur}
+            shadowOpacity={fShadowOpacity}
+            shadowOffset={fShadowOffset}
+            dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
+          />
+        ))}
     </Group>
   );
 }
@@ -3091,6 +3125,56 @@ export function StudioPage() {
     setCanvasH((h) => Math.max(h, y + height + margin));
     addEl(frame);
   }
+  // 사선 2분할 컷 — 기울어진 분할선으로 두 패널을 깐다(역동적 만화 연출).
+  function addDiagonalSplit() {
+    const margin = 24;
+    const w = CANVAS_W - margin * 2;
+    const frames = elements.filter((e): e is FrameEl => e.type === "frame");
+    const bottomFrame = frames.reduce<FrameEl | null>(
+      (best, f) => (!best || f.y + f.height > best.y + best.height ? f : best),
+      null
+    );
+    const top = bottomFrame ? bottomFrame.y + bottomFrame.height + margin : margin;
+    const h = 440;
+    const g = 18; // 사선 거터
+    const t1 = Math.round(h * 0.6); // 좌측 분할 y
+    const t2 = Math.round(h * 0.4); // 우측 분할 y(위로 기울어짐)
+    const upper: FrameEl = {
+      id: uid(),
+      type: "frame",
+      x: margin,
+      y: top,
+      width: w,
+      height: t1,
+      points: [0, 0, w, 0, w, t2, 0, t1],
+    };
+    const lowerY = top + t2 + g;
+    const lowerH = h - (t2 + g);
+    const lower: FrameEl = {
+      id: uid(),
+      type: "frame",
+      x: margin,
+      y: lowerY,
+      width: w,
+      height: lowerH,
+      points: [0, t1 - t2, w, 0, w, lowerH, 0, lowerH],
+    };
+    setCanvasH((hh) => Math.max(hh, top + h + margin));
+    commit([...elements, upper, lower]);
+    setTool("select");
+  }
+  // 선택한 사각형 프레임을 평행사변형(사선)으로 ↔ 사각형으로 토글.
+  function toggleSelectedFrameDiagonal() {
+    if (!selected || selected.type !== "frame") return;
+    if (selected.points) {
+      patchEl(selected.id, { points: undefined } as Partial<El>);
+    } else {
+      const skew = Math.round(selected.width * 0.14);
+      patchEl(selected.id, {
+        points: [skew, 0, selected.width, 0, selected.width - skew, selected.height, 0, selected.height],
+      } as Partial<El>);
+    }
+  }
   function addFxOverlay(svgMarkup: string, w: number, h: number) {
     setMenu(null);
     addEl(
@@ -4165,6 +4249,19 @@ export function StudioPage() {
         <button type="button" onClick={addFrame} className={toolBtn(false)}>
           <Plus size={14} /> + 패널 추가
         </button>
+        <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)} title="기울어진 분할선의 두 패널을 한 번에 추가">
+          <span className="text-[13px] leading-none">◩</span> 사선 컷
+        </button>
+        {selected?.type === "frame" && (
+          <button
+            type="button"
+            onClick={toggleSelectedFrameDiagonal}
+            className={toolBtn(Boolean(selected.points))}
+            title="선택한 패널을 사선(평행사변형)↔사각형으로"
+          >
+            <span className="text-[13px] leading-none">◪</span> {selected.points ? "직선화" : "사선화"}
+          </button>
+        )}
         <span className="mx-0.5 h-5 w-px bg-line" />
         <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
           <MousePointer2 size={14} /> 선택

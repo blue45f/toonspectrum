@@ -12,6 +12,8 @@ import { createBgmPlayer, findBgmMood, type BgmPlayer } from "./studio-bgm";
 import {
   REVEAL_SHOWN_STYLE,
   buildAmbientParticles,
+  cutFx,
+  emphasisAnimation,
   findAmbientPreset,
   revealHiddenStyle,
   stepAmbientParticle,
@@ -36,27 +38,34 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// 한 페이지 이미지를 감싸 스크롤 등장 효과를 적용한다.
+// 한 페이지(컷) 이미지를 감싸 스크롤 등장 효과 + 컷 강조 애니메이션을 적용한다.
+// 바깥 div가 리빌(opacity/transform transition), 안쪽 div가 강조(Web Animations)를 맡아 서로 안 부딪힌다.
 function RevealPage({
   src,
   alt,
   reveal,
-  enabled,
+  emphasis,
+  motionAllowed,
 }: {
   src: string;
   alt: string;
   reveal: string;
-  enabled: boolean;
+  emphasis: string;
+  motionAllowed: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(!enabled);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const revealActive = motionAllowed && reveal !== "none";
+  const emphasisActive = motionAllowed && emphasis !== "none";
+  const observe = revealActive || emphasisActive;
+  const [shown, setShown] = useState(!revealActive);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!observe) {
       setShown(true);
       return;
     }
-    const el = ref.current;
+    const el = outerRef.current;
     if (!el || typeof IntersectionObserver === "undefined") {
       setShown(true);
       return;
@@ -64,39 +73,44 @@ function RevealPage({
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) {
-            setShown(true);
-            io.disconnect();
+          if (!e.isIntersecting) continue;
+          setShown(true);
+          if (emphasisActive && innerRef.current && typeof innerRef.current.animate === "function") {
+            const anim = emphasisAnimation(emphasis);
+            if (anim) innerRef.current.animate(anim.keyframes, anim.options);
           }
+          io.disconnect();
         }
       },
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [enabled]);
+  }, [observe, emphasisActive, emphasis]);
 
-  const style = enabled && !shown ? revealHiddenStyle(reveal) : REVEAL_SHOWN_STYLE;
+  const style = revealActive && !shown ? revealHiddenStyle(reveal) : REVEAL_SHOWN_STYLE;
   return (
     <div
-      ref={ref}
+      ref={outerRef}
       style={{
         ...style,
-        transition: enabled
+        transition: revealActive
           ? "opacity 700ms ease, transform 760ms cubic-bezier(.2,.7,.2,1), filter 700ms ease"
           : undefined,
       }}
     >
-      <CoverImage
-        src={src}
-        alt={alt}
-        className="block w-full"
-        fallback={
-          <span className="grid aspect-[3/4] w-full place-items-center bg-raised/40 text-xs text-fg-3">
-            이미지를 불러올 수 없습니다.
-          </span>
-        }
-      />
+      <div ref={innerRef}>
+        <CoverImage
+          src={src}
+          alt={alt}
+          className="block w-full"
+          fallback={
+            <span className="grid aspect-[3/4] w-full place-items-center bg-raised/40 text-xs text-fg-3">
+              이미지를 불러올 수 없습니다.
+            </span>
+          }
+        />
+      </div>
     </div>
   );
 }
@@ -272,7 +286,6 @@ export function WebtoonFxPlayer({
   title: string;
 }) {
   const reduced = usePrefersReducedMotion();
-  const revealEnabled = !reduced && fx.reveal !== "none";
   const ambientPreset = reduced ? undefined : findAmbientPreset(fx.ambient);
   const ambientOn = ambientPreset && ambientPreset.id !== "none";
   const hasBgm = fx.bgmMood !== "" || fx.bgmUrl !== "";
@@ -283,15 +296,19 @@ export function WebtoonFxPlayer({
         {pages.length === 0 ? (
           <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
         ) : (
-          pages.map((page, index) => (
-            <RevealPage
-              key={`${page}-${index}`}
-              src={page}
-              alt={`${title} ${index + 1}컷`}
-              reveal={fx.reveal}
-              enabled={revealEnabled}
-            />
-          ))
+          pages.map((page, index) => {
+            const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조
+            return (
+              <RevealPage
+                key={`${page}-${index}`}
+                src={page}
+                alt={`${title} ${index + 1}컷`}
+                reveal={cut.reveal}
+                emphasis={cut.emphasis}
+                motionAllowed={!reduced}
+              />
+            );
+          })
         )}
         {ambientOn && <AmbientCanvas preset={ambientPreset} />}
       </div>

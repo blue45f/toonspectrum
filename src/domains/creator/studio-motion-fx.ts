@@ -11,13 +11,20 @@
  * 스키마 변경이 필요 없다. 전부 순수·결정적. 사용자 노출 문자열은 한글.
  */
 
+// 컷(페이지)별 효과 — 작품 기본 효과 위에 특정 컷만 다르게 연출한다.
+export interface WorkCutFx {
+  reveal: string; // "" = 작품 기본 리빌 상속, 그 외 RevealId
+  emphasis: string; // EmphasisId — 등장 시 1회 재생되는 강조 애니메이션
+}
+
 // ── 작품 doc에 저장되는 효과 설정(BGM 무드/URL은 studio-bgm이 소유, 여기선 문자열로만 보관) ──
 export interface WorkFxSettings {
-  reveal: string; // RevealId
+  reveal: string; // RevealId — 작품 전체 기본 등장 효과
   ambient: string; // AmbientId
   bgmMood: string; // BgmMood id ("" = 사용 안 함)
   bgmUrl: string; // 커스텀 오디오 URL ("" = 없음; 있으면 무드보다 우선)
   bgmVolume: number; // 0..1
+  cuts: WorkCutFx[]; // 컷별 효과(인덱스 = 페이지 순서). 미지정 컷은 기본 효과를 따른다.
 }
 
 export const DEFAULT_WORK_FX: WorkFxSettings = {
@@ -26,6 +33,7 @@ export const DEFAULT_WORK_FX: WorkFxSettings = {
   bgmMood: "",
   bgmUrl: "",
   bgmVolume: 0.5,
+  cuts: [],
 };
 
 function clamp01(n: number): number {
@@ -47,12 +55,38 @@ export function readWorkFx(doc: unknown): WorkFxSettings {
     bgmMood: typeof o.bgmMood === "string" ? o.bgmMood : DEFAULT_WORK_FX.bgmMood,
     bgmUrl: typeof o.bgmUrl === "string" ? o.bgmUrl : DEFAULT_WORK_FX.bgmUrl,
     bgmVolume: typeof o.bgmVolume === "number" ? clamp01(o.bgmVolume) : DEFAULT_WORK_FX.bgmVolume,
+    cuts: Array.isArray(o.cuts) ? o.cuts.map(normalizeCutFx) : [],
+  };
+}
+
+function normalizeCutFx(v: unknown): WorkCutFx {
+  if (!v || typeof v !== "object") return { reveal: "", emphasis: "none" };
+  const o = v as Record<string, unknown>;
+  return {
+    // 컷별 reveal은 ""(상속) 또는 유효한 RevealId만 허용.
+    reveal: o.reveal === "" || isRevealId(o.reveal) ? (o.reveal as string) : "",
+    emphasis: isEmphasisId(o.emphasis) ? o.emphasis : "none",
+  };
+}
+
+/** 특정 컷(페이지)의 실효 효과 — 컷별 reveal이 ""면 작품 기본 reveal을 상속. */
+export function cutFx(fx: WorkFxSettings, index: number): WorkCutFx {
+  const c = fx.cuts[index];
+  return {
+    reveal: c && c.reveal ? c.reveal : fx.reveal,
+    emphasis: c ? c.emphasis : "none",
   };
 }
 
 /** fx 설정이 기본값(아무 효과 없음)인지 — 리더가 효과 레이어를 통째로 생략할 수 있게. */
 export function hasAnyFx(fx: WorkFxSettings): boolean {
-  return fx.reveal !== "none" || fx.ambient !== "none" || fx.bgmMood !== "" || fx.bgmUrl !== "";
+  return (
+    fx.reveal !== "none" ||
+    fx.ambient !== "none" ||
+    fx.bgmMood !== "" ||
+    fx.bgmUrl !== "" ||
+    fx.cuts.some((c) => (c.reveal && c.reveal !== "none") || c.emphasis !== "none")
+  );
 }
 
 // ── 스크롤 리빌 ──────────────────────────────────────────────────────
@@ -64,9 +98,14 @@ export interface RevealPreset {
 
 export const REVEAL_PRESETS: RevealPreset[] = [
   { id: "none", label: "없음", description: "등장 효과 없이 바로 표시" },
+  { id: "fade", label: "페이드", description: "은은하게 떠오르듯 나타남" },
   { id: "fade-up", label: "페이드업", description: "아래에서 부드럽게 떠오르며 등장" },
   { id: "zoom-in", label: "줌인", description: "살짝 확대되며 또렷해짐" },
-  { id: "slide-in", label: "슬라이드", description: "옆에서 미끄러지듯 등장" },
+  { id: "zoom-out", label: "줌아웃", description: "크게 다가왔다 제자리로" },
+  { id: "slide-in", label: "슬라이드(좌)", description: "왼쪽에서 미끄러지듯 등장" },
+  { id: "slide-right", label: "슬라이드(우)", description: "오른쪽에서 미끄러지듯 등장" },
+  { id: "drop", label: "드롭", description: "위에서 떨어지듯 등장" },
+  { id: "rotate-in", label: "회전", description: "살짝 기울었다 바로 서며 등장" },
   { id: "blur-in", label: "블러", description: "흐릿함에서 선명해지며 등장" },
 ];
 
@@ -84,12 +123,22 @@ export interface RevealStyle {
 /** 화면에 들어오기 전(숨김) 상태의 인라인 스타일. 보임 상태는 항상 {1,"none","none"}. */
 export function revealHiddenStyle(id: string): RevealStyle {
   switch (id) {
+    case "fade":
+      return { opacity: 0, transform: "translateY(12px)", filter: "none" };
     case "fade-up":
       return { opacity: 0, transform: "translateY(32px)", filter: "none" };
     case "zoom-in":
       return { opacity: 0, transform: "scale(0.92)", filter: "none" };
+    case "zoom-out":
+      return { opacity: 0, transform: "scale(1.08)", filter: "none" };
     case "slide-in":
       return { opacity: 0, transform: "translateX(-36px)", filter: "none" };
+    case "slide-right":
+      return { opacity: 0, transform: "translateX(36px)", filter: "none" };
+    case "drop":
+      return { opacity: 0, transform: "translateY(-36px)", filter: "none" };
+    case "rotate-in":
+      return { opacity: 0, transform: "rotate(-4deg) scale(0.94)", filter: "none" };
     case "blur-in":
       return { opacity: 0.25, transform: "none", filter: "blur(10px)" };
     default:
@@ -98,6 +147,81 @@ export function revealHiddenStyle(id: string): RevealStyle {
 }
 
 export const REVEAL_SHOWN_STYLE: RevealStyle = { opacity: 1, transform: "none", filter: "none" };
+
+// ── 컷 강조 효과(등장 시 1회 재생, Web Animations API) ──────────────
+export interface EmphasisPreset {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const EMPHASIS_PRESETS: EmphasisPreset[] = [
+  { id: "none", label: "없음", description: "강조 효과 없음" },
+  { id: "shake", label: "흔들림", description: "충격·긴장 — 좌우로 부르르 흔들림" },
+  { id: "punch", label: "확대 펀치", description: "임팩트 — 확 커졌다 제자리로" },
+  { id: "flash", label: "번쩍", description: "섬광 — 밝게 번쩍" },
+  { id: "pop", label: "팝", description: "통통 튀며 강조" },
+  { id: "tilt", label: "기울임", description: "살짝 흔들리며 기울었다 바로" },
+];
+
+const EMPHASIS_IDS = new Set(EMPHASIS_PRESETS.map((p) => p.id));
+function isEmphasisId(v: unknown): v is string {
+  return typeof v === "string" && EMPHASIS_IDS.has(v);
+}
+
+export interface EmphasisAnimation {
+  keyframes: Keyframe[];
+  options: { duration: number; easing: string };
+}
+
+/** 컷이 화면에 들어올 때 1회 재생할 Web Animations 키프레임. none/미지정이면 null. */
+export function emphasisAnimation(id: string): EmphasisAnimation | null {
+  switch (id) {
+    case "shake":
+      return {
+        keyframes: [
+          { transform: "translateX(0)" },
+          { transform: "translateX(-9px)" },
+          { transform: "translateX(8px)" },
+          { transform: "translateX(-5px)" },
+          { transform: "translateX(3px)" },
+          { transform: "translateX(0)" },
+        ],
+        options: { duration: 480, easing: "ease-in-out" },
+      };
+    case "punch":
+      return {
+        keyframes: [{ transform: "scale(1)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }],
+        options: { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" },
+      };
+    case "flash":
+      return {
+        keyframes: [{ filter: "brightness(1)" }, { filter: "brightness(1.9)" }, { filter: "brightness(1)" }],
+        options: { duration: 360, easing: "ease-out" },
+      };
+    case "pop":
+      return {
+        keyframes: [
+          { transform: "scale(0.9)", offset: 0 },
+          { transform: "scale(1.05)", offset: 0.6 },
+          { transform: "scale(1)", offset: 1 },
+        ],
+        options: { duration: 440, easing: "cubic-bezier(.2,.8,.2,1)" },
+      };
+    case "tilt":
+      return {
+        keyframes: [
+          { transform: "rotate(0deg)" },
+          { transform: "rotate(-2.5deg)" },
+          { transform: "rotate(1.5deg)" },
+          { transform: "rotate(0deg)" },
+        ],
+        options: { duration: 520, easing: "ease-in-out" },
+      };
+    default:
+      return null;
+  }
+}
 
 // ── 분위기 오버레이(파티클) ──────────────────────────────────────────
 export type AmbientShape = "line" | "dot" | "petal" | "spark" | "blob";
@@ -124,6 +248,10 @@ export const AMBIENT_PRESETS: AmbientPreset[] = [
   { id: "sparkle", label: "반짝이", description: "두근·반짝이는 입자", shape: "spark", density: 48, color: "rgba(255,236,150,0.95)", minSize: 2, maxSize: 6, speedY: 18, drift: 22, twinkle: true },
   { id: "embers", label: "불씨", description: "긴장·떠오르는 불티", shape: "spark", density: 40, color: "rgba(255,150,70,0.9)", minSize: 2, maxSize: 5, speedY: -70, drift: 30, twinkle: true },
   { id: "bokeh", label: "보케", description: "몽환·부드러운 빛망울", shape: "blob", density: 24, color: "rgba(180,200,255,0.4)", minSize: 12, maxSize: 40, speedY: -16, drift: 18, twinkle: true },
+  { id: "leaves", label: "단풍", description: "가을·쓸쓸한 낙엽", shape: "petal", density: 30, color: "rgba(214,124,54,0.9)", minSize: 7, maxSize: 14, speedY: 70, drift: 80, twinkle: false },
+  { id: "pollen", label: "꽃가루", description: "따스한·황금빛 가루", shape: "spark", density: 50, color: "rgba(255,214,120,0.85)", minSize: 2, maxSize: 5, speedY: 24, drift: 34, twinkle: true },
+  { id: "stars", label: "별빛", description: "밤하늘·반짝이는 별", shape: "spark", density: 60, color: "rgba(235,240,255,0.95)", minSize: 1.5, maxSize: 4, speedY: -8, drift: 6, twinkle: true },
+  { id: "dust", label: "먼지", description: "고요·떠다니는 먼지", shape: "dot", density: 44, color: "rgba(220,220,210,0.4)", minSize: 1.5, maxSize: 4, speedY: 10, drift: 16, twinkle: true },
 ];
 
 const AMBIENT_IDS = new Set(AMBIENT_PRESETS.map((p) => p.id));
