@@ -13,4 +13,7 @@ interface ImportMetaEnv {
   // NotifyDesk — 인앱 알림 벨/인박스.
   readonly VITE_NOTIFYDESK_URL?: string;
   readonly VITE_NOTIFYDESK_PK?: string;
+  // desk-platform — 공개 문의(Inquiry) 게시판 백엔드 베이스 URL.
+  // 미설정 시 prod 기본값(https://desk-platform.vercel.app)으로 폴백한다. (lib/inquiry-api.ts)
+  readonly VITE_DESK_PLATFORM_URL?: string;
 }

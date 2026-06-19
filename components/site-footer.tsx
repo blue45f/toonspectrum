@@ -2,10 +2,8 @@ import { ToonSpectrumMark } from "./visual-marks";
 
 import Link from "@/src/compat/router-link";
 
-const TERMSDESK_BASE = "https://termsdesk.vercel.app";
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
-// 지원 보드만 외부(TermsDesk) 링크를 유지한다.
-const SUPPORT_URL = `${TERMSDESK_BASE}/support/webtoon-index`;
+// 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.
 
 const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
@@ -45,10 +43,10 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "이용 안내",
     links: [
+      { label: "문의", href: "/support" },
       { label: "이용약관", href: "/terms" },
       { label: "개인정보처리방침", href: "/privacy" },
       { label: "저작권·콘텐츠 안내", href: "/copyright" },
-      { label: "지원", href: SUPPORT_URL },
     ],
   },
 ];
@@ -81,8 +79,6 @@ export function SiteFooter() {
               <Link
                 key={l.href}
                 href={l.href}
-                target={l.href.startsWith(TERMSDESK_BASE) ? "_blank" : undefined}
-                rel={l.href.startsWith(TERMSDESK_BASE) ? "noreferrer" : undefined}
                 className="inline-flex items-center text-sm text-fg-2 transition-colors hover:text-accent"
               >
                 {l.label}

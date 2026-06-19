@@ -36,6 +36,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/privacy": "개인정보처리방침",
   "/copyright": "저작권·콘텐츠 안내",
   "/contact": "광고·제휴 문의",
+  "/support": "문의",
   "/create": "창작 게시판",
   "/studio": "창작 스튜디오",
   "/me": "내 정보",
@@ -166,6 +167,7 @@ const CopyrightPage = lazyRetry(
 const TermsPage = lazyRetry(() => import("@/src/domains/legal/PolicyPage").then((m) => ({ default: m.TermsPage })), "TermsPage");
 const PrivacyPage = lazyRetry(() => import("@/src/domains/legal/PolicyPage").then((m) => ({ default: m.PrivacyPage })), "PrivacyPage");
 const ContactPage = lazyRetry(() => import("@/src/domains/legal/ContactPage").then((m) => ({ default: m.ContactPage })), "ContactPage");
+const SupportPage = lazyRetry(() => import("@/src/domains/legal/SupportPage").then((m) => ({ default: m.SupportPage })), "SupportPage");
 const CreateGalleryPage = lazyRetry(
   () => import("@/src/domains/creator/CreateGalleryPage").then((m) => ({ default: m.CreateGalleryPage })),
   "CreateGalleryPage"
@@ -246,6 +248,7 @@ export function AppRouter() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/copyright" element={<CopyrightPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/create" element={<CreateGalleryPage />} />
           <Route path="/create/challenges" element={<CreateChallengesPage />} />
           <Route path="/create/series/:id" element={<CreateSeriesPage />} />

@@ -1,4 +1,5 @@
 import { Container } from "@/components/section";
+import Link from "@/src/compat/router-link";
 
 // 저작권·콘텐츠 안내(/copyright).
 export function CopyrightPage() {
@@ -43,12 +44,12 @@ export function CopyrightPage() {
         <section>
           <h2 className="mb-2 text-base font-bold text-fg">권리 침해 신고 (Notice &amp; Takedown)</h2>
           <p>
-            게재된 메타데이터·표지가 귀하의 권리를 침해한다고 판단되시면 아래 이메일로 작품명·해당 URL·권리 근거를
-            함께 보내 주세요. 접수 확인 후 <strong className="text-fg">영업일 기준 48시간 이내</strong>에 해당 항목을 수정·비노출
+            게재된 메타데이터·표지가 귀하의 권리를 침해한다고 판단되시면 <Link href="/support" className="text-accent underline underline-offset-2">문의 게시판</Link>에
+            작품명·해당 URL·권리 근거를 함께 남겨 주세요. 접수 확인 후 <strong className="text-fg">영업일 기준 48시간 이내</strong>에 해당 항목을 수정·비노출
             처리하고 결과를 회신드립니다.
           </p>
           <p className="mt-2">
-            이메일: <a className="text-accent underline underline-offset-2" href="mailto:blue45f@gmail.com">blue45f@gmail.com</a>
+            <Link href="/support" className="text-accent underline underline-offset-2">문의 남기기 →</Link>
           </p>
         </section>
       </div>

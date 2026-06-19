@@ -1,4 +1,5 @@
 import { Container } from "@/components/section";
+import Link from "@/src/compat/router-link";
 
 // 개인정보처리방침(/privacy).
 export function PrivacyPage() {
@@ -47,7 +48,8 @@ export function PrivacyPage() {
         <section>
           <h2 className="mb-2 text-base font-bold text-fg">6. 개인정보 보호책임자 / 문의</h2>
           <p>
-            개인정보 관련 문의: <a className="text-accent underline underline-offset-2" href="mailto:blue45f@gmail.com">blue45f@gmail.com</a>
+            개인정보 관련 문의는 <Link href="/support" className="text-accent underline underline-offset-2">문의 게시판</Link>으로 남겨 주세요.
+            운영팀이 확인 후 처리합니다.
           </p>
         </section>
       </div>
