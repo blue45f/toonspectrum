@@ -1678,6 +1678,8 @@ export function StudioPage() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
+  const [maximized, setMaximized] = useState(false);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
 
@@ -1754,6 +1756,22 @@ export function StudioPage() {
       void studioRootRef.current?.requestFullscreen?.();
     }
   }
+  // 브라우저 창 최대화 토글 — 켜면 좌우 패널을 접어 캔버스를 뷰포트 폭에 꽉 채운다(복원 시 펼침).
+  function toggleMaximize() {
+    const next = !maximized;
+    setMaximized(next);
+    setLeftPanelOpen(!next);
+    setRightPanelOpen(!next);
+  }
+  // 최대화 상태에서 ESC로 빠져나오기.
+  useEffect(() => {
+    if (!maximized || typeof window === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMaximized(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [maximized]);
   const rememberColor = (c: string) => {
     setRecentColors((prev) => {
       const next = pushRecentColor(prev, c);
@@ -1814,7 +1832,7 @@ export function StudioPage() {
     const el = wrapRef.current;
     // 컨테이너 폭에 맞춰 캔버스를 채운다. 전체화면이면 초광폭 모니터도 채우게 상한을 4배로 올린다.
     // ResizeObserver로 패널 접기·전체화면 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
-    const cap = isFullscreen ? 4 : 2.5;
+    const cap = isFullscreen || maximized ? 4 : 2.5;
     const measure = () => {
       const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
       setScale(Math.min(cap, Math.max(0.1, w / CANVAS_W)));
@@ -1830,7 +1848,7 @@ export function StudioPage() {
       ro?.disconnect();
       globalThis.removeEventListener("resize", measure);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, maximized]);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
@@ -4112,8 +4130,14 @@ export function StudioPage() {
   }
 
   return (
-    <div ref={studioRootRef} className={cn(isFullscreen && "min-h-screen overflow-y-auto bg-canvas")}>
-    <Container size="wide" className={cn("py-6", isFullscreen && "max-w-none")}>
+    <div
+      ref={studioRootRef}
+      className={cn(
+        isFullscreen && "min-h-screen overflow-y-auto bg-canvas",
+        maximized && "fixed inset-0 z-[60] overflow-y-auto bg-canvas"
+      )}
+    >
+    <Container size="wide" className={cn("py-6", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">창작 스튜디오</h1>
@@ -5514,6 +5538,15 @@ export function StudioPage() {
             title="집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
           >
             <Maximize2 size={12} /> 넓게
+          </button>
+          <button
+            type="button"
+            onClick={toggleMaximize}
+            aria-pressed={maximized}
+            className={cn(toolBtn(maximized), "h-8 px-2 text-[10px] font-semibold")}
+            title="브라우저 맞춤 — 브라우저 창을 꽉 채워 작업 (ESC로 복원)"
+          >
+            {maximized ? "복원" : "브라우저 맞춤"}
           </button>
           <button
             type="button"
