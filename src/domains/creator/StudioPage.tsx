@@ -1736,7 +1736,13 @@ export function StudioPage() {
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const onChange = () => setIsFullscreen(document.fullscreenElement === studioRootRef.current);
+    const onChange = () => {
+      const fs = document.fullscreenElement === studioRootRef.current;
+      setIsFullscreen(fs);
+      // 전체화면이면 좌우 패널을 접어 캔버스가 화면 폭을 최대한 쓰게 한다(빠져나오면 복원).
+      setLeftPanelOpen(!fs);
+      setRightPanelOpen(!fs);
+    };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
@@ -1806,11 +1812,12 @@ export function StudioPage() {
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const el = wrapRef.current;
-    // 컨테이너 폭에 맞춰 캔버스를 채운다(상한 2.5배). 패널을 접거나 전체화면이면 더 넓게 채워진다.
-    // ResizeObserver로 패널 접기 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
+    // 컨테이너 폭에 맞춰 캔버스를 채운다. 전체화면이면 초광폭 모니터도 채우게 상한을 4배로 올린다.
+    // ResizeObserver로 패널 접기·전체화면 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
+    const cap = isFullscreen ? 4 : 2.5;
     const measure = () => {
       const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
-      setScale(Math.min(2.5, Math.max(0.1, w / CANVAS_W)));
+      setScale(Math.min(cap, Math.max(0.1, w / CANVAS_W)));
     };
     measure();
     let ro: ResizeObserver | null = null;
@@ -1823,7 +1830,7 @@ export function StudioPage() {
       ro?.disconnect();
       globalThis.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [isFullscreen]);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
@@ -5486,7 +5493,7 @@ export function StudioPage() {
               const wrap = wrapRef.current;
               if (wrap) {
                 const w = wrap.clientWidth;
-                setScale(Math.min(2.5, Math.max(0.1, w / CANVAS_W)));
+                setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
                 setZoom(1);
               }
             }}
