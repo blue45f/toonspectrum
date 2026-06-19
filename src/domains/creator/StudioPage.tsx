@@ -2961,7 +2961,8 @@ export function StudioPage() {
       setMarqueeIds([]);
       return;
     }
-    if (!selectedId || selected?.locked) return;
+    // 잠금이어도 '선택 후 명시적 삭제'는 허용(이메레스 밑그림 등). 잠금은 이동/변형만 막는다.
+    if (!selectedId) return;
     removeById(selectedId);
   }
   function moveLayer(id: string, dir: "up" | "down") {
