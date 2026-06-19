@@ -5992,7 +5992,9 @@ export function StudioPage() {
               });
             }}
           >
-            <Layer>
+            {/* 배경 전용 레이어 — 지우개(destination-out)는 위 콘텐츠 레이어만 지우므로 배경은 보존된다.
+                (다크 테마에서 지운 자리로 페이지가 비쳐 검정으로 보이던 문제 해결) */}
+            <Layer listening={true}>
               <Rect
                 name="bg"
                 x={0}
@@ -6004,6 +6006,8 @@ export function StudioPage() {
                 fillLinearGradientEndPoint={bgGrad ? { x: 0, y: canvasH } : undefined}
                 fillLinearGradientColorStops={bgGrad ? [0, bgGrad[0], 1, bgGrad[1]] : undefined}
               />
+            </Layer>
+            <Layer>
               {showGrid && (
                 <Group listening={false}>
                   {Array.from({ length: Math.ceil(CANVAS_W / gridSize) }).map((_, i) => (
