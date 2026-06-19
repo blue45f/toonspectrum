@@ -5476,10 +5476,19 @@ export function StudioPage() {
         </span>
         {tool === "draw" && (
           <div className="flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md">
-            {/* Brush Presets Group */}
-            {drawMode === "pen" && (
+            {/* Brush Presets Group — 펜 전용. 지우개/도형에선 invisible로 '같은 너비·높이'를 유지해
+                상위 스티키 툴바의 줄바꿈이 변하지 않게 한다(펜↔지우개 전환 시 캔버스 점프 방지).
+                visibility:hidden이라 탭 포커스에서도 제외됨. */}
+            {tool === "draw" && (
               <>
-                <div className="flex items-center gap-1 bg-panel/30 rounded-lg p-0.5 border border-line/40" aria-label="브러시 프리셋">
+                <div
+                  className={cn(
+                    "flex items-center gap-1 bg-panel/30 rounded-lg p-0.5 border border-line/40",
+                    drawMode !== "pen" && "invisible pointer-events-none"
+                  )}
+                  aria-label="브러시 프리셋"
+                  aria-hidden={drawMode !== "pen"}
+                >
                   {BRUSH_PRESETS.map((p) => {
                     const active = brush === p.id;
                     return (
@@ -5504,14 +5513,18 @@ export function StudioPage() {
                     );
                   })}
                 </div>
-                <div className="mx-0.5 h-5 w-px bg-line/60" />
+                <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode !== "pen" && "invisible")} />
               </>
             )}
 
-            {/* Colors Group */}
-            {drawMode !== "eraser" && (
+            {/* Colors Group — 지우개에선 색이 의미 없지만 invisible로 너비·높이를 유지(툴바 점프 방지). */}
+            {tool === "draw" && (
               <>
-                <div className="flex items-center gap-1" aria-label="브러시 색상 설정">
+                <div
+                  className={cn("flex items-center gap-1", drawMode === "eraser" && "invisible pointer-events-none")}
+                  aria-label="브러시 색상 설정"
+                  aria-hidden={drawMode === "eraser"}
+                >
                   <div className="flex items-center gap-0.5" aria-label="빠른 색상">
                     {DRAW_COLOR_SWATCHES.map((swatch) => (
                       <button
@@ -5543,7 +5556,7 @@ export function StudioPage() {
                     <span className="text-[9px] mix-blend-difference text-white font-bold select-none">C</span>
                   </label>
                 </div>
-                <div className="mx-0.5 h-5 w-px bg-line/60" />
+                <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode === "eraser" && "invisible")} />
               </>
             )}
 
