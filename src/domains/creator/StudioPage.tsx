@@ -6067,7 +6067,9 @@ export function StudioPage() {
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
                 const draggable = !opts.asMask && tool === "select" && !locked;
-                const onSelect = opts.asMask ? () => {} : () => tool === "select" && !locked && setSelectedId(el.id);
+                // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
+                // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
+                const onSelect = opts.asMask ? () => {} : () => tool === "select" && setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -6640,6 +6642,23 @@ export function StudioPage() {
                 }
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
+              {/* 잠긴 선택 요소는 트랜스포머가 안 붙으므로 점선 박스로 '선택됨'을 표시(삭제·잠금해제 안내). */}
+              {selected && selected.locked && marqueeIds.length === 0 && tool === "select" && !isExporting && (() => {
+                const sb = elBounds(selected);
+                return (
+                  <Rect
+                    x={sb.x}
+                    y={sb.y}
+                    width={sb.w}
+                    height={sb.h}
+                    rotation={(selected as { rotation?: number }).rotation ?? 0}
+                    stroke="#7c5cff"
+                    strokeWidth={1.5 / effScale}
+                    dash={[7 / effScale, 4 / effScale]}
+                    listening={false}
+                  />
+                );
+              })()}
             </Layer>
             {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
             {!isExporting && tool === "draw" && (
