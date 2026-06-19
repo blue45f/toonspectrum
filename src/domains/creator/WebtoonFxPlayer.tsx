@@ -15,6 +15,7 @@ import {
   cutFx,
   emphasisAnimation,
   findAmbientPreset,
+  hasAnyFx,
   revealHiddenStyle,
   stepAmbientParticle,
   type AmbientParticle,
@@ -207,11 +208,16 @@ function AmbientCanvas({ preset }: { preset: AmbientPreset }) {
   );
 }
 
-// 화면 하단 고정 BGM 컨트롤 — 자동재생 정책상 사용자가 켜야 소리가 난다.
-function BgmControl({ fx }: { fx: WorkFxSettings }) {
+// 화면 하단 고정 효과툰 컨트롤 — 자동 재생(스스로 스크롤) + 배경음악.
+// 자동재생 정책상 BGM은 사용자가 재생을 눌러야 소리가 난다.
+function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
   const playerRef = useRef<BgmPlayer | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const [bgmOn, setBgmOn] = useState(false);
   const [volume, setVolume] = useState(fx.bgmVolume);
+  const [autoPlay, setAutoPlay] = useState(false);
+  const rafRef = useRef(0);
+  const targetRef = useRef(0);
+  const lastRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -220,58 +226,108 @@ function BgmControl({ fx }: { fx: WorkFxSettings }) {
     };
   }, []);
 
-  const moodLabel = fx.bgmUrl ? "내 음악" : (findBgmMood(fx.bgmMood)?.label ?? "BGM");
-
-  const toggle = () => {
-    if (!playerRef.current) {
+  const startBgm = () => {
+    if (!playerRef.current && hasBgm) {
       playerRef.current = createBgmPlayer({
         mood: fx.bgmUrl ? null : findBgmMood(fx.bgmMood),
         url: fx.bgmUrl || undefined,
         volume,
       });
     }
-    if (playing) {
-      playerRef.current.pause();
-      setPlaying(false);
-    } else {
-      playerRef.current.play();
-      setPlaying(true);
-    }
+    playerRef.current?.play();
+    setBgmOn(true);
+  };
+  const stopBgm = () => {
+    playerRef.current?.pause();
+    setBgmOn(false);
   };
 
+  // 자동 스크롤 루프 — 일정 속도로 아래로 흘러가며 효과·BGM과 함께 감상.
+  useEffect(() => {
+    if (!autoPlay || typeof window === "undefined") return;
+    const speed = 90; // px/s (천천히 읽히게)
+    targetRef.current = window.scrollY;
+    lastRef.current = 0;
+    const tick = (now: number) => {
+      const dt = lastRef.current ? Math.min(0.05, (now - lastRef.current) / 1000) : 0;
+      lastRef.current = now;
+      targetRef.current += speed * dt;
+      window.scrollTo(0, targetRef.current);
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+        setAutoPlay(false);
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    const stopOnUser = () => setAutoPlay(false);
+    window.addEventListener("wheel", stopOnUser, { passive: true });
+    window.addEventListener("touchmove", stopOnUser, { passive: true });
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("wheel", stopOnUser);
+      window.removeEventListener("touchmove", stopOnUser);
+    };
+  }, [autoPlay]);
+
+  const toggleAutoPlay = () => {
+    const next = !autoPlay;
+    setAutoPlay(next);
+    if (next && hasBgm && !bgmOn) startBgm(); // 재생 시작 시 BGM도 함께
+  };
+
+  const moodLabel = fx.bgmUrl ? "내 음악" : (findBgmMood(fx.bgmMood)?.label ?? "BGM");
+
   return (
-    <div className="pointer-events-auto fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full border border-line bg-panel/95 px-3 py-2 shadow-xl backdrop-blur">
+    <div className="pointer-events-auto fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 py-2 shadow-xl backdrop-blur">
       <button
         type="button"
-        onClick={toggle}
-        aria-pressed={playing}
+        onClick={toggleAutoPlay}
+        aria-pressed={autoPlay}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
-          playing ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
+          autoPlay ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
         )}
-        title={playing ? "배경음악 멈춤" : "배경음악 재생"}
+        title={autoPlay ? "자동 재생 멈춤" : "자동 재생 — 효과와 함께 스스로 스크롤"}
       >
-        {playing ? <Pause size={13} /> : <Play size={13} />}
-        <Music size={13} />
-        {moodLabel}
+        {autoPlay ? <Pause size={13} /> : <Play size={13} />}
+        자동 재생
       </button>
-      <label className="flex items-center gap-1.5 text-fg-3" title="배경음악 음량">
-        <Volume2 size={13} />
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={volume}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setVolume(v);
-            playerRef.current?.setVolume(v);
-          }}
-          className="h-1 w-20 cursor-pointer accent-[var(--color-accent)]"
-          aria-label="배경음악 음량"
-        />
-      </label>
+      {hasBgm && (
+        <>
+          <span className="h-4 w-px bg-line" />
+          <button
+            type="button"
+            onClick={() => (bgmOn ? stopBgm() : startBgm())}
+            aria-pressed={bgmOn}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
+              bgmOn ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
+            )}
+            title={bgmOn ? "배경음악 멈춤" : "배경음악 재생"}
+          >
+            <Music size={13} />
+            {moodLabel}
+          </button>
+          <label className="flex items-center gap-1.5 text-fg-3" title="배경음악 음량">
+            <Volume2 size={13} />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setVolume(v);
+                playerRef.current?.setVolume(v);
+              }}
+              className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
+              aria-label="배경음악 음량"
+            />
+          </label>
+        </>
+      )}
     </div>
   );
 }
@@ -312,7 +368,7 @@ export function WebtoonFxPlayer({
         )}
         {ambientOn && <AmbientCanvas preset={ambientPreset} />}
       </div>
-      {hasBgm && <BgmControl fx={fx} />}
+      {(hasAnyFx(fx) || pages.length >= 2) && <FxControlBar fx={fx} hasBgm={hasBgm} />}
     </>
   );
 }
