@@ -143,6 +143,7 @@ import {
   drawVignette,
   type PageGrade,
 } from "./studio-filters";
+import { coverFitInFrame, estimateBubbleHeight } from "./studio-fit";
 import { normalizeGlow, type Glow } from "./studio-glow";
 import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
@@ -2609,16 +2610,15 @@ export function StudioPage() {
       >
         <button
           type="button"
-          disabled={el.locked}
           onClick={() => {
             setTool("select");
             setSelectedId(el.id);
           }}
           className={cn(
-            "min-w-0 flex-1 truncate text-left text-xs disabled:cursor-default",
+            "min-w-0 flex-1 truncate text-left text-xs",
             el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
           )}
-          title={elementLabel(el)}
+          title={el.locked ? `${elementLabel(el)} (잠김 — 자물쇠로 해제)` : elementLabel(el)}
         >
           {el.clipBelow ? "⤵ " : ""}
           {elementLabel(el)}
@@ -3259,6 +3259,21 @@ export function StudioPage() {
         points: [skew, 0, selected.width, 0, selected.width - skew, selected.height, 0, selected.height],
       } as Partial<El>);
     }
+  }
+  // 선택 이미지를 들어있는 패널(없으면 캔버스)에 꽉 채운다(cover) — 드롭 후 수동 리사이즈 제거.
+  function fitSelectedToFrame() {
+    if (!selected || selected.type !== "image" || selected.locked) return;
+    const frame = containingPanel(selected, elements);
+    const target = frame
+      ? { x: frame.x, y: frame.y, width: frame.width, height: frame.height }
+      : { x: 0, y: 0, width: CANVAS_W, height: canvasH };
+    patchEl(selected.id, coverFitInFrame({ width: selected.width, height: selected.height }, target));
+  }
+  // 선택 말풍선 높이를 대사 길이에 자동으로 맞춘다.
+  function fitBubbleToText() {
+    if (!selected || selected.type !== "bubble" || selected.locked) return;
+    const h = estimateBubbleHeight(selected.text, selected.width, selected.fontSize ?? 24, selected.lineHeight ?? 1.2);
+    patchEl(selected.id, { height: h });
   }
   function addFxOverlay(svgMarkup: string, w: number, h: number) {
     setMenu(null);
@@ -7818,6 +7833,16 @@ export function StudioPage() {
                   />
                 </label>
               )}
+              {selected.type === "image" && (
+                <button
+                  type="button"
+                  onClick={fitSelectedToFrame}
+                  className="mt-2 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
+                  title="이미지를 패널(없으면 캔버스)에 비율 유지하며 꽉 채웁니다"
+                >
+                  {containingPanel(selected, elements) ? "패널에 꽉 채우기" : "캔버스에 꽉 채우기"}
+                </button>
+              )}
               {(selected.type === "text" || selected.type === "bubble") && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
                   <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -7854,6 +7879,16 @@ export function StudioPage() {
                       className="size-4 accent-accent"
                     />
                   </label>
+                  {selected.type === "bubble" && (
+                    <button
+                      type="button"
+                      onClick={fitBubbleToText}
+                      className="w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
+                      title="말풍선 높이를 대사 길이에 맞춥니다"
+                    >
+                      높이를 텍스트에 맞춤
+                    </button>
+                  )}
                 </div>
               )}
               {selected.type !== "frame" && (
