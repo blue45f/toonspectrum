@@ -180,6 +180,14 @@ import { normalizeStylize, type Stylize } from "./studio-stylize";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
 import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
+import {
+  DEFAULT_WATERMARK,
+  WATERMARK_POSITIONS,
+  normalizeWatermark,
+  shouldDrawWatermark,
+  watermarkPlacement,
+  type WatermarkSettings,
+} from "./studio-watermark";
 import { episodeLengthLabel, safeAreaMargin, webtoonWidthGuides } from "./studio-webtoon-guides";
 import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
 import { StudioBlurPanel } from "./StudioBlurPanel";
@@ -557,6 +565,29 @@ function elementLabel(el: El): string {
 }
 const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
+const WATERMARK_KEY = "toonspectrum-studio-watermark";
+
+// 내보내기 캔버스에 워터마크/서명을 합성한다(출력 픽셀에 직접 그림). 켜짐+텍스트가 있을 때만.
+function drawWatermarkOnCanvas(canvas: HTMLCanvasElement, s: WatermarkSettings) {
+  if (!shouldDrawWatermark(s)) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const pl = watermarkPlacement(canvas.width, canvas.height, s);
+  const text = s.text.trim();
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, Math.max(0, s.opacity));
+  ctx.font = `700 ${pl.fontPx}px "Pretendard", system-ui, sans-serif`;
+  ctx.textAlign = pl.textAlign;
+  ctx.textBaseline = pl.textBaseline;
+  // 밝은 배경·어두운 배경 어디서나 보이도록 어두운 외곽선 + 흰 채움.
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(1.5, pl.fontPx * 0.09);
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.strokeText(text, pl.x, pl.y);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, pl.x, pl.y);
+  ctx.restore();
+}
 const QUICK_SAMPLE_CANVAS_H = 1120;
 const QUICK_SAMPLE_MARGIN = 24;
 
@@ -1684,6 +1715,15 @@ export function StudioPage() {
       // localStorage 접근 불가면 빈 목록 유지.
     }
   }, []);
+  // 저장된 워터마크/서명 복원(마운트 시 1회).
+  useEffect(() => {
+    try {
+      const raw = globalThis.localStorage.getItem(WATERMARK_KEY);
+      if (raw) setWatermarkState(normalizeWatermark(JSON.parse(raw)));
+    } catch {
+      // 접근/파싱 불가면 기본값 유지.
+    }
+  }, []);
   const rememberColor = (c: string) => {
     setRecentColors((prev) => {
       const next = pushRecentColor(prev, c);
@@ -2047,6 +2087,16 @@ export function StudioPage() {
   const [exportTransparent, setExportTransparent] = useState(false);
   // 선택한 플랫폼 내보내기 규격(없으면 null = 자유 배율).
   const [exportPresetId, setExportPresetId] = useState<string | null>(null);
+  // 내보내기 워터마크/서명 — 세션 넘어 유지되게 localStorage에 저장.
+  const [watermark, setWatermarkState] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
+  const setWatermark = (next: WatermarkSettings) => {
+    setWatermarkState(next);
+    try {
+      globalThis.localStorage.setItem(WATERMARK_KEY, JSON.stringify(next));
+    } catch {
+      // 저장 불가(시크릿/임베드)는 무시 — 이번 세션엔 적용됨.
+    }
+  };
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // 내보내기 옵션 팝오버 바깥 클릭시 닫기
@@ -3812,6 +3862,7 @@ export function StudioPage() {
       bgNode.show();
       stage.batchDraw();
     }
+    drawWatermarkOnCanvas(canvas, watermark);
     setIsExporting(false);
     try {
       const blob = await canvasToBlob(canvas, exportMimeType(exportFormat), exportQuality(exportFormat));
@@ -3834,6 +3885,7 @@ export function StudioPage() {
     }
     const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
     const canvas = bakeGradeIntoCanvas(rawCanvas, pageGrade);
+    drawWatermarkOnCanvas(canvas, watermark);
     setIsExporting(false);
     try {
       await copyCanvasToClipboard(canvas);
@@ -3932,7 +3984,8 @@ export function StudioPage() {
           currentY += pageCanvases[idx].height + spacing * scale;
         }
 
-        // 파일 저장(분할 시 -1of2 식 접미사)
+        // 워터마크/서명을 합성한 뒤 파일 저장(분할 시 -1of2 식 접미사)
+        drawWatermarkOnCanvas(compositeCanvas, watermark);
         const blob = await canvasToBlob(
           compositeCanvas,
           exportMimeType(exportFormat),
@@ -4113,6 +4166,54 @@ export function StudioPage() {
                   />
                   투명 배경 (PNG·WebP)
                 </label>
+                <div className="mt-2.5 border-t border-line pt-2.5">
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg-2">
+                    <input
+                      type="checkbox"
+                      checked={watermark.enabled}
+                      onChange={(e) => setWatermark({ ...watermark, enabled: e.target.checked })}
+                      className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                    />
+                    서명·워터마크
+                  </label>
+                  {watermark.enabled && (
+                    <div className="mt-1.5 space-y-1.5">
+                      <input
+                        type="text"
+                        value={watermark.text}
+                        onChange={(e) => setWatermark({ ...watermark, text: e.target.value })}
+                        placeholder="© 작가명 / @아이디"
+                        maxLength={60}
+                        className="w-full rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={watermark.position}
+                          onChange={(e) => setWatermark({ ...watermark, position: e.target.value as WatermarkSettings["position"] })}
+                          className="h-7 flex-1 rounded-lg border border-line bg-card px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
+                          aria-label="워터마크 위치"
+                        >
+                          {WATERMARK_POSITIONS.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="range"
+                          min={0.15}
+                          max={1}
+                          step={0.05}
+                          value={watermark.opacity}
+                          onChange={(e) => setWatermark({ ...watermark, opacity: Number(e.target.value) })}
+                          className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
+                          title="워터마크 투명도"
+                          aria-label="워터마크 투명도"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {canCopyImageToClipboard() && (
                   <button
                     type="button"
