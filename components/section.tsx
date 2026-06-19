@@ -12,6 +12,7 @@ export function Section({
   action,
   children,
   className,
+  tick = false,
 }: {
   eyebrow?: string;
   title: React.ReactNode;
@@ -19,12 +20,24 @@ export function Section({
   action?: { label: string; href: string };
   children: React.ReactNode;
   className?: string;
+  /** 영문 라벨 앞 시그니처 accent 틱 — 에디토리얼 섹션 리듬에 브랜드 맥동을 더한다(홈 전용). */
+  tick?: boolean;
 }) {
   return (
     <section className={cn(className)}>
       <header className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          {eyebrow && <p className="eyebrow mb-1.5 text-accent">{eyebrow}</p>}
+          {eyebrow && (
+            <p className="eyebrow mb-1.5 flex items-center gap-2 text-accent">
+              {tick && (
+                <span
+                  aria-hidden
+                  className="h-2.5 w-0.5 shrink-0 rounded-full bg-accent motion-safe:[animation:pulse-soft_2.4s_ease-in-out_infinite]"
+                />
+              )}
+              {eyebrow}
+            </p>
+          )}
           <h2 className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
             {title}
           </h2>

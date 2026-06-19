@@ -8,11 +8,14 @@ export function CountUp({
   duration = 1.1,
   suffix = "",
   className,
+  separator = false,
 }: {
   value: number;
   duration?: number;
   suffix?: string;
   className?: string;
+  /** 천 단위 구분 기호(ko-KR) 적용 — 대형 인덱스 넘버럴 가독성. */
+  separator?: boolean;
 }) {
   const [n, setN] = useState(0);
 
@@ -32,9 +35,10 @@ export function CountUp({
     return () => cancelAnimationFrame(raf);
   }, [value, duration]);
 
+  const rounded = Math.round(n);
   return (
     <span className={className}>
-      {Math.round(n)}
+      {separator ? rounded.toLocaleString("ko-KR") : rounded}
       {suffix}
     </span>
   );

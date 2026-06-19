@@ -15,6 +15,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenu } from "./auth/auth-menu";
@@ -112,23 +113,34 @@ export function SiteHeader() {
           {/* 데스크탑 내비 (≥1024px) — 9개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출.
               텍스트 전용 링크: 항목별 아이콘 박스는 EN 라벨 합산 폭이 컨테이너 상한(1320px)을
               넘겨 어느 뷰포트에서도 한 줄에 들어가지 않는다(아이콘은 오버플로/모바일 메뉴 담당). */}
-          <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                aria-current={isActive(n.href, n.exact) ? "page" : undefined}
-                className={cn(
-                  "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
-                  isActive(n.href, n.exact)
-                    ? "bg-accent-soft text-accent"
-                    : "text-fg-2 hover:bg-raised/70 hover:text-fg"
-                )}
-              >
-                {t(n.i18n)}
-              </Link>
-            ))}
-          </nav>
+          <LayoutGroup id="nav-pill">
+            <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
+              {NAV.map((n) => {
+                const active = isActive(n.href, n.exact);
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
+                      active ? "text-accent" : "text-fg-2 hover:bg-raised/70 hover:text-fg"
+                    )}
+                  >
+                    {/* 활성 페이지 알약 — 내비 간 슬라이딩 인디케이터(시그니처). reduced-motion 시 즉시 이동. */}
+                    {active && (
+                      <motion.span
+                        layoutId="nav-active-pill"
+                        className="absolute inset-0 -z-10 rounded-full bg-accent-soft"
+                        transition={{ type: "spring", stiffness: 480, damping: 38 }}
+                      />
+                    )}
+                    {t(n.i18n)}
+                  </Link>
+                );
+              })}
+            </nav>
+          </LayoutGroup>
 
           <div className="ml-auto flex items-center gap-2">
             {/* 검색 트리거 — lg(1024~1280px)에선 9개 내비와 폭을 절충해 한 단계 좁힘.

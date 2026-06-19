@@ -119,7 +119,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     });
     collections.forEach((collection) => collection.titleIds.forEach((id) => ids.add(id)));
     recentlyViewed.forEach((id) => ids.add(id));
-    return Array.from(ids).sort();
+    return Array.from(ids).sort((a, b) => a.localeCompare(b));
   }, [collections, ratings, reads, subscriptions, recentlyViewed]);
 
   const titleIdsKey = titleIds.join(",");

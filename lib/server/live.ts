@@ -319,7 +319,7 @@ async function fetchKakao(day: string, limit = 8): Promise<LiveFetchResult> {
 
 function statusSignature(knownKeys?: Set<string>): string {
   if (!knownKeys?.size) return "*";
-  return [...knownKeys].sort().join(",");
+  return [...knownKeys].sort((a, b) => a.localeCompare(b)).join(",");
 }
 
 function isCacheFresh<T>(cache: CacheEntry<T> | null, signature: string, now: number): cache is CacheEntry<T> {
@@ -343,7 +343,10 @@ function resolveLiveRankingSources(platformFilter?: Set<PlatformId> | null): Liv
 }
 
 function liveRankingSignature(day: string, limit: number, sources: LiveRankingSource[]): string {
-  const ids = [...sources].map((source) => source.platformId).sort().join(",");
+  const ids = [...sources]
+    .map((source) => source.platformId)
+    .sort((a, b) => a.localeCompare(b))
+    .join(",");
   return `${day}|${limit}|${ids || "none"}`;
 }
 

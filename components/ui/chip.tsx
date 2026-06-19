@@ -7,17 +7,14 @@ export function GenreChip({
   active,
   size = "md",
   className,
-  asChild,
   ...props
 }: React.HTMLAttributes<HTMLElement> & {
   genre: string;
   active?: boolean;
   size?: "sm" | "md";
-  asChild?: boolean;
 }) {
-  const Comp = asChild ? "span" : "span";
   return (
-    <Comp
+    <span
       className={cn(
         "inline-flex items-center rounded-full border font-medium transition-colors duration-150 ease-out-expo",
         size === "sm" ? "px-2 py-0.5 text-[0.7rem]" : "px-2.5 py-1 text-xs",
@@ -31,7 +28,7 @@ export function GenreChip({
       {...props}
     >
       {genre}
-    </Comp>
+    </span>
   );
 }
 

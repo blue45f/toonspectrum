@@ -1,5 +1,6 @@
 import { ToonSpectrumMark } from "./visual-marks";
 
+import { spectrumGradient } from "@/lib/genre-color";
 import Link from "@/src/compat/router-link";
 
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
@@ -53,13 +54,21 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
+    <footer className="relative mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
+      {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러", "드라마"], 90) }}
+      />
       <div className="mx-auto grid max-w-[1320px] gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
         <div className="max-w-sm">
-          <div className="flex items-center gap-2.5">
-            <ToonSpectrumMark className="size-7 rounded-[0.55rem]" />
-            <span className="font-display text-lg font-bold">툰스펙트럼</span>
-          </div>
+          <Link href="/" className="group inline-flex items-center gap-2.5">
+            <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />
+            <span className="font-display text-lg font-bold transition-colors group-hover:text-accent">
+              툰스펙트럼
+            </span>
+          </Link>
           <p className="mt-4 text-sm leading-relaxed text-fg-2">
             네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
             왜 봐야 하는지 한 곳에서 답합니다.
@@ -79,9 +88,16 @@ export function SiteFooter() {
               <Link
                 key={l.href}
                 href={l.href}
-                className="inline-flex items-center text-sm text-fg-2 transition-colors hover:text-accent"
+                className="group/link inline-flex w-fit items-center gap-1.5 text-sm text-fg-2 transition-colors hover:text-accent"
               >
-                {l.label}
+                {/* hover 시 좌→우로 자라나는 accent 틱 — 미세 마이크로 인터랙션. */}
+                <span
+                  aria-hidden
+                  className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
+                />
+                <span className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
+                  {l.label}
+                </span>
               </Link>
             ))}
           </nav>
@@ -90,6 +106,14 @@ export function SiteFooter() {
       <div className="border-t border-line/60">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-1 px-4 py-5 text-xs text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>© 2026 툰스펙트럼</span>
+          <span className="inline-flex items-center gap-2">
+            <span
+              aria-hidden
+              className="h-1.5 w-7 rounded-full"
+              style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
+            />
+            <span className="eyebrow text-[0.6rem] text-fg-3">Type &amp; Spectrum</span>
+          </span>
         </div>
       </div>
     </footer>

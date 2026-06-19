@@ -145,6 +145,53 @@
   }
 }
 
+/* 히어로 persimmon 글로 — 아주 느린 호흡(브랜드 맥동). warm-ink 축 유지, opacity/scale 만. */
+@keyframes hero-bloom {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+/* 헤드라인 라인 진입 — clip 마스크로 아래에서 위로 드러난다(에디토리얼 와이프). */
+@keyframes line-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+    clip-path: inset(0 0 105% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 -15% 0);
+  }
+}
+
+/* 스펙트럼 틱 시머 — 시그니처 스펙트럼 바를 따라 흐르는 미세한 하이라이트. */
+@keyframes spectrum-sheen {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* 스펙트럼 라인 fill-in — 좌→우로 그려지는 진입(scaleX origin-left). */
+@keyframes spectrum-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* ============================================================
    Base
    ============================================================ */
@@ -267,15 +314,33 @@
   text-wrap: balance;
 }
 
-/* 스크롤 진입 리빌 (scroll-driven, 미지원 브라우저는 그대로 노출) */
+/* 스크롤 진입 리빌 — "이미 보이는 기본 상태를 강화"하는 방식.
+   기본은 opacity:1 (콘텐츠는 항상 보인다). 스크롤 타임라인을 지원하고 동작 허용 시에만,
+   진입 구간(entry) 동안 살짝 아래→제자리로 끌어올리는 진입 모션을 *추가* 입힌다.
+   타임라인이 못 돌거나(headless·비스크롤·미지원) 동작 최소화 선호 시엔 그대로 보인다 — 빈 화면 방지. */
 .reveal-children > * {
-  animation: fade-up linear both;
-  animation-timeline: view();
-  animation-range: entry 0% entry 48%;
+  opacity: 1;
 }
-@media (prefers-reduced-motion: reduce) {
-  .reveal-children > * {
-    animation: none;
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal-children > * {
+      /* forwards 만(both/backwards 금지) — 진입 전에는 기본 상태(opacity:1)를 유지하고
+         진입 구간을 지난 뒤에만 최종 프레임을 굳힌다. 진입 전 backwards-fill 로 인한
+         "영구 투명" 빈 화면을 방지한다. */
+      animation: reveal-rise linear forwards;
+      animation-timeline: view();
+      animation-range: entry 5% entry 60%;
+    }
+  }
+}
+@keyframes reveal-rise {
+  from {
+    opacity: 0.001;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

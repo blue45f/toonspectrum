@@ -434,7 +434,7 @@ export function SearchExplorer({
               label={tag}
               active={tags.includes(tag)}
               onClick={() => setTags((prev) => toggle(prev, tag))}
-              className={cn("h-7", tags.includes(tag) ? "" : "")}
+              className="h-7"
             />
           ))}
         </div>
