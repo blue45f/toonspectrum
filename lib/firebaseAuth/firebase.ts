@@ -1,15 +1,14 @@
-import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
+import { getAuth, type Auth } from 'firebase/auth'
 
-import { firebaseConfig } from "./config";
+import { firebaseConfig, isFirebaseAuthConfigured } from './config'
 
-/**
- * Firebase 앱 + Auth 싱글턴 — HMR 안전.
- *
- * Vite dev 의 모듈 핫리로드로 이 파일이 재평가돼도 `initializeApp` 을 다시 부르면
- * "Firebase App named '[DEFAULT]' already exists" 가 난다. 이미 초기화돼 있으면
- * `getApp()` 으로 재사용한다.
- */
-export const firebaseApp: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// env(apiKey 등) 미주입 시 getAuth 가 'auth/invalid-api-key' 로 throw 하므로,
+// 설정됐을 때만 초기화한다. 미설정이면 auth=null — 소비자는 isFirebaseAuthConfigured 로 가드.
+export const firebaseApp: FirebaseApp | null = isFirebaseAuthConfigured
+  ? getApps().length
+    ? getApp()
+    : initializeApp(firebaseConfig)
+  : null
 
-export const auth: Auth = getAuth(firebaseApp);
+export const auth: Auth = firebaseApp ? getAuth(firebaseApp) : (null as unknown as Auth)
