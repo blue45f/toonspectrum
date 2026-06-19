@@ -40,6 +40,19 @@ export function notifyConfig(): { endpoint: string; publishableKey: string } | n
   return { endpoint, publishableKey: pk(env.VITE_NOTIFYDESK_PK) };
 }
 
+/**
+ * AdDesk(스폰서 광고 지면) 설정 — VITE_ADDESK_URL 게이팅.
+ *
+ * 미설정이면 null → AdSlot 은 네트워크 광고를 부르지 않고 하우스 자리표시자로 폴백한다.
+ * 광고 노출 자체는 전역 토글(monetizationEnabled, /api/config)이 켜진 뒤에만 일어난다 —
+ * 즉 endpoint 설정과 수익화 토글이 **둘 다** 참이어야 실제 스폰서 크리에이티브가 서빙된다.
+ */
+export function adConfig(): { endpoint: string; publishableKey: string } | null {
+  const endpoint = env.VITE_ADDESK_URL;
+  if (!endpoint) return null;
+  return { endpoint, publishableKey: pk(env.VITE_ADDESK_PK) };
+}
+
 const ANON_KEY = "ts:deskcloud:anon";
 
 /**

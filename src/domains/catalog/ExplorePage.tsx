@@ -411,8 +411,8 @@ export function ExplorePage() {
           />
         )}
 
-        {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 결과 그리드 위 광고 지면. */}
-        <AdSlot />
+        {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 결과 그리드 위 광고 지면(탐색 전용 슬롯). */}
+        <AdSlot slots={["discover-spotlight-1", "discover-spotlight-2", "discover-spotlight-3"]} />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
