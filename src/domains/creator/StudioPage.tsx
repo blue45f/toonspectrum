@@ -1675,6 +1675,8 @@ export function StudioPage() {
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
+  const [isFullscreen, setIsFullscreen] = useState(false);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
 
@@ -1730,6 +1732,21 @@ export function StudioPage() {
       // 접근/파싱 불가면 기본값 유지.
     }
   }, []);
+  // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onChange = () => setIsFullscreen(document.fullscreenElement === studioRootRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  function toggleFullscreen() {
+    if (typeof document === "undefined") return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.();
+    } else {
+      void studioRootRef.current?.requestFullscreen?.();
+    }
+  }
   const rememberColor = (c: string) => {
     setRecentColors((prev) => {
       const next = pushRecentColor(prev, c);
@@ -1784,15 +1801,27 @@ export function StudioPage() {
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
+  const studioRootRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
+    const el = wrapRef.current;
+    // 컨테이너 폭에 맞춰 캔버스를 채운다(상한 2.5배). 패널을 접거나 전체화면이면 더 넓게 채워진다.
+    // ResizeObserver로 패널 접기 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
     const measure = () => {
-      const w = wrapRef.current?.clientWidth ?? CANVAS_W;
-      setScale(Math.min(1, w / CANVAS_W));
+      const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
+      setScale(Math.min(2.5, Math.max(0.1, w / CANVAS_W)));
     };
     measure();
+    let ro: ResizeObserver | null = null;
+    if (el && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(measure);
+      ro.observe(el);
+    }
     globalThis.addEventListener("resize", measure);
-    return () => globalThis.removeEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      globalThis.removeEventListener("resize", measure);
+    };
   }, []);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
@@ -4061,7 +4090,8 @@ export function StudioPage() {
   }
 
   return (
-    <Container size="wide" className="py-6">
+    <div ref={studioRootRef} className={cn(isFullscreen && "min-h-screen overflow-y-auto bg-canvas")}>
+    <Container size="wide" className={cn("py-6", isFullscreen && "max-w-none")}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">창작 스튜디오</h1>
@@ -5441,7 +5471,7 @@ export function StudioPage() {
               const wrap = wrapRef.current;
               if (wrap) {
                 const w = wrap.clientWidth;
-                setScale(Math.min(1, w / CANVAS_W));
+                setScale(Math.min(2.5, Math.max(0.1, w / CANVAS_W)));
                 setZoom(1);
               }
             }}
@@ -5462,6 +5492,15 @@ export function StudioPage() {
             title="집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
           >
             <Maximize2 size={12} /> 넓게
+          </button>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-pressed={isFullscreen}
+            className={cn(toolBtn(isFullscreen), "h-8 px-2 text-[10px] font-semibold")}
+            title="전체화면 — 창작 스튜디오를 모니터 전체로 (ESC로 종료)"
+          >
+            {isFullscreen ? "창 모드" : "전체화면"}
           </button>
         </div>
       </div>
@@ -9387,5 +9426,6 @@ export function StudioPage() {
         </div>
       )}
     </Container>
+    </div>
   );
 }
