@@ -1499,6 +1499,13 @@ function FocusLinesNode({
         }
         context.fillStrokeShape(shape);
       }}
+      hitFunc={(context, shape) => {
+        // 가는 선이라 빈 곳 클릭이 안 잡히는 문제 해결 — 전체 박스를 클릭 영역으로.
+        context.beginPath();
+        context.rect(0, 0, el.width, el.height);
+        context.closePath();
+        context.fillStrokeShape(shape);
+      }}
       x={el.x}
       y={el.y}
       width={el.width}
@@ -1555,6 +1562,13 @@ function SpeedLinesNode({
             context.lineTo(x, yStart + len);
           }
         }
+        context.fillStrokeShape(shape);
+      }}
+      hitFunc={(context, shape) => {
+        // 가는 선이라 빈 곳 클릭이 안 잡히는 문제 해결 — 전체 박스를 클릭 영역으로.
+        context.beginPath();
+        context.rect(0, 0, el.width, el.height);
+        context.closePath();
         context.fillStrokeShape(shape);
       }}
       x={el.x}
