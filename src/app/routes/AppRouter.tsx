@@ -29,6 +29,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/news": "웹툰·웹소설 소식",
   "/about": "소개",
   "/design": "디자인 시스템",
+  "/sitemap": "사이트맵",
   "/guide": "랭킹 산정 방식",
   "/settings": "설정",
   "/admin": "관리자 콘솔",
@@ -160,6 +161,10 @@ const DesignSystemPage = lazyRetry(
   () => import("@/src/domains/legal/DesignSystemPage").then((m) => ({ default: m.DesignSystemPage })),
   "DesignSystemPage"
 );
+const SitemapPage = lazyRetry(
+  () => import("@/src/domains/legal/SitemapPage").then((m) => ({ default: m.SitemapPage })),
+  "SitemapPage"
+);
 const CopyrightPage = lazyRetry(
   () => import("@/src/domains/legal/CopyrightPage").then((m) => ({ default: m.CopyrightPage })),
   "CopyrightPage"
@@ -243,6 +248,7 @@ export function AppRouter() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/design" element={<DesignSystemPage />} />
+          <Route path="/sitemap" element={<SitemapPage />} />
           <Route path="/guide" element={<GuidePage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

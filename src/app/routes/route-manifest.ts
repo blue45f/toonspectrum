@@ -15,5 +15,6 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/library", label: "내 서재" },
   { path: "/compare", label: "비교" },
   { path: "/insights", label: "인사이트" },
+  { path: "/sitemap", label: "사이트맵" },
   { path: "/admin", label: "관리자" },
 ];

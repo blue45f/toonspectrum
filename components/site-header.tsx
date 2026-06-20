@@ -105,7 +105,7 @@ export function SiteHeader() {
                 className="rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent"
                 title="베타 서비스 — 데이터·기능이 변경될 수 있습니다"
               >
-                beta
+                BETA
               </span>
             </span>
           </Link>
