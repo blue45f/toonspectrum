@@ -1,4 +1,14 @@
-import Konva from "konva";
+import KonvaCore from "konva/lib/Core";
+import "konva/lib/shapes/Circle";
+import "konva/lib/shapes/Ellipse";
+import "konva/lib/shapes/Image";
+import "konva/lib/shapes/Line";
+import "konva/lib/shapes/Path";
+import "konva/lib/shapes/Rect";
+import "konva/lib/shapes/Star";
+import "konva/lib/shapes/Text";
+import "konva/lib/shapes/TextPath";
+import "konva/lib/shapes/Transformer";
 import {
   AlignHorizontalJustifyCenter,
   AlignVerticalJustifyCenter,
@@ -32,8 +42,6 @@ import {
   Image as ImageIcon,
   Bookmark,
   Download,
-  Share2,
-  Globe,
   ImagePlus,
   LayoutTemplate,
   Loader2,
@@ -58,26 +66,17 @@ import {
   Type as TypeIcon,
   Undo2,
   Search,
-  Check,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState, useMemo, type ReactNode } from "react";
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
-  saveAsset,
-  listAssets,
-  deleteAsset,
-  renameAsset,
-  type StudioAsset,
-} from "./studio-asset-library";
-import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
-  BUBBLE_STYLE_PRESETS,
   CANVAS_W,
   EFFECT_EMOJIS,
   TEMPLATES,
@@ -89,8 +88,6 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
-import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
-import { normalizeBlurFx, type BlurFx } from "./studio-blur";
 import {
   BRUSH_PRESETS,
   gpenSegmentWidths,
@@ -103,62 +100,25 @@ import {
   STABILIZER_MAX,
 } from "./studio-brush";
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
-import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
 import { svgToDataUrl } from "./studio-characters";
-import { normalizeClarity, type Clarity } from "./studio-clarity";
 import { listClips, removeClip, saveClip, type StudioClip } from "./studio-clips";
-import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
 import {
   readRecentColors,
   storeRecentColors,
   pushRecentColor,
-} from "./studio-color-palettes";
-import { normalizeCurve, type CurvePoint } from "./studio-curves";
-import { normalizeDetail, type Detail } from "./studio-detail";
+} from "./studio-color-utils";
 import { dialogueToBubbles } from "./studio-dialogue";
-import { normalizeDistort, type Distort } from "./studio-distort";
 import {
-  EXPORT_SCALES,
-  EXPORT_FORMATS,
-  MAX_CANVAS_DIM,
-  canvasToBlob,
-  canCopyImageToClipboard,
-  copyCanvasToClipboard,
-  downloadBlob,
-  exportFormatLabel,
-  exportMimeType,
-  exportQuality,
-  maxFittingScale,
-  pageExportFileName,
-  splitPagesForExport,
-  stripExportFileName,
-  stripTotalHeight,
   type ExportFormat,
 } from "./studio-export";
-import { EXPORT_PRESETS, planStripSlices, recommendScale, validateExport, type ExportPreset } from "./studio-export-presets";
-import {
-  isDefaultPageGrade,
-  normalizePageGrade,
-  pageGradeToCssFilter,
-  vignetteCss,
-  drawVignette,
-  type PageGrade,
-} from "./studio-filters";
 import { coverFitInFrame, estimateBubbleHeight } from "./studio-fit";
-import { normalizeGlow, type Glow } from "./studio-glow";
-import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
-import { normalizeGrain, type Grain } from "./studio-grain";
-import { normalizeHalftone, type Halftone } from "./studio-halftone";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
-  registerStudioKonvaFilters,
-  buildImageFilters,
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
-} from "./studio-konva-filters";
-import { type LayerStylePatch } from "./studio-layer-styles";
+} from "./studio-konva-filter-fields";
 import {
   createLayerGroup,
   groupOfItem,
@@ -169,89 +129,201 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
-import { normalizeLevels, type LevelsParams } from "./studio-levels";
-import { normalizeLight, type Light } from "./studio-light";
-import { looksResetPatch, extractFilterFields, type StudioLook } from "./studio-looks";
 import { resizableNodeProps, textNodeProps } from "./studio-node-props";
-import { normalizeOutline, type Outline } from "./studio-outline";
-import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
-import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
-import { SCENE_TEMPLATE_CATEGORIES, SCENE_TEMPLATES, type SceneSeed } from "./studio-scene-templates";
-import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
-import { SFX_CATEGORIES, createSfxTextConfig, searchSfx, type SfxPreset } from "./studio-sfx-presets";
-import { normalizeSketch, type Sketch } from "./studio-sketch";
-import { StudioStickerGrid } from "./studio-sticker-grid";
-import { normalizeStylize, type Stylize } from "./studio-stylize";
+import {
+  isDefaultPageGrade,
+  normalizePageGrade,
+  pageGradeToCssFilter,
+  vignetteCss,
+  drawVignette,
+  type PageGrade,
+} from "./studio-page-grade";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
-import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
 import {
   DEFAULT_WATERMARK,
-  WATERMARK_POSITIONS,
   normalizeWatermark,
   shouldDrawWatermark,
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
 import { episodeLengthLabel, safeAreaMargin, webtoonWidthGuides } from "./studio-webtoon-guides";
-import { StudioAutoAdjustPanel } from "./StudioAutoAdjustPanel";
-import { StudioBlurPanel } from "./StudioBlurPanel";
-import { StudioChannelMixerPanel } from "./StudioChannelMixerPanel";
-import { StudioClarityPanel } from "./StudioClarityPanel";
-import { StudioColorBalancePanel } from "./StudioColorBalancePanel";
-import { StudioColorPopover } from "./StudioColorPopover";
-import { StudioCurvePanel } from "./StudioCurvePanel";
-import { StudioDetailPanel } from "./StudioDetailPanel";
-import { StudioDistortPanel } from "./StudioDistortPanel";
-import { StudioGlowPanel } from "./StudioGlowPanel";
-import { StudioGradientMapPanel } from "./StudioGradientMapPanel";
-import { StudioGrainPanel } from "./StudioGrainPanel";
-import { StudioHalftonePanel } from "./StudioHalftonePanel";
-import { StudioImageFilterPanel } from "./StudioImageFilterPanel";
-import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
-import { StudioLevelsPanel } from "./StudioLevelsPanel";
-import { StudioLightPanel } from "./StudioLightPanel";
-import { StudioLooksPanel } from "./StudioLooksPanel";
-import { StudioOutlinePanel } from "./StudioOutlinePanel";
-import { StudioPageGradePanel } from "./StudioPageGradePanel";
-import { StudioPhotoFilterPanel } from "./StudioPhotoFilterPanel";
-import { StudioSelectiveHslPanel } from "./StudioSelectiveHslPanel";
-import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
-import { StudioSketchPanel } from "./StudioSketchPanel";
-import { StudioStylizePanel } from "./StudioStylizePanel";
-import { StudioTextEffectPanel } from "./StudioTextEffectPanel";
-import { StudioTextPathPanel } from "./StudioTextPathPanel";
-import { StudioTonePanel } from "./StudioTonePanel";
-import { StudioVibrancePanel } from "./StudioVibrancePanel";
+
+import type { StudioAsset } from "./studio-asset-library";
+import type { AutoAdjust } from "./studio-auto-adjust";
+import type { BlurFx } from "./studio-blur";
+import type { ChannelMixer } from "./studio-channel-mixer";
+import type { Clarity } from "./studio-clarity";
+import type { ColorBalance } from "./studio-color-balance";
+import type { CurvePoint } from "./studio-curves";
+import type { Detail } from "./studio-detail";
+import type { Distort } from "./studio-distort";
+import type { Glow } from "./studio-glow";
+import type { GradientMap } from "./studio-gradient-map";
+import type { Grain } from "./studio-grain";
+import type { Halftone } from "./studio-halftone";
+import type { Light } from "./studio-light";
+import type { Outline } from "./studio-outline";
+import type { PanelLayoutPreset } from "./studio-panel-layouts";
+import type { PhotoFilter } from "./studio-photo-filter";
+import type { SceneSeed, SceneTemplate } from "./studio-scene-templates";
+import type { SelectiveHsl } from "./studio-selective-hsl";
+import type { SfxPreset } from "./studio-sfx-presets";
+import type { Sketch } from "./studio-sketch";
+import type { Stylize } from "./studio-stylize";
+import type { Vibrance } from "./studio-vibrance";
+import type {
+  StudioAssetMenuPanelProps,
+  StudioAssetSortOrder,
+  StudioAssetTab,
+} from "./StudioAssetMenuPanel";
+import type { StudioColorPopoverProps } from "./StudioColorPopover";
+import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
+import type {
+  GeneratedAssetQuality,
+  GeneratedAssetSize,
+  SharedAsset,
+} from "@/src/infrastructure/creator-client";
+import type Konva from "konva";
 
 import { Container } from "@/components/section";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
-import {
-  createWork,
-  getWork,
-  getCurrentUserId,
-  updateWork,
-  listSharedAssets,
-  publishAsset,
-  generateAsset,
-  deleteSharedAsset,
-  markSharedAssetUsed,
-  type GeneratedAssetQuality,
-  type GeneratedAssetSize,
-  type SharedAsset,
-} from "@/src/infrastructure/creator-client";
 
-// 커스텀 Konva 픽셀 필터(스크린톤/선화/색수차/포스터/노이즈 + 색온도/샤픈/먹선/듀오톤)를 한 번 등록.
-registerStudioKonvaFilters(Konva);
+const KonvaRuntime = KonvaCore as unknown as typeof Konva;
+KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
 
+const StudioImageAdjustmentsPanel = lazy(() =>
+  import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel }))
+);
+const StudioPageGradePanel = lazy(() =>
+  import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel }))
+);
+const StudioBubbleStylePresetPanel = lazy(() =>
+  import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel }))
+);
+const StudioShortcutsHelp = lazy(() =>
+  import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp }))
+);
+const StudioStickerGrid = lazy(() =>
+  import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid }))
+);
+const StudioTextEffectPanel = lazy(() =>
+  import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel }))
+);
+const StudioTextPathPanel = lazy(() =>
+  import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel }))
+);
+const StudioTonePanel = lazy(() =>
+  import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel }))
+);
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
+
+type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
+let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
+
+function loadStudioAssetMenuPanel(): Promise<StudioAssetMenuPanelModule> {
+  studioAssetMenuPanelPromise ??= import("./StudioAssetMenuPanel").then((mod) => ({
+    default: mod.StudioAssetMenuPanel,
+  }));
+  return studioAssetMenuPanelPromise;
+}
+
+const StudioAssetMenuPanel = lazy(loadStudioAssetMenuPanel);
+
+function preloadStudioAssetMenuPanel(): void {
+  void loadStudioAssetMenuPanel();
+}
+
+type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
+let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
+
+function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
+  studioExportMenuPanelPromise ??= import("./StudioExportMenuPanel").then((mod) => ({
+    default: mod.StudioExportMenuPanel,
+  }));
+  return studioExportMenuPanelPromise;
+}
+
+const StudioExportMenuPanel = lazy(loadStudioExportMenuPanel);
+
+function preloadStudioExportMenuPanel(): void {
+  void loadStudioExportMenuPanel();
+}
+
+type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen">;
+type StudioColorPopoverModule = { default: ComponentType<StudioColorPopoverProps> };
+
+let studioColorPopoverPromise: Promise<StudioColorPopoverModule> | null = null;
+
+function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
+  studioColorPopoverPromise ??= import("./StudioColorPopover").then((mod) => ({
+    default: mod.StudioColorPopover,
+  }));
+  return studioColorPopoverPromise;
+}
+
+const StudioColorPopoverContent = lazy(loadStudioColorPopover);
+
+function preloadStudioColorPopover(): void {
+  void loadStudioColorPopover();
+}
+
+function StudioColorPopoverFallback({
+  value,
+  title,
+  className,
+  onActivate,
+  busy = false,
+}: Pick<LazyStudioColorPopoverProps, "value" | "title" | "className"> & {
+  onActivate?: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <span className={className ? `relative inline-block ${className}` : "relative inline-block"}>
+      <button
+        type="button"
+        aria-label={title ?? "색상 선택"}
+        aria-expanded={false}
+        aria-busy={busy || undefined}
+        title={title ?? "색상 선택"}
+        onClick={onActivate}
+        onFocus={preloadStudioColorPopover}
+        onMouseEnter={preloadStudioColorPopover}
+        className="h-7 w-7 rounded border border-line cursor-pointer"
+        style={{ background: value }}
+      />
+    </span>
+  );
+}
+
+function LazyStudioColorPopover(props: LazyStudioColorPopoverProps) {
+  const [activated, setActivated] = useState(false);
+
+  if (!activated) {
+    return <StudioColorPopoverFallback {...props} onActivate={() => setActivated(true)} />;
+  }
+
+  return (
+    <Suspense fallback={<StudioColorPopoverFallback {...props} busy />}>
+      <StudioColorPopoverContent {...props} initialOpen />
+    </Suspense>
+  );
+}
+
+function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
+      {label}
+    </div>
+  );
+}
 
 type Tool = "select" | "draw";
 type DrawMode = "pen" | "eraser" | "shape";
 type DrawShapeKind = "line" | "rect" | "ellipse" | "star";
 
-interface ImageEl {
+export interface ImageEl {
   id: string;
   type: "image";
   src: string;
@@ -454,7 +526,7 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -469,8 +541,17 @@ type StudioOptionalAssetPacks = {
   emeresSections: Array<{ category: string; templates: StudioEmeresTemplate[] }>;
   emeresUnderlayOpacity: number;
 };
+type StudioSceneTemplatePacks = {
+  categories: Array<{ id: string; label: string }>;
+  templates: SceneTemplate[];
+};
+type StudioSfxPacks = {
+  categories: Array<{ id: SfxPreset["category"]; label: string }>;
+  presets: SfxPreset[];
+};
 
 const uid = () => crypto.randomUUID();
+const AUTH_SESSION_STORAGE_KEY = "toonspectrum-auth-session";
 const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   bgSceneSections: [],
   comicVectorStickers: [],
@@ -479,6 +560,14 @@ const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   fxOverlays: [],
   emeresSections: [],
   emeresUnderlayOpacity: 0.42,
+};
+const EMPTY_STUDIO_SCENE_TEMPLATE_PACKS: StudioSceneTemplatePacks = {
+  categories: [],
+  templates: [],
+};
+const EMPTY_STUDIO_SFX_PACKS: StudioSfxPacks = {
+  categories: [],
+  presets: [],
 };
 
 // 효과 피커 카테고리 칩 — 클릭 시 해당 섹션만 보여줘 7개 섹션 스크롤 없이 점프한다.
@@ -500,6 +589,31 @@ const FX_LINE_PRESETS: { id: "focus" | "speed"; label: string }[] = [
   { id: "speed", label: "💨 속도선 생성" },
 ];
 
+const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
+const BUBBLE_VARIANT_BY_ID = new Map(BUBBLE_VARIANTS.map((variant) => [variant.id, variant] as const));
+
+function getStoredStudioAuthUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = globalThis.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { user?: { id?: unknown } } | null;
+    return typeof parsed?.user?.id === "string" ? parsed.user.id : null;
+  } catch {
+    return null;
+  }
+}
+
+function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
+  const normalizedQuery = query.replace(/\s+/g, "").toLowerCase();
+  if (!normalizedQuery) return presets;
+  return presets.filter((preset) => {
+    const label = preset.label.replace(/\s+/g, "").toLowerCase();
+    const text = preset.text.replace(/\s+/g, "").toLowerCase();
+    return label.includes(normalizedQuery) || text.includes(normalizedQuery);
+  });
+}
+
 // 스튜디오 전용 구글폰트 7종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
 // 전역 폰트(Space Grotesk·Nanum Myeongjo)만 남기고, 이 7종은 스튜디오 마운트 시에만 주입한다.
 const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
@@ -509,16 +623,35 @@ const STUDIO_FONTS_CSS2_URL =
 // 요소의 대략적 바운딩 박스(중심·크기 판정용).
 function elBounds(el: El): { x: number; y: number; w: number; h: number } {
   if (el.type === "draw") {
-    const xs = el.points.filter((_, i) => i % 2 === 0);
-    const ys = el.points.filter((_, i) => i % 2 === 1);
-    if (!xs.length || !ys.length) return { x: xs[0] ?? 0, y: ys[0] ?? 0, w: 0, h: 0 };
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    return { x: minX, y: minY, w: Math.max(...xs) - minX, h: Math.max(...ys) - minY };
+    const x0 = el.points[0] ?? 0;
+    const y0 = el.points[1] ?? 0;
+    let minX = x0;
+    let minY = y0;
+    let maxX = x0;
+    let maxY = y0;
+    for (let i = 2; i < el.points.length; i += 2) {
+      const x = el.points[i] ?? maxX;
+      const y = el.points[i + 1] ?? maxY;
+      if (x < minX) minX = x;
+      else if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      else if (y > maxY) maxY = y;
+    }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
   }
   if (el.type === "text") return { x: el.x, y: el.y, w: el.width, h: el.fontSize * 1.4 };
   if (el.type === "sticker") return { x: el.x, y: el.y, w: el.fontSize, h: el.fontSize };
   return { x: el.x, y: el.y, w: el.width, h: el.height }; // image · bubble · frame
+}
+
+function studioElementIdOf(node: Konva.Node | null): string | null {
+  let current: Konva.Node | null = node;
+  while (current) {
+    const id = current.getAttr("studioElementId");
+    if (typeof id === "string" && id) return id;
+    current = current.getParent();
+  }
+  return null;
 }
 
 // 두 사각형이 겹치는지(마퀴 다중선택 판정).
@@ -554,7 +687,7 @@ function elementLabel(el: El): string {
     case "text":
       return `T ${el.text.slice(0, 14).trim() || "텍스트"}`;
     case "bubble": {
-      const v = BUBBLE_VARIANTS.find((b) => b.id === el.variant);
+      const v = BUBBLE_VARIANT_BY_ID.get(el.variant);
       return `${v?.sample ?? "💬"} ${v?.label ?? "말풍선"}`;
     }
     case "sticker":
@@ -1176,6 +1309,40 @@ function bakeGradeIntoCanvas(src: HTMLCanvasElement, grade: PageGrade): HTMLCanv
   return out;
 }
 
+const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
+type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
+type ImageFilterBuild = ReturnType<StudioKonvaFiltersModule["buildImageFilters"]>;
+const EMPTY_IMAGE_FILTER_BUILD: ImageFilterBuild = { filters: [], attrs: {}, cachePad: 0 };
+const imageFilterBuildCache = new Map<string, ImageFilterBuild>();
+let studioKonvaFiltersPromise: Promise<StudioKonvaFiltersModule> | null = null;
+
+function loadStudioKonvaFilters(): Promise<StudioKonvaFiltersModule> {
+  if (!studioKonvaFiltersPromise) {
+    studioKonvaFiltersPromise = import("./studio-konva-filters")
+      .then((mod) => {
+        mod.registerStudioKonvaFilters(KonvaRuntime);
+        return mod;
+      })
+      .catch((error) => {
+        studioKonvaFiltersPromise = null;
+        throw error;
+      });
+  }
+  return studioKonvaFiltersPromise;
+}
+
+function cachedBuildImageFilters(el: ImageEl, key: string, mod: StudioKonvaFiltersModule): ImageFilterBuild {
+  const cached = imageFilterBuildCache.get(key);
+  if (cached) return cached;
+  const built = mod.buildImageFilters(el, KonvaRuntime);
+  if (imageFilterBuildCache.size >= IMAGE_FILTER_BUILD_CACHE_LIMIT) {
+    const oldest = imageFilterBuildCache.keys().next().value;
+    if (oldest) imageFilterBuildCache.delete(oldest);
+  }
+  imageFilterBuildCache.set(key, built);
+  return built;
+}
+
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
 function UrlImage({
   el,
@@ -1194,6 +1361,7 @@ function UrlImage({
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
+  const [filterModule, setFilterModule] = useState<StudioKonvaFiltersModule | null>(null);
   const imageRef = useRef<Konva.Image | null>(null);
 
   useEffect(() => {
@@ -1234,32 +1402,50 @@ function UrlImage({
   }, [img, el.flipped, el.flippedY]);
 
   const hasFilters = hasActiveImageFilters(el);
+  const filterCacheKey = imageFilterCacheKey(el);
+  useEffect(() => {
+    if (!hasFilters || filterModule) return;
+    let active = true;
+    loadStudioKonvaFilters()
+      .then((mod) => {
+        if (active) setFilterModule(mod);
+      })
+      .catch((error) => {
+        console.error("Failed to load studio image filters:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [filterModule, hasFilters]);
+
   // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
-  const built = buildImageFilters(el, Konva);
+  const built = hasFilters && filterModule
+    ? cachedBuildImageFilters(el, filterCacheKey, filterModule)
+    : EMPTY_IMAGE_FILTER_BUILD;
   // react-konva filters prop 타입(Konva.NodeConfig["filters"])과 맞춘다.
   const filters: NonNullable<Konva.NodeConfig["filters"]> =
     built.filters as NonNullable<Konva.NodeConfig["filters"]>;
   const filterAttrs = built.attrs;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
-  const filterCacheKey = imageFilterCacheKey(el);
 
   useEffect(() => {
     const node = imageRef.current;
     if (!node) return;
     if (displayImg) {
       node.clearCache();
-      if (hasFilters) {
+      if (hasFilters && filterModule) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         node.cache(cachePad > 0 ? { offset: cachePad } : undefined);
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, cachePad]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad]);
 
   if (!displayImg) return null;
 
   return (
     <KImage
+      studioElementId={el.id}
       ref={(n) => {
         imageRef.current = n;
         innerRef(n);
@@ -1364,6 +1550,7 @@ function FramePanel({
 
   return (
     <Group
+      studioElementId={el.id}
       ref={innerRef}
       x={el.x}
       y={el.y}
@@ -1482,6 +1669,7 @@ function FocusLinesNode({
 
   return (
     <Shape
+      studioElementId={el.id}
       ref={innerRef}
       sceneFunc={(context, shape) => {
         context.beginPath();
@@ -1545,6 +1733,7 @@ function SpeedLinesNode({
 
   return (
     <Shape
+      studioElementId={el.id}
       ref={innerRef}
       sceneFunc={(context, shape) => {
         context.beginPath();
@@ -1612,7 +1801,7 @@ export function StudioPage() {
   const [params] = useSearchParams();
   const workId = params.get("id");
   const linkedTitleId = params.get("titleId");
-  const loggedIn = !!getCurrentUserId();
+  const loggedIn = !!getStoredStudioAuthUserId();
 
   // 편집 문서 상태(페이지 리스트를 히스토리로 관리하여 페이지 생성/삭제/이동도 undo/redo 지원)
   const [pagesHistory, setPagesHistory] = useState<PageState[][]>([
@@ -1648,6 +1837,8 @@ export function StudioPage() {
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
   const groups = activePage.groups ?? [];
+  const elementById = new Map<string, El>();
+  for (const element of elements) elementById.set(element.id, element);
 
   const hi = pagesHi;
   const history = pagesHistory;
@@ -1718,6 +1909,8 @@ export function StudioPage() {
 
   // 미니맵 스크롤 정보 상태
   const [scrollPos, setScrollPos] = useState({ left: 0, top: 0, width: 0, height: 0, scrollWidth: 0, scrollHeight: 0 });
+  const scrollRafRef = useRef<number | null>(null);
+  const updateScrollPosRef = useRef<() => void>(() => {});
 
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
@@ -1832,10 +2025,19 @@ export function StudioPage() {
   const [studioOptionalAssetPacks, setStudioOptionalAssetPacks] = useState<StudioOptionalAssetPacks | null>(null);
   const [studioOptionalAssetsLoading, setStudioOptionalAssetsLoading] = useState(false);
   const [studioOptionalAssetsError, setStudioOptionalAssetsError] = useState<string | null>(null);
+  const [panelLayoutPresets, setPanelLayoutPresets] = useState<PanelLayoutPreset[]>([]);
+  const [panelLayoutsLoading, setPanelLayoutsLoading] = useState(false);
+  const [panelLayoutsError, setPanelLayoutsError] = useState<string | null>(null);
+  const [sceneTemplatePacks, setSceneTemplatePacks] = useState<StudioSceneTemplatePacks | null>(null);
+  const [sceneTemplatesLoading, setSceneTemplatesLoading] = useState(false);
+  const [sceneTemplatesError, setSceneTemplatesError] = useState<string | null>(null);
+  const [sfxPacks, setSfxPacks] = useState<StudioSfxPacks | null>(null);
+  const [sfxLoading, setSfxLoading] = useState(false);
+  const [sfxError, setSfxError] = useState<string | null>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
   // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
-  const [assetTab, setAssetTab] = useState<"mine" | "community">("mine");
+  const [assetTab, setAssetTab] = useState<StudioAssetTab>("mine");
   const [shared, setShared] = useState<SharedAsset[]>([]);
   const [sharedLoading, setSharedLoading] = useState(false);
   const [sharedError, setSharedError] = useState<string | null>(null);
@@ -1851,8 +2053,13 @@ export function StudioPage() {
   const [error, setError] = useState<string | null>(null);
   const [workHydrated, setWorkHydrated] = useState(!workId);
   const studioOptionalAssets = studioOptionalAssetPacks ?? EMPTY_STUDIO_OPTIONAL_ASSETS;
+  const sceneTemplates = sceneTemplatePacks ?? EMPTY_STUDIO_SCENE_TEMPLATE_PACKS;
+  const studioSfx = sfxPacks ?? EMPTY_STUDIO_SFX_PACKS;
   const studioOptionalAssetsMountedRef = useRef(true);
   const studioOptionalAssetsLoadRef = useRef<Promise<void> | null>(null);
+  const panelLayoutsLoadRef = useRef<Promise<void> | null>(null);
+  const sceneTemplatesLoadRef = useRef<Promise<void> | null>(null);
+  const sfxLoadRef = useRef<Promise<void> | null>(null);
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1931,32 +2138,59 @@ export function StudioPage() {
     };
   }, [isSpacePressed, editing]);
 
-  // 미니맵용 스크롤 좌표 추적 리스너
-  const updateScrollPos = () => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    setScrollPos({
-      left: wrap.scrollLeft,
-      top: wrap.scrollTop,
-      width: wrap.clientWidth,
-      height: wrap.clientHeight,
-      scrollWidth: wrap.scrollWidth,
-      scrollHeight: wrap.scrollHeight,
-    });
-  };
+  // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶고 동일값이면 렌더를 생략한다.
+  useEffect(() => {
+    updateScrollPosRef.current = () => {
+      if (scrollRafRef.current !== null) return;
+      scrollRafRef.current = globalThis.requestAnimationFrame(() => {
+        scrollRafRef.current = null;
+        const wrap = wrapRef.current;
+        if (!wrap) return;
+        const next = {
+          left: wrap.scrollLeft,
+          top: wrap.scrollTop,
+          width: wrap.clientWidth,
+          height: wrap.clientHeight,
+          scrollWidth: wrap.scrollWidth,
+          scrollHeight: wrap.scrollHeight,
+        };
+        setScrollPos((prev) =>
+          prev.left === next.left &&
+          prev.top === next.top &&
+          prev.width === next.width &&
+          prev.height === next.height &&
+          prev.scrollWidth === next.scrollWidth &&
+          prev.scrollHeight === next.scrollHeight
+            ? prev
+            : next
+        );
+      });
+    };
+  });
+  const updateScrollPos = () => updateScrollPosRef.current();
 
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    wrap.addEventListener("scroll", updateScrollPos);
-    globalThis.addEventListener("resize", updateScrollPos);
-    const timer = setTimeout(updateScrollPos, 150);
+    const onScroll = () => updateScrollPosRef.current();
+    const onResize = () => updateScrollPosRef.current();
+    wrap.addEventListener("scroll", onScroll, { passive: true });
+    globalThis.addEventListener("resize", onResize);
+    const timer = globalThis.setTimeout(onResize, 150);
     return () => {
-      wrap.removeEventListener("scroll", updateScrollPos);
-      globalThis.removeEventListener("resize", updateScrollPos);
-      clearTimeout(timer);
+      wrap.removeEventListener("scroll", onScroll);
+      globalThis.removeEventListener("resize", onResize);
+      globalThis.clearTimeout(timer);
+      if (scrollRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
     };
-  }, [elements, canvasH, scale, zoom]);
+  }, []);
+
+  useEffect(() => {
+    updateScrollPosRef.current();
+  }, [canvasH, effScale, leftPanelOpen, rightPanelOpen, isFullscreen, maximized]);
 
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
@@ -2166,6 +2400,10 @@ export function StudioPage() {
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
+  const draftRafRef = useRef<number | null>(null);
+  const pendingDraftRef = useRef<DrawEl | null>(null);
+  const marqueeRafRef = useRef<number | null>(null);
+  const pendingMarqueeRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   // 드래그 중 표시할 정렬 가이드(스테이지 좌표; 캔버스/패널 중심·가장자리에 스냅).
   const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   // 스냅 가이드 갱신 — 값이 같으면 같은 참조를 유지해 드래그 매 프레임마다 StudioPage 전체가
@@ -2180,6 +2418,45 @@ export function StudioPage() {
         : { x, y }
     );
   };
+  const scheduleDraft = (next: DrawEl | null) => {
+    pendingDraftRef.current = next;
+    if (draftRafRef.current !== null) return;
+    draftRafRef.current = globalThis.requestAnimationFrame(() => {
+      draftRafRef.current = null;
+      setDraft(pendingDraftRef.current);
+    });
+  };
+  const clearDraftPreview = () => {
+    pendingDraftRef.current = null;
+    if (draftRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(draftRafRef.current);
+      draftRafRef.current = null;
+    }
+    setDraft(null);
+  };
+  const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
+    pendingMarqueeRectRef.current = next;
+    if (marqueeRafRef.current !== null) return;
+    marqueeRafRef.current = globalThis.requestAnimationFrame(() => {
+      marqueeRafRef.current = null;
+      setMarqueeRect(pendingMarqueeRectRef.current);
+    });
+  };
+  const clearMarqueePreview = () => {
+    pendingMarqueeRectRef.current = null;
+    if (marqueeRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(marqueeRafRef.current);
+      marqueeRafRef.current = null;
+    }
+    setMarqueeRect(null);
+  };
+  useEffect(
+    () => () => {
+      if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
+      if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
+    },
+    []
+  );
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
@@ -2224,8 +2501,9 @@ export function StudioPage() {
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [menu]);
 
-  const selected = elements.find((e) => e.id === selectedId) ?? null;
-  const showQuickStart = quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed);
+  const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
+  const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
   useEffect(() => {
@@ -2243,7 +2521,8 @@ export function StudioPage() {
     }
     setWorkHydrated(false);
     let alive = true;
-    getWork(workId)
+    import("@/src/infrastructure/creator-client")
+      .then(({ getWork }) => getWork(workId))
       .then((w) => {
         if (!alive) return;
         setTitle(w.title);
@@ -2293,6 +2572,87 @@ export function StudioPage() {
       studioOptionalAssetsMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (menu !== "template") return;
+    if (panelLayoutPresets.length > 0 || panelLayoutsLoadRef.current) return;
+
+    setPanelLayoutsLoading(true);
+    setPanelLayoutsError(null);
+    panelLayoutsLoadRef.current = import("./studio-panel-layouts")
+      .then((mod) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setPanelLayoutPresets(mod.PANEL_LAYOUTS);
+      })
+      .catch((err) => {
+        console.error("Failed to load studio panel layouts:", err);
+        panelLayoutsLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setPanelLayoutsError("컷 레이아웃을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setPanelLayoutsLoading(false);
+        }
+      });
+  }, [menu, panelLayoutPresets.length]);
+
+  useEffect(() => {
+    if (menu !== "scene") return;
+    if (sceneTemplatePacks || sceneTemplatesLoadRef.current) return;
+
+    setSceneTemplatesLoading(true);
+    setSceneTemplatesError(null);
+    sceneTemplatesLoadRef.current = import("./studio-scene-templates")
+      .then((mod) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setSceneTemplatePacks({
+          categories: mod.SCENE_TEMPLATE_CATEGORIES,
+          templates: mod.SCENE_TEMPLATES,
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load studio scene templates:", err);
+        sceneTemplatesLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setSceneTemplatesError("장면 템플릿을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setSceneTemplatesLoading(false);
+        }
+      });
+  }, [menu, sceneTemplatePacks]);
+
+  useEffect(() => {
+    if (menu !== "sticker") return;
+    if (sfxPacks || sfxLoadRef.current) return;
+
+    setSfxLoading(true);
+    setSfxError(null);
+    sfxLoadRef.current = import("./studio-sfx-presets")
+      .then((mod) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setSfxPacks({
+          categories: mod.SFX_CATEGORIES,
+          presets: mod.SFX_LIBRARY,
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load studio SFX presets:", err);
+        sfxLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setSfxError("효과음 프리셋을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setSfxLoading(false);
+        }
+      });
+  }, [menu, sfxPacks]);
 
   useEffect(() => {
     if (menu !== "bgScene" && menu !== "sticker" && menu !== "emeres") return;
@@ -2363,6 +2723,7 @@ export function StudioPage() {
   const loadAssetsList = async () => {
     setAssetsLoading(true);
     try {
+      const { listAssets } = await import("./studio-asset-library");
       const list = await listAssets();
       setAssets(list);
     } catch (err) {
@@ -2384,6 +2745,7 @@ export function StudioPage() {
     if (!file) return;
     try {
       const { src, width, height } = await downscaleImageFile(file);
+      const { saveAsset } = await import("./studio-asset-library");
       await saveAsset({ name: file.name, dataUrl: src, width, height });
       await loadAssetsList();
     } catch (err) {
@@ -2395,6 +2757,7 @@ export function StudioPage() {
 
   async function onDeleteAsset(id: string) {
     try {
+      const { deleteAsset } = await import("./studio-asset-library");
       await deleteAsset(id);
       await loadAssetsList();
     } catch (err) {
@@ -2404,7 +2767,7 @@ export function StudioPage() {
 
   // 에셋 라이브러리 고도화 상태 및 함수
   const [assetSearchQuery, setAssetSearchQuery] = useState("");
-  const [assetSortOrder, setAssetSortOrder] = useState<"newest" | "name" | "size">("newest");
+  const [assetSortOrder, setAssetSortOrder] = useState<StudioAssetSortOrder>("newest");
   const [renamingAssetId, setRenamingAssetId] = useState<string | null>(null);
   const [renamingAssetName, setRenamingAssetName] = useState("");
   const [assetPrompt, setAssetPrompt] = useState("");
@@ -2416,6 +2779,7 @@ export function StudioPage() {
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
     try {
+      const { renameAsset } = await import("./studio-asset-library");
       await renameAsset(id, renamingAssetName);
       setRenamingAssetId(null);
       await loadAssetsList();
@@ -2427,13 +2791,17 @@ export function StudioPage() {
   async function onGenerateAsset() {
     const prompt = assetPrompt.trim();
     if (!prompt || assetGenerating) return;
-    if (!getCurrentUserId()) {
+    if (!getStoredStudioAuthUserId()) {
       setError("AI 에셋을 생성하려면 로그인이 필요해요.");
       return;
     }
     setAssetGenerating(true);
     setError(null);
     try {
+      const [{ generateAsset }, { saveAsset }] = await Promise.all([
+        import("@/src/infrastructure/creator-client"),
+        import("./studio-asset-library"),
+      ]);
       const generated = await generateAsset({
         prompt,
         name: assetPromptName.trim() || undefined,
@@ -2458,38 +2826,6 @@ export function StudioPage() {
     }
   }
 
-  const filteredAssets = useMemo(() => {
-    let list = [...assets];
-    if (assetSearchQuery.trim()) {
-      const query = assetSearchQuery.toLowerCase();
-      list = list.filter((asset) => asset.name.toLowerCase().includes(query));
-    }
-    if (assetSortOrder === "newest") {
-      list.sort((a, b) => b.createdAt - a.createdAt);
-    } else if (assetSortOrder === "name") {
-      list.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
-    } else if (assetSortOrder === "size") {
-      list.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-    }
-    return list;
-  }, [assets, assetSearchQuery, assetSortOrder]);
-
-  const filteredShared = useMemo(() => {
-    let list = [...shared];
-    if (assetSearchQuery.trim()) {
-      const query = assetSearchQuery.toLowerCase();
-      list = list.filter((asset) => asset.name.toLowerCase().includes(query));
-    }
-    if (assetSortOrder === "newest") {
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (assetSortOrder === "name") {
-      list.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
-    } else if (assetSortOrder === "size") {
-      list.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-    }
-    return list;
-  }, [shared, assetSearchQuery, assetSortOrder]);
-
   // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
   const [fxSearchQuery, setFxSearchQuery] = useState("");
   const [fxPickerSection, setFxPickerSection] = useState<FxPickerSection>("all");
@@ -2500,7 +2836,7 @@ export function StudioPage() {
   const fxQuery = fxSearchQuery.trim().toLowerCase();
   const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
     fxPickerSection === "all" || fxPickerSection === section;
-  const fxSfxFiltered = searchSfx(fxSearchQuery);
+  const fxSfxFiltered = filterSfxPresets(studioSfx.presets, fxSearchQuery);
   const fxEmojisFiltered = fxQuery ? [] : EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
   const fxComicFiltered = filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery);
   const fxCreatureFiltered = filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery);
@@ -2536,6 +2872,7 @@ export function StudioPage() {
     setSharedLoading(true);
     setSharedError(null);
     try {
+      const { listSharedAssets } = await import("@/src/infrastructure/creator-client");
       setShared(await listSharedAssets({ limit: 60 }));
     } catch (err) {
       setSharedError(err instanceof Error ? err.message : "공유 에셋을 불러오지 못했어요.");
@@ -2551,12 +2888,13 @@ export function StudioPage() {
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset) {
-    if (!getCurrentUserId()) {
+    if (!getStoredStudioAuthUserId()) {
       setError("에셋을 공유하려면 로그인이 필요해요.");
       return;
     }
     setPublishingId(asset.id);
     try {
+      const { publishAsset } = await import("@/src/infrastructure/creator-client");
       await publishAsset({ name: asset.name, dataUrl: asset.dataUrl, width: asset.width, height: asset.height });
       setAssetTab("community");
       await loadSharedAssets();
@@ -2570,12 +2908,13 @@ export function StudioPage() {
   // 커뮤니티 에셋을 캔버스에 삽입(다운로드 카운트 증가)
   function onUseSharedAsset(asset: SharedAsset) {
     addRenderedImage(asset.dataUrl, asset.width, asset.height);
-    markSharedAssetUsed(asset.id);
+    void import("@/src/infrastructure/creator-client").then(({ markSharedAssetUsed }) => markSharedAssetUsed(asset.id));
     setMenu(null);
   }
 
   async function onDeleteSharedAsset(id: string) {
     try {
+      const { deleteSharedAsset } = await import("@/src/infrastructure/creator-client");
       await deleteSharedAsset(id);
       await loadSharedAssets();
     } catch (err) {
@@ -2587,16 +2926,18 @@ export function StudioPage() {
   useEffect(() => {
     const tr = trRef.current;
     if (!tr) return;
+    const lookup = new Map<string, El>();
+    for (const element of elements) lookup.set(element.id, element);
     if (tool !== "select") {
       tr.nodes([]);
     } else if (marqueeIds.length > 0) {
       const nodes = marqueeIds
-        .filter((id) => !elements.find((e) => e.id === id)?.locked)
+        .filter((id) => !lookup.get(id)?.locked)
         .map((id) => nodeRefs.current[id])
         .filter((n): n is Konva.Node => !!n);
       tr.nodes(nodes);
     } else {
-      const selLocked = elements.find((e) => e.id === selectedId)?.locked;
+      const selLocked = selectedId ? lookup.get(selectedId)?.locked : false;
       const node = selectedId && !selLocked ? nodeRefs.current[selectedId] : null;
       tr.nodes(node ? [node] : []);
     }
@@ -3266,17 +3607,11 @@ export function StudioPage() {
   }
   // 효과음 프리셋 삽입 — studio-sfx-presets의 무드별 스타일(색·외곽선·그라디언트·기울기)을
   // 그대로 적용한다. 위치만 중앙으로 잡고 나머지 시각 필드는 createSfxTextConfig가 채운다.
-  function addSfxPreset(preset: SfxPreset) {
+  async function addSfxPreset(preset: SfxPreset) {
     setMenu(null);
     const [cx, cy] = spawnCenter();
+    const { createSfxTextConfig } = await import("./studio-sfx-presets");
     addEl({ id: uid(), type: "text", ...createSfxTextConfig(preset, cx - 110, cy - 50) });
-  }
-  // 플랫폼 내보내기 규격 적용 — 권장 폭에 맞춰 배율을 잡고, 현재 포맷이 허용되지 않으면
-  // 권장 포맷으로 바꾼다. "원본 유지"(width 0)는 배율을 건드리지 않는다.
-  function applyExportPreset(preset: ExportPreset) {
-    setExportPresetId(preset.id);
-    if (!preset.allowedFormats.includes(exportFormat)) setExportFormat(preset.recommendedFormat);
-    if (preset.width > 0) setExportScale(recommendScale(CANVAS_W, preset));
   }
   function addBgScene(bg: StudioBgScene) {
     setMenu(null);
@@ -3464,7 +3799,7 @@ export function StudioPage() {
   }
   // 장면 템플릿 삽입 — 프레임·말풍선·효과를 한 번에 깐다(코미포/툰스푼 "한 번에" 발상).
   // 시드는 [0,720] 폭 안에서 좌상단 원점 기준 배치되므로 originX=0(전폭), originY는 현재 보기 부근.
-  function addSceneTemplate(template: (typeof SCENE_TEMPLATES)[number]) {
+  function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
     const [, cy] = spawnCenter();
     const originY = Math.max(20, Math.round(cy - 240));
@@ -3708,7 +4043,7 @@ export function StudioPage() {
         const pos = e.target.getStage()?.getRelativePointerPosition();
         if (pos) {
           marqueeStartRef.current = { x: pos.x, y: pos.y };
-          setMarqueeRect(null);
+          clearMarqueePreview();
         }
       }
     }
@@ -3719,7 +4054,7 @@ export function StudioPage() {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const s = marqueeStartRef.current;
-        setMarqueeRect({
+        scheduleMarqueeRect({
           x: Math.min(s.x, pos.x),
           y: Math.min(s.y, pos.y),
           w: Math.abs(pos.x - s.x),
@@ -3809,14 +4144,14 @@ export function StudioPage() {
       next = { ...current, points: [x0, y0, x1, y1] };
     }
     drawingRef.current = next;
-    setDraft(next);
+    scheduleDraft(next);
   }
   function onStageUp() {
     // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
     if (marqueeStartRef.current) {
-      const rect = marqueeRect;
+      const rect = pendingMarqueeRectRef.current ?? marqueeRect;
       marqueeStartRef.current = null;
-      setMarqueeRect(null);
+      clearMarqueePreview();
       if (rect && rect.w > 3 && rect.h > 3) {
         const ids = elements.filter((el) => !el.hidden && rectsIntersect(rect, elBounds(el))).map((el) => el.id);
         setMarqueeIds(ids);
@@ -3833,7 +4168,7 @@ export function StudioPage() {
       commit([...elements, finished]);
     }
     drawingRef.current = null;
-    setDraft(null);
+    clearDraftPreview();
   }
   // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
   function hideBrushCursor() {
@@ -3850,21 +4185,14 @@ export function StudioPage() {
     const node = e.target;
     const stage = node.getStage();
     if (!node || node === stage) return;
-    if (node.getParent() instanceof Konva.Transformer) return; // 트랜스포머 앵커(리사이즈)는 제외
+    if (node.getParent() instanceof KonvaRuntime.Transformer) return; // 트랜스포머 앵커(리사이즈)는 제외
     const layer = node.getLayer();
     if (!layer) return;
 
     // 다중선택 그룹 이동: 끄는 노드(좌표형)의 이동량을 나머지 선택 노드에 실시간 적용(draw·잠금 제외).
-    // Konva 노드엔 id가 없어(선택은 nodeRefs 맵 사용) nodeRefs 역방향 조회로 요소 id를 찾는다.
-    let draggedId: string | null = null;
-    for (const k in nodeRefs.current) {
-      if (nodeRefs.current[k] === node) {
-        draggedId = k;
-        break;
-      }
-    }
+    const draggedId = studioElementIdOf(node);
     if (draggedId && marqueeIds.length > 1 && marqueeIds.includes(draggedId)) {
-      const draggedEl = elements.find((el) => el.id === draggedId);
+      const draggedEl = elementById.get(draggedId);
       if (draggedEl && draggedEl.type !== "draw" && !draggedEl.locked) {
         const g = groupDragRef.current;
         if (!g || g.id !== draggedId) {
@@ -3875,7 +4203,7 @@ export function StudioPage() {
           if (ddx !== 0 || ddy !== 0) {
             for (const id of marqueeIds) {
               if (id === draggedId) continue;
-              const oel = elements.find((el) => el.id === id);
+              const oel = elementById.get(id);
               if (!oel || oel.type === "draw" || oel.locked) continue;
               const other = nodeRefs.current[id];
               if (other) {
@@ -3916,15 +4244,22 @@ export function StudioPage() {
         if (Math.abs(y - canvasH / 2) > 1) hLines.push(y);
       }
     }
-    const panel = elements.find(
-      (p): p is FrameEl =>
-        p.type === "frame" &&
-        !p.hidden &&
-        box.x + box.width / 2 >= p.x &&
-        box.x + box.width / 2 <= p.x + p.width &&
-        box.y + box.height / 2 >= p.y &&
-        box.y + box.height / 2 <= p.y + p.height,
-    );
+    let panel: FrameEl | null = null;
+    const boxCenterX = box.x + box.width / 2;
+    const boxCenterY = box.y + box.height / 2;
+    for (const candidate of elements) {
+      if (
+        candidate.type === "frame" &&
+        !candidate.hidden &&
+        boxCenterX >= candidate.x &&
+        boxCenterX <= candidate.x + candidate.width &&
+        boxCenterY >= candidate.y &&
+        boxCenterY <= candidate.y + candidate.height
+      ) {
+        panel = candidate;
+        break;
+      }
+    }
     if (panel) {
       vLines.push(panel.x, panel.x + panel.width / 2, panel.x + panel.width);
       hLines.push(panel.y, panel.y + panel.height / 2, panel.y + panel.height);
@@ -3984,7 +4319,7 @@ export function StudioPage() {
   }
 
   function startEditText(id: string) {
-    const el = elements.find((e) => e.id === id);
+    const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
     setEditing({ id, value: el.text });
   }
@@ -3994,11 +4329,11 @@ export function StudioPage() {
 
   function commitEditText() {
     if (editing) {
-      const el = elements.find((e) => e.id === editing.id);
+      const el = elementById.get(editing.id);
       // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존).
       let height: number | undefined;
       if (el && el.type === "bubble") {
-        const measure = new Konva.Text({
+        const measure = new KonvaRuntime.Text({
           text: editing.value || " ",
           width: el.width - 36,
           fontSize: el.fontSize ?? 24,
@@ -4071,6 +4406,7 @@ export function StudioPage() {
         } as Record<string, unknown>,
         status,
       };
+      const { createWork, updateWork } = await import("@/src/infrastructure/creator-client");
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
       
       try {
@@ -4123,6 +4459,7 @@ export function StudioPage() {
     drawWatermarkOnCanvas(canvas, watermark);
     setIsExporting(false);
     try {
+      const { canvasToBlob, downloadBlob, exportMimeType, exportQuality, pageExportFileName } = await import("./studio-export");
       const blob = await canvasToBlob(canvas, exportMimeType(exportFormat), exportQuality(exportFormat));
       downloadBlob(blob, pageExportFileName(title, exportFormat, transparent));
     } catch (err) {
@@ -4146,6 +4483,7 @@ export function StudioPage() {
     drawWatermarkOnCanvas(canvas, watermark);
     setIsExporting(false);
     try {
+      const { copyCanvasToClipboard } = await import("./studio-export");
       await copyCanvasToClipboard(canvas);
       setError(null);
     } catch (err) {
@@ -4155,6 +4493,17 @@ export function StudioPage() {
 
   async function handleDownloadAll(spacing = 24) {
     setExportMenuOpen(false);
+    const {
+      MAX_CANVAS_DIM,
+      canvasToBlob,
+      downloadBlob,
+      exportMimeType,
+      exportQuality,
+      maxFittingScale,
+      splitPagesForExport,
+      stripExportFileName,
+      stripTotalHeight,
+    } = await import("./studio-export");
     // 합성 전 캔버스 한계 가드: 총 높이×배율이 한계를 넘으면 빈 PNG가 조용히 저장되므로
     // 분할 저장 또는 배율 자동 하향 중 하나를 먼저 고른다.
     const pageHeights = pages.map((p) => p.canvasH);
@@ -4344,7 +4693,12 @@ export function StudioPage() {
             </button>
             <button
               type="button"
-              onClick={() => setExportMenuOpen((open) => !open)}
+              onClick={() => {
+                preloadStudioExportMenuPanel();
+                setExportMenuOpen((open) => !open);
+              }}
+              onMouseEnter={preloadStudioExportMenuPanel}
+              onFocus={preloadStudioExportMenuPanel}
               aria-expanded={exportMenuOpen}
               aria-label="내보내기 옵션"
               className={buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" })}
@@ -4353,181 +4707,30 @@ export function StudioPage() {
               <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
             </button>
             {exportMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-1.5 w-72 rounded-xl border border-line bg-panel p-3 shadow-xl">
-                <div className="mb-2.5">
-                  <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
-                  <div className="flex flex-wrap gap-1">
-                    {EXPORT_PRESETS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => applyExportPreset(p)}
-                        aria-pressed={exportPresetId === p.id}
-                        title={p.note}
-                        className={cn(
-                          "h-7 rounded-lg border px-2 text-[0.68rem] font-semibold transition-colors",
-                          exportPresetId === p.id ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
+              <Suspense
+                fallback={
+                  <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
+                    내보내기 옵션을 여는 중...
                   </div>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-fg-2">배율</span>
-                  <div className="flex items-center gap-1">
-                    {EXPORT_SCALES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => {
-                          setExportScale(s);
-                          setExportPresetId(null);
-                        }}
-                        aria-pressed={exportScale === s}
-                        className={cn(
-                          "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
-                          exportScale === s ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                        )}
-                      >
-                        {s}×
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-fg-2">포맷</span>
-                  <div className="flex items-center gap-1">
-                    {EXPORT_FORMATS.map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setExportFormat(f)}
-                        aria-pressed={exportFormat === f}
-                        className={cn(
-                          "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
-                          exportFormat === f ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                        )}
-                      >
-                        {exportFormatLabel(f)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <label
-                  className={cn(
-                    "mt-2.5 flex items-center gap-1.5 text-xs",
-                    exportFormat === "jpg" ? "cursor-not-allowed text-fg-3 opacity-50" : "cursor-pointer text-fg-2"
-                  )}
-                  title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명하게 내보내기"}
-                >
-                  <input
-                    type="checkbox"
-                    checked={exportTransparent && exportFormat !== "jpg"}
-                    disabled={exportFormat === "jpg"}
-                    onChange={(e) => setExportTransparent(e.target.checked)}
-                    className="size-3.5 accent-[var(--color-accent)] cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  투명 배경 (PNG·WebP)
-                </label>
-                <div className="mt-2.5 border-t border-line pt-2.5">
-                  <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg-2">
-                    <input
-                      type="checkbox"
-                      checked={watermark.enabled}
-                      onChange={(e) => setWatermark({ ...watermark, enabled: e.target.checked })}
-                      className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
-                    />
-                    서명·워터마크
-                  </label>
-                  {watermark.enabled && (
-                    <div className="mt-1.5 space-y-1.5">
-                      <input
-                        type="text"
-                        value={watermark.text}
-                        onChange={(e) => setWatermark({ ...watermark, text: e.target.value })}
-                        placeholder="© 작가명 / @아이디"
-                        maxLength={60}
-                        className="w-full rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
-                      />
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={watermark.position}
-                          onChange={(e) => setWatermark({ ...watermark, position: e.target.value as WatermarkSettings["position"] })}
-                          className="h-7 flex-1 rounded-lg border border-line bg-card px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
-                          aria-label="워터마크 위치"
-                        >
-                          {WATERMARK_POSITIONS.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="range"
-                          min={0.15}
-                          max={1}
-                          step={0.05}
-                          value={watermark.opacity}
-                          onChange={(e) => setWatermark({ ...watermark, opacity: Number(e.target.value) })}
-                          className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
-                          title="워터마크 투명도"
-                          aria-label="워터마크 투명도"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {canCopyImageToClipboard() && (
-                  <button
-                    type="button"
-                    onClick={handleCopyToClipboard}
-                    disabled={isExporting}
-                    className={cn(
-                      "mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50",
-                    )}
-                    title="현재 페이지를 클립보드에 이미지로 복사 (붙여넣기로 바로 사용)"
-                  >
-                    <Copy size={13} /> 클립보드로 복사
-                  </button>
-                )}
-                <p className="mt-2 text-[10px] tabular-nums text-fg-3">
-                  출력 폭 {(CANVAS_W * exportScale).toLocaleString()}px
-                  {(() => {
-                    const q = exportQuality(exportFormat);
-                    return q !== undefined ? ` · 품질 ${Math.round(q * 100)}%` : "";
-                  })()}
-                </p>
-                {(() => {
-                  const preset = exportPresetId ? EXPORT_PRESETS.find((p) => p.id === exportPresetId) : null;
-                  if (!preset) return null;
-                  const outW = Math.round(CANVAS_W * exportScale);
-                  const outH = Math.round(canvasH * exportScale);
-                  const v = validateExport({ width: outW, height: outH, format: exportFormat }, preset);
-                  const maxH = preset.maxImageHeight;
-                  const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
-                  return (
-                    <div className="mt-2 space-y-1">
-                      {v.warnings.map((w) => (
-                        <p key={w.code} className="rounded-md border border-warn/40 bg-warn/10 px-2 py-1 text-[10px] leading-snug text-warn">
-                          ⚠ {w.message}
-                        </p>
-                      ))}
-                      {slices && maxH !== undefined && (
-                        <p className="rounded-md border border-line bg-card px-2 py-1 text-[10px] leading-snug text-fg-3">
-                          규격 높이 {maxH.toLocaleString()}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
-                        </p>
-                      )}
-                      {v.ok && !slices && (
-                        <p className="rounded-md border border-good/40 bg-good/10 px-2 py-1 text-[10px] leading-snug text-good">
-                          {preset.label} 규격에 맞아요.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
+                }
+              >
+                <StudioExportMenuPanel
+                  canvasWidth={CANVAS_W}
+                  canvasHeight={canvasH}
+                  exportScale={exportScale}
+                  exportFormat={exportFormat}
+                  exportTransparent={exportTransparent}
+                  exportPresetId={exportPresetId}
+                  watermark={watermark}
+                  isExporting={isExporting}
+                  setExportScale={setExportScale}
+                  setExportFormat={setExportFormat}
+                  setExportTransparent={setExportTransparent}
+                  setExportPresetId={setExportPresetId}
+                  setWatermark={setWatermark}
+                  onCopyToClipboard={handleCopyToClipboard}
+                />
+              </Suspense>
             )}
           </div>
           {pages.length > 1 && (
@@ -4578,7 +4781,7 @@ export function StudioPage() {
           </button>
           {menu === "template" && (
             <div className="absolute left-0 top-full z-30 mt-1 grid max-h-80 w-64 gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-lg">
-              {groupTemplates(TEMPLATES).map((group) => (
+              {TEMPLATE_GROUPS.map((group) => (
                 <div key={group.group} className="grid gap-1">
                   <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
                   {group.templates.map((t) => (
@@ -4597,7 +4800,13 @@ export function StudioPage() {
               {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
               <div className="grid gap-1 border-t border-line pt-1.5">
                 <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
-                {PANEL_LAYOUTS.map((layout) => (
+                {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
+                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
+                )}
+                {panelLayoutsError && (
+                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
+                )}
+                {panelLayoutPresets.map((layout) => (
                   <button
                     key={layout.id}
                     type="button"
@@ -4782,7 +4991,9 @@ export function StudioPage() {
                 )}
               </div>
               <div className="max-h-72 overflow-y-auto pr-1">
-                <StudioTonePanel onPick={(svg) => addTone(svg)} query={toneSearchQuery} />
+                <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
+                  <StudioTonePanel onPick={(svg) => addTone(svg)} query={toneSearchQuery} />
+                </Suspense>
               </div>
             </div>
           )}
@@ -4883,8 +5094,14 @@ export function StudioPage() {
                 프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
               </p>
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                {SCENE_TEMPLATE_CATEGORIES.map((cat) => {
-                  const items = SCENE_TEMPLATES.filter((t) => t.category === cat.id);
+                {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
+                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
+                )}
+                {sceneTemplatesError && (
+                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
+                )}
+                {sceneTemplates.categories.map((cat) => {
+                  const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
                   if (items.length === 0) return null;
                   return (
                     <div key={cat.id}>
@@ -5050,6 +5267,12 @@ export function StudioPage() {
                   </button>
                 ))}
               </div>
+              {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
+                <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
+              )}
+              {sfxError && fxSectionVisible("sfx") && (
+                <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
+              )}
               {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
                 <>
                   <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
@@ -5058,8 +5281,8 @@ export function StudioPage() {
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => addSfxPreset(s)}
-                        title={`${s.label} · ${SFX_CATEGORIES.find((c) => c.id === s.category)?.label ?? ""}`}
+                        onClick={() => void addSfxPreset(s)}
+                        title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
                         className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
                       >
                         {s.text}
@@ -5088,15 +5311,17 @@ export function StudioPage() {
                   {studioOptionalAssetsError}
                 </p>
               )}
-              {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
-                <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
-              )}
-              {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
-                <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
-              )}
-              {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
-                <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
-              )}
+              <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
+                {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
+                  <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
+                )}
+                {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
+                  <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
+                )}
+                {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
+                  <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
+                )}
+              </Suspense>
               {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
                 <>
                   <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
@@ -5149,314 +5374,68 @@ export function StudioPage() {
           )}
         </div>
         <div ref={menu === "asset" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "asset" ? null : "asset")} aria-haspopup="menu" aria-expanded={menu === "asset"} className={toolBtn(menu === "asset")}>
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioAssetMenuPanel();
+              setMenu(menu === "asset" ? null : "asset");
+            }}
+            onMouseEnter={preloadStudioAssetMenuPanel}
+            onFocus={preloadStudioAssetMenuPanel}
+            aria-haspopup="menu"
+            aria-expanded={menu === "asset"}
+            className={toolBtn(menu === "asset")}
+          >
             <Folder size={14} /> 내 에셋
           </button>
           {menu === "asset" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-3 shadow-lg">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-0.5 rounded-lg border border-line bg-card p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setAssetTab("mine")}
-                    className={cn(
-                      "rounded-md px-2 py-1 text-[0.65rem] font-semibold transition-colors",
-                      assetTab === "mine" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
-                    )}
-                  >
-                    내 에셋
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssetTab("community")}
-                    className={cn(
-                      "flex items-center gap-1 rounded-md px-2 py-1 text-[0.65rem] font-semibold transition-colors",
-                      assetTab === "community" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
-                    )}
-                  >
-                    <Globe size={11} /> 커뮤니티
-                  </button>
+            <Suspense
+              fallback={
+                <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
+                  에셋 보관함을 여는 중...
                 </div>
-                {assetTab === "mine" && (
-                  <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-accent px-2 py-1 text-[0.65rem] font-medium text-white hover:bg-accent/90 transition-colors">
-                    <ImagePlus size={12} /> 업로드
-                    <input type="file" accept="image/*" className="hidden" onChange={onUploadAsset} />
-                  </label>
-                )}
-              </div>
-
-              {assetTab === "mine" && (
-                <div className="mb-2 rounded-lg border border-line bg-card/70 p-2">
-                  <div className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-semibold text-fg-2">
-                    <Sparkles size={12} className="text-accent" />
-                    AI 에셋 생성
-                  </div>
-                  <textarea
-                    value={assetPrompt}
-                    onChange={(e) => setAssetPrompt(e.target.value.slice(0, 1000))}
-                    onKeyDown={(e) => {
-                      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void onGenerateAsset();
-                    }}
-                    placeholder="예: 비 오는 골목 배경, 마법 소품, 놀란 표정 캐릭터"
-                    rows={2}
-                    className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
-                  />
-                  <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1.5">
-                    <input
-                      type="text"
-                      value={assetPromptName}
-                      onChange={(e) => setAssetPromptName(e.target.value.slice(0, 60))}
-                      placeholder="이름"
-                      className="min-w-0 rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
-                    />
-                    <button
-                      type="button"
-                      onClick={onGenerateAsset}
-                      disabled={!assetPrompt.trim() || assetGenerating}
-                      className="inline-flex h-7 items-center gap-1 rounded-md bg-accent px-2 text-[0.65rem] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
-                    >
-                      {assetGenerating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                      생성
-                    </button>
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                    <select
-                      value={assetPromptSize}
-                      onChange={(e) => setAssetPromptSize(e.target.value as GeneratedAssetSize)}
-                      className="rounded-md border border-line bg-panel px-1.5 py-1 text-[0.6rem] text-fg-2 outline-none focus:border-accent"
-                    >
-                      <option value="1024x1024">정사각</option>
-                      <option value="1536x1024">가로 배경</option>
-                      <option value="1024x1536">세로 컷</option>
-                    </select>
-                    <select
-                      value={assetPromptQuality}
-                      onChange={(e) => setAssetPromptQuality(e.target.value as GeneratedAssetQuality)}
-                      className="rounded-md border border-line bg-panel px-1.5 py-1 text-[0.6rem] text-fg-2 outline-none focus:border-accent"
-                    >
-                      <option value="low">빠르게</option>
-                      <option value="medium">표준</option>
-                      <option value="high">고품질</option>
-                      <option value="auto">자동</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* 검색 및 정렬 필터 */}
-              <div className="mb-2 flex items-center gap-1.5">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
-                  <input
-                    type="text"
-                    placeholder="에셋 검색..."
-                    value={assetSearchQuery}
-                    onChange={(e) => setAssetSearchQuery(e.target.value)}
-                    className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
-                  />
-                  {assetSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setAssetSearchQuery("")}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
-                </div>
-                <select
-                  value={assetSortOrder}
-                  onChange={(e) => setAssetSortOrder(e.target.value as "newest" | "name" | "size")}
-                  className="rounded-lg border border-line bg-card px-1.5 py-1 text-[0.65rem] text-fg-2 outline-none focus:border-accent transition-colors cursor-pointer"
-                >
-                  <option value="newest">최신순</option>
-                  <option value="name">이름순</option>
-                  <option value="size">크기순</option>
-                </select>
-              </div>
-
-              {assetTab === "mine" ? (
-                assetsLoading ? (
-                  <div className="flex h-32 items-center justify-center text-fg-3">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  </div>
-                ) : assets.length === 0 ? (
-                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                    <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
-                  </div>
-                ) : filteredAssets.length === 0 ? (
-                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {filteredAssets.map((asset) => (
-                      <div
-                        key={asset.id}
-                        className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50 cursor-grab active:cursor-grabbing"
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData(
-                            "application/json-asset",
-                            JSON.stringify({ src: asset.dataUrl, width: asset.width, height: asset.height })
-                          );
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addRenderedImage(asset.dataUrl, asset.width, asset.height);
-                            setMenu(null);
-                          }}
-                          className="w-full h-16 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center cursor-pointer"
-                          title={asset.name}
-                        >
-                          <img src={asset.dataUrl} alt={asset.name} className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
-                        </button>
-                        {renamingAssetId === asset.id ? (
-                          <div className="mt-1 flex w-full items-center gap-0.5">
-                            <input
-                              type="text"
-                              value={renamingAssetName}
-                              onChange={(e) => setRenamingAssetName(e.target.value)}
-                              className="w-full min-w-0 rounded border border-accent bg-panel px-1 py-0.5 text-[0.55rem] text-fg-1 outline-none"
-                              // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opens only on user action (rename click); focusing it immediately is correct edit-on-demand UX
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  handleRenameAsset(asset.id);
-                                } else if (e.key === "Escape") {
-                                  setRenamingAssetId(null);
-                                }
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleRenameAsset(asset.id)}
-                              className="rounded bg-accent p-0.5 text-white hover:bg-accent/90 shrink-0"
-                              title="확인"
-                            >
-                              <Check size={8} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRenamingAssetId(null)}
-                              className="rounded bg-line p-0.5 text-fg-3 hover:bg-raised shrink-0"
-                              title="취소"
-                            >
-                              <X size={8} />
-                            </button>
-                          </div>
-                        ) : (
-                          <span
-                            className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2 cursor-text"
-                            title={asset.name}
-                            onDoubleClick={() => {
-                              setRenamingAssetId(asset.id);
-                              setRenamingAssetName(asset.name);
-                            }}
-                          >
-                            {asset.name}
-                          </span>
-                        )}
-                        <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRenamingAssetId(asset.id);
-                              setRenamingAssetName(asset.name);
-                            }}
-                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-accent"
-                            title="이름 변경"
-                          >
-                            <Pencil size={10} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onShareAsset(asset)}
-                            disabled={publishingId === asset.id}
-                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-accent disabled:opacity-50"
-                            title="커뮤니티에 공유"
-                          >
-                            {publishingId === asset.id ? <Loader2 size={10} className="animate-spin" /> : <Share2 size={10} />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteAsset(asset.id)}
-                            className="flex size-5 items-center justify-center rounded bg-black/60 text-white hover:bg-red-500"
-                            title="삭제"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : sharedLoading ? (
-                <div className="flex h-32 items-center justify-center text-fg-3">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              ) : sharedError ? (
-                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                  <p className="text-xs text-fg-3">{sharedError}</p>
-                  <button type="button" onClick={loadSharedAssets} className="mt-2 rounded-md border border-line px-2 py-1 text-[0.6rem] text-fg-2 hover:bg-raised">
-                    다시 시도
-                  </button>
-                </div>
-              ) : shared.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                  <p className="text-xs text-fg-3">아직 공유된 에셋이 없어요.</p>
-                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
-                </div>
-              ) : filteredShared.length === 0 ? (
-                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                  <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {filteredShared.map((asset) => (
-                    <div
-                      key={asset.id}
-                      className="group relative flex flex-col items-center rounded-lg border border-line bg-card p-1.5 hover:border-accent/50 cursor-grab active:cursor-grabbing"
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(
-                          "application/json-asset",
-                          JSON.stringify({ src: asset.dataUrl, width: asset.width, height: asset.height })
-                        );
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onUseSharedAsset(asset)}
-                        className="w-full h-16 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center cursor-pointer"
-                        title={`${asset.name} · ${asset.author.name}`}
-                      >
-                        <img src={asset.dataUrl} alt={asset.name} className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105" />
-                      </button>
-                      <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
-                        {asset.name}
-                      </span>
-                      <span className="block w-full truncate text-center text-[0.55rem] text-fg-4">{asset.author.name}</span>
-                      {asset.isOwner && (
-                        <button
-                          type="button"
-                          onClick={() => onDeleteSharedAsset(asset.id)}
-                          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded bg-black/60 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
-                          title="공유 취소(삭제)"
-                        >
-                          <X size={10} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              }
+            >
+              <StudioAssetMenuPanel
+                assetTab={assetTab}
+                setAssetTab={setAssetTab}
+                onUploadAsset={onUploadAsset}
+                assetPrompt={assetPrompt}
+                setAssetPrompt={setAssetPrompt}
+                assetPromptName={assetPromptName}
+                setAssetPromptName={setAssetPromptName}
+                assetPromptSize={assetPromptSize}
+                setAssetPromptSize={setAssetPromptSize}
+                assetPromptQuality={assetPromptQuality}
+                setAssetPromptQuality={setAssetPromptQuality}
+                assetGenerating={assetGenerating}
+                onGenerateAsset={onGenerateAsset}
+                assetSearchQuery={assetSearchQuery}
+                setAssetSearchQuery={setAssetSearchQuery}
+                assetSortOrder={assetSortOrder}
+                setAssetSortOrder={setAssetSortOrder}
+                assets={assets}
+                assetsLoading={assetsLoading}
+                renamingAssetId={renamingAssetId}
+                setRenamingAssetId={setRenamingAssetId}
+                renamingAssetName={renamingAssetName}
+                setRenamingAssetName={setRenamingAssetName}
+                handleRenameAsset={handleRenameAsset}
+                onUseLocalAsset={(asset) => {
+                  addRenderedImage(asset.dataUrl, asset.width, asset.height);
+                  setMenu(null);
+                }}
+                onShareAsset={onShareAsset}
+                onDeleteAsset={onDeleteAsset}
+                publishingId={publishingId}
+                shared={shared}
+                sharedLoading={sharedLoading}
+                sharedError={sharedError}
+                loadSharedAssets={loadSharedAssets}
+                onUseSharedAsset={onUseSharedAsset}
+                onDeleteSharedAsset={onDeleteSharedAsset}
+              />
+            </Suspense>
           )}
         </div>
         <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
@@ -5466,7 +5445,7 @@ export function StudioPage() {
         <span className="mx-0.5 h-5 w-px bg-line" />
         <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
           색
-          <StudioColorPopover
+          <LazyStudioColorPopover
             value={color}
             onChange={setColor}
             recentColors={recentColors}
@@ -5902,7 +5881,7 @@ export function StudioPage() {
         </div>
 
         {/* 중앙: 캔버스 영역 */}
-        <div className="flex-1 min-w-0">
+        <div className="relative flex-1 min-w-0">
           {/* 임시저장 복구 배너 */}
           {hasAutosave && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
@@ -5998,10 +5977,7 @@ export function StudioPage() {
               if (pointerPos) {
                 const shape = stage.getIntersection(pointerPos);
                 if (shape) {
-                  const elId = Object.keys(nodeRefs.current).find((key) => {
-                    const node = nodeRefs.current[key];
-                    return node && (node === shape || shape.isAncestorOf(node));
-                  });
+                  const elId = studioElementIdOf(shape);
                   if (elId) {
                     clickedElId = elId;
                     setSelectedId(elId);
@@ -6167,6 +6143,7 @@ export function StudioPage() {
                 if (el.type === "text" && el.textPath && !isFlatTextPath(normalizeTextPath(el.textPath)))
                   return wrapClip(
                     <KTextPath
+                      studioElementId={el.id}
                       key={el.id}
                       ref={setRef}
                       text={el.text}
@@ -6204,6 +6181,7 @@ export function StudioPage() {
                 if (el.type === "text")
                   return wrapClip(
                     <KText
+                      studioElementId={el.id}
                       key={el.id}
                       ref={setRef}
                       text={el.vertical ? formatVerticalText(el.text) : el.text}
@@ -6246,6 +6224,7 @@ export function StudioPage() {
                 if (el.type === "sticker")
                   return wrapClip(
                     <KText
+                      studioElementId={el.id}
                       key={el.id}
                       ref={setRef}
                       text={el.text}
@@ -6430,6 +6409,7 @@ export function StudioPage() {
 
                 return wrapClip(
                   <Group
+                    studioElementId={el.id}
                     key={el.id}
                     ref={setRef}
                     x={el.x}
@@ -6955,7 +6935,11 @@ export function StudioPage() {
             ⌨
           </button>
 
-          <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+          {shortcutsOpen && (
+            <Suspense fallback={null}>
+              <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+            </Suspense>
+          )}
 
           {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 */}
           <div className="absolute bottom-3 left-3 z-30 flex items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur">
@@ -7277,17 +7261,20 @@ export function StudioPage() {
 
           {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
           <div className="rounded-2xl border border-line bg-panel/40 p-3">
-            <StudioPageGradePanel
-              grade={pageGrade}
-              onPatch={patchPageGrade}
-              onApplyPreset={applyPageGrade}
-              onReset={resetPageGrade}
-            />
+            <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
+              <StudioPageGradePanel
+                grade={pageGrade}
+                onPatch={patchPageGrade}
+                onApplyPreset={applyPageGrade}
+                onReset={resetPageGrade}
+              />
+            </Suspense>
           </div>
 
           {selected && (
             <div className="rounded-2xl border border-line bg-panel/40 p-3">
-              <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
+              <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
+                <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
               {selected.type === "draw" && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -7437,62 +7424,12 @@ export function StudioPage() {
               )}
               {selected.type === "bubble" && (
                 <>
-                  <div className="mt-2.5 pb-2.5 border-b border-line/40">
-                    <p className="mb-2 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">스타일 프리셋</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {BUBBLE_STYLE_PRESETS.map((p) => {
-                        const isMatch =
-                          selected.fill === p.fill &&
-                          selected.textFill === p.textFill &&
-                          (p.stroke ? selected.stroke === p.stroke : !selected.stroke) &&
-                          (p.strokeWidth ? selected.strokeWidth === p.strokeWidth : true);
-                        
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              patchEl(selected.id, {
-                                fill: p.fill,
-                                textFill: p.textFill,
-                                stroke: p.stroke,
-                                strokeWidth: p.strokeWidth,
-                                shadowColor: p.shadowColor,
-                                shadowBlur: p.shadowBlur,
-                                shadowOffsetX: p.shadowOffsetX,
-                                shadowOffsetY: p.shadowOffsetY,
-                                shadowOpacity: p.shadowOpacity,
-                                font: p.font ?? selected.font,
-                              } as Partial<El>);
-                            }}
-                            className={cn(
-                              "flex flex-col items-start p-1.5 rounded-lg border text-left transition-all hover:bg-raised/70 cursor-pointer",
-                              isMatch
-                                ? "border-accent bg-accent-soft/40 shadow-sm"
-                                : "border-line bg-card"
-                            )}
-                            title={p.description}
-                          >
-                            <span className="text-[0.65rem] font-semibold text-fg mb-1">{p.label}</span>
-                            <div className="flex items-center gap-1 w-full mt-auto">
-                              <span
-                                className="size-3.5 rounded-full border border-line shadow-sm flex items-center justify-center text-[8px] font-bold"
-                                style={{
-                                  backgroundColor: p.fill === "transparent" ? "transparent" : p.fill,
-                                  color: p.textFill,
-                                  borderColor: p.stroke || "rgba(0,0,0,0.15)",
-                                  borderWidth: p.stroke ? "1.5px" : "1px"
-                                }}
-                              >
-                                가
-                              </span>
-                              <span className="text-[0.55rem] text-fg-3 truncate">{p.description}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <Suspense fallback={<StudioPanelLoading label="말풍선 스타일을 여는 중..." />}>
+                    <StudioBubbleStylePresetPanel
+                      selected={selected}
+                      onApplyPreset={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                    />
+                  </Suspense>
 
                   <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                     배경 투명
@@ -7511,7 +7448,7 @@ export function StudioPage() {
                   {selected.fill !== "transparent" && (
                     <span className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                       말풍선색
-                      <StudioColorPopover
+                      <LazyStudioColorPopover
                         value={selected.fill}
                         onChange={(c) => patchEl(selected.id, { fill: c } as Partial<El>)}
                         recentColors={recentColors}
@@ -7907,22 +7844,26 @@ export function StudioPage() {
               )}
               {selected.type === "text" && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5">
-                  <StudioTextEffectPanel onApply={(patch) => patchEl(selected.id, patch as Partial<El>)} />
+                  <Suspense fallback={<StudioPanelLoading label="글자 효과 패널을 여는 중..." />}>
+                    <StudioTextEffectPanel onApply={(patch) => patchEl(selected.id, patch as Partial<El>)} />
+                  </Suspense>
                 </div>
               )}
               {/* 곡선 텍스트 — 아치/물결/원형 경로(Konva TextPath). */}
               {selected.type === "text" && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5">
-                  <StudioTextPathPanel
-                    value={normalizeTextPath(selected.textPath)}
-                    onPatch={(patch: Partial<TextPathConfig>) =>
-                      patchEl(selected.id, {
-                        textPath: normalizeTextPath({ ...normalizeTextPath(selected.textPath), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: TextPathConfig) => patchEl(selected.id, { textPath: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { textPath: undefined } as Partial<El>)}
-                  />
+                  <Suspense fallback={<StudioPanelLoading label="곡선 텍스트 패널을 여는 중..." />}>
+                    <StudioTextPathPanel
+                      value={normalizeTextPath(selected.textPath)}
+                      onPatch={(patch: Partial<TextPathConfig>) =>
+                        patchEl(selected.id, {
+                          textPath: normalizeTextPath({ ...normalizeTextPath(selected.textPath), ...patch }),
+                        } as Partial<El>)
+                      }
+                      onApplyPreset={(v: TextPathConfig) => patchEl(selected.id, { textPath: v } as Partial<El>)}
+                      onReset={() => patchEl(selected.id, { textPath: undefined } as Partial<El>)}
+                    />
+                  </Suspense>
                 </div>
               )}
               {selected.type === "text" && (
@@ -8700,361 +8641,13 @@ export function StudioPage() {
                 </div>
               )}
 
-              {/* 원클릭 룩 — 여러 필터를 묶은 큐레이티드 프리셋 + 필터 복사/붙여넣기/전체 초기화. */}
               {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioLooksPanel
-                    onApplyLook={(look: StudioLook) =>
-                      patchEl(selected.id, { ...looksResetPatch(), ...look.patch } as Partial<El>)
-                    }
-                    onCopy={() => setFilterClipboard(extractFilterFields(selected))}
-                    onPaste={() => {
-                      if (filterClipboard)
-                        patchEl(selected.id, { ...looksResetPatch(), ...filterClipboard } as Partial<El>);
-                    }}
-                    onResetAll={() => patchEl(selected.id, looksResetPatch() as Partial<El>)}
-                    canPaste={!!filterClipboard}
-                  />
-                </div>
-              )}
-              {/* 이미지 필터 효과 — 원클릭 프리셋 + 보정 슬라이더(StudioImageFilterPanel) */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioImageFilterPanel
-                    values={selected}
-                    onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 레벨 보정(Levels) — 입력/출력 검정·흰점 + 감마. ImageEl의 levels* 필드와 매핑. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioLevelsPanel
-                    value={normalizeLevels({
-                      blackPoint: selected.levelsBlack,
-                      whitePoint: selected.levelsWhite,
-                      gamma: selected.levelsGamma,
-                      outBlack: selected.levelsOutBlack,
-                      outWhite: selected.levelsOutWhite,
-                    })}
-                    onPatch={(patch) =>
-                      patchEl(selected.id, {
-                        ...(patch.blackPoint !== undefined ? { levelsBlack: patch.blackPoint } : {}),
-                        ...(patch.whitePoint !== undefined ? { levelsWhite: patch.whitePoint } : {}),
-                        ...(patch.gamma !== undefined ? { levelsGamma: patch.gamma } : {}),
-                        ...(patch.outBlack !== undefined ? { levelsOutBlack: patch.outBlack } : {}),
-                        ...(patch.outWhite !== undefined ? { levelsOutWhite: patch.outWhite } : {}),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(p: LevelsParams) =>
-                      patchEl(selected.id, {
-                        levelsBlack: p.blackPoint,
-                        levelsWhite: p.whitePoint,
-                        levelsGamma: p.gamma,
-                        levelsOutBlack: p.outBlack,
-                        levelsOutWhite: p.outWhite,
-                      } as Partial<El>)
-                    }
-                    onReset={() =>
-                      patchEl(selected.id, {
-                        levelsBlack: undefined,
-                        levelsWhite: undefined,
-                        levelsGamma: undefined,
-                        levelsOutBlack: undefined,
-                        levelsOutWhite: undefined,
-                      } as Partial<El>)
-                    }
-                  />
-                </div>
-              )}
-              {/* 레이어 스타일 — 드롭 섀도/글로우/둥근 모서리(Konva.Image 네이티브). */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioLayerStylePanel
-                    values={selected as LayerStylePatch}
-                    onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 톤 커브 (Curves) — 점 드래그로 임의 톤 곡선을 만든다. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioCurvePanel
-                    points={normalizeCurve(selected.curve)}
-                    onChange={(pts: CurvePoint[]) => patchEl(selected.id, { curve: pts } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { curve: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 컬러 밸런스 — 그림자/중간톤/하이라이트별 색 이동(시네마틱 톤). */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioColorBalancePanel
-                    value={normalizeColorBalance(selected.colorBalance)}
-                    onPatch={(patch: Partial<ColorBalance>) =>
-                      patchEl(selected.id, {
-                        colorBalance: normalizeColorBalance({ ...normalizeColorBalance(selected.colorBalance), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(balance: ColorBalance) => patchEl(selected.id, { colorBalance: balance } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { colorBalance: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 채널 믹서 — RGB 채널 재조합(흑백 변환·채널 스왑·적외선). */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioChannelMixerPanel
-                    value={normalizeChannelMixer(selected.channelMixer)}
-                    onPatch={(patch: Partial<ChannelMixer>) =>
-                      patchEl(selected.id, {
-                        channelMixer: normalizeChannelMixer({ ...normalizeChannelMixer(selected.channelMixer), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(mixer: ChannelMixer) => patchEl(selected.id, { channelMixer: mixer } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { channelMixer: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 선택 색상(HSL) — 특정 색 대역의 색조/채도/명도 조정. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioSelectiveHslPanel
-                    value={normalizeSelectiveHsl(selected.selectiveHsl)}
-                    onPatch={(patch: Partial<SelectiveHsl>) =>
-                      patchEl(selected.id, {
-                        selectiveHsl: normalizeSelectiveHsl({ ...normalizeSelectiveHsl(selected.selectiveHsl), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: SelectiveHsl) => patchEl(selected.id, { selectiveHsl: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { selectiveHsl: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 생동감(Vibrance) — 저채도 우선 채도 보정 + 전체 채도. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioVibrancePanel
-                    value={normalizeVibrance(selected.vibrance)}
-                    onPatch={(patch: Partial<Vibrance>) =>
-                      patchEl(selected.id, {
-                        vibrance: normalizeVibrance({ ...normalizeVibrance(selected.vibrance), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Vibrance) => patchEl(selected.id, { vibrance: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { vibrance: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 포토 필터 — 따뜻/차가운 색 오버레이(광도 유지). */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioPhotoFilterPanel
-                    value={normalizePhotoFilter(selected.photoFilter)}
-                    onPatch={(patch: Partial<PhotoFilter>) =>
-                      patchEl(selected.id, {
-                        photoFilter: normalizePhotoFilter({ ...normalizePhotoFilter(selected.photoFilter), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: PhotoFilter) => patchEl(selected.id, { photoFilter: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { photoFilter: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 그라디언트 맵 — 휘도를 멀티스톱 색 그라디언트로 매핑. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioGradientMapPanel
-                    value={normalizeGradientMap(selected.gradientMap)}
-                    onApplyPreset={(m: GradientMap) => patchEl(selected.id, { gradientMap: m } as Partial<El>)}
-                    onEditStopColor={(i: number, color: string) => {
-                      const cur = normalizeGradientMap(selected.gradientMap);
-                      const stops = cur.stops.map((s, j) => (j === i ? { ...s, color } : s));
-                      patchEl(selected.id, { gradientMap: normalizeGradientMap({ stops }) } as Partial<El>);
-                    }}
-                    onReset={() => patchEl(selected.id, { gradientMap: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 자동 보정 — 히스토그램 기반 원클릭 대비/톤/색/화이트밸런스. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioAutoAdjustPanel
-                    value={normalizeAutoAdjust(selected.autoAdjust)}
-                    onPatch={(patch: Partial<AutoAdjust>) =>
-                      patchEl(selected.id, {
-                        autoAdjust: normalizeAutoAdjust({ ...normalizeAutoAdjust(selected.autoAdjust), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: AutoAdjust) => patchEl(selected.id, { autoAdjust: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { autoAdjust: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 선명도/디테일 — 로컬 대비(클래리티) + 안개 제거. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioClarityPanel
-                    value={normalizeClarity(selected.clarity)}
-                    onPatch={(patch: Partial<Clarity>) =>
-                      patchEl(selected.id, {
-                        clarity: normalizeClarity({ ...normalizeClarity(selected.clarity), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Clarity) => patchEl(selected.id, { clarity: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { clarity: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 글로우/블룸 — 밝은 영역의 빛 번짐. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioGlowPanel
-                    value={normalizeGlow(selected.glow)}
-                    onPatch={(patch: Partial<Glow>) =>
-                      patchEl(selected.id, {
-                        glow: normalizeGlow({ ...normalizeGlow(selected.glow), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Glow) => patchEl(selected.id, { glow: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { glow: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 스티커 테두리 — 실루엣 바깥 색 외곽선(투명 배경 캐릭터용). */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioOutlinePanel
-                    value={normalizeOutline(selected.outline)}
-                    onPatch={(patch: Partial<Outline>) =>
-                      patchEl(selected.id, {
-                        outline: normalizeOutline({ ...normalizeOutline(selected.outline), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Outline) => patchEl(selected.id, { outline: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { outline: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 컬러 하프톤 — CMYK 망점 인쇄 룩. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioHalftonePanel
-                    value={normalizeHalftone(selected.halftone)}
-                    onPatch={(patch: Partial<Halftone>) =>
-                      patchEl(selected.id, {
-                        halftone: normalizeHalftone({ ...normalizeHalftone(selected.halftone), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Halftone) => patchEl(selected.id, { halftone: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { halftone: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 그레인/텍스처 — 필름 그레인·종이·주사선 오버레이. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioGrainPanel
-                    value={normalizeGrain(selected.grain)}
-                    onPatch={(patch: Partial<Grain>) =>
-                      patchEl(selected.id, {
-                        grain: normalizeGrain({ ...normalizeGrain(selected.grain), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Grain) => patchEl(selected.id, { grain: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { grain: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 흐림 갤러리 — 가우시안·모션·스핀·줌 블러. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioBlurPanel
-                    value={normalizeBlurFx(selected.blurFx)}
-                    onPatch={(patch: Partial<BlurFx>) =>
-                      patchEl(selected.id, {
-                        blurFx: normalizeBlurFx({ ...normalizeBlurFx(selected.blurFx), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: BlurFx) => patchEl(selected.id, { blurFx: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { blurFx: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 기하 왜곡 — 비틀기·물결·핀치·웨이브. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioDistortPanel
-                    value={normalizeDistort(selected.distort)}
-                    onPatch={(patch: Partial<Distort>) =>
-                      patchEl(selected.id, {
-                        distort: normalizeDistort({ ...normalizeDistort(selected.distort), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Distort) => patchEl(selected.id, { distort: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { distort: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 스타일라이즈 — 엠보스·외곽선·솔라리·유화. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioStylizePanel
-                    value={normalizeStylize(selected.stylize)}
-                    onPatch={(patch: Partial<Stylize>) =>
-                      patchEl(selected.id, {
-                        stylize: normalizeStylize({ ...normalizeStylize(selected.stylize), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Stylize) => patchEl(selected.id, { stylize: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { stylize: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 조명 효과 — 렌즈 플레어·라이트릭·햇살·광선. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioLightPanel
-                    value={normalizeLight(selected.light)}
-                    onPatch={(patch: Partial<Light>) =>
-                      patchEl(selected.id, {
-                        light: normalizeLight({ ...normalizeLight(selected.light), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Light) => patchEl(selected.id, { light: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { light: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 디테일/샤픈 — 하이패스·미디언·스마트 샤픈. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioDetailPanel
-                    value={normalizeDetail(selected.detail)}
-                    onPatch={(patch: Partial<Detail>) =>
-                      patchEl(selected.id, {
-                        detail: normalizeDetail({ ...normalizeDetail(selected.detail), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Detail) => patchEl(selected.id, { detail: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { detail: undefined } as Partial<El>)}
-                  />
-                </div>
-              )}
-              {/* 스케치/잉크 — 포토카피·크로스해치·스탬프·메조틴트. */}
-              {selected.type === "image" && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioSketchPanel
-                    value={normalizeSketch(selected.sketch)}
-                    onPatch={(patch: Partial<Sketch>) =>
-                      patchEl(selected.id, {
-                        sketch: normalizeSketch({ ...normalizeSketch(selected.sketch), ...patch }),
-                      } as Partial<El>)
-                    }
-                    onApplyPreset={(v: Sketch) => patchEl(selected.id, { sketch: v } as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { sketch: undefined } as Partial<El>)}
-                  />
-                </div>
+                <StudioImageAdjustmentsPanel
+                  selected={selected}
+                  filterClipboard={filterClipboard}
+                  onSetFilterClipboard={setFilterClipboard}
+                  onPatch={(patch) => patchEl(selected.id, patch)}
+                />
               )}
 
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
@@ -9113,7 +8706,8 @@ export function StudioPage() {
                 <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })} title="삭제 (Delete)">
                   <Trash2 size={14} /> 삭제
                 </button>
-              </div>
+                </div>
+              </Suspense>
             </div>
           )}
 
@@ -9712,14 +9306,13 @@ export function StudioPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const el = elements.find((e) => e.id === contextMenu.elId);
-                  if (el) patchEl(el.id, { locked: !el.locked });
+                  if (contextMenuEl) patchEl(contextMenuEl.id, { locked: !contextMenuEl.locked });
                   setContextMenu((prev) => ({ ...prev, visible: false }));
                 }}
                 className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
               >
-                {elements.find((e) => e.id === contextMenu.elId)?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
-                {elements.find((e) => e.id === contextMenu.elId)?.locked ? "잠금 해제" : "위치 잠금"}
+                {contextMenuEl?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
+                {contextMenuEl?.locked ? "잠금 해제" : "위치 잠금"}
               </button>
               <button
                 type="button"

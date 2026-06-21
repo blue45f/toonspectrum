@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchPolicyDocument,
   formatPolicyDate,
+  getStaticPolicyDocument,
   groupPolicySections,
   parsePolicyBlocks,
   policyApiUrl,
@@ -66,6 +67,7 @@ describe("fetchPolicyDocument", () => {
       contentHash: HASH,
       body: PAYLOAD.body,
       effectiveAt: "2026-06-08T00:00:00.000Z",
+      source: "termsdesk",
     });
   });
 
@@ -172,10 +174,22 @@ describe("PolicyArticle", () => {
     expect(html).toContain("<strong");
     expect(html).toContain("<li>항목 하나</li>");
     expect(html).toContain("v1");
+    expect(html).toContain("TermsDesk 게시 정본");
     expect(html).toContain("746985ca8410");
     expect(html).not.toContain(HASH); // 풀 해시가 아니라 12자 축약만 노출
     expect(html).toContain("2026년 6월 8일");
     expect(html).toContain(policyPublicUrl("terms-of-service"));
+  });
+
+  it("renders the bundled static policy copy as a distinct fallback source", () => {
+    const doc = getStaticPolicyDocument("privacy-policy");
+    const html = renderToStaticMarkup(<PolicyArticle doc={doc} />);
+
+    expect(doc.source).toBe("static");
+    expect(html).toContain("1. 수집하는 항목");
+    expect(html).toContain("내장 정책 사본");
+    expect(html).toContain("TermsDesk에서 원문·버전 이력 보기");
+    expect(html).toContain(policyPublicUrl("privacy-policy"));
   });
 });
 

@@ -3,9 +3,7 @@ import { getCollectionIconOption } from "./visual-marks-utils";
 import type { Platform } from "@/lib/types";
 import type { CSSProperties } from "react";
 
-
-import { cn } from "@/lib/utils";
-
+import { cx } from "@/lib/cx";
 
 type MarkSize = "dot" | "xs" | "sm" | "md" | "lg";
 
@@ -330,7 +328,7 @@ export function PlatformMark({
 
   return (
     <span
-      className={cn(
+      className={cx(
         "relative inline-grid shrink-0 place-items-center overflow-hidden border border-[oklch(0.95_0.01_85/0.16)] font-display font-bold leading-none shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]",
         platformSizes[size],
         platformText[size],
@@ -360,7 +358,7 @@ export function PlatformMark({
 export function ToonSpectrumMark({ className }: { className?: string }) {
   return (
     <span
-      className={cn(
+      className={cx(
         "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.14)] bg-[#1c1613] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
         className
       )}
@@ -420,7 +418,7 @@ export function CollectionIcon({
 
   return (
     <span
-      className={cn(
+      className={cx(
         "relative inline-grid shrink-0 place-items-center overflow-hidden border border-[oklch(0.95_0.01_85/0.14)] text-fg shadow-[inset_0_1px_0_oklch(1_0_0/0.13)]",
         sizeClass,
         active && "ring-2 ring-accent/50",

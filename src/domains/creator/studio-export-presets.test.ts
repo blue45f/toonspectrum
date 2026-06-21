@@ -82,6 +82,11 @@ describe("recommendScale", () => {
     expect(recommendScale(720, naver)).toBeCloseTo(0.96, 2);
   });
 
+  it("추천 배율을 적용하면 플랫폼 권장 폭에 맞는 출력 픽셀이 된다", () => {
+    expect(Math.round(720 * recommendScale(720, naver))).toBe(naver.width);
+    expect(Math.round(720 * recommendScale(720, canvas))).toBe(canvas.width);
+  });
+
   it("캔버스 720 → 웹툰 캔버스 800 ≈ 1.11", () => {
     expect(recommendScale(720, canvas)).toBeCloseTo(1.11, 2);
   });

@@ -5,6 +5,8 @@ import { buttonClass } from "./ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 
+export { Container } from "./container";
+
 export function Section({
   eyebrow,
   title,
@@ -77,31 +79,6 @@ export function Rail({
           {child}
         </div>
       ))}
-    </div>
-  );
-}
-
-// 페이지 컨테이너
-export function Container({
-  children,
-  className,
-  size = "default",
-}: {
-  children: React.ReactNode;
-  className?: string;
-  size?: "default" | "wide" | "prose";
-}) {
-  return (
-    <div
-      className={cn(
-        "mx-auto w-full px-4 sm:px-6",
-        size === "wide" && "max-w-[1320px]",
-        size === "default" && "max-w-[1180px]",
-        size === "prose" && "max-w-3xl",
-        className
-      )}
-    >
-      {children}
     </div>
   );
 }

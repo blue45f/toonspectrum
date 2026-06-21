@@ -24,7 +24,7 @@ import { normalizeSketch } from "./studio-sketch";
 import { normalizeStylize } from "./studio-stylize";
 import { normalizeVibrance } from "./studio-vibrance";
 
-import type { ImageFilterFields } from "./studio-konva-filters";
+import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 // ---------------------------------------------------------------------------
 // 타입 — 룩 카테고리와 룩 자체

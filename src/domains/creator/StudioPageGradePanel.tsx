@@ -8,7 +8,7 @@ import {
   PAGE_GRADE_RANGES,
   type PageGrade,
   type PageGradePreset,
-} from "./studio-filters";
+} from "./studio-page-grade";
 
 import { buttonClass } from "@/components/ui/button-utils";
 

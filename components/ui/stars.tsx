@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cx } from "@/lib/cx";
 
 const SIZES = { xs: 11, sm: 13, md: 16, lg: 22 } as const;
 
@@ -18,7 +18,7 @@ export function Stars({
   const pct = Math.max(0, Math.min(100, (value / 5) * 100));
   return (
     <span
-      className={cn("relative inline-flex shrink-0", className)}
+      className={cx("relative inline-flex shrink-0", className)}
       style={{ gap: px * 0.12 }}
       aria-label={`별점 ${value.toFixed(1)} / 5`}
     >
@@ -65,7 +65,7 @@ export function RatingInline({
 }) {
   return (
     <span
-      className={cn("inline-flex items-center gap-1.5", className)}
+      className={cx("inline-flex items-center gap-1.5", className)}
       title={estimated ? "추정 별점" : undefined}
     >
       <Stars value={value} size={size} />

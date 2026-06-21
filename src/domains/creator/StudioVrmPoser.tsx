@@ -1,12 +1,8 @@
-import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
-import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
-
-
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, type StudioExpressionPreset } from "./studio-pose-presets";
 import {
@@ -66,6 +62,8 @@ import {
   saveVrmThumbnail,
   type VrmLibraryEntry,
 } from "./vrm-library";
+
+import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import {
   publishAsset,
@@ -424,7 +422,6 @@ function prepareVrmScene(vrm: VRM) {
   vrm.scene.traverse((object) => {
     object.frustumCulled = false;
     if (isMesh(object)) {
-      object.castShadow = true;
       object.receiveShadow = true;
     }
   });
@@ -434,7 +431,18 @@ function prepareVrmScene(vrm: VRM) {
 
 function disposeVrm(vrm: VRM) {
   vrm.scene.parent?.remove(vrm.scene);
-  VRMUtils.deepDispose(vrm.scene);
+  void import("@pixiv/three-vrm")
+    .then(({ VRMUtils }) => {
+      VRMUtils.deepDispose(vrm.scene);
+    })
+    .catch(() => {
+      vrm.scene.traverse((object) => {
+        if (!isMesh(object)) return;
+        object.geometry.dispose();
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => material.dispose());
+      });
+    });
 }
 
 function shouldPreflightVrmUrl(url: string) {
@@ -456,11 +464,16 @@ async function assertLoadableVrmUrl(url: string) {
 async function loadVrmAsset(url: string) {
   await assertLoadableVrmUrl(url);
 
+  const [{ GLTFLoader }, { VRMLoaderPlugin, VRMUtils }] = await Promise.all([
+    import("three/examples/jsm/loaders/GLTFLoader.js"),
+    import("@pixiv/three-vrm"),
+  ]);
+
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
-  return loader.loadAsync(url).then((gltf: GLTF) => {
-    VRMUtils.removeUnnecessaryJoints?.(gltf.scene);
+  return loader.loadAsync(url).then((gltf) => {
+    VRMUtils.combineSkeletons?.(gltf.scene);
 
     const loadedVrm = gltf.userData.vrm as VRM | undefined;
     if (!loadedVrm) {
@@ -1731,12 +1744,21 @@ function VrmActor({
 
 type LightingTone = "morning" | "sunset" | "night" | "studio";
 
+function GroundShadow() {
+  return (
+    <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.48, 0.82, 1]} renderOrder={-1}>
+      <circleGeometry args={[1, 72]} />
+      <meshBasicMaterial color="#3c2b20" transparent opacity={0.18} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 function VrmLighting({ tone }: { tone: LightingTone }) {
   if (tone === "sunset") {
     return (
       <>
         <ambientLight intensity={0.52} color="#ffe8d6" />
-        <directionalLight castShadow intensity={1.5} position={[2.8, 3.8, 3.0]} color="#ffa07a" shadow-mapSize={[1024, 1024]} />
+        <directionalLight intensity={1.5} position={[2.8, 3.8, 3.0]} color="#ffa07a" />
         <directionalLight intensity={0.6} position={[-3.2, 2.0, 2.1]} color="#ffb732" />
         <directionalLight intensity={0.3} position={[-1.6, 3.4, -3.2]} color="#ff6b8b" />
       </>
@@ -1746,7 +1768,7 @@ function VrmLighting({ tone }: { tone: LightingTone }) {
     return (
       <>
         <ambientLight intensity={0.34} color="#1b1c30" />
-        <directionalLight castShadow intensity={0.92} position={[2.8, 4.2, 3.6]} color="#7fa3ff" shadow-mapSize={[1024, 1024]} />
+        <directionalLight intensity={0.92} position={[2.8, 4.2, 3.6]} color="#7fa3ff" />
         <directionalLight intensity={0.4} position={[-3.2, 2.6, 2.1]} color="#483d8b" />
         <directionalLight intensity={0.5} position={[-1.6, 3.4, -3.2]} color="#8a2be2" />
       </>
@@ -1765,7 +1787,7 @@ function VrmLighting({ tone }: { tone: LightingTone }) {
   return (
     <>
       <ambientLight intensity={0.68} />
-      <directionalLight castShadow intensity={1.32} position={[2.8, 4.2, 3.6]} shadow-mapSize={[1024, 1024]} />
+      <directionalLight intensity={1.32} position={[2.8, 4.2, 3.6]} />
       <directionalLight intensity={0.54} position={[-3.2, 2.6, 2.1]} color="#f7d8c4" />
       <directionalLight intensity={0.42} position={[-1.6, 3.4, -3.2]} color="#cfdcff" />
     </>
@@ -2689,7 +2711,6 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                   className="h-full w-full"
                   dpr={[1, 2]}
                   gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
-                  shadows
                   onCreated={({ gl }) => {
                     gl.setClearColor(0x000000, 0);
                     gl.setClearAlpha(0);
@@ -2726,7 +2747,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                       />
                     );
                   })}
-                  <ContactShadows position={[0, 0.01, 0]} opacity={0.22} scale={4.8} blur={2.35} far={2.6} resolution={512} color="#3c2b20" />
+                  <GroundShadow />
                   <OrbitControls
                     makeDefault
                     enableDamping

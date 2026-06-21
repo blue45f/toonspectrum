@@ -20,10 +20,10 @@
  * UrlImage의 캐시 패턴(clearCache → cache → getLayer()?.batchDraw())을 그대로 따른다.
  * 순수 래퍼 — Konva/react-konva 외 의존 없음.
  */
-import Konva from "konva";
 import { useEffect, useRef } from "react";
-import { Group } from "react-konva";
+import { Group } from "react-konva/lib/ReactKonvaCore";
 
+import type Konva from "konva";
 import type { ReactNode } from "react";
 
 export function ClipMaskGroup({

@@ -1,7 +1,5 @@
 import { createContext, useContext } from "react";
 
-import { api, apiPath } from "@/src/infrastructure/api";
-
 export type Session = {
   user: {
     id?: string;
@@ -43,6 +41,7 @@ export function useSession(): SessionContextValue {
 // GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을
 // 서버에서 검증해 세션을 확정한다. 리다이렉트 없이 모달에서 바로 로그인 완료.
 export async function signInWithGoogleIdToken(idToken: string) {
+  const { api, apiPath } = await import("@/src/infrastructure/api");
   const response = await api.raw(apiPath("/auth/oauth/google/id-token"), {
     method: "POST",
     throwHttpErrors: false,
@@ -78,6 +77,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
   }
 
   // 로그인 실패(비-2xx)도 정상 흐름으로 { ok:false, error } 를 돌려주므로 ky 예외를 끄고 Response 를 직접 다룬다.
+  const { api, apiPath } = await import("@/src/infrastructure/api");
   const response = await api.raw(apiPath("/auth/login"), {
     method: "POST",
     throwHttpErrors: false,
@@ -108,6 +108,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 export async function signOut() {
   const token = currentSession?.token;
   if (token) {
+    const { api, apiPath } = await import("@/src/infrastructure/api");
     await api
       .raw(apiPath("/auth/logout"), {
         method: "POST",

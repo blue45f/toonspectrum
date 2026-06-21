@@ -7,79 +7,40 @@
  * 픽셀 수학과 상수는 studio-filters / 기존 StudioPage 구현 그대로(verbatim).
  */
 
-import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
-import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx, type BlurFx } from "./studio-blur";
-import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat, type ChannelMixer } from "./studio-channel-mixer";
-import { clarityKonvaFilter, normalizeClarity, isIdentityClarity, type Clarity } from "./studio-clarity";
-import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance, type ColorBalance } from "./studio-color-balance";
-import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat, type CurvePoint } from "./studio-curves";
-import { detailKonvaFilter, normalizeDetail, isIdentityDetail, type Detail } from "./studio-detail";
-import { distortKonvaFilter, normalizeDistort, isIdentityDistort, type Distort } from "./studio-distort";
-import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
-import { glowKonvaFilter, normalizeGlow, isIdentityGlow, type Glow } from "./studio-glow";
-import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat, type GradientMap } from "./studio-gradient-map";
-import { grainKonvaFilter, normalizeGrain, isIdentityGrain, type Grain } from "./studio-grain";
-import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone, type Halftone } from "./studio-halftone";
-import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
-import { lightKonvaFilter, normalizeLight, isIdentityLight, type Light } from "./studio-light";
-import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad, type Outline } from "./studio-outline";
-import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter, type PhotoFilter } from "./studio-photo-filter";
-import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat, type SelectiveHsl } from "./studio-selective-hsl";
-import { sketchKonvaFilter, normalizeSketch, isIdentitySketch, type Sketch } from "./studio-sketch";
-import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize, type Stylize } from "./studio-stylize";
-import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance, type Vibrance } from "./studio-vibrance";
+import { Blur } from "konva/lib/filters/Blur";
+import { Brighten } from "konva/lib/filters/Brighten";
+import { Contrast } from "konva/lib/filters/Contrast";
+import { Grayscale } from "konva/lib/filters/Grayscale";
+import { HSL } from "konva/lib/filters/HSL";
+import { Invert } from "konva/lib/filters/Invert";
+import { Pixelate } from "konva/lib/filters/Pixelate";
+import { Sepia } from "konva/lib/filters/Sepia";
 
-// 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합) — 결합도를 낮추기 위한 로컬 타입.
-export type ImageFilterFields = {
-  blur?: number;
-  brightness?: number;
-  contrast?: number;
-  grayscale?: boolean;
-  sepia?: boolean;
-  screentone?: boolean;
-  lineart?: boolean;
-  chromatic?: number;
-  posterize?: number;
-  noise?: number;
-  saturation?: number;
-  hue?: number;
-  temperature?: number;
-  sharpen?: number;
-  pixelate?: number;
-  invert?: boolean;
-  inkThreshold?: number;
-  duotoneShadow?: string;
-  duotoneHighlight?: string;
-  // 레벨 보정(studio-levels) — 입력/출력 검정·흰점 + 감마.
-  levelsBlack?: number;
-  levelsWhite?: number;
-  levelsGamma?: number;
-  levelsOutBlack?: number;
-  levelsOutWhite?: number;
-  // 톤 커브(studio-curves) + 컬러 밸런스(studio-color-balance) + 채널 믹서(studio-channel-mixer).
-  curve?: CurvePoint[];
-  colorBalance?: ColorBalance;
-  channelMixer?: ChannelMixer;
-  selectiveHsl?: SelectiveHsl;
-  vibrance?: Vibrance;
-  gradientMap?: GradientMap;
-  photoFilter?: PhotoFilter;
-  autoAdjust?: AutoAdjust;
-  clarity?: Clarity;
-  outline?: Outline;
-  glow?: Glow;
-  halftone?: Halftone;
-  grain?: Grain;
-  // 흐림 갤러리(studio-blur) + 기하 왜곡(studio-distort).
-  blurFx?: BlurFx;
-  distort?: Distort;
-  // 스타일라이즈(studio-stylize) + 조명 효과(studio-light).
-  stylize?: Stylize;
-  light?: Light;
-  // 스케치/잉크(studio-sketch) + 디테일/샤픈(studio-detail).
-  sketch?: Sketch;
-  detail?: Detail;
-};
+import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust } from "./studio-auto-adjust";
+import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-blur";
+import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
+import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "./studio-clarity";
+import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "./studio-color-balance";
+import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat } from "./studio-curves";
+import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
+import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
+import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
+import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
+import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
+import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "./studio-grain";
+import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "./studio-halftone";
+import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
+import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
+import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
+import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "./studio-photo-filter";
+import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat } from "./studio-selective-hsl";
+import { sketchKonvaFilter, normalizeSketch, isIdentitySketch } from "./studio-sketch";
+import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize } from "./studio-stylize";
+import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance } from "./studio-vibrance";
+
+import type { ImageFilterFields } from "./studio-konva-filter-fields";
+
+export type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 // 하프톤이 항등(세기0)이 아니면 활성.
 function hasActiveHalftone(el: ImageFilterFields): boolean {
@@ -195,6 +156,17 @@ export type KonvaLike = {
   };
 };
 
+const BUILT_IN_KONVA_FILTERS: Record<string, unknown> = {
+  Blur,
+  Brighten,
+  Contrast,
+  Grayscale,
+  HSL,
+  Invert,
+  Pixelate,
+  Sepia,
+};
+
 // 보정값이 "활성"인지: 불리언은 truthy, 숫자는 0이 아니고 null/undefined가 아닐 때.
 function isActiveNumber(value: number | undefined): boolean {
   return value != null && value !== 0;
@@ -208,6 +180,10 @@ function isActiveNumber(value: number | undefined): boolean {
  */
 export function registerStudioKonvaFilters(konva: KonvaLike): void {
   const F = konva.Filters;
+
+  for (const [name, filter] of Object.entries(BUILT_IN_KONVA_FILTERS)) {
+    if (!F[name]) F[name] = filter;
+  }
 
   // --- StudioPage에서 옮겨온 5개(픽셀 수학·상수 그대로) ---
 

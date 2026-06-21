@@ -29,12 +29,22 @@ function safeProfileImageSrc(value: string | null | undefined): string | null {
 const ITEM_CLASS =
   "flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-sm text-fg-2 outline-none transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg data-[highlighted]:bg-raised data-[highlighted]:text-fg";
 
-export function AuthMenu() {
+export function AuthMenu({
+  defaultOpen = false,
+  defaultMenuOpen = false,
+}: {
+  defaultOpen?: boolean;
+  defaultMenuOpen?: boolean;
+}) {
   const { data: session, status } = useSession();
-  const [modal, setModal] = useState(false);
+  const [modal, setModal] = useState(defaultOpen);
   const [isAdmin, setIsAdmin] = useState(false);
   const t = useT();
   const uid = session?.user?.id;
+
+  useEffect(() => {
+    if (defaultOpen) setModal(true);
+  }, [defaultOpen]);
 
   // 관리자 콘솔 링크 노출 — 세션 role 은 화이트리스트(ADMIN_EMAILS) 승격을 반영 못 하므로
   // /api/admin/me 프로브로 실제 권한을 확인(성공=관리자)해 게이트한다.
@@ -80,7 +90,7 @@ export function AuthMenu() {
   const showAdmin = (u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin;
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root defaultOpen={defaultMenuOpen}>
       <DropdownMenu.Trigger
         className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label="계정 메뉴"

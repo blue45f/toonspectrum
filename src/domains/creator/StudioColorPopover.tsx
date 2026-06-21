@@ -4,15 +4,11 @@
 import { Pipette, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  isValidHexColor,
-  normalizeHexColor,
-  STUDIO_PALETTES,
-  type StudioPalette,
-} from "./studio-color-palettes";
+import { isValidHexColor, normalizeHexColor } from "./studio-color-utils";
 
-import { cn } from "@/lib/utils";
+import type { StudioPalette } from "./studio-color-palettes";
 
+import { cx } from "@/lib/cx";
 
 // EyeDropper는 일부 브라우저에만 있는 실험적 API — 타입 정의가 없어 좁은 형태만 선언한다.
 type EyeDropperResult = { sRGBHex: string };
@@ -25,6 +21,16 @@ function getEyeDropperCtor(): EyeDropperCtor | null {
   return typeof ctor === "function" ? ctor : null;
 }
 
+export type StudioColorPopoverProps = {
+  value: string;
+  onChange: (color: string) => void;
+  recentColors: string[];
+  onUseColor?: (color: string) => void;
+  title?: string;
+  className?: string;
+  initialOpen?: boolean;
+};
+
 export function StudioColorPopover({
   value,
   onChange,
@@ -32,20 +38,15 @@ export function StudioColorPopover({
   onUseColor,
   title,
   className,
-}: {
-  value: string;
-  onChange: (color: string) => void;
-  recentColors: string[];
-  onUseColor?: (color: string) => void;
-  title?: string;
-  className?: string;
-}): React.ReactElement {
-  const [open, setOpen] = useState(false);
+  initialOpen = false,
+}: StudioColorPopoverProps): React.ReactElement {
+  const [open, setOpen] = useState(initialOpen);
   // 트리거가 화면 우측/하단에 가까우면 팝오버를 안쪽으로 펼쳐 뷰포트 밖 잘림을 막는다.
   const [alignRight, setAlignRight] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   // 팔레트 탭 — 기본은 첫 팔레트, 선택 id로 어떤 팔레트의 색을 보여줄지 제어.
-  const [paletteId, setPaletteId] = useState<string>(STUDIO_PALETTES[0]?.id ?? "");
+  const [palettes, setPalettes] = useState<StudioPalette[]>([]);
+  const [paletteId, setPaletteId] = useState<string>("");
   // 헥스 텍스트 입력 로컬값 — 타이핑 중간 무효 상태를 허용하고 확정 시에만 반영.
   const [hexDraft, setHexDraft] = useState(value);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,23 @@ export function StudioColorPopover({
     setDropUp(rect.bottom + 340 > globalThis.innerHeight && rect.top > 340);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || palettes.length > 0) return;
+    let active = true;
+    import("./studio-color-palettes")
+      .then(({ STUDIO_PALETTES }) => {
+        if (!active) return;
+        setPalettes(STUDIO_PALETTES);
+        setPaletteId((current) => (current || STUDIO_PALETTES[0]?.id) ?? "");
+      })
+      .catch((error) => {
+        console.error("Failed to load studio color palettes:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, palettes.length]);
+
   // 팝오버 열림 동안 바깥 mousedown이면 닫는다. 닫힐 때 리스너 정리.
   useEffect(() => {
     if (!open) return;
@@ -85,13 +103,12 @@ export function StudioColorPopover({
     onUseColor?.(c);
   };
 
-  const activePalette: StudioPalette =
-    STUDIO_PALETTES.find((p) => p.id === paletteId) ?? STUDIO_PALETTES[0]!;
+  const activePalette: StudioPalette | null = palettes.find((p) => p.id === paletteId) ?? palettes[0] ?? null;
 
   const eyeDropperCtor = getEyeDropperCtor();
 
   return (
-    <div ref={rootRef} className={cn("relative inline-block", className)}>
+    <div ref={rootRef} className={cx("relative inline-block", className)}>
       {/* 트리거 — 현재 색 스와치 */}
       <button
         type="button"
@@ -105,7 +122,7 @@ export function StudioColorPopover({
 
       {open && (
         <div
-          className={cn(
+          className={cx(
             "absolute z-50 w-60 max-h-[min(70vh,24rem)] overflow-auto rounded-lg border border-line bg-card p-3 shadow-lg",
             alignRight ? "right-0" : "left-0",
             dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
@@ -192,37 +209,47 @@ export function StudioColorPopover({
 
           {/* 팔레트 탭 + 선택 팔레트 색 그리드 */}
           <div className="mt-2.5">
-            <div className="mb-1.5 flex flex-wrap gap-1">
-              {STUDIO_PALETTES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  title={p.tip}
-                  onClick={() => setPaletteId(p.id)}
-                  aria-pressed={p.id === activePalette.id}
-                  className={cn(
-                    "rounded px-1.5 py-0.5 text-[0.66rem] border transition-colors",
-                    p.id === activePalette.id
-                      ? "bg-accent-soft border-accent/60 text-accent"
-                      : "bg-card border-line text-fg-3 hover:bg-raised hover:text-fg-2"
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {activePalette.colors.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  title={c}
-                  onClick={() => handleSelect(c)}
-                  className="h-5 w-5 rounded border border-line cursor-pointer"
-                  style={{ background: c }}
-                />
-              ))}
-            </div>
+            {activePalette ? (
+              <>
+                <div className="mb-1.5 flex flex-wrap gap-1">
+                  {palettes.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      title={p.tip}
+                      onClick={() => setPaletteId(p.id)}
+                      aria-pressed={p.id === activePalette.id}
+                      className={cx(
+                        "rounded px-1.5 py-0.5 text-[0.66rem] border transition-colors",
+                        p.id === activePalette.id
+                          ? "bg-accent-soft border-accent/60 text-accent"
+                          : "bg-card border-line text-fg-3 hover:bg-raised hover:text-fg-2"
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {activePalette.colors.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onClick={() => handleSelect(c)}
+                      className="h-5 w-5 rounded border border-line cursor-pointer"
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap gap-1" aria-label="팔레트 불러오는 중">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <span key={i} className="h-5 w-5 rounded border border-line bg-raised/70" />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -4,10 +4,12 @@ import { Fragment, useEffect, useState } from "react";
 import {
   fetchPolicyDocument,
   formatPolicyDate,
+  getStaticPolicyDocument,
   groupPolicySections,
   parsePolicyBlocks,
   policyPublicUrl,
   shortContentHash,
+  shouldAutoFetchPolicyDocument,
   splitBoldSegments,
   type PolicyBlock,
   type PolicyDocument,
@@ -21,8 +23,8 @@ import { ErrorState } from "@/src/components/error-state";
 
 
 // 이용약관(/terms)·개인정보처리방침(/privacy).
-// 외부 리다이렉트 대신 TermsDesk 공개 API에서 게시 정본을 받아 내부에서 렌더하고,
-// 하단에 버전·콘텐츠 해시·시행일을 표기해 "지금 보는 문서가 게시 정본"임을 보장한다.
+// 외부 리다이렉트 대신 TermsDesk 공개 API에서 게시 정본을 받아 내부에서 렌더한다.
+// 로컬 preview 처럼 API 프록시가 없을 때는 내장 정책 사본을 즉시 보여준다.
 
 function InlineText({ text }: { text: string }) {
   const segments = splitBoldSegments(text);
@@ -68,6 +70,7 @@ function PolicyBlockView({ block }: { block: PolicyBlock }) {
 export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
   const sections = groupPolicySections(parsePolicyBlocks(doc.body));
   const effective = formatPolicyDate(doc.effectiveAt);
+  const isStatic = doc.source === "static";
   return (
     <>
       <div className="mt-8 space-y-7 text-sm leading-relaxed text-fg-2">
@@ -85,13 +88,20 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
       <footer className="mt-10 rounded-2xl border border-line/60 bg-card/20 p-4 text-xs leading-relaxed text-fg-3">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <FileCheck2 size={14} className="shrink-0 text-accent" aria-hidden />
-          <span className="font-medium text-fg-2">TermsDesk 게시 정본</span>
+          <span className="font-medium text-fg-2">{isStatic ? "내장 정책 사본" : "TermsDesk 게시 정본"}</span>
           <span>{doc.versionLabel}</span>
           {effective && <span>· 시행일 {effective}</span>}
           <span>
-            · 해시 <code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code>
+            · {isStatic ? "사본 ID" : "해시"}{" "}
+            <code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code>
           </span>
         </p>
+        {isStatic && (
+          <p className="mt-2">
+            API 연결 없이도 정책을 확인할 수 있도록 포함한 사본입니다. 최신 게시 정본은 TermsDesk 링크에서
+            확인할 수 있습니다.
+          </p>
+        )}
         <a
           href={policyPublicUrl(doc.policySlug)}
           target="_blank"
@@ -166,15 +176,23 @@ function PolicyPageShell({
   eyebrow: string;
   fallbackName: string;
 }) {
-  const [doc, setDoc] = useState<PolicyDocument | null>(null);
-  const [loading, setLoading] = useState(true);
+  const fallbackDoc = getStaticPolicyDocument(slug);
+  const [doc, setDoc] = useState<PolicyDocument | null>(fallbackDoc);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (!shouldAutoFetchPolicyDocument()) {
+      setDoc(fallbackDoc);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
     let alive = true;
     const controller = new AbortController();
-    setLoading(true);
+    setLoading(false);
     setError(false);
     fetchPolicyDocument(slug, controller.signal)
       .then((payload) => {
@@ -182,7 +200,7 @@ function PolicyPageShell({
       })
       .catch(() => {
         if (!alive || controller.signal.aborted) return;
-        setDoc(null);
+        setDoc(fallbackDoc);
         setError(true);
       })
       .finally(() => {
@@ -192,7 +210,7 @@ function PolicyPageShell({
       alive = false;
       controller.abort();
     };
-  }, [slug, reloadKey]);
+  }, [fallbackDoc, slug, reloadKey]);
 
   return (
     <Container size="prose" className="py-12 lg:py-16">
@@ -200,9 +218,21 @@ function PolicyPageShell({
       <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">
         {doc?.name || fallbackName}
       </h1>
+      {error && doc ? (
+        <div className="mt-5 rounded-2xl border border-line/60 bg-card/20 p-4 text-sm leading-relaxed text-fg-2">
+          <p>TermsDesk 게시 정본을 동기화하지 못해 내장 정책 사본을 표시합니다.</p>
+          <button
+            type="button"
+            className={buttonClass({ size: "sm", variant: "outline", className: "mt-3" })}
+            onClick={() => setReloadKey((v) => v + 1)}
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : null}
       {loading ? (
         <PolicySkeleton label={fallbackName} />
-      ) : error || !doc ? (
+      ) : !doc ? (
         <PolicyErrorFallback slug={slug} label={fallbackName} onRetry={() => setReloadKey((v) => v + 1)} />
       ) : (
         <PolicyArticle doc={doc} />

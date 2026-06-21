@@ -1,5 +1,6 @@
-import { type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
 import * as THREE from "three";
+
+import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type Vec3 = readonly [number, number, number];
 export type SideAwareDirection = {

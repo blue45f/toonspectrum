@@ -3,7 +3,7 @@ import { CoverImage } from "./cover-image";
 
 import type { Title } from "@/lib/types";
 
-import { cn } from "@/lib/utils";
+import { cx } from "@/lib/cx";
 
 const SIZE = {
   sm: { pad: "p-2.5", title: "text-sm leading-[1.15]", type: "text-[0.58rem]", wm: "text-[3.8rem]" },
@@ -19,6 +19,7 @@ export function TitlePoster({
   className,
   rank,
   priority,
+  unframed = false,
   titleAs: TitleTag = "h3",
 }: {
   title: Title;
@@ -26,6 +27,7 @@ export function TitlePoster({
   className?: string;
   rank?: number;
   priority?: boolean;
+  unframed?: boolean;
   // 표지 오버레이 제목의 시맨틱 태그. 상위 카드가 별도 제목을 가질 땐 "div"로 내려 heading 중복/순서 위반 방지.
   titleAs?: "h2" | "h3" | "div";
 }) {
@@ -36,7 +38,7 @@ export function TitlePoster({
   const issue = String(title.releaseYear).slice(-2);
   const glyphNode = (
     <div
-      className={cn(
+      className={cx(
         "absolute -right-3 top-1 select-none font-bold leading-none text-[oklch(0.96_0.01_85/0.14)] mix-blend-overlay",
         isNovel ? "font-serif" : "font-display",
         s.wm
@@ -49,8 +51,9 @@ export function TitlePoster({
 
   return (
     <div
-      className={cn(
-        "relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-[oklch(0.95_0.01_85/0.16)] bg-card shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]",
+      className={cx(
+        "relative aspect-[3/4] w-full overflow-hidden bg-card shadow-[inset_0_1px_0_oklch(1_0_0/0.14)]",
+        !unframed && "rounded-xl border border-[oklch(0.95_0.01_85/0.16)]",
         className
       )}
       style={{
@@ -83,9 +86,9 @@ export function TitlePoster({
       <div className="pointer-events-none absolute left-3 right-3 top-3 h-px bg-[oklch(0.95_0.01_85/0.28)]" />
       <div className="pointer-events-none absolute bottom-3 right-3 h-10 w-px bg-[oklch(0.95_0.01_85/0.2)]" />
 
-      <div className={cn("absolute left-0 top-0 flex items-center gap-1.5", s.pad)}>
+      <div className={cx("absolute left-0 top-0 flex items-center gap-1.5", s.pad)}>
         <span
-          className={cn(
+          className={cx(
             "rounded-md border border-[oklch(0.95_0.01_85/0.28)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-0.5 font-display font-semibold uppercase text-[oklch(0.95_0.01_85/0.9)] backdrop-blur-sm",
             s.type
           )}
@@ -93,7 +96,7 @@ export function TitlePoster({
           {isNovel ? "NOVEL" : "TOON"}
         </span>
         {size !== "sm" && (
-          <span className={cn("font-display font-semibold text-[oklch(0.95_0.01_85/0.62)]", s.type)}>
+          <span className={cx("font-display font-semibold text-[oklch(0.95_0.01_85/0.62)]", s.type)}>
             IDX {issue}
           </span>
         )}
@@ -105,9 +108,9 @@ export function TitlePoster({
         </div>
       )}
 
-      <div className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-1", s.pad)}>
+      <div className={cx("absolute inset-x-0 bottom-0 flex flex-col gap-1", s.pad)}>
         <TitleTag
-          className={cn(
+          className={cx(
             "text-balance line-clamp-3 font-bold text-[oklch(0.97_0.012_85)] drop-shadow-[0_1px_8px_oklch(0.1_0.02_70/0.72)]",
             isNovel ? "font-serif" : "",
             s.title

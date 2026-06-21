@@ -1,0 +1,242 @@
+import { Copy } from "lucide-react";
+
+import {
+  EXPORT_FORMATS,
+  EXPORT_SCALES,
+  canCopyImageToClipboard,
+  exportFormatLabel,
+  exportQuality,
+  type ExportFormat,
+} from "./studio-export";
+import { EXPORT_PRESETS, planStripSlices, recommendScale, validateExport } from "./studio-export-presets";
+import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
+
+import type { Dispatch, SetStateAction } from "react";
+
+import { cx } from "@/lib/cx";
+
+export interface StudioExportMenuPanelProps {
+  canvasWidth: number;
+  canvasHeight: number;
+  exportScale: number;
+  exportFormat: ExportFormat;
+  exportTransparent: boolean;
+  exportPresetId: string | null;
+  watermark: WatermarkSettings;
+  isExporting: boolean;
+  setExportScale: Dispatch<SetStateAction<number>>;
+  setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
+  setExportTransparent: Dispatch<SetStateAction<boolean>>;
+  setExportPresetId: Dispatch<SetStateAction<string | null>>;
+  setWatermark: (next: WatermarkSettings) => void;
+  onCopyToClipboard: () => void;
+}
+
+export function StudioExportMenuPanel({
+  canvasWidth,
+  canvasHeight,
+  exportScale,
+  exportFormat,
+  exportTransparent,
+  exportPresetId,
+  watermark,
+  isExporting,
+  setExportScale,
+  setExportFormat,
+  setExportTransparent,
+  setExportPresetId,
+  setWatermark,
+  onCopyToClipboard,
+}: StudioExportMenuPanelProps) {
+  const selectedPreset = exportPresetId ? EXPORT_PRESETS.find((preset) => preset.id === exportPresetId) : null;
+  const outW = Math.round(canvasWidth * exportScale);
+  const outH = Math.round(canvasHeight * exportScale);
+  const validation = selectedPreset
+    ? validateExport({ width: outW, height: outH, format: exportFormat }, selectedPreset)
+    : null;
+  const maxH = selectedPreset?.maxImageHeight;
+  const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
+  const quality = exportQuality(exportFormat);
+
+  return (
+    <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
+      <div className="mb-2.5">
+        <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
+        <div className="flex flex-wrap gap-1">
+          {EXPORT_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => {
+                setExportPresetId(preset.id);
+                if (!preset.allowedFormats.includes(exportFormat)) setExportFormat(preset.recommendedFormat);
+                if (preset.width > 0) setExportScale(recommendScale(canvasWidth, preset));
+              }}
+              aria-pressed={exportPresetId === preset.id}
+              title={preset.note}
+              className={cx(
+                "h-7 rounded-lg border px-2 text-[0.68rem] font-semibold transition-colors",
+                exportPresetId === preset.id
+                  ? "border-accent bg-accent-soft text-fg"
+                  : "border-line bg-card text-fg-2 hover:bg-raised"
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-fg-2">배율</span>
+        <div className="flex items-center gap-1">
+          {EXPORT_SCALES.map((scale) => (
+            <button
+              key={scale}
+              type="button"
+              onClick={() => {
+                setExportScale(scale);
+                setExportPresetId(null);
+              }}
+              aria-pressed={exportScale === scale}
+              className={cx(
+                "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
+                exportScale === scale ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+              )}
+            >
+              {scale}×
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-fg-2">포맷</span>
+        <div className="flex items-center gap-1">
+          {EXPORT_FORMATS.map((format) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => setExportFormat(format)}
+              aria-pressed={exportFormat === format}
+              className={cx(
+                "h-7 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
+                exportFormat === format ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+              )}
+            >
+              {exportFormatLabel(format)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label
+        className={cx(
+          "mt-2.5 flex items-center gap-1.5 text-xs",
+          exportFormat === "jpg" ? "cursor-not-allowed text-fg-3 opacity-50" : "cursor-pointer text-fg-2"
+        )}
+        title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명하게 내보내기"}
+      >
+        <input
+          type="checkbox"
+          checked={exportTransparent && exportFormat !== "jpg"}
+          disabled={exportFormat === "jpg"}
+          onChange={(event) => setExportTransparent(event.target.checked)}
+          className="size-3.5 cursor-pointer accent-[var(--color-accent)] disabled:cursor-not-allowed"
+        />
+        투명 배경 (PNG·WebP)
+      </label>
+
+      <div className="mt-2.5 border-t border-line pt-2.5">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg-2">
+          <input
+            type="checkbox"
+            checked={watermark.enabled}
+            onChange={(event) => setWatermark({ ...watermark, enabled: event.target.checked })}
+            className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+          />
+          서명·워터마크
+        </label>
+        {watermark.enabled && (
+          <div className="mt-1.5 space-y-1.5">
+            <input
+              type="text"
+              value={watermark.text}
+              onChange={(event) => setWatermark({ ...watermark, text: event.target.value })}
+              placeholder="© 작가명 / @아이디"
+              maxLength={60}
+              className="w-full rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+            />
+            <div className="flex items-center gap-1.5">
+              <select
+                value={watermark.position}
+                onChange={(event) =>
+                  setWatermark({ ...watermark, position: event.target.value as WatermarkSettings["position"] })
+                }
+                className="h-7 flex-1 rounded-lg border border-line bg-card px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
+                aria-label="워터마크 위치"
+              >
+                {WATERMARK_POSITIONS.map((position) => (
+                  <option key={position.id} value={position.id}>
+                    {position.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="range"
+                min={0.15}
+                max={1}
+                step={0.05}
+                value={watermark.opacity}
+                onChange={(event) => setWatermark({ ...watermark, opacity: Number(event.target.value) })}
+                className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
+                title="워터마크 투명도"
+                aria-label="워터마크 투명도"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {canCopyImageToClipboard() && (
+        <button
+          type="button"
+          onClick={onCopyToClipboard}
+          disabled={isExporting}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
+          title="현재 페이지를 클립보드에 이미지로 복사 (붙여넣기로 바로 사용)"
+        >
+          <Copy size={13} /> 클립보드로 복사
+        </button>
+      )}
+
+      <p className="mt-2 text-[10px] tabular-nums text-fg-3">
+        출력 폭 {outW.toLocaleString()}px
+        {quality !== undefined ? ` · 품질 ${Math.round(quality * 100)}%` : ""}
+      </p>
+
+      {selectedPreset && validation && (
+        <div className="mt-2 space-y-1">
+          {validation.warnings.map((warning) => (
+            <p
+              key={warning.code}
+              className="rounded-md border border-warn/40 bg-warn/10 px-2 py-1 text-[10px] leading-snug text-warn"
+            >
+              ⚠ {warning.message}
+            </p>
+          ))}
+          {slices && maxH !== undefined && (
+            <p className="rounded-md border border-line bg-card px-2 py-1 text-[10px] leading-snug text-fg-3">
+              규격 높이 {maxH.toLocaleString()}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
+            </p>
+          )}
+          {validation.ok && !slices && (
+            <p className="rounded-md border border-good/40 bg-good/10 px-2 py-1 text-[10px] leading-snug text-good">
+              {selectedPreset.label} 규격에 맞아요.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

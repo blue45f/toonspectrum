@@ -6,8 +6,8 @@ import { PlatformMark } from "./visual-marks";
 import type { Availability } from "@/lib/types";
 
 
+import { cx } from "@/lib/cx";
 import { PLATFORMS, PRICING_FULL } from "@/lib/platforms";
-import { cn } from "@/lib/utils";
 
 const PRICING_ICON = {
   free: Gift,
@@ -29,7 +29,7 @@ export function AvailabilityDots({
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
-    <span className={cn("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
+    <span className={cx("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
       {shown.map((a) => {
         const p = PLATFORMS[a.platformId];
         return (
@@ -63,7 +63,7 @@ export function PlatformTags({
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-1", className)}>
+    <span className={cx("inline-flex flex-wrap items-center gap-1", className)}>
       {shown.map((a) => {
         const p = PLATFORMS[a.platformId];
         return (
@@ -100,7 +100,7 @@ export function AvailabilityRouter({
   const sorted = [...availability].sort((a, b) => order[a.pricing] - order[b.pricing]);
 
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div className={cx("flex flex-col gap-1.5", className)}>
       {sorted.map((a) => {
         const p = PLATFORMS[a.platformId];
         const hasUrl = Boolean(a.url);
@@ -110,7 +110,7 @@ export function AvailabilityRouter({
             <PlatformMark platform={p} size="lg" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium text-fg">{p.name}</span>
-              <span className={cn("mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium", PRICING_TONE[a.pricing])}>
+              <span className={cx("mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium", PRICING_TONE[a.pricing])}>
                 <PricingIcon size={12} />
                 {PRICING_FULL[a.pricing]}
                 {a.isOriginal && <span className="ml-1.5 text-accent">· 독점</span>}

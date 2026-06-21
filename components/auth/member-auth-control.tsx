@@ -1,7 +1,7 @@
 "use client";
 
 import { LogIn, LogOut, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AuthDialog, useAuth } from "@/lib/firebaseAuth";
 import { cn, keepInlineText } from "@/lib/utils";
@@ -16,9 +16,19 @@ import { cn, keepInlineText } from "@/lib/utils";
  *
  * 헤더 폭이 좁아 라벨은 xl 이상에서만 노출하고, 그 외엔 아이콘만 보여준다(기존 헤더 관례).
  */
-export function MemberAuthControl({ className }: { className?: string }) {
+export function MemberAuthControl({
+  className,
+  defaultOpen = false,
+}: {
+  className?: string;
+  defaultOpen?: boolean;
+}) {
   const { user, loading, signOut } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
 
   if (loading) {
     // 초기 onAuthStateChanged 해석 전 — 레이아웃 점프 방지용 플레이스홀더.

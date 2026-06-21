@@ -5,6 +5,63 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
+const ENTRY_PRELOAD_EXCLUSIONS = [
+  "studio-konva-runtime",
+  "StudioVrmPoser",
+  "three.module",
+  "three-vrm.module",
+  "GLTFLoader",
+  "lucide-studio-core-icons",
+];
+const INITIAL_ICON_MODULES = new Set([
+  "chevron-left",
+  "chevron-right",
+  "pause",
+  "play",
+  "sparkles",
+  "star",
+]);
+const STUDIO_CORE_ICON_MODULES = new Set([
+  "bookmark",
+  "chevron-down",
+  "chevron-left",
+  "chevron-right",
+  "chevron-up",
+  "download",
+  "eye",
+  "eye-off",
+  "grid-2x2",
+  "image-plus",
+  "layout-template",
+  "loader-circle",
+  "minus",
+  "pencil",
+  "plus",
+  "rotate-ccw",
+  "send",
+  "sliders-horizontal",
+  "star",
+  "trash-2",
+  "type",
+  "upload",
+]);
+
+function iconModuleName(id: string) {
+  if (!id.includes("/node_modules/lucide-react/dist/esm/icons/")) return null;
+  const fileName = id.slice(id.lastIndexOf("/") + 1);
+  if (!fileName.endsWith(".mjs")) return null;
+  return fileName.slice(0, -4);
+}
+
+function isInitialIconModule(id: string) {
+  const moduleName = iconModuleName(id);
+  return Boolean(moduleName && INITIAL_ICON_MODULES.has(moduleName));
+}
+
+function isStudioCoreIconModule(id: string) {
+  const moduleName = iconModuleName(id);
+  return Boolean(moduleName && STUDIO_CORE_ICON_MODULES.has(moduleName));
+}
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
@@ -20,6 +77,38 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
+    },
+  },
+  build: {
+    modulePreload: {
+      resolveDependencies(_filename, deps, context) {
+        if (context.hostType !== "html") return deps;
+        return deps.filter((dep) => !ENTRY_PRELOAD_EXCLUSIONS.some((chunkName) => dep.includes(chunkName)));
+      },
+    },
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("/node_modules/react/") ||
+            id.includes("/node_modules/react-dom/") ||
+            id.includes("/node_modules/scheduler/") ||
+            id.includes("/node_modules/react-router/") ||
+            id.includes("/node_modules/react-router-dom/")
+          ) {
+            return "react-runtime";
+          }
+          if (id.includes("/node_modules/konva/") || id.includes("/node_modules/react-konva/")) {
+            return "studio-konva-runtime";
+          }
+          if (isInitialIconModule(id)) {
+            return "lucide-initial-icons";
+          }
+          if (isStudioCoreIconModule(id)) {
+            return "lucide-studio-core-icons";
+          }
+        },
+      },
     },
   },
   server: {

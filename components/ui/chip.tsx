@@ -1,5 +1,5 @@
+import { cx } from "@/lib/cx";
 import { genreColor, genreTint, genreBorder } from "@/lib/genre-color";
-import { cn } from "@/lib/utils";
 
 // 장르 스펙트럼 칩 — 장르별 고유 hue 틴트
 export function GenreChip({
@@ -15,7 +15,7 @@ export function GenreChip({
 }) {
   return (
     <span
-      className={cn(
+      className={cx(
         "inline-flex items-center rounded-full border font-medium transition-colors duration-150 ease-out-expo",
         size === "sm" ? "px-2 py-0.5 text-[0.7rem]" : "px-2.5 py-1 text-xs",
         className
@@ -51,7 +51,7 @@ export function TagChip({
     <button
       type="button"
       disabled={!interactive ? true : props.disabled}
-      className={cn(
+      className={cx(
         "inline-flex items-center rounded-full border font-medium transition-all duration-150 ease-out-expo",
         size === "sm" ? "px-2 py-0.5 text-[0.7rem]" : "px-2.5 py-1 text-xs",
         active
@@ -88,7 +88,7 @@ export function Badge({
   };
   return (
     <span
-      className={cn(
+      className={cx(
         "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.7rem] font-medium leading-none",
         tones[tone],
         className

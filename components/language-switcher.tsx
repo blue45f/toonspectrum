@@ -1,8 +1,8 @@
 import { Languages } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { cx } from "@/lib/cx";
 import { useI18n, type Lang } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 const HIDE_AFTER_MS = 4000;
 
@@ -36,7 +36,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   ];
   return (
     <div
-      className={cn(
+      className={cx(
         "inline-flex items-center gap-1 rounded-full border border-line bg-panel/90 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.3)] backdrop-blur",
         "transition-opacity duration-500 ease-out hover:opacity-100 focus-within:opacity-100",
         visible ? "opacity-100" : "opacity-0",
@@ -56,7 +56,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           type="button"
           onClick={() => setLang(o.id)}
           aria-pressed={lang === o.id}
-          className={cn(
+          className={cx(
             "rounded-full px-2 py-1 text-xs font-semibold transition-colors",
             lang === o.id ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
           )}

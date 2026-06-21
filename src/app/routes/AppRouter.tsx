@@ -2,8 +2,6 @@ import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 import { ErrorBoundary } from "@/src/components/error-boundary";
-import { NotFoundPage } from "@/src/components/NotFoundPage";
-import { HomePage } from "@/src/domains/catalog/HomePage";
 
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
 // /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.
@@ -105,8 +103,9 @@ function lazyRetry<T extends ComponentType<unknown>>(load: () => Promise<{ defau
   });
 }
 
-// 라우트별 코드 분할 — 랜딩(HomePage)·404는 eager, 나머지는 lazy로 초기 번들에서 분리.
+// 라우트별 코드 분할 — 404만 eager, 나머지는 lazy로 초기 번들에서 분리.
 // 페이지가 named export 라 default 로 매핑하고, lazyRetry가 청크 로드 실패를 복구한다.
+const HomePage = lazyRetry(() => import("@/src/domains/catalog/HomePage").then((m) => ({ default: m.HomePage })), "HomePage");
 const RankingPage = lazyRetry(() => import("@/src/domains/catalog/RankingPage").then((m) => ({ default: m.RankingPage })), "RankingPage");
 const SearchPage = lazyRetry(() => import("@/src/domains/catalog/SearchPage").then((m) => ({ default: m.SearchPage })), "SearchPage");
 const RecommendPage = lazyRetry(() => import("@/src/domains/catalog/RecommendPage").then((m) => ({ default: m.RecommendPage })), "RecommendPage");
@@ -194,6 +193,10 @@ const AccountPage = lazyRetry(() => import("@/src/domains/account/AccountPage").
 const AuthCallbackPage = lazyRetry(
   () => import("@/src/domains/account/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage })),
   "AuthCallbackPage"
+);
+const NotFoundPage = lazyRetry(
+  () => import("@/src/components/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
+  "NotFoundPage"
 );
 
 // 라우트 로딩 폴백 — 스피너 대신 스켈레톤(DESIGN.md: "스켈레톤 로딩, 스피너 금지").

@@ -3,53 +3,69 @@
 import {
   Search,
   Library,
-  Home,
-  TrendingUp,
-  Compass,
-  BarChart3,
-  MessageSquareQuote,
-  Sparkles,
-  CalendarDays,
-  MessageCircle,
-  Palette,
   Menu,
   X,
 } from "lucide-react";
-import { LayoutGroup, motion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 
-import { AuthMenu } from "./auth/auth-menu";
-import { MemberAuthControl } from "./auth/member-auth-control";
+import { AuthMenuShell } from "./auth/auth-menu-shell";
+import { MemberAuthControlShell } from "./auth/member-auth-control-shell";
 import { ToonSpectrumMark } from "./visual-marks";
 
+import { cx } from "@/lib/cx";
 import { useT } from "@/lib/i18n";
+import { keepInlineText } from "@/lib/text";
 import { useUi } from "@/lib/ui-store";
-import { cn, keepInlineText } from "@/lib/utils";
 import { usePathname } from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
 
 const NAV = [
-  { label: "홈", i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { label: "랭킹", i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
-  { label: "연재", i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
-  { label: "추천", i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
-  { label: "탐색", i18n: "nav.explore", href: "/explore", icon: Compass },
-  { label: "리뷰", i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
-  { label: "커뮤니티", i18n: "nav.community", href: "/community", icon: MessageCircle },
-  { label: "창작", i18n: "nav.create", href: "/create", icon: Palette },
-  { label: "인사이트", i18n: "nav.insights", href: "/insights", icon: BarChart3 },
+  { label: "홈", i18n: "nav.home", href: "/", exact: true },
+  { label: "랭킹", i18n: "nav.ranking", href: "/ranking" },
+  { label: "연재", i18n: "nav.calendar", href: "/calendar" },
+  { label: "추천", i18n: "nav.recommend", href: "/recommend" },
+  { label: "탐색", i18n: "nav.explore", href: "/explore" },
+  { label: "리뷰", i18n: "nav.reviews", href: "/reviews" },
+  { label: "커뮤니티", i18n: "nav.community", href: "/community" },
+  { label: "창작", i18n: "nav.create", href: "/create" },
+  { label: "인사이트", i18n: "nav.insights", href: "/insights" },
 ];
 
-// 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
-// 햄버거 오버플로 메뉴로 모두 도달 가능하다.
-const MOBILE_TABS = NAV.filter((n) =>
-  ["/", "/ranking", "/recommend", "/explore", "/community"].includes(n.href)
+const MobileHeaderNavigation = lazy(() =>
+  import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
 );
 
 function useActive() {
   const path = usePathname();
   return (href: string, exact?: boolean) =>
     exact ? path === href : path === href || path.startsWith(href + "/");
+}
+
+function matchesMobileNavigationViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+}
+
+function useMobileNavigationViewport() {
+  const [isMobile, setIsMobile] = useState(matchesMobileNavigationViewport);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return isMobile;
+}
+
+function MobileNavigationFallback() {
+  return (
+    <nav
+      aria-hidden="true"
+      className="fixed inset-x-0 bottom-0 z-50 h-[calc(3.75rem+env(safe-area-inset-bottom))] border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
+    />
+  );
 }
 
 export function SiteHeader() {
@@ -59,9 +75,11 @@ export function SiteHeader() {
   const openSearch = useUi((s) => s.openCommandPalette);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const isMobileNavigationViewport = useMobileNavigationViewport();
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
 
   // 라우트 이동 시 오버플로 메뉴 닫기
   useEffect(() => {
@@ -77,7 +95,6 @@ export function SiteHeader() {
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
@@ -113,34 +130,30 @@ export function SiteHeader() {
           {/* 데스크탑 내비 (≥1024px) — 9개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출.
               텍스트 전용 링크: 항목별 아이콘 박스는 EN 라벨 합산 폭이 컨테이너 상한(1320px)을
               넘겨 어느 뷰포트에서도 한 줄에 들어가지 않는다(아이콘은 오버플로/모바일 메뉴 담당). */}
-          <LayoutGroup id="nav-pill">
-            <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
-              {NAV.map((n) => {
-                const active = isActive(n.href, n.exact);
-                return (
-                  <Link
-                    key={n.href}
-                    href={n.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "relative inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
-                      active ? "text-accent" : "text-fg-2 hover:bg-raised/70 hover:text-fg"
-                    )}
-                  >
-                    {/* 활성 페이지 알약 — 내비 간 슬라이딩 인디케이터(시그니처). reduced-motion 시 즉시 이동. */}
-                    {active && (
-                      <motion.span
-                        layoutId="nav-active-pill"
-                        className="absolute inset-0 -z-10 rounded-full bg-accent-soft"
-                        transition={{ type: "spring", stiffness: 480, damping: 38 }}
-                      />
-                    )}
-                    {t(n.i18n)}
-                  </Link>
-                );
-              })}
-            </nav>
-          </LayoutGroup>
+          <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
+            {NAV.map((n) => {
+              const active = isActive(n.href, n.exact);
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cx(
+                    "relative inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-sm font-medium transition-colors duration-150 xl:px-3",
+                    active ? "text-accent" : "text-fg-2 hover:bg-raised/70 hover:text-fg"
+                  )}
+                >
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 -z-10 rounded-full bg-accent-soft transition-colors duration-150"
+                    />
+                  )}
+                  {t(n.i18n)}
+                </Link>
+              );
+            })}
+          </nav>
 
           <div className="ml-auto flex items-center gap-2">
             {/* 검색 트리거 — lg(1024~1280px)에선 9개 내비와 폭을 절충해 한 단계 좁힘.
@@ -167,7 +180,7 @@ export function SiteHeader() {
               href="/library"
               aria-label={t("nav.library")}
               aria-current={isActive("/library") ? "page" : undefined}
-              className={cn(
+              className={cx(
                 "group flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors",
                 isActive("/library")
                   ? "bg-accent text-on-accent"
@@ -180,8 +193,8 @@ export function SiteHeader() {
               </span>
             </Link>
             {/* 통합 회원 로그인(Firebase 이메일/게스트) — 기존 세션 AuthMenu 와 별개로 추가 */}
-            <MemberAuthControl />
-            <AuthMenu />
+            <MemberAuthControlShell />
+            <AuthMenuShell />
 
             {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}
             <button
@@ -199,147 +212,17 @@ export function SiteHeader() {
         </div>
       </header>
 
-      {/* 오버플로 메뉴 (<1024px): 9개 목적지 전부 + 내 서재 */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
-          {/* 백드롭 */}
-          <button
-            aria-label="메뉴 닫기"
-            onClick={closeMenu}
-            className="absolute inset-0 bg-canvas/70 backdrop-blur-sm motion-safe:animate-fade-up"
+      {shouldRenderMobileNavigation && (
+        <Suspense fallback={isMobileNavigationViewport ? <MobileNavigationFallback /> : null}>
+          <MobileHeaderNavigation
+            menuOpen={menuOpen}
+            menuId={menuId}
+            panelRef={panelRef}
+            closeMenu={closeMenu}
+            isActive={isActive}
           />
-          {/* 패널 */}
-          <div
-            ref={panelRef}
-            id={menuId}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("nav.allMenu")}
-            className="absolute inset-x-0 top-0 border-b border-line-strong bg-panel/95 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.97),oklch(0.185_0.018_68/0.96))] shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
-          >
-            <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-4 sm:px-6">
-              <span className="font-display text-sm font-semibold text-fg-2">{t("nav.menu")}</span>
-              <button
-                data-autofocus
-                onClick={closeMenu}
-                aria-label="메뉴 닫기"
-                className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <nav className="mx-auto max-w-[1320px] px-3 pb-4 sm:px-5">
-              <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                {NAV.map((n) => {
-                  const active = isActive(n.href, n.exact);
-                  return (
-                    <li key={n.href}>
-                      <Link
-                        href={n.href}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
-                          active
-                            ? "border-accent/35 bg-accent-soft text-accent"
-                            : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
-                            active
-                              ? "border-accent/35 bg-canvas/45"
-                              : "border-line bg-canvas/40 group-hover:border-line-strong"
-                          )}
-                        >
-                          <n.icon
-                            size={16}
-                            className={cn(
-                              "transition-colors",
-                              active ? "text-accent" : "text-fg-3 group-hover:text-accent"
-                            )}
-                          />
-                        </span>
-                        {t(n.i18n)}
-                      </Link>
-                    </li>
-                  );
-                })}
-                <li className="col-span-2 sm:col-span-3">
-                  <Link
-                    href="/library"
-                    aria-current={isActive("/library") ? "page" : undefined}
-                    className={cn(
-                      "group flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-150",
-                      isActive("/library")
-                        ? "border-accent/35 bg-accent text-on-accent"
-                        : "border-line bg-card/60 text-fg-2 hover:border-line-strong hover:bg-raised/70 hover:text-fg"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-8 shrink-0 place-items-center rounded-lg border transition-colors duration-150",
-                        isActive("/library")
-                          ? "border-on-accent/25 bg-on-accent/10"
-                          : "border-line bg-canvas/40 group-hover:border-line-strong"
-                      )}
-                    >
-                      <Library
-                        size={16}
-                        className={cn(
-                          "transition-colors",
-                          isActive("/library") ? "text-on-accent" : "text-fg-3 group-hover:text-accent"
-                        )}
-                      />
-                    </span>
-                    {t("nav.library")}
-                  </Link>
-                </li>
-              </ul>
-            </nav>
-          </div>
-        </div>
+        </Suspense>
       )}
-
-      {/* 모바일 하단 탭바 (<768px): 빠른 접근용. 전체 목적지는 상단 햄버거 메뉴 */}
-      <nav
-        aria-label="빠른 이동"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
-          {MOBILE_TABS.map((n) => {
-            const active = isActive(n.href, n.exact);
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
-                  active ? "text-accent" : "text-fg-3"
-                )}
-              >
-                {active && (
-                  <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
-                )}
-                <n.icon size={19} strokeWidth={active ? 2.4 : 1.9} />
-                {t(n.i18n)}
-              </Link>
-            );
-          })}
-          <Link
-            href="/library"
-            aria-current={isActive("/library") ? "page" : undefined}
-            className={cn(
-              "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
-              isActive("/library") ? "text-accent" : "text-fg-3"
-            )}
-          >
-            <Library size={19} strokeWidth={isActive("/library") ? 2.4 : 1.9} />
-            서재
-          </Link>
-        </div>
-      </nav>
     </>
   );
 }

@@ -137,13 +137,14 @@ export function planStripSlices(totalHeight: number, sliceHeight: number): Strip
 /**
  * 캔버스 폭을 프리셋 권장 폭에 맞추는 출력 배율.
  * - preset.width<=0(원본 유지) 또는 canvasWidth<=0 이면 1.
- * - 그 외 preset.width/canvasWidth 를 0.25~4로 클램프, 소수 둘째 자리 반올림.
+ * - 그 외 preset.width/canvasWidth 를 0.25~4로 클램프, 소수 셋째 자리 반올림.
+ *   690/720 같은 플랫폼 폭은 둘째 자리 반올림 시 691px가 되므로 실제 출력 폭 기준을 우선한다.
  */
 export function recommendScale(canvasWidth: number, preset: ExportPreset): number {
   if (preset.width <= 0 || canvasWidth <= 0) return 1;
   const raw = preset.width / canvasWidth;
   const clamped = Math.min(4, Math.max(0.25, raw));
-  return Math.round(clamped * 100) / 100;
+  return Math.round(clamped * 1000) / 1000;
 }
 
 export type ExportWarningCode = "format" | "height" | "filesize" | "width";

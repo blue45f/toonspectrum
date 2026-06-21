@@ -1,22 +1,28 @@
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { AppRouter } from "./routes/AppRouter";
 
-import { AgeGateModal } from "@/components/age-gate-modal";
 import { AuthSessionProvider } from "@/components/auth/session-provider";
-import { StoreSync } from "@/components/auth/store-sync";
-import { BackToTop } from "@/components/back-to-top";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { MotionProvider } from "@/components/motion-provider";
-import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ToastHost } from "@/components/toast-host";
-import { AuthProvider } from "@/lib/firebaseAuth";
-import { DeskCloudMounts } from "@/src/components/deskcloud-native/DeskCloudMounts";
-import { AppQueryProvider } from "@/src/infrastructure/query-provider";
+
+const AgeGateHost = lazy(() => import("@/components/age-gate-host").then((mod) => ({ default: mod.AgeGateHost })));
+const BackToTop = lazy(() => import("@/components/back-to-top").then((mod) => ({ default: mod.BackToTop })));
+const DeskCloudMounts = lazy(() =>
+  import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({ default: mod.DeskCloudMounts }))
+);
+const StoreSync = lazy(() => import("@/components/auth/store-sync").then((mod) => ({ default: mod.StoreSync })));
+const ToastHost = lazy(() => import("@/components/toast-host").then((mod) => ({ default: mod.ToastHost })));
+const SiteFooter = lazy(() => import("@/components/site-footer").then((mod) => ({ default: mod.SiteFooter })));
+
+const HAS_DESKCLOUD_MOUNTS = Boolean(
+  import.meta.env.VITE_SURVEYDESK_URL ||
+    import.meta.env.VITE_CHANGELOGDESK_URL ||
+    import.meta.env.VITE_NOTIFYDESK_URL
+);
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다.
@@ -36,41 +42,121 @@ function ScrollToTop() {
   return null;
 }
 
+function useDeferredByInput(timeoutMs = 4500) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    let timeoutId = 0;
+    const activate = () => setReady(true);
+    const options = { passive: true } as const;
+
+    timeoutId = window.setTimeout(activate, timeoutMs);
+    window.addEventListener("pointerdown", activate, options);
+    window.addEventListener("keydown", activate);
+    window.addEventListener("scroll", activate, options);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("pointerdown", activate);
+      window.removeEventListener("keydown", activate);
+      window.removeEventListener("scroll", activate);
+    };
+  }, [ready, timeoutMs]);
+
+  return ready;
+}
+
+function useDeferredByScroll(timeoutMs = 6500) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    let timeoutId = 0;
+    const activate = () => setReady(true);
+    const options = { passive: true } as const;
+
+    timeoutId = window.setTimeout(activate, timeoutMs);
+    window.addEventListener("scroll", activate, options);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("scroll", activate);
+    };
+  }, [ready, timeoutMs]);
+
+  return ready;
+}
+
+function DeskCloudHost() {
+  if (!HAS_DESKCLOUD_MOUNTS) return null;
+  return (
+    <Suspense fallback={null}>
+      <DeskCloudMounts />
+    </Suspense>
+  );
+}
+
+function DeferredFooter() {
+  const ready = useDeferredByScroll();
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <SiteFooter />
+    </Suspense>
+  );
+}
+
+function DeferredGlobalOverlays() {
+  const ready = useDeferredByInput();
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <AgeGateHost />
+      <ToastHost />
+    </Suspense>
+  );
+}
+
+function DeferredBackToTop() {
+  const ready = useDeferredByScroll();
+  if (!ready) return null;
+  return (
+    <Suspense fallback={null}>
+      <BackToTop />
+    </Suspense>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <AppQueryProvider>
-        <AuthSessionProvider>
-          {/* 통합 로그인(Firebase Auth) — 기존 세션 로그인과 별개로 추가. 헤더의 회원 로그인 진입점이 소비. */}
-          <AuthProvider>
-          <MotionProvider>
-            <StoreSync />
-            <ScrollToTop />
-            <a
-              href="#main-content"
-              className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
-            >
-              본문으로 건너뛰기
-            </a>
-            <SiteHeader />
-            <main id="main-content" tabIndex={-1} className="min-h-screen pb-20 outline-none md:pb-0">
-              <AppRouter />
-            </main>
-            <SiteFooter />
-            <CommandPaletteHost />
-            <AgeGateModal />
-            <BackToTop />
-            <ToastHost />
-            <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20">
-              <ThemeSwitcher />
-              <LanguageSwitcher />
-            </div>
-            {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
-            <DeskCloudMounts />
-          </MotionProvider>
-          </AuthProvider>
-        </AuthSessionProvider>
-      </AppQueryProvider>
+      <AuthSessionProvider>
+        <Suspense fallback={null}>
+          <StoreSync />
+        </Suspense>
+        <ScrollToTop />
+        <a
+          href="#main-content"
+          className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
+        >
+          본문으로 건너뛰기
+        </a>
+        <SiteHeader />
+        <main id="main-content" tabIndex={-1} className="min-h-screen pb-20 outline-none md:pb-0">
+          <AppRouter />
+        </main>
+        <DeferredFooter />
+        <CommandPaletteHost />
+        <DeferredGlobalOverlays />
+        <DeferredBackToTop />
+        <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20 max-md:left-auto max-md:right-4">
+          <ThemeSwitcher />
+          <LanguageSwitcher />
+        </div>
+        {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
+        <DeskCloudHost />
+      </AuthSessionProvider>
     </BrowserRouter>
   );
 }
