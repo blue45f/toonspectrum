@@ -30,6 +30,8 @@ import { normalizeQuery } from "@/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/lib/store";
 import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
+import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/src/infrastructure/search-client";
 
 
 const SORTS: { value: SortKey; label: string }[] = [
@@ -61,17 +63,6 @@ function toggle<T>(arr: T[], value: T): T[] {
 }
 
 type FilterToken = { key: string; label: string; category: string };
-type PlatformCoverage = { id: PlatformId; count: number; share: number };
-type SearchCatalogMeta = {
-  source: string;
-  sourceVersion?: string;
-  loadedAt: string;
-  titleCount: number;
-  seedFallback?: boolean;
-  platformCoverage: PlatformCoverage[];
-  filteredPlatformCoverage: PlatformCoverage[];
-};
-
 function facetClass(active: boolean) {
   return cn(
     "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
@@ -133,6 +124,7 @@ export function SearchExplorer({
   initialPlatforms?: PlatformId[];
 }) {
   const [q, setQ] = useState(initialQuery);
+  const debouncedQ = useDebouncedValue(q, 180);
   const [types, setTypes] = useState<WorkType[]>([]);
   const [genres, setGenres] = useState<string[]>([]);
   const [status, setStatus] = useState<SerialStatus[]>([]);
@@ -160,10 +152,11 @@ export function SearchExplorer({
   const recordRecentSearch = useApp((s) => s.addRecentSearch);
   const removeRecentSearch = useApp((s) => s.removeRecentSearch);
   const clearRecentSearches = useApp((s) => s.clearRecentSearches);
+  const textSettling = q.trim() !== debouncedQ.trim();
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ sort });
-    if (q) params.set("q", q);
+    if (debouncedQ) params.set("q", debouncedQ);
     if (types.length) params.set("types", types.join(","));
     if (genres.length) params.set("genres", genres.join(","));
     if (tags.length) params.set("tags", tags.join(","));
@@ -178,27 +171,20 @@ export function SearchExplorer({
     if (freeOnly) params.set("freeOnly", "true");
     if (adaptedOnly) params.set("adaptedOnly", "true");
     return params.toString();
-  }, [adaptedOnly, ages, freeOnly, genres, minRating, platforms, q, sort, status, tags, types, yearRange]);
+  }, [adaptedOnly, ages, debouncedQ, freeOnly, genres, minRating, platforms, sort, status, tags, types, yearRange]);
 
   useEffect(() => {
+    if (textSettling) {
+      setLoading(true);
+      return;
+    }
+
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    fetch(`/api/search?${query}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error("search_request_failed");
-        return response.json() as Promise<{
-          items: Title[];
-          typeCount: { webtoon: number; webnovel: number };
-          topTags: string[];
-          catalog?: SearchCatalogMeta;
-        }>;
-      })
+    fetchSearchResponse(query, controller.signal)
       .then((data) => {
         if (!alive) return;
         setResults(data.items);
@@ -207,9 +193,10 @@ export function SearchExplorer({
         setCatalog(data.catalog ?? null);
         setLimit(24);
         // 결과가 있는 검색어만 최근 검색어로 기록(오타·빈 검색은 제외). 정규화·중복 제거는 스토어가 담당.
-        if (normalizeQuery(q) && data.items.length > 0) recordRecentSearch(q);
+        if (normalizeQuery(debouncedQ) && data.items.length > 0) recordRecentSearch(debouncedQ);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isSearchAbortError(error)) return;
         if (!alive) return;
         setError("검색 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
         setResults([]);
@@ -224,8 +211,7 @@ export function SearchExplorer({
       alive = false;
       controller.abort();
     };
-    // q 는 query 문자열에 이미 포함돼 별도 재실행을 만들지 않는다(최근 검색어 기록에만 참조).
-  }, [query, retryKey, q, recordRecentSearch]);
+  }, [debouncedQ, query, recordRecentSearch, retryKey, textSettling]);
 
   const savedIds = useSavedTitleIds();
   const visibleResults = savedOnly ? results.filter((title) => savedIds.has(title.id)) : results;
@@ -694,7 +680,7 @@ export function SearchExplorer({
             <span className="h-1 w-1 rounded-full bg-line-strong" />
             <span className="truncate">{resultText}</span>
             <span className="h-1 w-1 rounded-full bg-line-strong" />
-            <span className="truncate">{loading ? "로딩 중" : typeSummary}</span>
+            <span className="truncate">{loading || textSettling ? "로딩 중" : typeSummary}</span>
           </div>
 
           {/* 최근 검색어 — 입력이 비었을 때만 노출, 칩 클릭으로 즉시 복귀(각 칩은 개별 삭제 가능). */}

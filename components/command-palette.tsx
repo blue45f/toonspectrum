@@ -14,8 +14,8 @@ import { genreColor } from "@/lib/genre-color";
 import { useApp } from "@/lib/store";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { useRouter } from "@/src/compat/navigation";
-
-
+import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
+import { fetchSearchResponse, isSearchAbortError } from "@/src/infrastructure/search-client";
 
 
 
@@ -39,11 +39,17 @@ export function CommandPalette({
   onOpenChange: (open: boolean) => void;
 }) {
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 140);
   const [results, setResults] = useState<Title[]>([]);
   const [recent, setRecent] = useState<Title[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const recentlyViewed = useApp((s) => s.recentlyViewed);
   const recentKey = recentlyViewed.slice(0, 5).join(",");
   const router = useRouter();
+  const trimmedQ = q.trim();
+  const debouncedTrimmedQ = debouncedQ.trim();
+  const searchSettling = Boolean(trimmedQ) && trimmedQ !== debouncedTrimmedQ;
+  const isSearching = Boolean(trimmedQ) && (searchSettling || searchLoading);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -56,34 +62,33 @@ export function CommandPalette({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !q.trim()) {
+    if (!open || !debouncedTrimmedQ) {
+      setSearchLoading(false);
       return;
     }
     let alive = true;
     const controller = new AbortController();
-    fetch(`/api/search?sort=relevance&q=${encodeURIComponent(q)}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("search failed");
-        return res.json() as Promise<{ items: Title[] }>;
-      })
+    setSearchLoading(true);
+    fetchSearchResponse(`sort=relevance&q=${encodeURIComponent(debouncedTrimmedQ)}`, controller.signal)
       .then((data) => {
         if (alive) setResults(data.items.slice(0, 7));
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isSearchAbortError(error)) return;
         if (alive) setResults([]);
+      })
+      .finally(() => {
+        if (alive) setSearchLoading(false);
       });
     return () => {
       alive = false;
       controller.abort();
     };
-  }, [open, q]);
+  }, [debouncedTrimmedQ, open]);
 
   // 팔레트가 열리고 질의가 없을 때만 최근 본 작품을 지연 로드(빈 상태 컨텍스트 제공).
   useEffect(() => {
-    if (!open || !recentKey) {
+    if (!open || trimmedQ || !recentKey) {
       return;
     }
     let alive = true;
@@ -110,7 +115,7 @@ export function CommandPalette({
       alive = false;
       controller.abort();
     };
-  }, [open, recentKey]);
+  }, [open, recentKey, trimmedQ]);
 
   const go = (href: string) => {
     onOpenChange(false);
@@ -140,7 +145,8 @@ export function CommandPalette({
             value={q}
             onValueChange={(value) => {
               setQ(value);
-              if (!value.trim()) setResults([]);
+              setResults([]);
+              if (!value.trim()) setSearchLoading(false);
             }}
             placeholder="작품, 작가, 태그를 검색하세요…"
             className="h-14 flex-1 bg-transparent text-[0.95rem] text-fg outline-none placeholder:text-fg-3"
@@ -151,7 +157,13 @@ export function CommandPalette({
         </div>
 
         <Command.List className="max-h-[52vh] overflow-y-auto overscroll-contain p-2">
-          {q.trim() && results.length === 0 && (
+          {trimmedQ && isSearching && (
+            <div className="px-3 py-10 text-center text-sm text-fg-3" role="status" aria-live="polite">
+              검색 중…
+            </div>
+          )}
+
+          {trimmedQ && !isSearching && results.length === 0 && (
             <div className="px-3 py-10 text-center text-sm text-fg-3">
               <p>{`'${q}'`} 검색 결과가 없어요.</p>
               <button
@@ -163,7 +175,7 @@ export function CommandPalette({
             </div>
           )}
 
-          {!q.trim() && recent.length > 0 && (
+          {!trimmedQ && recent.length > 0 && (
             <Command.Group
               heading="최근 본 작품"
               className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
@@ -193,7 +205,7 @@ export function CommandPalette({
             </Command.Group>
           )}
 
-          {!q.trim() && (
+          {!trimmedQ && (
             <Command.Group
               heading="바로가기"
               className="px-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
