@@ -5,7 +5,8 @@ import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { HERO_BANNER_AUTOPLAY_MS, HeroBannerBadge, HeroBannerSlide } from "./hero-banner-slide";
+import { HeroBannerBadge } from "./hero-banner-badge";
+import { HERO_BANNER_AUTOPLAY_MS, HeroBannerSlide } from "./hero-banner-slide";
 
 import type { Title } from "@/lib/types";
 
