@@ -1889,24 +1889,35 @@ function parseCameraError(error: unknown): string {
   if (error instanceof Error) {
     const name = error.name;
     const msg = error.message;
-    if (name === "NotAllowedError" || msg.includes("Permission denied")) {
-      errMsg = "카메라 사용 권한이 거부되었거나 요청이 차단되었습니다.\n\n" +
+
+    const isSecure = typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+    if (!isSecure) {
+      return "보안 접속(HTTPS 또는 localhost) 환경이 아니기 때문에 브라우저가 카메라 권한 팝업을 띄우지 않고 요청을 원천 차단했습니다.\n\n" +
         "[해결 방법]\n" +
-        "1. 브라우저 차단 해제: 주소창 왼쪽의 '자물쇠' 또는 '설정' 아이콘을 클릭하여 카메라 권한을 '허용'으로 변경하고 페이지를 새로고침해 주세요.\n" +
-        "2. 접속 주소 확인 (중요): 외부 IP(예: http://192.168.x.x:5173)나 외부 도메인으로 접속한 경우 브라우저 보안 규정상 카메라 권한 요청 팝업이 뜨지 않고 차단됩니다. 반드시 'http://localhost:5173' 주소로 직접 접속해 주세요.\n" +
-        "3. 시스템 설정 확인: macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라에서 사용 중이신 브라우저(Chrome, Safari 등)의 시스템 카메라 권한이 켜져 있는지 확인해 주세요.";
+        "1. 접속 주소를 확인해 주세요: 현재 IP 주소(예: http://192.168.x.x:5173) 또는 비보안(http) 도메인으로 접속 중이시라면, 보안 규정상 웹캠 기능 사용이 불가능합니다.\n" +
+        "2. 로컬 테스트인 경우: 반드시 주소창에 'http://localhost:5173'을 직접 타이핑하여 재접속해 주세요. (localhost는 비보안 환경이어도 예외적으로 웹캠이 허용됩니다.)\n" +
+        "3. 외부 배포 환경인 경우: 반드시 HTTPS 보안 인증서가 적용된 주소(https://...)로 접속해 주세요.";
+    }
+
+    if (name === "NotAllowedError" || msg.includes("Permission denied") || msg.includes("denied")) {
+      errMsg = "카메라 사용 권한이 거부되었거나 즉시 차단되었습니다. (브라우저가 동의 팝업을 띄우지 않는 상태)\n\n" +
+        "[원인 및 해결 방법]\n" +
+        "1. 이전에 카메라 권한을 '차단'으로 설정했기 때문일 수 있습니다. 브라우저 주소창 왼쪽의 '자물쇠' 또는 '설정' 아이콘을 클릭하여 '카메라' 항목이 '차단'되어 있다면 '허용' 또는 '요청(기본값)'으로 변경하고 페이지를 새로고침(F5)해 주세요.\n" +
+        "2. macOS 시스템 설정에서 차단되었을 수 있습니다. [macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라]로 이동하여, 현재 사용 중인 브라우저(Chrome, Safari, Arc 등)의 카메라 접근 허용 스위치를 켜 주세요. 시스템 권한이 꺼져 있으면 브라우저가 팝업을 띄우지 못하고 즉시 거부됩니다.\n" +
+        "3. 브라우저가 일시적인 오류 상태일 수 있습니다. 브라우저를 완전히 종료했다가 다시 실행하여 'http://localhost:5173' 주소로 다시 접속해 보세요.";
     } else if (name === "TypeError" && (msg.includes("undefined") || msg.includes("Insecure Context") || msg.includes("getUserMedia"))) {
-      errMsg = "보안 환경(HTTPS 또는 localhost)이 아니기 때문에 브라우저가 카메라 접근 요청을 띄우지 않고 차단했습니다.\n\n" +
+      errMsg = "보안 접속 환경(HTTPS 또는 localhost)이 아니어서 브라우저가 카메라 접근 요청을 원천 차단했습니다.\n\n" +
         "[해결 방법]\n" +
-        "외부 IP 주소(예: http://192.168.x.x:5173)로 접속 중이시라면, 카메라 보안 요구사항을 충족하기 위해 주소창에 'http://localhost:5173'을 입력하여 다시 접속해 주세요.";
+        "외부 IP 주소(예: http://192.168.x.x:5173) 대신, 웹 주소창에 직접 'http://localhost:5173'을 입력하고 접속하여 다시 실행해 주세요.";
     } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      errMsg = "연결된 카메라 장치를 찾을 수 없습니다. 카메라가 올바르게 연결되어 있는지 확인해 주세요.";
+      errMsg = "연결된 카메라(웹캠) 장치를 찾을 수 없습니다. 카메라가 컴퓨터에 올바르게 연결되어 있고 전원이 켜져 있는지 확인해 주세요.";
     } else if (name === "NotReadableError" || name === "TrackStartError") {
-      errMsg = "카메라가 이미 다른 앱(Zoom, Discord, 다른 브라우저 탭 등)에서 사용 중입니다. 다른 앱을 종료하고 다시 시도해 주세요.";
+      errMsg = "카메라 장치를 사용할 수 없습니다. 이미 다른 앱(Zoom, Discord, FaceTime, Skype, 또는 다른 브라우저 탭)에서 카메라를 사용 중일 가능성이 높습니다. 카메라를 점유 중인 다른 프로그램을 완전히 종료하고 다시 시도해 주세요.";
     } else if (name === "SecurityError") {
-      errMsg = "보안 환경(HTTPS 또는 localhost)이 아니거나 권한 정책으로 인해 카메라에 접근할 수 없습니다. 'http://localhost:5173' 주소로 접속해 주세요.";
+      errMsg = "보안 정책(Feature Policy 또는 Sandbox) 제한이나 비보안 컨텍스트 문제로 인해 카메라에 접근할 수 없습니다. 'http://localhost:5173' 주소로 직접 접속했는지 확인해 주세요.";
     } else {
-      errMsg = `카메라 접근 오류 (${name}): ${msg}`;
+      errMsg = `카메라 접근 오류 (${name}): ${msg}\n\n브라우저 주소창의 자물쇠 설정과 macOS 시스템 보안 설정에서 카메라 권한이 켜져 있는지 다시 한번 확인해 주세요.`;
     }
   }
   return errMsg;
@@ -1969,6 +1980,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [showConsent, setShowConsent] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
+  const [browserPermissionState, setBrowserPermissionState] = useState<"granted" | "denied" | "prompt" | "unsupported">("prompt");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -2039,6 +2051,39 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     }
   }, []);
 
+  // Check camera permission state on mount or when webcam status changes
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions || !navigator.permissions.query) {
+      setBrowserPermissionState("unsupported");
+      return;
+    }
+
+    let active = true;
+    const checkPermission = async () => {
+      try {
+        const res = await navigator.permissions.query({ name: "camera" as PermissionName });
+        if (active) {
+          setBrowserPermissionState(res.state);
+        }
+        res.onchange = () => {
+          if (active) {
+            setBrowserPermissionState(res.state);
+          }
+        };
+      } catch (e) {
+        console.warn("Permissions API not supported for camera:", e);
+        if (active) {
+          setBrowserPermissionState("unsupported");
+        }
+      }
+    };
+
+    checkPermission();
+    return () => {
+      active = false;
+    };
+  }, [webcamActive]);
+
   // Synchronize options to a ref for the frame loop
   const trackingOptionsRef = useRef(trackingOptions);
   useEffect(() => {
@@ -2071,6 +2116,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             throw new TypeError("navigator.mediaDevices is undefined (Insecure Context)");
           }
+
+          // Check if camera permission is explicitly denied to explain why prompt is not shown
+          let preDenied = false;
+          try {
+            if (navigator.permissions && navigator.permissions.query) {
+              const res = await navigator.permissions.query({ name: "camera" as PermissionName });
+              if (res.state === "denied") {
+                preDenied = true;
+              }
+            }
+          } catch (pe) {
+            console.warn("Permissions API check skipped:", pe);
+          }
+
+          if (preDenied) {
+            const err = new Error("Camera permission already denied by browser settings");
+            err.name = "NotAllowedError";
+            throw err;
+          }
+
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 320, height: 240, facingMode: "user" },
             audio: false,
@@ -4470,6 +4535,39 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <Loader2 className="animate-spin text-accent" size={16} />
                         AI 트래킹 모델 및 카메라 로딩 중...
                       </div>
+                    )}
+
+                    {/* 선제적 권한 상태 경고 배너 */}
+                    {!webcamActive && !webcamError && typeof window !== "undefined" && (
+                      <>
+                        {!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" && (
+                          <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-500 mb-3 leading-relaxed">
+                            <AlertTriangle className="shrink-0 mt-0.5" size={14} />
+                            <div>
+                              <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 비보안 환경 접속 (카메라 비활성화)</p>
+                              <p className="text-[0.65rem] opacity-90 text-left">
+                                현재 비보안 환경(HTTP IP 주소 등)으로 접속하셨습니다. 브라우저 보안 규정상 웹캠 접근 권한을 요청할 수 없으므로 실시간 트래킹 사용이 불가능합니다.
+                                <br />
+                                <strong>http://localhost:5173</strong>으로 재접속해 주세요.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {window.isSecureContext && browserPermissionState === "denied" && (
+                          <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500 mb-3 leading-relaxed">
+                            <AlertTriangle className="shrink-0 mt-0.5" size={14} />
+                            <div>
+                              <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 카메라 권한 차단됨</p>
+                              <p className="text-[0.65rem] opacity-90 text-left">
+                                브라우저 설정에서 이 사이트의 카메라 사용이 <strong>차단</strong>되어 있습니다.
+                                이 상태에서는 트래킹을 시작해도 권한 요청 창이 뜨지 않습니다.
+                                <br />
+                                주소창 왼쪽의 <strong>자물쇠/설정</strong> 아이콘을 눌러 카메라 권한을 '허용'으로 변경해 주세요.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {webcamError && (
