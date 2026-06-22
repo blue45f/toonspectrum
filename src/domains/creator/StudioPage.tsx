@@ -182,6 +182,7 @@ import { scheduleIdle } from "@/components/auth/schedule-idle";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/src/compat/auth-session-store";
 
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
@@ -557,7 +558,6 @@ type StudioSfxPacks = {
 };
 
 const uid = () => crypto.randomUUID();
-const AUTH_SESSION_STORAGE_KEY = "toonspectrum-auth-session";
 const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   bgSceneSections: [],
   comicVectorStickers: [],
@@ -594,21 +594,11 @@ const FX_LINE_PRESETS: { id: "focus" | "speed"; label: string }[] = [
   { id: "focus", label: "🔆 집중선 생성" },
   { id: "speed", label: "💨 속도선 생성" },
 ];
+const EMPTY_EFFECT_EMOJIS: string[] = [];
+const EMPTY_FX_LINE_PRESETS: typeof FX_LINE_PRESETS = [];
 
 const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
 const BUBBLE_VARIANT_BY_ID = new Map(BUBBLE_VARIANTS.map((variant) => [variant.id, variant] as const));
-
-function getStoredStudioAuthUserId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = globalThis.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { user?: { id?: unknown } } | null;
-    return typeof parsed?.user?.id === "string" ? parsed.user.id : null;
-  } catch {
-    return null;
-  }
-}
 
 function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
   const normalizedQuery = query.replace(/\s+/g, "").toLowerCase();
@@ -1805,9 +1795,11 @@ interface PageState {
 export function StudioPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { data: session } = useSession();
   const workId = params.get("id");
   const linkedTitleId = params.get("titleId");
-  const loggedIn = !!getStoredStudioAuthUserId();
+  const studioAuthUserId = session?.user?.id ?? null;
+  const loggedIn = Boolean(studioAuthUserId);
 
   // 편집 문서 상태(페이지 리스트를 히스토리로 관리하여 페이지 생성/삭제/이동도 undo/redo 지원)
   const [pagesHistory, setPagesHistory] = useState<PageState[][]>([
@@ -2910,7 +2902,7 @@ export function StudioPage() {
   async function onGenerateAsset() {
     const prompt = assetPrompt.trim();
     if (!prompt || assetGenerating) return;
-    if (!getStoredStudioAuthUserId()) {
+    if (!studioAuthUserId) {
       setError("AI 에셋을 생성하려면 로그인이 필요해요.");
       return;
     }
@@ -2952,39 +2944,55 @@ export function StudioPage() {
   const [bgSceneSearchQuery, setBgSceneSearchQuery] = useState("");
   const [bgSceneGenreFilter, setBgSceneGenreFilter] = useState("all");
 
-  const fxQuery = fxSearchQuery.trim().toLowerCase();
+  const fxMenuOpen = menu === "sticker";
+  const bgSceneMenuOpen = menu === "bgScene";
+  const emeresMenuOpen = menu === "emeres";
+  const fxQuery = fxMenuOpen ? fxSearchQuery.trim().toLowerCase() : "";
   const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
     fxPickerSection === "all" || fxPickerSection === section;
-  const fxSfxFiltered = filterSfxPresets(studioSfx.presets, fxSearchQuery);
-  const fxEmojisFiltered = fxQuery ? [] : EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
-  const fxComicFiltered = filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery);
-  const fxCreatureFiltered = filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery);
-  const fxPropFiltered = filterAssetsByLabel(studioOptionalAssets.propStickers, fxSearchQuery);
-  const fxLinePresetsFiltered = filterAssetsByLabel(FX_LINE_PRESETS, fxSearchQuery);
-  const fxOverlaysFiltered = filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery);
-  const fxPickerHasResults =
+  const fxSfxFiltered = fxMenuOpen ? filterSfxPresets(studioSfx.presets, fxSearchQuery) : EMPTY_STUDIO_SFX_PACKS.presets;
+  const fxEmojisFiltered = fxMenuOpen && !fxQuery ? EFFECT_EMOJIS : EMPTY_EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
+  const fxComicFiltered = fxMenuOpen
+    ? filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery)
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.comicVectorStickers;
+  const fxCreatureFiltered = fxMenuOpen
+    ? filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery)
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.creatureStickers;
+  const fxPropFiltered = fxMenuOpen
+    ? filterAssetsByLabel(studioOptionalAssets.propStickers, fxSearchQuery)
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.propStickers;
+  const fxLinePresetsFiltered = fxMenuOpen ? filterAssetsByLabel(FX_LINE_PRESETS, fxSearchQuery) : EMPTY_FX_LINE_PRESETS;
+  const fxOverlaysFiltered = fxMenuOpen
+    ? filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery)
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.fxOverlays;
+  const fxPickerHasResults = fxMenuOpen && (
     (fxSectionVisible("sfx") && fxSfxFiltered.length > 0) ||
     (fxSectionVisible("emoji") && fxEmojisFiltered.length > 0) ||
     (fxSectionVisible("comic") && fxComicFiltered.length > 0) ||
     (fxSectionVisible("creature") && fxCreatureFiltered.length > 0) ||
     (fxSectionVisible("prop") && fxPropFiltered.length > 0) ||
     (fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0) ||
-    (fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0);
-
-  const bgSceneSectionsFiltered = filterBgSceneSections(
-    bgSceneGenreFilter === "all"
-      ? studioOptionalAssets.bgSceneSections
-      : studioOptionalAssets.bgSceneSections.filter((group) => group.genre === bgSceneGenreFilter),
-    bgSceneSearchQuery
+    (fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0)
   );
+
+  const bgSceneSectionsFiltered = bgSceneMenuOpen
+    ? filterBgSceneSections(
+        bgSceneGenreFilter === "all"
+          ? studioOptionalAssets.bgSceneSections
+          : studioOptionalAssets.bgSceneSections.filter((group) => group.genre === bgSceneGenreFilter),
+        bgSceneSearchQuery
+      )
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.bgSceneSections;
 
   // 이메레스(스케치 밑그림) 피커 검색/카테고리 상태
   const [emeresSearchQuery, setEmeresSearchQuery] = useState("");
   const [emeresCategoryFilter, setEmeresCategoryFilter] = useState("all");
-  const emeresSectionsFiltered = studioOptionalAssets.emeresSections
-    .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
-    .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
-    .filter((section) => section.templates.length > 0);
+  const emeresSectionsFiltered = emeresMenuOpen
+    ? studioOptionalAssets.emeresSections
+        .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
+        .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
+        .filter((section) => section.templates.length > 0)
+    : EMPTY_STUDIO_OPTIONAL_ASSETS.emeresSections;
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -3007,7 +3015,7 @@ export function StudioPage() {
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset) {
-    if (!getStoredStudioAuthUserId()) {
+    if (!studioAuthUserId) {
       setError("에셋을 공유하려면 로그인이 필요해요.");
       return;
     }
