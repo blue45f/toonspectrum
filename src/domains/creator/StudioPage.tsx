@@ -1840,6 +1840,7 @@ export function StudioPage() {
   // 현재 페이지의 색보정(과거 저장본 안전 정규화) + 미리보기용 CSS filter 문자열.
   const pageGrade = normalizePageGrade(activePage.grade);
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
+  const pageGradeActive = !isDefaultPageGrade(pageGrade);
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
   const groups = activePage.groups ?? [];
   const elementById = new Map<string, El>();
@@ -1892,6 +1893,7 @@ export function StudioPage() {
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [pageGradePanelOpen, setPageGradePanelOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1899,6 +1901,10 @@ export function StudioPage() {
   const [maximized, setMaximized] = useState(false);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
+
+  useEffect(() => {
+    if (pageGradeActive) setPageGradePanelOpen(true);
+  }, [pageGradeActive]);
 
   // 템플릿 및 여백 관리 상태
   const [currentTemplate, setCurrentTemplate] = useState<TemplateSpec | null>(null);
@@ -7379,14 +7385,43 @@ export function StudioPage() {
 
           {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
           <div className="rounded-2xl border border-line bg-panel/40 p-3">
-            <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
-              <StudioPageGradePanel
-                grade={pageGrade}
-                onPatch={patchPageGrade}
-                onApplyPreset={applyPageGrade}
-                onReset={resetPageGrade}
-              />
-            </Suspense>
+            {pageGradePanelOpen ? (
+              <>
+                <div className="mb-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setPageGradePanelOpen(false)}
+                    className="inline-flex items-center gap-0.5 rounded text-[0.62rem] text-fg-3 transition-colors hover:text-fg"
+                    title="색보정 패널 접기"
+                  >
+                    접기 <ChevronUp size={13} />
+                  </button>
+                </div>
+                <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
+                  <StudioPageGradePanel
+                    grade={pageGrade}
+                    onPatch={patchPageGrade}
+                    onApplyPreset={applyPageGrade}
+                    onReset={resetPageGrade}
+                  />
+                </Suspense>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPageGradePanelOpen(true)}
+                aria-expanded={false}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-line/70 bg-card/65 px-3 py-2 text-left transition-colors hover:bg-raised"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">페이지 색보정</span>
+                  <span className="mt-0.5 block text-xs text-fg-2">
+                    {pageGradeActive ? "보정 적용됨" : "무드 프리셋·밝기·대비"}
+                  </span>
+                </span>
+                <ChevronDown size={14} className="shrink-0 text-fg-3" />
+              </button>
+            )}
           </div>
 
           {selected && (
