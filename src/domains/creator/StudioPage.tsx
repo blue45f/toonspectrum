@@ -102,11 +102,6 @@ import {
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import {
-  readRecentColors,
-  storeRecentColors,
-  pushRecentColor,
-} from "./studio-color-utils";
-import {
   type ExportFormat,
 } from "./studio-export";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
@@ -248,7 +243,9 @@ function preloadStudioExportMenuPanel(): void {
   void loadStudioExportMenuPanel();
 }
 
-type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen">;
+type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen"> & {
+  onLoadRecentColors?: () => void;
+};
 type StudioColorPopoverModule = { default: ComponentType<StudioColorPopoverProps> };
 
 let studioColorPopoverPromise: Promise<StudioColorPopoverModule> | null = null;
@@ -270,12 +267,19 @@ function StudioColorPopoverFallback({
   value,
   title,
   className,
+  onWarm,
   onActivate,
   busy = false,
 }: Pick<LazyStudioColorPopoverProps, "value" | "title" | "className"> & {
+  onWarm?: () => void;
   onActivate?: () => void;
   busy?: boolean;
 }) {
+  const warm = () => {
+    preloadStudioColorPopover();
+    onWarm?.();
+  };
+
   return (
     <span className={className ? `relative inline-block ${className}` : "relative inline-block"}>
       <button
@@ -285,8 +289,8 @@ function StudioColorPopoverFallback({
         aria-busy={busy || undefined}
         title={title ?? "색상 선택"}
         onClick={onActivate}
-        onFocus={preloadStudioColorPopover}
-        onMouseEnter={preloadStudioColorPopover}
+        onFocus={warm}
+        onMouseEnter={warm}
         className="h-7 w-7 rounded border border-line cursor-pointer"
         style={{ background: value }}
       />
@@ -294,11 +298,15 @@ function StudioColorPopoverFallback({
   );
 }
 
-function LazyStudioColorPopover(props: LazyStudioColorPopoverProps) {
+function LazyStudioColorPopover({ onLoadRecentColors, ...props }: LazyStudioColorPopoverProps) {
   const [activated, setActivated] = useState(false);
+  const activate = () => {
+    onLoadRecentColors?.();
+    setActivated(true);
+  };
 
   if (!activated) {
-    return <StudioColorPopoverFallback {...props} onActivate={() => setActivated(true)} />;
+    return <StudioColorPopoverFallback {...props} onWarm={onLoadRecentColors} onActivate={activate} />;
   }
 
   return (
@@ -1930,15 +1938,20 @@ export function StudioPage() {
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [color, setColor] = useState("#7c5cfc");
-  // 최근 사용 색(색상 팝오버 공용) — 마운트 시 localStorage에서 복원, 선택 시 앞으로 갱신.
+  // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
-  useEffect(() => {
-    try {
-      setRecentColors(readRecentColors(globalThis.localStorage));
-    } catch {
-      // localStorage 접근 불가(시크릿/임베드)면 빈 목록 유지.
-    }
-  }, []);
+  const recentColorsLoadRef = useRef<Promise<void> | null>(null);
+  const ensureRecentColorsLoaded = () => {
+    if (recentColorsLoadRef.current) return;
+    recentColorsLoadRef.current = import("./studio-color-utils")
+      .then(({ readRecentColors }) => {
+        setRecentColors(readRecentColors(globalThis.localStorage));
+      })
+      .catch((err) => {
+        recentColorsLoadRef.current = null;
+        console.error("Failed to load studio recent colors:", err);
+      });
+  };
   // 저장된 클립 복원 — 클립 메뉴를 열 때만 모듈/localStorage를 읽어 초기 스튜디오 로드를 가볍게 유지한다.
   useEffect(() => {
     if (menu !== "clip") return;
@@ -2005,15 +2018,18 @@ export function StudioPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [maximized]);
   const rememberColor = (c: string) => {
-    setRecentColors((prev) => {
-      const next = pushRecentColor(prev, c);
-      try {
-        storeRecentColors(globalThis.localStorage, next);
-      } catch {
-        // 저장 실패는 무시(보조 기능).
-      }
-      return next;
-    });
+    void import("./studio-color-utils")
+      .then(({ pushRecentColor, storeRecentColors }) => {
+        setRecentColors((prev) => {
+          const next = pushRecentColor(prev, c);
+          if (next === prev) return prev;
+          storeRecentColors(globalThis.localStorage, next);
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to store studio recent color:", err);
+      });
   };
   const [strokeWidth, setStrokeWidth] = useState(6);
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
@@ -5551,6 +5567,7 @@ export function StudioPage() {
             onChange={setColor}
             recentColors={recentColors}
             onUseColor={rememberColor}
+            onLoadRecentColors={ensureRecentColorsLoaded}
             title="브러시·도형 색상"
           />
         </span>
@@ -7554,6 +7571,7 @@ export function StudioPage() {
                         onChange={(c) => patchEl(selected.id, { fill: c } as Partial<El>)}
                         recentColors={recentColors}
                         onUseColor={rememberColor}
+                        onLoadRecentColors={ensureRecentColorsLoaded}
                         title="말풍선 색상"
                       />
                     </span>
