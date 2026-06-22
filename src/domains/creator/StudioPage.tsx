@@ -138,7 +138,6 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
-import { episodeLengthLabel, safeAreaMargin, webtoonWidthGuides } from "./studio-webtoon-guides";
 
 import type { StudioAsset } from "./studio-asset-library";
 import type { AutoAdjust } from "./studio-auto-adjust";
@@ -243,6 +242,17 @@ const StudioExportMenuPanel = lazy(loadStudioExportMenuPanel);
 
 function preloadStudioExportMenuPanel(): void {
   void loadStudioExportMenuPanel();
+}
+
+type StudioWebtoonGuidesModule = typeof import("./studio-webtoon-guides");
+let studioWebtoonGuidesPromise: Promise<StudioWebtoonGuidesModule> | null = null;
+
+function loadStudioWebtoonGuides(): Promise<StudioWebtoonGuidesModule> {
+  studioWebtoonGuidesPromise ??= import("./studio-webtoon-guides").catch((error) => {
+    studioWebtoonGuidesPromise = null;
+    throw error;
+  });
+  return studioWebtoonGuidesPromise;
 }
 
 type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen"> & {
@@ -1881,6 +1891,15 @@ export function StudioPage() {
   const [gridSize, setGridSize] = useState(40);
   // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
+  const [webtoonGuides, setWebtoonGuides] = useState<StudioWebtoonGuidesModule | null>(null);
+  const ensureWebtoonGuidesLoaded = () => {
+    if (webtoonGuides) return;
+    void loadStudioWebtoonGuides()
+      .then(setWebtoonGuides)
+      .catch((err) => {
+        console.error("Failed to load studio webtoon guides:", err);
+      });
+  };
   // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
   const [dialogueScript, setDialogueScript] = useState("");
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
@@ -6181,15 +6200,16 @@ export function StudioPage() {
                 </Group>
               )}
               {showWebtoonGuides &&
+                webtoonGuides &&
                 (() => {
-                  const safe = safeAreaMargin(CANVAS_W);
+                  const safe = webtoonGuides.safeAreaMargin(CANVAS_W);
                   return (
                     <Group listening={false}>
                       {/* 세이프영역(모바일 뷰어에서 잘릴 수 있는 양옆 여백) 음영 */}
                       <Rect x={0} y={0} width={safe.left} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
                       <Rect x={CANVAS_W - safe.right} y={0} width={safe.right} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
                       {/* 플랫폼 표준 연재폭 가이드선 */}
-                      {webtoonWidthGuides(CANVAS_W).map((g) => (
+                      {webtoonGuides.webtoonWidthGuides(CANVAS_W).map((g) => (
                         <Line
                           key={`wg-${g.pos}-${g.label}`}
                           points={[g.pos, 0, g.pos, canvasH]}
@@ -7295,22 +7315,29 @@ export function StudioPage() {
                 <input
                   type="checkbox"
                   checked={showWebtoonGuides}
-                  onChange={(e) => setShowWebtoonGuides(e.target.checked)}
+                  onChange={(e) => {
+                    if (e.target.checked) ensureWebtoonGuidesLoaded();
+                    setShowWebtoonGuides(e.target.checked);
+                  }}
+                  onPointerEnter={ensureWebtoonGuidesLoaded}
+                  onFocus={ensureWebtoonGuidesLoaded}
                   className="size-3.5 accent-accent"
                 />
               </label>
               {showWebtoonGuides && (
                 <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.62rem] leading-snug text-fg-3">
-                  {(() => {
-                    const len = episodeLengthLabel(canvasH);
-                    return (
-                      <>
-                        <span className="font-semibold text-fg-2">{len.label}</span> · {len.tier}
-                        <br />
-                        파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
-                      </>
-                    );
-                  })()}
+                  {webtoonGuides
+                    ? (() => {
+                        const len = webtoonGuides.episodeLengthLabel(canvasH);
+                        return (
+                          <>
+                            <span className="font-semibold text-fg-2">{len.label}</span> · {len.tier}
+                            <br />
+                            파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
+                          </>
+                        );
+                      })()
+                    : "웹툰 규격 가이드를 여는 중..."}
                 </div>
               )}
 
