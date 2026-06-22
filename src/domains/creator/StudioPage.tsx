@@ -107,11 +107,9 @@ import {
   storeRecentColors,
   pushRecentColor,
 } from "./studio-color-utils";
-import { dialogueToBubbles } from "./studio-dialogue";
 import {
   type ExportFormat,
 } from "./studio-export";
-import { coverFitInFrame, estimateBubbleHeight } from "./studio-fit";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
@@ -139,7 +137,6 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
-import { TONE_DEFAULT_SIZE, toneDataUrl } from "./studio-tones";
 import {
   DEFAULT_WATERMARK,
   normalizeWatermark,
@@ -2022,9 +2019,18 @@ export function StudioPage() {
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
-  const [studioOptionalAssetPacks, setStudioOptionalAssetPacks] = useState<StudioOptionalAssetPacks | null>(null);
-  const [studioOptionalAssetsLoading, setStudioOptionalAssetsLoading] = useState(false);
-  const [studioOptionalAssetsError, setStudioOptionalAssetsError] = useState<string | null>(null);
+  const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
+    EMPTY_STUDIO_OPTIONAL_ASSETS
+  );
+  const [studioBgSceneAssetsLoaded, setStudioBgSceneAssetsLoaded] = useState(false);
+  const [studioBgSceneAssetsLoading, setStudioBgSceneAssetsLoading] = useState(false);
+  const [studioBgSceneAssetsError, setStudioBgSceneAssetsError] = useState<string | null>(null);
+  const [studioStickerAssetsLoaded, setStudioStickerAssetsLoaded] = useState(false);
+  const [studioStickerAssetsLoading, setStudioStickerAssetsLoading] = useState(false);
+  const [studioStickerAssetsError, setStudioStickerAssetsError] = useState<string | null>(null);
+  const [studioEmeresAssetsLoaded, setStudioEmeresAssetsLoaded] = useState(false);
+  const [studioEmeresAssetsLoading, setStudioEmeresAssetsLoading] = useState(false);
+  const [studioEmeresAssetsError, setStudioEmeresAssetsError] = useState<string | null>(null);
   const [panelLayoutPresets, setPanelLayoutPresets] = useState<PanelLayoutPreset[]>([]);
   const [panelLayoutsLoading, setPanelLayoutsLoading] = useState(false);
   const [panelLayoutsError, setPanelLayoutsError] = useState<string | null>(null);
@@ -2052,11 +2058,12 @@ export function StudioPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workHydrated, setWorkHydrated] = useState(!workId);
-  const studioOptionalAssets = studioOptionalAssetPacks ?? EMPTY_STUDIO_OPTIONAL_ASSETS;
   const sceneTemplates = sceneTemplatePacks ?? EMPTY_STUDIO_SCENE_TEMPLATE_PACKS;
   const studioSfx = sfxPacks ?? EMPTY_STUDIO_SFX_PACKS;
   const studioOptionalAssetsMountedRef = useRef(true);
-  const studioOptionalAssetsLoadRef = useRef<Promise<void> | null>(null);
+  const bgSceneAssetsLoadRef = useRef<Promise<void> | null>(null);
+  const stickerAssetsLoadRef = useRef<Promise<void> | null>(null);
+  const emeresAssetsLoadRef = useRef<Promise<void> | null>(null);
   const panelLayoutsLoadRef = useRef<Promise<void> | null>(null);
   const sceneTemplatesLoadRef = useRef<Promise<void> | null>(null);
   const sfxLoadRef = useRef<Promise<void> | null>(null);
@@ -2656,44 +2663,102 @@ export function StudioPage() {
   }, [menu, sfxPacks]);
 
   useEffect(() => {
-    if (menu !== "bgScene" && menu !== "sticker" && menu !== "emeres") return;
-    if (studioOptionalAssetPacks || studioOptionalAssetsLoadRef.current) return;
+    if (menu !== "bgScene") return;
+    if (studioBgSceneAssetsLoaded || bgSceneAssetsLoadRef.current) return;
 
-    setStudioOptionalAssetsLoading(true);
-    setStudioOptionalAssetsError(null);
-    studioOptionalAssetsLoadRef.current = Promise.all([
+    setStudioBgSceneAssetsLoading(true);
+    setStudioBgSceneAssetsError(null);
+    bgSceneAssetsLoadRef.current = Promise.all([
       import("./studio-bg-scenes"),
       import("./studio-bg-scenes-extra"),
-      import("./studio-fx-assets"),
-      import("./studio-creature-stickers"),
-      import("./studio-prop-stickers"),
-      import("./studio-emeres-templates"),
     ])
-      .then(([bgScenes, bgScenesExtra, fxAssets, creatureAssets, propAssets, emeres]) => {
+      .then(([bgScenes, bgScenesExtra]) => {
         if (!studioOptionalAssetsMountedRef.current) return;
-        setStudioOptionalAssetPacks({
+        setStudioOptionalAssets((prev) => ({
+          ...prev,
           bgSceneSections: bgScenes.bgSceneSections([...bgScenes.BG_SCENES, ...bgScenesExtra.BG_SCENES_EXTRA]),
-          comicVectorStickers: fxAssets.COMIC_VECTOR_STICKERS,
-          creatureStickers: creatureAssets.CREATURE_STICKERS,
-          propStickers: propAssets.PROP_STICKERS,
-          fxOverlays: fxAssets.FX_OVERLAYS,
-          emeresSections: emeres.emeresSections(),
-          emeresUnderlayOpacity: emeres.EMERES_DEFAULT_OPACITY,
-        });
+        }));
+        setStudioBgSceneAssetsLoaded(true);
       })
       .catch((err) => {
-        console.error("Failed to load studio optional asset packs:", err);
-        studioOptionalAssetsLoadRef.current = null;
+        console.error("Failed to load studio background scenes:", err);
+        bgSceneAssetsLoadRef.current = null;
         if (studioOptionalAssetsMountedRef.current) {
-          setStudioOptionalAssetsError("스튜디오 에셋을 불러오지 못했습니다.");
+          setStudioBgSceneAssetsError("배경 씬을 불러오지 못했습니다.");
         }
       })
       .finally(() => {
         if (studioOptionalAssetsMountedRef.current) {
-          setStudioOptionalAssetsLoading(false);
+          setStudioBgSceneAssetsLoading(false);
         }
       });
-  }, [menu, studioOptionalAssetPacks]);
+  }, [menu, studioBgSceneAssetsLoaded]);
+
+  useEffect(() => {
+    if (menu !== "sticker") return;
+    if (studioStickerAssetsLoaded || stickerAssetsLoadRef.current) return;
+
+    setStudioStickerAssetsLoading(true);
+    setStudioStickerAssetsError(null);
+    stickerAssetsLoadRef.current = Promise.all([
+      import("./studio-fx-assets"),
+      import("./studio-creature-stickers"),
+      import("./studio-prop-stickers"),
+    ])
+      .then(([fxAssets, creatureAssets, propAssets]) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setStudioOptionalAssets((prev) => ({
+          ...prev,
+          comicVectorStickers: fxAssets.COMIC_VECTOR_STICKERS,
+          creatureStickers: creatureAssets.CREATURE_STICKERS,
+          propStickers: propAssets.PROP_STICKERS,
+          fxOverlays: fxAssets.FX_OVERLAYS,
+        }));
+        setStudioStickerAssetsLoaded(true);
+      })
+      .catch((err) => {
+        console.error("Failed to load studio sticker assets:", err);
+        stickerAssetsLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioStickerAssetsError("스티커 에셋을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioStickerAssetsLoading(false);
+        }
+      });
+  }, [menu, studioStickerAssetsLoaded]);
+
+  useEffect(() => {
+    if (menu !== "emeres") return;
+    if (studioEmeresAssetsLoaded || emeresAssetsLoadRef.current) return;
+
+    setStudioEmeresAssetsLoading(true);
+    setStudioEmeresAssetsError(null);
+    emeresAssetsLoadRef.current = import("./studio-emeres-templates")
+      .then((emeres) => {
+        if (!studioOptionalAssetsMountedRef.current) return;
+        setStudioOptionalAssets((prev) => ({
+          ...prev,
+          emeresSections: emeres.emeresSections(),
+          emeresUnderlayOpacity: emeres.EMERES_DEFAULT_OPACITY,
+        }));
+        setStudioEmeresAssetsLoaded(true);
+      })
+      .catch((err) => {
+        console.error("Failed to load studio emeres templates:", err);
+        emeresAssetsLoadRef.current = null;
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioEmeresAssetsError("이메레스 틀을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (studioOptionalAssetsMountedRef.current) {
+          setStudioEmeresAssetsLoading(false);
+        }
+      });
+  }, [menu, studioEmeresAssetsLoaded]);
 
   // 스튜디오 전용 구글폰트 로드 — 스타일시트는 마운트 시 1회 주입하고 언마운트 후에도 남긴다
   // (재진입 시 id 가드로 중복 주입 방지·폰트 캐시 유지). konva 캔버스 텍스트는 DOM과 달리
@@ -3715,17 +3780,19 @@ export function StudioPage() {
     }
   }
   // 선택 이미지를 들어있는 패널(없으면 캔버스)에 꽉 채운다(cover) — 드롭 후 수동 리사이즈 제거.
-  function fitSelectedToFrame() {
+  async function fitSelectedToFrame() {
     if (!selected || selected.type !== "image" || selected.locked) return;
     const frame = containingPanel(selected, elements);
     const target = frame
       ? { x: frame.x, y: frame.y, width: frame.width, height: frame.height }
       : { x: 0, y: 0, width: CANVAS_W, height: canvasH };
+    const { coverFitInFrame } = await import("./studio-fit");
     patchEl(selected.id, coverFitInFrame({ width: selected.width, height: selected.height }, target));
   }
   // 선택 말풍선 높이를 대사 길이에 자동으로 맞춘다.
-  function fitBubbleToText() {
+  async function fitBubbleToText() {
     if (!selected || selected.type !== "bubble" || selected.locked) return;
+    const { estimateBubbleHeight } = await import("./studio-fit");
     const h = estimateBubbleHeight(selected.text, selected.width, selected.fontSize ?? 24, selected.lineHeight ?? 1.2);
     patchEl(selected.id, { height: h });
   }
@@ -3745,8 +3812,9 @@ export function StudioPage() {
   }
   // 만화 스크린톤 — 톤 SVG를 이미지 엘리먼트로 추가(이미지 머신 재사용: 패널 클립·필터·변형).
   // 패널이 선택돼 있으면 그 칸을 덮도록(클립되어 깔끔히 채움), 아니면 기본 크기로 중앙 배치.
-  function addTone(svg: string) {
+  async function addTone(svg: string) {
     setMenu(null);
+    const { TONE_DEFAULT_SIZE, toneDataUrl } = await import("./studio-tones");
     const src = toneDataUrl(svg);
     if (selected?.type === "frame") {
       addEl({ id: uid(), type: "image", src, x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: 0, opacity: 0.9 });
@@ -3810,7 +3878,9 @@ export function StudioPage() {
     setTool("select");
   }
   // 대사 스크립트 일괄 삽입 — 여러 줄을 화자별 좌/우 말풍선으로 자동 배치(웹툰 제작 시간 단축).
-  function addDialogueBubbles() {
+  async function addDialogueBubbles() {
+    if (!dialogueScript.trim()) return;
+    const { dialogueToBubbles } = await import("./studio-dialogue");
     const seeds = dialogueToBubbles(dialogueScript, { canvasWidth: CANVAS_W, startY: 80 });
     if (seeds.length === 0) return;
     const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
@@ -4925,12 +4995,12 @@ export function StudioPage() {
                 </div>
               )}
               <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+                {studioBgSceneAssetsLoading && !studioBgSceneAssetsLoaded && (
                   <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
                 )}
-                {studioOptionalAssetsError && (
+                {studioBgSceneAssetsError && (
                   <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                    {studioOptionalAssetsError}
+                    {studioBgSceneAssetsError}
                   </p>
                 )}
                 {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
@@ -4995,7 +5065,7 @@ export function StudioPage() {
               </div>
               <div className="max-h-72 overflow-y-auto pr-1">
                 <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
-                  <StudioTonePanel onPick={(svg) => addTone(svg)} query={toneSearchQuery} />
+                  <StudioTonePanel onPick={(svg) => void addTone(svg)} query={toneSearchQuery} />
                 </Suspense>
               </div>
             </div>
@@ -5049,11 +5119,11 @@ export function StudioPage() {
                 </div>
               )}
               <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+                {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
                   <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
                 )}
-                {studioOptionalAssetsError && (
-                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioOptionalAssetsError}</p>
+                {studioEmeresAssetsError && (
+                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
                 )}
                 {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
                   <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
@@ -5216,7 +5286,7 @@ export function StudioPage() {
                 />
                 <button
                   type="button"
-                  onClick={addDialogueBubbles}
+                  onClick={() => void addDialogueBubbles()}
                   disabled={!dialogueScript.trim()}
                   className={cn(
                     "mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
@@ -5306,12 +5376,12 @@ export function StudioPage() {
                   </div>
                 </>
               )}
-              {studioOptionalAssetsLoading && !studioOptionalAssetPacks && (
+              {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
                 <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
               )}
-              {studioOptionalAssetsError && (
+              {studioStickerAssetsError && (
                 <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                  {studioOptionalAssetsError}
+                  {studioStickerAssetsError}
                 </p>
               )}
               <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
@@ -8070,7 +8140,7 @@ export function StudioPage() {
               {selected.type === "image" && (
                 <button
                   type="button"
-                  onClick={fitSelectedToFrame}
+                  onClick={() => void fitSelectedToFrame()}
                   className="mt-2 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
                   title="이미지를 패널(없으면 캔버스)에 비율 유지하며 꽉 채웁니다"
                 >
@@ -8116,7 +8186,7 @@ export function StudioPage() {
                   {selected.type === "bubble" && (
                     <button
                       type="button"
-                      onClick={fitBubbleToText}
+                      onClick={() => void fitBubbleToText()}
                       className="w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
                       title="말풍선 높이를 대사 길이에 맞춥니다"
                     >
