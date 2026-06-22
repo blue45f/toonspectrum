@@ -1938,6 +1938,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoading, setWebcamLoading] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [showConsent, setShowConsent] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
 
@@ -2037,10 +2038,31 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setWebcamLoading(true);
       setWebcamError(null);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240, facingMode: "user" },
-          audio: false,
-        });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 320, height: 240, facingMode: "user" },
+            audio: false,
+          });
+        } catch (cameraErr) {
+          console.error("Webcam access failed:", cameraErr);
+          let errMsg = "카메라 권한 접근에 실패했습니다.";
+          if (cameraErr instanceof Error) {
+            if (cameraErr.name === "NotAllowedError" || cameraErr.message.includes("Permission denied")) {
+              errMsg = "카메라 사용 권한이 거부되었습니다. 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘을 클릭해 카메라 권한을 '허용'으로 변경하거나, macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라에서 브라우저의 카메라 접근 권한을 확인해 주세요.";
+            } else if (cameraErr.name === "NotFoundError" || cameraErr.name === "DevicesNotFoundError") {
+              errMsg = "연결된 카메라 장치를 찾을 수 없습니다. 카메라가 올바르게 연결되어 있는지 확인해 주세요.";
+            } else if (cameraErr.name === "NotReadableError" || cameraErr.name === "TrackStartError") {
+              errMsg = "카메라가 이미 다른 앱(Zoom, Discord, 다른 브라우저 탭 등)에서 사용 중입니다. 다른 앱을 종료하고 다시 시도해 주세요.";
+            } else if (cameraErr.name === "SecurityError") {
+              errMsg = "보안 환경(HTTPS 또는 localhost)이 아니거나 권한 정책으로 인해 카메라에 접근할 수 없습니다.";
+            } else {
+              errMsg = `카메라 접근 오류 (${cameraErr.name}): ${cameraErr.message}`;
+            }
+          }
+          throw new Error(errMsg, { cause: cameraErr });
+        }
+
         if (!active) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -2057,7 +2079,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           }
         }
 
-        const landmarker = await initFaceLandmarker();
+        let landmarker;
+        try {
+          landmarker = await initFaceLandmarker();
+        } catch (modelErr) {
+          console.error("FaceLandmarker initialization failed:", modelErr);
+          throw new Error("얼굴 인식 AI 모델(MediaPipe)을 초기화하지 못했습니다. 인터넷 연결 상태를 확인하고 페이지를 새로고침해 주세요.", { cause: modelErr });
+        }
+
         if (!active) return;
         landmarkerRef.current = landmarker;
 
@@ -4427,13 +4456,48 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     )}
 
                     {webcamError && (
-                      <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-2.5 text-[0.62rem] text-red-500 mb-3">
+                      <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500 mb-3 leading-relaxed">
                         <AlertTriangle className="shrink-0 mt-0.5" size={14} />
-                        <div>{webcamError}</div>
+                        <div>
+                          <p className="font-semibold mb-1 text-[0.72rem]">카메라 권한 및 연결 오류</p>
+                          <p className="whitespace-pre-line text-[0.65rem] opacity-90">{webcamError}</p>
+                        </div>
                       </div>
                     )}
 
-                    {!webcamLoading && (
+                    {showConsent && !webcamActive && (
+                      <div className="rounded-lg border border-accent/25 bg-accent-soft/30 p-3 mb-3 text-[0.68rem] leading-relaxed text-fg-2 mt-3">
+                        <p className="font-bold mb-1.5 flex items-center gap-1 text-accent">
+                          🔒 개인정보 보호 및 카메라 활성화 안내
+                        </p>
+                        <p className="mb-2.5 text-fg-3 leading-relaxed">
+                          웹캠 실시간 페이스 트래킹을 이용하려면 카메라 권한 허용이 필요합니다.
+                          <strong className="text-fg block mt-1">촬영되는 모든 영상은 외부 서버로 전송되지 않으며</strong>, 사용자 기기 내부에서 실시간 AI 모델에 의해 로컬로만 분석 처리되어 프라이버시가 안전하게 보호됩니다.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="rounded bg-accent px-3 py-1.5 text-white font-semibold hover:bg-accent/90 cursor-pointer text-xs"
+                            onClick={() => {
+                              localStorage.setItem("studio_webcam_consent", "true");
+                              setShowConsent(false);
+                              setWebcamActive(true);
+                            }}
+                          >
+                            동의하고 카메라 켜기
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-line bg-card px-3 py-1.5 text-fg-2 hover:bg-raised cursor-pointer text-xs"
+                            onClick={() => setShowConsent(false)}
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!webcamLoading && !showConsent && (
                       <div className="mt-3 flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <button
@@ -4445,7 +4509,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 ? "border-red-500/35 bg-red-500/10 text-red-500 hover:bg-red-500/15"
                                 : "border-accent/55 bg-accent-soft text-accent hover:bg-accent-soft/80"
                             )}
-                            onClick={() => setWebcamActive((a) => !a)}
+                            onClick={() => {
+                              if (webcamActive) {
+                                setWebcamActive(false);
+                              } else {
+                                const consented = localStorage.getItem("studio_webcam_consent") === "true";
+                                if (consented) {
+                                  setWebcamActive(true);
+                                } else {
+                                  setShowConsent(true);
+                                }
+                              }
+                            }}
                           >
                             {webcamActive ? "트래킹 중지" : "트래킹 시작"}
                           </button>

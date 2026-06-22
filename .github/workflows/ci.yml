@@ -19,8 +19,8 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: webdex
-          POSTGRES_PASSWORD: webdex
           POSTGRES_DB: webdex
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -29,7 +29,7 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
+      DATABASE_URL: postgres://webdex@localhost:5432/webdex
     steps:
       - uses: actions/checkout@v6
       # pnpm 버전은 package.json "packageManager" 필드를 단일 소스로 사용한다.

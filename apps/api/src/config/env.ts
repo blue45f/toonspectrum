@@ -41,7 +41,6 @@ const UNSAFE_DEFAULTS: ReadonlyArray<string> = [
   "dev-secret-change-me",
   "change-me-in-production",
   "mypassword",
-  "postgres://webdex:webdex@127.0.0.1:55432/webdex",
 ];
 
 const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
@@ -74,6 +73,15 @@ export function validateEnv(
 
   const isProduction = source.NODE_ENV === "production";
   if (isProduction) {
+    const dbUrl = source.DATABASE_URL?.trim();
+    if (dbUrl && (dbUrl.includes("webdex:webdex") || dbUrl.includes("127.0.0.1:55432") || dbUrl.includes("localhost:55432"))) {
+      logger.error(
+        `\n${"!".repeat(72)}\n` +
+          `[env] 보안 경고: production 인데 DATABASE_URL 이 안전하지 않은 개발용 기본값입니다.\n` +
+          `      실제 비밀 값으로 교체하세요(현재 값은 공개/추측 가능).\n` +
+          `${"!".repeat(72)}\n`,
+      );
+    }
     for (const key of SECRET_KEYS) {
       const value = source[key]?.trim();
       if (value && UNSAFE_DEFAULTS.includes(value)) {

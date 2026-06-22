@@ -27,7 +27,10 @@ if (existsSync(path.join(ROOT, ".env.local"))) {
 const keepCurrent = process.argv.includes("--keep-current");
 
 async function main() {
-  const url = process.env.DATABASE_URL ?? "postgres://webdex:webdex@127.0.0.1:55432/webdex";
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL environment variable is required.");
+  }
   const needsSsl = /neon\.tech|sslmode=require/i.test(url);
   const client = new pg.Client({
     connectionString: url,

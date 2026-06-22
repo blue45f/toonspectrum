@@ -5,8 +5,10 @@ import * as schema from "./schema";
 
 // PostgreSQL(Neon) — node-postgres 드라이버. 로컬 검증은 docker postgres(:55432), 운영/원격은 Neon.
 // DATABASE_URL 미설정 시 로컬 docker 컨테이너로 폴백(개발 편의). Neon은 sslmode=require.
-const connectionString =
-  process.env.DATABASE_URL ?? "postgres://webdex:webdex@127.0.0.1:55432/webdex";
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is required. Please define it in .env.local");
+}
 const needsSsl = /neon\.tech|sslmode=require/i.test(connectionString);
 
 type EnvLike = Partial<Record<string, string | undefined>>;

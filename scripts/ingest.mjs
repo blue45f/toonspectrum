@@ -168,8 +168,10 @@ function ingestToFile(payload, titles) {
 
 // 레거시 경로(--db): DB catalog_snapshot 적재 — WEBDEX_CATALOG_FORCE_DB=1 운영에서만 의미 있다.
 async function ingestToDb(payload, titles) {
-  const url =
-    process.env.DATABASE_URL ?? "postgres://webdex:webdex@127.0.0.1:55432/webdex";
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL environment variable is required.");
+  }
   const needsSsl = /neon\.tech|sslmode=require/i.test(url);
   const client = new pg.Client({
     connectionString: url,
