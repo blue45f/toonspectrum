@@ -1,8 +1,9 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X } from "lucide-react";
+import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X, Webcam } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
+
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, type StudioExpressionPreset } from "./studio-pose-presets";
 import {
@@ -51,6 +52,17 @@ import {
   type PropCategory,
 } from "./studio-vrm-props";
 import {
+  initFaceLandmarker,
+  disposeFaceLandmarker,
+  processTrackingResult,
+  smoothRawChannels,
+  convertChannelsToVrmData,
+  DEFAULT_TRACKING_OPTIONS,
+  type TrackingOptions,
+  type TrackingChannels,
+  type VrmTrackingData,
+} from "./studio-vrm-webcam-tracking";
+import {
   deleteStoredVrmModel,
   getStoredVrmModel,
   isUsableVrmAssetResponse,
@@ -63,6 +75,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
+import type { FaceLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import {
@@ -76,6 +89,7 @@ type StudioVrmPoserProps = {
   open: boolean;
   onClose: () => void;
   onInsert: (pngDataUrl: string, width: number, height: number) => void;
+  initialDataUrl?: string;
 };
 
 type LoadStatus = "empty" | "loading" | "ready" | "error";
@@ -1708,6 +1722,9 @@ function VrmActor({
   vrm,
   customColors,
   physicsPreview,
+  webcamActive,
+  trackingDataRef,
+  idleAnimation,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -1716,14 +1733,14 @@ function VrmActor({
   vrm: VRM;
   customColors: Record<string, string>;
   physicsPreview: boolean;
+  webcamActive: boolean;
+  trackingDataRef: React.RefObject<VrmTrackingData | null>;
+  idleAnimation: boolean;
 }) {
   useEffect(() => {
     applyPoseToVrm(vrm, customBones, customYOffset);
-  }, [customBones, customYOffset, vrm]);
-
-  useEffect(() => {
     applyExpressionWeightsToVrm(vrm, expressionWeights);
-  }, [expressionWeights, vrm]);
+  }, [customBones, customYOffset, expressionWeights, vrm, webcamActive, idleAnimation]);
 
   useEffect(() => {
     applyRotationToVrm(vrm, bodyRotation);
@@ -1733,10 +1750,83 @@ function VrmActor({
     applyVrmCustomColors(vrm, customColors);
   }, [customColors, vrm]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    const dVal = delta as number;
+    const humanoid = vrm.humanoid;
+    const expressionManager = vrm.expressionManager;
+
+    if (webcamActive && trackingDataRef.current) {
+      const data = trackingDataRef.current;
+      if (humanoid) {
+        if (data.bones.head) {
+          const headBone = humanoid.getNormalizedBoneNode("head");
+          if (headBone) {
+            headBone.rotation.set(data.bones.head[0], data.bones.head[1], data.bones.head[2]);
+          }
+        }
+        if (data.bones.neck) {
+          const neckBone = humanoid.getNormalizedBoneNode("neck");
+          if (neckBone) {
+            neckBone.rotation.set(data.bones.neck[0], data.bones.neck[1], data.bones.neck[2]);
+          }
+        }
+      }
+
+      if (expressionManager) {
+        expressionManager.resetValues();
+        Object.entries(data.expressions).forEach(([name, weight]) => {
+          if (expressionManager.getExpression(name)) {
+            expressionManager.setValue(name, weight);
+          }
+        });
+        expressionManager.update();
+      }
+    } else if (idleAnimation) {
+      if (humanoid) {
+        const time = state.clock.elapsedTime;
+        // Breathing animation: chest and spine sine modulation
+        const breath = Math.sin(time * 1.8) * 0.015;
+        const breathSpine = Math.sin(time * 1.8 - 0.2) * 0.008;
+
+        const chestBone = humanoid.getNormalizedBoneNode("chest");
+        if (chestBone) {
+          const baseRot = customBones.chest?.rotation || [0, 0, 0];
+          chestBone.rotation.set(baseRot[0] + breath, baseRot[1], baseRot[2]);
+        }
+        const spineBone = humanoid.getNormalizedBoneNode("spine");
+        if (spineBone) {
+          const baseRot = customBones.spine?.rotation || [0, 0, 0];
+          spineBone.rotation.set(baseRot[0] + breathSpine, baseRot[1], baseRot[2]);
+        }
+
+        // Auto-blink: 200ms blink duration every 4.5 seconds
+        const cycle = time % 4.5;
+        let blinkWeight = 0;
+        if (cycle > 4.3) {
+          const progress = (cycle - 4.3) / 0.2;
+          blinkWeight = Math.sin(progress * Math.PI);
+        }
+
+        if (expressionManager) {
+          expressionManager.resetValues();
+          Object.entries(expressionWeights).forEach(([name, weight]) => {
+            if (expressionManager.getExpression(name)) {
+              expressionManager.setValue(name, weight);
+            }
+          });
+
+          if (blinkWeight > 0) {
+            expressionManager.setValue("blinkLeft", Math.max(blinkWeight, expressionWeights.blinkLeft || 0));
+            expressionManager.setValue("blinkRight", Math.max(blinkWeight, expressionWeights.blinkRight || 0));
+          }
+          expressionManager.update();
+        }
+      }
+    }
+
     // 흔들림 미리보기: 매 프레임 스프링본을 갱신(델타 상한으로 폭주 방지).
     // 정지 모드: delta 0으로 표정/제약만 동기화하고 스프링본은 정착 프레임에서 멈춘다.
-    vrm.update(physicsPreview ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA) : 0);
+    vrm.update(physicsPreview ? Math.min(dVal, PHYSICS_PREVIEW_MAX_DELTA) : 0);
   });
 
   return <primitive object={vrm.scene} />;
@@ -1794,7 +1884,7 @@ function VrmLighting({ tone }: { tone: LightingTone }) {
   );
 }
 
-export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps) {
+export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: StudioVrmPoserProps) {
   const [status, setStatus] = useState<LoadStatus>("empty");
   const [error, setError] = useState("");
   const [modelName, setModelName] = useState("");
@@ -1842,6 +1932,20 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
   const [physicsPreview, setPhysicsPreview] = useState(false);
   const [springJointCount, setSpringJointCount] = useState(0);
+  // 대기 애니메이션 (숨쉬기 및 자동 깜빡임)
+  const [idleAnimation, setIdleAnimation] = useState(false);
+  // 웹캠 페이스 트래킹 (studio-vrm-webcam-tracking)
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [webcamLoading, setWebcamLoading] = useState(false);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const landmarkerRef = useRef<FaceLandmarker | null>(null);
+  const prevChannelsRef = useRef<TrackingChannels | null>(null);
+  const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -1861,6 +1965,39 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
+  interface PendingPoseData {
+    bones?: PoseBoneMap;
+    yOffset?: number;
+    expressionWeights?: Record<string, number>;
+    customColors?: Record<string, string>;
+    modelId?: string;
+    modelName?: string;
+    vrmProps?: unknown;
+    costume?: unknown;
+    physics?: unknown;
+  }
+
+  const pendingPoseDataRef = useRef<PendingPoseData | null>(null);
+
+  useEffect(() => {
+    if (open && initialDataUrl) {
+      try {
+        const hashIndex = initialDataUrl.indexOf("#");
+        if (hashIndex !== -1) {
+          const hashStr = initialDataUrl.substring(hashIndex + 1);
+          const poseData = JSON.parse(decodeURIComponent(hashStr)) as PendingPoseData;
+          pendingPoseDataRef.current = poseData;
+          if (poseData.modelId) {
+            setActiveModelId(poseData.modelId);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse initial data URL", e);
+      }
+    } else if (!open) {
+      pendingPoseDataRef.current = null;
+    }
+  }, [open, initialDataUrl]);
 
   useEffect(() => {
     const stored = localStorage.getItem("studio_custom_poses");
@@ -1872,6 +2009,137 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       }
     }
   }, []);
+
+  // Synchronize options to a ref for the frame loop
+  const trackingOptionsRef = useRef(trackingOptions);
+  useEffect(() => {
+    trackingOptionsRef.current = trackingOptions;
+  }, [trackingOptions]);
+
+  // Webcam live tracking loop
+  useEffect(() => {
+    if (!webcamActive) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      prevChannelsRef.current = null;
+      trackingDataRef.current = null;
+      setFaceDetected(false);
+      return;
+    }
+
+    let active = true;
+    let lastVideoTime = -1;
+    let requestId: number;
+
+    const startCamera = async () => {
+      setWebcamLoading(true);
+      setWebcamError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: "user" },
+          audio: false,
+        });
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          try {
+            await video.play();
+          } catch (e) {
+            console.error("Video play failed:", e);
+          }
+        }
+
+        const landmarker = await initFaceLandmarker();
+        if (!active) return;
+        landmarkerRef.current = landmarker;
+
+        setWebcamLoading(false);
+
+        const loop = () => {
+          if (!active) return;
+          const currentVideo = videoRef.current;
+          const currentLandmarker = landmarkerRef.current;
+          if (currentVideo && currentLandmarker && currentVideo.readyState >= 2) {
+            const timestamp = performance.now();
+            if (currentVideo.currentTime !== lastVideoTime) {
+              lastVideoTime = currentVideo.currentTime;
+              const result = currentLandmarker.detectForVideo(currentVideo, timestamp);
+              const rawChannels = processTrackingResult(result);
+              if (rawChannels) {
+                setFaceDetected(true);
+                const smoothed = smoothRawChannels(prevChannelsRef.current, rawChannels, trackingOptionsRef.current.smoothing);
+                prevChannelsRef.current = smoothed;
+                const vrmData = convertChannelsToVrmData(smoothed, trackingOptionsRef.current);
+                trackingDataRef.current = vrmData;
+              } else {
+                setFaceDetected(false);
+              }
+            }
+          }
+          requestId = requestAnimationFrame(loop);
+        };
+        requestId = requestAnimationFrame(loop);
+      } catch (err) {
+        console.error("Webcam start failed:", err);
+        const errMsg = err instanceof Error ? err.message : "카메라 권한 접근에 실패했거나 트래킹 로드 오류가 발생했습니다.";
+        setWebcamError(errMsg);
+        setWebcamActive(false);
+        setWebcamLoading(false);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      active = false;
+      setWebcamLoading(false);
+      if (requestId) cancelAnimationFrame(requestId);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [webcamActive]);
+
+  useEffect(() => {
+    return () => {
+      disposeFaceLandmarker();
+    };
+  }, []);
+
+  const handleCapturePose = () => {
+    if (!trackingDataRef.current) return;
+    const data = trackingDataRef.current;
+
+    setCustomBones((prev) => {
+      const next = { ...prev };
+      if (data.bones.head) {
+        next.head = { rotation: [data.bones.head[0], data.bones.head[1], data.bones.head[2]] };
+      }
+      if (data.bones.neck) {
+        next.neck = { rotation: [data.bones.neck[0], data.bones.neck[1], data.bones.neck[2]] };
+      }
+      return next;
+    });
+
+    setExpressionWeights((prev) => {
+      const next = { ...prev };
+      Object.entries(data.expressions).forEach(([name, val]) => {
+        next[name] = val as number;
+      });
+      return next;
+    });
+
+    setWebcamActive(false);
+  };
 
   function handleSavePose() {
     const label = globalThis.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
@@ -2094,6 +2362,7 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
         expressionWeights: expressionWeights,
         customColors: customColors,
         modelName: modelName,
+        modelId: activeModelId,
         // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
@@ -2244,14 +2513,36 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
         if (cancelled) return;
         setLibraryEntries(entries);
         setLibraryStatus("ready");
-        loadModelRef.current(entries.find((entry) => entry.id === activeModelId) ?? entries[0]);
+        
+        let targetEntry = entries[0];
+        const pending = pendingPoseDataRef.current;
+        if (pending) {
+          if (pending.modelId) {
+            targetEntry = entries.find((e) => e.id === pending.modelId) || targetEntry;
+          } else if (pending.modelName) {
+            targetEntry = entries.find((e) => e.name === pending.modelName) || targetEntry;
+          }
+        } else {
+          targetEntry = entries.find((entry) => entry.id === activeModelId) || targetEntry;
+        }
+        loadModelRef.current(targetEntry);
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return;
         setLibraryEntries(SAMPLE_VRM_ENTRIES);
         setLibraryStatus("error");
         setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
-        loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);
+        
+        let targetEntry = SAMPLE_VRM_ENTRIES[0];
+        const pending = pendingPoseDataRef.current;
+        if (pending) {
+          if (pending.modelId) {
+            targetEntry = SAMPLE_VRM_ENTRIES.find((e) => e.id === pending.modelId) || targetEntry;
+          } else if (pending.modelName) {
+            targetEntry = SAMPLE_VRM_ENTRIES.find((e) => e.name === pending.modelName) || targetEntry;
+          }
+        }
+        loadModelRef.current(targetEntry);
       });
 
     return () => {
@@ -2305,48 +2596,99 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
     setVrm(nextVrm);
     setModelName(nextModelName);
     setActiveModelId(nextModelId);
-    // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
-    const spawnPose = pickNaturalIdlePose(nextModelId);
-    setActivePoseId(spawnPose.id);
-    setCustomBones(spawnPose.bones);
-    setCustomYOffset(spawnPose.yOffset ?? 0);
-    setActiveExpressionId("neutral");
-    setExpressionWeights({});
-    setBodyRotation(0);
-    setCustomColors({
-      tops: "#ffffff",
-      bottoms: "#ffffff",
-      hair: "#ffffff",
-      body: "#ffffff",
-      face: "#ffffff",
-    });
-    applyPoseToVrm(nextVrm, spawnPose.bones, spawnPose.yOffset ?? 0);
-    applyExpressionWeightsToVrm(nextVrm, {});
-    applyVrmCustomColors(nextVrm, {
-      tops: "#ffffff",
-      bottoms: "#ffffff",
-      hair: "#ffffff",
-      body: "#ffffff",
-      face: "#ffffff",
-    });
-    // 본 부착 소품 초기화.
-    setVrmPropItems([]);
-    setSelectedVrmPropUid(null);
-    // 의상 메시 수집 + 상태 초기화.
-    const meshes = collectCostumeMeshes(nextVrm);
-    setCostumeMeshes(meshes);
-    const freshCostume: CostumeState = { hidden: [], recolor: {} };
-    setCostumeState(freshCostume);
-    setSelectedCostumeKey(null);
-    applyCostumeState(meshes, freshCostume);
-    // 물리 초기화 + 정착(머리카락/치마 자연 정착).
-    setVrmPhysics(DEFAULT_VRM_PHYSICS);
-    setPhysicsPreview(false);
-    const joints = countSpringBoneJoints(nextVrm);
-    setSpringJointCount(joints);
-    if (joints > 0) {
-      applyVrmSpringBonePhysics(nextVrm, DEFAULT_VRM_PHYSICS);
-      settleVrmPhysics(nextVrm);
+
+    const pending = pendingPoseDataRef.current;
+    if (pending) {
+      pendingPoseDataRef.current = null;
+
+      const bones = pending.bones || {};
+      const yOffset = typeof pending.yOffset === "number" ? pending.yOffset : 0;
+      const expressionWeights = pending.expressionWeights || {};
+      const customColors = pending.customColors || {
+        tops: "#ffffff",
+        bottoms: "#ffffff",
+        hair: "#ffffff",
+        body: "#ffffff",
+        face: "#ffffff",
+      };
+
+      setCustomBones(bones);
+      setCustomYOffset(yOffset);
+      setActivePoseId("custom-loaded");
+      setExpressionWeights(expressionWeights);
+      setCustomColors(customColors);
+
+      applyPoseToVrm(nextVrm, bones, yOffset);
+      applyExpressionWeightsToVrm(nextVrm, expressionWeights);
+      applyVrmCustomColors(nextVrm, customColors);
+
+      // Restore costume
+      const restoredCostume = parseCostumeState(pending.costume);
+      setCostumeState(restoredCostume);
+      setSelectedCostumeKey(null);
+      const meshes = collectCostumeMeshes(nextVrm);
+      setCostumeMeshes(meshes);
+      applyCostumeState(meshes, restoredCostume);
+
+      // Restore props
+      const restoredProps = parseVrmProps(pending.vrmProps).items;
+      setVrmPropItems(restoredProps);
+      setSelectedVrmPropUid(null);
+
+      // Restore physics
+      const restoredPhysics = parseVrmPhysicsSettings(pending.physics);
+      setVrmPhysics(restoredPhysics);
+      setPhysicsPreview(false);
+      const joints = countSpringBoneJoints(nextVrm);
+      setSpringJointCount(joints);
+      if (joints > 0) {
+        applyVrmSpringBonePhysics(nextVrm, restoredPhysics);
+        settleVrmPhysics(nextVrm);
+      }
+    } else {
+      // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
+      const spawnPose = pickNaturalIdlePose(nextModelId);
+      setActivePoseId(spawnPose.id);
+      setCustomBones(spawnPose.bones);
+      setCustomYOffset(spawnPose.yOffset ?? 0);
+      setActiveExpressionId("neutral");
+      setExpressionWeights({});
+      setBodyRotation(0);
+      setCustomColors({
+        tops: "#ffffff",
+        bottoms: "#ffffff",
+        hair: "#ffffff",
+        body: "#ffffff",
+        face: "#ffffff",
+      });
+      applyPoseToVrm(nextVrm, spawnPose.bones, spawnPose.yOffset ?? 0);
+      applyExpressionWeightsToVrm(nextVrm, {});
+      applyVrmCustomColors(nextVrm, {
+        tops: "#ffffff",
+        bottoms: "#ffffff",
+        hair: "#ffffff",
+        body: "#ffffff",
+        face: "#ffffff",
+      });
+      // 본 부착 소품 초기화.
+      setVrmPropItems([]);
+      setSelectedVrmPropUid(null);
+      // 의상 메시 수집 + 상태 초기화.
+      const meshes = collectCostumeMeshes(nextVrm);
+      setCostumeMeshes(meshes);
+      const freshCostume: CostumeState = { hidden: [], recolor: {} };
+      setCostumeState(freshCostume);
+      setSelectedCostumeKey(null);
+      applyCostumeState(meshes, freshCostume);
+      // 물리 초기화 + 정착(머리카락/치마 자연 정착).
+      setVrmPhysics(DEFAULT_VRM_PHYSICS);
+      setPhysicsPreview(false);
+      const joints = countSpringBoneJoints(nextVrm);
+      setSpringJointCount(joints);
+      if (joints > 0) {
+        applyVrmSpringBonePhysics(nextVrm, DEFAULT_VRM_PHYSICS);
+        settleVrmPhysics(nextVrm);
+      }
     }
     setStatus("ready");
   }
@@ -2665,10 +3007,25 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
       }
       currentVrm.update(0);
       gl.render(scene, camera);
-      const dataUrl = gl.domElement.toDataURL("image/png");
+      const baseDataUrl = gl.domElement.toDataURL("image/png");
       const { width, height } = roundExportSize(gl.domElement);
       setIsCapturing(false);
-      onInsert(dataUrl, width, height);
+
+      const poseMetadata = {
+        yOffset: customYOffset,
+        bones: customBones,
+        expressionWeights: expressionWeights,
+        customColors: customColors,
+        modelName: modelName,
+        modelId: activeModelId,
+        vrmProps: serializeVrmProps(vrmPropItems),
+        costume: serializeCostume(costumeState),
+        physics: vrmPhysics,
+      };
+      const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
+      const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
+
+      onInsert(fullDataUrl, width, height);
       onClose();
     });
   }
@@ -2728,6 +3085,9 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                       vrm={vrm}
                       customColors={customColors}
                       physicsPreview={physicsPreview}
+                      webcamActive={webcamActive}
+                      trackingDataRef={trackingDataRef}
+                      idleAnimation={idleAnimation}
                     />
                   ) : null}
                   {vrm
@@ -3644,6 +4004,33 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                 </div>
               </section>
 
+              {/* ── 자연스러운 애니메이션 효과 ─────────────────────────── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Sparkles size={15} className="text-accent" aria-hidden />
+                  생동감 연출 (대기 모션)
+                </h3>
+                <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                  캐릭터가 정지해 있지 않고 자연스럽게 숨을 쉬고 눈을 깜빡이도록 설정하여 씬을 생생하게 연출합니다.
+                </p>
+                <div className="flex items-center justify-between text-xs text-fg-2 bg-card/40 border border-line/60 rounded-lg p-2.5">
+                  <span className="font-semibold">자연스러운 대기 모션 (숨쉬기 & 눈 깜빡임)</span>
+                  <input
+                    type="checkbox"
+                    className="accent-accent size-4 cursor-pointer"
+                    checked={idleAnimation}
+                    disabled={webcamActive}
+                    onChange={(e) => setIdleAnimation(e.target.checked)}
+                    title={webcamActive ? "웹캠 트래킹 중에는 비활성화됩니다" : "대기 애니메이션 토글"}
+                  />
+                </div>
+                {webcamActive && (
+                  <p className="mt-1.5 text-[0.55rem] text-accent font-semibold leading-relaxed">
+                    ℹ️ 웹캠 실시간 페이스 트래킹이 활성화되어 대기 모션이 자동으로 일시 중지되었습니다.
+                  </p>
+                )}
+              </section>
+
               {/* ── 본 부착 소품(손/머리/몸) ───────────────────────────── */}
               <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -3988,6 +4375,160 @@ export function StudioVrmPoser({ open, onClose, onInsert }: StudioVrmPoserProps)
                     >
                       물리 초기화
                     </button>
+                  </>
+                )}
+              </section>
+
+              {/* ── 웹캠 실시간 페이스 트래킹 ───────────────────────────── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Webcam size={15} className="text-accent" aria-hidden />
+                  웹캠 실시간 페이스 트래킹
+                </h3>
+                {!vrm ? (
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                    모델을 먼저 불러오세요.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                      내 행동이나 표정을 실시간으로 따라하게 만듭니다. 포즈 캡처를 클릭하면 현재 표정과 머리 각도가 저장됩니다.
+                    </p>
+
+                    {webcamActive && (
+                      <div className="relative overflow-hidden rounded-lg bg-black aspect-video border border-line mb-3">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className={cx(
+                            "w-full h-full object-cover",
+                            trackingOptions.mirrorMode ? "scale-x-[-1]" : ""
+                          )}
+                        />
+                        <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+                          <span
+                            className={cx(
+                              "size-1.5 rounded-full",
+                              faceDetected ? "bg-green-500 animate-pulse" : "bg-red-500"
+                            )}
+                          />
+                          {faceDetected ? "얼굴 감지됨" : "얼굴 감지 중..."}
+                        </div>
+                      </div>
+                    )}
+
+                    {webcamLoading && (
+                      <div className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card/50 py-4 text-xs text-fg-2">
+                        <Loader2 className="animate-spin text-accent" size={16} />
+                        AI 트래킹 모델 및 카메라 로딩 중...
+                      </div>
+                    )}
+
+                    {webcamError && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-2.5 text-[0.62rem] text-red-500 mb-3">
+                        <AlertTriangle className="shrink-0 mt-0.5" size={14} />
+                        <div>{webcamError}</div>
+                      </div>
+                    )}
+
+                    {!webcamLoading && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className={cx(
+                              CONTROL_BUTTON,
+                              "flex-1",
+                              webcamActive
+                                ? "border-red-500/35 bg-red-500/10 text-red-500 hover:bg-red-500/15"
+                                : "border-accent/55 bg-accent-soft text-accent hover:bg-accent-soft/80"
+                            )}
+                            onClick={() => setWebcamActive((a) => !a)}
+                          >
+                            {webcamActive ? "트래킹 중지" : "트래킹 시작"}
+                          </button>
+
+                          {webcamActive && (
+                            <button
+                              type="button"
+                              className={cx(
+                                CONTROL_BUTTON,
+                                "flex-1 border-accent/50 bg-accent text-on-accent hover:bg-accent/90"
+                              )}
+                              onClick={handleCapturePose}
+                              disabled={!faceDetected}
+                            >
+                              포즈 · 표정 캡처
+                            </button>
+                          )}
+                        </div>
+
+                        {webcamActive && (
+                          <div className="mt-2.5 space-y-2.5 rounded-lg border border-line/60 bg-card/20 p-2">
+                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                              <span>거울 모드 (좌우 반전)</span>
+                              <input
+                                type="checkbox"
+                                className="accent-accent"
+                                checked={trackingOptions.mirrorMode}
+                                onChange={(e) =>
+                                  setTrackingOptions((prev: TrackingOptions) => ({ ...prev, mirrorMode: e.target.checked }))
+                                }
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                              <span>시선 고정 (정면 바라보기)</span>
+                              <input
+                                type="checkbox"
+                                className="accent-accent"
+                                checked={trackingOptions.gazeLock}
+                                onChange={(e) =>
+                                  setTrackingOptions((prev: TrackingOptions) => ({ ...prev, gazeLock: e.target.checked }))
+                                }
+                              />
+                            </div>
+                            <div className="block text-[0.62rem] text-fg-2">
+                              <label htmlFor="tracking-sensitivity" className="flex justify-between mb-1">
+                                <span>트래킹 감도</span>
+                                <span>{trackingOptions.sensitivity.toFixed(1)}x</span>
+                              </label>
+                              <input
+                                id="tracking-sensitivity"
+                                type="range"
+                                min="0.5"
+                                max="2"
+                                step="0.1"
+                                className="w-full accent-accent h-1"
+                                value={trackingOptions.sensitivity}
+                                onChange={(e) =>
+                                  setTrackingOptions((prev: TrackingOptions) => ({ ...prev, sensitivity: Number(e.target.value) }))
+                                }
+                              />
+                            </div>
+                            <div className="block text-[0.62rem] text-fg-2 mt-2">
+                              <label htmlFor="tracking-smoothing" className="flex justify-between mb-1">
+                                <span>트래킹 부드러움</span>
+                                <span>{Math.round((1 - trackingOptions.smoothing) * 100)}%</span>
+                              </label>
+                              <input
+                                id="tracking-smoothing"
+                                type="range"
+                                min="0.05"
+                                max="1.0"
+                                step="0.05"
+                                className="w-full accent-accent h-1"
+                                value={trackingOptions.smoothing}
+                                onChange={(e) =>
+                                  setTrackingOptions((prev: TrackingOptions) => ({ ...prev, smoothing: Number(e.target.value) }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </section>

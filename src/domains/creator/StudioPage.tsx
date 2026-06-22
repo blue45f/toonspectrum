@@ -2086,6 +2086,8 @@ export function StudioPage() {
   const [sharedError, setSharedError] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
+  const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
+  const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
 
@@ -8866,6 +8868,20 @@ export function StudioPage() {
                 )}
                 {selected.type === "image" && (
                   <>
+                    {selected.src?.includes("#") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPoserInitialDataUrl(selected.src);
+                          setPoserInitialElementId(selected.id);
+                          setPoserVrmOpen(true);
+                        }}
+                        className={buttonClass({ size: "sm", variant: "solid", className: "gap-1 font-semibold" })}
+                        title="3D 캐릭터 재편집"
+                      >
+                        <Sparkles size={14} /> 3D 재편집
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => patchEl(selected.id, { flipped: !selected.flipped } as Partial<El>)}
@@ -8876,7 +8892,7 @@ export function StudioPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => patchEl(selected.id, { flippedY: !selected.flippedY } as Partial<El>)}
+                      onClick={() => patchEl(selected.id, {flippedY: !selected.flippedY} as Partial<El>)}
                       className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
                       title="상하 반전"
                     >
@@ -9438,8 +9454,29 @@ export function StudioPage() {
         {poserVrmOpen ? (
           <StudioVrmPoser
             open
-            onClose={() => setPoserVrmOpen(false)}
-            onInsert={addRenderedImage}
+            initialDataUrl={poserInitialDataUrl}
+            onClose={() => {
+              setPoserVrmOpen(false);
+              setPoserInitialDataUrl(undefined);
+              setPoserInitialElementId(undefined);
+            }}
+            onInsert={(src, w, h) => {
+              if (poserInitialElementId) {
+                const targetEl = elementById.get(poserInitialElementId);
+                if (targetEl && targetEl.type === "image") {
+                  const targetWidth = targetEl.width;
+                  const targetHeight = Math.round(targetWidth * (h / w));
+                  patchEl(poserInitialElementId, {
+                    src,
+                    height: targetHeight,
+                  });
+                } else {
+                  patchEl(poserInitialElementId, { src });
+                }
+              } else {
+                addRenderedImage(src, w, h);
+              }
+            }}
           />
         ) : null}
       </Suspense>
@@ -9454,6 +9491,24 @@ export function StudioPage() {
         >
           {contextMenu.elId ? (
             <>
+              {contextMenuEl?.type === "image" && contextMenuEl.src?.includes("#") && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPoserInitialDataUrl(contextMenuEl.src);
+                      setPoserInitialElementId(contextMenuEl.id);
+                      setPoserVrmOpen(true);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
+                  >
+                    <Sparkles size={12} />
+                    3D 캐릭터 편집
+                  </button>
+                  <div className="my-1 h-px bg-line" />
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => {
