@@ -101,7 +101,6 @@ import {
 } from "./studio-brush";
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
-import { listClips, removeClip, saveClip, type StudioClip } from "./studio-clips";
 import {
   readRecentColors,
   storeRecentColors,
@@ -151,6 +150,7 @@ import type { AutoAdjust } from "./studio-auto-adjust";
 import type { BlurFx } from "./studio-blur";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
+import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
@@ -1884,6 +1884,7 @@ export function StudioPage() {
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [menu, setMenu] = useState<null | StudioMenu>(null);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
   const [isFullscreen, setIsFullscreen] = useState(false);
   // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
@@ -1938,14 +1939,25 @@ export function StudioPage() {
       // localStorage 접근 불가(시크릿/임베드)면 빈 목록 유지.
     }
   }, []);
-  // 저장된 클립 복원(마운트 시 1회).
+  // 저장된 클립 복원 — 클립 메뉴를 열 때만 모듈/localStorage를 읽어 초기 스튜디오 로드를 가볍게 유지한다.
   useEffect(() => {
-    try {
-      setClips(listClips(globalThis.localStorage));
-    } catch {
-      // localStorage 접근 불가면 빈 목록 유지.
-    }
-  }, []);
+    if (menu !== "clip") return;
+    if (clipsLoadRef.current) return;
+
+    let alive = true;
+    clipsLoadRef.current = import("./studio-clips")
+      .then(({ listClips }) => {
+        if (!alive) return;
+        setClips(listClips(globalThis.localStorage));
+      })
+      .catch((err) => {
+        console.error("Failed to load studio clips:", err);
+        clipsLoadRef.current = null;
+      });
+    return () => {
+      alive = false;
+    };
+  }, [menu]);
   // 저장된 워터마크/서명 복원(마운트 시 1회).
   useEffect(() => {
     try {
@@ -2018,7 +2030,6 @@ export function StudioPage() {
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
-  const [menu, setMenu] = useState<null | StudioMenu>(null);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
   );
@@ -2067,6 +2078,7 @@ export function StudioPage() {
   const panelLayoutsLoadRef = useRef<Promise<void> | null>(null);
   const sceneTemplatesLoadRef = useRef<Promise<void> | null>(null);
   const sfxLoadRef = useRef<Promise<void> | null>(null);
+  const clipsLoadRef = useRef<Promise<void> | null>(null);
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -3896,7 +3908,7 @@ export function StudioPage() {
       : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
   }
   // 선택 요소(그룹이면 그룹 전체)를 원점 기준으로 정규화해 재사용 클립으로 저장.
-  function saveSelectionAsClip() {
+  async function saveSelectionAsClip() {
     if (!selected) return;
     const members = selected.groupId
       ? elements.filter((e) => e.groupId === selected.groupId)
@@ -3908,7 +3920,13 @@ export function StudioPage() {
       members.length > 1 ? "내 장면 클립" : selected.type === "bubble" ? "말풍선 클립" : "내 클립";
     const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
     if (!name) return;
-    setClips(saveClip(globalThis.localStorage, { id: uid(), name, createdAt: Date.now(), els }));
+    try {
+      const { saveClip } = await import("./studio-clips");
+      setClips(saveClip(globalThis.localStorage, { id: uid(), name, createdAt: Date.now(), els }));
+    } catch (err) {
+      console.error("Failed to save studio clip:", err);
+      setError("클립을 저장하지 못했습니다.");
+    }
     setMenu("clip");
   }
   // 클립을 캔버스에 삽입 — 새 id·새 그룹으로 화면 중앙 부근에 배치.
@@ -3928,8 +3946,14 @@ export function StudioPage() {
     setMenu(null);
     setTool("select");
   }
-  function deleteClip(id: string) {
-    setClips(removeClip(globalThis.localStorage, id));
+  async function deleteClip(id: string) {
+    try {
+      const { removeClip } = await import("./studio-clips");
+      setClips(removeClip(globalThis.localStorage, id));
+    } catch (err) {
+      console.error("Failed to delete studio clip:", err);
+      setError("클립을 삭제하지 못했습니다.");
+    }
   }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
@@ -5208,7 +5232,7 @@ export function StudioPage() {
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
               <button
                 type="button"
-                onClick={saveSelectionAsClip}
+                onClick={() => void saveSelectionAsClip()}
                 disabled={!selected}
                 className={cn(
                   "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
@@ -5237,7 +5261,7 @@ export function StudioPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteClip(c.id)}
+                        onClick={() => void deleteClip(c.id)}
                         aria-label={`${c.name} 클립 삭제`}
                         className="shrink-0 text-fg-4 transition-colors hover:text-bad"
                       >
