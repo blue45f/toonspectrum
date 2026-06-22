@@ -2772,10 +2772,14 @@ export function StudioPage() {
       });
   }, [menu, studioEmeresAssetsLoaded]);
 
-  // 스튜디오 전용 구글폰트 로드 — 스타일시트는 마운트 시 1회 주입하고 언마운트 후에도 남긴다
-  // (재진입 시 id 가드로 중복 주입 방지·폰트 캐시 유지). konva 캔버스 텍스트는 DOM과 달리
-  // 폰트 스왑을 스스로 감지하지 못하므로, 폰트가 도착하는 시점에 스테이지를 한 번씩 다시 그린다.
+  const shouldLoadStudioFonts =
+    menu === "bubble" || elements.some((el) => el.type === "text" || el.type === "bubble");
+
+  // 스튜디오 전용 구글폰트 로드 — 텍스트/말풍선을 쓰기 전에는 stylesheet를 주입하지 않는다.
+  // 한 번 로드한 뒤에는 id 가드로 중복 주입을 막고 폰트 캐시는 유지한다. Konva 캔버스 텍스트는 DOM과
+  // 달리 폰트 스왑을 스스로 감지하지 못하므로, 폰트가 도착하는 시점에 스테이지를 한 번씩 다시 그린다.
   useEffect(() => {
+    if (!shouldLoadStudioFonts) return;
     if (!document.getElementById(STUDIO_FONTS_LINK_ID)) {
       const link = document.createElement("link");
       link.id = STUDIO_FONTS_LINK_ID;
@@ -2795,7 +2799,7 @@ export function StudioPage() {
       mounted = false;
       document.fonts.removeEventListener("loadingdone", redrawStage);
     };
-  }, []);
+  }, [shouldLoadStudioFonts]);
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
