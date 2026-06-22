@@ -1979,15 +1979,6 @@ export function StudioPage() {
       alive = false;
     };
   }, [menu]);
-  // 저장된 워터마크/서명 복원(마운트 시 1회).
-  useEffect(() => {
-    try {
-      const raw = globalThis.localStorage.getItem(WATERMARK_KEY);
-      if (raw) setWatermarkState(normalizeWatermark(JSON.parse(raw)));
-    } catch {
-      // 접근/파싱 불가면 기본값 유지.
-    }
-  }, []);
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -2520,7 +2511,22 @@ export function StudioPage() {
   const [exportPresetId, setExportPresetId] = useState<string | null>(null);
   // 내보내기 워터마크/서명 — 세션 넘어 유지되게 localStorage에 저장.
   const [watermark, setWatermarkState] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
+  const watermarkLoadedRef = useRef(false);
+  const ensureWatermarkLoaded = () => {
+    if (watermarkLoadedRef.current) return watermark;
+    watermarkLoadedRef.current = true;
+    try {
+      const raw = globalThis.localStorage.getItem(WATERMARK_KEY);
+      const next = raw ? normalizeWatermark(JSON.parse(raw)) : DEFAULT_WATERMARK;
+      setWatermarkState(next);
+      return next;
+    } catch {
+      // 접근/파싱 불가면 기본값 유지.
+      return watermark;
+    }
+  };
   const setWatermark = (next: WatermarkSettings) => {
+    watermarkLoadedRef.current = true;
     setWatermarkState(next);
     try {
       globalThis.localStorage.setItem(WATERMARK_KEY, JSON.stringify(next));
@@ -4564,6 +4570,7 @@ export function StudioPage() {
     );
 
   async function handleDownload() {
+    const watermarkForExport = ensureWatermarkLoaded();
     setExportMenuOpen(false);
     setSelectedId(null);
     setIsExporting(true);
@@ -4588,7 +4595,7 @@ export function StudioPage() {
       bgNode.show();
       stage.batchDraw();
     }
-    drawWatermarkOnCanvas(canvas, watermark);
+    drawWatermarkOnCanvas(canvas, watermarkForExport);
     setIsExporting(false);
     try {
       const { canvasToBlob, downloadBlob, exportMimeType, exportQuality, pageExportFileName } = await import("./studio-export");
@@ -4601,6 +4608,7 @@ export function StudioPage() {
 
   // 현재 페이지를 클립보드에 이미지(PNG)로 복사 — 색보정 합성 후 ClipboardItem으로 기록.
   async function handleCopyToClipboard() {
+    const watermarkForExport = ensureWatermarkLoaded();
     setExportMenuOpen(false);
     setSelectedId(null);
     setIsExporting(true);
@@ -4612,7 +4620,7 @@ export function StudioPage() {
     }
     const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effScale });
     const canvas = bakeGradeIntoCanvas(rawCanvas, pageGrade);
-    drawWatermarkOnCanvas(canvas, watermark);
+    drawWatermarkOnCanvas(canvas, watermarkForExport);
     setIsExporting(false);
     try {
       const { copyCanvasToClipboard } = await import("./studio-export");
@@ -4624,6 +4632,7 @@ export function StudioPage() {
   }
 
   async function handleDownloadAll(spacing = 24) {
+    const watermarkForExport = ensureWatermarkLoaded();
     setExportMenuOpen(false);
     const {
       MAX_CANVAS_DIM,
@@ -4724,7 +4733,7 @@ export function StudioPage() {
         }
 
         // 워터마크/서명을 합성한 뒤 파일 저장(분할 시 -1of2 식 접미사)
-        drawWatermarkOnCanvas(compositeCanvas, watermark);
+        drawWatermarkOnCanvas(compositeCanvas, watermarkForExport);
         const blob = await canvasToBlob(
           compositeCanvas,
           exportMimeType(exportFormat),
@@ -4827,6 +4836,7 @@ export function StudioPage() {
               type="button"
               onClick={() => {
                 preloadStudioExportMenuPanel();
+                ensureWatermarkLoaded();
                 setExportMenuOpen((open) => !open);
               }}
               onMouseEnter={preloadStudioExportMenuPanel}
