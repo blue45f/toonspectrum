@@ -4,25 +4,12 @@
  *   - 각 룩의 patch는 완성된 분위기를 내는 필터 필드의 "선별된 부분집합"이다.
  *   - 스칼라/불리언 필드(brightness/contrast/grayscale/sepia/temperature 등)는 값을 직접 박는다.
  *   - 객체 필드(curve/colorBalance/photoFilter/vibrance/gradientMap/halftone/grain/glow/
- *     stylize/light/sketch/clarity)는 반드시 해당 모듈의 normalizeX({...})를 호출해 값을 만든다
- *     → 모든 객체 값이 범위 클램프·항등 검증을 통과해 무효 값이 절대 새지 않는다.
+ *     stylize/light/sketch/clarity)는 검증된 상수 범위의 raw preset object로 둔다.
+ *     무거운 필터 모듈은 실제 고급 보정 패널/필터 적용 시점에만 로드한다.
  * 룩은 "절대값(absolute)" 적용이라 가산이 아니다 — looksResetPatch()로 모든 필드를 비운 뒤 patch를 얹는다.
  * 필터 클립보드(복사/붙여넣기)도 LOOK_FILTER_KEYS / extractFilterFields로 공유한다.
  * Konva/DOM 의존 없음 — StudioPage와 단위 테스트가 함께 쓴다. 전부 순수·결정적(랜덤 없음).
  */
-
-import { normalizeClarity } from "./studio-clarity";
-import { normalizeColorBalance } from "./studio-color-balance";
-import { normalizeCurve } from "./studio-curves";
-import { normalizeGlow } from "./studio-glow";
-import { normalizeGradientMap } from "./studio-gradient-map";
-import { normalizeGrain } from "./studio-grain";
-import { normalizeHalftone } from "./studio-halftone";
-import { normalizeLight } from "./studio-light";
-import { normalizePhotoFilter } from "./studio-photo-filter";
-import { normalizeSketch } from "./studio-sketch";
-import { normalizeStylize } from "./studio-stylize";
-import { normalizeVibrance } from "./studio-vibrance";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
@@ -44,7 +31,7 @@ export type StudioLook = {
 
 // ---------------------------------------------------------------------------
 // 룩 카탈로그 — 카테고리별로 시각적으로 또렷하고 웹툰 실전에 쓸모 있는 16+ 룩.
-// 객체 필드는 전부 normalizeX(...)로 만들어 범위/항등 검증을 통과한다.
+// 객체 필드는 검증된 상수 범위로 선언해 룩 패널 진입 시 고급 필터 모듈을 당겨오지 않는다.
 // ---------------------------------------------------------------------------
 
 export const STUDIO_LOOKS: StudioLook[] = [
@@ -57,8 +44,8 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       grayscale: true,
       contrast: 22,
-      halftone: normalizeHalftone({ dotSize: 4, angle: 45, mode: "mono", strength: 85 }),
-      grain: normalizeGrain({ type: "film", amount: 18, size: 1, seed: 7 }),
+      halftone: { dotSize: 4, angle: 45, mode: "mono", strength: 85 },
+      grain: { type: "film", amount: 18, size: 1, seed: 7 },
     },
   },
   {
@@ -69,7 +56,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       saturation: 0.3,
       contrast: 18,
-      halftone: normalizeHalftone({ dotSize: 4, angle: 15, mode: "cmyk", strength: 100 }),
+      halftone: { dotSize: 4, angle: 15, mode: "cmyk", strength: 100 },
     },
   },
   {
@@ -80,7 +67,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       grayscale: true,
       contrast: 10,
-      sketch: normalizeSketch({ type: "photocopy", strength: 100, detail: 4 }),
+      sketch: { type: "photocopy", strength: 100, detail: 4 },
     },
   },
   {
@@ -91,7 +78,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       grayscale: true,
       contrast: 16,
-      halftone: normalizeHalftone({ dotSize: 3, angle: 45, mode: "mono", strength: 100 }),
+      halftone: { dotSize: 3, angle: 45, mode: "mono", strength: 100 },
     },
   },
 
@@ -104,14 +91,14 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       grayscale: true,
       contrast: 36,
-      curve: normalizeCurve([
+      curve: [
         { x: 0, y: 0 },
         { x: 56, y: 24 },
         { x: 200, y: 232 },
         { x: 255, y: 255 },
-      ]),
-      grain: normalizeGrain({ type: "film", amount: 38, size: 2, seed: 11 }),
-      glow: normalizeGlow({ strength: 18, size: 8, threshold: 80, color: "auto" }),
+      ],
+      grain: { type: "film", amount: 38, size: 2, seed: 11 },
+      glow: { strength: 18, size: 8, threshold: 80, color: "auto" },
     },
   },
   {
@@ -121,8 +108,8 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "시네마틱",
     patch: {
       contrast: 16,
-      colorBalance: normalizeColorBalance({ shadows: [-10, 5, 20], highlights: [25, 10, -20] }),
-      vibrance: normalizeVibrance({ vibrance: 12, saturation: 6 }),
+      colorBalance: { shadows: [-10, 5, 20], midtones: [0, 0, 0], highlights: [25, 10, -20] },
+      vibrance: { vibrance: 12, saturation: 6 },
     },
   },
   {
@@ -133,9 +120,9 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       contrast: 14,
       saturation: 0.25,
-      colorBalance: normalizeColorBalance({ shadows: [-18, -4, 24], highlights: [22, -10, 18] }),
-      glow: normalizeGlow({ strength: 55, size: 16, threshold: 55, color: "#00e5ff" }),
-      light: normalizeLight({ type: "glowStreak", intensity: 45, x: 50, y: 40, hue: 300 }),
+      colorBalance: { shadows: [-18, -4, 24], midtones: [0, 0, 0], highlights: [22, -10, 18] },
+      glow: { strength: 55, size: 16, threshold: 55, color: "#00e5ff" },
+      light: { type: "glowStreak", intensity: 45, x: 50, y: 40, hue: 300 },
     },
   },
   {
@@ -145,9 +132,9 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "시네마틱",
     patch: {
       brightness: 0.04,
-      photoFilter: normalizePhotoFilter({ color: "#ff9e3d", density: 35, preserveLuminosity: true }),
-      vibrance: normalizeVibrance({ vibrance: 18, saturation: 4 }),
-      light: normalizeLight({ type: "lightLeak", intensity: 48, x: 10, y: 16, hue: 38 }),
+      photoFilter: { color: "#ff9e3d", density: 35, preserveLuminosity: true },
+      vibrance: { vibrance: 18, saturation: 4 },
+      light: { type: "lightLeak", intensity: 48, x: 10, y: 16, hue: 38 },
     },
   },
 
@@ -158,15 +145,15 @@ export const STUDIO_LOOKS: StudioLook[] = [
     tip: "검정을 들어올린 페이드 커브에 따뜻한 색조와 필름 그레인을 더해 빛바랜 필름 톤을 냅니다.",
     category: "빈티지",
     patch: {
-      curve: normalizeCurve([
+      curve: [
         { x: 0, y: 24 },
         { x: 64, y: 78 },
         { x: 192, y: 198 },
         { x: 255, y: 235 },
-      ]),
-      photoFilter: normalizePhotoFilter({ color: "#ec8a00", density: 28, preserveLuminosity: true }),
-      grain: normalizeGrain({ type: "film", amount: 30, size: 2, seed: 23 }),
-      vibrance: normalizeVibrance({ vibrance: 0, saturation: -18 }),
+      ],
+      photoFilter: { color: "#ec8a00", density: 28, preserveLuminosity: true },
+      grain: { type: "film", amount: 30, size: 2, seed: 23 },
+      vibrance: { vibrance: 0, saturation: -18 },
     },
   },
   {
@@ -177,7 +164,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       sepia: true,
       contrast: 12,
-      grain: normalizeGrain({ type: "film", amount: 22, size: 1, seed: 5 }),
+      grain: { type: "film", amount: 22, size: 1, seed: 5 },
     },
   },
   {
@@ -187,13 +174,13 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "빈티지",
     patch: {
       saturation: -0.15,
-      curve: normalizeCurve([
+      curve: [
         { x: 0, y: 18 },
         { x: 128, y: 138 },
         { x: 255, y: 240 },
-      ]),
-      grain: normalizeGrain({ type: "scanline", amount: 35, size: 2, seed: 1 }),
-      photoFilter: normalizePhotoFilter({ color: "#d8a24a", density: 22, preserveLuminosity: true }),
+      ],
+      grain: { type: "scanline", amount: 35, size: 2, seed: 1 },
+      photoFilter: { color: "#d8a24a", density: 22, preserveLuminosity: true },
     },
   },
 
@@ -205,12 +192,12 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "감성",
     patch: {
       brightness: 0.08,
-      curve: normalizeCurve([
+      curve: [
         { x: 0, y: 22 },
         { x: 128, y: 150 },
         { x: 255, y: 250 },
-      ]),
-      vibrance: normalizeVibrance({ vibrance: 18, saturation: -38 }),
+      ],
+      vibrance: { vibrance: 18, saturation: -38 },
     },
   },
   {
@@ -220,9 +207,9 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "감성",
     patch: {
       brightness: 0.06,
-      glow: normalizeGlow({ strength: 45, size: 28, threshold: 45, color: "auto" }),
-      vibrance: normalizeVibrance({ vibrance: 14, saturation: -8 }),
-      light: normalizeLight({ type: "lightLeak", intensity: 30, x: 78, y: 20, hue: 320 }),
+      glow: { strength: 45, size: 28, threshold: 45, color: "auto" },
+      vibrance: { vibrance: 14, saturation: -8 },
+      light: { type: "lightLeak", intensity: 30, x: 78, y: 20, hue: 320 },
     },
   },
   {
@@ -233,8 +220,8 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       temperature: -22,
       saturation: 0.1,
-      vibrance: normalizeVibrance({ vibrance: 24, saturation: 6 }),
-      clarity: normalizeClarity({ clarity: 28, dehaze: 12 }),
+      vibrance: { vibrance: 24, saturation: 6 },
+      clarity: { clarity: 28, dehaze: 12 },
     },
   },
 
@@ -247,13 +234,13 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       grayscale: true,
       contrast: 34,
-      clarity: normalizeClarity({ clarity: 40, dehaze: 0 }),
-      curve: normalizeCurve([
+      clarity: { clarity: 40, dehaze: 0 },
+      curve: [
         { x: 0, y: 0 },
         { x: 64, y: 44 },
         { x: 192, y: 212 },
         { x: 255, y: 255 },
-      ]),
+      ],
     },
   },
   {
@@ -263,7 +250,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "흑백",
     patch: {
       grayscale: true,
-      sketch: normalizeSketch({ type: "stamp", strength: 100, detail: 5 }),
+      sketch: { type: "stamp", strength: 100, detail: 5 },
     },
   },
 
@@ -276,7 +263,7 @@ export const STUDIO_LOOKS: StudioLook[] = [
     patch: {
       saturation: 0.5,
       contrast: 12,
-      halftone: normalizeHalftone({ dotSize: 10, angle: 15, mode: "cmyk", strength: 100 }),
+      halftone: { dotSize: 10, angle: 15, mode: "cmyk", strength: 100 },
     },
   },
   {
@@ -285,9 +272,9 @@ export const STUDIO_LOOKS: StudioLook[] = [
     tip: "이웃 색을 뭉치는 유화 스타일화에 선명도와 생기를 더해 두꺼운 붓 터치 질감을 만듭니다.",
     category: "실험",
     patch: {
-      stylize: normalizeStylize({ type: "oilPaint", strength: 85, detail: 4 }),
-      clarity: normalizeClarity({ clarity: 22, dehaze: 0 }),
-      vibrance: normalizeVibrance({ vibrance: 20, saturation: 8 }),
+      stylize: { type: "oilPaint", strength: 85, detail: 4 },
+      clarity: { clarity: 22, dehaze: 0 },
+      vibrance: { vibrance: 20, saturation: 8 },
     },
   },
   {
@@ -297,14 +284,14 @@ export const STUDIO_LOOKS: StudioLook[] = [
     category: "실험",
     patch: {
       saturation: 0.2,
-      stylize: normalizeStylize({ type: "solarize", strength: 75, detail: 4 }),
-      gradientMap: normalizeGradientMap({
+      stylize: { type: "solarize", strength: 75, detail: 4 },
+      gradientMap: {
         stops: [
           { pos: 0, color: "#1a0030" },
           { pos: 0.5, color: "#9c3bd0" },
           { pos: 1, color: "#ffe07a" },
         ],
-      }),
+      },
     },
   },
 ];

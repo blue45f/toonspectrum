@@ -2356,6 +2356,7 @@ export function StudioPage() {
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       const targetW = Math.round(width * fit);
       const targetH = Math.round(height * fit);
+      setError(null);
       addEl({ id: uid(), type: "image", src, x: x - targetW / 2, y: y - targetH / 2, width: targetW, height: targetH, rotation: 0 });
     };
 
@@ -3148,6 +3149,7 @@ export function StudioPage() {
     commitPages(nextPages);
   }
   function addRenderedImage(src: string, width: number, height: number) {
+    setError(null);
     addEl(
       createCanvasImageElement({
         id: uid(),
@@ -3970,6 +3972,7 @@ export function StudioPage() {
     try {
       const { src, width, height } = await downscaleImageFile(file);
       const fit = Math.min(1, (CANVAS_W - 80) / width);
+      setError(null);
       addEl({
         id: uid(),
         type: "image",

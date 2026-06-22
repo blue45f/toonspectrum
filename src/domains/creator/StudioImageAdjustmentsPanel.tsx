@@ -1,66 +1,16 @@
-import { lazy, Suspense } from "react";
+import { ChevronDown } from "lucide-react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-import { normalizeAutoAdjust, type AutoAdjust } from "./studio-auto-adjust";
-import { normalizeBlurFx, type BlurFx } from "./studio-blur";
-import { normalizeChannelMixer, type ChannelMixer } from "./studio-channel-mixer";
-import { normalizeClarity, type Clarity } from "./studio-clarity";
-import { normalizeColorBalance, type ColorBalance } from "./studio-color-balance";
 import { normalizeCurve, type CurvePoint } from "./studio-curves";
-import { normalizeDetail, type Detail } from "./studio-detail";
-import { normalizeDistort, type Distort } from "./studio-distort";
-import { normalizeGlow, type Glow } from "./studio-glow";
-import { normalizeGradientMap, type GradientMap } from "./studio-gradient-map";
-import { normalizeGrain, type Grain } from "./studio-grain";
-import { normalizeHalftone, type Halftone } from "./studio-halftone";
 import { type LayerStylePatch } from "./studio-layer-styles";
 import { normalizeLevels, type LevelsParams } from "./studio-levels";
-import { normalizeLight, type Light } from "./studio-light";
 import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-looks";
-import { normalizeOutline, type Outline } from "./studio-outline";
-import { normalizePhotoFilter, type PhotoFilter } from "./studio-photo-filter";
-import { normalizeSelectiveHsl, type SelectiveHsl } from "./studio-selective-hsl";
-import { normalizeSketch, type Sketch } from "./studio-sketch";
-import { normalizeStylize, type Stylize } from "./studio-stylize";
-import { normalizeVibrance, type Vibrance } from "./studio-vibrance";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 import type { El, ImageEl } from "./StudioPage";
 
-const StudioAutoAdjustPanel = lazy(() =>
-  import("./StudioAutoAdjustPanel").then((mod) => ({ default: mod.StudioAutoAdjustPanel }))
-);
-const StudioBlurPanel = lazy(() =>
-  import("./StudioBlurPanel").then((mod) => ({ default: mod.StudioBlurPanel }))
-);
-const StudioChannelMixerPanel = lazy(() =>
-  import("./StudioChannelMixerPanel").then((mod) => ({ default: mod.StudioChannelMixerPanel }))
-);
-const StudioClarityPanel = lazy(() =>
-  import("./StudioClarityPanel").then((mod) => ({ default: mod.StudioClarityPanel }))
-);
-const StudioColorBalancePanel = lazy(() =>
-  import("./StudioColorBalancePanel").then((mod) => ({ default: mod.StudioColorBalancePanel }))
-);
 const StudioCurvePanel = lazy(() =>
   import("./StudioCurvePanel").then((mod) => ({ default: mod.StudioCurvePanel }))
-);
-const StudioDetailPanel = lazy(() =>
-  import("./StudioDetailPanel").then((mod) => ({ default: mod.StudioDetailPanel }))
-);
-const StudioDistortPanel = lazy(() =>
-  import("./StudioDistortPanel").then((mod) => ({ default: mod.StudioDistortPanel }))
-);
-const StudioGlowPanel = lazy(() =>
-  import("./StudioGlowPanel").then((mod) => ({ default: mod.StudioGlowPanel }))
-);
-const StudioGradientMapPanel = lazy(() =>
-  import("./StudioGradientMapPanel").then((mod) => ({ default: mod.StudioGradientMapPanel }))
-);
-const StudioGrainPanel = lazy(() =>
-  import("./StudioGrainPanel").then((mod) => ({ default: mod.StudioGrainPanel }))
-);
-const StudioHalftonePanel = lazy(() =>
-  import("./StudioHalftonePanel").then((mod) => ({ default: mod.StudioHalftonePanel }))
 );
 const StudioImageFilterPanel = lazy(() =>
   import("./StudioImageFilterPanel").then((mod) => ({ default: mod.StudioImageFilterPanel }))
@@ -71,29 +21,8 @@ const StudioLayerStylePanel = lazy(() =>
 const StudioLevelsPanel = lazy(() =>
   import("./StudioLevelsPanel").then((mod) => ({ default: mod.StudioLevelsPanel }))
 );
-const StudioLightPanel = lazy(() =>
-  import("./StudioLightPanel").then((mod) => ({ default: mod.StudioLightPanel }))
-);
 const StudioLooksPanel = lazy(() =>
   import("./StudioLooksPanel").then((mod) => ({ default: mod.StudioLooksPanel }))
-);
-const StudioOutlinePanel = lazy(() =>
-  import("./StudioOutlinePanel").then((mod) => ({ default: mod.StudioOutlinePanel }))
-);
-const StudioPhotoFilterPanel = lazy(() =>
-  import("./StudioPhotoFilterPanel").then((mod) => ({ default: mod.StudioPhotoFilterPanel }))
-);
-const StudioSelectiveHslPanel = lazy(() =>
-  import("./StudioSelectiveHslPanel").then((mod) => ({ default: mod.StudioSelectiveHslPanel }))
-);
-const StudioSketchPanel = lazy(() =>
-  import("./StudioSketchPanel").then((mod) => ({ default: mod.StudioSketchPanel }))
-);
-const StudioStylizePanel = lazy(() =>
-  import("./StudioStylizePanel").then((mod) => ({ default: mod.StudioStylizePanel }))
-);
-const StudioVibrancePanel = lazy(() =>
-  import("./StudioVibrancePanel").then((mod) => ({ default: mod.StudioVibrancePanel }))
 );
 
 interface StudioImageAdjustmentsPanelProps {
@@ -103,6 +32,493 @@ interface StudioImageAdjustmentsPanelProps {
   onPatch: (patch: Partial<El>) => void;
 }
 
+type DeferredAdjustmentSectionProps = Pick<StudioImageAdjustmentsPanelProps, "selected" | "onPatch">;
+
+const StudioColorBalanceSection = lazy(async () => {
+  const [panelMod, colorBalance] = await Promise.all([
+    import("./StudioColorBalancePanel"),
+    import("./studio-color-balance"),
+  ]);
+  const Panel = panelMod.StudioColorBalancePanel;
+  function StudioColorBalanceSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = colorBalance.normalizeColorBalance(selected.colorBalance);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            colorBalance: colorBalance.normalizeColorBalance({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(balance) => onPatch({ colorBalance: balance } as Partial<El>)}
+        onReset={() => onPatch({ colorBalance: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioColorBalanceSection };
+});
+
+const StudioChannelMixerSection = lazy(async () => {
+  const [panelMod, channelMixer] = await Promise.all([
+    import("./StudioChannelMixerPanel"),
+    import("./studio-channel-mixer"),
+  ]);
+  const Panel = panelMod.StudioChannelMixerPanel;
+  function StudioChannelMixerSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = channelMixer.normalizeChannelMixer(selected.channelMixer);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            channelMixer: channelMixer.normalizeChannelMixer({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(mixer) => onPatch({ channelMixer: mixer } as Partial<El>)}
+        onReset={() => onPatch({ channelMixer: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioChannelMixerSection };
+});
+
+const StudioSelectiveHslSection = lazy(async () => {
+  const [panelMod, selectiveHsl] = await Promise.all([
+    import("./StudioSelectiveHslPanel"),
+    import("./studio-selective-hsl"),
+  ]);
+  const Panel = panelMod.StudioSelectiveHslPanel;
+  function StudioSelectiveHslSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = selectiveHsl.normalizeSelectiveHsl(selected.selectiveHsl);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            selectiveHsl: selectiveHsl.normalizeSelectiveHsl({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ selectiveHsl: v } as Partial<El>)}
+        onReset={() => onPatch({ selectiveHsl: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioSelectiveHslSection };
+});
+
+const StudioVibranceSection = lazy(async () => {
+  const [panelMod, vibrance] = await Promise.all([
+    import("./StudioVibrancePanel"),
+    import("./studio-vibrance"),
+  ]);
+  const Panel = panelMod.StudioVibrancePanel;
+  function StudioVibranceSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = vibrance.normalizeVibrance(selected.vibrance);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            vibrance: vibrance.normalizeVibrance({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ vibrance: v } as Partial<El>)}
+        onReset={() => onPatch({ vibrance: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioVibranceSection };
+});
+
+const StudioPhotoFilterSection = lazy(async () => {
+  const [panelMod, photoFilter] = await Promise.all([
+    import("./StudioPhotoFilterPanel"),
+    import("./studio-photo-filter"),
+  ]);
+  const Panel = panelMod.StudioPhotoFilterPanel;
+  function StudioPhotoFilterSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = photoFilter.normalizePhotoFilter(selected.photoFilter);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            photoFilter: photoFilter.normalizePhotoFilter({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ photoFilter: v } as Partial<El>)}
+        onReset={() => onPatch({ photoFilter: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioPhotoFilterSection };
+});
+
+const StudioGradientMapSection = lazy(async () => {
+  const [panelMod, gradientMap] = await Promise.all([
+    import("./StudioGradientMapPanel"),
+    import("./studio-gradient-map"),
+  ]);
+  const Panel = panelMod.StudioGradientMapPanel;
+  function StudioGradientMapSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = gradientMap.normalizeGradientMap(selected.gradientMap);
+    return (
+      <Panel
+        value={value}
+        onApplyPreset={(m) => onPatch({ gradientMap: m } as Partial<El>)}
+        onEditStopColor={(i, color) => {
+          const stops = value.stops.map((stop, index) => (index === i ? { ...stop, color } : stop));
+          onPatch({ gradientMap: gradientMap.normalizeGradientMap({ stops }) } as Partial<El>);
+        }}
+        onReset={() => onPatch({ gradientMap: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioGradientMapSection };
+});
+
+const StudioAutoAdjustSection = lazy(async () => {
+  const [panelMod, autoAdjust] = await Promise.all([
+    import("./StudioAutoAdjustPanel"),
+    import("./studio-auto-adjust"),
+  ]);
+  const Panel = panelMod.StudioAutoAdjustPanel;
+  function StudioAutoAdjustSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = autoAdjust.normalizeAutoAdjust(selected.autoAdjust);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            autoAdjust: autoAdjust.normalizeAutoAdjust({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ autoAdjust: v } as Partial<El>)}
+        onReset={() => onPatch({ autoAdjust: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioAutoAdjustSection };
+});
+
+const StudioClaritySection = lazy(async () => {
+  const [panelMod, clarity] = await Promise.all([
+    import("./StudioClarityPanel"),
+    import("./studio-clarity"),
+  ]);
+  const Panel = panelMod.StudioClarityPanel;
+  function StudioClaritySection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = clarity.normalizeClarity(selected.clarity);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            clarity: clarity.normalizeClarity({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ clarity: v } as Partial<El>)}
+        onReset={() => onPatch({ clarity: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioClaritySection };
+});
+
+const StudioGlowSection = lazy(async () => {
+  const [panelMod, glow] = await Promise.all([
+    import("./StudioGlowPanel"),
+    import("./studio-glow"),
+  ]);
+  const Panel = panelMod.StudioGlowPanel;
+  function StudioGlowSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = glow.normalizeGlow(selected.glow);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            glow: glow.normalizeGlow({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ glow: v } as Partial<El>)}
+        onReset={() => onPatch({ glow: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioGlowSection };
+});
+
+const StudioOutlineSection = lazy(async () => {
+  const [panelMod, outline] = await Promise.all([
+    import("./StudioOutlinePanel"),
+    import("./studio-outline"),
+  ]);
+  const Panel = panelMod.StudioOutlinePanel;
+  function StudioOutlineSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = outline.normalizeOutline(selected.outline);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            outline: outline.normalizeOutline({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ outline: v } as Partial<El>)}
+        onReset={() => onPatch({ outline: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioOutlineSection };
+});
+
+const StudioHalftoneSection = lazy(async () => {
+  const [panelMod, halftone] = await Promise.all([
+    import("./StudioHalftonePanel"),
+    import("./studio-halftone"),
+  ]);
+  const Panel = panelMod.StudioHalftonePanel;
+  function StudioHalftoneSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = halftone.normalizeHalftone(selected.halftone);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            halftone: halftone.normalizeHalftone({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ halftone: v } as Partial<El>)}
+        onReset={() => onPatch({ halftone: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioHalftoneSection };
+});
+
+const StudioGrainSection = lazy(async () => {
+  const [panelMod, grain] = await Promise.all([
+    import("./StudioGrainPanel"),
+    import("./studio-grain"),
+  ]);
+  const Panel = panelMod.StudioGrainPanel;
+  function StudioGrainSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = grain.normalizeGrain(selected.grain);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            grain: grain.normalizeGrain({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ grain: v } as Partial<El>)}
+        onReset={() => onPatch({ grain: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioGrainSection };
+});
+
+const StudioBlurSection = lazy(async () => {
+  const [panelMod, blur] = await Promise.all([
+    import("./StudioBlurPanel"),
+    import("./studio-blur"),
+  ]);
+  const Panel = panelMod.StudioBlurPanel;
+  function StudioBlurSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = blur.normalizeBlurFx(selected.blurFx);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            blurFx: blur.normalizeBlurFx({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ blurFx: v } as Partial<El>)}
+        onReset={() => onPatch({ blurFx: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioBlurSection };
+});
+
+const StudioDistortSection = lazy(async () => {
+  const [panelMod, distort] = await Promise.all([
+    import("./StudioDistortPanel"),
+    import("./studio-distort"),
+  ]);
+  const Panel = panelMod.StudioDistortPanel;
+  function StudioDistortSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = distort.normalizeDistort(selected.distort);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            distort: distort.normalizeDistort({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ distort: v } as Partial<El>)}
+        onReset={() => onPatch({ distort: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioDistortSection };
+});
+
+const StudioStylizeSection = lazy(async () => {
+  const [panelMod, stylize] = await Promise.all([
+    import("./StudioStylizePanel"),
+    import("./studio-stylize"),
+  ]);
+  const Panel = panelMod.StudioStylizePanel;
+  function StudioStylizeSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = stylize.normalizeStylize(selected.stylize);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            stylize: stylize.normalizeStylize({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ stylize: v } as Partial<El>)}
+        onReset={() => onPatch({ stylize: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioStylizeSection };
+});
+
+const StudioLightSection = lazy(async () => {
+  const [panelMod, light] = await Promise.all([
+    import("./StudioLightPanel"),
+    import("./studio-light"),
+  ]);
+  const Panel = panelMod.StudioLightPanel;
+  function StudioLightSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = light.normalizeLight(selected.light);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            light: light.normalizeLight({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ light: v } as Partial<El>)}
+        onReset={() => onPatch({ light: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioLightSection };
+});
+
+const StudioDetailSection = lazy(async () => {
+  const [panelMod, detail] = await Promise.all([
+    import("./StudioDetailPanel"),
+    import("./studio-detail"),
+  ]);
+  const Panel = panelMod.StudioDetailPanel;
+  function StudioDetailSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = detail.normalizeDetail(selected.detail);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            detail: detail.normalizeDetail({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ detail: v } as Partial<El>)}
+        onReset={() => onPatch({ detail: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioDetailSection };
+});
+
+const StudioSketchSection = lazy(async () => {
+  const [panelMod, sketch] = await Promise.all([
+    import("./StudioSketchPanel"),
+    import("./studio-sketch"),
+  ]);
+  const Panel = panelMod.StudioSketchPanel;
+  function StudioSketchSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = sketch.normalizeSketch(selected.sketch);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            sketch: sketch.normalizeSketch({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ sketch: v } as Partial<El>)}
+        onReset={() => onPatch({ sketch: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioSketchSection };
+});
+
+function hasAdjustmentValue(value: unknown) {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return true;
+}
+
+function AdjustmentSection({
+  title,
+  defaultOpen = false,
+  forceOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  forceOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen || forceOpen);
+
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+
+  return (
+    <section className="mt-3 border-t border-line/50 pt-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-3 rounded-lg px-1.5 py-1 text-left text-xs font-semibold text-fg transition-colors hover:bg-raised/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <span>{title}</span>
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
+        />
+      </button>
+      {open ? (
+        <Suspense
+          fallback={
+            <div className="mt-2 rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
+              {title} 패널을 여는 중...
+            </div>
+          }
+        >
+          <div className="mt-2">{children}</div>
+        </Suspense>
+      ) : null}
+    </section>
+  );
+}
+
 export function StudioImageAdjustmentsPanel({
   selected,
   filterClipboard,
@@ -110,15 +526,8 @@ export function StudioImageAdjustmentsPanel({
   onPatch,
 }: StudioImageAdjustmentsPanelProps) {
   return (
-    <Suspense
-      fallback={
-        <div className="mt-3 rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
-          이미지 보정 패널을 여는 중...
-        </div>
-      }
-    >
-      <>
-      <div className="mt-3 border-t border-line/50 pt-3">
+    <>
+      <AdjustmentSection title="룩 프리셋" defaultOpen>
         <StudioLooksPanel
           onApplyLook={(look: StudioLook) => onPatch({ ...looksResetPatch(), ...look.patch } as Partial<El>)}
           onCopy={() => onSetFilterClipboard(extractFilterFields(selected))}
@@ -128,16 +537,16 @@ export function StudioImageAdjustmentsPanel({
           onResetAll={() => onPatch(looksResetPatch() as Partial<El>)}
           canPaste={!!filterClipboard}
         />
-      </div>
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
+      <AdjustmentSection title="기본 필터" defaultOpen>
         <StudioImageFilterPanel
           values={selected}
           onPatch={(patch) => onPatch(patch as Partial<El>)}
         />
-      </div>
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
+      <AdjustmentSection title="레벨" defaultOpen>
         <StudioLevelsPanel
           value={normalizeLevels({
             blackPoint: selected.levelsBlack,
@@ -174,257 +583,94 @@ export function StudioImageAdjustmentsPanel({
             } as Partial<El>)
           }
         />
-      </div>
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
+      <AdjustmentSection title="레이어 스타일" defaultOpen>
         <StudioLayerStylePanel
           values={selected as LayerStylePatch}
           onPatch={(patch) => onPatch(patch as Partial<El>)}
         />
-      </div>
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
+      <AdjustmentSection title="톤 커브" defaultOpen={hasAdjustmentValue(selected.curve)}>
         <StudioCurvePanel
           points={normalizeCurve(selected.curve)}
           onChange={(pts: CurvePoint[]) => onPatch({ curve: pts } as Partial<El>)}
           onReset={() => onPatch({ curve: undefined } as Partial<El>)}
         />
-      </div>
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioColorBalancePanel
-          value={normalizeColorBalance(selected.colorBalance)}
-          onPatch={(patch: Partial<ColorBalance>) =>
-            onPatch({
-              colorBalance: normalizeColorBalance({ ...normalizeColorBalance(selected.colorBalance), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(balance: ColorBalance) => onPatch({ colorBalance: balance } as Partial<El>)}
-          onReset={() => onPatch({ colorBalance: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="컬러 밸런스" forceOpen={hasAdjustmentValue(selected.colorBalance)}>
+        <StudioColorBalanceSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioChannelMixerPanel
-          value={normalizeChannelMixer(selected.channelMixer)}
-          onPatch={(patch: Partial<ChannelMixer>) =>
-            onPatch({
-              channelMixer: normalizeChannelMixer({ ...normalizeChannelMixer(selected.channelMixer), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(mixer: ChannelMixer) => onPatch({ channelMixer: mixer } as Partial<El>)}
-          onReset={() => onPatch({ channelMixer: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="채널 믹서" forceOpen={hasAdjustmentValue(selected.channelMixer)}>
+        <StudioChannelMixerSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioSelectiveHslPanel
-          value={normalizeSelectiveHsl(selected.selectiveHsl)}
-          onPatch={(patch: Partial<SelectiveHsl>) =>
-            onPatch({
-              selectiveHsl: normalizeSelectiveHsl({ ...normalizeSelectiveHsl(selected.selectiveHsl), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: SelectiveHsl) => onPatch({ selectiveHsl: v } as Partial<El>)}
-          onReset={() => onPatch({ selectiveHsl: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="선택 색상" forceOpen={hasAdjustmentValue(selected.selectiveHsl)}>
+        <StudioSelectiveHslSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioVibrancePanel
-          value={normalizeVibrance(selected.vibrance)}
-          onPatch={(patch: Partial<Vibrance>) =>
-            onPatch({
-              vibrance: normalizeVibrance({ ...normalizeVibrance(selected.vibrance), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Vibrance) => onPatch({ vibrance: v } as Partial<El>)}
-          onReset={() => onPatch({ vibrance: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="생동감" forceOpen={hasAdjustmentValue(selected.vibrance)}>
+        <StudioVibranceSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioPhotoFilterPanel
-          value={normalizePhotoFilter(selected.photoFilter)}
-          onPatch={(patch: Partial<PhotoFilter>) =>
-            onPatch({
-              photoFilter: normalizePhotoFilter({ ...normalizePhotoFilter(selected.photoFilter), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: PhotoFilter) => onPatch({ photoFilter: v } as Partial<El>)}
-          onReset={() => onPatch({ photoFilter: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="포토 필터" forceOpen={hasAdjustmentValue(selected.photoFilter)}>
+        <StudioPhotoFilterSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioGradientMapPanel
-          value={normalizeGradientMap(selected.gradientMap)}
-          onApplyPreset={(m: GradientMap) => onPatch({ gradientMap: m } as Partial<El>)}
-          onEditStopColor={(i: number, color: string) => {
-            const cur = normalizeGradientMap(selected.gradientMap);
-            const stops = cur.stops.map((s, j) => (j === i ? { ...s, color } : s));
-            onPatch({ gradientMap: normalizeGradientMap({ stops }) } as Partial<El>);
-          }}
-          onReset={() => onPatch({ gradientMap: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="그라디언트 맵" forceOpen={hasAdjustmentValue(selected.gradientMap)}>
+        <StudioGradientMapSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioAutoAdjustPanel
-          value={normalizeAutoAdjust(selected.autoAdjust)}
-          onPatch={(patch: Partial<AutoAdjust>) =>
-            onPatch({
-              autoAdjust: normalizeAutoAdjust({ ...normalizeAutoAdjust(selected.autoAdjust), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: AutoAdjust) => onPatch({ autoAdjust: v } as Partial<El>)}
-          onReset={() => onPatch({ autoAdjust: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="자동 보정" forceOpen={hasAdjustmentValue(selected.autoAdjust)}>
+        <StudioAutoAdjustSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioClarityPanel
-          value={normalizeClarity(selected.clarity)}
-          onPatch={(patch: Partial<Clarity>) =>
-            onPatch({
-              clarity: normalizeClarity({ ...normalizeClarity(selected.clarity), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Clarity) => onPatch({ clarity: v } as Partial<El>)}
-          onReset={() => onPatch({ clarity: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="명료도" forceOpen={hasAdjustmentValue(selected.clarity)}>
+        <StudioClaritySection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioGlowPanel
-          value={normalizeGlow(selected.glow)}
-          onPatch={(patch: Partial<Glow>) =>
-            onPatch({
-              glow: normalizeGlow({ ...normalizeGlow(selected.glow), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Glow) => onPatch({ glow: v } as Partial<El>)}
-          onReset={() => onPatch({ glow: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="글로우" forceOpen={hasAdjustmentValue(selected.glow)}>
+        <StudioGlowSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioOutlinePanel
-          value={normalizeOutline(selected.outline)}
-          onPatch={(patch: Partial<Outline>) =>
-            onPatch({
-              outline: normalizeOutline({ ...normalizeOutline(selected.outline), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Outline) => onPatch({ outline: v } as Partial<El>)}
-          onReset={() => onPatch({ outline: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="외곽선" forceOpen={hasAdjustmentValue(selected.outline)}>
+        <StudioOutlineSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioHalftonePanel
-          value={normalizeHalftone(selected.halftone)}
-          onPatch={(patch: Partial<Halftone>) =>
-            onPatch({
-              halftone: normalizeHalftone({ ...normalizeHalftone(selected.halftone), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Halftone) => onPatch({ halftone: v } as Partial<El>)}
-          onReset={() => onPatch({ halftone: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="하프톤" forceOpen={hasAdjustmentValue(selected.halftone)}>
+        <StudioHalftoneSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioGrainPanel
-          value={normalizeGrain(selected.grain)}
-          onPatch={(patch: Partial<Grain>) =>
-            onPatch({
-              grain: normalizeGrain({ ...normalizeGrain(selected.grain), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Grain) => onPatch({ grain: v } as Partial<El>)}
-          onReset={() => onPatch({ grain: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="그레인" forceOpen={hasAdjustmentValue(selected.grain)}>
+        <StudioGrainSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioBlurPanel
-          value={normalizeBlurFx(selected.blurFx)}
-          onPatch={(patch: Partial<BlurFx>) =>
-            onPatch({
-              blurFx: normalizeBlurFx({ ...normalizeBlurFx(selected.blurFx), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: BlurFx) => onPatch({ blurFx: v } as Partial<El>)}
-          onReset={() => onPatch({ blurFx: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="블러 FX" forceOpen={hasAdjustmentValue(selected.blurFx)}>
+        <StudioBlurSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioDistortPanel
-          value={normalizeDistort(selected.distort)}
-          onPatch={(patch: Partial<Distort>) =>
-            onPatch({
-              distort: normalizeDistort({ ...normalizeDistort(selected.distort), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Distort) => onPatch({ distort: v } as Partial<El>)}
-          onReset={() => onPatch({ distort: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="왜곡" forceOpen={hasAdjustmentValue(selected.distort)}>
+        <StudioDistortSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioStylizePanel
-          value={normalizeStylize(selected.stylize)}
-          onPatch={(patch: Partial<Stylize>) =>
-            onPatch({
-              stylize: normalizeStylize({ ...normalizeStylize(selected.stylize), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Stylize) => onPatch({ stylize: v } as Partial<El>)}
-          onReset={() => onPatch({ stylize: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="스타일라이즈" forceOpen={hasAdjustmentValue(selected.stylize)}>
+        <StudioStylizeSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioLightPanel
-          value={normalizeLight(selected.light)}
-          onPatch={(patch: Partial<Light>) =>
-            onPatch({
-              light: normalizeLight({ ...normalizeLight(selected.light), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Light) => onPatch({ light: v } as Partial<El>)}
-          onReset={() => onPatch({ light: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="조명" forceOpen={hasAdjustmentValue(selected.light)}>
+        <StudioLightSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioDetailPanel
-          value={normalizeDetail(selected.detail)}
-          onPatch={(patch: Partial<Detail>) =>
-            onPatch({
-              detail: normalizeDetail({ ...normalizeDetail(selected.detail), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Detail) => onPatch({ detail: v } as Partial<El>)}
-          onReset={() => onPatch({ detail: undefined } as Partial<El>)}
-        />
-      </div>
+      <AdjustmentSection title="디테일" forceOpen={hasAdjustmentValue(selected.detail)}>
+        <StudioDetailSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
 
-      <div className="mt-3 border-t border-line/50 pt-3">
-        <StudioSketchPanel
-          value={normalizeSketch(selected.sketch)}
-          onPatch={(patch: Partial<Sketch>) =>
-            onPatch({
-              sketch: normalizeSketch({ ...normalizeSketch(selected.sketch), ...patch }),
-            } as Partial<El>)
-          }
-          onApplyPreset={(v: Sketch) => onPatch({ sketch: v } as Partial<El>)}
-          onReset={() => onPatch({ sketch: undefined } as Partial<El>)}
-        />
-      </div>
-      </>
-    </Suspense>
+      <AdjustmentSection title="스케치" forceOpen={hasAdjustmentValue(selected.sketch)}>
+        <StudioSketchSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+    </>
   );
 }
