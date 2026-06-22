@@ -178,6 +178,7 @@ import type {
 } from "@/src/infrastructure/creator-client";
 import type Konva from "konva";
 
+import { scheduleIdle } from "@/components/auth/schedule-idle";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -1926,6 +1927,7 @@ export function StudioPage() {
 
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
+  const [autosaveChecked, setAutosaveChecked] = useState(Boolean(workId));
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2236,6 +2238,7 @@ export function StudioPage() {
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
     if (!workHydrated) return;
+    if (!autosaveChecked) return;
     // 복구 배너가 떠 있는 동안(복구/비우기 결정 전)은 저장하지 않는다 — 가드가 없으면
     // 재진입 1.5초 뒤 빈 초기 상태가 직전 작업을 덮어써 "복구하기"가 빈 캔버스를 복원한다.
     if (hasAutosave) return;
@@ -2263,7 +2266,7 @@ export function StudioPage() {
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated, hasAutosave]);
+  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated, autosaveChecked, hasAutosave]);
 
   // 복구 여부를 정하지 않은 채 캔버스 편집을 시작하면(undo 히스토리 누적) 배너를 닫고
   // 자동 저장을 재개한다 — 배너를 무시한 새 작업이 저장되지 않는 공백을 막는다.
@@ -2275,28 +2278,34 @@ export function StudioPage() {
   // (요소·게시 정보가 전부 빈 백업은 복구 가치가 없고, 과거 버전이 남긴 빈 페이로드도 거른다.)
   useEffect(() => {
     if (!workId) {
-      try {
-        const saved = localStorage.getItem("toonspectrum-studio-autosave");
-        if (saved) {
-          const parsed: {
-            pagesList?: { elements?: unknown[] }[];
-            title?: string;
-            description?: string;
-            tagsText?: string;
-          } = JSON.parse(saved);
-          const hasContent =
-            Array.isArray(parsed.pagesList) &&
-            parsed.pagesList.length > 0 &&
-            (parsed.pagesList.some((p) => (p?.elements?.length ?? 0) > 0) ||
-              (parsed.title ?? "").trim() !== "" ||
-              (parsed.description ?? "").trim() !== "" ||
-              (parsed.tagsText ?? "").trim() !== "");
-          if (hasContent) setHasAutosave(true);
+      setAutosaveChecked(false);
+      return scheduleIdle(() => {
+        try {
+          const saved = localStorage.getItem("toonspectrum-studio-autosave");
+          if (saved) {
+            const parsed: {
+              pagesList?: { elements?: unknown[] }[];
+              title?: string;
+              description?: string;
+              tagsText?: string;
+            } = JSON.parse(saved);
+            const hasContent =
+              Array.isArray(parsed.pagesList) &&
+              parsed.pagesList.length > 0 &&
+              (parsed.pagesList.some((p) => (p?.elements?.length ?? 0) > 0) ||
+                (parsed.title ?? "").trim() !== "" ||
+                (parsed.description ?? "").trim() !== "" ||
+                (parsed.tagsText ?? "").trim() !== "");
+            if (hasContent) setHasAutosave(true);
+          }
+        } catch {
+          // 무시
+        } finally {
+          setAutosaveChecked(true);
         }
-      } catch {
-        // 무시
-      }
+      });
     }
+    setAutosaveChecked(true);
   }, [workId]);
 
   function restoreAutosave() {
