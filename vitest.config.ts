@@ -12,8 +12,9 @@ if (existsSync(envPath)) {
   try {
     const content = readFileSync(envPath, "utf-8");
     const match = content.match(/^DATABASE_URL=(.+)$/m);
-    if (match && match[1]) {
-      process.env.DATABASE_URL = match[1].trim().replace(/^["']|["']$/g, "");
+    const dbUrl = match?.[1];
+    if (dbUrl) {
+      process.env.DATABASE_URL = dbUrl.trim().replace(/^["']|["']$/g, "");
     }
   } catch {
     // Ignore

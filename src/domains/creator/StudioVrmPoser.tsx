@@ -1884,6 +1884,34 @@ function VrmLighting({ tone }: { tone: LightingTone }) {
   );
 }
 
+function parseCameraError(error: unknown): string {
+  let errMsg = "카메라 권한 접근에 실패했습니다.";
+  if (error instanceof Error) {
+    const name = error.name;
+    const msg = error.message;
+    if (name === "NotAllowedError" || msg.includes("Permission denied")) {
+      errMsg = "카메라 사용 권한이 거부되었거나 요청이 차단되었습니다.\n\n" +
+        "[해결 방법]\n" +
+        "1. 브라우저 차단 해제: 주소창 왼쪽의 '자물쇠' 또는 '설정' 아이콘을 클릭하여 카메라 권한을 '허용'으로 변경하고 페이지를 새로고침해 주세요.\n" +
+        "2. 접속 주소 확인 (중요): 외부 IP(예: http://192.168.x.x:5173)나 외부 도메인으로 접속한 경우 브라우저 보안 규정상 카메라 권한 요청 팝업이 뜨지 않고 차단됩니다. 반드시 'http://localhost:5173' 주소로 직접 접속해 주세요.\n" +
+        "3. 시스템 설정 확인: macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라에서 사용 중이신 브라우저(Chrome, Safari 등)의 시스템 카메라 권한이 켜져 있는지 확인해 주세요.";
+    } else if (name === "TypeError" && (msg.includes("undefined") || msg.includes("Insecure Context") || msg.includes("getUserMedia"))) {
+      errMsg = "보안 환경(HTTPS 또는 localhost)이 아니기 때문에 브라우저가 카메라 접근 요청을 띄우지 않고 차단했습니다.\n\n" +
+        "[해결 방법]\n" +
+        "외부 IP 주소(예: http://192.168.x.x:5173)로 접속 중이시라면, 카메라 보안 요구사항을 충족하기 위해 주소창에 'http://localhost:5173'을 입력하여 다시 접속해 주세요.";
+    } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+      errMsg = "연결된 카메라 장치를 찾을 수 없습니다. 카메라가 올바르게 연결되어 있는지 확인해 주세요.";
+    } else if (name === "NotReadableError" || name === "TrackStartError") {
+      errMsg = "카메라가 이미 다른 앱(Zoom, Discord, 다른 브라우저 탭 등)에서 사용 중입니다. 다른 앱을 종료하고 다시 시도해 주세요.";
+    } else if (name === "SecurityError") {
+      errMsg = "보안 환경(HTTPS 또는 localhost)이 아니거나 권한 정책으로 인해 카메라에 접근할 수 없습니다. 'http://localhost:5173' 주소로 접속해 주세요.";
+    } else {
+      errMsg = `카메라 접근 오류 (${name}): ${msg}`;
+    }
+  }
+  return errMsg;
+}
+
 export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: StudioVrmPoserProps) {
   const [status, setStatus] = useState<LoadStatus>("empty");
   const [error, setError] = useState("");
@@ -2040,27 +2068,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       try {
         let stream: MediaStream;
         try {
+          if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new TypeError("navigator.mediaDevices is undefined (Insecure Context)");
+          }
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 320, height: 240, facingMode: "user" },
             audio: false,
           });
         } catch (cameraErr) {
           console.error("Webcam access failed:", cameraErr);
-          let errMsg = "카메라 권한 접근에 실패했습니다.";
-          if (cameraErr instanceof Error) {
-            if (cameraErr.name === "NotAllowedError" || cameraErr.message.includes("Permission denied")) {
-              errMsg = "카메라 사용 권한이 거부되었습니다. 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘을 클릭해 카메라 권한을 '허용'으로 변경하거나, macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라에서 브라우저의 카메라 접근 권한을 확인해 주세요.";
-            } else if (cameraErr.name === "NotFoundError" || cameraErr.name === "DevicesNotFoundError") {
-              errMsg = "연결된 카메라 장치를 찾을 수 없습니다. 카메라가 올바르게 연결되어 있는지 확인해 주세요.";
-            } else if (cameraErr.name === "NotReadableError" || cameraErr.name === "TrackStartError") {
-              errMsg = "카메라가 이미 다른 앱(Zoom, Discord, 다른 브라우저 탭 등)에서 사용 중입니다. 다른 앱을 종료하고 다시 시도해 주세요.";
-            } else if (cameraErr.name === "SecurityError") {
-              errMsg = "보안 환경(HTTPS 또는 localhost)이 아니거나 권한 정책으로 인해 카메라에 접근할 수 없습니다.";
-            } else {
-              errMsg = `카메라 접근 오류 (${cameraErr.name}): ${cameraErr.message}`;
-            }
-          }
-          throw new Error(errMsg, { cause: cameraErr });
+          throw new Error(parseCameraError(cameraErr), { cause: cameraErr });
         }
 
         if (!active) {
@@ -4470,10 +4487,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <p className="font-bold mb-1.5 flex items-center gap-1 text-accent">
                           🔒 개인정보 보호 및 카메라 활성화 안내
                         </p>
-                        <p className="mb-2.5 text-fg-3 leading-relaxed">
-                          웹캠 실시간 페이스 트래킹을 이용하려면 카메라 권한 허용이 필요합니다.
-                          <strong className="text-fg block mt-1">촬영되는 모든 영상은 외부 서버로 전송되지 않으며</strong>, 사용자 기기 내부에서 실시간 AI 모델에 의해 로컬로만 분석 처리되어 프라이버시가 안전하게 보호됩니다.
-                        </p>
+                        <div className="mb-2.5 text-fg-3 leading-relaxed text-[0.65rem] space-y-1">
+                          <p>웹캠 실시간 페이스 트래킹을 이용하려면 카메라 권한 허용이 필요합니다.</p>
+                          <p className="text-fg font-semibold mt-1">촬영되는 모든 영상은 외부 서버로 전송되지 않으며,</p>
+                          <p>사용자 기기 내부에서 실시간 AI 모델에 의해 로컬로만 분석 처리되어 프라이버시가 안전하게 보호됩니다.</p>
+                        </div>
                         <div className="flex gap-2">
                           <button
                             type="button"
