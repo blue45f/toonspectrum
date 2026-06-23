@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+
 import styles from "./IntroSplash.module.css";
 
 export function IntroSplash() {

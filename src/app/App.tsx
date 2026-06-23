@@ -5,10 +5,10 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { CommandPaletteHost } from "@/components/command-palette-host";
+import { IntroSplash } from "@/components/IntroSplash";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { IntroSplash } from "@/components/IntroSplash";
 
 const AgeGateHost = lazy(() =>
   import("@/components/age-gate-host").then((mod) => ({
