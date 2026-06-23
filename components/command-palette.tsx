@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock, Shuffle } from "lucide-react";
+import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock, Shuffle, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { MiniPoster } from "./rank-row";
@@ -23,6 +23,7 @@ const QUICK = [
   { label: "통합 검색", href: "/search", icon: Search, hint: "작품·작가·태그" },
   { label: "통합 랭킹", href: "/ranking", icon: TrendingUp, hint: "6개 축 랭킹" },
   { label: "맞춤 추천", href: "/recommend", icon: Sparkles, hint: "취향 기반 추천" },
+  { label: "캐릭터 운세", href: "/fortune", icon: Moon, hint: "사주·타로·궁합" },
   { label: "랜덤 작품", href: "/random", icon: Shuffle, hint: "무작위로 한 편" },
   { label: "연재 캘린더", href: "/calendar", icon: CalendarDays, hint: "요일별 연재" },
   { label: "작품 비교", href: "/compare", icon: Swords, hint: "두 작품 맞대보기" },

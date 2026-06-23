@@ -9,6 +9,7 @@ import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CreatorModule } from "./modules/creator/creator.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
+import { FortuneModule } from "./modules/fortune/fortune.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { MeModule } from "./modules/me/me.module";
 
@@ -30,6 +31,7 @@ import { MeModule } from "./modules/me/me.module";
     FeedbackModule,
     CreatorModule,
     LegalModule,
+    FortuneModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

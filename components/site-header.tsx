@@ -25,6 +25,7 @@ const NAV = [
   { label: "연재", i18n: "nav.calendar", href: "/calendar" },
   { label: "추천", i18n: "nav.recommend", href: "/recommend" },
   { label: "탐색", i18n: "nav.explore", href: "/explore" },
+  { label: "운세", i18n: "nav.fortune", href: "/fortune" },
   { label: "리뷰", i18n: "nav.reviews", href: "/reviews" },
   { label: "커뮤니티", i18n: "nav.community", href: "/community" },
   { label: "창작", i18n: "nav.create", href: "/create" },

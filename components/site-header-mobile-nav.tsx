@@ -12,6 +12,7 @@ import {
   Sparkles,
   TrendingUp,
   X,
+  Moon,
 } from "lucide-react";
 import { useEffect, type RefObject } from "react";
 
@@ -25,6 +26,7 @@ const MOBILE_NAV = [
   { label: "연재", i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
   { label: "추천", i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
   { label: "탐색", i18n: "nav.explore", href: "/explore", icon: Compass },
+  { label: "운세", i18n: "nav.fortune", href: "/fortune", icon: Moon },
   { label: "리뷰", i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
   { label: "커뮤니티", i18n: "nav.community", href: "/community", icon: MessageCircle },
   { label: "창작", i18n: "nav.create", href: "/create", icon: Palette },
