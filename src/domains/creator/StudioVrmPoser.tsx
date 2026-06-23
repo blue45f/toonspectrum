@@ -2309,7 +2309,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             } else if (videoDevices.some(d => !d.label)) {
               console.warn('Video devices found but labels empty (permission not yet fully granted or system level block)');
             }
-          } catch (e) { /* ignore */ }
+          } catch { /* ignore */ }
 
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 320, height: 240, facingMode: "user" },
