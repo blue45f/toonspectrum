@@ -203,6 +203,12 @@ export class FortuneService {
              [2컷 - (장면 및 동작 묘사)]
              다른캐릭터이름: "대사"
            * 사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온 중 최소 1~2명의 ToonSpectrum 오리지널 캐릭터들을 서로 대화하게(티키타카) 하여 두 사람의 궁합을 재치 있게 만화 콘티처럼 해석해 주세요.
+         - 단, '독서 처방전' 결과일 경우에는 고민에 귀 기울이고 상처를 어루만지는 듯한 [책 처방 에세이 편지] 형식으로 따뜻하고 다정하게 출력하세요.
+           * 포맷 예시:
+             "친애하는 당신에게,
+             보내주신 고민('고민내용')을 읽으며 당신의 마음 한편에 가라앉은 잔잔한 그늘을 보았습니다.
+             오늘 당신의 서가에서 꺼내드리고 싶은 책은..."
+           * 고민의 유형(힐링, 우울, 액션 필요 등)에 어울리는 ToonSpectrum 추천 장르와 함께 왜 이 책이 당신에게 위로가 되는지 캐릭터의 관점에서 진심 어린 에세이처럼 적어주세요.
       2. 사용자에게 친근한 대화체로 풀어나가세요. 기계적인 명리학/타로 사전적 풀이를 줄줄 늘어놓지 마세요.
       3. 카피는 짧고 단정하며, 느낌표(!)를 남발하지 마세요. (단우 캐릭터의 호탕한 대사 일부 예외 제외)
       4. 한국어로 가독성 있게 줄바꿈을 포함하여 대화하듯이 3~4문단 정도로 답변을 반환해 주세요. (궁합 콘티의 경우 컷당 줄바꿈을 적용해 주세요)
@@ -531,6 +537,75 @@ export class FortuneService {
       default:
         return `[1컷 - 운세를 풀이하는 캐릭터 에이전트]\n` +
           `에이전트: "두 분의 궁합 지수는 ${score}%입니다. 서로 양보하고 존중한다면 아주 훌륭한 관계를 유지할 수 있습니다."`;
+    }
+  }
+
+  // 독서 처방전 분석 및 추천
+  async drawPrescription(query: string, characterId: string) {
+    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
+
+    // 고민 텍스트 분류를 통한 추천 장르 간이 매칭
+    let recommendedGenres = ["일상", "드라마", "치유"];
+    if (query.includes("우울") || query.includes("슬픈") || query.includes("울고") || query.includes("외롭")) {
+      recommendedGenres = ["로맨스", "성장", "드라마"];
+    } else if (query.includes("가벼운") || query.includes("시원한") || query.includes("웃고") || query.includes("킬링")) {
+      recommendedGenres = ["개그", "일상", "판타지"];
+    } else if (query.includes("스트레스") || query.includes("화나") || query.includes("답답") || query.includes("액션")) {
+      recommendedGenres = ["액션", "무협", "학원"];
+    }
+
+    const recommendations = this.curateTitles(recommendedGenres);
+
+    // AI 처방전 생성
+    let interpretation: string;
+    try {
+      const dataText = `
+        사용자의 마음고민: "${query}"
+        분류된 처방 장르: ${recommendedGenres.join(", ")}
+      `;
+      interpretation = await this.generateAIFortune(
+        `독서 처방전`,
+        dataText,
+        character
+      );
+    } catch (_e) {
+      interpretation = this.getFallbackPrescription(query, character);
+    }
+
+    return {
+      character,
+      query,
+      interpretation,
+      recommendations
+    };
+  }
+
+  private getFallbackPrescription(query: string, character: FortuneCharacter): string {
+    switch (character.id) {
+      case "ara":
+        return `친애하는 당신에게,\n\n` +
+          `보내주신 마음의 결, "${query}"을 조심스레 읽어 보았어요. \n` +
+          `유난히 지친 오늘 같은 날에는 자극적인 바람보다는 따뜻한 차 한 잔과 함께 스며드는 이야기가 필요하기 마련이죠. \n` +
+          `제가 지키고 있는 서가에서 가장 다정한 책들을 몇 권 골라 책상에 얹어두었습니다. \n` +
+          `이 이야기들의 온기가 당신의 오늘 밤을 포근하게 안아줄 수 있기를 진심으로 바랄게요.`;
+      case "danwoo":
+        return `오늘 힘든 일 있었어? \n\n` +
+          `너가 적어준 사연 "${query}"을 보니까 내가 다 속상하네! \n` +
+          `이럴 때는 복잡하게 머리 쓸 필요 없이 유쾌하고 씩씩한 친구들과 노는 게 정답이야. \n` +
+          `내 도깨비 방망이 대신, 너에게 신나는 활력을 불어넣어 줄 꿀잼 작품들을 골라왔으니 바로 읽어봐! 기분이 확 좋아질 거야!`;
+      case "leona":
+        return `보내주신 별빛의 방황, "${query}"을 가만히 응시해 봅니다. \n\n` +
+          `마음의 궤도가 조금 흔들리는 것은 당신이 성장의 은하수를 지나고 있기 때문일 거예요. \n` +
+          `당신의 혼란스러운 파동을 평온하고 긍정적인 에너지로 정화해 줄 작품들의 주파수를 우주에서 엿들었답니다. \n` +
+          `별의 신호가 당신의 앞길을 밝혀주기를.`;
+      case "gaon":
+        return `적어준 번민 "${query}"에 담긴 고단함이 나에게까지 전해지는군. \n\n` +
+          `수련이 막힐 때일수록 검을 내려놓고 바람 소리에 귀를 기울여야 하는 법이다. \n` +
+          `당신의 날선 날을 부드럽게 다듬고, 다시 나아갈 내면의 굳건한 힘을 길러줄 작품들을 내 검끝으로 엄선해 두었다. \n` +
+          `잡념을 비우고 마음의 힘을 길러라.`;
+      default:
+        return `당신의 고민 "${query}"에 깊이 공감합니다. \n` +
+          `지친 마음을 위로해 줄 가독성 높은 추천 도서들과 함께 기분 전환의 시간을 가져보시길 권합니다.`;
     }
   }
 }

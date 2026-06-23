@@ -20,6 +20,11 @@ export interface CompatibilityRequest {
   characterId: string;
 }
 
+export interface PrescriptionRequest {
+  query: string;
+  characterId: string;
+}
+
 export interface SajuRequest {
   birthDate: string; // YYYY-MM-DD
   birthTime?: string; // HH:MM
@@ -74,5 +79,12 @@ export class FortuneController {
       body.partnerBirthTime,
       body.characterId
     );
+  }
+
+  // 독서 처방전
+  @Post("prescription")
+  @HttpCode(HttpStatus.OK)
+  async drawPrescription(@Body() body: PrescriptionRequest) {
+    return this.fortuneService.drawPrescription(body.query, body.characterId);
   }
 }

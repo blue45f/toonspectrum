@@ -74,7 +74,7 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
 export function FortunePage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [activeTab, setActiveTab] = useState<"today" | "saju" | "compatibility" | "tarot">("today");
+  const [activeTab, setActiveTab] = useState<"today" | "saju" | "compatibility" | "tarot" | "prescription">("today");
   
   // 사주 입력 상태
   const [birthDate, setBirthDate] = useState("");
@@ -84,6 +84,9 @@ export function FortunePage() {
   // 궁합 입력 상태
   const [partnerBirthDate, setPartnerBirthDate] = useState("");
   const [partnerBirthTime, setPartnerBirthTime] = useState("");
+  
+  // 처방전 입력 상태
+  const [prescriptionQuery, setPrescriptionQuery] = useState("");
   
   // 타로 상태
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
@@ -98,6 +101,7 @@ export function FortunePage() {
     card?: TarotCardData;
     today?: TodayFortuneData;
     score?: number;
+    query?: string;
     recommendations: Title[];
   } | null>(null);
 
@@ -205,6 +209,34 @@ export function FortunePage() {
     }
   };
 
+  // 독서 처방 API 호출
+  const handleAnalyzePrescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prescriptionQuery.trim() || !selectedChar) return;
+
+    setIsLoading(true);
+    setFortuneResult(null);
+
+    try {
+      const response = await fetch("/api/fortune/prescription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: prescriptionQuery,
+          characterId: selectedChar.id,
+        }),
+      });
+
+      if (!response.ok) throw new Error("독서 처방 호출 오류");
+      const data = await response.json();
+      setFortuneResult(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // 사주 분석 API 호출
   const handleAnalyzeSaju = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,6 +310,7 @@ export function FortunePage() {
     setBirthTime("");
     setPartnerBirthDate("");
     setPartnerBirthTime("");
+    setPrescriptionQuery("");
     setGender("none");
   };
 
@@ -437,6 +470,17 @@ export function FortunePage() {
                   인연 궁합
                 </button>
                 <button
+                  onClick={() => setActiveTab("prescription")}
+                  className={cn(
+                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
+                    activeTab === "prescription"
+                      ? "bg-accent text-on-accent shadow"
+                      : "text-fg-3 hover:text-fg"
+                  )}
+                >
+                  독서 처방
+                </button>
+                <button
                   onClick={() => setActiveTab("tarot")}
                   className={cn(
                     "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
@@ -461,7 +505,7 @@ export function FortunePage() {
                     <span className="relative inline-flex rounded-full h-10 w-10 bg-accent/80"></span>
                   </div>
                   <p className="mt-4 font-serif text-sm text-fg-3 animate-pulse">
-                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : "카드를"} 읽는 중...
+                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : activeTab === "prescription" ? "마음 고민을" : "카드를"} 읽는 중...
                   </p>
                 </div>
               )}
@@ -474,10 +518,10 @@ export function FortunePage() {
                   <div className="border-b border-line/60 pb-4 flex justify-between items-center">
                     <div>
                       <h3 className="text-xl font-extrabold text-fg font-display uppercase tracking-tight">
-                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : "TAROT READING"}
+                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : "선택한 카드의 오늘 기운"}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <button
@@ -546,6 +590,29 @@ export function FortunePage() {
                         ))}
                       </div>
 
+                    </div>
+                  )}
+
+                  {/* 독서 처방전 전용 결과 디스플레이 */}
+                  {activeTab === "prescription" && fortuneResult.query && (
+                    <div className="p-5 border border-amber-500/15 bg-gradient-to-br from-amber-500/5 to-card rounded-2xl relative overflow-hidden space-y-4 text-left">
+                      {/* 고풍스러운 문양 장식 */}
+                      <div className="absolute top-2 right-4 text-[10px] font-bold text-amber-500/40 uppercase tracking-widest font-display">Prescribed by {selectedChar.name}</div>
+                      
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
+                        <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
+                      </div>
+                      
+                      <div className="h-px bg-amber-500/10" />
+                      
+                      {/* 복약 가이드 / 연출 문구 */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">복약 처방전 가이드</span>
+                        <p className="text-xs leading-relaxed text-fg-3 italic">
+                          * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -776,6 +843,39 @@ export function FortunePage() {
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              )}
+
+              {/* 입력 폼: 독서 처방전 */}
+              {!isLoading && !fortuneResult && activeTab === "prescription" && (
+                <form onSubmit={handleAnalyzePrescription} className="space-y-5 max-w-md mx-auto w-full text-left">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-bold text-fg">아라의 가상 서재: AI 독서 처방전</h3>
+                    <p className="text-xs text-fg-3 mt-1">오늘 당신의 지친 마음이나 보고 싶은 분위기를 적어보세요.</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="prescription-query" className="text-xs font-semibold text-fg-2 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-accent-soft" /> 어떤 이야기가 필요한가요?
+                    </label>
+                    <textarea
+                      id="prescription-query"
+                      required
+                      rows={4}
+                      value={prescriptionQuery}
+                      onChange={(e) => setPrescriptionQuery(e.target.value)}
+                      placeholder="예: 오늘 회사에서 너무 힘든 일이 있어서 완전 시원하고 통쾌한 사이다 웹툰을 읽으며 스트레스 날려버리고 싶어!"
+                      className="w-full rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-fg placeholder:text-fg-4 focus:border-accent focus:outline-none resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>{selectedChar.name}에게 도서 처방받기</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </form>
               )}
 
               {/* 입력 폼: 궁합 */}
