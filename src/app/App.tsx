@@ -8,20 +8,41 @@ import { CommandPaletteHost } from "@/components/command-palette-host";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { IntroSplash } from "@/components/IntroSplash";
 
-const AgeGateHost = lazy(() => import("@/components/age-gate-host").then((mod) => ({ default: mod.AgeGateHost })));
-const BackToTop = lazy(() => import("@/components/back-to-top").then((mod) => ({ default: mod.BackToTop })));
-const DeskCloudMounts = lazy(() =>
-  import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({ default: mod.DeskCloudMounts }))
+const AgeGateHost = lazy(() =>
+  import("@/components/age-gate-host").then((mod) => ({
+    default: mod.AgeGateHost,
+  })),
 );
-const StoreSync = lazy(() => import("@/components/auth/store-sync").then((mod) => ({ default: mod.StoreSync })));
-const ToastHost = lazy(() => import("@/components/toast-host").then((mod) => ({ default: mod.ToastHost })));
-const SiteFooter = lazy(() => import("@/components/site-footer").then((mod) => ({ default: mod.SiteFooter })));
+const BackToTop = lazy(() =>
+  import("@/components/back-to-top").then((mod) => ({
+    default: mod.BackToTop,
+  })),
+);
+const DeskCloudMounts = lazy(() =>
+  import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
+    default: mod.DeskCloudMounts,
+  })),
+);
+const StoreSync = lazy(() =>
+  import("@/components/auth/store-sync").then((mod) => ({
+    default: mod.StoreSync,
+  })),
+);
+const ToastHost = lazy(() =>
+  import("@/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
+);
+const SiteFooter = lazy(() =>
+  import("@/components/site-footer").then((mod) => ({
+    default: mod.SiteFooter,
+  })),
+);
 
 const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_SURVEYDESK_URL ||
-    import.meta.env.VITE_CHANGELOGDESK_URL ||
-    import.meta.env.VITE_NOTIFYDESK_URL
+  import.meta.env.VITE_CHANGELOGDESK_URL ||
+  import.meta.env.VITE_NOTIFYDESK_URL,
 );
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
@@ -132,6 +153,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthSessionProvider>
+        <IntroSplash />
         <Suspense fallback={null}>
           <StoreSync />
         </Suspense>
@@ -143,7 +165,11 @@ export default function App() {
           본문으로 건너뛰기
         </a>
         <SiteHeader />
-        <main id="main-content" tabIndex={-1} className="min-h-screen pb-20 outline-none md:pb-0">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-h-screen pb-20 outline-none md:pb-0"
+        >
           <AppRouter />
         </main>
         <DeferredFooter />
