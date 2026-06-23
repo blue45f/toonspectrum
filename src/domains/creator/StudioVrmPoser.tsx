@@ -2057,9 +2057,10 @@ function parseCameraError(error: unknown): string {
     if (name === "NotAllowedError" || msg.includes("Permission denied") || msg.includes("denied")) {
       errMsg = "카메라 사용 권한이 거부되었거나 즉시 차단되었습니다. (브라우저가 동의 팝업을 띄우지 않는 상태)\n\n" +
         "[원인 및 해결 방법]\n" +
-        "1. 이전에 카메라 권한을 '차단'으로 설정했기 때문일 수 있습니다. 브라우저 주소창 왼쪽의 '자물쇠' 또는 '설정' 아이콘을 클릭하여 '카메라' 항목이 '차단'되어 있다면 '허용' 또는 '요청(기본값)'으로 변경하고 페이지를 새로고침(F5)해 주세요.\n" +
-        "2. macOS 시스템 설정에서 차단되었을 수 있습니다. [macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라]로 이동하여, 현재 사용 중인 브라우저(Chrome, Safari, Arc 등)의 카메라 접근 허용 스위치를 켜 주세요. 시스템 권한이 꺼져 있으면 브라우저가 팝업을 띄우지 못하고 즉시 거부됩니다.\n" +
-        `3. 브라우저가 일시적인 오류 상태일 수 있습니다. 브라우저를 완전히 종료했다가 다시 실행하여 '${recommended}' 주소로 다시 접속해 보세요.`;
+        "1. 브라우저 주소창 왼쪽 '자물쇠' 아이콘 클릭 → '카메라'가 '허용'인지 확인 (이 사이트 origin에서 별도로 설정해야 함: localhost vs https://webtoon-index.vercel.app 별개).\n" +
+        "2. macOS: 시스템 설정 → 개인정보 보호 및 보안 → 카메라 에서 사용 중인 브라우저 스위치를 **켜기**. (브라우저 권한과 별도의 시스템 권한임)\n" +
+        "3. 위 설정 변경 후: 브라우저 **완전 종료 → 재실행 → F5** 후 다시 '트래킹 시작' 클릭.\n" +
+        `4. 여전히 안 되면 '${recommended}' 로 직접 접속했는지, 다른 앱이 카메라 점유 중인지 확인.`;
     } else if (name === "TypeError" && (msg.includes("undefined") || msg.includes("Insecure Context") || msg.includes("getUserMedia"))) {
       errMsg = "보안 접속 환경(HTTPS 또는 localhost)이 아니어서 브라우저가 카메라 접근 요청을 원천 차단했습니다.\n\n" +
         "[해결 방법]\n" +
@@ -2296,24 +2297,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             throw new TypeError("navigator.mediaDevices is undefined (Insecure Context or unsupported browser)");
           }
 
-          // Check if camera permission is explicitly denied to explain why prompt is not shown
-          let preDenied = false;
+          // Always attempt getUserMedia on explicit user click (best chance for prompt).
+          // The separate permission state effect + banner handles showing "already denied" warning.
+          // This makes it more robust when Permissions API state lags behind actual grants (common on macOS).
+          // Optional: enumerate first to help diagnose (labels empty = no permission yet or system block)
           try {
-            if (navigator.permissions && navigator.permissions.query) {
-              const res = await navigator.permissions.query({ name: "camera" as PermissionName });
-              if (res.state === "denied") {
-                preDenied = true;
-              }
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            if (videoDevices.length === 0) {
+              console.warn('No videoinput devices found via enumerateDevices()');
+            } else if (videoDevices.some(d => !d.label)) {
+              console.warn('Video devices found but labels empty (permission not yet fully granted or system level block)');
             }
-          } catch (pe) {
-            console.warn("Permissions API check skipped:", pe);
-          }
-
-          if (preDenied) {
-            const err = new Error("Camera permission already denied by browser settings");
-            err.name = "NotAllowedError";
-            throw err;
-          }
+          } catch (e) { /* ignore */ }
 
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 320, height: 240, facingMode: "user" },
@@ -4863,11 +4859,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <div className="flex-1">
                               <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 카메라 권한 차단됨 (팝업이 뜨지 않음)</p>
                               <p className="text-[0.65rem] opacity-90 text-left mb-1.5">
-                                브라우저 또는 시스템에서 카메라가 <strong>즉시 차단</strong>되고 있습니다. 권한 요청 팝업이 나타나지 않습니다.
+                                브라우저 UI에서는 허용한 것처럼 보이지만, 여전히 즉시 차단됩니다. (두 단계 권한 모두 확인 필요)
                               </p>
                               <ol className="list-decimal pl-4 text-[0.62rem] space-y-0.5 opacity-95">
-                                <li>브라우저 주소창 왼쪽 <strong>자물쇠/설정</strong> → 카메라를 "허용" 또는 "요청(기본값)"으로 변경 → 새로고침</li>
-                                <li><strong>macOS 중요:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 사용 중인 브라우저(Chrome/Safari/Arc 등) 스위치 <strong>켜기</strong></li>
+                                <li>이 사이트 <strong>정확한 주소</strong>(https://webtoon-index.vercel.app) 에서 브라우저 '자물쇠' → 카메라 '허용' (localhost와 별개)</li>
+                                <li><strong>macOS 시스템:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 브라우저 앱 스위치 <strong>켜기</strong></li>
+                                <li>설정 바꾼 후 브라우저 완전 종료 → 재시작 → 이 페이지 F5</li>
                               </ol>
                             </div>
                           </div>
