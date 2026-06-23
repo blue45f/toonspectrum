@@ -54,6 +54,14 @@ interface TarotCardData {
   description: string;
 }
 
+interface TodayFortuneData {
+  score: number;
+  color: string;
+  direction: string;
+  time: string;
+  luckyNumber: number;
+}
+
 // 오행 색상 매핑 (ToonSpectrum 디자인 토큰을 활용한 프리미엄 컬러 세트)
 const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   "목": { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-500" },
@@ -66,12 +74,16 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
 export function FortunePage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [activeTab, setActiveTab] = useState<"saju" | "tarot">("saju");
+  const [activeTab, setActiveTab] = useState<"today" | "saju" | "compatibility" | "tarot">("today");
   
   // 사주 입력 상태
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [gender, setGender] = useState("none");
+  
+  // 궁합 입력 상태
+  const [partnerBirthDate, setPartnerBirthDate] = useState("");
+  const [partnerBirthTime, setPartnerBirthTime] = useState("");
   
   // 타로 상태
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
@@ -81,7 +93,11 @@ export function FortunePage() {
   const [fortuneResult, setFortuneResult] = useState<{
     interpretation: string;
     saju?: SajuData;
+    mySaju?: SajuData;
+    partnerSaju?: SajuData;
     card?: TarotCardData;
+    today?: TodayFortuneData;
+    score?: number;
     recommendations: Title[];
   } | null>(null);
 
@@ -131,6 +147,63 @@ export function FortunePage() {
       clearInterval(interval);
     };
   }, [fortuneResult]);
+
+  // 오늘의 운세 API 호출
+  const handleAnalyzeToday = async () => {
+    if (!selectedChar) return;
+
+    setIsLoading(true);
+    setFortuneResult(null);
+
+    try {
+      const response = await fetch("/api/fortune/today", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: selectedChar.id,
+        }),
+      });
+
+      if (!response.ok) throw new Error("오늘의 운세 호출 오류");
+      const data = await response.json();
+      setFortuneResult(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 궁합 API 호출
+  const handleAnalyzeCompatibility = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!birthDate || !partnerBirthDate || !selectedChar) return;
+
+    setIsLoading(true);
+    setFortuneResult(null);
+
+    try {
+      const response = await fetch("/api/fortune/compatibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          myBirthDate: birthDate,
+          myBirthTime: birthTime || undefined,
+          partnerBirthDate,
+          partnerBirthTime: partnerBirthTime || undefined,
+          characterId: selectedChar.id,
+        }),
+      });
+
+      if (!response.ok) throw new Error("궁합 호출 오류");
+      const data = await response.json();
+      setFortuneResult(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 사주 분석 API 호출
   const handleAnalyzeSaju = async (e: React.FormEvent) => {
@@ -203,6 +276,8 @@ export function FortunePage() {
     setTarotStep("idle");
     setBirthDate("");
     setBirthTime("");
+    setPartnerBirthDate("");
+    setPartnerBirthTime("");
     setGender("none");
   };
 
@@ -329,6 +404,17 @@ export function FortunePage() {
             {!fortuneResult && !isLoading && (
               <div className="flex rounded-xl border border-line bg-panel/30 p-1">
                 <button
+                  onClick={() => setActiveTab("today")}
+                  className={cn(
+                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
+                    activeTab === "today"
+                      ? "bg-accent text-on-accent shadow"
+                      : "text-fg-3 hover:text-fg"
+                  )}
+                >
+                  오늘의 운세
+                </button>
+                <button
                   onClick={() => setActiveTab("saju")}
                   className={cn(
                     "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
@@ -337,7 +423,18 @@ export function FortunePage() {
                       : "text-fg-3 hover:text-fg"
                   )}
                 >
-                  사주팔자 / 만세력 성향
+                  사주팔자
+                </button>
+                <button
+                  onClick={() => setActiveTab("compatibility")}
+                  className={cn(
+                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
+                    activeTab === "compatibility"
+                      ? "bg-accent text-on-accent shadow"
+                      : "text-fg-3 hover:text-fg"
+                  )}
+                >
+                  인연 궁합
                 </button>
                 <button
                   onClick={() => setActiveTab("tarot")}
@@ -364,7 +461,7 @@ export function FortunePage() {
                     <span className="relative inline-flex rounded-full h-10 w-10 bg-accent/80"></span>
                   </div>
                   <p className="mt-4 font-serif text-sm text-fg-3 animate-pulse">
-                    {selectedChar.name}가 당신의 사주와 기운을 읽는 중...
+                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : "카드를"} 읽는 중...
                   </p>
                 </div>
               )}
@@ -377,10 +474,10 @@ export function FortunePage() {
                   <div className="border-b border-line/60 pb-4 flex justify-between items-center">
                     <div>
                       <h3 className="text-xl font-extrabold text-fg font-display uppercase tracking-tight">
-                        {activeTab === "saju" ? "SAJU MANSE" : "TAROT READING"}
+                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "saju" ? "생년월일 오행 밸런스 결과" : "선택한 카드의 오늘 기운"}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <button
@@ -390,6 +487,117 @@ export function FortunePage() {
                       <RotateCcw className="h-3 w-3" /> 다시 보기
                     </button>
                   </div>
+
+                  {/* 오늘의 운세 전용 결과 디스플레이 */}
+                  {activeTab === "today" && fortuneResult.today && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                      
+                      {/* 오늘의 운세 지수 원형 도넛/게이지 */}
+                      <div className="md:col-span-4 flex flex-col items-center justify-center p-4 border border-line/45 rounded-2xl bg-card/30 relative overflow-hidden">
+                        <span className="text-[10px] font-bold text-fg-3 uppercase tracking-wider mb-2">FORTUNE SCORE</span>
+                        <div className="relative flex items-center justify-center w-28 h-28">
+                          {/* SVG 원형 프로그레스 */}
+                          <svg className="w-full h-full transform -rotate-90">
+                            <circle
+                              cx="56"
+                              cy="56"
+                              r="48"
+                              className="stroke-line/50"
+                              strokeWidth="8"
+                              fill="transparent"
+                            />
+                            <circle
+                              cx="56"
+                              cy="56"
+                              r="48"
+                              className="stroke-accent transition-all duration-1000 ease-out"
+                              strokeWidth="8"
+                              fill="transparent"
+                              strokeDasharray={2 * Math.PI * 48}
+                              strokeDashoffset={2 * Math.PI * 48 * (1 - fortuneResult.today.score / 100)}
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <div className="absolute flex flex-col items-center">
+                            <span className="text-3xl font-extrabold font-display text-fg">
+                              {fortuneResult.today.score}
+                            </span>
+                            <span className="text-[9px] font-bold text-accent">SCORE</span>
+                          </div>
+                        </div>
+                        <p className="mt-3 text-xs font-semibold text-fg-2">
+                          {fortuneResult.today.score >= 90 ? "★ 최고의 하루 ★" : fortuneResult.today.score >= 80 ? "☆ 맑음 & 평온 ☆" : "무난하고 조심스러운 하루"}
+                        </p>
+                      </div>
+
+                      {/* 행운의 요소 그리드 */}
+                      <div className="md:col-span-8 grid grid-cols-2 gap-3.5">
+                        {[
+                          { label: "행운의 컬러", value: fortuneResult.today.color, desc: "의상이나 소품으로 챙겨보세요" },
+                          { label: "행운의 방향", value: fortuneResult.today.direction, desc: "이 방향으로 이동해 보세요" },
+                          { label: "행운의 시간대", value: fortuneResult.today.time, desc: "가장 좋은 일이 생길 타이밍" },
+                          { label: "행운의 숫자", value: fortuneResult.today.luckyNumber, desc: "오늘 당신의 수호 숫자" },
+                        ].map((item, idx) => (
+                          <div key={idx} className="p-3 border border-line/45 bg-card/20 rounded-xl flex flex-col">
+                            <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.label}</span>
+                            <span className="text-base font-extrabold text-fg mt-1 font-serif">{item.value}</span>
+                            <span className="text-[9px] text-fg-3 mt-0.5">{item.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* 궁합 전용 결과 디스플레이 */}
+                  {activeTab === "compatibility" && fortuneResult.score && fortuneResult.mySaju && fortuneResult.partnerSaju && (
+                    <div className="space-y-6">
+                      
+                      {/* 궁합 요약 매칭 바 */}
+                      <div className="p-5 border border-line/45 bg-card/30 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col gap-1 text-center md:text-left">
+                          <span className="text-[10px] font-bold text-accent uppercase tracking-wider">COMPATIBILITY MATCH</span>
+                          <h4 className="text-lg font-bold text-fg">웹툰 주인공 같은 두 사람의 만남</h4>
+                          <p className="text-xs text-fg-3">오행의 상생 흐름과 상성 결합도를 분석한 결과입니다.</p>
+                        </div>
+                        <div className="flex items-center gap-3.5 bg-card px-5 py-3.5 rounded-xl border border-line/40">
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold text-fg-3 block">궁합 지수</span>
+                            <span className="text-2xl font-extrabold text-accent font-display">{fortuneResult.score}%</span>
+                          </div>
+                          <div className="h-8 w-px bg-line" />
+                          <span className="text-xs font-semibold text-fg-2">
+                            {fortuneResult.score >= 90 ? "신이 내린 찰떡궁합" : fortuneResult.score >= 80 ? "든든하고 편안한 연인" : fortuneResult.score >= 70 ? "서로 맞춰가는 든든한 동반자" : "유연한 소통이 필요한 인연"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 두 사람의 사주 대조 뷰 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 본인 사주 */}
+                        <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
+                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-bold text-fg">일주: {fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
+                            <span className="text-[10px] text-fg-3">
+                              목({fortuneResult.mySaju.elementsRatio.wood}%) 화({fortuneResult.mySaju.elementsRatio.fire}%) 토({fortuneResult.mySaju.elementsRatio.earth}%) 금({fortuneResult.mySaju.elementsRatio.metal}%) 수({fortuneResult.mySaju.elementsRatio.water}%)
+                            </span>
+                          </div>
+                        </div>
+                        {/* 상대방 사주 */}
+                        <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
+                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-bold text-fg">일주: {fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
+                            <span className="text-[10px] text-fg-3">
+                              목({fortuneResult.partnerSaju.elementsRatio.wood}%) 화({fortuneResult.partnerSaju.elementsRatio.fire}%) 토({fortuneResult.partnerSaju.elementsRatio.earth}%) 금({fortuneResult.partnerSaju.elementsRatio.metal}%) 수({fortuneResult.partnerSaju.elementsRatio.water}%)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
 
                   {/* 사주 전용 결과 디스플레이 */}
                   {activeTab === "saju" && fortuneResult.saju && (
@@ -475,32 +683,34 @@ export function FortunePage() {
                     <div className="flex flex-col md:flex-row gap-6 items-center">
                       
                       {/* 타로 카드 앞면 타이포그래픽 포스터 */}
-                      <div className="w-52 shrink-0 aspect-[2/3.5] rounded-2xl border-2 border-accent/40 bg-gradient-to-b from-panel to-card p-4 flex flex-col justify-between text-center relative overflow-hidden shadow-[0_12px_24px_-10px_rgba(230,85,35,0.15)]">
-                        {/* 신비로운 배경 광선 효과 */}
-                        <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-accent/10 blur-xl pointer-events-none" />
-                        <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-accent/10 blur-xl pointer-events-none" />
+                      <div 
+                        className="w-52 shrink-0 aspect-[2/3] rounded-2xl border-2 border-amber-500/40 bg-cover bg-center p-4 flex flex-col justify-between text-center relative overflow-hidden shadow-[0_12px_30px_-5px_rgba(217,119,6,0.25)]"
+                        style={{ backgroundImage: "url('/images/tarot/tarot-front-bg.jpg')" }}
+                      >
+                        {/* 텍스트 가독성을 위한 중심 오버레이 */}
+                        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
                         
-                        <div className="border-b border-line pb-2">
-                          <span className="font-display text-xs font-bold text-accent tracking-widest uppercase">
+                        <div className="border-b border-amber-500/20 pb-2 z-10">
+                          <span className="font-display text-xs font-bold text-amber-400 tracking-widest uppercase">
                             NO. {fortuneResult.card.id}
                           </span>
                         </div>
                         
-                        <div className="py-8 flex flex-col justify-center flex-1">
-                          <span className="font-display text-lg font-bold text-fg-2 uppercase tracking-wide">
+                        <div className="py-6 flex flex-col justify-center flex-1 z-10">
+                          <span className="font-display text-[10px] font-bold text-slate-300 uppercase tracking-widest">
                             {fortuneResult.card.nameEn}
                           </span>
-                          <span className="font-serif text-2xl font-bold text-fg mt-1">
+                          <span className="font-serif text-3xl font-extrabold text-white mt-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                             {fortuneResult.card.name}
                           </span>
-                          <span className="text-[10px] text-accent mt-2 font-bold uppercase tracking-wider">
+                          <span className="text-[10px] text-amber-300 mt-2.5 font-bold uppercase tracking-wider bg-black/45 px-2 py-0.5 rounded-full mx-auto">
                             {fortuneResult.card.type === "upright" ? "정방향 (Upright)" : "역방향 (Reversed)"}
                           </span>
                         </div>
 
-                        <div className="border-t border-line pt-2 flex flex-wrap justify-center gap-1">
+                        <div className="border-t border-amber-500/20 pt-2 flex flex-wrap justify-center gap-1 z-10">
                           {fortuneResult.card.keywords.slice(0, 3).map((kw, i) => (
-                            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-card text-fg-3 border border-line/40">
+                            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-amber-200 border border-amber-500/20">
                               #{kw.replace("(장해/과잉)", "")}
                             </span>
                           ))}
@@ -537,6 +747,109 @@ export function FortunePage() {
                   </div>
 
                 </div>
+              )}
+
+              {/* 입력 폼: 오늘의 운세 */}
+              {!isLoading && !fortuneResult && activeTab === "today" && (
+                <div className="space-y-6 text-center max-w-md mx-auto w-full py-8">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-fg">오늘 하루는 어떨까요?</h3>
+                    <p className="text-xs text-fg-3 leading-relaxed">
+                      {selectedChar.name}가 당신만을 위한 오늘의 행운 수치와 컬러, 방향, 그리고 따뜻한 하루 가이드를 준비했습니다.
+                    </p>
+                  </div>
+                  
+                  <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-line/60 bg-gradient-to-tr from-accent-soft to-panel/30 flex items-center justify-center">
+                    {/* 장식용 별자리 효과 */}
+                    <Sparkles className="absolute h-12 w-12 text-accent-soft/30 animate-pulse" />
+                    <span className="font-serif text-sm italic text-fg-2 z-10 px-6">
+                      "오늘도 당신만의 이야기를 써 내려갈 시간이에요."
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeToday}
+                    className="w-full mt-6 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>오늘의 운세 확인하기</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* 입력 폼: 궁합 */}
+              {!isLoading && !fortuneResult && activeTab === "compatibility" && (
+                <form onSubmit={handleAnalyzeCompatibility} className="space-y-5 max-w-md mx-auto w-full text-left">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-bold text-fg">두 사람의 궁합 분석 정보 입력</h3>
+                    <p className="text-xs text-fg-3 mt-1">상대방과의 궁합을 웹툰 콘티 연출 형태로 보여 드립니다.</p>
+                  </div>
+                  
+                  {/* 본인 정보 */}
+                  <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
+                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
+                        <input
+                          id="my-birth-date"
+                          type="date"
+                          required
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="my-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <input
+                          id="my-birth-time"
+                          type="time"
+                          value={birthTime}
+                          onChange={(e) => setBirthTime(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 상대방 정보 */}
+                  <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
+                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
+                        <input
+                          id="partner-birth-date"
+                          type="date"
+                          required
+                          value={partnerBirthDate}
+                          onChange={(e) => setPartnerBirthDate(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="partner-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <input
+                          id="partner-birth-time"
+                          type="time"
+                          value={partnerBirthTime}
+                          onChange={(e) => setPartnerBirthTime(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full mt-6 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>{selectedChar.name}에게 궁합 풀이받기 (웹툰 연출형)</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </form>
               )}
 
               {/* 입력 폼: 사주 */}
@@ -643,7 +956,8 @@ export function FortunePage() {
                               repeat: Infinity,
                               ease: "easeInOut"
                             }}
-                            className="w-24 aspect-[2/3.5] rounded-xl border border-accent/30 bg-gradient-to-b from-panel to-card"
+                            className="w-24 aspect-[2/3] rounded-xl border border-amber-500/20 bg-cover bg-center shadow-md"
+                            style={{ backgroundImage: "url('/images/tarot/tarot-back.jpg')" }}
                           />
                         ))}
                       </div>
@@ -662,12 +976,11 @@ export function FortunePage() {
                             type="button"
                             whileHover={{ y: -10, scale: 1.03 }}
                             onClick={() => handleSelectTarotCard(idx)}
-                            className="w-28 cursor-pointer aspect-[2/3.5] rounded-xl border border-line bg-gradient-to-br from-panel/90 to-card flex items-center justify-center relative overflow-hidden transition-colors hover:border-accent focus:outline-none"
+                            className="w-28 cursor-pointer aspect-[2/3] rounded-xl border border-amber-500/20 bg-cover bg-center flex items-center justify-center relative overflow-hidden shadow-lg transition-all hover:border-amber-400 focus:outline-none"
+                            style={{ backgroundImage: "url('/images/tarot/tarot-back.jpg')" }}
                           >
-                            {/* 카드 뒷면 무늬 장식 */}
-                            <div className="absolute inset-2 border border-line-strong/50 rounded-lg flex items-center justify-center">
-                              <Sparkles className="h-6 w-6 text-accent-soft" />
-                            </div>
+                            {/* 카드 뒷면에 호버 시 미세한 골드 이펙트 오버레이 */}
+                            <div className="absolute inset-0 bg-black/10 hover:bg-transparent transition-colors" />
                           </motion.button>
                         ))}
                       </div>

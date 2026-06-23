@@ -27,6 +27,14 @@ export interface FortuneCharacter {
   avatarUrl: string;
 }
 
+export interface TodayFortuneResult {
+  score: number;
+  color: string;
+  direction: string;
+  time: string;
+  luckyNumber: number;
+}
+
 const CHARACTERS: FortuneCharacter[] = [
   {
     id: "ara",
@@ -188,9 +196,16 @@ export class FortuneService {
          - 도깨비 단우: 친근하고 장난꾸러기 같은 활기찬 반말투. 가끔 심술을 부리는 척하지만 속은 다정한 오빠/형 같은 조언. "도깨비 방망이", "금은보화", "장난", "메밀묵" 언급.
          - 점술가 레오나: 매혹적이고 신비로운 반말/존댓말 혼용 톤. 우주와 별의 흐름을 읽는 점술가의 기품. "운명의 별빛", "은하수", "우주의 신호", "점괘" 언급.
          - 검객 가온: 묵직하고 냉철하며 과묵한 무사 어조(반말투). 불필요한 사설은 배제하고 본질을 꿰뚫는 뼈 때리는 격려와 일침. "검(劍)", "바람", "수련", "흔들리지 않는 마음" 언급.
+         - 단, '두 사람의 찰떡 궁합 분석' 결과일 경우에는 일반 줄글 설명 대신 반드시 [웹툰/만화 시나리오 대본 연출] 형식으로 출력하세요.
+           * 포맷 예시:
+             [1컷 - (장면 및 동작 묘사)]
+             캐릭터이름: "대사"
+             [2컷 - (장면 및 동작 묘사)]
+             다른캐릭터이름: "대사"
+           * 사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온 중 최소 1~2명의 ToonSpectrum 오리지널 캐릭터들을 서로 대화하게(티키타카) 하여 두 사람의 궁합을 재치 있게 만화 콘티처럼 해석해 주세요.
       2. 사용자에게 친근한 대화체로 풀어나가세요. 기계적인 명리학/타로 사전적 풀이를 줄줄 늘어놓지 마세요.
       3. 카피는 짧고 단정하며, 느낌표(!)를 남발하지 마세요. (단우 캐릭터의 호탕한 대사 일부 예외 제외)
-      4. 한국어로 가독성 있게 줄바꿈을 포함하여 대화하듯이 3~4문단 정도로 답변을 반환해 주세요.
+      4. 한국어로 가독성 있게 줄바꿈을 포함하여 대화하듯이 3~4문단 정도로 답변을 반환해 주세요. (궁합 콘티의 경우 컷당 줄바꿈을 적용해 주세요)
     `;
 
     const prompt = `
@@ -344,6 +359,178 @@ export class FortuneService {
       default:
         return `사주 일주는 ${dayPillarName}이며, 오행 분포는 ${elementStrengths}입니다. \n` +
           `조화와 균형이 중요한 명리적 흐름 속에서, 오늘 당신에게 딱 알맞은 장르의 웹툰을 추천해 드립니다.`;
+    }
+  }
+
+  // 오늘의 운세 보기
+  async drawTodayFortune(characterId: string) {
+    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
+    
+    // 오늘의 운세 지수 및 행운 요소 생성
+    const score = Math.floor(Math.random() * 41) + 60; // 60~100 사이의 점수
+    const colors = ["금색", "보라색", "청록색", "검은색", "붉은색", "은색", "주황색", "푸른색"];
+    const directions = ["동쪽", "서쪽", "남쪽", "북쪽", "남동쪽", "북동쪽", "남서쪽", "북서쪽"];
+    const times = ["오전 07시 ~ 09시", "오전 10시 ~ 12시", "오후 01시 ~ 03시", "오후 04시 ~ 06시", "오후 07시 ~ 09시", "오후 10시 ~ 12시"];
+    const luckyNumber = Math.floor(Math.random() * 10);
+
+    const todayData: TodayFortuneResult = {
+      score,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      direction: directions[Math.floor(Math.random() * directions.length)],
+      time: times[Math.floor(Math.random() * times.length)],
+      luckyNumber
+    };
+
+    // 장르 매칭 (운세 지수에 따라 매칭)
+    let recommendedGenres = ["일상", "드라마", "로맨스"];
+    if (score < 75) {
+      recommendedGenres = ["액션", "스릴러", "느와르"];
+    } else if (score < 90) {
+      recommendedGenres = ["판타지", "현판", "성장"];
+    }
+
+    const recommendations = this.curateTitles(recommendedGenres);
+
+    // AI 해석 텍스트 생성
+    let interpretation: string;
+    try {
+      const todayText = `
+        오늘의 종합 운세 지수: ${score}%
+        행운의 컬러: ${todayData.color}
+        행운의 방향: ${todayData.direction}
+        행운의 시간: ${todayData.time}
+        행운의 숫자: ${todayData.luckyNumber}
+      `;
+      interpretation = await this.generateAIFortune(
+        `오늘의 종합 운세`,
+        todayText,
+        character
+      );
+    } catch (_e) {
+      interpretation = this.getFallbackTodayInterpretation(todayData, character);
+    }
+
+    return {
+      character,
+      today: todayData,
+      interpretation,
+      recommendations
+    };
+  }
+
+  private getFallbackTodayInterpretation(data: TodayFortuneResult, character: FortuneCharacter): string {
+    switch (character.id) {
+      case "ara":
+        return `오늘 당신의 하루는 ${data.score}%의 맑은 기운으로 가득 차 있네요. \n\n` +
+          `행운을 보존해 줄 색상은 '${data.color}'이고, 추천하는 행운의 방향은 '${data.direction}'입니다. \n` +
+          `특히 '${data.time}' 즈음에 소소하게 기쁜 소식이 찾아올 수 있어요. 숫자는 '${data.luckyNumber}'이 도움을 주네요. \n` +
+          `차분히 차 한 잔 마시며 오늘 하루의 책장을 우아하게 넘겨 나가 보길 바랍니다.`;
+      case "danwoo":
+        return `야아! 대박이네! 오늘 네 하루 운세 점수는 무려 ${data.score}점이야! \n\n` +
+          `오늘의 행운 컬러인 '${data.color}' 계열 옷을 입거나 소품을 챙겨봐! 행운의 방향은 '${data.direction}'이란다! \n` +
+          `특히 '${data.time}'에 도깨비 요술 같은 행운이 뚝딱 솟아날지 몰라. 행운의 숫자 '${data.luckyNumber}'도 잘 기억해둬! \n` +
+          `신나고 장난 가득한 하루를 마음껏 즐겨봐!`;
+      case "leona":
+        return `오늘 우주의 별자리가 가리키는 당신의 운세 지수는 ${data.score}%입니다. \n\n` +
+          `밤하늘에서 당신을 지켜주는 행운의 빛은 '${data.color}'이며, 에너지가 솟아나는 방향은 '${data.direction}'입니다. \n` +
+          `특히 '${data.time}' 사이에 우주의 긍정적인 파동이 가장 크게 울리겠네요. 행운의 기호는 숫자 '${data.luckyNumber}'입니다. \n` +
+          `별의 신호가 당신의 앞길을 밝혀주기를.`;
+      case "gaon":
+        return `오늘 하루, 당신의 마음가짐 지수는 ${data.score}%다. 꽤 훌륭하군. \n\n` +
+          `마음을 가라앉히는 행운의 기운은 '${data.color}', 검끝이 향해야 할 운명의 방향은 '${data.direction}'이다. \n` +
+          `특히 '${data.time}'에 당신의 수련이나 노력이 빛을 발할 시간이 될 것이니 주의 깊게 관찰하게. 행운의 숫자는 '${data.luckyNumber}'이다. \n` +
+          `흔들리지 말고 단단하게 나아가라.`;
+      default:
+        return `오늘 당신의 하루 운세 지수는 ${data.score}%입니다. \n` +
+          `행운의 컬러는 '${data.color}', 행운의 방향은 '${data.direction}', 시간대는 '${data.time}'입니다. 편안한 하루 보내세요.`;
+    }
+  }
+
+  // 궁합 계산 및 해석
+  async drawCompatibility(myBirthDate: string, myBirthTime: string | undefined, partnerBirthDate: string, partnerBirthTime: string | undefined, characterId = "ara") {
+    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
+    
+    const mySaju: SajuResult = calculateSaju(myBirthDate, myBirthTime);
+    const partnerSaju: SajuResult = calculateSaju(partnerBirthDate, partnerBirthTime);
+
+    // 상성 적합도 계산 (기본 70점에서 시작하여 오행 밸런스에 따라 가감)
+    const myRatio = mySaju.elementsRatio;
+    const partnerRatio = partnerSaju.elementsRatio;
+    let compatibilityScore = 70;
+    
+    const woodFireShare = Math.min(myRatio.wood, partnerRatio.fire) + 
+                         Math.min(myRatio.fire, partnerRatio.earth) + 
+                         Math.min(myRatio.earth, partnerRatio.metal) + 
+                         Math.min(myRatio.metal, partnerRatio.water) + 
+                         Math.min(myRatio.water, partnerRatio.wood);
+    
+    compatibilityScore += Math.floor(woodFireShare / 5);
+    if (compatibilityScore > 100) compatibilityScore = 100;
+    if (compatibilityScore < 50) compatibilityScore = 50;
+
+    const targetGenres = ["로맨스", "로판", "드라마"];
+    const recommendations = this.curateTitles(targetGenres);
+
+    // AI 해석 텍스트 생성
+    let interpretation: string;
+    try {
+      const compatText = `
+        나의 사주 일주: ${mySaju.dayPillar.kanKorean}${mySaju.dayPillar.jiKorean} (${mySaju.elementsRatio.wood}% 목, ${mySaju.elementsRatio.fire}% 화, ${mySaju.elementsRatio.earth}% 토, ${mySaju.elementsRatio.metal}% 금, ${mySaju.elementsRatio.water}% 수)
+        상대방의 사주 일주: ${partnerSaju.dayPillar.kanKorean}${partnerSaju.dayPillar.jiKorean} (${partnerSaju.elementsRatio.wood}% 목, ${partnerSaju.elementsRatio.fire}% 화, ${partnerSaju.elementsRatio.earth}% 토, ${partnerSaju.elementsRatio.metal}% 금, ${partnerSaju.elementsRatio.water}% 수)
+        두 사람의 궁합 조화 지수: ${compatibilityScore}%
+      `;
+      interpretation = await this.generateAIFortune(
+        `두 사람의 찰떡 궁합 분석`,
+        compatText,
+        character
+      );
+    } catch (_e) {
+      interpretation = this.getFallbackCompatibilityInterpretation(compatibilityScore, character);
+    }
+
+    return {
+      character,
+      mySaju,
+      partnerSaju,
+      score: compatibilityScore,
+      interpretation,
+      recommendations
+    };
+  }
+
+  private getFallbackCompatibilityInterpretation(score: number, character: FortuneCharacter): string {
+    switch (character.id) {
+      case "ara":
+        return `[1컷 - 도서관 구석에서 책을 얹어두고 미소 짓는 사서 아라]\n` +
+          `아라: "두 분의 생년월일이 적힌 기록지를 함께 포개어 보았어요. 서로 포근하게 겹치는 부분이 무척 아름답네요."\n\n` +
+          `[2컷 - 장난스레 아라 머리맡으로 뛰어내리는 도깨비 단우]\n` +
+          `단우: "어디 어디? 우와, 궁합 지수가 ${score}%나 되네! 이 정도면 방망이 뚝딱 안 해도 알아서 달달하게 잘 놀겠구먼!"\n\n` +
+          `[3컷 - 차분히 찻잔을 내려놓는 아라]\n` +
+          `아라: "맞아요, 단우 씨. 서로 부족한 기운을 채워주며 한 편의 예쁜 성장 웹툰 같은 관계를 이어갈 수 있는 좋은 궁합이랍니다."`;
+      case "danwoo":
+        return `[1컷 - 도깨비 방망이를 어깨에 얹고 흐뭇하게 웃는 단우]\n` +
+          `단우: "으하하! 너희 둘의 오행 기운을 냄비에 넣고 끓여봤는데 상성이 아주 펄펄 끓는다! 궁합 지수는 ${score}%!"\n\n` +
+          `[2컷 - 옆에서 팔짱을 끼고 한숨을 푹 쉬는 검객 가온]\n` +
+          `가온: "조용히 해라, 도깨비. 시끄럽다. 하지만... 두 사람의 기운이 서로 검과 방패처럼 든든해 보이는 건 사실이군."\n\n` +
+          `[3컷 - 가온의 어깨를 툭 치며 웃는 단우]\n` +
+          `단우: "그렇지? 가끔 사소한 장난으로 투덕거려도 결국 찰떡같이 붙어 다닐 녀석들이니까 걱정 붙들어 매라고!"`;
+      case "leona":
+        return `[1컷 - 신비로운 보랏빛 점술 테이블 위에 타로 카드를 부채꼴로 펼치는 레오나]\n` +
+          `레오나: "두 분의 사주 은하수가 서로를 향해 부드러운 궤도를 그리며 수렴하고 있어요. 조화율은 ${score}%..."\n\n` +
+          `[2컷 - 책장을 넘기며 안경을 고쳐 쓰는 사서 아라]\n` +
+          `아라: "도서관 고서에 적힌 조화의 흐름과도 정확히 일치하네요. 상생의 기운이 아주 맑게 흐르고 있습니다."\n\n` +
+          `[3컷 - 별자리를 가리키며 매혹적으로 웃는 레오나]\n` +
+          `레오나: "맞아요. 가끔 은하수의 폭풍이 불더라도 두 분은 별빛처럼 서로를 구원해 줄 운명적인 소울메이트가 될 거예요."`;
+      case "gaon":
+        return `[1컷 - 검을 천천히 칼집에 꽂으며 눈을 감는 검객 가온]\n` +
+          `가온: "두 사람의 운명의 궤적을 베어 내어 나란히 놓아 보았다. 부딪힘 없이 물 흐르듯 어우러지는군. 궁합 지수 ${score}%."\n\n` +
+          `[2컷 - 수정구를 들여다보며 유쾌하게 윙크하는 점술가 레오나]\n` +
+          `레오나: "어머, 가온이 웬일로 칭찬을 다 하네? 맞아, 두 사람의 합은 아주 화려하고 뜨거운 로맨스 웹툰의 정석 같은 상성이야."\n\n` +
+          `[3컷 - 눈을 살며시 뜨고 앞을 응시하는 가온]\n` +
+          `가온: "흥, 시끄러운 점술가 같으니. 하지만... 서로의 검끝이 흔들릴 때 든든한 바람이 되어줄 귀한 인연임은 분명하다. 소중히 다스려라."`;
+      default:
+        return `[1컷 - 운세를 풀이하는 캐릭터 에이전트]\n` +
+          `에이전트: "두 분의 궁합 지수는 ${score}%입니다. 서로 양보하고 존중한다면 아주 훌륭한 관계를 유지할 수 있습니다."`;
     }
   }
 }

@@ -8,6 +8,18 @@ export interface TarotRequest {
   characterId: string;
 }
 
+export interface TodayFortuneRequest {
+  characterId: string;
+}
+
+export interface CompatibilityRequest {
+  myBirthDate: string;
+  myBirthTime?: string;
+  partnerBirthDate: string;
+  partnerBirthTime?: string;
+  characterId: string;
+}
+
 export interface SajuRequest {
   birthDate: string; // YYYY-MM-DD
   birthTime?: string; // HH:MM
@@ -40,6 +52,26 @@ export class FortuneController {
       body.birthDate,
       body.birthTime,
       body.gender,
+      body.characterId
+    );
+  }
+
+  // 오늘의 운세
+  @Post("today")
+  @HttpCode(HttpStatus.OK)
+  async drawTodayFortune(@Body() body: TodayFortuneRequest) {
+    return this.fortuneService.drawTodayFortune(body.characterId);
+  }
+
+  // 궁합 분석
+  @Post("compatibility")
+  @HttpCode(HttpStatus.OK)
+  async drawCompatibility(@Body() body: CompatibilityRequest) {
+    return this.fortuneService.drawCompatibility(
+      body.myBirthDate,
+      body.myBirthTime,
+      body.partnerBirthDate,
+      body.partnerBirthTime,
       body.characterId
     );
   }
