@@ -5,10 +5,18 @@ import styles from "./IntroSplash.module.css";
 
 export function IntroSplash() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isVisible, setIsVisible] = useState(true);
+  const isInitialized = useRef(false);
+  // 세션 기준 최초 사이트 진입 시에만 인트로 노출
+  const isFirstVisit = typeof window !== "undefined" && !sessionStorage.getItem("toonspectrum-intro-shown");
+  const [isVisible, setIsVisible] = useState(isFirstVisit);
   const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
+    if (!isFirstVisit) return;
+
+    // 방문 기록 세션에 플래그 저장
+    sessionStorage.setItem("toonspectrum-intro-shown", "true");
+
     const fadeTimer = setTimeout(() => {
       setIsFading(true);
     }, 2000);
@@ -21,10 +29,14 @@ export function IntroSplash() {
       clearTimeout(fadeTimer);
       clearTimeout(removeTimer);
     };
-  }, []);
+  }, [isFirstVisit]);
 
   useEffect(() => {
+    if (!isVisible) return;
+    if (isInitialized.current) return;
     if (!canvasRef.current) return;
+
+    isInitialized.current = true;
 
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -225,7 +237,7 @@ export function IntroSplash() {
       texture.dispose();
       renderer.dispose();
     };
-  }, []);
+  }, [isVisible]);
 
   if (!isVisible) return null;
 
