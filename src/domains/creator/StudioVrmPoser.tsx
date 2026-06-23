@@ -64,7 +64,10 @@ import {
 import {
   initFaceLandmarker,
   disposeFaceLandmarker,
+  initPoseLandmarker,
+  disposePoseLandmarker,
   processTrackingResult,
+  processPoseResult,
   smoothRawChannels,
   convertChannelsToVrmData,
   DEFAULT_TRACKING_OPTIONS,
@@ -85,7 +88,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
-import type { FaceLandmarker } from "@mediapipe/tasks-vision";
+import type { FaceLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import {
@@ -1890,18 +1893,12 @@ function VrmActor({
     if (webcamActive && trackingDataRef.current) {
       const data = trackingDataRef.current;
       if (humanoid) {
-        if (data.bones.head) {
-          const headBone = humanoid.getNormalizedBoneNode("head");
-          if (headBone) {
-            headBone.rotation.set(data.bones.head[0], data.bones.head[1], data.bones.head[2]);
+        Object.entries(data.bones).forEach(([boneName, rot]) => {
+          const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
+          if (bone) {
+            bone.rotation.set(rot[0], rot[1], rot[2]);
           }
-        }
-        if (data.bones.neck) {
-          const neckBone = humanoid.getNormalizedBoneNode("neck");
-          if (neckBone) {
-            neckBone.rotation.set(data.bones.neck[0], data.bones.neck[1], data.bones.neck[2]);
-          }
-        }
+        });
       }
 
       if (expressionManager) {
@@ -2148,6 +2145,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
   const prevChannelsRef = useRef<TrackingChannels | null>(null);
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2341,15 +2339,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         }
 
         let landmarker;
+        let poseLandmarker;
         try {
-          landmarker = await initFaceLandmarker();
+          [landmarker, poseLandmarker] = await Promise.all([
+            initFaceLandmarker(),
+            initPoseLandmarker(),
+          ]);
         } catch (modelErr) {
-          console.error("FaceLandmarker initialization failed:", modelErr);
-          throw new Error("얼굴 인식 AI 모델(MediaPipe)을 초기화하지 못했습니다. 인터넷 연결 상태를 확인하고 페이지를 새로고침해 주세요.", { cause: modelErr });
+          console.error("Tracking AI models initialization failed:", modelErr);
+          throw new Error("얼굴 및 전신 인식 AI 모델(MediaPipe)을 초기화하지 못했습니다. 인터넷 연결 상태를 확인하고 페이지를 새로고침해 주세요.", { cause: modelErr });
         }
 
         if (!active) return;
         landmarkerRef.current = landmarker;
+        poseLandmarkerRef.current = poseLandmarker;
 
         setWebcamLoading(false);
 
@@ -2357,21 +2360,44 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           if (!active) return;
           const currentVideo = videoRef.current;
           const currentLandmarker = landmarkerRef.current;
-          if (currentVideo && currentLandmarker && currentVideo.readyState >= 2) {
+          const currentPoseLandmarker = poseLandmarkerRef.current;
+          if (currentVideo && currentLandmarker && currentPoseLandmarker && currentVideo.readyState >= 2) {
             const timestamp = performance.now();
             if (currentVideo.currentTime !== lastVideoTime) {
               lastVideoTime = currentVideo.currentTime;
               const result = currentLandmarker.detectForVideo(currentVideo, timestamp);
+              const poseResult = currentPoseLandmarker.detectForVideo(currentVideo, timestamp);
+              
               const rawChannels = processTrackingResult(result);
-              if (rawChannels) {
-                setFaceDetected(true);
-                const smoothed = smoothRawChannels(prevChannelsRef.current, rawChannels, trackingOptionsRef.current.smoothing);
-                prevChannelsRef.current = smoothed;
-                const vrmData = convertChannelsToVrmData(smoothed, trackingOptionsRef.current);
-                trackingDataRef.current = vrmData;
-              } else {
-                setFaceDetected(false);
-              }
+              const poseBones = processPoseResult(poseResult, trackingOptionsRef.current.mirrorMode);
+
+              const faceChannels = rawChannels || {
+                headPitch: 0,
+                headYaw: 0,
+                headRoll: 0,
+                blinkLeft: 0,
+                blinkRight: 0,
+                gazeX: 0,
+                gazeY: 0,
+                mouthOpen: 0,
+                mouthSmile: 0,
+                browInnerUp: 0,
+                browOuterUpLeft: 0,
+                browOuterUpRight: 0,
+              };
+
+              setFaceDetected(!!rawChannels);
+
+              const smoothed = smoothRawChannels(
+                prevChannelsRef.current,
+                faceChannels,
+                trackingOptionsRef.current.smoothing
+              );
+              prevChannelsRef.current = smoothed;
+
+              const vrmData = convertChannelsToVrmData(smoothed, trackingOptionsRef.current);
+              vrmData.bones = { ...vrmData.bones, ...poseBones };
+              trackingDataRef.current = vrmData;
             }
           }
           requestId = requestAnimationFrame(loop);
@@ -2402,6 +2428,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   useEffect(() => {
     return () => {
       disposeFaceLandmarker();
+      disposePoseLandmarker();
     };
   }, []);
 
@@ -2411,12 +2438,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
     setCustomBones((prev) => {
       const next = { ...prev };
-      if (data.bones.head) {
-        next.head = { rotation: [data.bones.head[0], data.bones.head[1], data.bones.head[2]] };
-      }
-      if (data.bones.neck) {
-        next.neck = { rotation: [data.bones.neck[0], data.bones.neck[1], data.bones.neck[2]] };
-      }
+      Object.entries(data.bones).forEach(([boneName, rot]) => {
+        next[boneName as VRMHumanBoneName] = {
+          rotation: [rot[0], rot[1], rot[2]] as const,
+        };
+      });
       return next;
     });
 
