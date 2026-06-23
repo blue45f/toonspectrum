@@ -793,4 +793,160 @@ export const PROP_STICKERS: FxOverlay[] = [
       `<path d="M180 155 C170 155, 165 135, 180 125 C185 110, 210 110, 215 125 C225 125, 230 140, 220 155 Z" fill="${WHITE}" />` +
       `</g>`,
   ),
+  prop(
+    "prop-sword",
+    "용사의 검",
+    220,
+    220,
+    `${shadow(110, 205, 65, 8)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<rect x="105" y="145" width="10" height="50" rx="3" fill="#78350f" />` +
+      `<circle cx="110" cy="198" r="12" fill="#fbbf24" />` +
+      `<rect x="70" y="135" width="80" height="14" rx="4" fill="#fbbf24" />` +
+      `<circle cx="110" cy="142" r="6" fill="#00f2ff" />` +
+      `<path d="M98 135 L98 40 L110 20 L122 40 L122 135 Z" fill="#cbd5e1" />` +
+      `<path d="M110 135 L110 25 L122 40 L122 135 Z" fill="#94a3b8" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-magic-staff",
+    "마법 지팡이",
+    220,
+    220,
+    `${shadow(110, 205, 50, 7)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M70 190 L140 60" stroke="#78350f" stroke-width="12" />` +
+      `<circle cx="140" cy="60" r="18" fill="#fbbf24" />` +
+      `<path d="M125 55 C120 40, 130 30, 140 35 C150 30, 160 40, 155 55" fill="none" stroke-width="6" />` +
+      `<polygon points="140,15 155,35 140,55 125,35" fill="#d8b4fe" />` +
+      `<polygon points="140,15 140,55 125,35" fill="#a78bfa" />` +
+      `<polygon points="165,20 168,26 175,27 170,32 171,38 165,35 159,38 160,32 155,27 162,26" fill="#ffd166" stroke="none" />` +
+      `<polygon points="110,50 112,54 117,55 113,59 114,64 110,61 106,64 107,59 103,55 108,54" fill="#60a5fa" stroke="none" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-magic-potion",
+    "마법 물약",
+    200,
+    220,
+    `${shadow(100, 205, 50, 10)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<rect x="85" y="55" width="30" height="30" rx="3" fill="#cbd5e1" opacity="0.8" />` +
+      `<polygon points="87,55 113,55 108,35 92,35" fill="#b45309" />` +
+      `<circle cx="100" cy="135" r="55" fill="#e2e8f0" opacity="0.4" />` +
+      `<path d="M50 150 A55 55 0 0 0 150 150 C140 140, 130 140, 120 145 C100 155, 80 135, 50 150 Z" fill="#ec4899" />` +
+      `<circle cx="85" cy="155" r="6" fill="#fbcfe8" stroke="none" />` +
+      `<circle cx="115" cy="165" r="4" fill="#fbcfe8" stroke="none" />` +
+      `<circle cx="100" cy="140" r="5" fill="#fbcfe8" stroke="none" />` +
+      `<circle cx="100" cy="135" r="55" fill="none" />` +
+      `<path d="M60 115 A45 45 0 0 1 125 95" fill="none" stroke="${WHITE}" stroke-width="5" stroke-linecap="round" opacity="0.6" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-holy-shield",
+    "수호의 방패",
+    220,
+    220,
+    `${shadow(110, 205, 65, 9)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M50 50 C110 40, 110 40, 170 50 C170 110, 160 170, 110 200 C60 170, 50 110, 50 50 Z" fill="#fbbf24" />` +
+      `<path d="M62 62 C110 54, 110 54, 158 62 C158 112, 149 160, 110 186 C71 160, 62 112, 62 62 Z" fill="#e2e8f0" />` +
+      `<path d="M102 70 H118 V165 H102 Z M80 95 H140 V111 H80 Z" fill="#ef4444" />` +
+      `<polygon points="110,93 118,103 110,113 102,103" fill="#3b82f6" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-treasure-chest",
+    "보물 상자",
+    240,
+    220,
+    `${shadow(120, 205, 80, 12)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<rect x="40" y="115" width="160" height="75" rx="8" fill="#78350f" />` +
+      `<circle cx="70" cy="115" r="10" fill="#fde047" />` +
+      `<circle cx="90" cy="112" r="10" fill="#fbbf24" />` +
+      `<circle cx="110" cy="115" r="10" fill="#fbbf24" />` +
+      `<circle cx="130" cy="110" r="10" fill="#fde047" />` +
+      `<circle cx="150" cy="113" r="10" fill="#fde047" />` +
+      `<circle cx="170" cy="116" r="10" fill="#fbbf24" />` +
+      `<polygon points="80,105 88,113 80,121 72,113" fill="#ef4444" />` +
+      `<polygon points="145,100 151,108 145,116 139,108" fill="#10b981" />` +
+      `<path d="M35 115 L45 70 C85 60, 155 60, 195 70 L205 115 Z" fill="#92400e" />` +
+      `<path d="M40 115 L40 190" stroke="#f59e0b" stroke-width="12" />` +
+      `<path d="M200 115 L200 190" stroke="#f59e0b" stroke-width="12" />` +
+      `<path d="M40 145 H200" stroke="#f59e0b" stroke-width="8" />` +
+      `<rect x="105" y="110" width="30" height="30" rx="4" fill="#fbbf24" />` +
+      `<circle cx="120" cy="120" r="5" fill="${INK}" />` +
+      `<line x1="120" y1="123" x2="120" y2="135" stroke-width="5" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-crown",
+    "임금의 왕관",
+    220,
+    200,
+    `${shadow(110, 185, 65, 9)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M45 145 L40 75 L75 105 L110 50 L145 105 L180 75 L175 145 Z" fill="#fbbf24" />` +
+      `<rect x="42" y="132" width="136" height="20" rx="3" fill="#d97706" />` +
+      `<circle cx="65" cy="142" r="5" fill="#ef4444" stroke="none" />` +
+      `<circle cx="110" cy="142" r="6" fill="#3b82f6" stroke="none" />` +
+      `<circle cx="155" cy="142" r="5" fill="#10b981" stroke="none" />` +
+      `<circle cx="40" cy="75" r="8" fill="#fbbf24" />` +
+      `<circle cx="110" cy="50" r="10" fill="#fbbf24" />` +
+      `<circle cx="180" cy="75" r="8" fill="#fbbf24" />` +
+      `<polygon points="110,75 120,90 110,105 100,90" fill="#ef4444" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-coffee-mug",
+    "커피 머그잔",
+    220,
+    200,
+    `${shadow(100, 180, 60, 9)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M140 90 C175 90, 175 150, 140 150" fill="none" stroke-width="12" />` +
+      `<path d="M50 80 H150 L140 170 H60 Z" fill="#67e8f9" />` +
+      `<ellipse cx="100" cy="80" rx="46" ry="12" fill="#78350f" />` +
+      `<path d="M100 83 C96 76, 80 80, 100 92 C120 80, 104 76, 100 83 Z" fill="#fef3c7" stroke="none" />` +
+      `<path d="M80 60 Q75 45 85 30 T75 10" fill="none" stroke="${WHITE}" stroke-width="4" opacity="0.6" />` +
+      `<path d="M105 60 Q115 45 105 30 T115 10" fill="none" stroke="${WHITE}" stroke-width="4" opacity="0.6" />` +
+      `<path d="M125 60 Q120 48 130 35 T120 18" fill="none" stroke="${WHITE}" stroke-width="4" opacity="0.6" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-sunglasses",
+    "힙한 선글라스",
+    240,
+    160,
+    `${shadow(120, 125, 75, 8)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M40 70 C40 70 80 62 120 70 C160 62 200 70 200 70 L205 95 C190 120 160 125 145 110 C130 95 125 95 120 95 C115 95 110 95 95 110 C80 125 50 120 35 95 Z" fill="#1e293b" />` +
+      `<path d="M48 78 C70 74 88 84 88 94 C84 108 62 113 52 100 C46 92 48 78 48 78 Z" fill="#ec4899" />` +
+      `<path d="M192 78 C170 74 152 84 152 94 C156 108 178 113 188 100 C194 92 192 78 192 78 Z" fill="#f59e0b" />` +
+      `<line x1="55" y1="84" x2="75" y2="104" stroke="${WHITE}" stroke-width="5" stroke-linecap="round" opacity="0.7" />` +
+      `<line x1="160" y1="84" x2="180" y2="104" stroke="${WHITE}" stroke-width="5" stroke-linecap="round" opacity="0.7" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-angel-wing",
+    "천사 날개",
+    260,
+    220,
+    `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M40 100 C40 100 80 40 150 50 C180 54 220 90 230 110 C210 115 190 105 180 115 C165 105 150 120 135 120 C120 115 105 130 90 125 C75 120 50 135 40 100 Z" fill="#eff6ff" />` +
+      `<path d="M70 95 C90 70 130 75 160 85 C150 92 135 88 125 95 C115 92 100 102 90 100" fill="none" stroke-width="5" />` +
+      `<path d="M95 110 C110 95 135 98 150 105" fill="none" stroke-width="5" />` +
+      `</g>`,
+  ),
+  prop(
+    "prop-devil-wing",
+    "악마 날개",
+    260,
+    220,
+    `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M40 110 C60 50 130 60 210 70 C225 73 235 65 240 75 L215 110 C195 125 185 115 165 140 C155 125 135 125 115 145 C105 130 75 130 40 110 Z" fill="#581c87" />` +
+      `<path d="M40 110 Q120 80 210 70 M210 70 L165 140 M210 70 L115 145" fill="none" stroke="#a78bfa" stroke-width="5" />` +
+      `</g>`,
+  ),
 ];

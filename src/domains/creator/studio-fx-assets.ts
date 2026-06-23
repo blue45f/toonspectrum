@@ -19,6 +19,7 @@ export interface ComicVectorSticker {
 }
 
 const INK = "#16100c"; // 굵은 잉크 라인 색
+const WHITE = "#ffffff";
 
 // 내부 유틸: 자체 완결형 svg 문자열 래퍼.
 function svg(w: number, h: number, body: string): string {
@@ -708,7 +709,116 @@ export const COMIC_VECTOR_STICKERS: ComicVectorSticker[] = [
   { id: "focus-mark", label: "집중", svg: stickerFocusMark(), width: 260, height: 260 },
   { id: "glowing-crystal", label: "마법 마석", svg: stickerGlowingCrystal(), width: 240, height: 260 },
   { id: "cat-ears", label: "고양이 귀", svg: stickerCatEars(), width: 260, height: 160 },
+  { id: "feather-dust", label: "흩날리는 깃털", svg: stickerFeathers(), width: 240, height: 240 },
+  { id: "bubble-pop", label: "비눗방울", svg: stickerBubbles(), width: 240, height: 240 },
+  { id: "magic-spell-circle", label: "마법 소환진", svg: stickerMagicCircle(), width: 260, height: 260 },
+  { id: "blood-splatter", label: "액션 잉크튀김", svg: stickerBloodSplash(), width: 240, height: 240 },
+  { id: "wind-slash", label: "바람 검기", svg: stickerWindSlash(), width: 280, height: 200 },
+  { id: "sweat-drop-emoji", label: "이마 땀방울", svg: stickerSweatEmoji(), width: 200, height: 200 },
 ];
+
+function stickerFeathers(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M 60 70 C 40 50 70 20 110 30 C 130 35 150 60 155 70 C 140 73 130 65 120 73 C 110 65 100 75 90 75 C 80 70 70 82 60 70 Z" fill="#eff6ff" transform="rotate(-15 100 50)"/>
+      <path d="M 60 70 L 155 70" stroke-width="4" stroke="#bfdbfe" transform="rotate(-15 100 50)"/>
+      
+      <path d="M 40 160 C 25 145 48 122 78 130 C 93 134 108 152 112 160 C 101 162 93 156 86 162 C 78 156 71 164 64 164 Z" fill="#eff6ff" transform="rotate(30 75 145) scale(0.7)"/>
+      <path d="M 40 160 L 112 160" stroke-width="3" stroke="#bfdbfe" transform="rotate(30 75 145) scale(0.7)"/>
+      
+      <path d="M 140 150 C 120 130 150 100 190 110 C 210 115 230 140 235 150 C 220 153 210 145 200 153 C 190 145 180 155 170 155 Z" fill="#eff6ff" transform="rotate(45 185 130) scale(0.85)"/>
+      <path d="M 140 150 L 235 150" stroke-width="4" stroke="#bfdbfe" transform="rotate(45 185 130) scale(0.85)"/>
+    </g>
+  `);
+}
+
+function stickerBubbles(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="6" fill="none">
+      <circle cx="120" cy="120" r="60" fill="#e0f2fe" opacity="0.3"/>
+      <circle cx="120" cy="120" r="60" />
+      <path d="M85 85 A50 50 0 0 1 155 85" stroke="${WHITE}" stroke-width="6" stroke-linecap="round" opacity="0.75"/>
+      <circle cx="95" cy="145" r="8" fill="${WHITE}" stroke="none"/>
+      
+      <circle cx="185" cy="65" r="30" fill="#fdf2f8" opacity="0.35"/>
+      <circle cx="185" cy="65" r="30"/>
+      <path d="M168 48 A25 25 0 0 1 202 48" stroke="${WHITE}" stroke-width="4.5" stroke-linecap="round" opacity="0.75"/>
+      
+      <circle cx="60" cy="175" r="20" fill="#f5f3ff" opacity="0.35"/>
+      <circle cx="60" cy="175" r="20"/>
+      <path d="M49 164 A16 16 0 0 1 71 164" stroke="${WHITE}" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+    </g>
+  `);
+}
+
+function stickerMagicCircle(): string {
+  const W = 260;
+  const H = 260;
+  return svg(W, H, `
+    <g stroke="#a78bfa" stroke-width="5" fill="none" stroke-linejoin="round">
+      <circle cx="130" cy="130" r="110" stroke-width="8" opacity="0.9"/>
+      <circle cx="130" cy="130" r="95" stroke-width="3"/>
+      <polygon points="130,30 216,180 44,180" stroke-width="5"/>
+      <polygon points="130,230 216,80 44,80" stroke-width="5"/>
+      <circle cx="130" cy="130" r="40" stroke-width="4" fill="#a78bfa" opacity="0.15"/>
+      <circle cx="130" cy="130" r="25" stroke-width="2"/>
+      <circle cx="130" cy="30" r="10" fill="#1e1b4b" stroke-width="3"/>
+      <circle cx="130" cy="230" r="10" fill="#1e1b4b" stroke-width="3"/>
+      <circle cx="44" cy="80" r="10" fill="#1e1b4b" stroke-width="3"/>
+      <circle cx="216" cy="80" r="10" fill="#1e1b4b" stroke-width="3"/>
+      <circle cx="44" cy="180" r="10" fill="#1e1b4b" stroke-width="3"/>
+      <circle cx="216" cy="180" r="10" fill="#1e1b4b" stroke-width="3"/>
+    </g>
+  `);
+}
+
+function stickerBloodSplash(): string {
+  const W = 240;
+  const H = 240;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="6" fill="#be123c" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M120 120 C90 100, 70 80, 50 110 C30 140, 70 160, 100 150 C90 180, 100 200, 120 200 C150 200, 150 170, 160 150 C190 160, 200 130, 180 110 C160 90, 140 100, 120 120 Z" />
+      <path d="M165 95 L205 75 L180 105 Z" />
+      <path d="M75 145 L35 165 L55 135 Z" />
+      <path d="M145 155 L165 215 L130 175 Z" />
+      <path d="M95 95 L55 55 L90 80 Z" />
+      <circle cx="110" cy="50" r="10" />
+      <circle cx="190" cy="170" r="8" />
+      <circle cx="50" cy="185" r="7" />
+      <circle cx="215" cy="105" r="12" />
+    </g>
+  `);
+}
+
+function stickerWindSlash(): string {
+  const W = 280;
+  const H = 200;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="7" fill="#e0f2fe" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M30 160 C 90 90, 180 60, 250 80 C 190 110, 100 140, 30 160 Z" />
+      <path d="M60 130 C 110 75, 170 55, 220 70 C 170 90, 110 110, 60 130 Z" fill="#bae6fd" stroke-width="5" />
+      <polygon points="20,170 10,165 25,162" fill="${INK}" stroke="none"/>
+      <polygon points="265,75 275,80 260,82" fill="${INK}" stroke="none"/>
+      <polygon points="245,60 252,65 240,66" fill="${INK}" stroke="none"/>
+    </g>
+  `);
+}
+
+function stickerSweatEmoji(): string {
+  const W = 200;
+  const H = 200;
+  return svg(W, H, `
+    <g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M100 25 C100 25 150 90 150 130 C150 165 125 180 100 180 C75 180 50 165 50 130 C50 90 100 25 100 25 Z" fill="#38bdf8"/>
+      <path d="M75 120 C75 100 90 55 100 45" fill="none" stroke="${WHITE}" stroke-width="7" stroke-linecap="round" opacity="0.65"/>
+      <circle cx="120" cy="145" r="8" fill="${WHITE}" stroke="none"/>
+    </g>
+  `);
+}
 
 function stickerGlowingCrystal(): string {
   const W = 240;

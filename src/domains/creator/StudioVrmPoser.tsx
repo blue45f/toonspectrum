@@ -3166,6 +3166,80 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       return next;
     });
   }
+  function applyHandPosePreset(side: 'left' | 'right', poseType: 'fist' | 'open' | 'point' | 'peace' | 'thumbsUp' | 'relaxed') {
+    const sign = side === 'left' ? -1 : 1;
+    setFingerEdits((prev) => {
+      const next = { ...prev };
+      const fingers = ['Index', 'Middle', 'Ring', 'Little'] as const;
+      const segments = ['Proximal', 'Intermediate', 'Distal'] as const;
+      
+      if (poseType === 'open') {
+        fingers.forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, 0];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, 0];
+      } else if (poseType === 'fist') {
+        const rad = d(85);
+        fingers.forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * rad];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(40), sign * d(40)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(40)];
+      } else if (poseType === 'point') {
+        const curlRad = d(85);
+        segments.forEach((seg) => {
+          next[`${side}Index${seg}` as VRMHumanBoneName] = [0, 0, 0];
+          next[`${side}Middle${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+          next[`${side}Ring${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+          next[`${side}Little${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(40), sign * d(40)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(20)];
+      } else if (poseType === 'peace') {
+        const curlRad = d(85);
+        segments.forEach((seg) => {
+          next[`${side}Index${seg}` as VRMHumanBoneName] = [0, 0, 0];
+          next[`${side}Middle${seg}` as VRMHumanBoneName] = [0, 0, 0];
+          next[`${side}Ring${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+          next[`${side}Little${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+        });
+        next[`${side}IndexProximal` as VRMHumanBoneName] = [0, 0, sign * d(-5)];
+        next[`${side}MiddleProximal` as VRMHumanBoneName] = [0, 0, sign * d(5)];
+        
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(45), sign * d(40)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(30)];
+      } else if (poseType === 'thumbsUp') {
+        const curlRad = d(85);
+        fingers.forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * curlRad];
+          });
+        });
+        next[`${side}ThumbMetacarpal` as VRMHumanBoneName] = [0, 0, 0];
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * d(-20), sign * d(-20)];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, 0, sign * d(-15)];
+      } else if (poseType === 'relaxed') {
+        const rad = d(20);
+        fingers.forEach((f) => {
+          segments.forEach((seg) => {
+            next[`${side}${f}${seg}` as VRMHumanBoneName] = [0, 0, sign * rad];
+          });
+        });
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * rad * 0.6, sign * rad * 0.5];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, sign * rad * 0.4, 0];
+      }
+      return next;
+    });
+  }
 
   function handleExpressionSelect(action: ExpressionAction) {
     setActiveExpressionId(action.id);
@@ -4388,7 +4462,33 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="flex-1 accent-accent" />
                       <span className="w-6 tabular-nums">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
                     </div>
-                    <button type="button" onClick={() => setFingerEdits({})} className="mt-0.5 text-[0.58rem] text-accent underline">손가락 초기화</button>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.62rem] text-fg-3">
+                      <span className="shrink-0 font-semibold text-fg-2">왼손:</span>
+                      {[
+                        { id: "fist" as const, label: "주먹" },
+                        { id: "open" as const, label: "보" },
+                        { id: "point" as const, label: "가리키기" },
+                        { id: "peace" as const, label: "브이" },
+                        { id: "thumbsUp" as const, label: "따봉" },
+                        { id: "relaxed" as const, label: "기본" },
+                      ].map(p => (
+                        <button key={p.id} type="button" onClick={() => applyHandPosePreset('left', p.id)} className="px-1.5 py-0.5 rounded border border-line bg-card hover:bg-raised transition-colors cursor-pointer">{p.label}</button>
+                      ))}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.62rem] text-fg-3">
+                      <span className="shrink-0 font-semibold text-fg-2">오른손:</span>
+                      {[
+                        { id: "fist" as const, label: "주먹" },
+                        { id: "open" as const, label: "보" },
+                        { id: "point" as const, label: "가리키기" },
+                        { id: "peace" as const, label: "브이" },
+                        { id: "thumbsUp" as const, label: "따봉" },
+                        { id: "relaxed" as const, label: "기본" },
+                      ].map(p => (
+                        <button key={p.id} type="button" onClick={() => applyHandPosePreset('right', p.id)} className="px-1.5 py-0.5 rounded border border-line bg-card hover:bg-raised transition-colors cursor-pointer">{p.label}</button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setFingerEdits({})} className="mt-2 text-[0.58rem] text-accent underline cursor-pointer">손가락 전체 초기화</button>
                   </div>
 
                   {/* Full state IO */}

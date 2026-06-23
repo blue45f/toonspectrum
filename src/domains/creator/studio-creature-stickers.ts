@@ -503,4 +503,178 @@ export const CREATURE_STICKERS: FxOverlay[] = [
       `</g>` +
       `${eye(101, 115, 8, 11)}${eye(151, 115, 8, 11)}${cheek(84, 142, 10, 5, "#ff93a1")}${cheek(168, 142, 10, 5, "#ff93a1")}`,
   ),
+  sticker(
+    "cr-baby-unicorn",
+    "아기 유니콘",
+    260,
+    280,
+    `${shadow(130, 255, 75, 14)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M70 180 C40 160 45 130 65 140 C55 125 70 120 85 130 C75 115 95 110 105 130" fill="#fbcfe8" />` +
+      `<path d="M190 180 C220 160 215 130 195 140 C205 125 190 120 175 130 C185 115 165 110 155 130" fill="#fbcfe8" />` +
+      `<ellipse cx="130" cy="195" rx="55" ry="50" fill="${WHITE}" />` +
+      `<ellipse cx="130" cy="195" rx="35" ry="30" fill="#fdf2f8" />` +
+      `<circle cx="130" cy="120" r="58" fill="${WHITE}" />` +
+      `<path d="M80 82 L55 50 L88 72 Z" fill="${WHITE}" />` +
+      `<path d="M80 78 L65 56 L83 72 Z" fill="#fbcfe8" stroke-width="4" />` +
+      `<path d="M180 82 L205 50 L172 72 Z" fill="${WHITE}" />` +
+      `<path d="M180 78 L195 56 L177 72 Z" fill="#fbcfe8" stroke-width="4" />` +
+      `<path d="M90 85 Q110 65 130 82 T170 85" fill="none" stroke="#fbcfe8" stroke-width="15" />` +
+      `<path d="M100 80 Q120 60 140 77 T160 80" fill="none" stroke="#ddd6fe" stroke-width="12" />` +
+      `<polygon points="130,22 138,62 122,62" fill="#fde047" />` +
+      `<line x1="125" y1="50" x2="135" y2="40" stroke-width="4" />` +
+      `<line x1="124" y1="36" x2="134" y2="28" stroke-width="4" />` +
+      `<ellipse cx="130" cy="142" rx="24" ry="16" fill="#fce7f3" />` +
+      `<circle cx="123" cy="138" r="3" fill="${INK}" stroke="none" />` +
+      `<circle cx="137" cy="138" r="3" fill="${INK}" stroke="none" />` +
+      `<path d="M125 146 Q130 152 135 146" fill="none" stroke-width="4" />` +
+      `</g>` +
+      `${eye(104, 118, 9, 12)}${eye(156, 118, 9, 12)}${cheek(86, 138)}${cheek(174, 138)}`,
+  ),
+  sticker(
+    "cr-baby-phoenix",
+    "아기 피닉스",
+    260,
+    260,
+    `${shadow(130, 235, 70, 13)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M110 220 L90 250 L115 240 L130 255 L145 240 L170 250 L150 220 Z" fill="#ef4444" />` +
+      `<path d="M65 160 C50 140 40 170 55 190 Z" fill="#f97316" />` +
+      `<path d="M195 160 C210 140 220 170 205 190 Z" fill="#f97316" />` +
+      `<circle cx="130" cy="175" r="50" fill="#f97316" />` +
+      `<ellipse cx="130" cy="185" rx="32" ry="26" fill="#facc15" />` +
+      `<circle cx="130" cy="115" r="54" fill="#f97316" />` +
+      `<path d="M130 65 C120 40 140 30 135 15 C150 30 140 50 145 65 Z" fill="#ef4444" />` +
+      `<path d="M120 68 C115 50 130 45 125 35 C135 45 128 60 132 68 Z" fill="#facc15" />` +
+      `<polygon points="130,122 138,112 122,112" fill="#fbbf24" />` +
+      `</g>` +
+      `${eye(104, 110, 8, 12)}${eye(156, 110, 8, 12)}${cheek(88, 130, 9, 5, "#ef4444")}${cheek(172, 130, 9, 5, "#ef4444")}`,
+  ),
+  sticker(
+    "cr-shiba-inu",
+    "시바견",
+    260,
+    260,
+    `${shadow(130, 225, 75, 14)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<ellipse cx="130" cy="175" rx="55" ry="46" fill="#e28743" />` +
+      `<path d="M90 155 L130 185 L170 155 Z" fill="#10b981" />` +
+      `<circle cx="130" cy="175" r="5" fill="${WHITE}" stroke="none" />` +
+      `<circle cx="130" cy="115" r="56" fill="#e28743" />` +
+      `<path d="M78 125 C78 145 105 160 130 160 C155 160 182 145 182 125 C182 110 78 110 78 125 Z" fill="${WHITE}" />` +
+      `<path d="M175 70 L200 40 L165 55 Z" fill="#e28743" />` +
+      `<path d="M85 70 L60 40 L95 55 Z" fill="#e28743" />` +
+      `<path d="M83 66 L68 46 L90 56 Z" fill="#fbcfe8" stroke-width="4" />` +
+      `<path d="M177 66 L192 46 L170 56 Z" fill="#fbcfe8" stroke-width="4" />` +
+      `<ellipse cx="130" cy="134" rx="18" ry="13" fill="${WHITE}" />` +
+      `<ellipse cx="130" cy="128" rx="7" ry="5" fill="${INK}" />` +
+      `<path d="M130 133 C126 137 122 137 122 134 M130 133 C134 137 138 137 138 134" fill="none" stroke-width="4" />` +
+      `</g>` +
+      `${eye(102, 108, 8, 11)}${eye(158, 108, 8, 11)}${cheek(84, 126, 11, 6, "#ff8b6f")}${cheek(176, 126, 11, 6, "#ff8b6f")}`,
+  ),
+  sticker(
+    "cr-alpaca",
+    "포근 알파카",
+    250,
+    280,
+    `${shadow(125, 255, 70, 13)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M80 180 C60 180 60 230 80 240 C100 250 150 250 170 240 C190 230 190 180 170 180 Z" fill="#fafaf9" />` +
+      `<path d="M100 120 L100 200 H150 L150 120 Z" fill="#fafaf9" />` +
+      `<path d="M90 130 A15 15 0 0 0 90 160 A15 15 0 0 0 90 190" fill="none" stroke-width="6" />` +
+      `<path d="M160 130 A15 15 0 0 1 160 160 A15 15 0 0 1 160 190" fill="none" stroke-width="6" />` +
+      `<rect x="95" y="180" width="60" height="15" rx="5" fill="#ef4444" />` +
+      `<rect x="135" y="195" width="15" height="28" rx="2" fill="#ef4444" />` +
+      `<line x1="140" y1="223" x2="140" y2="225" stroke="#facc15" stroke-width="4" />` +
+      `<line x1="145" y1="223" x2="145" y2="225" stroke="#facc15" stroke-width="4" />` +
+      `<path d="M90 90 C80 90 80 60 100 50 C120 40 130 40 150 50 C170 60 170 90 160 90 Z" fill="#fafaf9" />` +
+      `<circle cx="105" cy="55" r="14" fill="#fafaf9" />` +
+      `<circle cx="125" cy="48" r="15" fill="#fafaf9" />` +
+      `<circle cx="145" cy="55" r="14" fill="#fafaf9" />` +
+      `<path d="M95 50 L85 20 L100 40 Z" fill="#fafaf9" />` +
+      `<path d="M155 50 L165 20 L150 40 Z" fill="#fafaf9" />` +
+      `<ellipse cx="125" cy="98" rx="25" ry="20" fill="#fef3c7" />` +
+      `<polygon points="125,98 129,92 121,92" fill="${INK}" />` +
+      `<path d="M125 101 C122 104 119 104 119 102 M125 101 C128 104 131 104 131 102" fill="none" stroke-width="4" />` +
+      `</g>` +
+      `${eye(112, 85, 7, 10)}${eye(138, 85, 7, 10)}${cheek(98, 102, 7, 4)}${cheek(152, 102, 7, 4)}`,
+  ),
+  sticker(
+    "cr-baby-seal",
+    "아기 하프물범",
+    260,
+    240,
+    `${shadow(130, 215, 85, 14)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M60 170 C30 180 20 200 40 210 Z" fill="#fafaf9" />` +
+      `<path d="M200 170 C230 180 240 200 220 210 Z" fill="#fafaf9" />` +
+      `<ellipse cx="130" cy="150" rx="80" ry="62" fill="#fafaf9" />` +
+      `<ellipse cx="130" cy="156" rx="16" ry="12" fill="#f5f5f4" />` +
+      `<ellipse cx="130" cy="150" rx="7" ry="5" fill="${INK}" />` +
+      `<path d="M130 155 C126 159 122 159 122 156 M130 155 C134 159 138 159 138 156" fill="none" stroke-width="4" />` +
+      `<path d="M105 152 H90 M105 160 L92 165 M155 152 H170 M155 160 L168 165" fill="none" stroke-width="3" />` +
+      `</g>` +
+      `${eye(104, 134, 9, 12)}${eye(156, 134, 9, 12)}${cheek(84, 154, 11, 6)}${cheek(176, 154, 11, 6)}`,
+  ),
+  sticker(
+    "cr-raccoon-ninja",
+    "닌자 너구리",
+    260,
+    260,
+    `${shadow(130, 230, 75, 14)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<circle cx="130" cy="175" r="50" fill="#94a3b8" />` +
+      `<ellipse cx="130" cy="185" rx="30" ry="24" fill="#cbd5e1" />` +
+      `<path d="M90 158 L130 178 L170 158" stroke="#3b82f6" stroke-width="12" stroke-linecap="round" fill="none" />` +
+      `<circle cx="130" cy="115" r="54" fill="#94a3b8" />` +
+      `<ellipse cx="98" cy="122" rx="20" ry="15" fill="#334155" transform="rotate(-15 98 122)" />` +
+      `<ellipse cx="162" cy="122" rx="20" ry="15" fill="#334155" transform="rotate(15 162 122)" />` +
+      `<ellipse cx="130" cy="132" rx="14" ry="10" fill="#f8fafc" />` +
+      `<polygon points="130,130 134,125 126,125" fill="${INK}" />` +
+      `<path d="M78 95 H182" stroke="#3b82f6" stroke-width="14" stroke-linecap="round" />` +
+      `<rect x="115" y="90" width="30" height="10" rx="2" fill="#cbd5e1" stroke="none" />` +
+      `<circle cx="130" cy="95" r="2" fill="${INK}" stroke="none" />` +
+      `<path d="M85 70 L65 44 L95 56 Z" fill="#475569" />` +
+      `<path d="M175 70 L195 44 L165 56 Z" fill="#475569" />` +
+      `</g>` +
+      `${eye(102, 120, 8, 11)}${eye(158, 120, 8, 11)}${cheek(84, 138, 9, 5, "#ff8b8b")}${cheek(176, 138, 9, 5, "#ff8b8b")}`,
+  ),
+  sticker(
+    "cr-sloth",
+    "늘보 늘보",
+    260,
+    260,
+    `${shadow(130, 230, 75, 13)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<circle cx="130" cy="175" r="50" fill="#d97706" />` +
+      `<ellipse cx="130" cy="185" rx="30" ry="24" fill="#fef3c7" />` +
+      `<circle cx="130" cy="115" r="54" fill="#d97706" />` +
+      `<ellipse cx="130" cy="118" rx="42" ry="34" fill="#fef3c7" />` +
+      `<path d="M82 120 C82 105 105 110 105 125 C105 135 82 135 82 120 Z" fill="#b45309" />` +
+      `<path d="M178 120 C178 105 155 110 155 125 C155 135 178 135 178 120 Z" fill="#b45309" />` +
+      `<ellipse cx="130" cy="126" rx="9" ry="6" fill="#78350f" />` +
+      `<path d="M124 136 Q130 140 136 136" fill="none" stroke-width="4" />` +
+      `</g>` +
+      `${eye(96, 120, 6, 9)}${eye(164, 120, 6, 9)}${cheek(84, 134, 8, 4, "#ff9aa1")}${cheek(176, 134, 8, 4, "#ff9aa1")}`,
+  ),
+  sticker(
+    "cr-baby-griffin",
+    "아기 그리핀",
+    260,
+    280,
+    `${shadow(130, 250, 75, 14)}` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M70 170 C45 150 40 110 65 120 C55 100 80 95 95 115" fill="#facc15" />` +
+      `<path d="M190 170 C215 150 220 110 195 120 C205 100 180 95 165 115" fill="#facc15" />` +
+      `<ellipse cx="130" cy="190" rx="55" ry="46" fill="#eab308" />` +
+      `<path d="M130 236 Q150 250 175 240" fill="none" stroke-width="7" />` +
+      `<circle cx="180" cy="235" r="8" fill="#fbbf24" />` +
+      `<circle cx="130" cy="115" r="54" fill="#fbbf24" />` +
+      `<path d="M110 65 L95 45 L115 55 Z" fill="#fbbf24" />` +
+      `<path d="M150 65 L165 45 L145 55 Z" fill="#fbbf24" />` +
+      `<polygon points="130,140 142,120 118,120" fill="#f59e0b" />` +
+      `<polygon points="130,140 136,120 124,120" fill="#d97706" />` +
+      `</g>` +
+      `${eye(104, 108, 9, 12)}${eye(156, 108, 9, 12)}${cheek(86, 130, 9, 5)}${cheek(174, 130, 9, 5)}`,
+  ),
 ];

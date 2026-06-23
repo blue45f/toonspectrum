@@ -2,6 +2,7 @@ import type { BgScene } from "./studio-bg-scenes";
 
 const W = 720;
 const H = 1080;
+const INK = "#16100c";
 
 type Stop = readonly [offset: string, color: string, opacity?: string];
 type Point = readonly [x: number, y: number];
@@ -999,6 +1000,228 @@ const sHorrorCrimsonForest = (() => {
   );
 })();
 
+const sFantasyTemple = (() => {
+  const defs =
+    vGrad("hft-sky", [
+      ["0", "#0c051a"],
+      ["0.5", "#1e0b36"],
+      ["1", "#2e0f4a"],
+    ]) +
+    rGrad("hft-pool", 360, 1080, 500, [
+      ["0", "#22d3ee", "0.9"],
+      ["0.6", "#0891b2", "0.4"],
+      ["1", "#0f172a", "0"],
+    ]) +
+    rGrad("hft-glow", 360, 400, 300, [
+      ["0", "#a78bfa", "0.65"],
+      ["0.5", "#818cf8", "0.25"],
+      ["1", "#a78bfa", "0"],
+    ]);
+
+  const column = (x: number, y: number, w: number, h: number) => {
+    return `<g>` +
+      `<rect x="${x - w * 0.15}" y="${y + h - 25}" width="${w * 1.3}" height="25" fill="#f8fafc" rx="4" />` +
+      `<rect x="${x}" y="${y}" width="${w}" height="${h - 25}" fill="#e2e8f0" />` +
+      `<line x1="${x + w * 0.25}" y1="${y}" x2="${x + w * 0.25}" y2="${y + h - 25}" stroke="#cbd5e1" stroke-width="4"/>` +
+      `<line x1="${x + w * 0.5}" y1="${y}" x2="${x + w * 0.5}" y2="${y + h - 25}" stroke="#94a3b8" stroke-width="5"/>` +
+      `<line x1="${x + w * 0.75}" y1="${y}" x2="${x + w * 0.75}" y2="${y + h - 25}" stroke="#cbd5e1" stroke-width="4"/>` +
+      `<rect x="${x - w * 0.1}" y="${y}" width="${w * 1.2}" height="35" fill="#f1f5f9" rx="6" />` +
+      `<rect x="${x - w * 0.05}" y="${y + 15}" width="${w * 1.1}" height="10" fill="#cbd5e1" />` +
+      `</g>`;
+  };
+
+  const body =
+    bg("url(#hft-sky)") +
+    stars(80, 777, 0, 0, 720, 700, 0.9, 2.5, "#fff") +
+    `<circle cx="360" cy="400" r="180" fill="url(#hft-glow)"/>` +
+    `<circle cx="360" cy="380" r="80" fill="#faf5ff" opacity="0.12" />` +
+    `<circle cx="360" cy="380" r="75" fill="#fff" opacity="0.8" />` +
+    `<circle cx="360" cy="380" r="120" fill="none" stroke="#c084fc" stroke-width="12" stroke-dasharray="10 30" opacity="0.7" />` +
+    `<circle cx="360" cy="380" r="105" fill="none" stroke="#38bdf8" stroke-width="6" stroke-dasharray="5 15" opacity="0.8" />` +
+    ridge([
+      [0, 650], [120, 580], [280, 680], [420, 560], [560, 640], [720, 590]
+    ], 700, "#1e113a") +
+    `<rect x="140" y="660" width="440" height="20" fill="#0f172a" />` +
+    `<rect x="110" y="680" width="500" height="30" fill="#334155" />` +
+    `<rect x="60" y="710" width="600" height="40" fill="#475569" />` +
+    column(80, 480, 50, 230) +
+    column(180, 450, 45, 260) +
+    column(590, 480, 50, 230) +
+    column(495, 450, 45, 260) +
+    `<path d="M 0 750 H 720 L 640 1080 H 80 Z" fill="#1e293b" />` +
+    `<path d="M 180 750 L 80 1080 H 640 L 540 750 Z" fill="url(#hft-pool)" />` +
+    `<circle cx="280" cy="620" r="6" fill="#67e8f9" opacity="0.8" />` +
+    `<circle cx="440" cy="640" r="8" fill="#c084fc" opacity="0.75" />` +
+    `<circle cx="320" cy="520" r="5" fill="#fef08a" opacity="0.6" />` +
+    `<circle cx="410" cy="500" r="4" fill="#a78bfa" opacity="0.7" />` +
+    `<circle cx="240" cy="570" r="6" fill="#38bdf8" opacity="0.6" />` +
+    `<circle cx="480" cy="580" r="5" fill="#22d3ee" opacity="0.8" />`;
+
+  return scene(defs, body);
+})();
+
+const sCyberLab = (() => {
+  const defs =
+    vGrad("hcl-sky", [
+      ["0", "#080711"],
+      ["0.5", "#0f1122"],
+      ["1", "#151833"],
+    ]) +
+    rGrad("hcl-cyan-glow", 150, 450, 350, [
+      ["0", "#06b6d4", "0.35"],
+      ["0.7", "#06b6d4", "0.08"],
+      ["1", "#06b6d4", "0"],
+    ]) +
+    rGrad("hcl-magenta-glow", 570, 400, 300, [
+      ["0", "#d946ef", "0.32"],
+      ["0.65", "#d946ef", "0.06"],
+      ["1", "#d946ef", "0"],
+    ]) +
+    vGrad("hcl-floor", [
+      ["0", "#181a30"],
+      ["0.5", "#0a0c16"],
+      ["1", "#04050a"],
+    ]);
+
+  const body =
+    bg("url(#hcl-sky)") +
+    bg("url(#hcl-cyan-glow)") +
+    bg("url(#hcl-magenta-glow)") +
+    `<rect x="20" y="100" width="100" height="500" fill="#1e1e2f" stroke="#06b6d4" stroke-width="4" />` +
+    `<rect x="35" y="120" width="70" height="15" fill="#0891b2" opacity="0.8" />` +
+    `<rect x="35" y="145" width="70" height="15" fill="#0f172a" />` +
+    `<circle cx="45" cy="152" r="3" fill="#22c55e" stroke="none" />` +
+    `<circle cx="55" cy="152" r="3" fill="#ef4444" stroke="none" />` +
+    `<rect x="35" y="170" width="70" height="15" fill="#0891b2" opacity="0.8" />` +
+    `<rect x="35" y="195" width="70" height="15" fill="#0891b2" opacity="0.8" />` +
+    `<rect x="35" y="220" width="70" height="15" fill="#0f172a" />` +
+    `<circle cx="45" cy="227" r="3" fill="#22c55e" stroke="none" />` +
+    `<rect x="35" y="245" width="70" height="15" fill="#0891b2" opacity="0.8" />` +
+    `<rect x="35" y="270" width="70" height="15" fill="#0f172a" />` +
+    `<circle cx="55" cy="277" r="3" fill="#f59e0b" stroke="none" />` +
+    `<rect x="35" y="295" width="70" height="80" fill="#0a0f1d" stroke="#3b82f6" stroke-width="2"/>` +
+    `<path d="M 45 315 L 95 355" stroke="#38bdf8" stroke-width="3" fill="none" />` +
+    `<rect x="600" y="80" width="100" height="520" fill="#1e1e2f" stroke="#d946ef" stroke-width="4" />` +
+    `<rect x="615" y="110" width="70" height="40" fill="#4a044e" />` +
+    `<path d="M625 130 H 675" stroke="#e879f9" stroke-width="5" />` +
+    `<rect x="615" y="170" width="70" height="40" fill="#0f172a" />` +
+    `<circle cx="630" cy="190" r="5" fill="#22c55e" />` +
+    `<circle cx="645" cy="190" r="5" fill="#22c55e" />` +
+    `<circle cx="660" cy="190" r="5" fill="#ef4444" />` +
+    `<rect x="615" y="230" width="70" height="40" fill="#4a044e" />` +
+    `<path d="M625 250 H 675" stroke="#e879f9" stroke-width="5" />` +
+    `<g opacity="0.85">` +
+      `<rect x="180" y="120" width="360" height="280" rx="16" fill="#0f172a" stroke="#00f5ff" stroke-width="5" opacity="0.75"/>` +
+      `<rect x="195" y="135" width="330" height="250" rx="10" fill="#050811" />` +
+      `<line x1="195" y1="260" x2="525" y2="260" stroke="#00f5ff" stroke-width="1" opacity="0.2"/>` +
+      `<line x1="360" y1="135" x2="360" y2="385" stroke="#00f5ff" stroke-width="1" opacity="0.2"/>` +
+      `<circle cx="360" cy="260" r="80" fill="none" stroke="#ff2ea6" stroke-width="2.5" stroke-dasharray="6 8"/>` +
+      `<circle cx="360" cy="260" r="40" fill="none" stroke="#00f5ff" stroke-width="2"/>` +
+      `<path d="M 360 260 L 420 200" stroke="#00f5ff" stroke-width="3" stroke-linecap="round" />` +
+      `<polygon points="415,200 422,198 420,205" fill="#00f5ff" />` +
+      `<rect x="210" y="150" width="40" height="15" fill="#00f5ff" />` +
+      `<rect x="210" y="170" width="60" height="15" fill="#00f5ff" opacity="0.7" />` +
+      `<rect x="210" y="190" width="25" height="15" fill="#00f5ff" opacity="0.4" />` +
+      `<rect x="450" y="150" width="50" height="12" fill="#ff2ea6" />` +
+      `<rect x="450" y="167" width="35" height="12" fill="#ff2ea6" opacity="0.6" />` +
+    `</g>` +
+    `<path d="M0 600 H720 L660 760 H60 Z" fill="#1e1e2f" stroke="${INK}" stroke-width="8"/>` +
+    `<rect x="140" y="630" width="440" height="80" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="4"/>` +
+    `<circle cx="170" cy="670" r="10" fill="#ef4444" />` +
+    `<circle cx="200" cy="670" r="10" fill="#22c55e" />` +
+    `<circle cx="230" cy="670" r="10" fill="#3b82f6" />` +
+    `<rect x="270" y="650" width="100" height="40" rx="4" fill="#334155" />` +
+    `<path d="M280 670 H360" stroke="#10b981" stroke-width="6" />` +
+    `<rect x="390" y="650" width="160" height="40" rx="4" fill="#334155" />` +
+    `<rect x="410" y="660" width="30" height="20" fill="#a78bfa" />` +
+    `<rect x="450" y="660" width="30" height="20" fill="#fbcfe8" />` +
+    `<rect x="490" y="660" width="40" height="20" fill="#00f5ff" />` +
+    `<path d="M 0 760 H 720 L 720 1080 H 0 Z" fill="url(#hcl-floor)" />` +
+    `<path d="M 360 760 L 360 1080" stroke="#3b82f6" stroke-width="3" opacity="0.3" />` +
+    `<path d="M 220 760 L 60 1080" stroke="#3b82f6" stroke-width="2" opacity="0.25" />` +
+    `<path d="M 500 760 L 660 1080" stroke="#3b82f6" stroke-width="2" opacity="0.25" />` +
+    `<line x1="0" y1="840" x2="720" y2="840" stroke="#3b82f6" stroke-width="1.5" opacity="0.2" />` +
+    `<line x1="0" y1="940" x2="720" y2="940" stroke="#3b82f6" stroke-width="1.5" opacity="0.2" />` +
+    `<line x1="0" y1="1040" x2="720" y2="1040" stroke="#3b82f6" stroke-width="2" opacity="0.3" />`;
+
+  return scene(defs, body);
+})();
+
+const sVintageStudy = (() => {
+  const defs =
+    vGrad("hvs-sky", [
+      ["0", "#0c0a21"],
+      ["0.6", "#14112e"],
+      ["1", "#1e153f"],
+    ]) +
+    rGrad("hvs-room-glow", 360, 800, 600, [
+      ["0", "#fef08a", "0.45"],
+      ["0.4", "#fcd34d", "0.22"],
+      ["1", "#451a03", "0"],
+    ]) +
+    vGrad("hvs-wood", [
+      ["0", "#451a03"],
+      ["0.5", "#301002"],
+      ["1", "#1c0901"],
+    ]);
+
+  const books = (x: number, y: number, w: number, h: number) => {
+    let out = "";
+    const colors = ["#b91c1c", "#1d4ed8", "#15803d", "#d97706", "#7c3aed", "#475569"];
+    let curX = x;
+    const random = rng(x + y);
+    while (curX < x + w - 10) {
+      const bw = 8 + random() * 12;
+      const bh = h * 0.7 + random() * (h * 0.25);
+      const color = colors[Math.floor(random() * colors.length)];
+      out += `<rect x="${curX.toFixed(1)}" y="${(y + h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${color}" stroke="${INK}" stroke-width="2.5" />`;
+      if (bh > 45) {
+        out += `<line x1="${(curX + bw / 2).toFixed(1)}" y1="${(y + h - bh + 10).toFixed(1)}" x2="${(curX + bw / 2).toFixed(1)}" y2="${(y + h - 10).toFixed(1)}" stroke="#fef08a" stroke-dasharray="4,8" stroke-width="2" opacity="0.7" />`;
+      }
+      curX += bw;
+    }
+    return out;
+  };
+
+  const shelf = (y: number) => {
+    return `<rect x="40" y="${y}" width="240" height="15" fill="#3f1a04" stroke="${INK}" stroke-width="4" />` +
+      books(50, y - 80, 220, 80) +
+      `<rect x="440" y="${y}" width="240" height="15" fill="#3f1a04" stroke="${INK}" stroke-width="4" />` +
+      books(450, y - 80, 220, 80);
+  };
+
+  const body =
+    bg("#1c1917") +
+    bg("url(#hvs-room-glow)") +
+    `<path d="M 280 450 C 280 280, 440 280, 440 450 L 440 700 H 280 Z" fill="url(#hvs-sky)" stroke="${INK}" stroke-width="8" />` +
+    stars(30, 999, 290, 310, 430, 680, 0.7, 2.0, "#fff") +
+    `<path d="M 400 350 A 25 25 0 1 0 400 390 A 20 20 0 1 1 400 350 Z" fill="#fef08a" opacity="0.85" />` +
+    `<path d="M 360 300 V 700 M 280 480 H 440 M 280 580 H 440" stroke="${INK}" stroke-width="6" fill="none" opacity="0.8" />` +
+    `<path d="M 280 300 C 260 400, 260 500, 240 680 L 280 680 Z" fill="#991b1b" stroke="${INK}" stroke-width="4" />` +
+    `<path d="M 440 300 C 460 400, 460 500, 480 680 L 440 680 Z" fill="#991b1b" stroke="${INK}" stroke-width="4" />` +
+    `<rect x="30" y="80" width="260" height="740" fill="#5c2606" stroke="${INK}" stroke-width="7" />` +
+    `<rect x="40" y="90" width="240" height="720" fill="#2d1502" />` +
+    `<rect x="430" y="80" width="260" height="740" fill="#5c2606" stroke="${INK}" stroke-width="7" />` +
+    `<rect x="440" y="90" width="240" height="720" fill="#2d1502" />` +
+    shelf(180) +
+    shelf(290) +
+    shelf(400) +
+    shelf(510) +
+    shelf(620) +
+    shelf(730) +
+    `<ellipse cx="360" cy="850" rx="140" ry="40" fill="#7f1d1d" stroke="${INK}" stroke-width="5" />` +
+    `<ellipse cx="360" cy="850" rx="110" ry="30" fill="#fb7185" stroke-width="3" fill-opacity="0.3" />` +
+    `<path d="M 0 820 L 0 1080 H 720 L 720 820 Z" fill="url(#hvs-wood)" opacity="0.9" stroke="${INK}" stroke-width="7" />` +
+    `<polygon points="120,950 600,950 640,1080 80,1080" fill="#78350f" stroke="${INK}" stroke-width="8" />` +
+    `<rect x="220" y="960" width="80" height="60" rx="3" fill="#fafaf9" stroke="${INK}" stroke-width="3" transform="rotate(-8 260 990)" />` +
+    `<rect x="340" y="962" width="100" height="70" rx="3" fill="#fafaf9" stroke="${INK}" stroke-width="3" transform="rotate(5 390 997)" />` +
+    `<ellipse cx="500" cy="980" rx="15" ry="6" fill="#fbbf24" stroke="${INK}" stroke-width="3" />` +
+    `<rect x="496" y="955" width="8" height="25" fill="#fef08a" stroke="${INK}" stroke-width="3" />` +
+    `<path d="M 500 955 C 500 955, 490 940, 500 930 C 510 940, 500 955, 500 955 Z" fill="#f97316" stroke="${INK}" stroke-width="2" />`;
+
+  return scene(defs, body);
+})();
+
 export const BG_SCENES_EXTRA: BgScene[] = [
   { id: "x-murim-bamboo-canyon", label: "협곡 대나무길", genre: "무협", svg: sMurimBambooCanyon },
   { id: "x-sageuk-tiled-night", label: "기와 야경", genre: "사극", svg: sSageukTiledNight },
@@ -1015,4 +1238,7 @@ export const BG_SCENES_EXTRA: BgScene[] = [
   { id: "x-cherry-blossoms", label: "고요한 벚꽃길", genre: "로맨스", svg: sCherryBlossoms },
   { id: "x-murim-ink-cliff", label: "무협 검은절벽", genre: "무협", svg: sMurimInkCliff },
   { id: "x-horror-crimson-forest", label: "공포 핏빛숲", genre: "공포", svg: sHorrorCrimsonForest },
+  { id: "x-fantasy-temple", label: "신비로운 신전", genre: "판타지", svg: sFantasyTemple },
+  { id: "x-cyber-lab", label: "사이버 연구소", genre: "사이버펑크", svg: sCyberLab },
+  { id: "x-vintage-study", label: "고풍스러운 서재", genre: "일상", svg: sVintageStudy },
 ];

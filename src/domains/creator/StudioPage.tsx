@@ -18,6 +18,9 @@ import {
   AlignEndHorizontal,
   ArrowDownToLine,
   ArrowUpToLine,
+  ArrowRight,
+  Triangle,
+  Hexagon,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -69,7 +72,7 @@ import {
   X,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -338,7 +341,7 @@ function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: str
 
 type Tool = "select" | "draw";
 type DrawMode = "pen" | "eraser" | "shape";
-type DrawShapeKind = "line" | "rect" | "ellipse" | "star";
+type DrawShapeKind = "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
 
 export interface ImageEl {
   id: string;
@@ -543,7 +546,7 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -689,6 +692,7 @@ function containingPanel(el: El, all: El[]): FrameEl | null {
 
 // 레이어 목록용 라벨(아이콘 + 이름).
 function elementLabel(el: El): string {
+  if (el.name) return el.name;
   switch (el.type) {
     case "text":
       return `T ${el.text.slice(0, 14).trim() || "텍스트"}`;
@@ -1005,6 +1009,61 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               numPoints={5}
               innerRadius={Math.max(0.1, Math.min(box.width, box.height) / 4)}
               outerRadius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
+              fill={el.fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "arrow") {
+          return (
+            <Arrow
+              key={index}
+              points={points}
+              pointerLength={Math.max(8, strokeWidth * 2)}
+              pointerWidth={Math.max(8, strokeWidth * 2)}
+              fill={stroke}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "triangle") {
+          const box = drawBounds(points);
+          return (
+            <RegularPolygon
+              key={index}
+              x={box.x + box.width / 2}
+              y={box.y + box.height / 2}
+              sides={3}
+              radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
+              fill={el.fill}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              opacity={opacity}
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+          );
+        }
+
+        if (kind === "polygon") {
+          const box = drawBounds(points);
+          return (
+            <RegularPolygon
+              key={index}
+              x={box.x + box.width / 2}
+              y={box.y + box.height / 2}
+              sides={6}
+              radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
               stroke={stroke}
               strokeWidth={strokeWidth}
@@ -3153,6 +3212,20 @@ export function StudioPage() {
     const nextElements = seedElId ? (setItemGroup(elements, seedElId, g.id) as El[]) : elements;
     updateActivePage({ groups: [...groups, g], elements: nextElements });
   }
+  function groupSelectedElements() {
+    if (marqueeIds.length < 2) return;
+    const groupId = uid();
+    const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
+    const nextElements = elements.map((el) => {
+      if (marqueeIds.includes(el.id)) {
+        return { ...el, groupId } as El;
+      }
+      return el;
+    });
+    updateActivePage({ groups: [...groups, g], elements: nextElements });
+    setSelectedId(null);
+    setMarqueeIds([]);
+  }
   function renameLayerGroup(groupId: string, name: string) {
     updateActivePage({ groups: groups.map((g) => (g.id === groupId ? { ...g, name } : g)) });
   }
@@ -3188,11 +3261,17 @@ export function StudioPage() {
             setTool("select");
             setSelectedId(el.id);
           }}
+          onDoubleClick={() => {
+            const newName = globalThis.prompt("레이어 이름 변경", el.name || elementLabel(el));
+            if (newName !== null) {
+              patchEl(el.id, { name: newName.trim() } as Partial<El>);
+            }
+          }}
           className={cn(
-            "min-w-0 flex-1 truncate text-left text-xs",
+            "min-w-0 flex-1 truncate text-left text-xs select-none",
             el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
           )}
-          title={el.locked ? `${elementLabel(el)} (잠김 — 자물쇠로 해제)` : elementLabel(el)}
+          title={el.locked ? `${elementLabel(el)} (잠김) · 더블클릭하여 이름 변경` : `${elementLabel(el)} · 더블클릭하여 이름 변경`}
         >
           {el.clipBelow ? "⤵ " : ""}
           {elementLabel(el)}
@@ -3545,9 +3624,103 @@ export function StudioPage() {
     commitCoalesced(next, `nudge:${id}`); // 연속 방향키는 한 번의 실행취소로 합침
   }
   // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
-  // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하.
-  function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom") {
+  // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하 / 다중 분배.
+  function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") {
+    if (marqueeIds.length > 1) {
+      const selectedEls = elements.filter((el) => marqueeIds.includes(el.id) && !el.locked);
+      if (selectedEls.length === 0) return;
+
+      const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
+
+      if (mode === "distributeH" || mode === "distributeV") {
+        if (selectedEls.length < 3) return; // 3개 미만은 분배 NOP
+        if (mode === "distributeH") {
+          const sorted = [...boundsList].sort((a, b) => (a.b.x + a.b.w / 2) - (b.b.x + b.b.w / 2));
+          const leftEl = sorted[0]!;
+          const rightEl = sorted[sorted.length - 1]!;
+          const startX = leftEl.b.x + leftEl.b.w / 2;
+          const endX = rightEl.b.x + rightEl.b.w / 2;
+          const step = (endX - startX) / (sorted.length - 1);
+
+          const next = elements.map((el) => {
+            if (!marqueeIds.includes(el.id) || el.locked) return el;
+            const sortedIdx = sorted.findIndex((item) => item.el.id === el.id);
+            if (sortedIdx === 0 || sortedIdx === sorted.length - 1) return el; // 양 끝은 고정
+            const item = sorted[sortedIdx]!;
+            const targetCenterX = startX + sortedIdx * step;
+            const currentCenterX = item.b.x + item.b.w / 2;
+            const dx = targetCenterX - currentCenterX;
+
+            return el.type === "draw"
+              ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : 0)) } as El)
+              : ({ ...el, x: (el as { x: number }).x + dx } as El);
+          });
+          commit(next);
+        } else {
+          const sorted = [...boundsList].sort((a, b) => (a.b.y + a.b.h / 2) - (b.b.y + b.b.h / 2));
+          const topEl = sorted[0]!;
+          const bottomEl = sorted[sorted.length - 1]!;
+          const startY = topEl.b.y + topEl.b.h / 2;
+          const endY = bottomEl.b.y + bottomEl.b.h / 2;
+          const step = (endY - startY) / (sorted.length - 1);
+
+          const next = elements.map((el) => {
+            if (!marqueeIds.includes(el.id) || el.locked) return el;
+            const sortedIdx = sorted.findIndex((item) => item.el.id === el.id);
+            if (sortedIdx === 0 || sortedIdx === sorted.length - 1) return el; // 양 끝은 고정
+            const item = sorted[sortedIdx]!;
+            const targetCenterY = startY + sortedIdx * step;
+            const currentCenterY = item.b.y + item.b.h / 2;
+            const dy = targetCenterY - currentCenterY;
+
+            return el.type === "draw"
+              ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? 0 : dy)) } as El)
+              : ({ ...el, y: (el as { y: number }).y + dy } as El);
+          });
+          commit(next);
+        }
+        return;
+      }
+
+      // Normal alignment (relative to selection bounding box)
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      boundsList.forEach(({ b }) => {
+        minX = Math.min(minX, b.x);
+        maxX = Math.max(maxX, b.x + b.w);
+        minY = Math.min(minY, b.y);
+        maxY = Math.max(maxY, b.y + b.h);
+      });
+
+      const totalW = maxX - minX;
+      const totalH = maxY - minY;
+
+      const next = elements.map((el) => {
+        if (!marqueeIds.includes(el.id) || el.locked) return el;
+        const b = elBounds(el);
+        let dx = 0;
+        let dy = 0;
+        if (mode === "left") dx = minX - b.x;
+        else if (mode === "right") dx = maxX - b.w - b.x;
+        else if (mode === "hcenter") dx = minX + (totalW - b.w) / 2 - b.x;
+        else if (mode === "top") dy = minY - b.y;
+        else if (mode === "bottom") dy = maxY - b.h - b.y;
+        else if (mode === "vcenter") dy = minY + (totalH - b.h) / 2 - b.y;
+
+        if (dx === 0 && dy === 0) return el;
+        return el.type === "draw"
+          ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
+          : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
+      });
+      commit(next);
+      return;
+    }
+
     if (!selected || selected.locked) return;
+    if (mode === "distributeH" || mode === "distributeV") return;
     const b = elBounds(selected);
     const frame = containingPanel(selected, elements);
     const ox = frame ? frame.x : 0;
@@ -5780,6 +5953,9 @@ export function StudioPage() {
                   { kind: "rect" as const, label: "사각형", icon: Square },
                   { kind: "ellipse" as const, label: "타원", icon: Circle },
                   { kind: "star" as const, label: "별", icon: StarIcon },
+                  { kind: "arrow" as const, label: "화살표", icon: ArrowRight },
+                  { kind: "triangle" as const, label: "삼각형", icon: Triangle },
+                  { kind: "polygon" as const, label: "다각형", icon: Hexagon },
                 ]).map((item) => {
                   const Icon = item.icon;
                   const active = tool === "draw" && drawMode === "shape" && drawShape === item.kind;
@@ -6097,25 +6273,110 @@ export function StudioPage() {
             <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs">
               <span className="font-semibold text-accent">{marqueeIds.length}개 선택됨</span>
               <span className="text-fg-3">· 방향키로 이동 · 모서리로 크기·회전</span>
-              <div className="ml-auto flex items-center gap-1.5">
+              <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+                {marqueeIds.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={groupSelectedElements}
+                    className="flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
+                    title="그룹화"
+                  >
+                    <FolderPlus size={13} />
+                    <span>그룹화</span>
+                  </button>
+                )}
+                <div className="h-4 w-px bg-line/60 mx-1" />
+                <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("left")}
+                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
+                    title="왼쪽 정렬"
+                  >
+                    <AlignLeft size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("hcenter")}
+                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
+                    title="가로 가운데 정렬"
+                  >
+                    <AlignCenter size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("right")}
+                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
+                    title="오른쪽 정렬"
+                  >
+                    <AlignRight size={13} />
+                  </button>
+                </div>
+                <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("top")}
+                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                    title="위쪽 정렬"
+                  >
+                    상
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("vcenter")}
+                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                    title="세로 가운데 정렬"
+                  >
+                    중
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => alignSelected("bottom")}
+                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                    title="아래쪽 정렬"
+                  >
+                    하
+                  </button>
+                </div>
+                {marqueeIds.length >= 3 && (
+                  <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => alignSelected("distributeH")}
+                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.6rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                      title="가로 간격 동일하게 정렬"
+                    >
+                      가로 분배
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => alignSelected("distributeV")}
+                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.6rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                      title="세로 간격 동일하게 정렬"
+                    >
+                      세로 분배
+                    </button>
+                  </div>
+                )}
+                <div className="h-4 w-px bg-line/60 mx-1" />
                 <button
                   type="button"
                   onClick={duplicateSelected}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
                 >
                   복제
                 </button>
                 <button
                   type="button"
                   onClick={removeSelected}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised"
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised cursor-pointer"
                 >
                   삭제
                 </button>
                 <button
                   type="button"
                   onClick={() => setMarqueeIds([])}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
                 >
                   해제
                 </button>
@@ -6593,6 +6854,91 @@ export function StudioPage() {
                   }
                 }
 
+                let lx = el.width * tXRatio;
+                let ly = el.height + bTailLen;
+
+                if (tailDirection === "bottom") {
+                  const ratio = tailDir === "right" ? 1 - tXRatio : tXRatio;
+                  lx = el.width * ratio;
+                  ly = el.height + bTailLen;
+                } else if (tailDirection === "top") {
+                  const ratio = tailDir === "right" ? 1 - tXRatio : tXRatio;
+                  lx = el.width * ratio;
+                  ly = -bTailLen;
+                } else if (tailDirection === "left") {
+                  lx = -bTailLen;
+                  ly = el.height * tXRatio;
+                } else if (tailDirection === "right") {
+                  lx = el.width + bTailLen;
+                  ly = el.height * tXRatio;
+                }
+
+                const tailHandle = selectedId === el.id && showTail && !isExporting && (
+                  <KCircle
+                    x={lx}
+                    y={ly}
+                    radius={6 / effScale}
+                    fill="#ffcc00"
+                    stroke="#1f1a16"
+                    strokeWidth={1.5 / effScale}
+                    draggable
+                    onDragMove={(e) => {
+                      e.cancelBubble = true;
+                      const node = e.target;
+                      const dx = node.x();
+                      const dy = node.y();
+
+                      const dTop = Math.abs(dy);
+                      const dBot = Math.abs(dy - el.height);
+                      const dLeft = Math.abs(dx);
+                      const dRight = Math.abs(dx - el.width);
+                      const minDist = Math.min(dTop, dBot, dLeft, dRight);
+
+                      let newDir: "bottom" | "top" | "left" | "right" = "bottom";
+                      let ratio = tXRatio;
+                      let len = tHeight;
+
+                      if (minDist === dBot) {
+                        newDir = "bottom";
+                        const rawRatio = dx / el.width;
+                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
+                        len = Math.max(8, Math.min(150, dy - el.height));
+                      } else if (minDist === dTop) {
+                        newDir = "top";
+                        const rawRatio = dx / el.width;
+                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
+                        len = Math.max(8, Math.min(150, -dy));
+                      } else if (minDist === dLeft) {
+                        newDir = "left";
+                        const rawRatio = dy / el.height;
+                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
+                        len = Math.max(8, Math.min(150, -dx));
+                      } else if (minDist === dRight) {
+                        newDir = "right";
+                        const rawRatio = dy / el.height;
+                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
+                        len = Math.max(8, Math.min(150, dx - el.width));
+                      }
+
+                      if (tailDir === "right" && (newDir === "bottom" || newDir === "top")) {
+                        ratio = 1 - ratio;
+                      }
+
+                      patchEl(el.id, {
+                        tailDirection: newDir,
+                        tailXRatio: Math.round(ratio * 100) / 100,
+                        tailHeight: Math.round(len),
+                      });
+                    }}
+                    onDragEnd={(e) => {
+                      e.cancelBubble = true;
+                      e.target.x(lx);
+                      e.target.y(ly);
+                      e.target.getLayer()?.batchDraw();
+                    }}
+                  />
+                );
+
                 return wrapClip(
                   <Group
                     studioElementId={el.id}
@@ -6777,6 +7123,7 @@ export function StudioPage() {
                       lineHeight={bubbleLineHeight}
                       letterSpacing={bubbleLetterSpacing}
                     />
+                    {tailHandle}
                   </Group>
                 );
                 };
@@ -9024,6 +9371,9 @@ export function StudioPage() {
                       { kind: "rect" as const, label: "사각형" },
                       { kind: "ellipse" as const, label: "타원" },
                       { kind: "star" as const, label: "별" },
+                      { kind: "arrow" as const, label: "화살표" },
+                      { kind: "triangle" as const, label: "삼각형" },
+                      { kind: "polygon" as const, label: "다각형" },
                     ]).map((item) => {
                       const active = drawShape === item.kind;
                       return (
