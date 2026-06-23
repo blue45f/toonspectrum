@@ -90,6 +90,19 @@ export const VRM_PROPS: readonly PropDef[] = [
   { id: "shoulderbag", label: "숄더백", category: "body", defaultBone: "chest", defaultPosition: [0.08, -0.08, 0.04], defaultRotationDeg: [0, 0, 10], defaultScale: 1, defaultColor: "#5a4632", hint: "데일리 컷. 한쪽 어깨로 사선 배치." },
   { id: "cape", label: "망토", category: "body", defaultBone: "chest", defaultPosition: [0, 0, -0.06], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#3a2b55", hint: "히어로·판타지 컷. 색으로 진영을 표현." },
   { id: "wings", label: "날개", category: "body", defaultBone: "chest", defaultPosition: [0, 0.02, -0.08], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f2f2f5", hint: "천사·요정 컷. 스케일을 키워 존재감을." },
+  // 추가 12종 (손/머리/몸 다양)
+  { id: "umbrella", label: "우산", category: "hand", defaultBone: "rightHand", defaultPosition: [0.03, 0.05, 0.02], defaultRotationDeg: [0, 0, 10], defaultScale: 1.1, defaultColor: "#1e293b", hint: "비·그늘 컷. 색으로 천 변경." },
+  { id: "flute", label: "플루트", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0, 0.01], defaultRotationDeg: [80, 10, 0], defaultScale: 0.9, defaultColor: "#854d0e", hint: "음악·판타지." },
+  { id: "wand", label: "마법봉", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0], defaultRotationDeg: [0, 0, -30], defaultScale: 1, defaultColor: "#6b7280", hint: "마법·효과 컷." },
+  { id: "headphones", label: "헤드폰", category: "head", defaultBone: "head", defaultPosition: [0, 0.06, 0.04], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "음악·현대 컷." },
+  { id: "headband", label: "헤드밴드", category: "head", defaultBone: "head", defaultPosition: [0, 0.07, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e11d48", hint: "스포츠·운동." },
+  { id: "flowerCrown", label: "꽃관", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f472b6", hint: "자연·요정." },
+  { id: "scarf", label: "목도리", category: "body", defaultBone: "neck", defaultPosition: [0, -0.02, 0.05], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#dc2626", hint: "겨울·패션." },
+  { id: "holster", label: "총집", category: "body", defaultBone: "hips", defaultPosition: [0.12, -0.1, -0.05], defaultRotationDeg: [0, 20, 0], defaultScale: 1, defaultColor: "#451a03", hint: "액션·서부." },
+  { id: "belt", label: "벨트", category: "body", defaultBone: "hips", defaultPosition: [0, -0.08, 0.08], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#334155", hint: "허리 장식." },
+  { id: "backwing", label: "작은 날개", category: "body", defaultBone: "chest", defaultPosition: [0, 0.05, -0.12], defaultRotationDeg: [10, 0, 0], defaultScale: 0.8, defaultColor: "#a5b4fc", hint: "요정·소악마." },
+  { id: "gloves", label: "장갑", category: "body", defaultBone: "leftHand", defaultPosition: [0.01, -0.02, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "액션·정장." },
+  { id: "choker", label: "초커", category: "head", defaultBone: "neck", defaultPosition: [0, -0.02, 0.06], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#111827", hint: "패션 장식." },
 ] as const;
 
 export function propDefById(id: string): PropDef | undefined {

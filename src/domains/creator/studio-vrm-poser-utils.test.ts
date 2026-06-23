@@ -1,0 +1,164 @@
+import * as THREE from "three";
+import { describe, expect, it } from "vitest";
+
+import {
+  stripFingerBones,
+  applyPoserVisualState,
+  applyFullState,
+  planFullStateRestore,
+  type PoseBoneMap,
+  type FingerRotationMap,
+  type BodyScale,
+  type FullVrmState,
+} from "./studio-vrm-poser-utils";
+
+import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
+
+
+type BoneNodes = Partial<Record<VRMHumanBoneName, THREE.Object3D>>;
+
+function addBone(bones: BoneNodes, name: VRMHumanBoneName, parent: THREE.Object3D, position: THREE.Vector3Tuple) {
+  const bone = new THREE.Object3D();
+  bone.name = name;
+  bone.position.set(position[0], position[1], position[2]);
+  parent.add(bone);
+  bones[name] = bone;
+  return bone;
+}
+
+function createMinimalVrm() {
+  const scene = new THREE.Group();
+  const bones: BoneNodes = {};
+  const hips = addBone(bones, "hips", scene, [0, 1.02, 0]);
+  const spine = addBone(bones, "spine", hips, [0, 0.22, 0]);
+  const chest = addBone(bones, "chest", spine, [0, 0.26, 0]);
+  const neck = addBone(bones, "neck", chest, [0, 0.28, 0]);
+  addBone(bones, "head", neck, [0, 0.18, 0]);
+
+  const leftShoulder = addBone(bones, "leftShoulder", chest, [0.06, 0.13, 0]);
+  const leftUpperArm = addBone(bones, "leftUpperArm", leftShoulder, [0.12, 0, 0]);
+  const leftLowerArm = addBone(bones, "leftLowerArm", leftUpperArm, [0.34, -0.62, 0]);
+  const leftHand = addBone(bones, "leftHand", leftLowerArm, [0.14, -0.58, 0]);
+  addBone(bones, "leftIndexProximal", leftHand, [0.06, -0.07, 0]);
+
+  const rightShoulder = addBone(bones, "rightShoulder", chest, [-0.06, 0.13, 0]);
+  const rightUpperArm = addBone(bones, "rightUpperArm", rightShoulder, [-0.12, 0, 0]);
+  const rightLowerArm = addBone(bones, "rightLowerArm", rightUpperArm, [-0.34, -0.62, 0]);
+  const rightHand = addBone(bones, "rightHand", rightLowerArm, [-0.14, -0.58, 0]);
+  addBone(bones, "rightIndexProximal", rightHand, [-0.06, -0.07, 0]);
+
+  const humanoid = {
+    resetNormalizedPose: () => {
+      Object.values(bones).forEach((b) => {
+        b.rotation.set(0, 0, 0);
+        b.quaternion.identity();
+      });
+      scene.position.set(0, 0, 0);
+      scene.updateMatrixWorld(true);
+    },
+    getNormalizedBoneNode: (name: VRMHumanBoneName) => bones[name] ?? null,
+    update: () => scene.updateMatrixWorld(true),
+  };
+
+  const vrm = {
+    scene,
+    humanoid,
+    update: () => scene.updateMatrixWorld(true),
+  } as unknown as VRM;
+
+  return { vrm, bones };
+}
+
+describe("studio-vrm-poser-utils unified pipeline", () => {
+  it("stripFingerBones removes finger entries", () => {
+    const bones: PoseBoneMap = {
+      hips: { rotation: [0, 0, 0] },
+      leftIndexProximal: { rotation: [0, 0, 0.3] },
+    };
+    const stripped = stripFingerBones(bones);
+    expect("hips" in stripped).toBe(true);
+    expect("leftIndexProximal" in stripped).toBe(false);
+  });
+
+  it("applyPoserVisualState applies pose (stripped) then fingerEdits and bodyScale; finger survives different pose", () => {
+    const { vrm } = createMinimalVrm();
+
+    const pose1: PoseBoneMap = { hips: { rotation: [0, 0, 0] } };
+    const finger: FingerRotationMap = { leftIndexProximal: [0, 0, 0.4] };
+    const scale: BodyScale = { height: 1.2, width: 0.9 };
+
+    applyPoserVisualState(vrm, { bones: pose1, fingerEdits: finger, bodyScale: scale });
+
+    const fingerBone = vrm.humanoid!.getNormalizedBoneNode("leftIndexProximal");
+    expect(fingerBone?.rotation.z).toBeCloseTo(0.4);
+
+    expect(vrm.scene.scale.y).toBeCloseTo(1.2, 2);
+
+    // switch to different pose
+    const pose2: PoseBoneMap = { hips: { rotation: [0.1, 0, 0] } };
+    applyPoserVisualState(vrm, { bones: pose2, fingerEdits: finger, bodyScale: scale });
+
+    // finger should still be applied (survives)
+    const fingerBone2 = vrm.humanoid!.getNormalizedBoneNode("leftIndexProximal");
+    expect(fingerBone2?.rotation.z).toBeCloseTo(0.4);
+  });
+
+  it("applyFullState invokes costume/props/physics delegates when present", () => {
+    const { vrm } = createMinimalVrm();
+
+    const calls: string[] = [];
+    const mockApplyers = {
+      applyPose: () => { calls.push("pose"); },
+      applyExpr: () => { calls.push("expr"); },
+      applyCostume: (c: any) => { calls.push("costume:" + (c ? "yes" : "no")); },
+      applyProps: (p: any) => { calls.push("props:" + (p?.items ? "yes" : "no")); },
+      applyPhysics: (p: any) => { calls.push("physics:" + (p ? "yes" : "no")); },
+    };
+
+    const fullState = {
+      version: 2,
+      bones: {},
+      costume: { hidden: ["foo"] },
+      props: { items: [{ uid: "1" }] },
+      physics: { stiffnessScale: 1 },
+    } as any;
+
+    applyFullState(vrm, fullState, mockApplyers);
+
+    expect(calls).toContain("costume:yes");
+    expect(calls).toContain("props:yes");
+    expect(calls).toContain("physics:yes");
+  });
+
+  it("planFullStateRestore returns complete plan with stripped bones for maximal AC2 input", () => {
+    const input: FullVrmState = {
+      version: 2,
+      bones: {
+        hips: { rotation: [0, 0, 0] },
+        leftIndexProximal: { rotation: [0, 0, 0.3] },
+      },
+      yOffset: 0.1,
+      expressionWeights: { happy: 0.8 },
+      bodyScale: { height: 1.2, width: 0.95 },
+      lighting: { intensity: 1.5, colorTemp: 0.7, directionDeg: 45 },
+      env: "floor",
+      fingerOverrides: { leftIndexProximal: [0, 0, 0.3] },
+      costume: { hidden: ["x"] },
+      props: { items: [{ uid: "p1" }] },
+      physics: { stiffnessScale: 1.1 },
+    } as any;
+
+    const plan = planFullStateRestore(input);
+    expect("leftIndexProximal" in plan.strippedBones).toBe(false);
+    expect("hips" in plan.strippedBones).toBe(true);
+    expect(plan.yOffset).toBe(0.1);
+    expect(plan.expressionWeights.happy).toBe(0.8);
+    expect(plan.bodyScale?.height).toBe(1.2);
+    expect(plan.lighting?.intensity).toBe(1.5);
+    expect(plan.env).toBe("floor");
+    expect(plan.fingerOverrides?.leftIndexProximal?.[2]).toBeCloseTo(0.3);
+    expect((plan.costume as any)?.hidden).toContain("x");
+    expect((plan.propsItems as any)?.[0]?.uid).toBe("p1");
+    expect((plan.physics as any)?.stiffnessScale).toBe(1.1);
+  });
+});

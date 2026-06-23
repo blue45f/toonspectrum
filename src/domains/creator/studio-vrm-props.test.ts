@@ -21,7 +21,7 @@ describe("VRM 소품 카탈로그", () => {
   });
 
   it("16종 이상이 등록되어 있다", () => {
-    expect(VRM_PROPS.length).toBeGreaterThanOrEqual(16);
+    expect(VRM_PROPS.length).toBeGreaterThanOrEqual(28);
   });
 
   it("모든 기본 부착 본이 부착 가능 본 집합에 속한다", () => {

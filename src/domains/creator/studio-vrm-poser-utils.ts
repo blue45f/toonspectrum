@@ -1,5 +1,8 @@
 import * as THREE from "three";
 
+import { POSER_FINGER_BONES } from "./studio-pose-presets";
+import { parseVrmProps } from "./studio-vrm-props";
+
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type Vec3 = readonly [number, number, number];
@@ -868,3 +871,286 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
     }
   });
 }
+
+// ── 신규 순수 헬퍼: finger / bodyScale / lighting / full state ─────────────
+
+export type FingerRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
+
+export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return;
+  (Object.keys(fingers) as VRMHumanBoneName[]).forEach((boneName) => {
+    const rot = fingers[boneName];
+    if (rot) applyEulerRotation(humanoid, boneName, rot);
+  });
+  vrm.scene.updateMatrixWorld(true);
+}
+
+export type BodyScale = {
+  height: number; // 0.7 ~ 1.4
+  width: number; // 0.7 ~ 1.3
+};
+
+export function applyBodyScale(vrm: VRM, scale: BodyScale) {
+  const s = Math.max(0.5, Math.min(1.6, scale.height || 1));
+  const w = Math.max(0.5, Math.min(1.6, scale.width || 1));
+  const sc = (vrm.scene as any).scale; // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (sc && typeof sc.set === "function") sc.set(w, s, w);
+  vrm.scene.updateMatrixWorld(true);
+}
+
+export type LightingParams = {
+  intensity: number; // 0.2~3
+  colorTemp: number; // 0=cool blue ~1=warm orange
+  directionDeg: number; // azimuth
+};
+
+export function computeLightingUniforms(params: LightingParams) {
+  const i = Math.max(0.1, Math.min(4, params.intensity ?? 1));
+  const t = Math.max(0, Math.min(1, params.colorTemp ?? 0.5));
+  const dir = (params.directionDeg ?? 45) * (Math.PI / 180);
+  // simple: cool (high blue) to warm (high red/yellow)
+  const r = 1.0 - t * 0.3;
+  const g = 0.95 - t * 0.15;
+  const b = 0.85 + t * 0.1;
+  return {
+    intensity: i,
+    color: [r, g, b] as const,
+    dir: { x: Math.cos(dir), y: -0.6, z: Math.sin(dir) },
+  };
+}
+
+export type EnvVariant = "none" | "floor" | "wall" | "room" | "outdoor";
+
+export type FullVrmState = {
+  version: 2;
+  poseId?: string;
+  bones: PoseBoneMap;
+  yOffset: number;
+  expressionId?: string;
+  expressionWeights?: Record<string, number>;
+  costume?: unknown;
+  props?: unknown;
+  physics?: unknown;
+  bodyScale?: BodyScale;
+  lighting?: LightingParams;
+  env?: EnvVariant;
+  fingerOverrides?: FingerRotationMap;
+};
+
+export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
+  return {
+    version: 2,
+    poseId: state.poseId,
+    bones: state.bones || {},
+    yOffset: state.yOffset ?? 0,
+    expressionId: state.expressionId,
+    expressionWeights: state.expressionWeights,
+    costume: state.costume,
+    props: state.props,
+    physics: state.physics,
+    bodyScale: state.bodyScale,
+    lighting: state.lighting,
+    env: state.env,
+    fingerOverrides: state.fingerOverrides,
+  };
+}
+
+export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
+  applyPose: (bones: PoseBoneMap, y: number) => void;
+  applyExpr: (weights: Record<string, number>) => void;
+  applyCostume?: (c: unknown) => void;
+  applyProps?: (p: unknown) => void;
+  applyPhysics?: (p: unknown) => void;
+}) {
+  if (state.bones) applyers.applyPose(stripFingerBones(state.bones), state.yOffset ?? 0);
+  if (state.expressionWeights) applyers.applyExpr(state.expressionWeights);
+  if (state.bodyScale) applyBodyScale(vrm, state.bodyScale);
+  if (state.fingerOverrides) applyFingerRotations(vrm, state.fingerOverrides);
+  if (state.costume && applyers.applyCostume) applyers.applyCostume(state.costume);
+  if (state.props && applyers.applyProps) applyers.applyProps(state.props);
+  if (state.physics && applyers.applyPhysics) applyers.applyPhysics(state.physics);
+  // lighting/env applied in scene setup (UI side)
+}
+
+export function stripFingerBones(bones: PoseBoneMap): PoseBoneMap {
+  const result: PoseBoneMap = {};
+  (Object.keys(bones) as VRMHumanBoneName[]).forEach((k) => {
+    if (!POSER_FINGER_BONES.includes(k)) {
+      result[k] = bones[k];
+    }
+  });
+  return result;
+}
+
+export function applyPoserVisualState(
+  vrm: VRM,
+  state: { bones: PoseBoneMap; yOffset?: number; fingerEdits?: FingerRotationMap; bodyScale?: BodyScale }
+) {
+  const { bones, yOffset = 0, fingerEdits = {}, bodyScale } = state;
+  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset);
+  if (Object.keys(fingerEdits).length) {
+    applyFingerRotations(vrm, fingerEdits);
+  }
+  if (bodyScale) {
+    applyBodyScale(vrm, bodyScale);
+  }
+}
+
+/**
+ * Pure planner for full state restore (AC2).
+ * Returns a plan object with every React state field + stripped bones.
+ */
+export function planFullStateRestore(state: FullVrmState): {
+  strippedBones: PoseBoneMap;
+  yOffset: number;
+  expressionWeights: Record<string, number>;
+  bodyScale?: BodyScale;
+  lighting?: LightingParams;
+  env?: EnvVariant;
+  fingerOverrides?: FingerRotationMap;
+  costume?: unknown;
+  propsItems?: unknown;
+  physics?: unknown;
+} {
+  return {
+    strippedBones: stripFingerBones(state.bones || {}),
+    yOffset: state.yOffset ?? 0,
+    expressionWeights: state.expressionWeights || {},
+    bodyScale: state.bodyScale,
+    lighting: state.lighting,
+    env: state.env,
+    fingerOverrides: state.fingerOverrides,
+    costume: state.costume,
+    propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
+    physics: state.physics,
+  };
+}
+
+/**
+ * Pure helpers so component handlers can delegate.
+ * Tests import and call these (aliased as handle*) to drive the exact shipped restore logic.
+ */
+export function performLoadFullLocal(
+  name: string,
+  savedFullStates: Record<string, FullVrmState>,
+  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
+  vrm: VRM | null
+) {
+  const s = savedFullStates[name];
+  if (!s) return;
+  commitFullStateRestore(s, vrm);
+}
+
+export function performPasteFullState(
+  s: FullVrmState | null | undefined,
+  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
+  vrm: VRM | null
+) {
+  if (!s || s.version !== 2) return;
+  commitFullStateRestore(s, vrm);
+}
+
+export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmState | null {
+  try {
+    const hashIndex = dataUrl.indexOf("#");
+    if (hashIndex === -1) return null;
+    const hashStr = dataUrl.substring(hashIndex + 1);
+    const poseData = JSON.parse(decodeURIComponent(hashStr));
+
+    return {
+      version: 2,
+      bones: poseData.bones || {},
+      yOffset: typeof poseData.yOffset === "number" ? poseData.yOffset : 0,
+      expressionWeights: poseData.expressionWeights || {},
+      bodyScale: poseData.bodyScale,
+      fingerOverrides: poseData.fingerOverrides,
+      lighting: poseData.lighting,
+      env: poseData.env,
+      costume: poseData.costume,
+      props: poseData.props ?? (poseData.vrmProps ? { items: parseVrmProps(poseData.vrmProps).items } : undefined),
+      physics: poseData.physics,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function performSelectSharedPose(
+  asset: { dataUrl: string },
+  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
+  vrm: VRM | null,
+  sideEffects?: {
+    setActivePoseId?: (id: string) => void;
+    setCustomColors?: (c: Record<string, string>) => void;
+    alertFn?: (msg: string) => void;
+  }
+) {
+  const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);
+  if (!full) {
+    sideEffects?.alertFn?.("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
+    return;
+  }
+  commitFullStateRestore(full, vrm);
+
+  // legacy customColors support (not in FullVrmState)
+  try {
+    const hashIndex = asset.dataUrl.indexOf("#");
+    if (hashIndex !== -1) {
+      const hashStr = asset.dataUrl.substring(hashIndex + 1);
+      const poseData = JSON.parse(decodeURIComponent(hashStr));
+      if (poseData.customColors && sideEffects?.setCustomColors) {
+        sideEffects.setCustomColors(poseData.customColors);
+      }
+      if (sideEffects?.setActivePoseId) {
+        // caller will usually set a better id; here we just signal
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Factory so that the real handlers inside the component and the tests
+ * use the exact same logic objects.
+ * Tests call the returned handle* functions with controlled deps.
+ */
+export function createFullStateLoadHandlers(deps: {
+  savedFullStates: Record<string, FullVrmState>;
+  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void;
+  vrmRef: { current: VRM | null };
+  setActivePoseId?: (id: string) => void;
+  setCustomColors?: (c: Record<string, string>) => void;
+  alertFn?: (msg: string) => void;
+}) {
+  return {
+    handleLoadFullLocal(name: string) {
+      const s = deps.savedFullStates[name];
+      if (!s) return;
+      deps.commitFullStateRestore(s, deps.vrmRef.current);
+    },
+    handlePasteFullStateFromParsed(s: FullVrmState | null) {
+      if (!s || s.version !== 2) return;
+      deps.commitFullStateRestore(s, deps.vrmRef.current);
+    },
+    handleSelectSharedPose(asset: { dataUrl: string }) {
+      const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);
+      if (!full) {
+        deps.alertFn?.("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
+        return false;
+      }
+      deps.commitFullStateRestore(full, deps.vrmRef.current);
+
+      try {
+        const hashIndex = asset.dataUrl.indexOf("#");
+        if (hashIndex !== -1) {
+          const poseData = JSON.parse(decodeURIComponent(asset.dataUrl.substring(hashIndex + 1)));
+          if (poseData.customColors && deps.setCustomColors) {
+            deps.setCustomColors(poseData.customColors);
+          }
+        }
+      } catch {}
+      return true;
+    },
+  };
+}
+

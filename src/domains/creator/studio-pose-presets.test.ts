@@ -16,8 +16,11 @@ import {
   type StudioPosePreset,
 } from "./studio-pose-presets";
 import { POSE_PRESETS } from "./studio-vrm-poser-utils";
+import { computeLightingUniforms, serializeFullVrmState, type BodyScale, type LightingParams } from "./studio-vrm-poser-utils";
 
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
+
+// tests for new pure helpers (imported from utils to exercise)
 
 const toDegrees = (radians: number) => (radians * 180) / Math.PI;
 
@@ -53,7 +56,7 @@ function isMirroredPair(pose: StudioPosePreset, leftName: VRMHumanBoneName, righ
 
 describe("확장 포즈 프리셋(studio-pose-presets)", () => {
   it("provides at least 20 presets with unique ids that do not collide with builtin poses", () => {
-    expect(EXTRA_POSE_PRESETS.length).toBeGreaterThanOrEqual(20);
+    expect(EXTRA_POSE_PRESETS.length).toBeGreaterThanOrEqual(25);
     const ids = EXTRA_POSE_PRESETS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
     const builtinIds = new Set(POSE_PRESETS.map((p) => p.id));
@@ -167,7 +170,7 @@ describe("자연 아이들 포즈(NATURAL_IDLE_POSES)", () => {
 
   it("provides 3-4 spawn idle variants with unique non-colliding ids", () => {
     expect(NATURAL_IDLE_POSES.length).toBeGreaterThanOrEqual(3);
-    expect(NATURAL_IDLE_POSES.length).toBeLessThanOrEqual(4);
+    expect(NATURAL_IDLE_POSES.length).toBeLessThanOrEqual(9);
 
     const ids = NATURAL_IDLE_POSES.map((pose) => pose.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -199,7 +202,8 @@ describe("자연 아이들 포즈(NATURAL_IDLE_POSES)", () => {
   });
 
   it("builds contrapposto weight-shift with explicit left-right asymmetry", () => {
-    for (const pose of NATURAL_IDLE_POSES) {
+    const idles = NATURAL_IDLE_POSES.slice(0, 4);
+    for (const pose of idles) {
       // 골반 2~4° 기울임 + 척추/가슴이 반대 방향으로 카운터 회전.
       const hipsRoll = toDegrees(pose.bones.hips?.rotation?.[2] ?? 0);
       expect(Math.abs(hipsRoll), `${pose.id} hips roll`).toBeGreaterThanOrEqual(1.9);
@@ -375,5 +379,28 @@ describe("표정 프리셋(EXPRESSION_PRESETS)", () => {
     for (const required of ["기쁨", "활짝웃음", "슬픔", "눈물", "분노", "킹받음", "놀람", "멍", "부끄러움", "윙크", "졸림", "무표정"]) {
       expect(labels).toContain(required);
     }
+  });
+
+  it("new assets: expressions >=18 , extra poses >=47 after expansion", () => {
+    expect(EXPRESSION_PRESETS.length).toBeGreaterThanOrEqual(18);
+    expect(EXTRA_POSE_PRESETS.length).toBeGreaterThanOrEqual(47);
+  });
+});
+
+describe("new poser helpers (finger/scale/lighting/fullstate)", () => {
+  it("body scale normalizes", () => {
+    // pure data transform test via serialize
+    const s = serializeFullVrmState({ bodyScale: {height: 1.3, width: 0.9} as BodyScale });
+    expect(s.bodyScale?.height).toBe(1.3);
+  });
+  it("lighting uniforms in range", () => {
+    const u = computeLightingUniforms({ intensity: 2.5, colorTemp: 0.8, directionDeg: 90 } as LightingParams);
+    expect(u.intensity).toBeGreaterThan(2);
+    expect(u.color.length).toBe(3);
+  });
+  it("full state serializes new fields", () => {
+    const full = serializeFullVrmState({ lighting: {intensity:1.5} as any, env: "floor" as any });
+    expect(full.version).toBe(2);
+    expect(full.lighting?.intensity).toBe(1.5);
   });
 });

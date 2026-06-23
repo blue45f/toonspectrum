@@ -5,13 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import * as THREE from "three";
 
 
-import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, type StudioExpressionPreset } from "./studio-pose-presets";
+import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
 import {
   classifyMeshName,
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
   tintColor,
-  parseCostumeState,
   serializeCostume,
   type CostumeState,
   type CostumeSlot,
@@ -33,9 +32,21 @@ import {
   getPoseBoneRotation,
   POSE_PRESETS,
   ZERO_ROTATION,
+  computeLightingUniforms,
+  serializeFullVrmState,
+  applyFullState,
+  stripFingerBones,
+  applyPoserVisualState,
+  planFullStateRestore,
+  createFullStateLoadHandlers,
   type PoseBoneMap,
   type PosePreset,
   type Vec3,
+  type FingerRotationMap,
+  type BodyScale,
+  type LightingParams,
+  type EnvVariant,
+  type FullVrmState,
 } from "./studio-vrm-poser-utils";
 import {
   PROP_ATTACH_BONES,
@@ -43,7 +54,6 @@ import {
   PROP_CATEGORY_LABELS as VRM_PROP_CATEGORY_LABELS,
   propsByCategory,
   createPropInstance,
-  parseVrmProps,
   serializeVrmProps,
   buildPropObject,
   propDefById,
@@ -251,6 +261,67 @@ const COSTUME_PRESETS: CostumePreset[] = [
     emoji: "👨‍🚀",
     colors: { tops: "#f97316", bottoms: "#e2e8f0", hair: "#475569", body: "#f1f5f9", face: "#f1f5f9" },
   },
+  // 추가 10종 (장르 다양성: 웹툰·판타지·현대·전통·코스프레)
+  {
+    id: "idol",
+    name: "아이돌 스테이지",
+    emoji: "🎤",
+    colors: { tops: "#f472b6", bottoms: "#1e293b", hair: "#e0f2fe", body: "#ffe4e6", face: "#ffedd5" },
+  },
+  {
+    id: "samurai",
+    name: "사무라이",
+    emoji: "🗡️",
+    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#0f172a", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "witch",
+    name: "마녀",
+    emoji: "🧙‍♀️",
+    colors: { tops: "#312e81", bottoms: "#1e1b4b", hair: "#64748b", body: "#c084fc", face: "#c084fc" },
+  },
+  {
+    id: "pirate",
+    name: "해적",
+    emoji: "🏴‍☠️",
+    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#854d0e", body: "#fed7aa", face: "#ffedd5" },
+  },
+  {
+    id: "hanbok",
+    name: "한복",
+    emoji: "👘",
+    colors: { tops: "#b91c1c", bottoms: "#166534", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "maid",
+    name: "메이드",
+    emoji: "🧹",
+    colors: { tops: "#1e293b", bottoms: "#1e293b", hair: "#f3e8ff", body: "#fff1f2", face: "#ffedd5" },
+  },
+  {
+    id: "butler",
+    name: "집사/신사",
+    emoji: "🎩",
+    colors: { tops: "#0f172a", bottoms: "#0f172a", hair: "#1e293b", body: "#f1f5f9", face: "#ffedd5" },
+  },
+  {
+    id: "superhero",
+    name: "히어로",
+    emoji: "🦸",
+    colors: { tops: "#1e40af", bottoms: "#1e3a8a", hair: "#f8fafc", body: "#e0f2fe", face: "#ffedd5" },
+  },
+  {
+    id: "qipao",
+    name: "치파오",
+    emoji: "🪭",
+    colors: { tops: "#9f1239", bottoms: "#9f1239", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
+  },
+  {
+    id: "street",
+    name: "스트릿 패션",
+    emoji: "🧢",
+    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#f59e0b", body: "#fef3c7", face: "#ffedd5" },
+  },
 ];
 
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
@@ -332,6 +403,37 @@ const BONE_LABELS: Record<string, string> = {
   rightLowerLeg: "오른쪽 무릎 (R Lower Leg)",
   leftFoot: "왼쪽 발목 (L Foot)",
   rightFoot: "오른쪽 발목 (R Foot)",
+  // finger labels (detailed per-finger editing)
+  leftThumbMetacarpal: "왼 엄지 중수 (L Thumb MC)",
+  leftThumbProximal: "왼 엄지 근위 (L Thumb Prox)",
+  leftThumbDistal: "왼 엄지 말단 (L Thumb Dist)",
+  leftIndexProximal: "왼 검지 근위",
+  leftIndexIntermediate: "왼 검지 중간",
+  leftIndexDistal: "왼 검지 말단",
+  leftMiddleProximal: "왼 중지 근위",
+  leftMiddleIntermediate: "왼 중지 중간",
+  leftMiddleDistal: "왼 중지 말단",
+  leftRingProximal: "왼 약지 근위",
+  leftRingIntermediate: "왼 약지 중간",
+  leftRingDistal: "왼 약지 말단",
+  leftLittleProximal: "왼 소지 근위",
+  leftLittleIntermediate: "왼 소지 중간",
+  leftLittleDistal: "왼 소지 말단",
+  rightThumbMetacarpal: "오른 엄지 중수",
+  rightThumbProximal: "오른 엄지 근위",
+  rightThumbDistal: "오른 엄지 말단",
+  rightIndexProximal: "오른 검지 근위",
+  rightIndexIntermediate: "오른 검지 중간",
+  rightIndexDistal: "오른 검지 말단",
+  rightMiddleProximal: "오른 중지 근위",
+  rightMiddleIntermediate: "오른 중지 중간",
+  rightMiddleDistal: "오른 중지 말단",
+  rightRingProximal: "오른 약지 근위",
+  rightRingIntermediate: "오른 약지 중간",
+  rightRingDistal: "오른 약지 말단",
+  rightLittleProximal: "오른 소지 근위",
+  rightLittleIntermediate: "오른 소지 중간",
+  rightLittleDistal: "오른 소지 말단",
 };
 
 const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneName[] }> = [
@@ -341,6 +443,8 @@ const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneNam
   { id: "leftArm", label: "왼팔", bones: ["leftUpperArm", "leftLowerArm", "leftHand"] },
   { id: "rightLeg", label: "오른다리", bones: ["rightUpperLeg", "rightLowerLeg", "rightFoot"] },
   { id: "leftLeg", label: "왼다리", bones: ["leftUpperLeg", "leftLowerLeg", "leftFoot"] },
+  { id: "leftFingers", label: "왼손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("left")) as VRMHumanBoneName[] },
+  { id: "rightFingers", label: "오른손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("right")) as VRMHumanBoneName[] },
 ];
 
 type ScenePropDef = {
@@ -406,6 +510,30 @@ const SCENE_PROPS: ScenePropDef[] = [
   { id: "bubbles", label: "비눗방울", emoji: "🫧", category: "effect", position: [-0.35, 1.3, 0.35], scale: 0.1 },
   { id: "leaves", label: "나뭇잎", emoji: "🍃", category: "effect", position: [0.4, 1.5, -0.2], scale: 0.1 },
   { id: "feather", label: "깃털", emoji: "🪶", category: "effect", position: [-0.3, 1.6, 0.25], scale: 0.09 },
+  // 추가 20종 이상 (장르·웹툰 컷용)
+  /* animals extra */
+  { id: "hamster", label: "햄스터", emoji: "🐹", category: "animal", position: [0.4, 0.1, 0.4], scale: 0.07 },
+  { id: "snake", label: "뱀", emoji: "🐍", category: "animal", position: [-0.5, 0.2, -0.1], scale: 0.09 },
+  { id: "frog", label: "개구리", emoji: "🐸", category: "animal", position: [0.55, 0.05, 0.5], scale: 0.08 },
+  { id: "panda", label: "판다", emoji: "🐼", category: "animal", position: [-0.6, 0.3, 0.2], scale: 0.14 },
+  { id: "lion", label: "사자", emoji: "🦁", category: "animal", position: [0.65, 0.1, -0.3], scale: 0.13 },
+  /* items extra */
+  { id: "basket", label: "바구니", emoji: "🧺", category: "item", position: [0.5, 0.2, 0.3], scale: 0.12 },
+  { id: "letter", label: "편지", emoji: "✉️", category: "item", position: [-0.35, 0.9, 0.4], scale: 0.07 },
+  { id: "rose", label: "장미", emoji: "🌹", category: "item", position: [0.25, 0.7, 0.2], scale: 0.1 },
+  { id: "dagger", label: "단검", emoji: "🗡️", category: "item", position: [0.6, 0.4, -0.1], scale: 0.1 },
+  { id: "mirror", label: "거울", emoji: "🪞", category: "item", position: [-0.5, 1.0, 0.25], scale: 0.11 },
+  { id: "clock", label: "시계", emoji: "🕰️", category: "item", position: [0.4, 1.3, 0.1], scale: 0.09 },
+  { id: "teacup", label: "찻잔", emoji: "🍵", category: "item", position: [-0.3, 0.5, 0.5], scale: 0.08 },
+  { id: "backpack2", label: "큰배낭", emoji: "🎒", category: "item", position: [0.55, 0.6, -0.15], scale: 0.12 },
+  { id: "torch", label: "횃불", emoji: "🔥", category: "item", position: [-0.6, 0.7, 0.05], scale: 0.1 },
+  { id: "coin", label: "금화", emoji: "🪙", category: "item", position: [0.3, 0.4, 0.6], scale: 0.05 },
+  /* effects extra */
+  { id: "heartFX", label: "하트 이펙트", emoji: "💕", category: "effect", position: [0.1, 2.0, 0.3], scale: 0.12 },
+  { id: "note", label: "음표", emoji: "🎵", category: "effect", position: [-0.2, 1.9, -0.4], scale: 0.1 },
+  { id: "magic", label: "마법진", emoji: "✨", category: "effect", position: [0, 0.1, 0.2], scale: 0.15 },
+  { id: "smoke", label: "연기", emoji: "💨", category: "effect", position: [0.5, 1.0, -0.5], scale: 0.13 },
+  { id: "cherry", label: "벚꽃잎", emoji: "🌸", category: "effect", position: [-0.4, 1.7, 0.2], scale: 0.09 },
 ];
 
 const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };
@@ -1725,6 +1853,8 @@ function VrmActor({
   webcamActive,
   trackingDataRef,
   idleAnimation,
+  fingerEdits,
+  bodyScale,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -1736,11 +1866,13 @@ function VrmActor({
   webcamActive: boolean;
   trackingDataRef: React.RefObject<VrmTrackingData | null>;
   idleAnimation: boolean;
+  fingerEdits: FingerRotationMap;
+  bodyScale: BodyScale;
 }) {
   useEffect(() => {
-    applyPoseToVrm(vrm, customBones, customYOffset);
+    applyPoserVisualState(vrm, { bones: customBones, yOffset: customYOffset, fingerEdits, bodyScale });
     applyExpressionWeightsToVrm(vrm, expressionWeights);
-  }, [customBones, customYOffset, expressionWeights, vrm, webcamActive, idleAnimation]);
+  }, [customBones, customYOffset, expressionWeights, fingerEdits, bodyScale, vrm, webcamActive, idleAnimation]);
 
   useEffect(() => {
     applyRotationToVrm(vrm, bodyRotation);
@@ -1843,43 +1975,51 @@ function GroundShadow() {
   );
 }
 
-function VrmLighting({ tone }: { tone: LightingTone }) {
-  if (tone === "sunset") {
-    return (
-      <>
-        <ambientLight intensity={0.52} color="#ffe8d6" />
-        <directionalLight intensity={1.5} position={[2.8, 3.8, 3.0]} color="#ffa07a" />
-        <directionalLight intensity={0.6} position={[-3.2, 2.0, 2.1]} color="#ffb732" />
-        <directionalLight intensity={0.3} position={[-1.6, 3.4, -3.2]} color="#ff6b8b" />
-      </>
-    );
-  }
-  if (tone === "night") {
-    return (
-      <>
-        <ambientLight intensity={0.34} color="#1b1c30" />
-        <directionalLight intensity={0.92} position={[2.8, 4.2, 3.6]} color="#7fa3ff" />
-        <directionalLight intensity={0.4} position={[-3.2, 2.6, 2.1]} color="#483d8b" />
-        <directionalLight intensity={0.5} position={[-1.6, 3.4, -3.2]} color="#8a2be2" />
-      </>
-    );
-  }
-  if (tone === "studio") {
-    return (
-      <>
-        <ambientLight intensity={0.92} />
-        <directionalLight intensity={1.5} position={[0, 3.0, 4.0]} />
-        <directionalLight intensity={0.8} position={[3.0, 2.0, 2.0]} />
-        <directionalLight intensity={0.8} position={[-3.0, 2.0, 2.0]} />
-      </>
-    );
-  }
+function VrmLighting({ tone, lighting, env }: { tone: LightingTone; lighting?: LightingParams; env?: EnvVariant }) {
+  const li = lighting ? computeLightingUniforms(lighting) : null;
+  const iMul = li ? li.intensity : 1;
+  const col = li ? li.color : null;
+  const dirPos = li ? [li.dir.x * 3.5, li.dir.y * 4, li.dir.z * 3.5] as const : [2.8, 4.2, 3.6] as const;
+
+  const base = tone === "sunset" ? { amb: [0.52, "#ffe8d6"], d1: [1.5, "#ffa07a"], d2: [0.6, "#ffb732"], d3: [0.3, "#ff6b8b"] } :
+               tone === "night" ? { amb: [0.34, "#1b1c30"], d1: [0.92, "#7fa3ff"], d2: [0.4, "#483d8b"], d3: [0.5, "#8a2be2"] } :
+               tone === "studio" ? { amb: [0.92, "#ffffff"], d1: [1.5, "#ffffff"], d2: [0.8, "#ffffff"], d3: [0.8, "#ffffff"] } :
+               { amb: [0.68, "#ffffff"], d1: [1.32, "#ffffff"], d2: [0.54, "#f7d8c4"], d3: [0.42, "#cfdcff"] };
+
+  const ambI = (base.amb[0] as number) * (iMul * 0.9);
+  const d1I = (base.d1[0] as number) * iMul;
+  const d2I = (base.d2[0] as number) * iMul * 0.9;
+  const d3I = (base.d3[0] as number) * iMul * 0.8;
+
+  const c1 = col ? `rgb(${Math.round(col[0]*255)},${Math.round(col[1]*255)},${Math.round(col[2]*255)})` : (base.d1[1] as string);
+  const c2 = col ? `rgb(${Math.round(col[0]*255*0.85)},${Math.round(col[1]*255*0.85)},${Math.round(col[2]*255*0.9)})` : (base.d2[1] as string);
+
   return (
     <>
-      <ambientLight intensity={0.68} />
-      <directionalLight intensity={1.32} position={[2.8, 4.2, 3.6]} />
-      <directionalLight intensity={0.54} position={[-3.2, 2.6, 2.1]} color="#f7d8c4" />
-      <directionalLight intensity={0.42} position={[-1.6, 3.4, -3.2]} color="#cfdcff" />
+      <ambientLight intensity={ambI} color={base.amb[1] as string} />
+      <directionalLight intensity={d1I} position={dirPos as [number,number,number]} color={c1} />
+      <directionalLight intensity={d2I} position={[-3.2, 2.6, 2.1]} color={c2} />
+      <directionalLight intensity={d3I} position={[-1.6, 3.4, -3.2]} color={base.d3[1] as string} />
+
+      {/* Env variants (floor / wall / room / outdoor) */}
+      {(env === "floor" || env === "room" || env === "outdoor") && (
+        <mesh position={[0, -0.01, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
+          <planeGeometry args={[8, 8]} />
+          <meshLambertMaterial color={env === "outdoor" ? "#3a5f3a" : "#3a3a3f"} />
+        </mesh>
+      )}
+      {(env === "wall" || env === "room") && (
+        <>
+          <mesh position={[0, 2.5, -2.8]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+          <mesh position={[0, 2.5, 2.8]} rotation={[0, Math.PI, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+        </>
+      )}
+      {env === "room" && (
+        <>
+          <mesh position={[-3.2, 2.5, 0]} rotation={[0, Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+          <mesh position={[3.2, 2.5, 0]} rotation={[0, -Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+        </>
+      )}
     </>
   );
 }
@@ -1944,6 +2084,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
+
+  // early decl for new features used in effects
+  const [bodyScale, setBodyScale] = useState<BodyScale>({ height: 1, width: 1 });
+  const [fingerEdits, setFingerEdits] = useState<FingerRotationMap>({});
+  const [lighting, setLighting] = useState<LightingParams>({ intensity: 1.2, colorTemp: 0.5, directionDeg: 45 });
+  const [envVariant, setEnvVariant] = useState<EnvVariant>("none");
+  const [fullStateName, setFullStateName] = useState("");
+  const [savedFullStates, setSavedFullStates] = useState<Record<string, FullVrmState>>({});
   const [customColors, setCustomColors] = useState<Record<string, string>>({
     tops: "#ffffff",
     bottoms: "#ffffff",
@@ -1992,6 +2140,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
+
+  // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
+  // Removed duplicate here to prevent double application on every render.
+
   const onCaptureUpdate = useCallback((state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => {
     if (cleanupGl) {
       if (captureRef.current.gl === cleanupGl) {
@@ -2016,6 +2168,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     vrmProps?: unknown;
     costume?: unknown;
     physics?: unknown;
+    // new high-level state for restore on load
+    bodyScale?: BodyScale;
+    fingerOverrides?: FingerRotationMap;
+    lighting?: LightingParams;
+    env?: EnvVariant;
   }
 
   const pendingPoseDataRef = useRef<PendingPoseData | null>(null);
@@ -2047,6 +2204,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         setSavedPoses(JSON.parse(stored));
       } catch (e) {
         console.error("Failed to load custom poses", e);
+      }
+    }
+    const fullStored = localStorage.getItem("studio_vrm_full_states");
+    if (fullStored) {
+      try {
+        setSavedFullStates(JSON.parse(fullStored));
+      } catch (e) {
+        console.error("Failed to load full vrm states", e);
       }
     }
   }, []);
@@ -2280,10 +2445,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
   function handleCustomPoseSelect(pose: CustomPose) {
     setActivePoseId(pose.id);
-    setCustomBones(pose.bones);
+    const stripped = stripFingerBones(pose.bones);
+    setCustomBones(stripped);
     setCustomYOffset(pose.yOffset);
     if (vrmRef.current) {
-      applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset);
+      applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset, fingerEdits, bodyScale });
       if (preserveExpression) {
         applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
       } else if (pose.expressionWeights) {
@@ -2358,6 +2524,70 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     } catch (_e) {
       alert("포즈 붙여넣기에 실패했습니다. 데이터 형식을 확인해 주세요.");
     }
+  }
+
+  // 풀 스테이트 copy/paste + local save/load (새 기능)
+  function handleCopyFullState() {
+    try {
+      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits });
+      const json = JSON.stringify(full);
+      navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
+    } catch { alert("전체 상태 복사 실패"); }
+  }
+  async function handlePasteFullState() {
+    try {
+      let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = localStorage.getItem("studio_vrm_full_clip") || ""; }
+      if (!json) return alert("전체 상태 데이터 없음");
+      const s = JSON.parse(json) as FullVrmState;
+      loadHandlers.handlePasteFullStateFromParsed(s);
+      if (s && s.version === 2) alert("전체 상태 붙여넣기 OK");
+    } catch { alert("붙여넣기 실패"); }
+  }
+  function handleSaveFullLocal() {
+    const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
+    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits});
+    const next = { ...savedFullStates, [name]: full };
+    setSavedFullStates(next);
+    localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
+    setFullStateName(""); alert(`저장: ${name}`);
+  }
+  function commitFullStateRestore(s: FullVrmState, vrm: VRM | null) {
+    const plan = planFullStateRestore(s);
+    setCustomBones(plan.strippedBones);
+    setCustomYOffset(plan.yOffset);
+    setExpressionWeights(plan.expressionWeights);
+    if (plan.bodyScale) setBodyScale(plan.bodyScale);
+    if (plan.lighting) setLighting(plan.lighting);
+    if (plan.env) setEnvVariant(plan.env);
+    if (plan.fingerOverrides) setFingerEdits(plan.fingerOverrides);
+    if (plan.costume && typeof plan.costume === "object") setCostumeState(plan.costume as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (plan.propsItems) setVrmPropItems(plan.propsItems as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    if (vrm) {
+      const meshes = collectCostumeMeshes(vrm);
+      applyFullState(vrm, s, {
+        applyPose: (b, y) => applyPoseToVrm(vrm, b, y),
+        applyExpr: (w) => applyExpressionWeightsToVrm(vrm, w),
+        applyCostume: (c) => { setCostumeMeshes(meshes); applyCostumeState(meshes, c as any); }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        applyProps: (p: any) => { if (p?.items) { setVrmPropItems(p.items); } }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        applyPhysics: (p: any) => { if (p) { setVrmPhysics(p as any); if (countSpringBoneJoints(vrm)) { applyVrmSpringBonePhysics(vrm, p as any); settleVrmPhysics(vrm); } } }, // eslint-disable-line @typescript-eslint/no-explicit-any
+      });
+    }
+  }
+
+  // Use the exact same factory the tests use so handlers execute shipped code
+  const loadHandlers = createFullStateLoadHandlers({
+    savedFullStates,
+    commitFullStateRestore,
+    vrmRef,
+    setActivePoseId,
+    setCustomColors,
+    alertFn: (m) => alert(m),
+  });
+
+  function handleLoadFullLocal(name: string) {
+    loadHandlers.handleLoadFullLocal(name);
   }
 
   function handleExportPoses() {
@@ -2474,6 +2704,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         customColors: customColors,
         modelName: modelName,
         modelId: activeModelId,
+        // full AC2 for uniform restore via commit
+        bodyScale,
+        fingerOverrides: fingerEdits,
+        lighting,
+        env: envVariant,
         // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
@@ -2502,63 +2737,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function handleSelectSharedPose(asset: SharedAsset) {
-    try {
-      const hashIndex = asset.dataUrl.indexOf("#");
-      if (hashIndex === -1) {
-        alert("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
-        return;
-      }
-      const hashStr = asset.dataUrl.substring(hashIndex + 1);
-      const poseData = JSON.parse(decodeURIComponent(hashStr));
-
-      if (poseData.bones) {
-        setCustomBones(poseData.bones);
-      }
-      if (typeof poseData.yOffset === "number") {
-        setCustomYOffset(poseData.yOffset);
-      }
-      if (poseData.expressionWeights) {
-        setExpressionWeights(poseData.expressionWeights);
-      } else {
-        setExpressionWeights({});
-      }
-      if (poseData.customColors) {
-        setCustomColors(poseData.customColors);
-      }
-
-      // 본 부착 소품·의상·물리 복원(옵셔널 — 없으면 빈/기본값).
-      const restoredProps = parseVrmProps(poseData.vrmProps).items;
-      setVrmPropItems(restoredProps);
-      setSelectedVrmPropUid(null);
-
-      const restoredCostume = parseCostumeState(poseData.costume);
-      setCostumeState(restoredCostume);
-      setSelectedCostumeKey(null);
-
-      const restoredPhysics = parseVrmPhysicsSettings(poseData.physics);
-      setVrmPhysics(restoredPhysics);
-      setPhysicsPreview(false);
-
-      if (vrmRef.current) {
-        applyPoseToVrm(vrmRef.current, poseData.bones || {}, poseData.yOffset ?? 0);
-        applyExpressionWeightsToVrm(vrmRef.current, poseData.expressionWeights || {});
-        applyVrmCustomColors(vrmRef.current, poseData.customColors || {});
-        const meshes = collectCostumeMeshes(vrmRef.current);
-        setCostumeMeshes(meshes);
-        applyCostumeState(meshes, restoredCostume);
-        const joints = countSpringBoneJoints(vrmRef.current);
-        setSpringJointCount(joints);
-        if (joints > 0) {
-          applyVrmSpringBonePhysics(vrmRef.current, restoredPhysics);
-          settleVrmPhysics(vrmRef.current);
-        }
-      }
-
+    const ok = loadHandlers.handleSelectSharedPose(asset);
+    if (ok) {
       setActivePoseId(`shared-${asset.id}`);
       alert(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 적용했습니다.`);
-    } catch (e) {
-      console.error(e);
-      alert("포즈 데이터를 파싱하는 중 오류가 발생했습니다.");
     }
   }
 
@@ -2715,52 +2897,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       const bones = pending.bones || {};
       const yOffset = typeof pending.yOffset === "number" ? pending.yOffset : 0;
       const expressionWeights = pending.expressionWeights || {};
-      const customColors = pending.customColors || {
-        tops: "#ffffff",
-        bottoms: "#ffffff",
-        hair: "#ffffff",
-        body: "#ffffff",
-        face: "#ffffff",
+
+      const pendingFull: FullVrmState = {
+        version: 2,
+        bones: bones,
+        yOffset,
+        expressionWeights,
+        bodyScale: pending.bodyScale,
+        fingerOverrides: pending.fingerOverrides,
+        lighting: pending.lighting,
+        env: pending.env,
+        costume: pending.costume,
+        props: pending.vrmProps,
+        physics: pending.physics,
       };
-
-      setCustomBones(bones);
-      setCustomYOffset(yOffset);
-      setActivePoseId("custom-loaded");
-      setExpressionWeights(expressionWeights);
-      setCustomColors(customColors);
-
-      applyPoseToVrm(nextVrm, bones, yOffset);
-      applyExpressionWeightsToVrm(nextVrm, expressionWeights);
-      applyVrmCustomColors(nextVrm, customColors);
-
-      // Restore costume
-      const restoredCostume = parseCostumeState(pending.costume);
-      setCostumeState(restoredCostume);
-      setSelectedCostumeKey(null);
-      const meshes = collectCostumeMeshes(nextVrm);
-      setCostumeMeshes(meshes);
-      applyCostumeState(meshes, restoredCostume);
-
-      // Restore props
-      const restoredProps = parseVrmProps(pending.vrmProps).items;
-      setVrmPropItems(restoredProps);
-      setSelectedVrmPropUid(null);
-
-      // Restore physics
-      const restoredPhysics = parseVrmPhysicsSettings(pending.physics);
-      setVrmPhysics(restoredPhysics);
-      setPhysicsPreview(false);
-      const joints = countSpringBoneJoints(nextVrm);
-      setSpringJointCount(joints);
-      if (joints > 0) {
-        applyVrmSpringBonePhysics(nextVrm, restoredPhysics);
-        settleVrmPhysics(nextVrm);
-      }
+      commitFullStateRestore(pendingFull, nextVrm);
     } else {
       // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
       const spawnPose = pickNaturalIdlePose(nextModelId);
+      const strippedSpawn = stripFingerBones(spawnPose.bones);
       setActivePoseId(spawnPose.id);
-      setCustomBones(spawnPose.bones);
+      setCustomBones(strippedSpawn);
       setCustomYOffset(spawnPose.yOffset ?? 0);
       setActiveExpressionId("neutral");
       setExpressionWeights({});
@@ -2772,7 +2929,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         body: "#ffffff",
         face: "#ffffff",
       });
-      applyPoseToVrm(nextVrm, spawnPose.bones, spawnPose.yOffset ?? 0);
+      applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits, bodyScale });
       applyExpressionWeightsToVrm(nextVrm, {});
       applyVrmCustomColors(nextVrm, {
         tops: "#ffffff",
@@ -2931,10 +3088,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   function handlePoseSelect(poseId: string) {
     setActivePoseId(poseId);
     const pose = findPose(poseId);
-    setCustomBones(pose.bones);
+    const strippedBones = stripFingerBones(pose.bones);
+    setCustomBones(strippedBones);
     setCustomYOffset(pose.yOffset ?? 0);
     if (vrmRef.current) {
-      applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset ?? 0);
+      applyPoserVisualState(vrmRef.current, {
+        bones: strippedBones,
+        yOffset: pose.yOffset ?? 0,
+        fingerEdits,
+        bodyScale,
+      });
       if (preserveExpression) {
         applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
       } else {
@@ -2949,6 +3112,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (!vrm) return;
     const radians = d(degrees);
     const key = boneName as VRMHumanBoneName;
+    if (POSER_FINGER_BONES.includes(key)) {
+      // Single source of truth: fingers go to fingerEdits only
+      setFingerEdits((prev) => {
+        const current = prev[key] ? [...prev[key]] as [number, number, number] : [0, 0, 0];
+        current[axisIndex] = radians;
+        return { ...prev, [key]: current };
+      });
+      return;
+    }
     setCustomBones((prev) => {
       const current = [...getPoseBoneRotation(prev[key])] as [number, number, number];
       current[axisIndex] = radians;
@@ -2958,6 +3130,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
   function handleYOffsetChange(value: number) {
     setCustomYOffset(value);
+  }
+
+  // Quick finger curl updater for the 고도화 section (affects multiple segments for natural look)
+  function updateFingerCurl(side: 'left' | 'right', curlDeg: number) {
+    const rad = d(curlDeg);
+    const sign = side === 'left' ? -1 : 1;
+    const fingers = ['Index', 'Middle', 'Ring', 'Little'] as const;
+    const segments = ['Proximal', 'Intermediate', 'Distal'] as const;
+    setFingerEdits((prev) => {
+      const next = { ...prev };
+      fingers.forEach((f) => {
+        segments.forEach((seg) => {
+          const k = `${side}${f}${seg}` as VRMHumanBoneName;
+          next[k] = [0, 0, sign * rad];
+        });
+        // thumb a bit less
+        next[`${side}ThumbProximal` as VRMHumanBoneName] = [0, sign * rad * 0.6, sign * rad * 0.5];
+        next[`${side}ThumbDistal` as VRMHumanBoneName] = [0, sign * rad * 0.4, 0];
+      });
+      return next;
+    });
   }
 
   function handleExpressionSelect(action: ExpressionAction) {
@@ -3186,7 +3379,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
                   <CameraDirector presetId={activeCameraId} />
-                  <VrmLighting tone={lightingTone} />
+                  <VrmLighting tone={lightingTone} lighting={lighting} env={envVariant} />
                   {vrm ? (
                     <VrmActor
                       bodyRotation={bodyRotation}
@@ -3199,6 +3392,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       webcamActive={webcamActive}
                       trackingDataRef={trackingDataRef}
                       idleAnimation={idleAnimation}
+                      fingerEdits={fingerEdits}
+                      bodyScale={bodyScale}
                     />
                   ) : null}
                   {vrm
@@ -3919,7 +4114,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     if (!cat) return null;
                     return cat.bones.map((boneName) => {
                       const label = BONE_LABELS[boneName] || boneName;
-                      const [xRad, yRad, zRad] = getPoseBoneRotation(customBones[boneName]);
+                      const isFinger = POSER_FINGER_BONES.includes(boneName);
+                      const rot = isFinger
+                        ? (fingerEdits[boneName] || [0, 0, 0])
+                        : getPoseBoneRotation(customBones[boneName]);
+                      const [xRad, yRad, zRad] = rot as [number, number, number];
                       const xDeg = Math.round(THREE.MathUtils.radToDeg(xRad));
                       const yDeg = Math.round(THREE.MathUtils.radToDeg(yRad));
                       const zDeg = Math.round(THREE.MathUtils.radToDeg(zRad));
@@ -3933,9 +4132,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               className="text-[0.62rem] text-accent hover:underline animate-fade-in"
                               disabled={!vrm}
                               onClick={() => {
-                                setCustomBones((prev) => {
-                                  return { ...prev, [boneName]: { rotation: ZERO_ROTATION } };
-                                });
+                                if (isFinger) {
+                                  setFingerEdits((prev) => {
+                                    const next = { ...prev };
+                                    delete next[boneName];
+                                    return next;
+                                  });
+                                } else {
+                                  setCustomBones((prev) => {
+                                    return { ...prev, [boneName]: { rotation: ZERO_ROTATION } };
+                                  });
+                                }
                               }}
                             >
                               초기화
@@ -4014,25 +4221,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     onClick={() => {
                       if (activePoseId.startsWith("custom-")) {
                         const pose = savedPoses.find((p) => p.id === activePoseId);
-                        if (pose) {
-                          setCustomBones(pose.bones);
+                        if (pose && vrmRef.current) {
+                          const stripped = stripFingerBones(pose.bones);
+                          setCustomBones(stripped);
                           setCustomYOffset(pose.yOffset);
                           if (pose.expressionWeights) {
                             setExpressionWeights(pose.expressionWeights);
-                            if (vrmRef.current) {
-                              applyExpressionWeightsToVrm(vrmRef.current, pose.expressionWeights);
-                            }
+                            applyExpressionWeightsToVrm(vrmRef.current, pose.expressionWeights);
                           }
-                          if (vrmRef.current) {
-                            applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset);
-                          }
+                          applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset, fingerEdits, bodyScale });
                         }
                       } else {
                         const pose = findPose(activePoseId);
-                        setCustomBones(pose.bones);
-                        setCustomYOffset(pose.yOffset ?? 0);
                         if (vrmRef.current) {
-                          applyPoseToVrm(vrmRef.current, pose.bones, pose.yOffset ?? 0);
+                          const stripped = stripFingerBones(pose.bones);
+                          setCustomBones(stripped);
+                          setCustomYOffset(pose.yOffset ?? 0);
+                          applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset ?? 0, fingerEdits, bodyScale });
                         }
                       }
                     }}
@@ -4112,6 +4317,83 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       {preset.label}
                     </button>
                   ))}
+                </div>
+              </section>
+
+              {/* ── 고도화 컨트롤 (body scale, lighting+, env, full state) ── */}
+              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Sliders size={15} className="text-accent" aria-hidden />
+                  고도화 컨트롤
+                </h3>
+                <div className="space-y-2 text-[0.62rem]">
+                  {/* Body Scale */}
+                  <div>
+                    <div className="font-semibold mb-0.5">몸 스케일 (키/너비)</div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-6">H</span>
+                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
+                      <span className="w-10 tabular-nums text-right">{bodyScale.height.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-6">W</span>
+                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
+                      <span className="w-10 tabular-nums text-right">{bodyScale.width.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  {/* Enhanced Lighting */}
+                  <div>
+                    <div className="font-semibold mb-0.5">조명 고도화 (I / Temp / Dir)</div>
+                    <div className="flex gap-1 items-center">
+                      <span>I</span>
+                      <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting(l => ({...l, intensity: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
+                      <span className="w-8 tabular-nums">{lighting.intensity.toFixed(1)}</span>
+                      <span>T</span>
+                      <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting(l => ({...l, colorTemp: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
+                      <span className="w-8 tabular-nums">{lighting.colorTemp.toFixed(1)}</span>
+                      <span>D</span>
+                      <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting(l => ({...l, directionDeg: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
+                      <span className="w-8 tabular-nums">{Math.round(lighting.directionDeg)}°</span>
+                    </div>
+                  </div>
+                  {/* Env variants */}
+                  <div>
+                    <div className="font-semibold mb-0.5">환경 변형</div>
+                    {(["none","floor","wall","room","outdoor"] as const).map(v => (
+                      <button key={v} type="button" onClick={() => setEnvVariant(v)} className={cx("mr-1 px-1.5 py-0.5 rounded border text-[0.6rem]", envVariant === v ? "bg-accent text-white border-accent" : "border-line bg-card hover:bg-raised")}>{v}</button>
+                    ))}
+                  </div>
+                  {/* Finger quick controls (detailed per-finger also available in "관절 미세 조정" tabs) */}
+                  <div>
+                    <div className="font-semibold mb-0.5">손가락 (컬)</div>
+                    <div className="flex items-center gap-2">
+                      <span>왼</span>
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="flex-1 accent-accent" />
+                      <span className="w-6 tabular-nums">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))}°</span>
+                      <span>오른</span>
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="flex-1 accent-accent" />
+                      <span className="w-6 tabular-nums">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
+                    </div>
+                    <button type="button" onClick={() => setFingerEdits({})} className="mt-0.5 text-[0.58rem] text-accent underline">손가락 초기화</button>
+                  </div>
+
+                  {/* Full state IO */}
+                  <div>
+                    <div className="font-semibold mb-0.5">전체 상태 (pose+scale+finger+lighting+env+...)</div>
+                    <div className="flex gap-1 items-center">
+                      <input value={fullStateName} onChange={e=>setFullStateName(e.target.value)} placeholder="state name" className="flex-1 bg-card border border-line px-1 py-0.5 text-[0.6rem] rounded" />
+                      <button type="button" onClick={handleSaveFullLocal} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Save</button>
+                      <button type="button" onClick={handleCopyFullState} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Copy</button>
+                      <button type="button" onClick={handlePasteFullState} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Paste</button>
+                    </div>
+                    {Object.keys(savedFullStates).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {Object.keys(savedFullStates).map(n => (
+                          <button key={n} type="button" onClick={() => handleLoadFullLocal(n)} className="text-[0.58rem] px-1 py-0 border border-line rounded hover:bg-raised">{n}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </section>
 
