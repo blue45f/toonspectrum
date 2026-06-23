@@ -236,14 +236,21 @@ export function FortunePage() {
                 onClick={() => setSelectedChar(char)}
                 className="group relative text-left w-full block cursor-pointer overflow-hidden rounded-2xl border border-line bg-card/65 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-line-strong hover:bg-raised"
               >
-                {/* 아바타 플레이스홀더 (그라디언트 + 캐릭터 이니셜/로고) */}
+                {/* 캐릭터 아바타 이미지 (없을 경우 텍스트 fallback) */}
                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gradient-to-br from-accent-soft to-panel/80 flex items-center justify-center border border-line/40">
-                  <span className="font-display text-4xl font-extrabold text-accent/60 group-hover:scale-105 transition-transform duration-300">
-                    {char.name[0]}
-                  </span>
-                  {/* 실제 프로덕션에서 이미지가 들어갈 공간 */}
+                  {char.avatarUrl ? (
+                    <img 
+                      src={char.avatarUrl} 
+                      alt={char.name} 
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <span className="font-display text-4xl font-extrabold text-accent/60 group-hover:scale-105 transition-transform duration-300">
+                      {char.name[0]}
+                    </span>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
-                  <div className="absolute bottom-3 left-3 text-left">
+                  <div className="absolute bottom-3 left-3 text-left z-10">
                     <span className="text-[10px] uppercase tracking-wider text-accent font-semibold block">
                       {char.origin}
                     </span>
@@ -271,7 +278,15 @@ export function FortunePage() {
           <aside className="lg:col-span-4 flex flex-col gap-4">
             <div className="rounded-2xl border border-line bg-panel/35 p-5 flex flex-col items-center text-center">
               <div className="relative aspect-square w-24 overflow-hidden rounded-full bg-gradient-to-br from-accent/20 to-panel border-2 border-accent flex items-center justify-center shadow-lg">
-                <span className="font-display text-3xl font-extrabold text-accent">{selectedChar.name[0]}</span>
+                {selectedChar.avatarUrl ? (
+                  <img 
+                    src={selectedChar.avatarUrl} 
+                    alt={selectedChar.name} 
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="font-display text-3xl font-extrabold text-accent">{selectedChar.name[0]}</span>
+                )}
               </div>
               <h2 className="mt-3 text-lg font-bold text-fg">{selectedChar.name}</h2>
               <span className="text-xs text-fg-3">《{selectedChar.origin}》</span>

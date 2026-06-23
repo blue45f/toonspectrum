@@ -29,32 +29,32 @@ export interface FortuneCharacter {
 
 const CHARACTERS: FortuneCharacter[] = [
   {
-    id: "sung-jinwoo",
-    name: "성진우",
-    origin: "나 혼자만 레벨업",
-    greeting: "이 정도 운세라면 네 스스로 개척할 수 있어. 굳이 운명에 기대지 마라.",
-    avatarUrl: "/images/characters/sung-jinwoo.webp"
+    id: "ara",
+    name: "사서 아라",
+    origin: "ToonSpectrum",
+    greeting: "어서 오세요. 당신의 운명이 적힌 기록을 찾고 계셨나요? 차분하게 한 장씩 읽어드릴게요.",
+    avatarUrl: "/images/characters/ara.jpg"
   },
   {
-    id: "park-moondae",
-    name: "박문대",
-    origin: "데뷔 못 하면 죽는 병 걸림",
-    greeting: "오늘 하루도 일단 생존해봅시다. 너무 크게 의미 부여는 하지 말고, 차분하게 가요.",
-    avatarUrl: "/images/characters/park-moondae.webp"
+    id: "danwoo",
+    name: "도깨비 단우",
+    origin: "ToonSpectrum",
+    greeting: "오호라, 인간이 내 소문을 듣고 찾아왔나? 오늘 네 운이 대박인지 쪽박인지 내가 한번 봐주지!",
+    avatarUrl: "/images/characters/danwoo.jpg"
   },
   {
-    id: "cheong-myeong",
-    name: "청명",
-    origin: "화산귀환",
-    greeting: "운명? 사주팔자? 핫하! 그까짓 거 칼 한번 휘둘러서 다 베어버리면 그만이지! 그래도 궁금해?",
-    avatarUrl: "/images/characters/cheong-myeong.webp"
+    id: "leona",
+    name: "점술가 레오나",
+    origin: "ToonSpectrum",
+    greeting: "별들이 오늘 밤 유난히 반짝이네요. 당신의 별자리가 가리키는 미래를 엿볼 준비가 되셨나요?",
+    avatarUrl: "/images/characters/leona.jpg"
   },
   {
-    id: "yoo-joonghyuk",
-    name: "유중혁",
-    origin: "전지적 독자 시점",
-    greeting: "이번 회차의 운세인가... 듣고 싶다면 말해주마. 결말을 바꿀 수 있다면 말이지.",
-    avatarUrl: "/images/characters/yoo-joonghyuk.webp"
+    id: "gaon",
+    name: "검객 가온",
+    origin: "ToonSpectrum",
+    greeting: "운명 따위, 칼 한 자루로 베어버릴 뿐. 하지만 굳이 길을 묻겠다면 검끝이 가리키는 곳을 말해주지.",
+    avatarUrl: "/images/characters/gaon.jpg"
   }
 ];
 
@@ -134,7 +134,7 @@ export class FortuneService {
   }
 
   // 사주 계산 및 해석
-  async drawSaju(birthDate: string, birthTime?: string, gender = "none", characterId = "sung-jinwoo") {
+  async drawSaju(birthDate: string, birthTime?: string, gender = "none", characterId = "ara") {
     const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
     const sajuResult: SajuResult = calculateSaju(birthDate, birthTime);
 
@@ -179,17 +179,17 @@ export class FortuneService {
     }
 
     const systemInstructions = `
-      당신은 웹툰/웹소설의 캐릭터 '${character.name}' (출처: 《${character.origin}》) 입니다.
+      당신은 ToonSpectrum의 오리지널 캐릭터 '${character.name}' 입니다.
       사용자에게 '${type}' 결과를 해설해주는 상황입니다.
       
       반드시 다음 규칙을 준수하세요:
       1. 완전히 캐릭터 '${character.name}'의 페르소나, 성격, 어조, 핵심 대사의 뉘앙스를 반영하여 말하세요.
-         - 성진우: 반말투, 시크하고 냉정하지만 든든한 조언, 혼잣말이나 그림자 군대 언급 가능.
-         - 박문대: 기본 존댓말(하지만 딱딱한 비즈니스 톤), 현실적이고 드라이한 격려, "아이돌"이나 "상태창", "생존" 키워드 활용.
-         - 청명: 반말투, 괄괄하고 성질내는 듯하지만 속 깊은 조언, "대가리를 깨버린다"거나 "화산", "도(道)", "당과" 언급 가능.
-         - 유중혁: 극도의 저음 반말투, 비장하고 냉혹함, 회차나 성좌, 결말, 동료 언급 가능.
+         - 사서 아라: 차분하고 상냥한 경어체. 지혜롭고 사려 깊은 카운셀러 톤. "책", "도서관", "기록", "페이지" 등의 단어를 활용해 운세를 기록을 읽어주듯이 설명.
+         - 도깨비 단우: 친근하고 장난꾸러기 같은 활기찬 반말투. 가끔 심술을 부리는 척하지만 속은 다정한 오빠/형 같은 조언. "도깨비 방망이", "금은보화", "장난", "메밀묵" 언급.
+         - 점술가 레오나: 매혹적이고 신비로운 반말/존댓말 혼용 톤. 우주와 별의 흐름을 읽는 점술가의 기품. "운명의 별빛", "은하수", "우주의 신호", "점괘" 언급.
+         - 검객 가온: 묵직하고 냉철하며 과묵한 무사 어조(반말투). 불필요한 사설은 배제하고 본질을 꿰뚫는 뼈 때리는 격려와 일침. "검(劍)", "바람", "수련", "흔들리지 않는 마음" 언급.
       2. 사용자에게 친근한 대화체로 풀어나가세요. 기계적인 명리학/타로 사전적 풀이를 줄줄 늘어놓지 마세요.
-      3. 카피는 짧고 단정하며, 느낌표(!)를 남발하지 마세요. (청명 캐릭터의 호탕한 대사 일부 예외 제외)
+      3. 카피는 짧고 단정하며, 느낌표(!)를 남발하지 마세요. (단우 캐릭터의 호탕한 대사 일부 예외 제외)
       4. 한국어로 가독성 있게 줄바꿈을 포함하여 대화하듯이 3~4문단 정도로 답변을 반환해 주세요.
     `;
 
@@ -289,26 +289,26 @@ export class FortuneService {
     const directionStr = card.type === "upright" ? "정방향" : "역방향";
     
     switch (character.id) {
-      case "sung-jinwoo":
-        return `흠, 네가 뽑은 카드는 ${card.name}(${directionStr})이군. \n\n` +
-          `키워드는 [${card.keywords.join(", ")}]이다. 이 카드는 흐름을 바꾸라는 신호야. \n` +
-          `너무 앞만 보고 달리다가는 그림자들도 널 지킬 수 없다. 조금 힘을 빼고 주위를 살펴봐라. \n` +
-          `진짜 싸움은 다음 단계부터니까, 오늘 하루는 체력을 보존하도록 해.`;
-      case "park-moondae":
-        return `뽑으신 카드는 ${card.name}(${directionStr})이네요. \n\n` +
-          `주요 키워드는 [${card.keywords.join(", ")}]입니다. \n` +
-          `지금 상태창에 경고가 뜬 건 아니지만, 너무 과로하지 말라는 데이터입니다. \n` +
-          `오늘 하루는 예정된 스케줄만 조용히 끝마치고 숙소에서 쉬는 걸 권합니다. 생존이 우선이니까요.`;
-      case "cheong-myeong":
-        return `이 녀석 봐라? ${card.name}(${directionStr}) 카드를 뽑았네! \n\n` +
-          `이게 무슨 뜻이냐고? [${card.keywords.join(", ")}] 이란다. \n` +
-          `녀석아, 대가리를 굴린다고 운명이 바뀌는 줄 알아? 그냥 네가 가진 도(道)를 믿고 앞만 보고 나아가면 되는 거야! \n` +
-          `정 불안하면 화산에 시주나 넉넉히 하고 가거라! 핫하하!`;
-      case "yoo-joonghyuk":
+      case "ara":
+        return `이곳 책장의 먼지 쌓인 페이지 속에서 당신의 미래를 찾아냈어요. 뽑으신 카드는 ${card.name}(${directionStr})이네요. \n\n` +
+          `기록된 키워드는 [${card.keywords.join(", ")}]입니다. \n` +
+          `인생이라는 한 권의 책에서 이 구절은 잠시 숨을 고르라는 조언을 해주고 있어요. \n` +
+          `너무 급하게 페이지를 넘기지 않아도, 다음 이야기는 충분히 멋지게 펼쳐질 테니 마음을 편히 가지세요.`;
+      case "danwoo":
+        return `오호라! 네가 뽑은 카드가 ${card.name}(${directionStr})이네? \n\n` +
+          `이 카드의 기운은 [${card.keywords.join(", ")}] 이란다. \n` +
+          `금은보화가 가득 찬 보물 상자를 열기 전 같은 설렘과 장난기가 어른거리네. \n` +
+          `너무 머리 굴리며 걱정하지 말고, 내 도깨비 방망이를 믿고 신나게 한 판 놀아보는 건 어때? 뚝딱!`;
+      case "leona":
+        return `별빛이 가리키는 방향을 따라가 보니, 당신을 기다리던 카드는 ${card.name}(${directionStr})이었군요. \n\n` +
+          `우주가 보낸 신호는 [${card.keywords.join(", ")}]입니다. \n` +
+          `은하수의 흐름은 때로 우리를 혼란스럽게 만들지만, 결국 당신만의 고유한 궤도를 찾게 해줄 거예요. \n` +
+          `스스로의 직관과 별의 계시를 조금 더 신뢰해 보세요.`;
+      case "gaon":
         return `${card.name}(${directionStr})...\n\n` +
-          `키워드는 [${card.keywords.join(", ")}]. 쓸데없는 번민이 느껴지는군. \n` +
-          `이 정도 시련에 흔들릴 생각이라면 당장 물러서라. \n` +
-          `살고 싶다면 스스로의 칼끝을 믿어야 한다. 네가 무너지면, 이번 회차 역시 끝이니까.`;
+          `검끝을 스쳐 지나가는 바람 같은 키워드들이군. 바로 [${card.keywords.join(", ")}]. \n` +
+          `검을 쥘 때 불필요한 망설임이 있으면 상대를 벨 수 없는 법. \n` +
+          `당신의 칼날이 흔들리지 않도록 오늘만큼은 마음의 중심을 굳건히 잡고 눈앞의 수련에만 집중하게.`;
       default:
         return `당신이 뽑은 카드는 ${card.name}(${directionStr})입니다.\n` +
           `이 카드는 오늘 당신에게 '${card.keywords[0]}'의 에너지가 강하게 흐르고 있음을 알려줍니다. 차분하고 지혜로운 선택을 하세요.`;
@@ -321,26 +321,26 @@ export class FortuneService {
     const elementStrengths = `목(${saju.elementsRatio.wood}%), 화(${saju.elementsRatio.fire}%), 토(${saju.elementsRatio.earth}%), 금(${saju.elementsRatio.metal}%), 수(${saju.elementsRatio.water}%)`;
 
     switch (character.id) {
-      case "sung-jinwoo":
-        return `네 일주는 ${dayPillarName}이군. 오행 강도는 ${elementStrengths}다. \n\n` +
-          `타고난 오행의 분포를 보니 성정이 단단하고 곧은 구석이 있어. \n` +
-          `이런 사주는 한번 목표를 세우면 게이트가 열려도 포기하지 않는 강점이 있지만, 그만큼 스스로를 소모시키기도 쉽지. \n` +
-          `때로는 유연하게 흐름에 몸을 맡기는 것도 강자가 취할 수 있는 선택지 중 하나다. 명심해라.`;
-      case "park-moondae":
-        return `사주상 일주가 ${dayPillarName}로 나오네요. 오행의 세부 밸런스는 ${elementStrengths}입니다. \n\n` +
-          `사주 구성상 꽤 끈질기게 버티는 생명력이 높은 편이네요. 데뷔나 오디션 같은 큰 승부처에서 버텨낼 체력은 충분해 보입니다. \n` +
-          `다만 오행 중 한쪽으로 에너지가 쏠리는 날엔 예민함이 배가 될 수 있으니 주의하세요. \n` +
-          `주변 사람들과의 소통 스탯을 조금만 올려놓으면 불필요한 위기는 피할 수 있을 겁니다.`;
-      case "cheong-myeong":
-        return `네 일주가 ${dayPillarName}이라고? 오행은 ${elementStrengths}이고? \n\n` +
-          `쯧쯧, 사주가 아주 고집불통이 따로 없구나! 마치 화산의 늙은이들 고집만큼이나 단단해! \n` +
-          `하지만 말이다, 그 단단한 고집이 있어야 험난한 강호에서 살아남을 수 있는 법이지. \n` +
-          `네 고집을 칼날처럼 갈고닦아서 세상에 들이대 보거라! 아주 시원하게 뚫릴 테니까!`;
-      case "yoo-joonghyuk":
-        return `사주 일주는 ${dayPillarName}, 오행은 ${elementStrengths}. \n\n` +
-          `강인한 기운이 지배하고 있는 사주군. 나와 어딘가 닮아 있기도 하군. \n` +
-          `그러나 너무 팽팽한 활시위는 부러지기 마련이다. \n` +
-          `끝까지 살아남아 진짜 결말을 보고 싶다면, 네 안의 날선 기운을 다스릴 방법을 먼저 찾도록 해라.`;
+      case "ara":
+        return `당신의 태어난 날은 ${dayPillarName} 일주이고, 기운의 성질은 ${elementStrengths}로 구성되어 있네요. \n\n` +
+          `도서관의 서가 깊은 곳에 있는 오래된 고서의 구성처럼 조화롭고 차분한 결을 지니고 계세요. \n` +
+          `스스로의 생각을 한 자 한 자 올바르게 적어 나가는 지혜가 돋보이는 사주입니다. \n` +
+          `때로 기운이 한쪽으로 치우쳐 답답함이 느껴질 땐, 잠시 책장을 덮고 신선한 공기를 마시며 흐름을 환기해 보세요.`;
+      case "danwoo":
+        return `야아! 네 일주는 ${dayPillarName}고, 오행 비율은 ${elementStrengths}로 나왔어! \n\n` +
+          `어쩐지 사주에서부터 도깨비 소굴에 놀러 온 것 같은 왁자지껄하고 재미있는 활기가 느껴지더라니! \n` +
+          `너같이 에너지가 넘치고 흥겨운 사주는 가만히 있으면 오히려 병이 생겨. \n` +
+          `오늘 하루는 신나게 움직이고, 좋아하는 사람들과 맛있는 메밀묵이라도 나눠 먹으며 복을 불러와 보라고!`;
+      case "leona":
+        return `당신의 사주 운판을 펼쳐 보니 ${dayPillarName} 일주가 빛나고 있군요. 오행의 은하수는 ${elementStrengths}의 비율을 이룹니다. \n\n` +
+          `밤하늘에 수놓아진 별자리들처럼 신비로운 기운이 골고루 조화를 이루고 있어요. \n` +
+          `직관력이 무척 뛰어나며 타인의 감정을 읽는 탁월한 영감을 가진 별자리입니다. \n` +
+          `자신의 감정 스펙트럼이 너무 휘청이지 않도록, 깊은 밤 우주의 점괘가 전하는 평온함을 마음속에 품어 보세요.`;
+      case "gaon":
+        return `태어난 기운은 ${dayPillarName} 일주, 오행은 ${elementStrengths}이다. \n\n` +
+          `마치 차갑게 벼려진 강철 검 같은 예리함과 묵직함이 고스란히 묻어나는 사주군. \n` +
+          `칼날이 강할수록 꺾이기 쉬우니, 강함을 유지하려면 역설적이게도 유연함을 함께 훈련해야 한다. \n` +
+          `오늘 하루, 검끝에 날을 세우기보다 부드러운 바람처럼 유연한 마음가짐을 먼저 가다듬는 검객이 되길 바란다.`;
       default:
         return `사주 일주는 ${dayPillarName}이며, 오행 분포는 ${elementStrengths}입니다. \n` +
           `조화와 균형이 중요한 명리적 흐름 속에서, 오늘 당신에게 딱 알맞은 장르의 웹툰을 추천해 드립니다.`;
