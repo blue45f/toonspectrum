@@ -58,6 +58,8 @@ export interface CreatorWorkSummary {
   seriesTitle: string | null;
   challengeId: string | null;
   challengeTitle: string | null;
+  // 리믹스 (이어서 편집하기) 관계 필드
+  remixFromId: string | null;
   createdAt: string;
 }
 
@@ -77,6 +79,13 @@ export interface CreatorWorkDetail extends CreatorWorkSummary {
   prevEpisode: CreatorEpisodeRef | null;
   nextEpisode: CreatorEpisodeRef | null;
   challenge: { id: string; slug: string; title: string; endsAt: string | null } | null;
+  remixFromTitle: string | null;
+  remixedChildren?: {
+    id: string;
+    title: string;
+    cover: string;
+    author: CreatorAuthor;
+  }[];
 }
 
 export interface CreatorWorkComment {
@@ -100,6 +109,8 @@ export interface CreatorWorkInput {
   // 연재 시리즈/챌린지 연결(선택) — 미전달 시 기존 단편 게시 플로우와 완전 동일하게 동작.
   seriesId?: unknown;
   challengeId?: unknown;
+  // 리믹스 (이어서 편집하기) 원본 작품 ID
+  remixFromId?: unknown;
 }
 
 function safeDate(value: Date | number | string | null | undefined): string {
@@ -462,6 +473,7 @@ export async function listWorks(opts: {
         challengeId: ready ? creatorWorks.challengeId : sql<string | null>`NULL`,
         seriesTitle: ready ? creatorSeries.title : sql<string | null>`NULL`,
         challengeTitle: ready ? creatorChallenges.title : sql<string | null>`NULL`,
+        remixFromId: ready ? creatorWorks.remixFromId : sql<string | null>`NULL`,
       })
       .from(creatorWorks)
       .innerJoin(users, eq(creatorWorks.userId, users.id))
@@ -514,6 +526,7 @@ export async function listWorks(opts: {
       seriesTitle: r.seriesTitle ?? null,
       challengeId: r.challengeId ?? null,
       challengeTitle: r.challengeTitle ?? null,
+      remixFromId: r.remixFromId ?? null,
       createdAt: safeDate(r.createdAt),
     }));
   } catch {
@@ -548,6 +561,7 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
         seriesId: ready ? creatorWorks.seriesId : sql<string | null>`NULL`,
         episodeNo: ready ? creatorWorks.episodeNo : sql<number | null>`NULL`,
         challengeId: ready ? creatorWorks.challengeId : sql<string | null>`NULL`,
+        remixFromId: ready ? creatorWorks.remixFromId : sql<string | null>`NULL`,
       })
       .from(creatorWorks)
       .innerJoin(users, eq(creatorWorks.userId, users.id))
@@ -632,6 +646,47 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       }
     }
 
+    let remixFromTitle: string | null = null;
+    let remixedChildren: CreatorWorkDetail["remixedChildren"] = [];
+    if (ready) {
+      if (row.remixFromId) {
+        const [parent] = await db
+          .select({ title: creatorWorks.title })
+          .from(creatorWorks)
+          .where(eq(creatorWorks.id, row.remixFromId))
+          .limit(1);
+        if (parent) {
+          remixFromTitle = parent.title;
+        }
+      }
+      const childrenRows = await db
+        .select({
+          id: creatorWorks.id,
+          title: creatorWorks.title,
+          cover: creatorWorks.cover,
+          userId: users.id,
+          author: users.name,
+          avatar: users.avatar,
+        })
+        .from(creatorWorks)
+        .innerJoin(users, eq(creatorWorks.userId, users.id))
+        .where(
+          and(
+            eq(creatorWorks.remixFromId, id),
+            eq(creatorWorks.status, "published"),
+            eq(creatorWorks.hidden, false)
+          )
+        )
+        .orderBy(desc(creatorWorks.createdAt))
+        .limit(10);
+      remixedChildren = childrenRows.map((c) => ({
+        id: c.id,
+        title: c.title,
+        cover: c.cover,
+        author: { id: c.userId, name: c.author ?? "익명", avatar: c.avatar ?? "#7c5cfc" },
+      }));
+    }
+
     return {
       id: row.id,
       title: row.title,
@@ -651,6 +706,9 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       seriesTitle,
       challengeId: row.challengeId ?? null,
       challengeTitle,
+      remixFromId: row.remixFromId ?? null,
+      remixFromTitle,
+      remixedChildren,
       createdAt: safeDate(row.createdAt),
       updatedAt: safeDate(row.updatedAt),
       pages: parsePages(row.pages),
@@ -712,6 +770,8 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     }
   }
 
+  const remixFromId = parseRefId(input.remixFromId);
+
   const id = crypto.randomUUID();
   const now = new Date();
   const values: typeof creatorWorks.$inferInsert = {
@@ -726,6 +786,7 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     pages,
     doc,
     status,
+    remixFromId,
     createdAt: now,
     updatedAt: now,
   };
@@ -756,6 +817,7 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     seriesTitle,
     challengeId,
     challengeTitle,
+    remixFromId,
     createdAt: safeDate(now),
   };
 }

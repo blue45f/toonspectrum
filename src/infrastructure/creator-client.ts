@@ -35,6 +35,7 @@ export interface WorkSummary {
   seriesTitle?: string | null;
   challengeId?: string | null;
   challengeTitle?: string | null;
+  remixFromId?: string | null;
 }
 
 // 작품 상세의 이전화/다음화 내비게이션 항목.
@@ -52,6 +53,13 @@ export interface WorkDetail extends WorkSummary {
   prevEpisode?: EpisodeRef | null;
   nextEpisode?: EpisodeRef | null;
   challenge?: { id: string; slug: string; title: string; endsAt: string | null } | null;
+  remixFromTitle?: string | null;
+  remixedChildren?: {
+    id: string;
+    title: string;
+    cover: string;
+    author: WorkAuthor;
+  }[];
 }
 
 export interface WorkComment {
@@ -85,6 +93,7 @@ export interface CreateWorkInput {
   // 선택: 연재 시리즈 회차로 게시(서버가 episodeNo 자동 부여) / 챌린지 참여작으로 게시.
   seriesId?: string | null;
   challengeId?: string | null;
+  remixFromId?: string | null;
 }
 
 export type UpdateWorkInput = Partial<CreateWorkInput>;

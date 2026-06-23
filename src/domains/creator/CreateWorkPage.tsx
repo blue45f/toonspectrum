@@ -12,6 +12,7 @@ import {
   Settings2,
   Trash2,
   Trophy,
+  WandSparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -319,6 +320,160 @@ function WorkComments({ workId }: { workId: string }) {
   );
 }
 
+interface ElNode {
+  id: string;
+  type: string;
+  name: string;
+  details?: string;
+  opacity?: number;
+  hidden?: boolean;
+}
+
+interface StudioElement {
+  id: string;
+  type: string;
+  variant?: string;
+  text?: string;
+  src?: string;
+  points?: number[];
+  stroke?: string;
+  width?: number;
+  height?: number;
+  bg?: string;
+  bgColor?: string;
+  lineCount?: number;
+  opacity?: number;
+  hidden?: boolean;
+}
+
+interface StudioDoc {
+  pagesList?: { elements?: StudioElement[] }[];
+  elements?: StudioElement[];
+}
+
+function parseLayersFromDoc(doc: unknown): { pageIndex: number; layers: ElNode[] }[] {
+  if (!doc || typeof doc !== "object") return [];
+  const studioDoc = doc as StudioDoc;
+  const pagesList = studioDoc.pagesList;
+  if (!pagesList || !Array.isArray(pagesList)) {
+    if (studioDoc.elements && Array.isArray(studioDoc.elements)) {
+      return [{ pageIndex: 1, layers: mapElementsToNodes(studioDoc.elements) }];
+    }
+    return [];
+  }
+  return pagesList.map((page, index: number) => ({
+    pageIndex: index + 1,
+    layers: mapElementsToNodes(page?.elements ?? []),
+  }));
+}
+
+function mapElementsToNodes(elements: StudioElement[]): ElNode[] {
+  return elements.map((el) => {
+    let name = "레이어";
+    let details = "";
+    if (el.type === "bubble") {
+      name = `말풍선 (${el.variant === "speech" ? "대사" : el.variant === "thought" ? "생각" : el.variant === "shout" ? "외침" : "설명"})`;
+      details = el.text ? `"${el.text.slice(0, 30)}${el.text.length > 30 ? "..." : ""}"` : "(비어 있음)";
+    } else if (el.type === "text") {
+      name = "텍스트 레이어";
+      details = el.text ? `"${el.text.slice(0, 30)}${el.text.length > 30 ? "..." : ""}"` : "(비어 있음)";
+    } else if (el.type === "image") {
+      name = el.src && el.src.startsWith("data:") ? "3D 캐릭터 렌더" : "배경 / 스튜디오 이미지";
+      details = el.src && !el.src.startsWith("data:") ? el.src.split("/").pop() || "" : "";
+    } else if (el.type === "sticker") {
+      name = "소품 / 스티커";
+      details = el.text || "";
+    } else if (el.type === "draw") {
+      name = `자유 드로잉 (${el.points ? Math.floor(el.points.length / 2) : 0} 획)`;
+      details = el.stroke || "";
+    } else if (el.type === "frame") {
+      name = `컷 프레임 (${el.width}x${el.height})`;
+      details = el.bg || el.bgColor || "투명";
+    } else if (el.type === "focusLines") {
+      name = "효과선 (집중선)";
+      details = `${el.lineCount}개 선`;
+    } else if (el.type === "speedLines") {
+      name = "효과선 (속도선)";
+      details = `${el.lineCount}개 선`;
+    }
+
+    return {
+      id: el.id,
+      type: el.type,
+      name,
+      details,
+      opacity: el.opacity,
+      hidden: el.hidden,
+    };
+  });
+}
+
+function WorkInspector({ doc }: { doc: unknown }) {
+  const [open, setOpen] = useState(false);
+  const pages = parseLayersFromDoc(doc);
+  const totalLayers = pages.reduce((sum, p) => sum + p.layers.length, 0);
+
+  if (totalLayers === 0) return null;
+
+  return (
+    <section className="mt-6 rounded-2xl border border-line bg-panel/30 p-4 sm:p-5">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between font-bold text-sm text-fg"
+      >
+        <span className="flex items-center gap-1.5">
+          <Layers size={15} className="text-accent" />
+          개체/레이어 탐색기 (Inspector)
+          <span className="numeral text-fg-3">{totalLayers}개 요소</span>
+        </span>
+        <span className="text-xs text-accent hover:underline">
+          {open ? "닫기" : "레이어 트리 열기"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-4 max-h-96 overflow-y-auto rounded-xl border border-line bg-card/60 p-3 space-y-4 font-mono text-[0.72rem] leading-relaxed">
+          {pages.map((p) => (
+            <div key={p.pageIndex} className="space-y-1.5">
+              <h4 className="font-semibold text-fg-2 border-b border-line pb-1 mb-2 border-solid">
+                Page {p.pageIndex}
+              </h4>
+              {p.layers.length === 0 ? (
+                <p className="text-fg-3 italic pl-3">이 페이지에는 개체가 없습니다.</p>
+              ) : (
+                <div className="pl-2 space-y-1">
+                  {p.layers.map((layer) => (
+                    <div
+                      key={layer.id}
+                      className={cn(
+                        "flex items-center justify-between rounded px-2.5 py-1.5 bg-canvas/30 hover:bg-canvas/60 border border-transparent hover:border-line border-solid transition-colors",
+                        layer.hidden && "opacity-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-accent font-bold">[{layer.type.toUpperCase()}]</span>
+                        <span className="text-fg font-medium truncate">{layer.name}</span>
+                        {layer.details && (
+                          <span className="text-fg-3 truncate italic">{layer.details}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 text-fg-3">
+                        {layer.opacity !== undefined && <span>op:{Math.round(layer.opacity * 100)}%</span>}
+                        {layer.hidden && <span className="text-bad">[숨김]</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function CreateWorkPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -435,6 +590,20 @@ export function CreateWorkPage() {
       </Link>
 
       <header className="mb-6">
+        {/* 리믹스 원작 정보 배지 */}
+        {work.remixFromId && (
+          <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-line bg-raised/50 px-2.5 py-1.5 text-xs text-fg-2 border-solid">
+            <span className="font-semibold text-accent flex items-center gap-1">
+              <WandSparkles size={13} />
+              Remix
+            </span>
+            <span>이 작품은 원작</span>
+            <Link href={`/create/${work.remixFromId}`} className="font-semibold text-fg hover:text-accent hover:underline">
+              {work.remixFromTitle || "원본 작품"}
+            </Link>
+            <span>의 리믹스 버전입니다.</span>
+          </div>
+        )}
         {/* 연재 시리즈 배지 — 시리즈 상세로 이동 */}
         {work.series && (
           <Link
@@ -542,6 +711,18 @@ export function CreateWorkPage() {
             <span className="numeral">{formatCount(work.views)}</span> 조회
           </span>
 
+          <Link
+            href={`/studio?remix=${encodeURIComponent(work.id)}`}
+            className={buttonClass({
+              size: "sm",
+              variant: "outline",
+              className: "gap-1.5 border-accent/40 bg-accent-soft/20 text-accent hover:bg-accent-soft/30 ml-2 border-solid",
+            })}
+          >
+            <WandSparkles size={14} />
+            <span>이어서 편집 (Remix)</span>
+          </Link>
+
           {work.isOwner && (
             <div className="ml-auto flex items-center gap-2">
               <Link
@@ -588,6 +769,43 @@ export function CreateWorkPage() {
 
       {/* 세로 웹툰 스크롤 — 효과툰 리더(스크롤 모션·분위기·BGM, doc.fx 기반) */}
       <WebtoonFxPlayer pages={work.pages} fx={readWorkFx(work.doc)} title={work.title} />
+
+      {/* 개체/레이어 탐색기 (Inspector) */}
+      <WorkInspector doc={work.doc} />
+
+      {/* 이 작품을 이어서 그린 리믹스 작품들 */}
+      {work.remixedChildren && work.remixedChildren.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-line bg-panel/30 p-4 sm:p-5">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg mb-4">
+            <WandSparkles size={15} className="text-accent" />
+            이 작품을 이어서 그린 리믹스 작품들
+            <span className="numeral text-fg-3">{work.remixedChildren.length}</span>
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {work.remixedChildren.map((child) => (
+              <Link
+                key={child.id}
+                href={`/create/${child.id}`}
+                className="group flex flex-col overflow-hidden rounded-xl border border-line bg-card/60 transition-colors hover:border-line-strong"
+              >
+                <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
+                  <CoverImage
+                    src={child.cover}
+                    alt={child.title}
+                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 p-2">
+                  <h3 className="line-clamp-1 text-xs font-semibold leading-tight text-fg group-hover:text-accent">
+                    {child.title}
+                  </h3>
+                  <p className="truncate text-[0.65rem] text-fg-3">by {child.author.name}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 시리즈 회차 내비게이션 — 이전화/시리즈 목록/다음화 */}
       {work.series && (

@@ -1807,6 +1807,7 @@ export function StudioPage() {
   const [params] = useSearchParams();
   const { data: session } = useSession();
   const workId = params.get("id");
+  const remixId = params.get("remix");
   const linkedTitleId = params.get("titleId");
   const studioAuthUserId = session?.user?.id ?? null;
   const loggedIn = Boolean(studioAuthUserId);
@@ -2583,21 +2584,32 @@ export function StudioPage() {
     }
   }, [elements]);
 
-  // 기존 작품 로드(편집 모드).
+  // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
-    if (!workId) {
+    const targetId = workId || remixId;
+    if (!targetId) {
       setWorkHydrated(true);
       return;
     }
     setWorkHydrated(false);
     let alive = true;
     import("@/src/infrastructure/creator-client")
-      .then(({ getWork }) => getWork(workId))
+      .then(({ getWork }) => getWork(targetId))
       .then((w) => {
         if (!alive) return;
-        setTitle(w.title);
-        setDescription(w.description);
-        setTagsText((w.tags ?? []).join(", "));
+        if (remixId) {
+          setTitle(w.title + " (리믹스)");
+          setDescription(
+            `이 작품은 ${w.author.name} 작가님의 '${w.title}' 작품을 리믹스(이어서 편집)한 작품입니다.\n\n${w.description}`
+          );
+          const rawTags = w.tags ?? [];
+          const combinedTags = rawTags.includes("리믹스") ? rawTags : [...rawTags, "리믹스"];
+          setTagsText(combinedTags.join(", "));
+        } else {
+          setTitle(w.title);
+          setDescription(w.description);
+          setTagsText((w.tags ?? []).join(", "));
+        }
         const doc = w.doc as {
           elements?: El[];
           bg?: string;
@@ -2634,7 +2646,7 @@ export function StudioPage() {
     return () => {
       alive = false;
     };
-  }, [workId]);
+  }, [workId, remixId]);
 
   useEffect(() => {
     studioOptionalAssetsMountedRef.current = true;
@@ -4572,6 +4584,7 @@ export function StudioPage() {
           panelGutter,
         } as Record<string, unknown>,
         status,
+        remixFromId: (!workId && remixId) ? remixId : undefined,
       };
       const { createWork, updateWork } = await import("@/src/infrastructure/creator-client");
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);

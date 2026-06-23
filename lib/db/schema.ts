@@ -389,6 +389,8 @@ export const creatorWorks = pgTable(
     episodeNo: integer("episodeNo"), // 시리즈 내 회차 번호(서버가 max+1 자동 부여)
     // 창작 챌린지(툰스푼 창작 작업실 스타일) — 설정 시 해당 챌린지 참여작.
     challengeId: text("challengeId"),
+    // 리믹스 (이어서 편집하기) 원작 ID 링크
+    remixFromId: text("remixFromId"),
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
     updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
@@ -398,6 +400,7 @@ export const creatorWorks = pgTable(
     index("idx_creator_work_status_created").on(t.status, t.createdAt), // 공개 보드 최신순
     index("idx_creator_work_series_episode").on(t.seriesId, t.episodeNo), // 시리즈 회차 정렬
     index("idx_creator_work_challenge_created").on(t.challengeId, t.createdAt), // 챌린지 참여작
+    index("idx_creator_work_remix").on(t.remixFromId), // 리믹스 쿼리 최적화
   ]
 );
 
