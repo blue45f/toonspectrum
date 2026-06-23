@@ -104,16 +104,36 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-line/60">
-        <div className="mx-auto flex max-w-[1320px] flex-col gap-1 px-4 py-5 text-xs text-fg-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© 2026 툰스펙트럼</span>
-          <span className="inline-flex items-center gap-2">
-            <span
-              aria-hidden
-              className="h-1.5 w-7 rounded-full"
-              style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
-            />
-            <span className="eyebrow text-[0.6rem] text-fg-3">Type &amp; Spectrum</span>
-          </span>
+        <div className="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 text-[11px] text-fg-3 space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 leading-relaxed">
+            <div>
+              <p className="font-semibold text-fg-2">상호: 에이치준랩스</p>
+              <p>대표자: 김희준 | 개인정보보호책임자: 김희준</p>
+            </div>
+            <div>
+              <p>사업자등록번호: 355-07-03473</p>
+              <p>주소: 서울특별시 송파구 가락로34길 13, 101호(방이동)</p>
+            </div>
+            <div>
+              <p>이메일: blue45f@gmail.com</p>
+              <p>전화번호: 010-3873-4197</p>
+            </div>
+            <div>
+              <p>호스팅 서비스: Vercel (Frontend)</p>
+              <p>플랫폼 형태: 웹툰·웹소설 통합 검색 및 분석 인덱스</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-line/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <span>© {new Date().getFullYear()} 툰스펙트럼. All rights reserved.</span>
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-1.5 w-7 rounded-full"
+                style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
+              />
+              <span className="eyebrow text-[0.6rem] text-fg-3">Type &amp; Spectrum</span>
+            </span>
+          </div>
         </div>
       </div>
     </footer>
