@@ -124,7 +124,7 @@ export function SiteFooter() {
             </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-line/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} 툰스펙트럼. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} 툰스펙트럼 (Beta). All rights reserved.</span>
             <span className="inline-flex items-center gap-2">
               <span
                 aria-hidden
