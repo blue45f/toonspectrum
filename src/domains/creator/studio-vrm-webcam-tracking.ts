@@ -122,17 +122,34 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
 
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
 
-    const landmarker = await FLM.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        delegate: "GPU",
-      },
-      runningMode: "VIDEO",
-      outputFaceBlendshapes: true,
-      outputFacialTransformationMatrixes: true,
-      numFaces: 1,
-    });
+    // Try GPU first, fallback to CPU (some GPUs / environments fail on GPU delegate)
+    let landmarker: FaceLandmarker;
+    try {
+      landmarker = await FLM.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU",
+        },
+        runningMode: "VIDEO",
+        outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: true,
+        numFaces: 1,
+      });
+    } catch (gpuErr) {
+      console.warn("FaceLandmarker GPU delegate failed, falling back to CPU:", gpuErr);
+      landmarker = await FLM.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "CPU",
+        },
+        runningMode: "VIDEO",
+        outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: true,
+        numFaces: 1,
+      });
+    }
 
     cachedLandmarker = landmarker;
     return landmarker;

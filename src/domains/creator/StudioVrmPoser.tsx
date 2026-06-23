@@ -2030,14 +2030,28 @@ function parseCameraError(error: unknown): string {
     const name = error.name;
     const msg = error.message;
 
+    // Compute recommended access URL dynamically
+    const getRecommendedUrl = () => {
+      if (typeof window === "undefined") return "https://webtoon-index.vercel.app/studio";
+      const { protocol, hostname, origin, pathname } = window.location;
+      const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+      if (protocol === "https:" || isLocal) {
+        // Use current URL (preserve path like /studio)
+        return `${origin}${pathname}`;
+      }
+      // Suggest production HTTPS URL
+      return "https://webtoon-index.vercel.app/studio";
+    };
+    const recommended = getRecommendedUrl();
     const isSecure = typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
     if (!isSecure) {
       return "보안 접속(HTTPS 또는 localhost) 환경이 아니기 때문에 브라우저가 카메라 권한 팝업을 띄우지 않고 요청을 원천 차단했습니다.\n\n" +
         "[해결 방법]\n" +
-        "1. 접속 주소를 확인해 주세요: 현재 IP 주소(예: http://192.168.x.x:5173) 또는 비보안(http) 도메인으로 접속 중이시라면, 보안 규정상 웹캠 기능 사용이 불가능합니다.\n" +
-        "2. 로컬 테스트인 경우: 반드시 주소창에 'http://localhost:5173'을 직접 타이핑하여 재접속해 주세요. (localhost는 비보안 환경이어도 예외적으로 웹캠이 허용됩니다.)\n" +
-        "3. 외부 배포 환경인 경우: 반드시 HTTPS 보안 인증서가 적용된 주소(https://...)로 접속해 주세요.";
+        `1. 현재 비보안 주소로 접속 중입니다. 브라우저 보안 규정상 웹캠은 HTTPS 또는 localhost에서만 허용됩니다.\n` +
+        `2. 로컬 개발 시: 주소창에 'http://localhost:5173' (또는 현재 Vite 포트)을 직접 입력해 접속하세요.\n` +
+        `3. 운영/배포 환경에서는 반드시 HTTPS 주소(${recommended})로 접속하세요. (Vercel 등은 자동으로 HTTPS를 강제합니다.)\n` +
+        `4. 외부 IP(예: http://192.168.x.x:xxxx)로 직접 접속 중이라면, 도메인 또는 localhost를 사용하거나 ngrok/cloudflare tunnel 같은 HTTPS 터널을 이용하세요.`;
     }
 
     if (name === "NotAllowedError" || msg.includes("Permission denied") || msg.includes("denied")) {
@@ -2045,17 +2059,17 @@ function parseCameraError(error: unknown): string {
         "[원인 및 해결 방법]\n" +
         "1. 이전에 카메라 권한을 '차단'으로 설정했기 때문일 수 있습니다. 브라우저 주소창 왼쪽의 '자물쇠' 또는 '설정' 아이콘을 클릭하여 '카메라' 항목이 '차단'되어 있다면 '허용' 또는 '요청(기본값)'으로 변경하고 페이지를 새로고침(F5)해 주세요.\n" +
         "2. macOS 시스템 설정에서 차단되었을 수 있습니다. [macOS 시스템 설정 > 개인정보 보호 및 보안 > 카메라]로 이동하여, 현재 사용 중인 브라우저(Chrome, Safari, Arc 등)의 카메라 접근 허용 스위치를 켜 주세요. 시스템 권한이 꺼져 있으면 브라우저가 팝업을 띄우지 못하고 즉시 거부됩니다.\n" +
-        "3. 브라우저가 일시적인 오류 상태일 수 있습니다. 브라우저를 완전히 종료했다가 다시 실행하여 'http://localhost:5173' 주소로 다시 접속해 보세요.";
+        `3. 브라우저가 일시적인 오류 상태일 수 있습니다. 브라우저를 완전히 종료했다가 다시 실행하여 '${recommended}' 주소로 다시 접속해 보세요.`;
     } else if (name === "TypeError" && (msg.includes("undefined") || msg.includes("Insecure Context") || msg.includes("getUserMedia"))) {
       errMsg = "보안 접속 환경(HTTPS 또는 localhost)이 아니어서 브라우저가 카메라 접근 요청을 원천 차단했습니다.\n\n" +
         "[해결 방법]\n" +
-        "외부 IP 주소(예: http://192.168.x.x:5173) 대신, 웹 주소창에 직접 'http://localhost:5173'을 입력하고 접속하여 다시 실행해 주세요.";
+        `현재 주소가 비보안(HTTP IP 등)입니다. 로컬 개발은 'http://localhost:5173' (또는 dev server), 운영 환경은 HTTPS 주소(${recommended})로 직접 접속해 주세요.`;
     } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
       errMsg = "연결된 카메라(웹캠) 장치를 찾을 수 없습니다. 카메라가 컴퓨터에 올바르게 연결되어 있고 전원이 켜져 있는지 확인해 주세요.";
     } else if (name === "NotReadableError" || name === "TrackStartError") {
       errMsg = "카메라 장치를 사용할 수 없습니다. 이미 다른 앱(Zoom, Discord, FaceTime, Skype, 또는 다른 브라우저 탭)에서 카메라를 사용 중일 가능성이 높습니다. 카메라를 점유 중인 다른 프로그램을 완전히 종료하고 다시 시도해 주세요.";
     } else if (name === "SecurityError") {
-      errMsg = "보안 정책(Feature Policy 또는 Sandbox) 제한이나 비보안 컨텍스트 문제로 인해 카메라에 접근할 수 없습니다. 'http://localhost:5173' 주소로 직접 접속했는지 확인해 주세요.";
+      errMsg = `보안 정책(Feature Policy 또는 Sandbox) 제한이나 비보안 컨텍스트 문제로 인해 카메라에 접근할 수 없습니다. '${recommended}' 주소로 직접 접속했는지 확인해 주세요.`;
     } else {
       errMsg = `카메라 접근 오류 (${name}): ${msg}\n\n브라우저 주소창의 자물쇠 설정과 macOS 시스템 보안 설정에서 카메라 권한이 켜져 있는지 다시 한번 확인해 주세요.`;
     }
@@ -2279,7 +2293,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         let stream: MediaStream;
         try {
           if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new TypeError("navigator.mediaDevices is undefined (Insecure Context)");
+            throw new TypeError("navigator.mediaDevices is undefined (Insecure Context or unsupported browser)");
           }
 
           // Check if camera permission is explicitly denied to explain why prompt is not shown
@@ -2307,6 +2321,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           });
         } catch (cameraErr) {
           console.error("Webcam access failed:", cameraErr);
+          // Force update permission state on NotAllowed so banner shows even if Permissions API was "prompt"
+          if (cameraErr instanceof Error && (cameraErr.name === "NotAllowedError" || /denied|Permission denied/i.test(cameraErr.message))) {
+            setBrowserPermissionState("denied");
+          }
           throw new Error(parseCameraError(cameraErr), { cause: cameraErr });
         }
 
@@ -4828,9 +4846,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <div>
                               <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 비보안 환경 접속 (카메라 비활성화)</p>
                               <p className="text-[0.65rem] opacity-90 text-left">
-                                현재 비보안 환경(HTTP IP 주소 등)으로 접속하셨습니다. 브라우저 보안 규정상 웹캠 접근 권한을 요청할 수 없으므로 실시간 트래킹 사용이 불가능합니다.
+                                현재 비보안(HTTP) 주소로 접속 중입니다. 브라우저 정책상 웹캠은 HTTPS 또는 localhost 에서만 동작합니다.
                                 <br />
-                                <strong>http://localhost:5173</strong>으로 재접속해 주세요.
+                                {window.location.protocol === "https:" ? "" : (
+                                  window.location.hostname.includes("vercel") || window.location.hostname.includes("webtoon-index")
+                                    ? `현재 URL을 https:// 로 시작하게 변경하거나 ${window.location.origin.replace("http:", "https:")}${window.location.pathname} 로 접속하세요.`
+                                    : `로컬 개발 시 http://localhost:5173 (또는 현재 dev 서버)로 직접 접속. 운영 환경은 HTTPS(${window.location.hostname.includes(".") ? "현재 도메인" : "https://webtoon-index.vercel.app/studio"})로 접속하세요.`
+                                )}
                               </p>
                             </div>
                           </div>
@@ -4838,14 +4860,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         {window.isSecureContext && browserPermissionState === "denied" && (
                           <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500 mb-3 leading-relaxed">
                             <AlertTriangle className="shrink-0 mt-0.5" size={14} />
-                            <div>
-                              <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 카메라 권한 차단됨</p>
-                              <p className="text-[0.65rem] opacity-90 text-left">
-                                브라우저 설정에서 이 사이트의 카메라 사용이 <strong>차단</strong>되어 있습니다.
-                                이 상태에서는 트래킹을 시작해도 권한 요청 창이 뜨지 않습니다.
-                                <br />
-                                주소창 왼쪽의 <strong>자물쇠/설정</strong> 아이콘을 눌러 카메라 권한을 '허용'으로 변경해 주세요.
+                            <div className="flex-1">
+                              <p className="font-semibold mb-1 text-[0.72rem]">⚠️ 카메라 권한 차단됨 (팝업이 뜨지 않음)</p>
+                              <p className="text-[0.65rem] opacity-90 text-left mb-1.5">
+                                브라우저 또는 시스템에서 카메라가 <strong>즉시 차단</strong>되고 있습니다. 권한 요청 팝업이 나타나지 않습니다.
                               </p>
+                              <ol className="list-decimal pl-4 text-[0.62rem] space-y-0.5 opacity-95">
+                                <li>브라우저 주소창 왼쪽 <strong>자물쇠/설정</strong> → 카메라를 "허용" 또는 "요청(기본값)"으로 변경 → 새로고침</li>
+                                <li><strong>macOS 중요:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 사용 중인 브라우저(Chrome/Safari/Arc 등) 스위치 <strong>켜기</strong></li>
+                              </ol>
                             </div>
                           </div>
                         )}
@@ -4853,11 +4876,36 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     )}
 
                     {webcamError && (
-                      <div className="flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500 mb-3 leading-relaxed">
-                        <AlertTriangle className="shrink-0 mt-0.5" size={14} />
-                        <div>
-                          <p className="font-semibold mb-1 text-[0.72rem]">카메라 권한 및 연결 오류</p>
-                          <p className="whitespace-pre-line text-[0.65rem] opacity-90">{webcamError}</p>
+                      <div className="flex flex-col gap-2 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-500 mb-3 leading-relaxed">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="shrink-0 mt-0.5" size={14} />
+                          <div>
+                            <p className="font-semibold mb-1 text-[0.72rem]">카메라 권한 및 연결 오류</p>
+                            <p className="whitespace-pre-line text-[0.65rem] opacity-90">{webcamError}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pl-6">
+                          <button
+                            type="button"
+                            className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
+                            onClick={() => {
+                              setWebcamError(null);
+                              setWebcamActive(true);
+                            }}
+                          >
+                            다시 시도
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
+                            onClick={() => {
+                              // Re-check permission state
+                              setBrowserPermissionState("prompt");
+                              setWebcamError(null);
+                            }}
+                          >
+                            권한 상태 재확인
+                          </button>
                         </div>
                       </div>
                     )}
@@ -4911,6 +4959,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               if (webcamActive) {
                                 setWebcamActive(false);
                               } else {
+                                setWebcamError(null);
                                 const consented = localStorage.getItem("studio_webcam_consent") === "true";
                                 if (consented) {
                                   setWebcamActive(true);
