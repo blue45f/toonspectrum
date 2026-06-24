@@ -136,7 +136,8 @@ export function solveHandToFingerBones(
   // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준).
   // handRoll 은 검지-소지 교차곱이라 물리적 좌/우손에서 이미 부호가 반대다 → 측별 sign 을
   // 곱하면 한 손만 맞고 다른 손은 뒤집히므로 곱하지 않는다(양손 일관).
-  out[`${avatarSide}Hand`] = [-handRoll(landmarks), 0, 0];
+  // 전역 방향은 실기기 검증으로 보정(부호 +).
+  out[`${avatarSide}Hand`] = [handRoll(landmarks), 0, 0];
 
   return out;
 }
