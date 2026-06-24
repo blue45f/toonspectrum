@@ -253,6 +253,40 @@ function ShareHero({
     );
   }
 
+  if (tab === "tarot" && result.cards && result.cards.length === 3) {
+    return (
+      <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+        {result.cards.map((card, idx) => {
+          const v = getTarotVisual(card.id);
+          const cardAccent = tarotAccent(v.hue);
+          return (
+            <div key={idx} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: accent, marginBottom: 4 }}>{card.position}</div>
+              <div
+                style={{
+                  height: 132,
+                  borderRadius: 11,
+                  border: `2px solid ${cardAccent}`,
+                  background: `linear-gradient(160deg, oklch(0.42 0.13 ${v.hue}), oklch(0.18 0.05 ${v.hue}))`,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: 9, fontWeight: 800, color: cardAccent }}>{v.roman}</span>
+                <span style={{ fontSize: 28, transform: card.type === "reversed" ? "rotate(180deg)" : undefined }}>{v.glyph}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>{card.name}</span>
+                <span style={{ fontSize: 9, color: sub }}>{card.type === "reversed" ? "역" : "정"}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   if (tab === "tarot" && result.card) {
     const v = getTarotVisual(result.card.id);
     const cardAccent = tarotAccent(v.hue);

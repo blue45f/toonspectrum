@@ -13,6 +13,7 @@ import {
   SkipForward,
   Sparkle,
   Share2,
+  X,
 } from "lucide-react";
 import { MotionConfig, motion } from "motion/react";
 import { useState, useEffect, useRef } from "react";
@@ -197,6 +198,7 @@ export function FortunePage() {
   const addToHistory = useFortuneStore((s) => s.addToHistory);
   const history = useFortuneStore((s) => s.history);
   const clearHistory = useFortuneStore((s) => s.clearHistory);
+  const removeFromHistory = useFortuneStore((s) => s.removeFromHistory);
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
@@ -482,22 +484,31 @@ export function FortunePage() {
               </div>
               <div className="rail flex gap-2.5 overflow-x-auto pb-1">
                 {history.map((h) => (
-                  <button
-                    key={h.id}
-                    type="button"
-                    onClick={() => restoreFortune(h)}
-                    className="flex min-w-[150px] shrink-0 items-center gap-2.5 rounded-xl border border-line bg-card/50 p-2.5 text-left transition-colors hover:border-line-strong hover:bg-raised"
-                  >
-                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line/50">
-                      {h.characterAvatar ? (
-                        <img src={h.characterAvatar} alt="" className="h-full w-full object-cover" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
-                      <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
-                    </div>
-                  </button>
+                  <div key={h.id} className="group relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => restoreFortune(h)}
+                      className="flex min-w-[150px] items-center gap-2.5 rounded-xl border border-line bg-card/50 p-2.5 pr-7 text-left transition-colors hover:border-line-strong hover:bg-raised"
+                    >
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line/50">
+                        {h.characterAvatar ? (
+                          <img src={h.characterAvatar} alt="" className="h-full w-full object-cover" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
+                        <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromHistory(h.id)}
+                      aria-label="이 운세 기록 삭제"
+                      className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full text-fg-3 opacity-0 transition-opacity hover:bg-raised hover:text-fg focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1086,23 +1097,42 @@ export function FortunePage() {
                       </div>
                     </div>
 
-                    {/* 세운(歲運) — 올해/내년의 운세 */}
+                    {/* 세운(歲運) — 올해/내년의 운세 (웹툰 컷 연출) */}
                     {fortuneResult.yearLuck && (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {[fortuneResult.yearLuck.thisYear, fortuneResult.yearLuck.nextYear].map((y, i) => (
-                          <div key={y.year} className="rounded-2xl border border-line/45 bg-card/20 p-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--char-accent)" }}>
-                                {i === 0 ? "올해의 운세 (세운)" : "내년 미리보기"}
-                              </span>
-                              <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                          <motion.div
+                            key={y.year}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: i === 1 ? 0.92 : 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.1 + i * 0.12, ease: "easeOut" }}
+                            className="relative overflow-hidden rounded-2xl p-4"
+                            style={{ border: "2px solid var(--char-accent)", background: "var(--char-accent-soft)" }}
+                          >
+                            {/* 스크린톤(하프톤) */}
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute inset-0 opacity-50"
+                              style={{ backgroundImage: "radial-gradient(oklch(1 0 0 / 0.06) 1px, transparent 1.4px)", backgroundSize: "7px 7px" }}
+                            />
+                            {/* 干支 도장 워터마크 */}
+                            <span aria-hidden className="pointer-events-none absolute -right-1 -top-2 select-none font-display text-5xl font-black opacity-10" style={{ color: "var(--char-accent)" }}>
+                              {y.kanji}
+                            </span>
+                            <div className="relative">
+                              <div className="flex items-center justify-between">
+                                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--char-accent)", color: "var(--color-on-accent)" }}>
+                                  {i === 0 ? "올해의 운세 · 세운" : "내년 미리보기"}
+                                </span>
+                                <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                              </div>
+                              <div className="mt-1.5 flex items-baseline gap-2">
+                                <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
+                                <span className="text-sm font-bold text-fg-2">{y.themeName}</span>
+                              </div>
+                              <p className="mt-1 text-xs leading-relaxed text-fg-3">{y.themeFocus}</p>
                             </div>
-                            <div className="mt-1 flex items-baseline gap-2">
-                              <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
-                              <span className="text-sm font-bold text-fg-2">{y.themeName}</span>
-                            </div>
-                            <p className="mt-1 text-xs leading-relaxed text-fg-3">{y.themeFocus}</p>
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     )}

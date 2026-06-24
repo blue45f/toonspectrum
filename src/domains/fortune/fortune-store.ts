@@ -33,6 +33,7 @@ interface FortuneStore extends FortuneProfile {
   setProfile: (patch: Partial<FortuneProfile>) => void;
   recordView: () => void;
   addToHistory: (rec: Omit<SavedFortune, "id" | "dateLabel">) => void;
+  removeFromHistory: (id: string) => void;
   clearHistory: () => void;
 }
 
@@ -69,6 +70,7 @@ export const useFortuneStore = create<FortuneStore>()(
           const full: SavedFortune = { ...rec, id, dateLabel };
           return { history: [full, ...s.history].slice(0, 8) };
         }),
+      removeFromHistory: (id) => set((s) => ({ history: s.history.filter((h) => h.id !== id) })),
       clearHistory: () => set({ history: [] }),
     }),
     {
