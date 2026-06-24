@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -2162,6 +2162,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activeExpressionCategory, setActiveExpressionCategory] = useState<string>("emotion");
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
+  const [poseQuery, setPoseQuery] = useState("");
   const [bodyRotation, setBodyRotation] = useState(0);
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
   const [turntable, setTurntable] = useState(false);
@@ -2390,6 +2391,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     }
   }, []);
   const activeCamera = findCameraPreset(activeCameraId);
+  // 포즈 검색 — 이름/분위기 기준 필터. 빈 검색이면 전체 노출.
+  const poseQ = poseQuery.trim().toLowerCase();
+  const poseMatches = (p: { label: string; tone?: string }) =>
+    !poseQ || p.label.toLowerCase().includes(poseQ) || (p.tone?.toLowerCase().includes(poseQ) ?? false);
+  const poseResultCount =
+    POSE_PRESETS.filter(poseMatches).length +
+    NATURAL_IDLE_POSES.filter(poseMatches).length +
+    EXTRA_POSE_PRESETS.filter(poseMatches).length +
+    savedPoses.filter(poseMatches).length;
   // 비활성 탭 섹션은 hidden 속성으로 숨겨 마운트는 유지(웹캠 video 등 ref 보존).
   // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
@@ -4257,8 +4267,25 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   />
                   <span className="font-medium">포즈 적용 시 캐릭터 표정 유지</span>
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {POSE_PRESETS.map((pose) => (
+
+                <div className="relative mb-3">
+                  <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+                  <input
+                    type="search"
+                    value={poseQuery}
+                    onChange={(e) => setPoseQuery(e.target.value)}
+                    placeholder="포즈 검색 (이름 · 분위기)"
+                    className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  />
+                </div>
+                {poseQ && poseResultCount === 0 ? (
+                  <p className="rounded-xl border border-dashed border-line/55 bg-card/20 py-4 text-center text-[0.68rem] italic text-fg-3">
+                    “{poseQuery}” 검색 결과가 없습니다.
+                  </p>
+                ) : null}
+
+                <div className={cx("grid grid-cols-2 gap-2", poseQ && !POSE_PRESETS.some(poseMatches) && "hidden")}>
+                  {POSE_PRESETS.filter(poseMatches).map((pose) => (
                     <button
                       key={pose.id}
                       type="button"
@@ -4278,10 +4305,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
 
                 {/* 자연 아이들 포즈 — 캐릭터 스폰 시 자동 적용되는 비대칭 컨트라포스토 대기 */}
-                <div className="mt-3.5 border-t border-line/45 pt-3">
-                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">자연 대기 · 스폰 포즈 ({NATURAL_IDLE_POSES.length})</p>
+                <div className={cx("mt-3.5 border-t border-line/45 pt-3", poseQ && !NATURAL_IDLE_POSES.some(poseMatches) && "hidden")}>
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">자연 대기 · 스폰 포즈 ({poseQ ? NATURAL_IDLE_POSES.filter(poseMatches).length : NATURAL_IDLE_POSES.length})</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {NATURAL_IDLE_POSES.map((pose) => (
+                    {NATURAL_IDLE_POSES.filter(poseMatches).map((pose) => (
                       <button
                         key={pose.id}
                         type="button"
@@ -4302,10 +4329,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
 
                 {/* 확장 포즈 프리셋(studio-pose-presets) — 코미Po!식 상황별 포즈 팩 */}
-                <div className="mt-3.5 border-t border-line/45 pt-3">
-                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">확장 포즈 팩 ({EXTRA_POSE_PRESETS.length})</p>
+                <div className={cx("mt-3.5 border-t border-line/45 pt-3", poseQ && !EXTRA_POSE_PRESETS.some(poseMatches) && "hidden")}>
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">확장 포즈 팩 ({poseQ ? EXTRA_POSE_PRESETS.filter(poseMatches).length : EXTRA_POSE_PRESETS.length})</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {EXTRA_POSE_PRESETS.map((pose) => (
+                    {EXTRA_POSE_PRESETS.filter(poseMatches).map((pose) => (
                       <button
                         key={pose.id}
                         type="button"
@@ -4325,7 +4352,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   </div>
                 </div>
 
-                <div className="mt-3.5 space-y-2 border-t border-line/45 pt-3">
+                <div className={cx("mt-3.5 space-y-2 border-t border-line/45 pt-3", poseQ && !savedPoses.some(poseMatches) && "hidden")}>
                   <div className="flex items-center justify-between">
                     <p className="text-[0.65rem] font-bold text-fg-3 uppercase tracking-wider">내가 만든 포즈 ({savedPoses.length})</p>
                     <div className="flex gap-1">
@@ -4355,7 +4382,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </p>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
-                      {savedPoses.map((pose) => (
+                      {savedPoses.filter(poseMatches).map((pose) => (
                         <div
                           key={pose.id}
                           className={cx(
