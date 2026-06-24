@@ -6,6 +6,7 @@ import * as THREE from "three";
 
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
+import { VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
   classifyMeshName,
   COSTUME_SLOT_LABELS,
@@ -330,6 +331,8 @@ const COSTUME_PRESETS: CostumePreset[] = [
 
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
+// 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손). 머리·목은 이미 EMA 스무딩됨.
+const LIMB_BONE_RE = /Arm|Leg|Foot|Hand/;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
@@ -1958,6 +1961,13 @@ function VrmActor({
     applyVrmCustomColors(vrm, customColors);
   }, [customColors, vrm]);
 
+  // 팔/다리 본 시간축 스무딩(프레임 간 상태 유지). 웹캠 토글마다 리셋해 stale 보간 방지.
+  const boneSmootherRef = useRef<VrmBoneSmoother>(new VrmBoneSmoother());
+  useEffect(() => {
+    const smoother = boneSmootherRef.current;
+    return () => smoother.reset();
+  }, [webcamActive]);
+
   useFrame((state, delta) => {
     const dVal = delta as number;
     const humanoid = vrm.humanoid;
@@ -1966,12 +1976,21 @@ function VrmActor({
     if (webcamActive && trackingDataRef.current) {
       const data = trackingDataRef.current;
       if (humanoid) {
+        const smoother = boneSmootherRef.current;
+        const limbBones: string[] = [];
         Object.entries(data.bones).forEach(([boneName, rot]) => {
           const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
-          if (bone) {
+          if (!bone) return;
+          // 팔/다리/발/손은 quaternion 슬러프로 스무딩(떨림 제거). 머리/목은 이미 EMA 스무딩됨.
+          if (LIMB_BONE_RE.test(boneName)) {
+            limbBones.push(boneName);
+            bone.quaternion.copy(smoother.smooth(boneName, rot, dVal));
+          } else {
             bone.rotation.set(rot[0], rot[1], rot[2]);
           }
         });
+        // 이번 프레임에 사라진(미검출) 팔다리 본은 상태를 비워 재검출 시 stale 보간 방지.
+        smoother.retainOnly(limbBones);
       }
 
       if (expressionManager) {
