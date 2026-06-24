@@ -21,6 +21,7 @@ import { useState, useEffect, useRef } from "react";
 
 
 import { CountUp, ConfettiBurst } from "./fortune-fx";
+import { useFortuneStore, computeStreak } from "./fortune-store";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
@@ -140,18 +141,25 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
 };
 
 export function FortunePage() {
+  // 재방문 영속화 — 저장된 프로필로 입력 초기값을 채운다(재입력 제거)
+  const savedProfile = useFortuneStore.getState();
+  const setProfile = useFortuneStore((s) => s.setProfile);
+  const recordView = useFortuneStore((s) => s.recordView);
+  const viewedDates = useFortuneStore((s) => s.viewedDates);
+  const streak = computeStreak(viewedDates);
+
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [activeTab, setActiveTab] = useState<FortuneTab>("today");
-  
-  // 사주 입력 상태
-  const [birthDate, setBirthDate] = useState("");
-  const [birthTime, setBirthTime] = useState("");
-  const [gender, setGender] = useState("none");
-  
+
+  // 사주 입력 상태 (저장값으로 초기화)
+  const [birthDate, setBirthDate] = useState(savedProfile.birthDate);
+  const [birthTime, setBirthTime] = useState(savedProfile.birthTime);
+  const [gender, setGender] = useState(savedProfile.gender);
+
   // 궁합 입력 상태
-  const [partnerBirthDate, setPartnerBirthDate] = useState("");
-  const [partnerBirthTime, setPartnerBirthTime] = useState("");
+  const [partnerBirthDate, setPartnerBirthDate] = useState(savedProfile.partnerBirthDate);
+  const [partnerBirthTime, setPartnerBirthTime] = useState(savedProfile.partnerBirthTime);
   
   // 처방전 입력 상태
   const [prescriptionQuery, setPrescriptionQuery] = useState("");
@@ -185,6 +193,15 @@ export function FortunePage() {
     onSuccess?: (data: FortuneResult) => void
   ): Promise<FortuneResult | null> => {
     playback.stop();
+    // 입력 프로필 영속화 — 다음 방문 시 재입력 제거
+    setProfile({
+      birthDate,
+      birthTime,
+      gender,
+      partnerBirthDate,
+      partnerBirthTime,
+      lastCharacterId: selectedChar?.id ?? null,
+    });
     setErrorMsg(null);
     setLiveMsg("");
     setIsLoading(true);
@@ -229,14 +246,15 @@ export function FortunePage() {
      
   }, []);
 
-  // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내(접근성)
+  // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내 + 출석 기록(스트릭)
   useEffect(() => {
     if (!fortuneResult) return;
     const name = selectedChar?.name ?? "캐릭터";
     const score = fortuneResult.today?.score ?? fortuneResult.score;
     setLiveMsg(`${name}의 운세 결과가 도착했어요.${score != null ? ` 지수 ${score}점.` : ""}`);
     resultHeadingRef.current?.focus();
-  }, [fortuneResult, selectedChar]);
+    recordView();
+  }, [fortuneResult, selectedChar, recordView]);
 
   // 재생/일시정지/이어듣기 토글
   const handleTogglePlay = () => {
@@ -434,7 +452,14 @@ export function FortunePage() {
               </div>
               <h2 className="mt-3 text-lg font-bold text-fg">{selectedChar.name}</h2>
               <span className="text-xs text-fg-3">《{selectedChar.origin}》</span>
-              
+
+              {/* 연속 출석 스트릭 */}
+              {streak > 0 && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">
+                  🔥 {streak}일 연속 출석
+                </span>
+              )}
+
               <button
                 onClick={() => {
                   setSelectedChar(null);
