@@ -9,7 +9,7 @@
 //  - TrackingChannels는 "카메라 좌표계"(미러 전)이고,
 //    convertChannelsToVrmData에서 mirrorMode·gazeLock·sensitivity를 반영한다.
 
-import * as THREE from "three";
+import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 
 import type {
   FaceLandmarker,
@@ -17,6 +17,7 @@ import type {
   PoseLandmarker,
   PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
+
 
 /* ── Public Types ─────────────────────────────────────────────────────── */
 
@@ -514,96 +515,15 @@ export function convertChannelsToVrmData(
   return { bones, expressions };
 }
 
-interface PoseLandmark {
-  x: number;
-  y: number;
-  z: number;
-  visibility?: number;
-}
-
 /**
- * 어깨 -> 팔꿈치, 팔꿈치 -> 손목 등의 3D 방향 벡터를 기반으로
- * VRM 표준 뼈에 적절히 반영될 오일러 회전 각도를 계산한다.
- */
-function computeBoneRotation(
-  parent: PoseLandmark | undefined,
-  child: PoseLandmark | undefined,
-  defaultDir: THREE.Vector3,
-  mirrorSign: number
-): readonly [number, number, number] | null {
-  if (!parent || !child) return null;
-  // 유효한 관절 인식 감도 검사
-  if ((parent.visibility ?? 1) < 0.45 || (child.visibility ?? 1) < 0.45) return null;
-
-  // MediaPipe: Y(하향 양수), Z(전방 양수)
-  // VRM/Three.js: Y(상향 양수), Z(후방 양수)
-  const dx = (child.x - parent.x) * mirrorSign;
-  const dy = -(child.y - parent.y);
-  const dz = -(child.z - parent.z);
-
-  const targetDir = new THREE.Vector3(dx, dy, dz).normalize();
-  if (targetDir.lengthSq() < 1e-6) return null;
-
-  const quat = new THREE.Quaternion().setFromUnitVectors(defaultDir, targetDir);
-  const euler = new THREE.Euler().setFromQuaternion(quat, "XYZ");
-  return [euler.x, euler.y, euler.z] as const;
-}
-
-/**
- * PoseLandmarkerResult에서 팔, 다리, 발 등의 3D 관절 회전값을 추출한다.
+ * PoseLandmarkerResult에서 팔/다리/발의 **부모상대** 본 회전(Euler)을 추출한다.
+ * 실제 계산은 studio-vrm-pose-solver 에 위임한다(부모상대 회전으로 팔꿈치/무릎 이중회전
+ * 버그 수정 + 단일 카메라 z 감쇠 + 가시성 게이팅). 호출부 계약(본 이름→[x,y,z])은 동일.
  */
 export function processPoseResult(
   result: PoseLandmarkerResult,
   mirrorMode = true
 ): Record<string, readonly [number, number, number]> {
-  const bones: Record<string, readonly [number, number, number]> = {};
-  if (!result || !result.worldLandmarks || result.worldLandmarks.length === 0) {
-    return bones;
-  }
-
-  const landmarks = result.worldLandmarks[0];
-  if (!landmarks) return bones;
-
-  const mirrorSign = mirrorMode ? -1 : 1;
-
-  // 좌우 반전 시 대응 뼈 이름 변경
-  const getSideName = (side: "left" | "right") => {
-    if (!mirrorMode) return side;
-    return side === "left" ? "right" : "left";
-  };
-
-  // 1) 팔 트래킹 (왼어깨 11 -> 왼꿈치 13 -> 왼손목 15)
-  const leftUpperArm = computeBoneRotation(landmarks[11], landmarks[13], new THREE.Vector3(1, 0, 0), mirrorSign);
-  if (leftUpperArm) bones[`${getSideName("left")}UpperArm`] = leftUpperArm;
-
-  const leftLowerArm = computeBoneRotation(landmarks[13], landmarks[15], new THREE.Vector3(1, 0, 0), mirrorSign);
-  if (leftLowerArm) bones[`${getSideName("left")}LowerArm`] = leftLowerArm;
-
-  const rightUpperArm = computeBoneRotation(landmarks[12], landmarks[14], new THREE.Vector3(-1, 0, 0), mirrorSign);
-  if (rightUpperArm) bones[`${getSideName("right")}UpperArm`] = rightUpperArm;
-
-  const rightLowerArm = computeBoneRotation(landmarks[14], landmarks[16], new THREE.Vector3(-1, 0, 0), mirrorSign);
-  if (rightLowerArm) bones[`${getSideName("right")}LowerArm`] = rightLowerArm;
-
-  // 2) 다리 트래킹 (왼골반 23 -> 왼무릎 25 -> 왼발목 27)
-  const leftUpperLeg = computeBoneRotation(landmarks[23], landmarks[25], new THREE.Vector3(0, -1, 0), mirrorSign);
-  if (leftUpperLeg) bones[`${getSideName("left")}UpperLeg`] = leftUpperLeg;
-
-  const leftLowerLeg = computeBoneRotation(landmarks[25], landmarks[27], new THREE.Vector3(0, -1, 0), mirrorSign);
-  if (leftLowerLeg) bones[`${getSideName("left")}LowerLeg`] = leftLowerLeg;
-
-  // 3) 발 트래킹 (왼발목 27 -> 왼발끝 29)
-  const leftFoot = computeBoneRotation(landmarks[27], landmarks[29], new THREE.Vector3(0, 0, 1), mirrorSign);
-  if (leftFoot) bones[`${getSideName("left")}Foot`] = leftFoot;
-
-  const rightUpperLeg = computeBoneRotation(landmarks[24], landmarks[26], new THREE.Vector3(0, -1, 0), mirrorSign);
-  if (rightUpperLeg) bones[`${getSideName("right")}UpperLeg`] = rightUpperLeg;
-
-  const rightLowerLeg = computeBoneRotation(landmarks[26], landmarks[28], new THREE.Vector3(0, -1, 0), mirrorSign);
-  if (rightLowerLeg) bones[`${getSideName("right")}LowerLeg`] = rightLowerLeg;
-
-  const rightFoot = computeBoneRotation(landmarks[28], landmarks[30], new THREE.Vector3(0, 0, 1), mirrorSign);
-  if (rightFoot) bones[`${getSideName("right")}Foot`] = rightFoot;
-
-  return bones;
+  const landmarks = result?.worldLandmarks?.[0];
+  return solvePoseToVrmBones(landmarks, { mirror: mirrorMode });
 }
