@@ -133,8 +133,8 @@ export function solveHandToFingerBones(
   out[`${avatarSide}ThumbProximal`] = [0, sign * thumbProx * 0.6, sign * thumbProx * 0.5];
   out[`${avatarSide}ThumbDistal`] = [0, 0, sign * thumbDist];
 
-  // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준). 부호는 측에 따라 반전.
-  out[`${avatarSide}Hand`] = [sign * handRoll(landmarks), 0, 0];
+  // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준). 실기기 검증으로 부호 보정(-sign).
+  out[`${avatarSide}Hand`] = [-sign * handRoll(landmarks), 0, 0];
 
   return out;
 }
