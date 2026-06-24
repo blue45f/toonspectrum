@@ -31,6 +31,7 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  Files,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -183,6 +184,8 @@ import type Konva from "konva";
 import { scheduleIdle } from "@/components/auth/schedule-idle";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
+import { useIsMobile } from "@/components/use-media-query";
+import { useResizable } from "@/components/use-resizable";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/src/compat/auth-session-store";
 
@@ -335,6 +338,37 @@ function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: str
   return (
     <div className="rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
       {label}
+    </div>
+  );
+}
+
+// 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
+function PanelResizeHandle({
+  handleProps,
+  dragging,
+  label,
+}: {
+  handleProps: Record<string, unknown>;
+  dragging: boolean;
+  label: string;
+}) {
+  return (
+    <div
+      {...handleProps}
+      aria-label={label}
+      title={`${label} — 드래그·더블클릭(기본)·←/→`}
+      className={cn(
+        "group relative hidden w-2 shrink-0 cursor-col-resize select-none items-center justify-center self-stretch rounded-full transition-colors lg:flex",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        dragging ? "bg-accent/25" : "hover:bg-accent/15"
+      )}
+    >
+      <span
+        className={cn(
+          "h-10 w-1 rounded-full transition-colors",
+          dragging ? "bg-accent" : "bg-line group-hover:bg-accent/60"
+        )}
+      />
     </div>
   );
 }
@@ -1965,6 +1999,35 @@ export function StudioPage() {
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
+  const isMobile = useIsMobile();
+  // 모바일에서 열려 있는 바텀시트(페이지 목록 / 속성). null=캔버스 전체.
+  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props">(null);
+  const pagesSheetRef = useRef<HTMLDivElement>(null);
+  const propsSheetRef = useRef<HTMLElement>(null);
+  const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
+  // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
+  useEffect(() => {
+    if (!isMobile) setMobileSheet(null);
+  }, [isMobile]);
+  // 바텀시트 a11y: 열리면 시트 내부(닫기 버튼)로 포커스를 옮기고, 닫히면 트리거로 되돌린다.
+  useEffect(() => {
+    if (!isMobile) return;
+    if (!mobileSheet) {
+      sheetReturnFocusRef.current?.focus?.();
+      sheetReturnFocusRef.current = null;
+      return;
+    }
+    sheetReturnFocusRef.current = document.activeElement as HTMLElement | null;
+    const id = requestAnimationFrame(() => {
+      const sheet = mobileSheet === "pages" ? pagesSheetRef.current : propsSheetRef.current;
+      sheet?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [mobileSheet, isMobile]);
+  // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
+  const leftResize = useResizable({ initial: 176, min: 132, max: 320, edge: "right", storageKey: "studio:leftW" });
+  const rightResize = useResizable({ initial: 304, min: 248, max: 560, edge: "left", storageKey: "studio:rightW" });
   const [pageGradePanelOpen, setPageGradePanelOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
@@ -2196,6 +2259,11 @@ export function StudioPage() {
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
+  // 핀치 줌 제스처가 최신 zoom을 stale 없이 읽도록 ref로 동기화.
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
   const effScale = scale * zoom;
   const snapBoundFunc = (pos: { x: number; y: number }) => {
     if (!snapEnabled) return pos;
@@ -2218,6 +2286,51 @@ export function StudioPage() {
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
+  }, []);
+
+  // 모바일 핀치 줌 — 두 손가락 거리 변화를 zoom에 반영(한 손가락 스크롤=네이티브 패닝은 그대로).
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    // 정확히 두 손가락일 때만 기준선을 잡는다. 손가락 수가 바뀌면(예: 2→3→2) 기준선을 버려
+    // 다음 두-손가락 프레임에서 새로 잡게 해 줌이 튀지 않도록 한다.
+    const arm = (e: TouchEvent) => {
+      if (e.touches.length === 2 && !stageRef.current?.isDragging()) {
+        pinchStartDist = dist(e.touches);
+        pinchStartZoom = zoomRef.current;
+      } else {
+        pinchStartDist = 0;
+      }
+    };
+    const onTouchStart = arm;
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || stageRef.current?.isDragging()) {
+        pinchStartDist = 0; // 요소 드래그 중이거나 두 손가락이 아니면 핀치 비활성
+        return;
+      }
+      if (pinchStartDist === 0) {
+        // 두 손가락이 막 모인 첫 프레임 — 기준선만 잡고 이번 프레임은 줌하지 않는다.
+        pinchStartDist = dist(e.touches);
+        pinchStartZoom = zoomRef.current;
+        return;
+      }
+      e.preventDefault(); // 브라우저 페이지 줌 차단
+      setZoom(clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist)));
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length !== 2) pinchStartDist = 0;
+    };
+    node.addEventListener("touchstart", onTouchStart, { passive: true });
+    node.addEventListener("touchmove", onTouchMove, { passive: false });
+    node.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      node.removeEventListener("touchstart", onTouchStart);
+      node.removeEventListener("touchmove", onTouchMove);
+      node.removeEventListener("touchend", onTouchEnd);
+    };
   }, []);
 
   // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
@@ -3803,7 +3916,8 @@ export function StudioPage() {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
-        if (shortcutsOpen) setShortcutsOpen(false);
+        if (mobileSheet) setMobileSheet(null);
+        else if (shortcutsOpen) setShortcutsOpen(false);
         else if (menu) {
           // 위 레이어부터 닫기: 단축키 오버레이 → 열린 툴바 드롭다운 → 선택해제.
           // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
@@ -4784,6 +4898,13 @@ export function StudioPage() {
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
+  // 모바일 하단 도구막대 버튼 — 아이콘 + 작은 라벨 세로 스택.
+  const mobileBarBtn = (active: boolean) =>
+    cn(
+      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.62rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+      active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
+    );
+
   async function handleDownload() {
     const watermarkForExport = ensureWatermarkLoaded();
     setExportMenuOpen(false);
@@ -5025,7 +5146,7 @@ export function StudioPage() {
         maximized && "fixed inset-0 z-[60] overflow-y-auto bg-canvas"
       )}
     >
-    <Container size="wide" className={cn("py-6", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
+    <Container size="wide" className={cn("py-6", !(isFullscreen || maximized) && "xl:max-w-[1600px] 2xl:max-w-[1880px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">창작 스튜디오</h1>
@@ -6013,8 +6134,9 @@ export function StudioPage() {
         <button type="button" onClick={redo} disabled={hi >= history.length - 1} className={cn(toolBtn(false), "disabled:opacity-40")} title="다시실행">
           <Redo2 size={14} />
         </button>
-        <span className="mx-0.5 h-5 w-px bg-line" />
-        <div className="flex items-center gap-1">
+        <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
+        {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
+        <div className="hidden items-center gap-1 lg:flex">
           <button
             type="button"
             onClick={() => setZoom((z) => clampZoom(z - 0.1))}
@@ -6096,7 +6218,16 @@ export function StudioPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
+      <div className="flex flex-col gap-4 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0">
+        {/* 모바일 바텀시트 백드롭 — 탭하면 닫힘 */}
+        {isMobile && mobileSheet && (
+          <button
+            type="button"
+            aria-label="패널 닫기"
+            onClick={() => setMobileSheet(null)}
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm lg:hidden"
+          />
+        )}
         {/* 왼쪽: 페이지 목록 사이드바 (접으면 얇은 레일로) */}
         {!leftPanelOpen && (
           <button
@@ -6109,7 +6240,25 @@ export function StudioPage() {
             <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">페이지</span>
           </button>
         )}
-        <div className={cn("w-full lg:w-44 flex-shrink-0 flex flex-col gap-2 rounded-2xl border border-line bg-panel/20 p-3", !leftPanelOpen && "lg:hidden")}>
+        <div
+          ref={pagesSheetRef}
+          role={isMobile ? "dialog" : undefined}
+          aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
+          aria-label={isMobile ? "페이지 목록" : undefined}
+          inert={isMobile && mobileSheet !== "pages" ? true : undefined}
+          className={cn(
+            "flex flex-col gap-2 border border-line p-3",
+            // 모바일: 하단에서 올라오는 바텀시트
+            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
+            "lg:static lg:z-auto lg:max-h-none lg:flex-shrink-0 lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
+            mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
+            !leftPanelOpen && "lg:hidden"
+          )}
+          style={isMobile ? undefined : { width: leftResize.width }}
+        >
+          {/* 모바일 시트 손잡이 */}
+          <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
           <div className="flex items-center justify-between border-b border-line/50 pb-2">
             <span className="flex items-center gap-1 text-xs font-bold text-fg-2">
               <button
@@ -6121,6 +6270,15 @@ export function StudioPage() {
                 <ChevronLeft size={13} />
               </button>
               페이지 목록
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                className="ml-1 rounded p-0.5 text-fg-3 hover:bg-raised lg:hidden"
+                aria-label="페이지 시트 닫기"
+                data-autofocus
+              >
+                <X size={14} />
+              </button>
             </span>
             <button
               type="button"
@@ -6130,7 +6288,7 @@ export function StudioPage() {
               <Plus size={10} /> 추가
             </button>
           </div>
-          <div className="flex flex-row lg:flex-col gap-1.5 overflow-x-auto lg:overflow-y-auto max-h-[80px] lg:max-h-[calc(100dvh-24rem)] pr-1">
+          <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[56vh] lg:max-h-[calc(100dvh-24rem)] pr-1">
             {pages.map((p, idx) => {
               const isActive = p.id === currentPageId;
               return (
@@ -6149,7 +6307,7 @@ export function StudioPage() {
                     }
                   }}
                   className={cn(
-                    "flex min-w-[100px] lg:min-w-0 lg:w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
+                    "flex w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
                     isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card"
                   )}
                 >
@@ -6240,6 +6398,11 @@ export function StudioPage() {
             })}
           </div>
         </div>
+
+        {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
+        {leftPanelOpen && (
+          <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
+        )}
 
         {/* 중앙: 캔버스 영역 */}
         <div className="relative flex-1 min-w-0">
@@ -7450,7 +7613,7 @@ export function StudioPage() {
           <button
             type="button"
             onClick={() => setQuickStartOpen(true)}
-            className="absolute bottom-3 right-3 z-30 grid size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="absolute bottom-3 right-3 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid"
             aria-label="빠른 시작 도움말 열기"
             aria-expanded={showQuickStart}
             title="빠른 시작"
@@ -7461,7 +7624,7 @@ export function StudioPage() {
           <button
             type="button"
             onClick={() => setShortcutsOpen(true)}
-            className="absolute bottom-3 right-16 z-30 grid size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="absolute bottom-3 right-16 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid"
             aria-label="키보드 단축키 보기"
             title="키보드 단축키 (?)"
           >
@@ -7474,8 +7637,8 @@ export function StudioPage() {
             </Suspense>
           )}
 
-          {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 */}
-          <div className="absolute bottom-3 left-3 z-30 flex items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur">
+          {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 (모바일은 하단 도구막대로 대체) */}
+          <div className="absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur lg:flex">
             <button
               type="button"
               onClick={() => setZoom((z) => clampZoom(z - 0.25))}
@@ -7542,6 +7705,11 @@ export function StudioPage() {
           )}
         </div>
 
+        {/* 캔버스 ↔ 속성 패널 너비 스플리터(데스크톱) */}
+        {rightPanelOpen && (
+          <PanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="속성 패널 너비 조절" />
+        )}
+
         {/* 사이드: 속성 + 게시 정보 (접으면 얇은 레일로) */}
         {!rightPanelOpen && (
           <button
@@ -7554,7 +7722,36 @@ export function StudioPage() {
             <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">속성</span>
           </button>
         )}
-        <aside className={cn("flex flex-col gap-4", !rightPanelOpen && "lg:hidden")}>
+        <aside
+          ref={propsSheetRef}
+          role={isMobile ? "dialog" : undefined}
+          aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
+          aria-label={isMobile ? "속성" : undefined}
+          inert={isMobile && mobileSheet !== "props" ? true : undefined}
+          className={cn(
+            "flex flex-col gap-4",
+            // 모바일: 하단에서 올라오는 바텀시트
+            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
+            "lg:static lg:z-auto lg:max-h-none lg:flex-shrink-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
+            mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
+            !rightPanelOpen && "lg:hidden"
+          )}
+          style={isMobile ? undefined : { width: rightResize.width }}
+        >
+          {/* 모바일 시트 손잡이 + 닫기 */}
+          <div className="flex items-center justify-between lg:hidden">
+            <div className="mx-auto h-1 w-10 rounded-full bg-line" />
+            <button
+              type="button"
+              onClick={() => setMobileSheet(null)}
+              className="absolute right-3 rounded p-1 text-fg-3 hover:bg-raised"
+              aria-label="속성 시트 닫기"
+              data-autofocus
+            >
+              <X size={16} />
+            </button>
+          </div>
           <div className="hidden justify-end lg:flex">
             <button
               type="button"
@@ -9811,6 +10008,72 @@ export function StudioPage() {
             />
           </div>
         </aside>
+
+        {/* 모바일 하단 도구막대 — 패널 토글·추가·줌을 한 손에 */}
+        {isMobile && (
+          <nav
+            aria-label="스튜디오 모바일 도구막대"
+            className="fixed inset-x-0 bottom-0 z-[55] flex items-stretch gap-0.5 border-t border-line bg-panel/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden"
+          >
+            <button
+              type="button"
+              onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+              aria-pressed={mobileSheet === "pages"}
+              className={mobileBarBtn(mobileSheet === "pages")}
+            >
+              <Files size={18} />
+              <span>페이지</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileSheet(null);
+                setQuickStartOpen(true);
+              }}
+              className={mobileBarBtn(false)}
+            >
+              <Plus size={18} />
+              <span>추가</span>
+            </button>
+            <div className="flex flex-[1.4] items-center justify-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                disabled={zoom <= ZOOM_MIN}
+                className="grid size-9 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                aria-label="축소"
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                className="min-w-[2.7rem] rounded-lg px-1 py-1.5 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                aria-label="확대·축소 100%로 맞춤"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                disabled={zoom >= ZOOM_MAX}
+                className="grid size-9 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                aria-label="확대"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileSheet((s) => (s === "props" ? null : "props"))}
+              aria-pressed={mobileSheet === "props"}
+              className={mobileBarBtn(mobileSheet === "props")}
+            >
+              <SlidersHorizontal size={18} />
+              <span>속성</span>
+            </button>
+          </nav>
+        )}
       </div>
 
       <Suspense fallback={<PoserLoadingOverlay />}>
