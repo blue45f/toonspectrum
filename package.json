@@ -61,6 +61,7 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.15.0",
     "google-auth-library": "^10.7.0",
+    "html-to-image": "^1.11.13",
     "konva": "^10.3.0",
     "ky": "^2.0.2",
     "lucide-react": "^1.17.0",

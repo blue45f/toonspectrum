@@ -12,13 +12,15 @@ import {
   SkipBack,
   SkipForward,
   Sparkle,
+  Share2,
 } from "lucide-react";
-import { motion } from "motion/react";
-import { useState, useEffect } from "react";
+import { MotionConfig, motion } from "motion/react";
+import { useState, useEffect, useRef } from "react";
 
 
 
 
+import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
 import { WebtoonStrip } from "./WebtoonStrip";
@@ -77,6 +79,50 @@ interface TodayFortuneData {
   luckyNumber: number;
 }
 
+// 백엔드 명리 분석(사주/오늘 일진/궁합) — 응답에 포함, 공유 카드·표시에 사용
+export interface SajuAnalysisData {
+  dayMasterKan: string;
+  dayMasterElement: string;
+  yinYang: string;
+  strength: string;
+  dominantTenGod: string;
+  usefulElement: string;
+  usefulElementEn: string;
+  personality: string;
+  summary: string;
+}
+export interface IljinData {
+  todayPillar: string;
+  relationTenGod: string;
+  themeName: string;
+  themeFocus: string;
+  score: number;
+}
+export interface CompatData {
+  score: number;
+  grade: string;
+  factors: string[];
+}
+
+export interface FortuneResult {
+  interpretation: string;
+  panels?: FortunePanel[];
+  saju?: SajuData;
+  mySaju?: SajuData;
+  partnerSaju?: SajuData;
+  card?: TarotCardData;
+  today?: TodayFortuneData;
+  analysis?: SajuAnalysisData | null;
+  iljin?: IljinData | null;
+  compat?: CompatData;
+  luckyElement?: string | null;
+  score?: number;
+  query?: string;
+  recommendations: Title[];
+}
+
+export type FortuneTab = "today" | "saju" | "compatibility" | "tarot" | "prescription";
+
 // 오행 영문키 → 한글 (오늘의 운세 개인화 표시용)
 const ELEMENT_KO: Record<string, string> = {
   wood: "목(木)", fire: "화(火)", earth: "토(土)", metal: "금(金)", water: "수(水)",
@@ -94,7 +140,7 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
 export function FortunePage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-  const [activeTab, setActiveTab] = useState<"today" | "saju" | "compatibility" | "tarot" | "prescription">("today");
+  const [activeTab, setActiveTab] = useState<FortuneTab>("today");
   
   // 사주 입력 상태
   const [birthDate, setBirthDate] = useState("");
@@ -113,30 +159,82 @@ export function FortunePage() {
   
   // 결과 상태
   const [isLoading, setIsLoading] = useState(false);
-  const [fortuneResult, setFortuneResult] = useState<{
-    interpretation: string;
-    panels?: FortunePanel[];
-    saju?: SajuData;
-    mySaju?: SajuData;
-    partnerSaju?: SajuData;
-    card?: TarotCardData;
-    today?: TodayFortuneData;
-    luckyElement?: string | null;
-    score?: number;
-    query?: string;
-    recommendations: Title[];
-  } | null>(null);
+  const [fortuneResult, setFortuneResult] = useState<FortuneResult | null>(null);
 
-  // 운세 웹툰 재생 오케스트레이터 — 음성(Azure/Web Speech) + 컷 애니메이션 동기
+  // 운세 웹툰 재생 오케스트레이터 — 음성(Web Speech) + 컷 애니메이션 동기
   const playback = useFortunePlayback(fortuneResult?.panels);
 
-  // 1. 캐릭터 리스트 가져오기
-  useEffect(() => {
+  // 결과 공유/저장 모달
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // 에러·재시도 (운세 호출 실패 시)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [charLoadFailed, setCharLoadFailed] = useState(false);
+  const retryRef = useRef<(() => void) | null>(null);
+  // 결과 헤딩 포커스용(접근성) + 라이브 안내
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [liveMsg, setLiveMsg] = useState("");
+
+  // 운세 API 공용 호출 — 로딩/에러/재시도/낭독정지를 일관 처리
+  const callFortune = async (
+    url: string,
+    body: Record<string, unknown>,
+    retry: () => void,
+    onSuccess?: (data: FortuneResult) => void
+  ): Promise<FortuneResult | null> => {
+    playback.stop();
+    setErrorMsg(null);
+    setLiveMsg("");
+    setIsLoading(true);
+    setFortuneResult(null);
+    retryRef.current = retry;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const data: FortuneResult = await response.json();
+      setFortuneResult(data);
+      onSuccess?.(data);
+      return data;
+    } catch (error) {
+      console.error("운세 호출 실패:", error);
+      setErrorMsg("운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 1. 캐릭터 리스트 가져오기 (실패 시 재시도 버튼 노출)
+  const loadCharacters = () => {
+    setCharLoadFailed(false);
     fetch("/api/fortune/characters")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        return res.json();
+      })
       .then((data) => setCharacters(data))
-      .catch((err) => console.error("캐릭터 정보 로드 실패:", err));
+      .catch((err) => {
+        console.error("캐릭터 정보 로드 실패:", err);
+        setCharLoadFailed(true);
+      });
+  };
+  useEffect(() => {
+    loadCharacters();
+     
   }, []);
+
+  // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내(접근성)
+  useEffect(() => {
+    if (!fortuneResult) return;
+    const name = selectedChar?.name ?? "캐릭터";
+    const score = fortuneResult.today?.score ?? fortuneResult.score;
+    setLiveMsg(`${name}의 운세 결과가 도착했어요.${score != null ? ` 지수 ${score}점.` : ""}`);
+    resultHeadingRef.current?.focus();
+  }, [fortuneResult, selectedChar]);
 
   // 재생/일시정지/이어듣기 토글
   const handleTogglePlay = () => {
@@ -145,128 +243,53 @@ export function FortunePage() {
     else playback.play();
   };
 
-  // 오늘의 운세 API 호출
-  const handleAnalyzeToday = async () => {
+  // 오늘의 운세 — 생년월일 입력 시 사주 오행으로 개인화(같은 날·같은 사람은 항상 동일)
+  const handleAnalyzeToday = () => {
     if (!selectedChar) return;
-
-    playback.stop();
-    setIsLoading(true);
-    setFortuneResult(null);
-
-    try {
-      const response = await fetch("/api/fortune/today", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          characterId: selectedChar.id,
-          // 생년월일을 입력하면 사주 오행으로 개인화된 '오늘의 운세'를 받는다.
-          // (입력 안 하면 일반 운세) 같은 날·같은 사람은 항상 같은 결과.
-          birthDate: birthDate || undefined,
-          birthTime: birthTime || undefined,
-          gender,
-        }),
-      });
-
-      if (!response.ok) throw new Error("오늘의 운세 호출 오류");
-      const data = await response.json();
-      setFortuneResult(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+    callFortune(
+      "/api/fortune/today",
+      { characterId: selectedChar.id, birthDate: birthDate || undefined, birthTime: birthTime || undefined, gender },
+      handleAnalyzeToday
+    );
   };
 
-  // 궁합 API 호출
-  const handleAnalyzeCompatibility = async (e: React.FormEvent) => {
+  // 궁합
+  const handleAnalyzeCompatibility = (e: React.FormEvent) => {
     e.preventDefault();
     if (!birthDate || !partnerBirthDate || !selectedChar) return;
-
-    playback.stop();
-    setIsLoading(true);
-    setFortuneResult(null);
-
-    try {
-      const response = await fetch("/api/fortune/compatibility", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          myBirthDate: birthDate,
-          myBirthTime: birthTime || undefined,
-          partnerBirthDate,
-          partnerBirthTime: partnerBirthTime || undefined,
-          characterId: selectedChar.id,
-        }),
-      });
-
-      if (!response.ok) throw new Error("궁합 호출 오류");
-      const data = await response.json();
-      setFortuneResult(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+    callFortune(
+      "/api/fortune/compatibility",
+      {
+        myBirthDate: birthDate,
+        myBirthTime: birthTime || undefined,
+        partnerBirthDate,
+        partnerBirthTime: partnerBirthTime || undefined,
+        characterId: selectedChar.id,
+      },
+      () => handleAnalyzeCompatibility(e)
+    );
   };
 
-  // 독서 처방 API 호출
-  const handleAnalyzePrescription = async (e: React.FormEvent) => {
+  // 독서 처방
+  const handleAnalyzePrescription = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prescriptionQuery.trim() || !selectedChar) return;
-
-    playback.stop();
-    setIsLoading(true);
-    setFortuneResult(null);
-
-    try {
-      const response = await fetch("/api/fortune/prescription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: prescriptionQuery,
-          characterId: selectedChar.id,
-        }),
-      });
-
-      if (!response.ok) throw new Error("독서 처방 호출 오류");
-      const data = await response.json();
-      setFortuneResult(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+    callFortune(
+      "/api/fortune/prescription",
+      { query: prescriptionQuery, characterId: selectedChar.id },
+      () => handleAnalyzePrescription(e)
+    );
   };
 
-  // 사주 분석 API 호출
-  const handleAnalyzeSaju = async (e: React.FormEvent) => {
+  // 사주 분석
+  const handleAnalyzeSaju = (e: React.FormEvent) => {
     e.preventDefault();
     if (!birthDate || !selectedChar) return;
-
-    playback.stop();
-    setIsLoading(true);
-    setFortuneResult(null);
-
-    try {
-      const response = await fetch("/api/fortune/saju", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          birthDate,
-          birthTime: birthTime || undefined,
-          gender,
-          characterId: selectedChar.id,
-        }),
-      });
-
-      if (!response.ok) throw new Error("사주 호출 오류");
-      const data = await response.json();
-      setFortuneResult(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+    callFortune(
+      "/api/fortune/saju",
+      { birthDate, birthTime: birthTime || undefined, gender, characterId: selectedChar.id },
+      () => handleAnalyzeSaju(e)
+    );
   };
 
   // 타로 셔플 시작
@@ -278,31 +301,18 @@ export function FortunePage() {
   };
 
   // 타로 카드 선택 및 해석 요청
-  const handleSelectTarotCard = async (_cardIdx: number) => {
+  const handleSelectTarotCard = (_cardIdx: number) => {
     if (!selectedChar || tarotStep !== "spread") return;
-    
-    playback.stop();
-    setIsLoading(true);
-    setFortuneResult(null);
-
-    try {
-      const response = await fetch("/api/fortune/tarot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          characterId: selectedChar.id,
-        }),
-      });
-
-      if (!response.ok) throw new Error("타로 호출 오류");
-      const data = await response.json();
-      setFortuneResult(data);
-      setTarotStep("revealed");
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+    const charId = selectedChar.id;
+    callFortune(
+      "/api/fortune/tarot",
+      { characterId: charId },
+      () => {
+        setTarotStep("spread");
+        handleSelectTarotCard(_cardIdx);
+      },
+      () => setTarotStep("revealed")
+    );
   };
 
   // 상태 초기화
@@ -319,7 +329,11 @@ export function FortunePage() {
   };
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-8 sm:px-6">
+      {/* 스크린리더 전용 라이브 영역 — 운세 결과 도착 안내 */}
+      <p className="sr-only" role="status" aria-live="polite">{liveMsg}</p>
+
       {/* 타이틀 헤더 */}
       <header className="mb-10 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-1 text-xs font-semibold text-accent mb-3">
@@ -340,6 +354,18 @@ export function FortunePage() {
           <h2 className="mb-6 text-center text-lg font-bold text-fg-2">
             당신의 운세를 해석해줄 캐릭터 에이전트를 고르세요.
           </h2>
+          {charLoadFailed && characters.length === 0 && (
+            <div role="alert" className="mx-auto mb-6 max-w-md rounded-xl border border-bad/30 bg-bad/10 p-4 text-center">
+              <p className="text-sm text-fg-2">캐릭터를 불러오지 못했어요.</p>
+              <button
+                type="button"
+                onClick={loadCharacters}
+                className="mt-3 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-accent-2"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {characters.map((char) => (
               <button
@@ -525,11 +551,29 @@ export function FortunePage() {
             )}
 
             {/* 컨텐츠 카드 영역 */}
-            <div className="rounded-2xl border border-line bg-panel/20 p-6 min-h-[400px] flex flex-col justify-center">
-              
+            <div
+              className="rounded-2xl border border-line bg-panel/20 p-6 min-h-[400px] flex flex-col justify-center"
+              aria-live="polite"
+              aria-busy={isLoading}
+            >
+
+              {/* 에러 + 재시도 */}
+              {!isLoading && errorMsg && (
+                <div role="alert" className="flex flex-col items-center gap-3 py-10 text-center">
+                  <div className="rounded-full border border-bad/30 bg-bad/10 px-4 py-2 text-sm text-fg-2">{errorMsg}</div>
+                  <button
+                    type="button"
+                    onClick={() => retryRef.current?.()}
+                    className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-accent-2"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              )}
+
               {/* 로딩 표시 */}
               {isLoading && (
-                <div className="flex flex-col items-center justify-center py-12">
+                <div className="flex flex-col items-center justify-center py-12" role="status">
                   <div className="relative flex h-10 w-10">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-10 w-10 bg-accent/80"></span>
@@ -547,19 +591,31 @@ export function FortunePage() {
                   {/* 결과 상단 공통 헤더 */}
                   <div className="border-b border-line/60 pb-4 flex justify-between items-center">
                     <div>
-                      <h3 className="text-xl font-extrabold text-fg font-display uppercase tracking-tight">
+                      <h3
+                        ref={resultHeadingRef}
+                        tabIndex={-1}
+                        className="text-xl font-extrabold text-fg font-display uppercase tracking-tight outline-none"
+                      >
                         {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
                         {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
-                    <button
-                      onClick={handleReset}
-                      className="text-xs text-accent hover:underline flex items-center gap-1"
-                    >
-                      <RotateCcw className="h-3 w-3" /> 다시 보기
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShareOpen(true)}
+                        className="flex items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
+                      >
+                        <Share2 className="h-3 w-3" /> 공유·저장
+                      </button>
+                      <button
+                        onClick={handleReset}
+                        className="flex items-center gap-1 text-xs text-fg-3 hover:text-fg"
+                      >
+                        <RotateCcw className="h-3 w-3" /> 다시 보기
+                      </button>
+                    </div>
                   </div>
 
                   {/* 오늘의 운세 전용 결과 디스플레이 */}
@@ -1259,6 +1315,17 @@ export function FortunePage() {
 
         </div>
       )}
+
+      {/* 결과 공유·저장 모달 */}
+      {shareOpen && fortuneResult && selectedChar && (
+        <FortuneShareModal
+          result={fortuneResult}
+          character={selectedChar}
+          tab={activeTab}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
+
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
         <p className="text-[10px] text-fg-3 leading-relaxed">
@@ -1271,5 +1338,6 @@ export function FortunePage() {
         </p>
       </footer>
     </div>
+    </MotionConfig>
   );
 }
