@@ -6,9 +6,7 @@
 // 동일하게 [0, 0, sign*각도](Z축 회전, sign=좌-1/우+1)로 매핑한다. 엄지는 Y·Z 복합.
 // → 수동 "주먹" 프리셋과 같은 축이라 손가락이 올바른 방향으로 말린다.
 //
-// 순수 함수라 단위 테스트가 가능하다(three 외 의존 없음).
-
-import * as THREE from "three";
+// 순수 함수라 단위 테스트가 가능하다(MediaPipe 의존 없음).
 
 export interface HandLandmark {
   x: number;
@@ -57,37 +55,6 @@ const MAX_CURL = 1.95;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** HandLandmark → three/VRM 프레임(Y-up, Z-back) 벡터. */
-function toVec(lm: HandLandmark): THREE.Vector3 {
-  return new THREE.Vector3(lm.x, -lm.y, -lm.z);
-}
-
-/**
- * 손바닥 roll(뒤집힘) — 손바닥 법선이 "아래(-Y)" 기준에서 팔뚝 축(손목→중지MCP)을 중심으로
- * 얼마나 돌았는지의 부호각(rad). 손등이 위면 0 근처, 손바닥을 위로 뒤집으면 ±π 근처.
- * 손 본의 X축(팔뚝 방향) 회전으로 적용해 손바닥 방향을 반영한다.
- */
-function handRoll(lm: readonly HandLandmark[]): number {
-  const wrist = toVec(lm[HAND_LM.wrist]);
-  const forward = toVec(lm[HAND_LM.middleMcp]).sub(wrist); // 손목→중지 MCP = 손 방향
-  const across = toVec(lm[HAND_LM.indexMcp]).sub(toVec(lm[HAND_LM.littleMcp])); // 검지MCP→소지MCP
-  if (forward.lengthSq() < 1e-8 || across.lengthSq() < 1e-8) return 0;
-  forward.normalize();
-  const normal = new THREE.Vector3().crossVectors(forward, across.normalize()); // 손바닥 법선
-  if (normal.lengthSq() < 1e-8) return 0;
-  normal.normalize();
-  // forward 에 수직한 평면으로 normal·down 을 투영해 부호각 계산.
-  const down = new THREE.Vector3(0, -1, 0);
-  const nP = normal.sub(forward.clone().multiplyScalar(normal.dot(forward)));
-  const dP = down.sub(forward.clone().multiplyScalar(down.dot(forward)));
-  if (nP.lengthSq() < 1e-8 || dP.lengthSq() < 1e-8) return 0;
-  nP.normalize();
-  dP.normalize();
-  const sin = new THREE.Vector3().crossVectors(nP, dP).dot(forward);
-  const cos = nP.dot(dP);
-  return Math.atan2(sin, cos);
-}
-
 /** 관절 p1 에서 분절 (p0→p1)과 (p1→p2) 사이 각(rad). 곧게 펴면 0. */
 function jointAngle(lm: readonly HandLandmark[], i0: number, i1: number, i2: number): number {
   const ax = lm[i1].x - lm[i0].x;
@@ -132,12 +99,6 @@ export function solveHandToFingerBones(
   const thumbDist = clamp(jointAngle(landmarks, HAND_LM.thumbMcp, HAND_LM.thumbIp, HAND_LM.thumbTip), 0, MAX_CURL);
   out[`${avatarSide}ThumbProximal`] = [0, sign * thumbProx * 0.6, sign * thumbProx * 0.5];
   out[`${avatarSide}ThumbDistal`] = [0, 0, sign * thumbDist];
-
-  // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준).
-  // handRoll 은 검지-소지 교차곱이라 물리적 좌/우손에서 이미 부호가 반대다 → 측별 sign 을
-  // 곱하면 한 손만 맞고 다른 손은 뒤집히므로 곱하지 않는다(양손 일관).
-  // 전역 방향은 실기기 검증으로 보정(부호 +).
-  out[`${avatarSide}Hand`] = [handRoll(landmarks), 0, 0];
 
   return out;
 }

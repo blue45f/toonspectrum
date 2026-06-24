@@ -2706,8 +2706,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               if (handLm) {
                 const handResult = handLm.detectForVideo(currentVideo, timestamp);
                 const fingers: Record<string, readonly [number, number, number]> = {};
-                // worldLandmarks(미터 3D)는 손바닥 법선·관절각 계산에 더 정밀하다.
-                const hands = handResult?.worldLandmarks ?? [];
+                const hands = handResult?.landmarks ?? [];
                 const handed = handResult?.handednesses ?? [];
                 for (let i = 0; i < hands.length; i++) {
                   const label = handed[i]?.[0]?.categoryName ?? "Right";
