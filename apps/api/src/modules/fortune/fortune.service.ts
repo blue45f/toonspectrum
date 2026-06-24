@@ -6,6 +6,7 @@ import { TITLES } from "../../../../../lib/server/catalog-store";
 
 import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin, todayCategoryScores } from "./saju-analysis";
 import { calculateSaju, SajuResult } from "./saju-utils";
+import { getZodiacSign, genresByZodiacElement, ZODIAC_ELEMENT_COLOR } from "./zodiac";
 
 import type { Title } from "../../../../../lib/types";
 
@@ -573,6 +574,57 @@ export class FortuneService {
       panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
+  }
+
+  // 별자리(서양 점성) 운세 — 생일(월/일)만으로. 하루 동안 같은 결과(날짜+별자리 시드).
+  async drawZodiac(characterId: string, month: number, day: number) {
+    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
+    const sign = getZodiacSign(month, day);
+
+    const rng = this.seededRandom(`${this.dailySeed(characterId)}:zodiac:${sign.id}`);
+    const score = Math.floor(rng() * 36) + 62; // 62~97
+    const luckyColor = ZODIAC_ELEMENT_COLOR[sign.element];
+    const luckyNumber = Math.floor(rng() * 10);
+
+    const recommendations = this.curateTitles(genresByZodiacElement(sign.element));
+
+    let interpretation: string;
+    try {
+      const text = `
+        별자리: ${sign.ko}(${sign.en} ${sign.glyph}) · ${sign.element}의 별자리 · 지배행성 ${sign.ruling}
+        성향 키워드: ${sign.traits.join(", ")}
+        오늘의 별자리 운세 지수: ${score}% / 행운 컬러: ${luckyColor} / 행운 숫자: ${luckyNumber}
+        ※ 위 별자리 성향과 오늘의 기운을 근거로 오늘 하루를 구체적으로 풀어줘.
+      `;
+      interpretation = await this.generateAIFortune(`오늘의 별자리 운세`, text, character);
+    } catch (_e) {
+      interpretation = this.getFallbackZodiacInterpretation(sign, score, luckyColor, character);
+    }
+
+    return {
+      character,
+      zodiac: { ...sign, score, luckyColor, luckyNumber },
+      interpretation,
+      panels: this.parsePanels(interpretation, character.id),
+      recommendations,
+    };
+  }
+
+  private getFallbackZodiacInterpretation(
+    sign: import("./zodiac").ZodiacSign,
+    score: number,
+    luckyColor: string,
+    character: FortuneCharacter
+  ): string {
+    const sn = character.name.split(" ").pop() ?? character.name;
+    const traits = sign.traits.join("·");
+    return `[1컷 - ${sn}이(가) 밤하늘에서 ${sign.ko}를 가리킨다]\n` +
+      `${sn}: "당신의 별자리는 ${sign.ko}(${sign.glyph}), ${sign.element}의 기운이에요. ${traits}의 빛을 타고났죠."\n` +
+      `효과음: 반짝\n\n` +
+      `[2컷 - 별의 흐름을 읽는 ${sn}]\n` +
+      `${sn}: "오늘 ${sign.ko}의 운세 지수는 ${score}%. 타고난 ${sign.traits[0]}이(가) 빛을 발하는 하루예요."\n\n` +
+      `[3컷 - 다정하게 조언하는 ${sn}]\n` +
+      `${sn}: "행운의 색 '${luckyColor}'을 곁에 두면, 별빛이 당신의 길을 한층 또렷이 밝혀줄 거예요."`;
   }
 
   private getFallbackTodayInterpretation(

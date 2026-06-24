@@ -11,6 +11,7 @@ import type { FortuneResult, FortuneTab } from "./FortunePage";
 const CHAR_HUE: Record<string, number> = { ara: 162, danwoo: 70, leona: 292, gaon: 248 };
 const TAB_LABEL: Record<FortuneTab, string> = {
   today: "오늘의 운세",
+  zodiac: "별자리 운세",
   saju: "사주팔자",
   compatibility: "인연 궁합",
   tarot: "오늘의 타로",
@@ -306,6 +307,23 @@ function ShareHero({
           </div>
         )}
         {c.factors[0] && <div style={{ fontSize: 12, color: ink, marginTop: 6, lineHeight: 1.5 }}>{c.factors[0]}</div>}
+      </div>
+    );
+  }
+
+  if (tab === "zodiac" && result.zodiac) {
+    const z = result.zodiac;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <span style={{ fontSize: 52, filter: `drop-shadow(0 2px 10px ${accent})` }}>{z.glyph}</span>
+        <div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span style={{ fontSize: 38, fontWeight: 900, color: accent }}>{z.score}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>점</span>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{z.ko} · {z.element}의 별자리</div>
+          <div style={{ fontSize: 11, color: sub, marginTop: 3 }}>#{z.traits.join(" #")}</div>
+        </div>
       </div>
     );
   }

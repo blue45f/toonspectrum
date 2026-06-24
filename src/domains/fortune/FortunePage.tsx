@@ -105,6 +105,19 @@ export interface CompatData {
   grade: string;
   factors: string[];
 }
+export interface ZodiacData {
+  id: string;
+  ko: string;
+  en: string;
+  glyph: string;
+  element: string;
+  dateRange: string;
+  traits: string[];
+  ruling: string;
+  score: number;
+  luckyColor: string;
+  luckyNumber: number;
+}
 
 export interface FortuneResult {
   interpretation: string;
@@ -118,13 +131,14 @@ export interface FortuneResult {
   iljin?: IljinData | null;
   categories?: { love: number; money: number; work: number; health: number } | null;
   compat?: CompatData;
+  zodiac?: ZodiacData;
   luckyElement?: string | null;
   score?: number;
   query?: string;
   recommendations: Title[];
 }
 
-export type FortuneTab = "today" | "saju" | "compatibility" | "tarot" | "prescription";
+export type FortuneTab = "today" | "saju" | "compatibility" | "tarot" | "prescription" | "zodiac";
 
 // 오행 영문키 → 한글 (오늘의 운세 개인화 표시용)
 const ELEMENT_KO: Record<string, string> = {
@@ -270,6 +284,17 @@ export function FortunePage() {
       "/api/fortune/today",
       { characterId: selectedChar.id, birthDate: birthDate || undefined, birthTime: birthTime || undefined, gender },
       handleAnalyzeToday
+    );
+  };
+
+  // 별자리(서양 점성) — 생년월일의 월/일만 사용
+  const handleAnalyzeZodiac = () => {
+    if (!selectedChar || !birthDate) return;
+    const [, m, d] = birthDate.split("-").map(Number);
+    callFortune(
+      "/api/fortune/zodiac",
+      { characterId: selectedChar.id, month: m, day: d },
+      handleAnalyzeZodiac
     );
   };
 
@@ -520,64 +545,34 @@ export function FortunePage() {
           {/* 오른쪽: 메인 입력 및 결과창 (8/12 cols) */}
           <main className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* 탭 네비게이션 (결과 출력 전일 때만 노출) */}
+            {/* 탭 네비게이션 (결과 출력 전일 때만 노출) — 모바일 가로 스크롤 칩 + ARIA */}
             {!fortuneResult && !isLoading && (
-              <div className="flex rounded-xl border border-line bg-panel/30 p-1">
-                <button
-                  onClick={() => setActiveTab("today")}
-                  className={cn(
-                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
-                    activeTab === "today"
-                      ? "bg-accent text-on-accent shadow"
-                      : "text-fg-3 hover:text-fg"
-                  )}
-                >
-                  오늘의 운세
-                </button>
-                <button
-                  onClick={() => setActiveTab("saju")}
-                  className={cn(
-                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
-                    activeTab === "saju"
-                      ? "bg-accent text-on-accent shadow"
-                      : "text-fg-3 hover:text-fg"
-                  )}
-                >
-                  사주팔자
-                </button>
-                <button
-                  onClick={() => setActiveTab("compatibility")}
-                  className={cn(
-                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
-                    activeTab === "compatibility"
-                      ? "bg-accent text-on-accent shadow"
-                      : "text-fg-3 hover:text-fg"
-                  )}
-                >
-                  인연 궁합
-                </button>
-                <button
-                  onClick={() => setActiveTab("prescription")}
-                  className={cn(
-                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
-                    activeTab === "prescription"
-                      ? "bg-accent text-on-accent shadow"
-                      : "text-fg-3 hover:text-fg"
-                  )}
-                >
-                  독서 처방
-                </button>
-                <button
-                  onClick={() => setActiveTab("tarot")}
-                  className={cn(
-                    "flex-1 rounded-lg py-2.5 text-xs font-semibold transition-all",
-                    activeTab === "tarot"
-                      ? "bg-accent text-on-accent shadow"
-                      : "text-fg-3 hover:text-fg"
-                  )}
-                >
-                  오늘의 타로 리딩
-                </button>
+              <div
+                role="tablist"
+                aria-label="운세 종류"
+                className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
+              >
+                {([
+                  { key: "today", label: "오늘의 운세" },
+                  { key: "zodiac", label: "별자리" },
+                  { key: "saju", label: "사주팔자" },
+                  { key: "compatibility", label: "인연 궁합" },
+                  { key: "prescription", label: "독서 처방" },
+                  { key: "tarot", label: "타로 리딩" },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={activeTab === tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={cn(
+                      "min-h-11 min-w-fit shrink-0 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all",
+                      activeTab === tab.key ? "bg-accent text-on-accent shadow" : "text-fg-3 hover:text-fg"
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             )}
 
@@ -610,7 +605,7 @@ export function FortunePage() {
                     <span className="relative inline-flex rounded-full h-10 w-10 bg-accent/80"></span>
                   </div>
                   <p className="mt-4 font-serif text-sm text-fg-3 animate-pulse">
-                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : activeTab === "prescription" ? "마음 고민을" : "카드를"} 읽는 중...
+                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : activeTab === "prescription" ? "마음 고민을" : activeTab === "zodiac" ? "별자리를" : "카드를"} 읽는 중...
                   </p>
                 </div>
               )}
@@ -627,10 +622,10 @@ export function FortunePage() {
                         tabIndex={-1}
                         className="text-xl font-extrabold text-fg font-display uppercase tracking-tight outline-none"
                       >
-                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : "TAROT READING"}
+                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : activeTab === "zodiac" ? "ZODIAC HOROSCOPE" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : "선택한 카드의 오늘 기운"}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -752,6 +747,54 @@ export function FortunePage() {
                         </div>
                       )}
 
+                    </div>
+                  )}
+
+                  {/* 별자리 전용 결과 디스플레이 */}
+                  {activeTab === "zodiac" && fortuneResult.zodiac && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                      {/* 별자리 글리프 카드 */}
+                      <div className="md:col-span-4 flex flex-col items-center justify-center rounded-2xl border border-line/45 bg-card/30 p-5 text-center">
+                        <motion.span
+                          className="text-6xl"
+                          initial={{ scale: 0, rotate: -30, opacity: 0 }}
+                          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                          transition={{ type: "spring", stiffness: 140, damping: 12 }}
+                          style={{ filter: "drop-shadow(0 3px 14px var(--color-accent))" }}
+                        >
+                          {fortuneResult.zodiac.glyph}
+                        </motion.span>
+                        <span className="mt-2 text-lg font-bold text-fg">{fortuneResult.zodiac.ko}</span>
+                        <span className="text-[11px] text-fg-3">{fortuneResult.zodiac.en} · {fortuneResult.zodiac.dateRange}</span>
+                        <span className="mt-2 rounded-full border border-accent/25 bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">
+                          {fortuneResult.zodiac.element}의 별자리 · {fortuneResult.zodiac.ruling}
+                        </span>
+                      </div>
+
+                      {/* 별자리 운세 지수 + 성향 + 행운 */}
+                      <div className="md:col-span-8 space-y-4">
+                        <div className="flex items-baseline gap-2">
+                          <CountUp value={fortuneResult.zodiac.score} className="font-display text-4xl font-extrabold text-accent" />
+                          <span className="text-sm font-bold text-fg-2">점 · 오늘의 별자리 운세</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {fortuneResult.zodiac.traits.map((tr) => (
+                            <span key={tr} className="rounded-full border border-line/50 bg-card/40 px-3 py-1 text-xs font-semibold text-fg-2">
+                              #{tr}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-line/45 bg-card/20 p-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">행운 컬러</span>
+                            <span className="mt-1 block font-serif text-base font-extrabold text-fg">{fortuneResult.zodiac.luckyColor}</span>
+                          </div>
+                          <div className="rounded-xl border border-line/45 bg-card/20 p-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">행운 숫자</span>
+                            <span className="mt-1 block font-serif text-base font-extrabold text-fg">{fortuneResult.zodiac.luckyNumber}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1115,6 +1158,39 @@ export function FortunePage() {
                     className="w-full rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
                     <span>{birthDate ? "내 사주로 오늘의 운세 보기" : "오늘의 운세 확인하기"}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* 입력 폼: 별자리 (생일의 월/일만 사용) */}
+              {!isLoading && !fortuneResult && activeTab === "zodiac" && (
+                <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-fg">생일로 보는 별자리 운세</h3>
+                    <p className="text-xs text-fg-3 leading-relaxed">
+                      생년월일만 입력하면 {selectedChar.name}가 당신의 별자리와 오늘의 별빛 흐름을 풀어드려요. (월·일만 사용)
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-2">
+                    <label htmlFor="zodiac-birth-date" className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
+                      <Calendar className="h-3.5 w-3.5 text-fg-3" /> 생년월일
+                    </label>
+                    <input
+                      id="zodiac-birth-date"
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeZodiac}
+                    disabled={!birthDate}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
+                  >
+                    <span>{selectedChar.name}에게 별자리 운세 보기</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>

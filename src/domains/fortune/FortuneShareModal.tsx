@@ -23,6 +23,7 @@ interface FortuneShareModalProps {
 
 const TAB_LABEL: Record<FortuneTab, string> = {
   today: "오늘의 운세",
+  zodiac: "별자리 운세",
   saju: "사주팔자",
   compatibility: "인연 궁합",
   tarot: "오늘의 타로",

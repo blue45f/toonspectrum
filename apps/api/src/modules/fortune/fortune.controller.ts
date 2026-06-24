@@ -29,6 +29,12 @@ export interface PrescriptionRequest {
   characterId: string;
 }
 
+export interface ZodiacRequest {
+  characterId: string;
+  month: number;
+  day: number;
+}
+
 export interface SajuRequest {
   birthDate: string; // YYYY-MM-DD
   birthTime?: string; // HH:MM
@@ -95,5 +101,12 @@ export class FortuneController {
   @HttpCode(HttpStatus.OK)
   async drawPrescription(@Body() body: PrescriptionRequest) {
     return this.fortuneService.drawPrescription(body.query, body.characterId);
+  }
+
+  // 별자리(서양 점성) 운세
+  @Post("zodiac")
+  @HttpCode(HttpStatus.OK)
+  async drawZodiac(@Body() body: ZodiacRequest) {
+    return this.fortuneService.drawZodiac(body.characterId, body.month, body.day);
   }
 }
