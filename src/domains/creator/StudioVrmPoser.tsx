@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, Maximize2, PersonStanding, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -2151,6 +2151,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [viewResetNonce, setViewResetNonce] = useState(0);
   const [viewportHinted, setViewportHinted] = useState(false);
   const viewportApiRef = useRef<ViewportApi | null>(null);
+  // 편집 되돌리기/다시실행 — 전체 포저 상태 스냅샷 히스토리(직렬화 재사용).
+  const historyRef = useRef<FullVrmState[]>([]);
+  const historyIndexRef = useRef(-1);
+  const isRestoringRef = useRef(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
@@ -2242,6 +2248,102 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     const timer = setTimeout(() => setViewportHinted(true), 6000);
     return () => clearTimeout(timer);
   }, [vrm, viewportHinted]);
+
+  // 현재 편집 상태를 직렬화 가능한 전체 스냅샷으로 캡처(undo 히스토리/공유와 동일 포맷).
+  const captureFullState = useCallback(
+    (): FullVrmState =>
+      serializeFullVrmState({
+        poseId: activePoseId,
+        expressionId: activeExpressionId,
+        bones: customBones,
+        yOffset: customYOffset,
+        expressionWeights,
+        costume: costumeState,
+        props: { items: vrmPropItems },
+        physics: vrmPhysics,
+        bodyScale,
+        lighting,
+        env: envVariant,
+        fingerOverrides: fingerEdits,
+      }),
+    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits]
+  );
+
+  const restoreHistoryAt = (index: number) => {
+    const snap = historyRef.current[index];
+    if (!snap) return;
+    isRestoringRef.current = true;
+    commitFullStateRestore(snap, vrmRef.current);
+    setActivePoseId(snap.poseId ?? "default");
+    setActiveExpressionId(snap.expressionId ?? "neutral");
+    setCanUndo(index > 0);
+    setCanRedo(index < historyRef.current.length - 1);
+  };
+  const doUndo = () => {
+    if (historyIndexRef.current <= 0) return;
+    historyIndexRef.current -= 1;
+    restoreHistoryAt(historyIndexRef.current);
+  };
+  const doRedo = () => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    historyIndexRef.current += 1;
+    restoreHistoryAt(historyIndexRef.current);
+  };
+
+  // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재. 복원 중 변경은 건너뛴다.
+  useEffect(() => {
+    if (!vrm) return;
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      const snap = JSON.parse(JSON.stringify(captureFullState())) as FullVrmState;
+      const base = historyRef.current.slice(0, historyIndexRef.current + 1);
+      const last = base[base.length - 1];
+      if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
+      base.push(snap);
+      if (base.length > 60) base.shift();
+      historyRef.current = base;
+      historyIndexRef.current = base.length - 1;
+      setCanUndo(historyIndexRef.current > 0);
+      setCanRedo(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [vrm, captureFullState]);
+
+  // 키보드 핸들러가 항상 최신 undo/redo를 호출하도록 ref 동기화(렌더 후).
+  const undoRef = useRef(doUndo);
+  const redoRef = useRef(doRedo);
+  useEffect(() => {
+    undoRef.current = doUndo;
+    redoRef.current = doRedo;
+  });
+
+  // 키보드 단축키: Esc 닫기, ⌘/Ctrl+Z 되돌리기, ⌘/Ctrl+Shift+Z(또는 +Y) 다시 실행.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (typing || !(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redoRef.current();
+        else undoRef.current();
+      } else if (key === "y") {
+        e.preventDefault();
+        redoRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
   // Removed duplicate here to prevent double application on every render.
@@ -3560,7 +3662,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               {displayModelName ? `${displayModelName} · 투명 PNG로 패널에 추가` : "내 VRM을 불러와 투명 PNG로 패널에 추가"}
             </p>
           </div>
-          <button type="button" aria-label="닫기" className={ICON_BUTTON} onClick={onClose}>
+          <button type="button" aria-label="닫기" title="닫기 (Esc)" className={ICON_BUTTON} onClick={onClose}>
             <X size={17} aria-hidden />
           </button>
         </header>
@@ -3637,6 +3739,28 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
                 {vrm ? (
                   <>
+                    <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        aria-label="실행 취소"
+                        title="실행 취소 (⌘Z)"
+                        disabled={!canUndo}
+                        className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                        onClick={doUndo}
+                      >
+                        <Undo2 size={16} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="다시 실행"
+                        title="다시 실행 (⌘⇧Z)"
+                        disabled={!canRedo}
+                        className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                        onClick={doRedo}
+                      >
+                        <Redo2 size={16} aria-hidden />
+                      </button>
+                    </div>
                     <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
                       <button type="button" aria-label="확대" title="확대" className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
                         <ZoomIn size={16} aria-hidden />
