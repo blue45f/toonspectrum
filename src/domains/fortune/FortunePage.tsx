@@ -227,14 +227,25 @@ export function FortunePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error(`status ${response.status}`);
+      if (!response.ok) {
+        // 검증 실패(400) 등 — 서버 메시지를 그대로 보여준다
+        let serverMsg = "";
+        try {
+          const err = await response.json();
+          serverMsg = Array.isArray(err?.message) ? err.message[0] : err?.message ?? "";
+        } catch {
+          /* ignore */
+        }
+        setErrorMsg(serverMsg || "운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+        return null;
+      }
       const data: FortuneResult = await response.json();
       setFortuneResult(data);
       onSuccess?.(data);
       return data;
     } catch (error) {
       console.error("운세 호출 실패:", error);
-      setErrorMsg("운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setErrorMsg("네트워크 오류로 운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
       return null;
     } finally {
       setIsLoading(false);
