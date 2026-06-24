@@ -142,6 +142,8 @@ export interface FortuneResult {
   mySaju?: SajuData;
   partnerSaju?: SajuData;
   card?: TarotCardData;
+  cards?: (TarotCardData & { position?: string })[];
+  spread?: "one" | "three";
   today?: TodayFortuneData;
   analysis?: SajuAnalysisData | null;
   iljin?: IljinData | null;
@@ -214,6 +216,7 @@ export function FortunePage() {
   
   // 타로 상태
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
+  const [tarotSpread, setTarotSpread] = useState<"one" | "three">("one");
   
   // 결과 상태
   const [isLoading, setIsLoading] = useState(false);
@@ -423,7 +426,7 @@ export function FortunePage() {
     if (!selectedChar || tarotStep !== "spread") return;
     callFortune(
       "/api/fortune/tarot",
-      { characterId: selectedChar.id, cardIdx },
+      { characterId: selectedChar.id, cardIdx, spread: tarotSpread },
       () => {
         setTarotStep("spread");
         handleSelectTarotCard(cardIdx);
@@ -1106,8 +1109,29 @@ export function FortunePage() {
                     </div>
                   )}
 
-                  {/* 타로 전용 결과 디스플레이 */}
-                  {activeTab === "tarot" && fortuneResult.card && (
+                  {/* 타로 전용 결과 디스플레이 — 3카드 스프레드 / 단일 카드 */}
+                  {activeTab === "tarot" && fortuneResult.cards && fortuneResult.cards.length > 1 && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-3 sm:gap-5">
+                        {fortuneResult.cards.map((c, i) => (
+                          <div key={i} className="flex flex-col items-center gap-2">
+                            <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">{c.position}</span>
+                            <motion.div
+                              className="w-full max-w-[160px]"
+                              style={{ perspective: 1000 }}
+                              initial={{ rotateY: 180, scale: 0.7, opacity: 0 }}
+                              animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                              transition={{ duration: 0.7, ease: "easeOut", type: "spring", stiffness: 120, damping: 14, delay: i * 0.18 }}
+                            >
+                              <TarotCardFace card={c} />
+                            </motion.div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-center text-xs text-fg-3">과거 · 현재 · 미래의 흐름을 {selectedChar.name}가 웹툰으로 풀어드려요.</p>
+                    </div>
+                  )}
+                  {activeTab === "tarot" && fortuneResult.card && (!fortuneResult.cards || fortuneResult.cards.length <= 1) && (
                     <div className="flex flex-col md:flex-row gap-6 items-center">
                       {/* 카드별 고유 디자인의 타로 카드 페이스 — 3D 플립 리빌 */}
                       <motion.div
@@ -1529,11 +1553,30 @@ export function FortunePage() {
               {!isLoading && !fortuneResult && activeTab === "tarot" && (
                 <div className="space-y-6 text-center max-w-lg mx-auto w-full">
                   {tarotStep === "idle" && (
-                    <div className="py-12 space-y-4">
+                    <div className="py-10 space-y-4">
                       <h3 className="text-lg font-bold text-fg">오늘의 타로 리딩</h3>
                       <p className="text-xs text-fg-3 max-w-sm mx-auto leading-relaxed">
-                        차분하게 정신을 집중하고, 마우스를 통해 카드를 섞은 뒤 오늘의 조언을 줄 한 장의 카드를 직접 뽑아보세요.
+                        정신을 집중하고 카드를 섞은 뒤, 오늘의 조언을 줄 카드를 직접 뽑아보세요.
                       </p>
+                      {/* 스프레드 선택 — 1장 / 3장(과거·현재·미래) */}
+                      <div className="mx-auto flex max-w-xs items-center overflow-hidden rounded-full border border-line">
+                        {([
+                          { key: "one", label: "1장 뽑기" },
+                          { key: "three", label: "3장 (과거·현재·미래)" },
+                        ] as const).map((s) => (
+                          <button
+                            key={s.key}
+                            type="button"
+                            onClick={() => setTarotSpread(s.key)}
+                            className={cn(
+                              "flex-1 py-2 text-[11px] font-bold transition-colors",
+                              tarotSpread === s.key ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
                       <button
                         onClick={startTarotShuffle}
                         className="rounded-lg bg-accent px-6 py-2.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors"

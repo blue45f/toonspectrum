@@ -68,6 +68,7 @@ export class TarotDto extends createZodDto(
   z.object({
     characterId,
     cardIdx: z.number().int().min(0).max(11).optional(),
+    spread: z.enum(["one", "three"]).optional(),
   })
 ) {}
 

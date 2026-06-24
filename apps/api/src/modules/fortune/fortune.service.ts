@@ -133,37 +133,73 @@ export class FortuneService {
     return CHARACTERS;
   }
 
-  // 타로 카드 뽑기 및 해석
-  // cardIdx: 사용자가 펼쳐진 3장 중 고른 위치(0~2). 그 선택이 결과를 결정하도록
-  // 날짜+캐릭터+선택위치로 시드해, 같은 날 같은 위치는 항상 같은 카드를 주되
-  // 위치(0/1/2)마다 서로 다른 카드가 나오게 한다(난수로 선택을 버리던 문제 해결).
-  async drawTarot(characterId: string, cardIdx = 0) {
-    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
-
-    const rng = this.seededRandom(`${this.dailySeed(characterId)}:tarot:${cardIdx}`);
+  // 시드 키로 결정적 타로 카드 1장 생성(정/역 포함)
+  private buildTarotCard(seedKey: string): TarotCard {
+    const rng = this.seededRandom(seedKey);
     const base = TAROT_CARDS[Math.floor(rng() * TAROT_CARDS.length)];
     const isReversed = rng() > 0.58; // 정방향이 조금 더 잦게
-
-    const card: TarotCard = {
+    return {
       id: base.id,
       name: base.name,
       nameEn: base.nameEn,
       type: isReversed ? "reversed" : "upright",
       keywords: isReversed ? base.reversed : base.keywords,
-      description: `${base.name} 카드 (${isReversed ? "역방향" : "정방향"})`
+      description: `${base.name} 카드 (${isReversed ? "역방향" : "정방향"})`,
     };
+  }
 
-    // 장르 매칭
-    const recommendedGenres = this.getGenresByTarot(card);
-    const recommendations = this.curateTitles(recommendedGenres);
+  // 타로 카드 뽑기 및 해석
+  // cardIdx: 고른 위치(0~2)가 결과를 결정(시드). spread="three"면 과거·현재·미래 3카드.
+  async drawTarot(characterId: string, cardIdx = 0, spread: "one" | "three" = "one") {
+    const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
+    const day = this.dailySeed(characterId);
 
-    // AI 해석 텍스트 생성
+    if (spread === "three") {
+      const positions = ["과거", "현재", "미래"];
+      // 세 장이 서로 다른 카드가 되도록 충돌 시 결정적으로 재시드한다.
+      const used = new Set<number>();
+      const cards = positions.map((position, i) => {
+        let c = this.buildTarotCard(`${day}:tarot3:${i}`);
+        let salt = 0;
+        while (used.has(c.id) && salt < 30) {
+          salt += 1;
+          c = this.buildTarotCard(`${day}:tarot3:${i}:${salt}`);
+        }
+        used.add(c.id);
+        return { ...c, position };
+      });
+      const present = cards[1];
+      const recommendations = this.curateTitles(this.getGenresByTarot(present));
+
+      let interpretation: string;
+      try {
+        const text = cards
+          .map((c) => `[${c.position}] ${c.name}(${c.type === "upright" ? "정방향" : "역방향"}) — ${c.keywords.slice(0, 3).join(", ")}`)
+          .join("\n");
+        interpretation = await this.generateAIFortune(`3카드 타로 스프레드(과거·현재·미래)`, text, character);
+      } catch (_e) {
+        interpretation = this.getFallbackTarotSpread(cards, character);
+      }
+
+      return {
+        character,
+        card: present, // 공유/하위호환용 대표 카드(현재)
+        cards,
+        spread: "three" as const,
+        interpretation,
+        panels: this.parsePanels(interpretation, character.id),
+        recommendations,
+      };
+    }
+
+    const card = this.buildTarotCard(`${day}:tarot:${cardIdx}`);
+    const recommendations = this.curateTitles(this.getGenresByTarot(card));
+
     let interpretation: string;
     try {
       interpretation = await this.generateAIFortune(
         `오늘의 타로 운세`,
-        `뽑힌 카드: ${card.name} (${card.type === "upright" ? "정방향" : "역방향"})
-        키워드: ${card.keywords.join(", ")}`,
+        `뽑힌 카드: ${card.name} (${card.type === "upright" ? "정방향" : "역방향"})\n키워드: ${card.keywords.join(", ")}`,
         character
       );
     } catch (_e) {
@@ -173,10 +209,33 @@ export class FortuneService {
     return {
       character,
       card,
+      cards: [{ ...card, position: "오늘" }],
+      spread: "one" as const,
       interpretation,
       panels: this.parsePanels(interpretation, character.id),
-      recommendations
+      recommendations,
     };
+  }
+
+  // 3카드 스프레드 폴백(과거·현재·미래 콘티)
+  private getFallbackTarotSpread(
+    cards: Array<TarotCard & { position: string }>,
+    character: FortuneCharacter
+  ): string {
+    const sn = character.name.split(" ").pop() ?? character.name;
+    const line = (c: TarotCard & { position: string }) =>
+      `${c.position}의 ${c.name}(${c.type === "upright" ? "정방향" : "역방향"}) — ${c.keywords.slice(0, 2).join(", ")}`;
+    return (
+      `[1컷 - ${sn}이(가) 카드 세 장을 과거·현재·미래로 나란히 펼친다]\n` +
+      `${sn}: "세 장의 흐름을 읽어볼게요. 과거엔 ${cards[0].name}, 현재는 ${cards[1].name}, 미래엔 ${cards[2].name}이 놓였네요."\n` +
+      `효과음: 차르륵\n\n` +
+      `[2컷 - 과거 카드를 짚는 ${sn}]\n` +
+      `${sn}: "${line(cards[0])}. 지나온 자리가 지금의 당신을 만들었어요."\n\n` +
+      `[3컷 - 현재 카드를 짚는 ${sn}]\n` +
+      `${sn}: "${line(cards[1])}. 지금 이 기운을 어떻게 쓰느냐가 관건이에요."\n\n` +
+      `[4컷 - 미래 카드를 가리키며 미소 짓는 ${sn}]\n` +
+      `${sn}: "${line(cards[2])}. 흐름을 믿고 한 걸음 내디뎌 보세요."`
+    );
   }
 
   // 사주 계산 및 해석

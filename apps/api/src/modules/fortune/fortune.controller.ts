@@ -26,7 +26,7 @@ export class FortuneController {
   @Post("tarot")
   @HttpCode(HttpStatus.OK)
   async drawTarot(@Body() body: TarotDto) {
-    return this.fortuneService.drawTarot(body.characterId, body.cardIdx ?? 0);
+    return this.fortuneService.drawTarot(body.characterId, body.cardIdx ?? 0, body.spread ?? "one");
   }
 
   // 사주팔자 분석
