@@ -40,6 +40,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/studio": "창작 스튜디오",
   "/me": "내 정보",
   "/fortune": "캐릭터 운세",
+  "/play": "놀이터",
 };
 
 function useRouteTitle(pathname: string) {
@@ -199,6 +200,10 @@ const FortunePage = lazyRetry(
   () => import("@/src/domains/fortune/FortunePage").then((m) => ({ default: m.FortunePage })),
   "FortunePage"
 );
+const PlayPage = lazyRetry(
+  () => import("@/src/domains/play/PlayPage").then((m) => ({ default: m.PlayPage })),
+  "PlayPage"
+);
 const NotFoundPage = lazyRetry(
   () => import("@/src/components/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
   "NotFoundPage"
@@ -277,6 +282,7 @@ export function AppRouter() {
           <Route path="/admin/members" element={<AdminMembersPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/fortune" element={<FortunePage />} />
+          <Route path="/play" element={<PlayPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

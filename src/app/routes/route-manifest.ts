@@ -8,6 +8,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/ranking", label: "랭킹" },
   { path: "/search", label: "검색" },
   { path: "/recommend", label: "추천" },
+  { path: "/play", label: "놀이터" },
   { path: "/explore", label: "탐색" },
   { path: "/calendar", label: "연재" },
   { path: "/reviews", label: "리뷰" },
