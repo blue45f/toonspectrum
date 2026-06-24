@@ -20,6 +20,9 @@ const mockChannels: TrackingChannels = {
   browInnerUp: 0.1,
   browOuterUpLeft: 0.2,
   browOuterUpRight: 0.3,
+  browDown: 0.15,
+  mouthFrown: 0.25,
+  eyeWide: 0.35,
 };
 
 describe("studio-vrm-webcam-tracking", () => {
@@ -63,6 +66,23 @@ describe("studio-vrm-webcam-tracking", () => {
       expect(result.expressions.lookRight).toBeCloseTo(0);
       expect(result.expressions.aa).toBeCloseTo(0.6);
       expect(result.expressions.happy).toBeCloseTo(0.7);
+    });
+
+    it("감정 표현(surprised/angry/sad)을 블렌드셰이프에서 유도한다", () => {
+      const options: TrackingOptions = {
+        gazeLock: false,
+        mirrorMode: false,
+        sensitivity: 1.0,
+        smoothing: 0.35,
+        fingerTracking: true,
+      };
+      const result = convertChannelsToVrmData(mockChannels, options);
+      // eyeWide 0.35, browInnerUp 0.1 → surprised ≈ 0.35*0.85 + 0.1*0.25
+      expect(result.expressions.surprised).toBeCloseTo(0.35 * 0.85 + 0.1 * 0.25, 4);
+      // browDown 0.15 → angry ≈ 0.15*0.95
+      expect(result.expressions.angry).toBeCloseTo(0.15 * 0.95, 4);
+      // mouthFrown 0.25, browInnerUp 0.1 → sad ≈ 0.25*0.7 + 0.1*0.3
+      expect(result.expressions.sad).toBeCloseTo(0.25 * 0.7 + 0.1 * 0.3, 4);
     });
 
     it("미러링 비활성화 상태에서 부호 및 좌우 채널을 유지한다", () => {

@@ -48,6 +48,12 @@ export interface TrackingChannels {
   browOuterUpLeft: number;
   /** 오른쪽 눈썹 바깥 올림 0-1 */
   browOuterUpRight: number;
+  /** 눈썹 내림(찡그림) 0-1 — angry */
+  browDown: number;
+  /** 입꼬리 내림 0-1 — sad/angry */
+  mouthFrown: number;
+  /** 눈 크게 뜸 0-1 — surprised */
+  eyeWide: number;
 }
 
 /** 트래킹 후처리 옵션. */
@@ -110,6 +116,13 @@ const BS = {
   eyeLookDownLeft: "eyeLookDownLeft",
   eyeLookUpRight: "eyeLookUpRight",
   eyeLookDownRight: "eyeLookDownRight",
+  // 감정 표현용(angry/sad/surprised).
+  browDownLeft: "browDownLeft",
+  browDownRight: "browDownRight",
+  mouthFrownLeft: "mouthFrownLeft",
+  mouthFrownRight: "mouthFrownRight",
+  eyeWideLeft: "eyeWideLeft",
+  eyeWideRight: "eyeWideRight",
 } as const;
 
 /* ── Singleton FaceLandmarker ─────────────────────────────────────────── */
@@ -403,6 +416,11 @@ export function processTrackingResult(
   const browOuterUpLeft = bs(bsMap, BS.browOuterUpLeft);
   const browOuterUpRight = bs(bsMap, BS.browOuterUpRight);
 
+  // — Emotion blendshapes (양쪽 평균) —
+  const browDown = (bs(bsMap, BS.browDownLeft) + bs(bsMap, BS.browDownRight)) * 0.5;
+  const mouthFrown = (bs(bsMap, BS.mouthFrownLeft) + bs(bsMap, BS.mouthFrownRight)) * 0.5;
+  const eyeWide = (bs(bsMap, BS.eyeWideLeft) + bs(bsMap, BS.eyeWideRight)) * 0.5;
+
   // — Gaze —
   // gazeX: positive = looking right from camera's perspective
   // eyeLookInLeft = left eye looking inward (toward nose) = looking right
@@ -439,6 +457,9 @@ export function processTrackingResult(
     browInnerUp,
     browOuterUpLeft,
     browOuterUpRight,
+    browDown,
+    mouthFrown,
+    eyeWide,
   };
 }
 
@@ -476,6 +497,9 @@ export function smoothRawChannels(
     browInnerUp: lerp(prev.browInnerUp, next.browInnerUp, a),
     browOuterUpLeft: lerp(prev.browOuterUpLeft, next.browOuterUpLeft, a),
     browOuterUpRight: lerp(prev.browOuterUpRight, next.browOuterUpRight, a),
+    browDown: lerp(prev.browDown, next.browDown, a),
+    mouthFrown: lerp(prev.mouthFrown, next.mouthFrown, a),
+    eyeWide: lerp(prev.eyeWide, next.eyeWide, a),
   };
 }
 
@@ -570,6 +594,10 @@ export function convertChannelsToVrmData(
     browInnerUp: clamp01(channels.browInnerUp * s),
     browOuterUpLeft: clamp01(browOuterL * s),
     browOuterUpRight: clamp01(browOuterR * s),
+    // VRM 1.0 표준 감정 표현 — 눈 크게 뜸/눈썹 찡그림/입꼬리 내림에서 유도.
+    surprised: clamp01((channels.eyeWide * 0.85 + channels.browInnerUp * 0.25) * s),
+    angry: clamp01(channels.browDown * 0.95 * s),
+    sad: clamp01((channels.mouthFrown * 0.7 + channels.browInnerUp * 0.3) * s),
   };
 
   return { bones, expressions };

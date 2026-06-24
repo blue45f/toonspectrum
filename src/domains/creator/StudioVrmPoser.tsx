@@ -2680,6 +2680,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 browInnerUp: 0,
                 browOuterUpLeft: 0,
                 browOuterUpRight: 0,
+                browDown: 0,
+                mouthFrown: 0,
+                eyeWide: 0,
               };
 
               setFaceDetected(!!rawChannels);
