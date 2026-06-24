@@ -83,6 +83,35 @@ export class VrmBoneSmoother {
     return next;
   }
 
+  /**
+   * 미검출 본을 타깃(rest) 회전 쪽으로 부드럽게 감쇠(half-life 기반).
+   * - 추적된 적 없는 본(상태 없음)은 페이드하지 않고 null 반환.
+   * - rest 에 충분히 도달하면 상태를 비우고 null 반환(이후 적용 불필요 → 그대로 유지).
+   * 반환값이 있으면 그 quaternion 을 적용한다.
+   */
+  fadeToward(
+    boneName: string,
+    targetEuler: readonly [number, number, number],
+    dt: number,
+    halfLifeSec: number
+  ): THREE.Quaternion | null {
+    const cur = this.states.get(boneName);
+    if (!cur) return null;
+    const target = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(targetEuler[0], targetEuler[1], targetEuler[2], "XYZ")
+    );
+    if (cur.dot(target) < 0) target.set(-target.x, -target.y, -target.z, -target.w);
+    const alpha = 1 - Math.pow(0.5, Math.max(dt, 1e-4) / Math.max(halfLifeSec, 1e-3));
+    const next = cur.clone().slerp(target, alpha);
+    const remaining = 2 * Math.acos(clamp(Math.abs(next.dot(target)), -1, 1));
+    if (remaining < 0.01) {
+      this.states.delete(boneName);
+      return null;
+    }
+    this.states.set(boneName, next);
+    return next;
+  }
+
   /** 이번 프레임에 미검출된 본의 상태 제거(재검출 시 stale 보간 대신 즉시 스냅). */
   forget(boneName: string): void {
     this.states.delete(boneName);

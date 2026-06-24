@@ -103,5 +103,28 @@ describe("studio-vrm-bone-smoother", () => {
       const raw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.9, 0, 0, "XYZ"));
       expect(angleBetween(qb, raw)).toBeLessThan(1e-6);
     });
+
+    it("fadeToward: 추적된 적 없는 본은 null(페이드 안 함)", () => {
+      const s = new VrmBoneSmoother();
+      expect(s.fadeToward("x", rotX(0), DT, 0.2)).toBeNull();
+    });
+
+    it("fadeToward: 끊긴 본을 rest(0)로 점진 복귀시키고 도달하면 null", () => {
+      const s = new VrmBoneSmoother();
+      s.smooth("arm", rotX(1.0), DT); // 1rad 까지 추적됨
+      let lastNonNull = s.fadeToward("arm", rotX(0), DT, 0.2);
+      let settled = false;
+      for (let i = 0; i < 300; i++) {
+        const q = s.fadeToward("arm", rotX(0), DT, 0.2);
+        if (q === null) {
+          settled = true;
+          break;
+        }
+        lastNonNull = q;
+      }
+      expect(settled).toBe(true); // 결국 rest 도달 → null
+      expect(lastNonNull).not.toBeNull();
+      expect(angleBetween(lastNonNull!, IDENT)).toBeLessThan(0.05); // 거의 rest
+    });
   });
 });

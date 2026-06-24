@@ -333,6 +333,22 @@ const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
 // 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손). 머리·목은 이미 EMA 스무딩됨.
 const LIMB_BONE_RE = /Arm|Leg|Foot|Hand/;
+// 솔버가 생성할 수 있는 팔다리 본 — 추적이 끊긴 본을 rest 로 페이드할 때 순회 대상.
+const CANONICAL_LIMB_BONES = [
+  "leftUpperArm",
+  "leftLowerArm",
+  "rightUpperArm",
+  "rightLowerArm",
+  "leftUpperLeg",
+  "leftLowerLeg",
+  "leftFoot",
+  "rightUpperLeg",
+  "rightLowerLeg",
+  "rightFoot",
+] as const;
+const ZERO_EULER = [0, 0, 0] as const;
+// 추적 끊김 시 rest 복귀 속도(half-life, 초). 작을수록 빨리 복귀.
+const LIMB_FADE_HALF_LIFE = 0.2;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
@@ -1977,20 +1993,27 @@ function VrmActor({
       const data = trackingDataRef.current;
       if (humanoid) {
         const smoother = boneSmootherRef.current;
-        const limbBones: string[] = [];
+        const present = new Set<string>();
         Object.entries(data.bones).forEach(([boneName, rot]) => {
           const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
           if (!bone) return;
           // 팔/다리/발/손은 quaternion 슬러프로 스무딩(떨림 제거). 머리/목은 이미 EMA 스무딩됨.
           if (LIMB_BONE_RE.test(boneName)) {
-            limbBones.push(boneName);
+            present.add(boneName);
             bone.quaternion.copy(smoother.smooth(boneName, rot, dVal));
           } else {
             bone.rotation.set(rot[0], rot[1], rot[2]);
           }
         });
-        // 이번 프레임에 사라진(미검출) 팔다리 본은 상태를 비워 재검출 시 stale 보간 방지.
-        smoother.retainOnly(limbBones);
+        // 추적이 끊긴 팔다리 본은 얼어붙지 않고 사용자 포즈(customBones, 기본 항등)로 부드럽게 복귀.
+        for (const boneName of CANONICAL_LIMB_BONES) {
+          if (present.has(boneName)) continue;
+          const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
+          if (!bone) continue;
+          const rest = customBones[boneName]?.rotation ?? ZERO_EULER;
+          const faded = smoother.fadeToward(boneName, rest, dVal, LIMB_FADE_HALF_LIFE);
+          if (faded) bone.quaternion.copy(faded);
+        }
       }
 
       if (expressionManager) {
