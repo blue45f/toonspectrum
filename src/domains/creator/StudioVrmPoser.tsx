@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -39,6 +39,7 @@ import {
   applyPoserVisualState,
   planFullStateRestore,
   createFullStateLoadHandlers,
+  type PoseBone,
   type PoseBoneMap,
   type PosePreset,
   type Vec3,
@@ -3358,6 +3359,45 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     }
   }
 
+  // 포즈 좌우 반전 — 좌우 본을 맞바꾼다. 방향(aim) 본은 side 스왑만으로 자동 미러되고,
+  // 절대 방향(Vec3)은 x 부호를, 회전(Euler) 본은 y·z 부호를 뒤집는다(YZ 평면 미러).
+  function handleMirrorPose() {
+    if (!vrm) return;
+    const swapSide = (key: string): VRMHumanBoneName => {
+      if (key.startsWith("left")) return ("right" + key.slice(4)) as VRMHumanBoneName;
+      if (key.startsWith("right")) return ("left" + key.slice(5)) as VRMHumanBoneName;
+      return key as VRMHumanBoneName;
+    };
+    const mirrorBone = (bone: PoseBone): PoseBone => {
+      if (bone.direction) {
+        if (Array.isArray(bone.direction)) {
+          const dir = bone.direction;
+          return { direction: [-dir[0], dir[1], dir[2]] as [number, number, number] };
+        }
+        // side-aware 방향은 부호(sideX)가 본 위치에 따라 자동 적용되므로 값 유지.
+        return { direction: { ...bone.direction } };
+      }
+      const [x, y, z] = getPoseBoneRotation(bone);
+      return { rotation: [x, -y, -z] };
+    };
+    const mirroredBones: PoseBoneMap = {};
+    (Object.keys(customBones) as VRMHumanBoneName[]).forEach((key) => {
+      const bone = customBones[key];
+      if (bone) mirroredBones[swapSide(key)] = mirrorBone(bone);
+    });
+    const mirroredFingers: FingerRotationMap = {};
+    (Object.keys(fingerEdits) as VRMHumanBoneName[]).forEach((key) => {
+      const v = fingerEdits[key];
+      if (!v) return;
+      mirroredFingers[swapSide(key)] = [v[0], -v[1], -v[2]];
+    });
+    setCustomBones(mirroredBones);
+    setFingerEdits(mirroredFingers);
+    if (vrmRef.current) {
+      applyPoserVisualState(vrmRef.current, { bones: mirroredBones, yOffset: customYOffset, fingerEdits: mirroredFingers, bodyScale });
+    }
+  }
+
   function handleBoneRotationChange(boneName: string, axisIndex: number, degrees: number) {
     if (!vrm) return;
     const radians = d(degrees);
@@ -4151,6 +4191,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     포즈
                   </h3>
                   <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!vrm}
+                      onClick={handleMirrorPose}
+                      className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                      title="현재 포즈를 좌우로 반전"
+                    >
+                      <FlipHorizontal2 size={11} aria-hidden /> 반전
+                    </button>
                     <button
                       type="button"
                       disabled={!vrm}
