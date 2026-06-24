@@ -351,6 +351,22 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; h
   { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
 ];
 
+const ENV_VARIANTS: Array<{ id: EnvVariant; label: string }> = [
+  { id: "none", label: "없음" },
+  { id: "floor", label: "바닥" },
+  { id: "wall", label: "벽" },
+  { id: "room", label: "방" },
+  { id: "outdoor", label: "야외" },
+];
+const HAND_SHAPE_PRESETS = [
+  { id: "fist", label: "주먹" },
+  { id: "open", label: "보" },
+  { id: "point", label: "가리키기" },
+  { id: "peace", label: "브이" },
+  { id: "thumbsUp", label: "따봉" },
+  { id: "relaxed", label: "기본" },
+] as const;
+
 const NEUTRAL_EXPRESSION_ACTION: ExpressionAction = { id: "neutral", label: "초기화", name: null, tone: "리셋" };
 const EXPRESSION_LABELS: Record<string, string> = {
   happy: "행복",
@@ -4717,100 +4733,106 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
               {/* ── 고도화 컨트롤 (body scale, lighting+, env, full state) ── */}
               <section hidden={hideOnTab("scene")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sliders size={15} className="text-accent" aria-hidden />
-                  고도화 컨트롤
+                  세부 조정 · 상태 저장
                 </h3>
-                <div className="space-y-2 text-[0.62rem]">
-                  {/* Body Scale */}
-                  <div>
-                    <div className="font-semibold mb-0.5">몸 스케일 (키/너비)</div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-6">H</span>
-                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
-                      <span className="w-10 tabular-nums text-right">{bodyScale.height.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-6">W</span>
-                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
-                      <span className="w-10 tabular-nums text-right">{bodyScale.width.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  {/* Enhanced Lighting */}
-                  <div>
-                    <div className="font-semibold mb-0.5">조명 고도화 (I / Temp / Dir)</div>
-                    <div className="flex gap-1 items-center">
-                      <span>I</span>
-                      <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting(l => ({...l, intensity: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
-                      <span className="w-8 tabular-nums">{lighting.intensity.toFixed(1)}</span>
-                      <span>T</span>
-                      <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting(l => ({...l, colorTemp: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
-                      <span className="w-8 tabular-nums">{lighting.colorTemp.toFixed(1)}</span>
-                      <span>D</span>
-                      <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting(l => ({...l, directionDeg: parseFloat(e.target.value)}))} className="flex-1 accent-accent" />
-                      <span className="w-8 tabular-nums">{Math.round(lighting.directionDeg)}°</span>
-                    </div>
-                  </div>
-                  {/* Env variants */}
-                  <div>
-                    <div className="font-semibold mb-0.5">환경 변형</div>
-                    {(["none","floor","wall","room","outdoor"] as const).map(v => (
-                      <button key={v} type="button" onClick={() => setEnvVariant(v)} className={cx("mr-1 px-1.5 py-0.5 rounded border text-[0.6rem]", envVariant === v ? "bg-accent text-white border-accent" : "border-line bg-card hover:bg-raised")}>{v}</button>
-                    ))}
-                  </div>
-                  {/* Finger quick controls (detailed per-finger also available in "관절 미세 조정" tabs) */}
-                  <div>
-                    <div className="font-semibold mb-0.5">손가락 (컬)</div>
-                    <div className="flex items-center gap-2">
-                      <span>왼</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="flex-1 accent-accent" />
-                      <span className="w-6 tabular-nums">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))}°</span>
-                      <span>오른</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="flex-1 accent-accent" />
-                      <span className="w-6 tabular-nums">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.62rem] text-fg-3">
-                      <span className="shrink-0 font-semibold text-fg-2">왼손:</span>
-                      {[
-                        { id: "fist" as const, label: "주먹" },
-                        { id: "open" as const, label: "보" },
-                        { id: "point" as const, label: "가리키기" },
-                        { id: "peace" as const, label: "브이" },
-                        { id: "thumbsUp" as const, label: "따봉" },
-                        { id: "relaxed" as const, label: "기본" },
-                      ].map(p => (
-                        <button key={p.id} type="button" onClick={() => applyHandPosePreset('left', p.id)} className="px-1.5 py-0.5 rounded border border-line bg-card hover:bg-raised transition-colors cursor-pointer">{p.label}</button>
-                      ))}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.62rem] text-fg-3">
-                      <span className="shrink-0 font-semibold text-fg-2">오른손:</span>
-                      {[
-                        { id: "fist" as const, label: "주먹" },
-                        { id: "open" as const, label: "보" },
-                        { id: "point" as const, label: "가리키기" },
-                        { id: "peace" as const, label: "브이" },
-                        { id: "thumbsUp" as const, label: "따봉" },
-                        { id: "relaxed" as const, label: "기본" },
-                      ].map(p => (
-                        <button key={p.id} type="button" onClick={() => applyHandPosePreset('right', p.id)} className="px-1.5 py-0.5 rounded border border-line bg-card hover:bg-raised transition-colors cursor-pointer">{p.label}</button>
-                      ))}
-                    </div>
-                    <button type="button" onClick={() => setFingerEdits({})} className="mt-2 text-[0.58rem] text-accent underline cursor-pointer">손가락 전체 초기화</button>
+                <div className="space-y-3.5">
+                  {/* 몸 비율 */}
+                  <div className="space-y-1.5">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">몸 비율</p>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">키</span>
+                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.height.toFixed(2)}×</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">너비</span>
+                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.width.toFixed(2)}×</span>
+                    </label>
                   </div>
 
-                  {/* Full state IO */}
-                  <div>
-                    <div className="font-semibold mb-0.5">전체 상태 (pose+scale+finger+lighting+env+...)</div>
-                    <div className="flex gap-1 items-center">
-                      <input value={fullStateName} onChange={e=>setFullStateName(e.target.value)} placeholder="state name" className="flex-1 bg-card border border-line px-1 py-0.5 text-[0.6rem] rounded" />
-                      <button type="button" onClick={handleSaveFullLocal} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Save</button>
-                      <button type="button" onClick={handleCopyFullState} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Copy</button>
-                      <button type="button" onClick={handlePasteFullState} className="px-1.5 py-0.5 border border-line rounded text-[0.6rem] hover:bg-raised">Paste</button>
+                  {/* 조명 미세 조정 */}
+                  <div className="space-y-1.5 border-t border-line/45 pt-3">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">조명 미세 조정</p>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">밝기</span>
+                      <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting(l => ({...l, intensity: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.intensity.toFixed(1)}</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">색온도</span>
+                      <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting(l => ({...l, colorTemp: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.colorTemp < 0.45 ? "차갑게" : lighting.colorTemp > 0.55 ? "따뜻하게" : "중간"}</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">방향</span>
+                      <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting(l => ({...l, directionDeg: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(lighting.directionDeg)}°</span>
+                    </label>
+                  </div>
+
+                  {/* 배경 환경 */}
+                  <div className="space-y-1.5 border-t border-line/45 pt-3">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">배경 환경</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ENV_VARIANTS.map(({ id, label }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setEnvVariant(id)}
+                          className={cx(
+                            "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                            envVariant === id ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 손가락 굽힘 + 손모양 프리셋 */}
+                  <div className="space-y-2 border-t border-line/45 pt-3">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">손가락 굽힘 (검지)</p>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">왼손</span>
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))}°</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-12 shrink-0 font-medium">오른손</span>
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="h-1 flex-1 accent-accent" />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
+                    </label>
+                    {(["left", "right"] as const).map((side) => (
+                      <div key={side} className="flex flex-wrap items-center gap-1.5">
+                        <span className="w-16 shrink-0 whitespace-nowrap text-[0.66rem] font-semibold text-fg-2">{side === "left" ? "왼손 모양" : "오른손 모양"}</span>
+                        {HAND_SHAPE_PRESETS.map((p) => (
+                          <button key={p.id} type="button" onClick={() => applyHandPosePreset(side, p.id)} className="rounded-lg border border-line bg-card px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{p.label}</button>
+                        ))}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setFingerEdits({})} className="rounded-lg border border-line bg-card px-2 py-1 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-accent">손가락 초기화</button>
+                  </div>
+
+                  {/* 전체 상태 저장 · 불러오기 */}
+                  <div className="space-y-2 border-t border-line/45 pt-3">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">전체 상태 저장 · 불러오기</p>
+                    <p className="text-[0.62rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
+                    <div className="flex gap-1.5">
+                      <input value={fullStateName} onChange={e=>setFullStateName(e.target.value)} placeholder="상태 이름" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" />
+                      <button type="button" onClick={handleSaveFullLocal} className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft">저장</button>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={handleCopyFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">복사</button>
+                      <button type="button" onClick={handlePasteFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">붙여넣기</button>
                     </div>
                     {Object.keys(savedFullStates).length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
                         {Object.keys(savedFullStates).map(n => (
-                          <button key={n} type="button" onClick={() => handleLoadFullLocal(n)} className="text-[0.58rem] px-1 py-0 border border-line rounded hover:bg-raised">{n}</button>
+                          <button key={n} type="button" onClick={() => handleLoadFullLocal(n)} className="rounded-lg border border-line bg-card px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{n}</button>
                         ))}
                       </div>
                     )}
