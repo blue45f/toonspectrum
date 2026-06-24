@@ -49,6 +49,7 @@ describe("studio-vrm-webcam-tracking", () => {
         mirrorMode: true,
         sensitivity: 1.0,
         smoothing: 0.35,
+        fingerTracking: true,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);
@@ -70,6 +71,7 @@ describe("studio-vrm-webcam-tracking", () => {
         mirrorMode: false,
         sensitivity: 1.0,
         smoothing: 0.35,
+        fingerTracking: true,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);
@@ -87,6 +89,7 @@ describe("studio-vrm-webcam-tracking", () => {
         mirrorMode: true,
         sensitivity: 1.0,
         smoothing: 0.35,
+        fingerTracking: true,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);
@@ -102,6 +105,7 @@ describe("studio-vrm-webcam-tracking", () => {
         mirrorMode: false,
         sensitivity: 1.5,
         smoothing: 0.35,
+        fingerTracking: true,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);

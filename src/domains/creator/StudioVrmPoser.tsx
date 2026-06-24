@@ -16,6 +16,7 @@ import {
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
+import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
 import {
   parseVrmPhysicsSettings,
   DEFAULT_VRM_PHYSICS,
@@ -38,6 +39,7 @@ import {
   applyFullState,
   stripFingerBones,
   applyPoserVisualState,
+  applyFingerRotations,
   planFullStateRestore,
   createFullStateLoadHandlers,
   type PoseBone,
@@ -68,6 +70,8 @@ import {
   disposeFaceLandmarker,
   initPoseLandmarker,
   disposePoseLandmarker,
+  initHandLandmarker,
+  disposeHandLandmarker,
   processTrackingResult,
   processPoseResult,
   smoothRawChannels,
@@ -90,7 +94,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
-import type { FaceLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
+import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 import {
@@ -2014,6 +2018,9 @@ function VrmActor({
           const faded = smoother.fadeToward(boneName, rest, dVal, LIMB_FADE_HALF_LIFE);
           if (faded) bone.quaternion.copy(faded);
         }
+
+        // 손가락 추적 결과 적용(감지된 손만; 없으면 사용자 손 포즈 유지).
+        if (data.fingers) applyFingerRotations(vrm, data.fingers);
       }
 
       if (expressionManager) {
@@ -2274,6 +2281,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const prevChannelsRef = useRef<TrackingChannels | null>(null);
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2632,6 +2640,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         landmarkerRef.current = landmarker;
         poseLandmarkerRef.current = poseLandmarker;
 
+        // 손가락 추적(옵션) — 별도 lazy 초기화. 실패해도 전신 추적은 유지.
+        if (trackingOptionsRef.current.fingerTracking) {
+          initHandLandmarker()
+            .then((hand) => {
+              if (active) handLandmarkerRef.current = hand;
+            })
+            .catch((handErr) => console.warn("HandLandmarker init failed (손가락 추적 비활성):", handErr));
+        }
+
         setWebcamLoading(false);
 
         const loop = () => {
@@ -2675,6 +2692,22 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
               const vrmData = convertChannelsToVrmData(smoothed, trackingOptionsRef.current);
               vrmData.bones = { ...vrmData.bones, ...poseBones };
+
+              // 손가락 추적: 감지된 각 손의 21개 랜드마크 → 아바타 측(미러 반영) 손가락 본.
+              const handLm = handLandmarkerRef.current;
+              if (handLm) {
+                const handResult = handLm.detectForVideo(currentVideo, timestamp);
+                const fingers: Record<string, readonly [number, number, number]> = {};
+                const hands = handResult?.landmarks ?? [];
+                const handed = handResult?.handednesses ?? [];
+                for (let i = 0; i < hands.length; i++) {
+                  const label = handed[i]?.[0]?.categoryName ?? "Right";
+                  const side = avatarSideForHand(label, trackingOptionsRef.current.mirrorMode);
+                  Object.assign(fingers, solveHandToFingerBones(hands[i], side));
+                }
+                vrmData.fingers = fingers;
+              }
+
               trackingDataRef.current = vrmData;
             }
           }
@@ -2696,6 +2729,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       active = false;
       setWebcamLoading(false);
       if (requestId) cancelAnimationFrame(requestId);
+      // 핸드 랜드마커 참조 해제 — 재시작 시 옵션에 따라 다시 설정.
+      handLandmarkerRef.current = null;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -2707,6 +2742,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     return () => {
       disposeFaceLandmarker();
       disposePoseLandmarker();
+      disposeHandLandmarker();
     };
   }, []);
 
@@ -5571,6 +5607,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 checked={trackingOptions.gazeLock}
                                 onChange={(e) =>
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, gazeLock: e.target.checked }))
+                                }
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                              <span>손가락 추적 (재시작 시 적용)</span>
+                              <input
+                                type="checkbox"
+                                className="accent-accent"
+                                checked={trackingOptions.fingerTracking}
+                                onChange={(e) =>
+                                  setTrackingOptions((prev: TrackingOptions) => ({ ...prev, fingerTracking: e.target.checked }))
                                 }
                               />
                             </div>

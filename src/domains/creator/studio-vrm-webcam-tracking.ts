@@ -14,6 +14,7 @@ import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 import type {
   FaceLandmarker,
   FaceLandmarkerResult,
+  HandLandmarker,
   PoseLandmarker,
   PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
@@ -59,6 +60,8 @@ export interface TrackingOptions {
   sensitivity: number;
   /** 스무딩 필터 값 (0.05=매우 부드러움, 1=즉각 반영) */
   smoothing: number;
+  /** true이면 손가락 추적(HandLandmarker) 사용. */
+  fingerTracking: boolean;
 }
 
 /** VRM 캐릭터에 적용할 뼈 회전 + 표정 가중치. */
@@ -67,6 +70,8 @@ export interface VrmTrackingData {
   bones: Record<string, readonly [number, number, number]>;
   /** VRM 표정 이름 → 0-1 가중치. */
   expressions: Record<string, number>;
+  /** 손가락 본 이름 → Euler radians (손가락 추적 시). */
+  fingers?: Record<string, readonly [number, number, number]>;
 }
 
 /* ── Constants ────────────────────────────────────────────────────────── */
@@ -80,6 +85,7 @@ export const DEFAULT_TRACKING_OPTIONS: Readonly<TrackingOptions> = {
   mirrorMode: true,
   sensitivity: 1,
   smoothing: 0.35,
+  fingerTracking: true,
 };
 
 /** CDN 에셋 경로 — MediaPipe Vision WASM. */
@@ -237,6 +243,57 @@ export function disposePoseLandmarker(): void {
     cachedPoseLandmarker = null;
   }
   initPosePromise = null;
+}
+
+let cachedHandLandmarker: HandLandmarker | null = null;
+let initHandPromise: Promise<HandLandmarker> | null = null;
+
+/** MediaPipe HandLandmarker를 lazy 초기화(싱글턴, 양손). */
+export async function initHandLandmarker(): Promise<HandLandmarker> {
+  if (cachedHandLandmarker) return cachedHandLandmarker;
+  if (initHandPromise) return initHandPromise;
+
+  initHandPromise = (async () => {
+    const { FilesetResolver, HandLandmarker: HLM } = await import("@mediapipe/tasks-vision");
+    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+    const model =
+      "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+    let landmarker: HandLandmarker;
+    try {
+      landmarker = await HLM.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: model, delegate: "GPU" },
+        runningMode: "VIDEO",
+        numHands: 2,
+      });
+    } catch (err) {
+      console.warn("HandLandmarker GPU delegate failed, falling back to CPU:", err);
+      landmarker = await HLM.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: model, delegate: "CPU" },
+        runningMode: "VIDEO",
+        numHands: 2,
+      });
+    }
+
+    cachedHandLandmarker = landmarker;
+    return landmarker;
+  })();
+
+  try {
+    return await initHandPromise;
+  } catch (error) {
+    initHandPromise = null;
+    throw error;
+  }
+}
+
+/** 캐시된 HandLandmarker를 해제(메모리 반환). */
+export function disposeHandLandmarker(): void {
+  if (cachedHandLandmarker) {
+    cachedHandLandmarker.close();
+    cachedHandLandmarker = null;
+  }
+  initHandPromise = null;
 }
 
 /* ── Blendshape extraction helpers ────────────────────────────────────── */
