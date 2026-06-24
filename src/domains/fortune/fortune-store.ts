@@ -1,8 +1,22 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import type { FortuneResult, FortuneTab } from "./FortunePage";
+
 // 운세 페이지 재방문 영속화 — 생년월일 등 입력을 기억해 재입력을 없애고,
-// 운세를 본 날짜를 모아 '연속 출석(스트릭)'을 계산한다. localStorage 영속.
+// 운세를 본 날짜를 모아 '연속 출석(스트릭)'을 계산하고, 최근 본 운세를 보관(재방문)한다.
+// localStorage 영속.
+
+export interface SavedFortune {
+  id: string;
+  tab: FortuneTab;
+  characterId: string;
+  characterName: string;
+  characterAvatar: string;
+  dateLabel: string; // 표시용 날짜
+  summary: string; // 짧은 요약(점수·일주·카드명 등)
+  result: FortuneResult;
+}
 
 export interface FortuneProfile {
   lastCharacterId: string | null;
@@ -15,8 +29,11 @@ export interface FortuneProfile {
 
 interface FortuneStore extends FortuneProfile {
   viewedDates: string[]; // 운세를 본 KST 날짜(YYYY-MM-DD) 모음
+  history: SavedFortune[]; // 최근 본 운세(최신순, 최대 8개)
   setProfile: (patch: Partial<FortuneProfile>) => void;
   recordView: () => void;
+  addToHistory: (rec: Omit<SavedFortune, "id" | "dateLabel">) => void;
+  clearHistory: () => void;
 }
 
 // KST 기준 오늘 날짜
@@ -34,6 +51,7 @@ export const useFortuneStore = create<FortuneStore>()(
       partnerBirthDate: "",
       partnerBirthTime: "",
       viewedDates: [],
+      history: [],
       setProfile: (patch) => set(patch),
       recordView: () =>
         set((s) => {
@@ -43,10 +61,19 @@ export const useFortuneStore = create<FortuneStore>()(
           const next = [...s.viewedDates, today].slice(-60);
           return { viewedDates: next };
         }),
+      addToHistory: (rec) =>
+        set((s) => {
+          const id =
+            typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+          const dateLabel = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+          const full: SavedFortune = { ...rec, id, dateLabel };
+          return { history: [full, ...s.history].slice(0, 8) };
+        }),
+      clearHistory: () => set({ history: [] }),
     }),
     {
       name: "toonspectrum-fortune",
-      version: 1,
+      version: 1, // history는 추가 필드라 기본 merge로 처리됨(버전 범프·migrate 불필요)
     }
   )
 );

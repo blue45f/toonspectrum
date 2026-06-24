@@ -28,6 +28,7 @@ import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
 import { WebtoonStrip } from "./WebtoonStrip";
 
+import type { SavedFortune } from "./fortune-store";
 import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/lib/types";
 
@@ -144,6 +145,21 @@ export interface FortuneResult {
 
 export type FortuneTab = "today" | "saju" | "compatibility" | "tarot" | "prescription" | "zodiac";
 
+// 보관함 표시용 짧은 요약
+function fortuneSummary(tab: FortuneTab, r: FortuneResult): string {
+  if (tab === "today" && r.today) return `오늘의 운세 ${r.today.score}점`;
+  if (tab === "zodiac" && r.zodiac) return `${r.zodiac.ko} ${r.zodiac.score}점`;
+  if (tab === "saju" && r.saju) return `사주 ${r.saju.dayPillar.kanKorean}${r.saju.dayPillar.jiKorean}일주`;
+  if (tab === "compatibility" && r.compat) return `궁합 ${r.compat.score}%`;
+  if (tab === "tarot" && r.card) return `타로 ${r.card.name}`;
+  if (tab === "prescription") return "독서 처방";
+  return "운세 결과";
+}
+
+const TAB_LABEL_KO: Record<FortuneTab, string> = {
+  today: "오늘의 운세", zodiac: "별자리", saju: "사주팔자", compatibility: "인연 궁합", prescription: "독서 처방", tarot: "타로",
+};
+
 // 오행 영문키 → 한글 (오늘의 운세 개인화 표시용)
 const ELEMENT_KO: Record<string, string> = {
   wood: "목(木)", fire: "화(火)", earth: "토(土)", metal: "금(金)", water: "수(水)",
@@ -165,6 +181,9 @@ export function FortunePage() {
   const recordView = useFortuneStore((s) => s.recordView);
   const viewedDates = useFortuneStore((s) => s.viewedDates);
   const streak = computeStreak(viewedDates);
+  const addToHistory = useFortuneStore((s) => s.addToHistory);
+  const history = useFortuneStore((s) => s.history);
+  const clearHistory = useFortuneStore((s) => s.clearHistory);
 
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
@@ -246,6 +265,17 @@ export function FortunePage() {
       const data: FortuneResult = await response.json();
       setFortuneResult(data);
       onSuccess?.(data);
+      recordView(); // 출석(스트릭)은 실제 새 조회에서만
+      if (selectedChar) {
+        addToHistory({
+          tab: activeTab,
+          characterId: selectedChar.id,
+          characterName: selectedChar.name,
+          characterAvatar: selectedChar.avatarUrl,
+          summary: fortuneSummary(activeTab, data),
+          result: data,
+        });
+      }
       return data;
     } catch (error) {
       console.error("운세 호출 실패:", error);
@@ -275,15 +305,32 @@ export function FortunePage() {
      
   }, []);
 
-  // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내 + 출석 기록(스트릭)
+  // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내(접근성)
   useEffect(() => {
     if (!fortuneResult) return;
     const name = selectedChar?.name ?? "캐릭터";
     const score = fortuneResult.today?.score ?? fortuneResult.score;
     setLiveMsg(`${name}의 운세 결과가 도착했어요.${score != null ? ` 지수 ${score}점.` : ""}`);
     resultHeadingRef.current?.focus();
-    recordView();
-  }, [fortuneResult, selectedChar, recordView]);
+  }, [fortuneResult, selectedChar]);
+
+  // 보관함에서 운세 복원
+  const restoreFortune = (saved: SavedFortune) => {
+    const char =
+      characters.find((c) => c.id === saved.characterId) ?? {
+        id: saved.characterId,
+        name: saved.characterName,
+        origin: "ToonSpectrum",
+        greeting: "",
+        avatarUrl: saved.characterAvatar,
+      };
+    playback.stop();
+    setErrorMsg(null);
+    setSelectedChar(char);
+    setActiveTab(saved.tab);
+    setTarotStep(saved.tab === "tarot" ? "revealed" : "idle");
+    setFortuneResult(saved.result);
+  };
 
   // 재생/일시정지/이어듣기 토글
   const handleTogglePlay = () => {
@@ -410,6 +457,38 @@ export function FortunePage() {
       {/* 1단계: 캐릭터 에이전트 선택 */}
       {!selectedChar ? (
         <section className="mt-8">
+          {/* 최근 본 운세 보관함 — 클릭 시 그 결과로 복원 */}
+          {history.length > 0 && (
+            <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-line bg-panel/30 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-3">
+                  <Sparkles className="h-3.5 w-3.5 text-accent" /> 최근 본 운세
+                </h2>
+                <button onClick={clearHistory} className="text-[11px] text-fg-3 hover:text-fg">전체 지우기</button>
+              </div>
+              <div className="rail flex gap-2.5 overflow-x-auto pb-1">
+                {history.map((h) => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => restoreFortune(h)}
+                    className="flex min-w-[150px] shrink-0 items-center gap-2.5 rounded-xl border border-line bg-card/50 p-2.5 text-left transition-colors hover:border-line-strong hover:bg-raised"
+                  >
+                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line/50">
+                      {h.characterAvatar ? (
+                        <img src={h.characterAvatar} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-bold text-fg">{h.summary}</div>
+                      <div className="text-[10px] text-fg-3">{TAB_LABEL_KO[h.tab]} · {h.dateLabel}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <h2 className="mb-6 text-center text-lg font-bold text-fg-2">
             당신의 운세를 해석해줄 캐릭터 에이전트를 고르세요.
           </h2>
