@@ -6251,11 +6251,11 @@ export function StudioPage() {
             // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
-            "lg:static lg:z-auto lg:max-h-none lg:flex-shrink-0 lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
+            "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
             !leftPanelOpen && "lg:hidden"
           )}
-          style={isMobile ? undefined : { width: leftResize.width }}
+          style={isMobile ? undefined : { width: leftResize.width, minWidth: 132 }}
         >
           {/* 모바일 시트 손잡이 */}
           <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
@@ -6405,7 +6405,7 @@ export function StudioPage() {
         )}
 
         {/* 중앙: 캔버스 영역 */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative flex-1 min-w-0 lg:min-w-[22rem]">
           {/* 임시저장 복구 배너 */}
           {hasAutosave && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
@@ -7733,11 +7733,11 @@ export function StudioPage() {
             // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
-            "lg:static lg:z-auto lg:max-h-none lg:flex-shrink-0 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
+            "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             !rightPanelOpen && "lg:hidden"
           )}
-          style={isMobile ? undefined : { width: rightResize.width }}
+          style={isMobile ? undefined : { width: rightResize.width, minWidth: 248 }}
         >
           {/* 모바일 시트 손잡이 + 닫기 */}
           <div className="flex items-center justify-between lg:hidden">
