@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, ImagePlus, Loader2, RotateCcw, Sliders, Sparkles, Trash2, Upload, UserRound, WandSparkles, X, Webcam } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, PersonStanding, RotateCcw, Sliders, Smile, Sparkles, Swords, Trash2, Upload, UserRound, WandSparkles, X, Webcam } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -338,6 +338,16 @@ const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
   "inline-grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+// 우측 컨트롤 패널 탭 — 16개 섹션을 작업 흐름별로 묶어 탐색 부담을 줄인다.
+type PanelTab = "character" | "pose" | "face" | "scene" | "props";
+const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; hint: string }> = [
+  { id: "character", label: "캐릭터", icon: UserRound, hint: "모델 · 의상 · 색상" },
+  { id: "pose", label: "포즈", icon: PersonStanding, hint: "프리셋 · 관절 · 대기" },
+  { id: "face", label: "표정", icon: Smile, hint: "표정 · 블렌드 · 웹캠" },
+  { id: "scene", label: "연출", icon: Clapperboard, hint: "카메라 · 조명 · 물리" },
+  { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
+];
 
 const NEUTRAL_EXPRESSION_ACTION: ExpressionAction = { id: "neutral", label: "초기화", name: null, tone: "리셋" };
 const EXPRESSION_LABELS: Record<string, string> = {
@@ -2088,6 +2098,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [expressionWeights, setExpressionWeights] = useState<Record<string, number>>({});
   const [activeExpressionCategory, setActiveExpressionCategory] = useState<string>("emotion");
   const [activeCameraId, setActiveCameraId] = useState("front");
+  const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
   const [bodyRotation, setBodyRotation] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
@@ -2153,6 +2164,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
+  const panelScrollRef = useRef<HTMLDivElement>(null);
+
+  const handlePanelTabChange = useCallback((tab: PanelTab) => {
+    setActivePanelTab(tab);
+    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+  }, []);
 
   // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
   // Removed duplicate here to prevent double application on every render.
@@ -2167,6 +2184,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     }
   }, []);
   const activeCamera = findCameraPreset(activeCameraId);
+  // 비활성 탭 섹션은 hidden 속성으로 숨겨 마운트는 유지(웹캠 video 등 ref 보존).
+  // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
+  const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
   const availableExpressionActions = getAvailableExpressionActions(vrm);
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
@@ -3610,8 +3630,33 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           </section>
 
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
-              <section>
+            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
+              {PANEL_TABS.map((tab) => {
+                const TabIcon = tab.icon;
+                const isActive = activePanelTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    title={tab.hint}
+                    className={cx(
+                      "group flex flex-col items-center gap-1 rounded-xl border px-1 py-1.5 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      isActive
+                        ? "border-accent/55 bg-accent-soft text-accent shadow-[inset_0_-2px_0_0_var(--color-accent,oklch(0.72_0.16_45))]"
+                        : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
+                    )}
+                    onClick={() => handlePanelTabChange(tab.id)}
+                  >
+                    <TabIcon size={17} aria-hidden className={isActive ? "" : "opacity-80 group-hover:opacity-100"} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div ref={panelScrollRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+              <section hidden={hideOnTab("character")}>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <Upload size={15} className="text-accent" aria-hidden />
@@ -3703,7 +3748,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section>
+              <section hidden={hideOnTab("face")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   표정
@@ -3760,7 +3805,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section className="rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("face")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   표정 세부 조절 (Blendshape Mix)
@@ -3847,7 +3892,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </button>
               </section>
 
-              <section>
+              <section hidden={hideOnTab("pose")}>
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <UserRound size={15} className="text-accent" aria-hidden />
@@ -4025,7 +4070,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section className="rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("pose")} className="rounded-xl border border-line bg-card/45 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <Sparkles size={15} className="text-accent" aria-hidden />
@@ -4103,7 +4148,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 )}
               </section>
 
-              <section className="rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   의상 및 신체 색상 변경
@@ -4198,7 +4243,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </button>
               </section>
 
-              <section className="rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("pose")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   관절 미세 조정 (Manual Pose)
@@ -4361,7 +4406,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section>
+              <section hidden={hideOnTab("scene")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Camera size={15} className="text-accent" aria-hidden />
                   카메라
@@ -4405,7 +4450,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </label>
               </section>
 
-              <section className="mt-4">
+              <section hidden={hideOnTab("scene")} className="mt-4">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <WandSparkles size={15} className="text-accent" aria-hidden />
                   조명 연출
@@ -4435,7 +4480,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 고도화 컨트롤 (body scale, lighting+, env, full state) ── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("scene")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sliders size={15} className="text-accent" aria-hidden />
                   고도화 컨트롤
@@ -4538,7 +4583,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 자연스러운 애니메이션 효과 ─────────────────────────── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("pose")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   생동감 연출 (대기 모션)
@@ -4565,7 +4610,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 본 부착 소품(손/머리/몸) ───────────────────────────── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("props")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   소품 부착 (손·머리·몸)
@@ -4724,7 +4769,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 의상 분리 토글 / 리컬러 ─────────────────────────────── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("character")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sliders size={15} className="text-accent" aria-hidden />
                   의상 분리 · 부분 채색
@@ -4823,7 +4868,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 흔들림 물리(스프링본) ──────────────────────────────── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("scene")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <WandSparkles size={15} className="text-accent" aria-hidden />
                   흔들림 물리 (머리카락·치마)
@@ -4913,7 +4958,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 웹캠 실시간 페이스 트래킹 ───────────────────────────── */}
-              <section className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <section hidden={hideOnTab("face")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Webcam size={15} className="text-accent" aria-hidden />
                   웹캠 실시간 페이스 트래킹
@@ -5178,7 +5223,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 )}
               </section>
 
-              <section className="mt-4">
+              <section hidden={hideOnTab("props")} className="mt-4">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   3D 소품 · 동물 배치
