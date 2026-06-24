@@ -98,7 +98,7 @@ function main() {
   for (const [id, nt] of newById) {
     const ot = oldById.get(id);
     if (ot) {
-      merged.push({ ...nt, availability: mergeAvailability(ot.availability, nt.availability) });
+      merged.push(mergeTitle(ot, nt));
       updated++;
     } else {
       merged.push(nt);
