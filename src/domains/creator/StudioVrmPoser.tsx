@@ -2102,7 +2102,7 @@ function parseCameraError(error: unknown): string {
 
     // Compute recommended access URL dynamically
     const getRecommendedUrl = () => {
-      if (typeof window === "undefined") return "https://webtoon-index.vercel.app/studio";
+      if (typeof window === "undefined") return "https://toonspectrum.vercel.app/studio";
       const { protocol, hostname, origin, pathname } = window.location;
       const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
       if (protocol === "https:" || isLocal) {
@@ -2110,7 +2110,7 @@ function parseCameraError(error: unknown): string {
         return `${origin}${pathname}`;
       }
       // Suggest production HTTPS URL
-      return "https://webtoon-index.vercel.app/studio";
+      return "https://toonspectrum.vercel.app/studio";
     };
     const recommended = getRecommendedUrl();
     const isSecure = typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -2127,7 +2127,7 @@ function parseCameraError(error: unknown): string {
     if (name === "NotAllowedError" || msg.includes("Permission denied") || msg.includes("denied")) {
       errMsg = "카메라 사용 권한이 거부되었거나 즉시 차단되었습니다. (브라우저가 동의 팝업을 띄우지 않는 상태)\n\n" +
         "[원인 및 해결 방법]\n" +
-        "1. 브라우저 주소창 왼쪽 '자물쇠' 아이콘 클릭 → '카메라'가 '허용'인지 확인 (이 사이트 origin에서 별도로 설정해야 함: localhost vs https://webtoon-index.vercel.app 별개).\n" +
+        "1. 브라우저 주소창 왼쪽 '자물쇠' 아이콘 클릭 → '카메라'가 '허용'인지 확인 (이 사이트 origin에서 별도로 설정해야 함: localhost vs https://toonspectrum.vercel.app 별개).\n" +
         "2. macOS: 시스템 설정 → 개인정보 보호 및 보안 → 카메라 에서 사용 중인 브라우저 스위치를 **켜기**. (브라우저 권한과 별도의 시스템 권한임)\n" +
         "3. 위 설정 변경 후: 브라우저 **완전 종료 → 재실행 → F5** 후 다시 '트래킹 시작' 클릭.\n" +
         `4. 여전히 안 되면 '${recommended}' 로 직접 접속했는지, 다른 앱이 카메라 점유 중인지 확인.`;
@@ -5371,7 +5371,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 {window.location.protocol === "https:" ? "" : (
                                   window.location.hostname.includes("vercel") || window.location.hostname.includes("webtoon-index")
                                     ? `현재 URL을 https:// 로 시작하게 변경하거나 ${window.location.origin.replace("http:", "https:")}${window.location.pathname} 로 접속하세요.`
-                                    : `로컬 개발 시 http://localhost:5173 (또는 현재 dev 서버)로 직접 접속. 운영 환경은 HTTPS(${window.location.hostname.includes(".") ? "현재 도메인" : "https://webtoon-index.vercel.app/studio"})로 접속하세요.`
+                                    : `로컬 개발 시 http://localhost:5173 (또는 현재 dev 서버)로 직접 접속. 운영 환경은 HTTPS(${window.location.hostname.includes(".") ? "현재 도메인" : "https://toonspectrum.vercel.app/studio"})로 접속하세요.`
                                 )}
                               </p>
                             </div>
@@ -5386,7 +5386,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 브라우저 UI에서는 허용한 것처럼 보이지만, 여전히 즉시 차단됩니다. (두 단계 권한 모두 확인 필요)
                               </p>
                               <ol className="list-decimal pl-4 text-[0.62rem] space-y-0.5 opacity-95">
-                                <li>이 사이트 <strong>정확한 주소</strong>(https://webtoon-index.vercel.app) 에서 브라우저 '자물쇠' → 카메라 '허용' (localhost와 별개)</li>
+                                <li>이 사이트 <strong>정확한 주소</strong>(https://toonspectrum.vercel.app) 에서 브라우저 '자물쇠' → 카메라 '허용' (localhost와 별개)</li>
                                 <li><strong>macOS 시스템:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 브라우저 앱 스위치 <strong>켜기</strong></li>
                                 <li>설정 바꾼 후 브라우저 완전 종료 → 재시작 → 이 페이지 F5</li>
                               </ol>
