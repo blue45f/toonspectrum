@@ -133,8 +133,10 @@ export function solveHandToFingerBones(
   out[`${avatarSide}ThumbProximal`] = [0, sign * thumbProx * 0.6, sign * thumbProx * 0.5];
   out[`${avatarSide}ThumbDistal`] = [0, 0, sign * thumbDist];
 
-  // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준). 실기기 검증으로 부호 보정(-sign).
-  out[`${avatarSide}Hand`] = [-sign * handRoll(landmarks), 0, 0];
+  // 손바닥 roll(뒤집힘) → 손 본 X축 회전(팔뚝 축 기준).
+  // handRoll 은 검지-소지 교차곱이라 물리적 좌/우손에서 이미 부호가 반대다 → 측별 sign 을
+  // 곱하면 한 손만 맞고 다른 손은 뒤집히므로 곱하지 않는다(양손 일관).
+  out[`${avatarSide}Hand`] = [-handRoll(landmarks), 0, 0];
 
   return out;
 }
