@@ -224,39 +224,46 @@ function inSameGroup(groups: string[][], a: string, b: string): boolean {
 export interface CompatibilityAnalysis {
   score: number;
   grade: string;
-  factors: string[]; // 명리적 근거(사용자에게 보여줄 한 줄들)
+  factors: string[]; // 긍정+주의 통합(하위호환)
+  positives: string[]; // 잘 맞는 점
+  cautions: string[]; // 조율이 필요한 점
+  elementComplement: number; // 오행 보완 점수(0~100): 서로의 약한 오행을 채워주는 정도
+}
+
+// 지지 한 쌍의 관계 → 점수 가감 + 한 줄 근거(긍정/주의)
+function jiRelation(x: string, y: string, label: string): { delta: number; positive?: string; caution?: string } {
+  if (x === y) return { delta: 2, positive: `${label} ${x}·${y} 동일 — 비슷한 결` };
+  if (JI_LIUHE[x] === y) return { delta: 9, positive: `${label} ${x}·${y} 육합(六合) — 편안한 결합` };
+  if (inSameGroup(SANHE_GROUPS, x, y)) return { delta: 7, positive: `${label} 삼합(三合) — 뜻이 잘 맞는 인연` };
+  if (JI_CHUNG[x] === y) return { delta: -7, caution: `${label} 충(沖) — 변화·이동수, 속도 조율` };
+  if (inSameGroup(XING_GROUPS, x, y)) return { delta: -4, caution: `${label} 형(刑) — 사소한 마찰, 배려 필요` };
+  return { delta: 0 };
 }
 
 export function analyzeCompatibility(mine: SajuResult, partner: SajuResult): CompatibilityAnalysis {
   const a = mine.dayPillar;
   const b = partner.dayPillar;
-  let score = 62;
-  const factors: string[] = [];
+  let score = 60;
+  const positives: string[] = [];
+  const cautions: string[] = [];
 
   // 일간 합/충
   if (KAN_HE[a.kanKorean] === b.kanKorean) {
     score += 14;
-    factors.push(`일간 ${a.kanKorean}·${b.kanKorean}이 천간합(天干合) — 끌림과 보완의 인연`);
+    positives.push(`일간 ${a.kanKorean}·${b.kanKorean} 천간합(天干合) — 끌림과 보완의 인연`);
   } else if (KAN_CHUNG[a.kanKorean] === b.kanKorean) {
     score -= 8;
-    factors.push(`일간이 천간충(天干沖) — 강한 자극과 긴장, 조율이 필요`);
-  } else {
-    factors.push(`일간 ${a.kanKorean}·${b.kanKorean} — 무난한 거리감`);
+    cautions.push(`일간 천간충(天干沖) — 강한 자극과 긴장, 조율 필요`);
   }
 
-  // 일지 관계
-  if (JI_LIUHE[a.jiKorean] === b.jiKorean) {
-    score += 12;
-    factors.push(`일지 ${a.jiKorean}·${b.jiKorean}이 육합(六合) — 편안하고 안정적인 결합`);
-  } else if (inSameGroup(SANHE_GROUPS, a.jiKorean, b.jiKorean) && a.jiKorean !== b.jiKorean) {
-    score += 10;
-    factors.push(`일지가 삼합(三合) — 뜻이 잘 맞는 동지 같은 인연`);
-  } else if (JI_CHUNG[a.jiKorean] === b.jiKorean) {
-    score -= 8;
-    factors.push(`일지가 충(沖) — 변화와 이동수, 서로의 속도 조율이 관건`);
-  } else if (inSameGroup(XING_GROUPS, a.jiKorean, b.jiKorean) && a.jiKorean !== b.jiKorean) {
-    score -= 5;
-    factors.push(`일지가 형(刑) — 사소한 마찰, 세심한 배려가 필요`);
+  // 일지(배우자궁) + 연지(띠) 합충
+  for (const rel of [
+    jiRelation(a.jiKorean, b.jiKorean, "일지(궁합궁)"),
+    jiRelation(mine.yearPillar.jiKorean, partner.yearPillar.jiKorean, "띠(연지)"),
+  ]) {
+    score += rel.delta;
+    if (rel.positive) positives.push(rel.positive);
+    if (rel.caution) cautions.push(rel.caution);
   }
 
   // 일간 오행 상생상극
@@ -264,16 +271,27 @@ export function analyzeCompatibility(mine: SajuResult, partner: SajuResult): Com
   const eb = b.elementKan as Element;
   if (ea === eb) {
     score += 4;
-    factors.push(`같은 ${ea} 오행 — 결이 닮아 편안함`);
+    positives.push(`같은 ${ea} 오행 — 결이 닮아 편안함`);
   } else if (SHENG[ea] === eb || SHENG[eb] === ea) {
     score += 8;
-    factors.push(`오행이 상생(相生) — 서로를 북돋아 주는 기운`);
+    positives.push(`오행 상생(相生) — 서로를 북돋아 주는 기운`);
   } else if (KE[ea] === eb || KE[eb] === ea) {
     score -= 4;
-    factors.push(`오행이 상극(相剋) — 끌리지만 자기주장 조율이 필요`);
+    cautions.push(`오행 상극(相剋) — 끌리지만 자기주장 조율 필요`);
   }
 
-  score = Math.max(45, Math.min(97, score));
+  // 오행 보완 — 서로의 약한 오행(20% 미만)을 상대가 강하게(25% 이상) 채워주는 정도
+  const elements: Array<keyof SajuResult["elementsRatio"]> = ["wood", "fire", "earth", "metal", "water"];
+  let complementHits = 0;
+  for (const el of elements) {
+    if (mine.elementsRatio[el] < 20 && partner.elementsRatio[el] >= 25) complementHits += 1;
+    if (partner.elementsRatio[el] < 20 && mine.elementsRatio[el] >= 25) complementHits += 1;
+  }
+  const elementComplement = Math.min(100, 40 + complementHits * 14);
+  score += complementHits * 3;
+  if (complementHits >= 2) positives.push(`오행 보완 — 서로의 부족한 기운을 ${complementHits}곳에서 채워줌`);
+
+  score = Math.max(45, Math.min(98, Math.round(score)));
   const grade =
     score >= 90 ? "천생연분" :
     score >= 80 ? "찰떡궁합" :
@@ -281,5 +299,7 @@ export function analyzeCompatibility(mine: SajuResult, partner: SajuResult): Com
     score >= 60 ? "노력으로 빛나는 인연" :
     "유연한 소통이 필요한 인연";
 
-  return { score, grade, factors };
+  if (positives.length === 0) positives.push("무난하고 담백한 거리감의 인연");
+
+  return { score, grade, factors: [...positives, ...cautions], positives, cautions, elementComplement };
 }

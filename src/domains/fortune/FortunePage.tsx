@@ -104,6 +104,9 @@ export interface CompatData {
   score: number;
   grade: string;
   factors: string[];
+  positives?: string[];
+  cautions?: string[];
+  elementComplement?: number;
 }
 export interface ZodiacData {
   id: string;
@@ -880,6 +883,37 @@ export function FortunePage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* 명리 근거 — 잘 맞는 점 / 조율이 필요한 점 + 오행 보완 */}
+                      {fortuneResult.compat && (fortuneResult.compat.positives?.length || fortuneResult.compat.cautions?.length) && (
+                        <div className="space-y-3">
+                          {fortuneResult.compat.elementComplement != null && (
+                            <div className="rounded-xl border border-line/45 bg-card/20 p-3">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-semibold text-fg-2">오행 보완도</span>
+                                <span className="font-display font-bold text-accent">{fortuneResult.compat.elementComplement}</span>
+                              </div>
+                              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-card">
+                                <motion.div className="h-full rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${fortuneResult.compat.elementComplement}%` }} transition={{ duration: 0.9, ease: "easeOut" }} />
+                              </div>
+                            </div>
+                          )}
+                          {fortuneResult.compat.positives && fortuneResult.compat.positives.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {fortuneResult.compat.positives.map((p, i) => (
+                                <span key={i} className="rounded-full border border-good/25 bg-good/10 px-2.5 py-1 text-[11px] font-semibold text-good">✓ {p}</span>
+                              ))}
+                            </div>
+                          )}
+                          {fortuneResult.compat.cautions && fortuneResult.compat.cautions.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {fortuneResult.compat.cautions.map((c, i) => (
+                                <span key={i} className="rounded-full border border-warn/25 bg-warn/10 px-2.5 py-1 text-[11px] font-semibold text-warn">⚠ {c}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     </div>
                   )}
