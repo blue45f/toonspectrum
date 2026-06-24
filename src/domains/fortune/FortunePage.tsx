@@ -125,10 +125,20 @@ export interface ZodiacData {
   luckyNumber: number;
 }
 
+export interface YearLuckData {
+  year: number;
+  kanji: string;
+  relationTenGod: string;
+  themeName: string;
+  themeFocus: string;
+  score: number;
+}
+
 export interface FortuneResult {
   interpretation: string;
   panels?: FortunePanel[];
   saju?: SajuData;
+  yearLuck?: { thisYear: YearLuckData; nextYear: YearLuckData };
   mySaju?: SajuData;
   partnerSaju?: SajuData;
   card?: TarotCardData;
@@ -996,8 +1006,9 @@ export function FortunePage() {
 
                   {/* 사주 전용 결과 디스플레이 */}
                   {activeTab === "saju" && fortuneResult.saju && (
+                    <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      
+
                       {/* 사주 8자 격자 표 */}
                       <div className="space-y-3">
                         <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">사주 원판 (四柱八字)</h4>
@@ -1070,6 +1081,28 @@ export function FortunePage() {
                           ))}
                         </div>
                       </div>
+                    </div>
+
+                    {/* 세운(歲運) — 올해/내년의 운세 */}
+                    {fortuneResult.yearLuck && (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {[fortuneResult.yearLuck.thisYear, fortuneResult.yearLuck.nextYear].map((y, i) => (
+                          <div key={y.year} className="rounded-2xl border border-line/45 bg-card/20 p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--char-accent)" }}>
+                                {i === 0 ? "올해의 운세 (세운)" : "내년 미리보기"}
+                              </span>
+                              <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
+                            </div>
+                            <div className="mt-1 flex items-baseline gap-2">
+                              <CountUp value={y.score} className="font-display text-2xl font-extrabold" style={{ color: "var(--char-accent)" }} />
+                              <span className="text-sm font-bold text-fg-2">{y.themeName}</span>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-fg-3">{y.themeFocus}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     </div>
                   )}
 

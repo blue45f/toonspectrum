@@ -192,6 +192,49 @@ export function todayCategoryScores(
   };
 }
 
+// ── 세운(歲運): 그 해 간지 vs 내 일간 — 올해/내년의 운세 ────────────────
+const YEAR_KANS_KO = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"];
+const YEAR_JIS_KO = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"];
+const YEAR_KAN_EL: Record<string, Element> = {
+  갑: "목", 을: "목", 병: "화", 정: "화", 무: "토", 기: "토", 경: "금", 신: "금", 임: "수", 계: "수",
+};
+const YEAR_THEME: Record<TenGod, { name: string; focus: string }> = {
+  비겁: { name: "독립·동료의 해", focus: "내 힘으로 밀어붙이는 한 해. 동업·협력과 지출 관리가 관건이에요." },
+  식상: { name: "표현·결실의 해", focus: "재능과 활동이 꽃피는 해. 새 도전·창작에 좋은 흐름이에요." },
+  재성: { name: "재물·인연의 해", focus: "재물과 인연이 넓어지는 해. 거래·연애·결혼에 길합니다." },
+  관성: { name: "성취·명예의 해", focus: "승진·시험·자리가 오르는 해. 책임과 평판 관리가 중요해요." },
+  인성: { name: "배움·귀인의 해", focus: "공부·자격·문서, 귀인의 도움이 드는 해입니다." },
+};
+
+export interface YearLuck {
+  year: number;
+  kanji: string;
+  relationTenGod: TenGod;
+  themeName: string;
+  themeFocus: string;
+  score: number;
+}
+
+export function analyzeYearLuck(analysis: SajuAnalysis, year: number): YearLuck {
+  const ki = (((year - 4) % 10) + 10) % 10;
+  const ji = (((year - 4) % 12) + 12) % 12;
+  const kanKo = YEAR_KANS_KO[ki];
+  const jiKo = YEAR_JIS_KO[ji];
+  const god = tenGod(analysis.dayMasterElement, YEAR_KAN_EL[kanKo]);
+
+  let score = 72;
+  if (god === "인성") score += 9;
+  else if (god === "재성") score += 8;
+  else if (god === "식상") score += 4;
+  else if (god === "관성") score += 2;
+  if (analysis.strength === "신약" && (god === "인성" || god === "비겁")) score += 7;
+  if (analysis.strength === "신강" && (god === "식상" || god === "재성" || god === "관성")) score += 7;
+  score = Math.max(58, Math.min(96, score));
+
+  const t = YEAR_THEME[god];
+  return { year, kanji: `${kanKo}${jiKo}`, relationTenGod: god, themeName: t.name, themeFocus: t.focus, score };
+}
+
 // ── 궁합: 일간 합충 · 지지 합충 · 오행 상생상극 ──────────────────────
 const KAN_HE: Record<string, string> = {
   갑: "기", 기: "갑", 을: "경", 경: "을", 병: "신", 신: "병", 정: "임", 임: "정", 무: "계", 계: "무",

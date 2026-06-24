@@ -4,7 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import { TITLES } from "../../../../../lib/server/catalog-store";
 
-import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin, todayCategoryScores } from "./saju-analysis";
+import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin, analyzeYearLuck, todayCategoryScores } from "./saju-analysis";
 import { calculateSaju, SajuResult } from "./saju-utils";
 import { getZodiacSign, genresByZodiacElement, ZODIAC_ELEMENT_COLOR } from "./zodiac";
 
@@ -214,10 +214,18 @@ export class FortuneService {
       interpretation = this.getFallbackSajuInterpretation(sajuResult, character, analysis);
     }
 
+    // 세운 — 올해/내년의 운세(연 간지 vs 일간)
+    const kstYear = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCFullYear();
+    const yearLuck = {
+      thisYear: analyzeYearLuck(analysis, kstYear),
+      nextYear: analyzeYearLuck(analysis, kstYear + 1),
+    };
+
     return {
       character,
       saju: sajuResult,
       analysis,
+      yearLuck,
       interpretation,
       panels: this.parsePanels(interpretation, character.id),
       recommendations
