@@ -10,6 +10,9 @@ export interface TarotRequest {
 
 export interface TodayFortuneRequest {
   characterId: string;
+  birthDate?: string; // YYYY-MM-DD (선택: 입력 시 사주 기반 개인화)
+  birthTime?: string; // HH:MM
+  gender?: string; // "male" | "female" | "none"
 }
 
 export interface CompatibilityRequest {
@@ -65,7 +68,12 @@ export class FortuneController {
   @Post("today")
   @HttpCode(HttpStatus.OK)
   async drawTodayFortune(@Body() body: TodayFortuneRequest) {
-    return this.fortuneService.drawTodayFortune(body.characterId);
+    return this.fortuneService.drawTodayFortune(
+      body.characterId,
+      body.birthDate,
+      body.birthTime,
+      body.gender
+    );
   }
 
   // 궁합 분석

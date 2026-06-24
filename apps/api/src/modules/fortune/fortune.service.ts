@@ -4,6 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import { TITLES } from "../../../../../lib/server/catalog-store";
 
+import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin } from "./saju-analysis";
 import { calculateSaju, SajuResult } from "./saju-utils";
 
 import type { Title } from "../../../../../lib/types";
@@ -33,6 +34,20 @@ export interface TodayFortuneResult {
   direction: string;
   time: string;
   luckyNumber: number;
+}
+
+// 웹툰 컷(패널) 한 줄: 나레이션(speaker="") 혹은 캐릭터 대사
+export interface FortunePanelLine {
+  speaker: string; // 화자 이름. 나레이션이면 빈 문자열
+  characterId: string | null; // 매칭된 ToonSpectrum 캐릭터 id (없으면 null)
+  text: string;
+  sfx?: string; // 효과음(있으면 컷에 스티커로 표시)
+}
+
+// 웹툰 컷(패널) 한 칸
+export interface FortunePanel {
+  scene: string | null; // [N컷 - 장면 묘사]의 묘사 부분
+  lines: FortunePanelLine[];
 }
 
 const CHARACTERS: FortuneCharacter[] = [
@@ -91,6 +106,26 @@ const TAROT_CARDS = [
   { id: 21, name: "세계", nameEn: "The World", keywords: ["완성", "통합", "조화", "여행의 끝"] }
 ];
 
+// 오행 영문키 → 한글 (오늘의 운세 개인화 텍스트용)
+const ELEMENT_NAMES_KO: Record<string, string> = {
+  wood: "목", fire: "화", earth: "토", metal: "금", water: "수",
+};
+
+// 오행별 행운 컬러·방위·숫자 (명리 방위·색 매핑). 오늘의 운세를 생년월일 사주에
+// 연동할 때, '오늘 보완하면 좋은 기운'(약한 오행)에서 이 값을 가져온다.
+const ELEMENT_LUCK: Record<string, { color: string; direction: string; numbers: number[] }> = {
+  wood: { color: "초록색", direction: "동쪽", numbers: [3, 8] },
+  fire: { color: "붉은색", direction: "남쪽", numbers: [2, 7] },
+  earth: { color: "황금색", direction: "남서쪽", numbers: [0, 5] },
+  metal: { color: "은백색", direction: "서쪽", numbers: [4, 9] },
+  water: { color: "검은색", direction: "북쪽", numbers: [1, 6] },
+};
+
+const TIME_SLOTS = [
+  "오전 07시 ~ 09시", "오전 10시 ~ 12시", "오후 01시 ~ 03시",
+  "오후 04시 ~ 06시", "오후 07시 ~ 09시", "오후 10시 ~ 12시",
+];
+
 @Injectable()
 export class FortuneService {
   getCharacters(): FortuneCharacter[] {
@@ -137,6 +172,7 @@ export class FortuneService {
       character,
       card,
       interpretation,
+      panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
   }
@@ -145,22 +181,27 @@ export class FortuneService {
   async drawSaju(birthDate: string, birthTime?: string, gender = "none", characterId = "ara") {
     const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
     const sajuResult: SajuResult = calculateSaju(birthDate, birthTime);
+    // 명리 해석 — 일간 중심 십성·신강신약·용신·성격 (난수 아님)
+    const analysis = analyzeSaju(sajuResult);
 
-    // 오행 강약 분석에 기반하여 추천 장르 도출
-    // 예: 수(water)가 부족하면 판타지나 드라마, 목(wood)이 많으면 역동적인 액션 등
+    // 용신(보완 오행)을 우선해 추천 장르 도출
     const recommendedGenres = this.getGenresBySaju(sajuResult);
     const recommendations = this.curateTitles(recommendedGenres);
 
     // AI 해석 텍스트 생성
     let interpretation: string;
     try {
+      const tg = analysis.tenGodCounts;
       const sajuText = `
-        생년월일시: ${birthDate} ${birthTime || "시간 모름"} (${gender === "male" ? "남성" : "여성"})
-        년주: ${sajuResult.yearPillar.kanKorean}${sajuResult.yearPillar.jiKorean} (${sajuResult.yearPillar.kan}${sajuResult.yearPillar.ji})
-        월주: ${sajuResult.monthPillar.kanKorean}${sajuResult.monthPillar.jiKorean} (${sajuResult.monthPillar.kan}${sajuResult.monthPillar.ji})
-        일주: ${sajuResult.dayPillar.kanKorean}${sajuResult.dayPillar.jiKorean} (${sajuResult.dayPillar.kan}${sajuResult.dayPillar.ji})
-        시주: ${sajuResult.hourPillar.kanKorean}${sajuResult.hourPillar.jiKorean} (${sajuResult.hourPillar.kan}${sajuResult.hourPillar.ji})
-        오행 비율: 목(${sajuResult.elementsRatio.wood}%), 화(${sajuResult.elementsRatio.fire}%), 토(${sajuResult.elementsRatio.earth}%), 금(${sajuResult.elementsRatio.metal}%), 수(${sajuResult.elementsRatio.water}%)
+        생년월일시: ${birthDate} ${birthTime || "시간 모름"} (${gender === "male" ? "남성" : gender === "female" ? "여성" : "성별 미상"})
+        년주 ${sajuResult.yearPillar.kanKorean}${sajuResult.yearPillar.jiKorean} · 월주 ${sajuResult.monthPillar.kanKorean}${sajuResult.monthPillar.jiKorean} · 일주 ${sajuResult.dayPillar.kanKorean}${sajuResult.dayPillar.jiKorean} · 시주 ${sajuResult.hourPillar.kanKorean}${sajuResult.hourPillar.jiKorean}
+        [핵심 명리 분석]
+        일간(나): ${analysis.dayMasterKan}(${analysis.dayMasterElement}·${analysis.yinYang}) — ${analysis.personality}
+        신강/신약: ${analysis.strength}
+        십성 분포: 비겁 ${tg.비겁} · 식상 ${tg.식상} · 재성 ${tg.재성} · 관성 ${tg.관성} · 인성 ${tg.인성} (주된 기운: ${analysis.dominantTenGod})
+        용신(보완하면 좋은 기운): ${analysis.usefulElement}
+        오행 비율: 목 ${sajuResult.elementsRatio.wood}% 화 ${sajuResult.elementsRatio.fire}% 토 ${sajuResult.elementsRatio.earth}% 금 ${sajuResult.elementsRatio.metal}% 수 ${sajuResult.elementsRatio.water}%
+        위 명리 분석을 근거로(일간 성향·신강신약·주된 십성·용신을 반드시 녹여), 성격·강점·올해 흐름·조언을 충실히 풀어줘.
       `;
       interpretation = await this.generateAIFortune(
         `평생 사주 및 성향 분석`,
@@ -168,13 +209,15 @@ export class FortuneService {
         character
       );
     } catch (_e) {
-      interpretation = this.getFallbackSajuInterpretation(sajuResult, character);
+      interpretation = this.getFallbackSajuInterpretation(sajuResult, character, analysis);
     }
 
     return {
       character,
       saju: sajuResult,
+      analysis,
       interpretation,
+      panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
   }
@@ -189,35 +232,37 @@ export class FortuneService {
     const systemInstructions = `
       당신은 ToonSpectrum의 오리지널 캐릭터 '${character.name}' 입니다.
       사용자에게 '${type}' 결과를 해설해주는 상황입니다.
-      
-      반드시 다음 규칙을 준수하세요:
-      1. 완전히 캐릭터 '${character.name}'의 페르소나, 성격, 어조, 핵심 대사의 뉘앙스를 반영하여 말하세요.
-         - 사서 아라: 차분하고 상냥한 경어체. 지혜롭고 사려 깊은 카운셀러 톤. "책", "도서관", "기록", "페이지" 등의 단어를 활용해 운세를 기록을 읽어주듯이 설명.
-         - 도깨비 단우: 친근하고 장난꾸러기 같은 활기찬 반말투. 가끔 심술을 부리는 척하지만 속은 다정한 오빠/형 같은 조언. "도깨비 방망이", "금은보화", "장난", "메밀묵" 언급.
-         - 점술가 레오나: 매혹적이고 신비로운 반말/존댓말 혼용 톤. 우주와 별의 흐름을 읽는 점술가의 기품. "운명의 별빛", "은하수", "우주의 신호", "점괘" 언급.
-         - 검객 가온: 묵직하고 냉철하며 과묵한 무사 어조(반말투). 불필요한 사설은 배제하고 본질을 꿰뚫는 뼈 때리는 격려와 일침. "검(劍)", "바람", "수련", "흔들리지 않는 마음" 언급.
-         - 단, '두 사람의 찰떡 궁합 분석' 결과일 경우에는 일반 줄글 설명 대신 반드시 [웹툰/만화 시나리오 대본 연출] 형식으로 출력하세요.
-           * 포맷 예시:
-             [1컷 - (장면 및 동작 묘사)]
-             캐릭터이름: "대사"
-             [2컷 - (장면 및 동작 묘사)]
-             다른캐릭터이름: "대사"
-           * 사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온 중 최소 1~2명의 ToonSpectrum 오리지널 캐릭터들을 서로 대화하게(티키타카) 하여 두 사람의 궁합을 재치 있게 만화 콘티처럼 해석해 주세요.
-         - 단, '독서 처방전' 결과일 경우에는 고민에 귀 기울이고 상처를 어루만지는 듯한 [책 처방 에세이 편지] 형식으로 따뜻하고 다정하게 출력하세요.
-           * 포맷 예시:
-             "친애하는 당신에게,
-             보내주신 고민('고민내용')을 읽으며 당신의 마음 한편에 가라앉은 잔잔한 그늘을 보았습니다.
-             오늘 당신의 서가에서 꺼내드리고 싶은 책은..."
-           * 고민의 유형(힐링, 우울, 액션 필요 등)에 어울리는 ToonSpectrum 추천 장르와 함께 왜 이 책이 당신에게 위로가 되는지 캐릭터의 관점에서 진심 어린 에세이처럼 적어주세요.
-      2. 사용자에게 친근한 대화체로 풀어나가세요. 기계적인 명리학/타로 사전적 풀이를 줄줄 늘어놓지 마세요.
-      3. 카피는 짧고 단정하며, 느낌표(!)를 남발하지 마세요. (단우 캐릭터의 호탕한 대사 일부 예외 제외)
-      4. 한국어로 가독성 있게 줄바꿈을 포함하여 대화하듯이 3~4문단 정도로 답변을 반환해 주세요. (궁합 콘티의 경우 컷당 줄바꿈을 적용해 주세요)
+      출력물은 화면에서 **세로 스크롤 웹툰(만화 콘티)** 으로 렌더링됩니다.
+
+      ★ 가장 중요한 출력 형식 규칙 (반드시 준수):
+      모든 답변을 예외 없이 아래 [웹툰 콘티 대본] 형식으로만 출력하세요. 일반 줄글 단락으로 쓰지 마세요.
+
+        [1컷 - (장면·표정·동작을 짧고 생생하게 묘사)]
+        ${character.name.split(" ").pop()}: "대사 (따옴표로 감쌀 것)"
+        효과음: 두근두근   ← (선택) 컷 분위기를 살릴 의성어/의태어
+        [2컷 - (다음 장면 묘사)]
+        ${character.name.split(" ").pop()}: "대사"
+
+      - 컷은 총 3~5개. 각 컷은 '[N컷 - 묘사]' 헤더로 시작하고, 그 아래 '이름: "대사"' 줄을 1~2개 둡니다.
+      - 화면 가독성을 위해 한 대사는 1~2문장으로 짧게. 명리학/타로 사전식 나열 금지.
+      - '효과음:' 줄은 컷마다 0~1개만, 짧게(예: 반짝, 휘익, 쿵, 두근두근).
+
+      1. 캐릭터 '${character.name}'의 페르소나·말투를 100% 반영하세요.
+         - 사서 아라: 차분하고 상냥한 경어체, 사려 깊은 카운셀러 톤. "책", "도서관", "기록", "페이지" 모티프.
+         - 도깨비 단우: 활기찬 반말 장난꾸러기, 속은 다정한 형/오빠. "도깨비 방망이", "금은보화", "메밀묵" 모티프.
+         - 점술가 레오나: 매혹적·신비로운 톤. "운명의 별빛", "은하수", "우주의 신호", "점괘" 모티프.
+         - 검객 가온: 묵직·냉철·과묵한 무사 반말. 본질을 꿰뚫는 일침. "검(劍)", "바람", "수련" 모티프.
+      2. 결과 데이터(운세 지수·오행·카드 등)를 대사 속에 자연스럽게 녹여 풀이하세요.
+      3. '두 사람의 찰떡 궁합 분석'이면, 위 4명 중 1~2명을 더 등장시켜 서로 티키타카(대화)하게 만들어 재치 있는 궁합 콘티로 연출하세요.
+      4. '독서 처방전'이면, 컷 안 대사를 고민을 어루만지는 따뜻하고 다정한 어조로(편지를 읽어주듯) 채우세요.
+      5. 한국어로, 느낌표(!) 남발 금지(단우의 호탕한 일부 예외 제외).
     `;
 
     const prompt = `
       ${dataText}
-      
+
       위 결과를 바탕으로, 너의 캐릭터 스타일로 운세를 재미있고 통찰력 있게 설명해줘.
+      반드시 위에서 지정한 [웹툰 콘티 대본] 형식(컷 헤더 + 이름: "대사")으로만 출력해.
     `;
 
     const response = await fetch(
@@ -236,8 +281,8 @@ export class FortuneService {
             parts: [{ text: systemInstructions }]
           },
           generationConfig: {
-            maxOutputTokens: 800,
-            temperature: 0.7
+            maxOutputTokens: 1100,
+            temperature: 0.8
           }
         })
       }
@@ -290,17 +335,30 @@ export class FortuneService {
     }
   }
 
+  // 오늘의 십성 테마별 장르 매칭
+  private getGenresByTenGod(god: import("./saju-analysis").TenGod): string[] {
+    switch (god) {
+      case "재성": return ["로맨스", "로판", "드라마"]; // 재물·애정
+      case "관성": return ["무협", "느와르", "전쟁"]; // 책임·명예
+      case "인성": return ["판타지", "미스터리", "성장"]; // 학업·귀인
+      case "식상": return ["일상", "개그", "스포츠"]; // 표현·활동
+      case "비겁": return ["액션", "학원", "스릴러"]; // 경쟁·동료
+    }
+  }
+
   // 카탈로그 데이터 큐레이션 (추천 작품 3종 뽑기)
   private curateTitles(targetGenres: string[]): Title[] {
     if (!TITLES || TITLES.length === 0) return [];
-    
-    // 타겟 장르 중 하나 이상 포함하면서 평점이 높은 순으로 정렬하여 3개 선정
-    const matched = TITLES.filter(t => t.genres.some(g => targetGenres.includes(g)))
-      .sort((a, b) => {
-        const ratingA = a.stats?.ratingAvg ?? 0;
-        const ratingB = b.stats?.ratingAvg ?? 0;
-        return ratingB - ratingA;
-      });
+
+    // 19금(성인) 작품은 추천에서 제외. 타겟 장르 중 하나 이상 포함하면서
+    // 평점이 높은 순으로 정렬하여 3개 선정.
+    const matched = TITLES.filter(
+      t => t.ageRating !== "19" && t.genres.some(g => targetGenres.includes(g))
+    ).sort((a, b) => {
+      const ratingA = a.stats?.ratingAvg ?? 0;
+      const ratingB = b.stats?.ratingAvg ?? 0;
+      return ratingB - ratingA;
+    });
 
     return matched.slice(0, 3);
   }
@@ -309,87 +367,173 @@ export class FortuneService {
   private getFallbackTarotInterpretation(card: TarotCard, character: FortuneCharacter): string {
     const directionStr = card.type === "upright" ? "정방향" : "역방향";
     
+    const kw = card.keywords.slice(0, 3).join(", ");
     switch (character.id) {
       case "ara":
-        return `이곳 책장의 먼지 쌓인 페이지 속에서 당신의 미래를 찾아냈어요. 뽑으신 카드는 ${card.name}(${directionStr})이네요. \n\n` +
-          `기록된 키워드는 [${card.keywords.join(", ")}]입니다. \n` +
-          `인생이라는 한 권의 책에서 이 구절은 잠시 숨을 고르라는 조언을 해주고 있어요. \n` +
-          `너무 급하게 페이지를 넘기지 않아도, 다음 이야기는 충분히 멋지게 펼쳐질 테니 마음을 편히 가지세요.`;
+        return `[1컷 - 아라가 먼지 쌓인 책장 사이에서 카드 한 장을 조심스레 집어 든다]\n` +
+          `아라: "당신을 기다리던 카드는 ${card.name}(${directionStr})이네요."\n` +
+          `효과음: 사르륵\n\n` +
+          `[2컷 - 카드를 펼쳐 보이는 아라]\n` +
+          `아라: "여기 적힌 구절은 [${kw}]. 잠시 숨을 고르라는 기록이에요."\n\n` +
+          `[3컷 - 따뜻하게 미소 짓는 아라]\n` +
+          `아라: "급히 페이지를 넘기지 않아도 다음 이야기는 멋지게 펼쳐질 테니, 마음 편히 가지세요."`;
       case "danwoo":
-        return `오호라! 네가 뽑은 카드가 ${card.name}(${directionStr})이네? \n\n` +
-          `이 카드의 기운은 [${card.keywords.join(", ")}] 이란다. \n` +
-          `금은보화가 가득 찬 보물 상자를 열기 전 같은 설렘과 장난기가 어른거리네. \n` +
-          `너무 머리 굴리며 걱정하지 말고, 내 도깨비 방망이를 믿고 신나게 한 판 놀아보는 건 어때? 뚝딱!`;
+        return `[1컷 - 단우가 카드를 휙 뒤집으며 눈을 동그랗게 뜬다]\n` +
+          `단우: "오호라! 네가 뽑은 게 ${card.name}(${directionStr})이라고?"\n` +
+          `효과음: 뚝딱!\n\n` +
+          `[2컷 - 방망이를 빙글 돌리는 단우]\n` +
+          `단우: "기운이 [${kw}]… 보물 상자 열기 직전 같은 설렘이 어른거리는걸."\n\n` +
+          `[3컷 - 씩 웃으며 엄지를 치켜드는 단우]\n` +
+          `단우: "머리 굴리지 말고 내 방망이 믿고 신나게 한 판 놀아봐!"`;
       case "leona":
-        return `별빛이 가리키는 방향을 따라가 보니, 당신을 기다리던 카드는 ${card.name}(${directionStr})이었군요. \n\n` +
-          `우주가 보낸 신호는 [${card.keywords.join(", ")}]입니다. \n` +
-          `은하수의 흐름은 때로 우리를 혼란스럽게 만들지만, 결국 당신만의 고유한 궤도를 찾게 해줄 거예요. \n` +
-          `스스로의 직관과 별의 계시를 조금 더 신뢰해 보세요.`;
+        return `[1컷 - 레오나가 별빛 감도는 테이블 위로 카드를 미끄러뜨린다]\n` +
+          `레오나: "별빛을 따라가니, 당신의 카드는 ${card.name}(${directionStr})이었군요."\n` +
+          `효과음: 반짝\n\n` +
+          `[2컷 - 카드를 손끝으로 어루만지는 레오나]\n` +
+          `레오나: "우주가 보낸 신호는 [${kw}]…"\n\n` +
+          `[3컷 - 매혹적으로 속삭이는 레오나]\n` +
+          `레오나: "은하수의 흐름이 잠시 혼란스러워도 결국 당신만의 궤도를 찾아줘요. 직관을 조금 더 믿어요."`;
       case "gaon":
-        return `${card.name}(${directionStr})...\n\n` +
-          `검끝을 스쳐 지나가는 바람 같은 키워드들이군. 바로 [${card.keywords.join(", ")}]. \n` +
-          `검을 쥘 때 불필요한 망설임이 있으면 상대를 벨 수 없는 법. \n` +
-          `당신의 칼날이 흔들리지 않도록 오늘만큼은 마음의 중심을 굳건히 잡고 눈앞의 수련에만 집중하게.`;
+        return `[1컷 - 가온이 카드를 내려다보며 눈을 가늘게 뜬다]\n` +
+          `가온: "${card.name}(${directionStr})…"\n\n` +
+          `[2컷 - 검을 고쳐 쥐는 가온]\n` +
+          `가온: "검끝을 스치는 바람 같은 기운이군. 바로 [${kw}]."\n` +
+          `효과음: 스릉\n\n` +
+          `[3컷 - 등을 돌려 앞을 응시하는 가온]\n` +
+          `가온: "망설임이 칼날을 흔든다. 오늘은 중심을 굳건히 잡고 눈앞의 수련에만 집중하라."`;
       default:
-        return `당신이 뽑은 카드는 ${card.name}(${directionStr})입니다.\n` +
-          `이 카드는 오늘 당신에게 '${card.keywords[0]}'의 에너지가 강하게 흐르고 있음을 알려줍니다. 차분하고 지혜로운 선택을 하세요.`;
+        return `[1컷 - 에이전트가 카드를 펼친다]\n` +
+          `에이전트: "당신이 뽑은 카드는 ${card.name}(${directionStr}). '${card.keywords[0]}'의 에너지가 흐릅니다."\n\n` +
+          `[2컷 - 차분히 조언하는 에이전트]\n` +
+          `에이전트: "오늘은 차분하고 지혜로운 선택을 하세요."`;
     }
   }
 
-  // 로컬 폴백 해석: 사주
-  private getFallbackSajuInterpretation(saju: SajuResult, character: FortuneCharacter): string {
-    const dayPillarName = `${saju.dayPillar.kanKorean}${saju.dayPillar.jiKorean}`;
-    const elementStrengths = `목(${saju.elementsRatio.wood}%), 화(${saju.elementsRatio.fire}%), 토(${saju.elementsRatio.earth}%), 금(${saju.elementsRatio.metal}%), 수(${saju.elementsRatio.water}%)`;
+  // 로컬 폴백 해석: 사주 (명리 분석 근거를 녹인 충실한 풀이)
+  private getFallbackSajuInterpretation(
+    saju: SajuResult,
+    character: FortuneCharacter,
+    analysis: import("./saju-analysis").SajuAnalysis
+  ): string {
+    const dayPillar = `${saju.dayPillar.kanKorean}${saju.dayPillar.jiKorean}`;
+    const dm = `${analysis.dayMasterKan}(${analysis.dayMasterElement}·${analysis.yinYang})`;
+    const tg = analysis.tenGodCounts;
+    const persona = analysis.personality;
+    const useStr =
+      analysis.strength === "신강"
+        ? `기운이 강한 신강 사주라, 넘치는 힘을 ${analysis.usefulElement}(으)로 흘려보내면 더 빛나요`
+        : analysis.strength === "신약"
+          ? `기운을 도와줄 뿌리가 필요한 신약 사주라, ${analysis.usefulElement}의 기운으로 채우면 단단해져요`
+          : `오행이 비교적 고른 중화 사주라, 가장 옅은 ${analysis.usefulElement}을(를) 더하면 균형이 살아나요`;
 
     switch (character.id) {
       case "ara":
-        return `당신의 태어난 날은 ${dayPillarName} 일주이고, 기운의 성질은 ${elementStrengths}로 구성되어 있네요. \n\n` +
-          `도서관의 서가 깊은 곳에 있는 오래된 고서의 구성처럼 조화롭고 차분한 결을 지니고 계세요. \n` +
-          `스스로의 생각을 한 자 한 자 올바르게 적어 나가는 지혜가 돋보이는 사주입니다. \n` +
-          `때로 기운이 한쪽으로 치우쳐 답답함이 느껴질 땐, 잠시 책장을 덮고 신선한 공기를 마시며 흐름을 환기해 보세요.`;
+        return `[1컷 - 아라가 두꺼운 명리 고서를 펼쳐 일간 칸을 짚는다]\n` +
+          `아라: "당신의 일간은 ${dm}. ${persona}."\n` +
+          `효과음: 사르륵\n\n` +
+          `[2컷 - 책장을 넘기며 십성 표를 살피는 아라]\n` +
+          `아라: "일주 ${dayPillar}, 십성으로 보면 ${analysis.dominantTenGod}의 기운이 가장 또렷하네요. 그래서 ${this.tenGodMeaning(analysis.dominantTenGod)}."\n\n` +
+          `[3컷 - 찻잔을 내려놓으며 차분히 설명하는 아라]\n` +
+          `아라: "${useStr}."\n\n` +
+          `[4컷 - 책을 덮으며 따뜻하게 미소 짓는 아라]\n` +
+          `아라: "타고난 결을 억누르기보다 그 강점을 살려가면, 당신만의 한 권이 아름답게 채워질 거예요."`;
       case "danwoo":
-        return `야아! 네 일주는 ${dayPillarName}고, 오행 비율은 ${elementStrengths}로 나왔어! \n\n` +
-          `어쩐지 사주에서부터 도깨비 소굴에 놀러 온 것 같은 왁자지껄하고 재미있는 활기가 느껴지더라니! \n` +
-          `너같이 에너지가 넘치고 흥겨운 사주는 가만히 있으면 오히려 병이 생겨. \n` +
-          `오늘 하루는 신나게 움직이고, 좋아하는 사람들과 맛있는 메밀묵이라도 나눠 먹으며 복을 불러와 보라고!`;
+        return `[1컷 - 단우가 사주판을 들여다보며 눈을 빛낸다]\n` +
+          `단우: "오호! 네 일간이 ${dm}이네. ${persona}!"\n` +
+          `효과음: 두구두구\n\n` +
+          `[2컷 - 방망이로 십성 글자를 가리키는 단우]\n` +
+          `단우: "${analysis.dominantTenGod} 기운이 제일 세! 한마디로 ${this.tenGodMeaning(analysis.dominantTenGod)}는 뜻이라고."\n\n` +
+          `[3컷 - 팔짱을 끼고 진지해지는 단우]\n` +
+          `단우: "${useStr}. 이거 하나만 챙겨도 운이 확 풀려!"\n\n` +
+          `[4컷 - 메밀묵을 건네며 씩 웃는 단우]\n` +
+          `단우: "타고난 끼를 숨기지 말고 팍팍 써먹어. 그게 네 복을 부르는 길이야!"`;
       case "leona":
-        return `당신의 사주 운판을 펼쳐 보니 ${dayPillarName} 일주가 빛나고 있군요. 오행의 은하수는 ${elementStrengths}의 비율을 이룹니다. \n\n` +
-          `밤하늘에 수놓아진 별자리들처럼 신비로운 기운이 골고루 조화를 이루고 있어요. \n` +
-          `직관력이 무척 뛰어나며 타인의 감정을 읽는 탁월한 영감을 가진 별자리입니다. \n` +
-          `자신의 감정 스펙트럼이 너무 휘청이지 않도록, 깊은 밤 우주의 점괘가 전하는 평온함을 마음속에 품어 보세요.`;
+        return `[1컷 - 레오나가 별자리 운판 위로 사주를 펼친다]\n` +
+          `레오나: "당신의 중심별, 일간은 ${dm}. ${persona}."\n` +
+          `효과음: 반짝\n\n` +
+          `[2컷 - 손끝으로 십성의 궤도를 따라 그리는 레오나]\n` +
+          `레오나: "별들의 배치를 보니 ${analysis.dominantTenGod}의 기운이 가장 강하게 흐르네요. ${this.tenGodMeaning(analysis.dominantTenGod)}."\n\n` +
+          `[3컷 - 수정구에 비친 빛을 응시하는 레오나]\n` +
+          `레오나: "${useStr}."\n\n` +
+          `[4컷 - 매혹적으로 미소 지으며 고개를 드는 레오나]\n` +
+          `레오나: "타고난 궤도를 신뢰해요. 당신의 별빛은 이미 제 길을 알고 있으니까요."`;
       case "gaon":
-        return `태어난 기운은 ${dayPillarName} 일주, 오행은 ${elementStrengths}이다. \n\n` +
-          `마치 차갑게 벼려진 강철 검 같은 예리함과 묵직함이 고스란히 묻어나는 사주군. \n` +
-          `칼날이 강할수록 꺾이기 쉬우니, 강함을 유지하려면 역설적이게도 유연함을 함께 훈련해야 한다. \n` +
-          `오늘 하루, 검끝에 날을 세우기보다 부드러운 바람처럼 유연한 마음가짐을 먼저 가다듬는 검객이 되길 바란다.`;
+        return `[1컷 - 가온이 검을 닦으며 사주를 응시한다]\n` +
+          `가온: "네 본바탕, 일간은 ${dm}. ${persona}."\n\n` +
+          `[2컷 - 검끝으로 십성 글자를 짚는 가온]\n` +
+          `가온: "${analysis.dominantTenGod}의 기운이 가장 무겁군. 곧 ${this.tenGodMeaning(analysis.dominantTenGod)}는 뜻이다."\n` +
+          `효과음: 스릉\n\n` +
+          `[3컷 - 검을 칼집에 꽂으며 눈을 감는 가온]\n` +
+          `가온: "${useStr}."\n\n` +
+          `[4컷 - 등을 돌려 앞을 응시하는 가온]\n` +
+          `가온: "타고난 날을 갈되, 부족한 결은 채워라. 그래야 검도 사람도 부러지지 않는다."`;
       default:
-        return `사주 일주는 ${dayPillarName}이며, 오행 분포는 ${elementStrengths}입니다. \n` +
-          `조화와 균형이 중요한 명리적 흐름 속에서, 오늘 당신에게 딱 알맞은 장르의 웹툰을 추천해 드립니다.`;
+        return `[1컷 - 에이전트가 사주를 풀이한다]\n` +
+          `에이전트: "일간 ${dm}, 일주 ${dayPillar}. ${analysis.strength} 사주이고 ${analysis.dominantTenGod} 기운이 두드러집니다."\n\n` +
+          `[2컷 - 십성 분포를 설명하는 에이전트]\n` +
+          `에이전트: "비겁 ${tg.비겁}·식상 ${tg.식상}·재성 ${tg.재성}·관성 ${tg.관성}·인성 ${tg.인성}. ${useStr}."`;
+    }
+  }
+
+  // 십성 의미를 한 줄로 (폴백 풀이에 사용)
+  private tenGodMeaning(god: import("./saju-analysis").TenGod): string {
+    switch (god) {
+      case "비겁": return "자기 주관과 추진력이 강하고 동료·경쟁 운이 두드러진다";
+      case "식상": return "표현력과 재능, 활동력이 풍부해 무언가를 만들어내는 힘이 있다";
+      case "재성": return "현실 감각과 재물·인연을 다루는 수완이 좋다";
+      case "관성": return "책임감과 자기 관리가 뛰어나 명예·직장 운으로 이어진다";
+      case "인성": return "배움과 사색을 즐기고 귀인의 도움과 문서 운이 따른다";
     }
   }
 
   // 오늘의 운세 보기
-  async drawTodayFortune(characterId: string) {
+  // birthDate가 있으면 사주 오행으로 개인화한다. '오늘의 운세'인데 모두 같은 값이거나
+  // 매번 바뀌면(피드백) 의미가 없으므로, KST 날짜 + 생년월일시 + 캐릭터로 시드해
+  // "같은 사람·같은 날엔 항상 같고, 사람마다 다른" 결정적 운세를 만든다.
+  async drawTodayFortune(characterId: string, birthDate?: string, birthTime?: string, gender = "none") {
     const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
-    
-    // 오늘의 운세 지수 및 행운 요소 생성
-    const score = Math.floor(Math.random() * 41) + 60; // 60~100 사이의 점수
-    const colors = ["금색", "보라색", "청록색", "검은색", "붉은색", "은색", "주황색", "푸른색"];
-    const directions = ["동쪽", "서쪽", "남쪽", "북쪽", "남동쪽", "북동쪽", "남서쪽", "북서쪽"];
-    const times = ["오전 07시 ~ 09시", "오전 10시 ~ 12시", "오후 01시 ~ 03시", "오후 04시 ~ 06시", "오후 07시 ~ 09시", "오후 10시 ~ 12시"];
-    const luckyNumber = Math.floor(Math.random() * 10);
+    const saju = birthDate ? calculateSaju(birthDate, birthTime) : null;
 
-    const todayData: TodayFortuneResult = {
-      score,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      direction: directions[Math.floor(Math.random() * directions.length)],
-      time: times[Math.floor(Math.random() * times.length)],
-      luckyNumber
-    };
+    // 사주가 있으면 '오늘의 일진(日辰) 대비 내 일간'을 명리로 분석해 점수·테마를
+    // 산출한다(난수 아님). 용신(보완 오행)으로 행운 컬러·방향을 정한다.
+    const analysis = saju ? analyzeSaju(saju) : null;
+    const iljin = analysis ? analyzeTodayByIljin(analysis) : null;
 
-    // 장르 매칭 (운세 지수에 따라 매칭)
+    // 시간대·행운숫자 등 부수 요소는 날짜+생년 시드로 결정(하루 고정)
+    const seed = `${this.dailySeed(characterId)}:${birthDate ?? "anon"}:${birthTime ?? ""}`;
+    const rng = this.seededRandom(seed);
+
+    let luckyElement: string | null = null;
+    let todayData: TodayFortuneResult;
+    if (analysis && iljin) {
+      luckyElement = analysis.usefulElementEn; // 용신
+      const luck = ELEMENT_LUCK[luckyElement];
+      todayData = {
+        score: iljin.score, // 일진 명리 기반 점수
+        color: luck.color,
+        direction: luck.direction,
+        time: TIME_SLOTS[Math.floor(rng() * TIME_SLOTS.length)],
+        luckyNumber: luck.numbers[Math.floor(rng() * luck.numbers.length)],
+      };
+    } else {
+      const score = Math.floor(rng() * 41) + 60;
+      const colors = ["금색", "보라색", "청록색", "검은색", "붉은색", "은색", "주황색", "푸른색"];
+      const directions = ["동쪽", "서쪽", "남쪽", "북쪽", "남동쪽", "북동쪽", "남서쪽", "북서쪽"];
+      todayData = {
+        score,
+        color: colors[Math.floor(rng() * colors.length)],
+        direction: directions[Math.floor(rng() * directions.length)],
+        time: TIME_SLOTS[Math.floor(rng() * TIME_SLOTS.length)],
+        luckyNumber: Math.floor(rng() * 10),
+      };
+    }
+    const score = todayData.score;
+
+    // 장르 매칭 — 오늘의 십성 테마가 있으면 그에 맞춰
     let recommendedGenres = ["일상", "드라마", "로맨스"];
-    if (score < 75) {
+    if (iljin) {
+      recommendedGenres = this.getGenresByTenGod(iljin.relationTenGod);
+    } else if (score < 75) {
       recommendedGenres = ["액션", "스릴러", "느와르"];
     } else if (score < 90) {
       recommendedGenres = ["판타지", "현판", "성장"];
@@ -400,12 +544,12 @@ export class FortuneService {
     // AI 해석 텍스트 생성
     let interpretation: string;
     try {
+      const grounding = analysis && iljin
+        ? `\n        [명리 근거]\n        내 일간: ${analysis.dayMasterKan}(${analysis.dayMasterElement}·${analysis.yinYang}), ${analysis.strength} 사주\n        오늘의 일진: ${iljin.todayPillar} → 내 일간과의 관계는 '${iljin.relationTenGod}'\n        오늘의 테마: ${iljin.themeName} — ${iljin.themeFocus}\n        오늘 보완하면 좋은 기운(용신): ${ELEMENT_NAMES_KO[analysis.usefulElementEn]}\n        ※ 위 일진 관계와 테마를 반드시 근거로 삼아 오늘 하루를 구체적으로 풀어줘.`
+        : "";
       const todayText = `
-        오늘의 종합 운세 지수: ${score}%
-        행운의 컬러: ${todayData.color}
-        행운의 방향: ${todayData.direction}
-        행운의 시간: ${todayData.time}
-        행운의 숫자: ${todayData.luckyNumber}
+        오늘의 종합 운세 지수: ${score}%${gender !== "none" ? ` (${gender === "male" ? "남성" : "여성"})` : ""}
+        행운의 컬러: ${todayData.color} / 방향: ${todayData.direction} / 시간: ${todayData.time} / 숫자: ${todayData.luckyNumber}${grounding}
       `;
       interpretation = await this.generateAIFortune(
         `오늘의 종합 운세`,
@@ -413,43 +557,78 @@ export class FortuneService {
         character
       );
     } catch (_e) {
-      interpretation = this.getFallbackTodayInterpretation(todayData, character);
+      interpretation = this.getFallbackTodayInterpretation(todayData, character, iljin);
     }
 
     return {
       character,
       today: todayData,
+      saju,
+      analysis,
+      iljin,
+      luckyElement,
       interpretation,
+      panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
   }
 
-  private getFallbackTodayInterpretation(data: TodayFortuneResult, character: FortuneCharacter): string {
+  private getFallbackTodayInterpretation(
+    data: TodayFortuneResult,
+    character: FortuneCharacter,
+    iljin?: import("./saju-analysis").TodayIljinAnalysis | null
+  ): string {
+    const sn = character.name.split(" ").pop() ?? character.name;
+    // 사주 기반이면 '오늘의 일진 테마'를 첫 컷으로 깔아 운세를 명리에 근거시킨다.
+    const themeIntro = iljin
+      ? `[1컷 - ${sn}이(가) 오늘의 일진을 짚어준다]\n` +
+        `${sn}: "오늘은 ${iljin.todayPillar}일. 당신 일간과는 '${iljin.relationTenGod}' 관계라 ${iljin.themeName}이 드는 날이에요."\n` +
+        `효과음: 반짝\n\n` +
+        `[2컷 - 오늘의 핵심 조언을 건네는 ${sn}]\n` +
+        `${sn}: "${iljin.themeFocus}"\n\n`
+      : "";
+    const base = ((): string => {
     switch (character.id) {
       case "ara":
-        return `오늘 당신의 하루는 ${data.score}%의 맑은 기운으로 가득 차 있네요. \n\n` +
-          `행운을 보존해 줄 색상은 '${data.color}'이고, 추천하는 행운의 방향은 '${data.direction}'입니다. \n` +
-          `특히 '${data.time}' 즈음에 소소하게 기쁜 소식이 찾아올 수 있어요. 숫자는 '${data.luckyNumber}'이 도움을 주네요. \n` +
-          `차분히 차 한 잔 마시며 오늘 하루의 책장을 우아하게 넘겨 나가 보길 바랍니다.`;
+        return `[1컷 - 아라가 오래된 운세 장부를 펼치며 부드럽게 미소 짓는다]\n` +
+          `아라: "오늘 당신의 하루는 ${data.score}%의 맑은 기운으로 적혀 있네요."\n` +
+          `효과음: 사르륵\n\n` +
+          `[2컷 - 책갈피를 짚으며 한 구절을 가리키는 아라]\n` +
+          `아라: "행운의 색은 '${data.color}', 걸음을 옮기면 좋은 방향은 '${data.direction}'이에요."\n\n` +
+          `[3컷 - 창밖으로 시선을 돌리는 아라]\n` +
+          `아라: "특히 '${data.time}'에 작은 기쁨이 찾아올 거예요. 숫자 '${data.luckyNumber}'을 마음에 품고, 차 한 잔과 함께 오늘의 책장을 우아하게 넘겨보길."`;
       case "danwoo":
-        return `야아! 대박이네! 오늘 네 하루 운세 점수는 무려 ${data.score}점이야! \n\n` +
-          `오늘의 행운 컬러인 '${data.color}' 계열 옷을 입거나 소품을 챙겨봐! 행운의 방향은 '${data.direction}'이란다! \n` +
-          `특히 '${data.time}'에 도깨비 요술 같은 행운이 뚝딱 솟아날지 몰라. 행운의 숫자 '${data.luckyNumber}'도 잘 기억해둬! \n` +
-          `신나고 장난 가득한 하루를 마음껏 즐겨봐!`;
+        return `[1컷 - 단우가 도깨비 방망이를 어깨에 걸치고 호탕하게 웃는다]\n` +
+          `단우: "야아, 오늘 네 운세 점수가 무려 ${data.score}점이네!"\n` +
+          `효과음: 뚝딱!\n\n` +
+          `[2컷 - 손가락을 튕기며 장난스레 윙크하는 단우]\n` +
+          `단우: "행운 컬러 '${data.color}' 소품 하나 챙기고, '${data.direction}' 방향으로 슬쩍 움직여봐."\n\n` +
+          `[3컷 - 메밀묵 그릇을 내밀며 씩 웃는 단우]\n` +
+          `단우: "'${data.time}'엔 요술 같은 행운이 솟을지 몰라. 숫자 '${data.luckyNumber}' 기억하고 신나게 한 판 놀아보라고!"`;
       case "leona":
-        return `오늘 우주의 별자리가 가리키는 당신의 운세 지수는 ${data.score}%입니다. \n\n` +
-          `밤하늘에서 당신을 지켜주는 행운의 빛은 '${data.color}'이며, 에너지가 솟아나는 방향은 '${data.direction}'입니다. \n` +
-          `특히 '${data.time}' 사이에 우주의 긍정적인 파동이 가장 크게 울리겠네요. 행운의 기호는 숫자 '${data.luckyNumber}'입니다. \n` +
-          `별의 신호가 당신의 앞길을 밝혀주기를.`;
+        return `[1컷 - 레오나가 별빛이 감도는 수정구를 들여다본다]\n` +
+          `레오나: "오늘 우주가 가리키는 당신의 운세는 ${data.score}%…"\n` +
+          `효과음: 반짝\n\n` +
+          `[2컷 - 손끝으로 별자리를 그리는 레오나]\n` +
+          `레오나: "당신을 지키는 빛은 '${data.color}', 에너지가 솟는 방향은 '${data.direction}'이에요."\n\n` +
+          `[3컷 - 매혹적으로 미소 지으며 고개를 드는 레오나]\n` +
+          `레오나: "'${data.time}'에 우주의 파동이 가장 크게 울려요. 숫자 '${data.luckyNumber}'을 부적처럼 지녀요. 별의 신호가 당신을 밝히길."`;
       case "gaon":
-        return `오늘 하루, 당신의 마음가짐 지수는 ${data.score}%다. 꽤 훌륭하군. \n\n` +
-          `마음을 가라앉히는 행운의 기운은 '${data.color}', 검끝이 향해야 할 운명의 방향은 '${data.direction}'이다. \n` +
-          `특히 '${data.time}'에 당신의 수련이나 노력이 빛을 발할 시간이 될 것이니 주의 깊게 관찰하게. 행운의 숫자는 '${data.luckyNumber}'이다. \n` +
-          `흔들리지 말고 단단하게 나아가라.`;
+        return `[1컷 - 가온이 검을 천천히 닦으며 눈을 가늘게 뜬다]\n` +
+          `가온: "오늘 네 마음가짐 지수는 ${data.score}%. 꽤 훌륭하군."\n\n` +
+          `[2컷 - 검끝으로 한 방향을 가리키는 가온]\n` +
+          `가온: "마음을 가라앉힐 기운은 '${data.color}', 검끝이 향할 방향은 '${data.direction}'이다."\n` +
+          `효과음: 스릉\n\n` +
+          `[3컷 - 등을 돌려 앞을 응시하는 가온]\n` +
+          `가온: "'${data.time}'에 네 수련이 빛을 발한다. 숫자는 '${data.luckyNumber}'. 흔들리지 말고 단단하게 나아가라."`;
       default:
-        return `오늘 당신의 하루 운세 지수는 ${data.score}%입니다. \n` +
-          `행운의 컬러는 '${data.color}', 행운의 방향은 '${data.direction}', 시간대는 '${data.time}'입니다. 편안한 하루 보내세요.`;
+        return `[1컷 - 에이전트가 오늘의 운세를 풀이한다]\n` +
+          `에이전트: "오늘 운세 지수는 ${data.score}%, 행운의 컬러는 '${data.color}', 방향은 '${data.direction}'입니다."\n\n` +
+          `[2컷 - 따뜻하게 인사하는 에이전트]\n` +
+          `에이전트: "행운의 시간대 '${data.time}', 숫자 '${data.luckyNumber}'과 함께 편안한 하루 보내세요."`;
     }
+    })();
+    return themeIntro + base;
   }
 
   // 궁합 계산 및 해석
@@ -459,20 +638,9 @@ export class FortuneService {
     const mySaju: SajuResult = calculateSaju(myBirthDate, myBirthTime);
     const partnerSaju: SajuResult = calculateSaju(partnerBirthDate, partnerBirthTime);
 
-    // 상성 적합도 계산 (기본 70점에서 시작하여 오행 밸런스에 따라 가감)
-    const myRatio = mySaju.elementsRatio;
-    const partnerRatio = partnerSaju.elementsRatio;
-    let compatibilityScore = 70;
-    
-    const woodFireShare = Math.min(myRatio.wood, partnerRatio.fire) + 
-                         Math.min(myRatio.fire, partnerRatio.earth) + 
-                         Math.min(myRatio.earth, partnerRatio.metal) + 
-                         Math.min(myRatio.metal, partnerRatio.water) + 
-                         Math.min(myRatio.water, partnerRatio.wood);
-    
-    compatibilityScore += Math.floor(woodFireShare / 5);
-    if (compatibilityScore > 100) compatibilityScore = 100;
-    if (compatibilityScore < 50) compatibilityScore = 50;
+    // 명리 궁합 — 일간 합/충, 일지 육합·삼합·충·형, 오행 상생상극 (난수 아님)
+    const compat = analyzeCompatibility(mySaju, partnerSaju);
+    const compatibilityScore = compat.score;
 
     const targetGenres = ["로맨스", "로판", "드라마"];
     const recommendations = this.curateTitles(targetGenres);
@@ -481,9 +649,12 @@ export class FortuneService {
     let interpretation: string;
     try {
       const compatText = `
-        나의 사주 일주: ${mySaju.dayPillar.kanKorean}${mySaju.dayPillar.jiKorean} (${mySaju.elementsRatio.wood}% 목, ${mySaju.elementsRatio.fire}% 화, ${mySaju.elementsRatio.earth}% 토, ${mySaju.elementsRatio.metal}% 금, ${mySaju.elementsRatio.water}% 수)
-        상대방의 사주 일주: ${partnerSaju.dayPillar.kanKorean}${partnerSaju.dayPillar.jiKorean} (${partnerSaju.elementsRatio.wood}% 목, ${partnerSaju.elementsRatio.fire}% 화, ${partnerSaju.elementsRatio.earth}% 토, ${partnerSaju.elementsRatio.metal}% 금, ${partnerSaju.elementsRatio.water}% 수)
-        두 사람의 궁합 조화 지수: ${compatibilityScore}%
+        나의 일주: ${mySaju.dayPillar.kanKorean}${mySaju.dayPillar.jiKorean} (일간 ${mySaju.dayPillar.kanKorean}·${mySaju.dayPillar.elementKan})
+        상대의 일주: ${partnerSaju.dayPillar.kanKorean}${partnerSaju.dayPillar.jiKorean} (일간 ${partnerSaju.dayPillar.kanKorean}·${partnerSaju.dayPillar.elementKan})
+        궁합 지수: ${compatibilityScore}% (${compat.grade})
+        [명리 궁합 근거]
+        ${compat.factors.map((f) => `- ${f}`).join("\n        ")}
+        ※ 위 명리 근거(일간 합충·일지 관계·오행 상생상극)를 반드시 녹여 두 사람의 궁합을 풀어줘.
       `;
       interpretation = await this.generateAIFortune(
         `두 사람의 찰떡 궁합 분석`,
@@ -491,7 +662,7 @@ export class FortuneService {
         character
       );
     } catch (_e) {
-      interpretation = this.getFallbackCompatibilityInterpretation(compatibilityScore, character);
+      interpretation = this.getFallbackCompatibilityInterpretation(compatibilityScore, character, compat);
     }
 
     return {
@@ -499,12 +670,29 @@ export class FortuneService {
       mySaju,
       partnerSaju,
       score: compatibilityScore,
+      compat,
       interpretation,
+      panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
   }
 
-  private getFallbackCompatibilityInterpretation(score: number, character: FortuneCharacter): string {
+  private getFallbackCompatibilityInterpretation(
+    score: number,
+    character: FortuneCharacter,
+    compat?: import("./saju-analysis").CompatibilityAnalysis
+  ): string {
+    const sn = character.name.split(" ").pop() ?? character.name;
+    // 명리 궁합 근거를 첫 컷으로 깔아 풀이를 근거에 둔다.
+    const themeIntro = compat
+      ? `[1컷 - ${sn}이(가) 두 사람의 사주를 나란히 펼쳐 본다]\n` +
+        `${sn}: "두 분의 궁합은 ${score}%, '${compat.grade}'예요. ${compat.factors[0]}."\n` +
+        `효과음: 두근\n\n` +
+        (compat.factors[1]
+          ? `[2컷 - 근거를 하나 더 짚어주는 ${sn}]\n${sn}: "${compat.factors.slice(1).join(", ")}."\n\n`
+          : "")
+      : "";
+    const base = ((): string => {
     switch (character.id) {
       case "ara":
         return `[1컷 - 도서관 구석에서 책을 얹어두고 미소 짓는 사서 아라]\n` +
@@ -538,6 +726,8 @@ export class FortuneService {
         return `[1컷 - 운세를 풀이하는 캐릭터 에이전트]\n` +
           `에이전트: "두 분의 궁합 지수는 ${score}%입니다. 서로 양보하고 존중한다면 아주 훌륭한 관계를 유지할 수 있습니다."`;
     }
+    })();
+    return themeIntro + base;
   }
 
   // 독서 처방전 분석 및 추천
@@ -576,6 +766,7 @@ export class FortuneService {
       character,
       query,
       interpretation,
+      panels: this.parsePanels(interpretation, character.id),
       recommendations
     };
   }
@@ -583,29 +774,182 @@ export class FortuneService {
   private getFallbackPrescription(query: string, character: FortuneCharacter): string {
     switch (character.id) {
       case "ara":
-        return `친애하는 당신에게,\n\n` +
-          `보내주신 마음의 결, "${query}"을 조심스레 읽어 보았어요. \n` +
-          `유난히 지친 오늘 같은 날에는 자극적인 바람보다는 따뜻한 차 한 잔과 함께 스며드는 이야기가 필요하기 마련이죠. \n` +
-          `제가 지키고 있는 서가에서 가장 다정한 책들을 몇 권 골라 책상에 얹어두었습니다. \n` +
-          `이 이야기들의 온기가 당신의 오늘 밤을 포근하게 안아줄 수 있기를 진심으로 바랄게요.`;
+        return `[1컷 - 아라가 당신의 사연이 적힌 쪽지를 두 손으로 감싸 읽는다]\n` +
+          `아라: "보내주신 마음의 결, ‘${query}’을 조심스레 읽어 보았어요."\n` +
+          `효과음: 사르륵\n\n` +
+          `[2컷 - 서가에서 책 몇 권을 골라 품에 안는 아라]\n` +
+          `아라: "지친 날엔 자극적인 바람보다, 따뜻한 차처럼 스며드는 이야기가 필요하죠."\n\n` +
+          `[3컷 - 책을 책상에 가만히 내려놓으며 미소 짓는 아라]\n` +
+          `아라: "가장 다정한 책들을 얹어둘게요. 이 온기가 당신의 오늘 밤을 포근히 안아주길."`;
       case "danwoo":
-        return `오늘 힘든 일 있었어? \n\n` +
-          `너가 적어준 사연 "${query}"을 보니까 내가 다 속상하네! \n` +
-          `이럴 때는 복잡하게 머리 쓸 필요 없이 유쾌하고 씩씩한 친구들과 노는 게 정답이야. \n` +
-          `내 도깨비 방망이 대신, 너에게 신나는 활력을 불어넣어 줄 꿀잼 작품들을 골라왔으니 바로 읽어봐! 기분이 확 좋아질 거야!`;
+        return `[1컷 - 단우가 사연을 읽다 눈썹을 찡그리며 안타까워한다]\n` +
+          `단우: "오늘 힘든 일 있었어? ‘${query}’… 읽으니까 내가 다 속상하네!"\n\n` +
+          `[2컷 - 방망이를 번쩍 들어 올리는 단우]\n` +
+          `단우: "이럴 땐 머리 복잡하게 굴리지 말고, 유쾌한 친구들이랑 노는 게 정답이야."\n` +
+          `효과음: 뚝딱!\n\n` +
+          `[3컷 - 작품 더미를 안겨주며 활짝 웃는 단우]\n` +
+          `단우: "활력 뿜뿜한 꿀잼 작품들 골라왔어. 바로 읽어봐, 기분이 확 좋아질걸!"`;
       case "leona":
-        return `보내주신 별빛의 방황, "${query}"을 가만히 응시해 봅니다. \n\n` +
-          `마음의 궤도가 조금 흔들리는 것은 당신이 성장의 은하수를 지나고 있기 때문일 거예요. \n` +
-          `당신의 혼란스러운 파동을 평온하고 긍정적인 에너지로 정화해 줄 작품들의 주파수를 우주에서 엿들었답니다. \n` +
-          `별의 신호가 당신의 앞길을 밝혀주기를.`;
+        return `[1컷 - 레오나가 사연을 별빛에 비춰 가만히 응시한다]\n` +
+          `레오나: "보내주신 별빛의 방황, ‘${query}’을 들여다봅니다."\n` +
+          `효과음: 반짝\n\n` +
+          `[2컷 - 손끝으로 흔들리는 별을 어루만지는 레오나]\n` +
+          `레오나: "궤도가 흔들리는 건, 당신이 성장의 은하수를 지나는 중이기 때문이에요."\n\n` +
+          `[3컷 - 작품의 주파수를 건네는 레오나]\n` +
+          `레오나: "혼란한 파동을 평온으로 정화해 줄 이야기를 우주에서 엿들었어요. 별의 신호가 당신을 밝히길."`;
       case "gaon":
-        return `적어준 번민 "${query}"에 담긴 고단함이 나에게까지 전해지는군. \n\n` +
-          `수련이 막힐 때일수록 검을 내려놓고 바람 소리에 귀를 기울여야 하는 법이다. \n` +
-          `당신의 날선 날을 부드럽게 다듬고, 다시 나아갈 내면의 굳건한 힘을 길러줄 작품들을 내 검끝으로 엄선해 두었다. \n` +
-          `잡념을 비우고 마음의 힘을 길러라.`;
+        return `[1컷 - 가온이 사연을 읽고 잠시 눈을 감는다]\n` +
+          `가온: "적어준 번민 ‘${query}’의 고단함이 내게까지 전해지는군."\n\n` +
+          `[2컷 - 검을 내려놓고 바람 소리에 귀 기울이는 가온]\n` +
+          `가온: "수련이 막힐 땐, 검을 내려놓고 바람 소리를 들어야 하는 법이다."\n` +
+          `효과음: 스으…\n\n` +
+          `[3컷 - 작품 몇 권을 검끝으로 가리키는 가온]\n` +
+          `가온: "날선 마음을 다듬고 다시 나아갈 힘을 길러줄 것들을 골라뒀다. 잡념을 비우고 마음의 힘을 길러라."`;
       default:
-        return `당신의 고민 "${query}"에 깊이 공감합니다. \n` +
-          `지친 마음을 위로해 줄 가독성 높은 추천 도서들과 함께 기분 전환의 시간을 가져보시길 권합니다.`;
+        return `[1컷 - 에이전트가 당신의 고민을 헤아린다]\n` +
+          `에이전트: "당신의 고민 ‘${query}’에 깊이 공감합니다."\n\n` +
+          `[2컷 - 추천 도서를 건네는 에이전트]\n` +
+          `에이전트: "지친 마음을 위로해 줄 작품들과 함께 기분 전환의 시간을 가져보세요."`;
     }
+  }
+
+  // ── 결정적(시드) 난수 ──────────────────────────────────────────────
+  // '오늘의 운세'가 하루 동안 흔들리지 않도록, 외부 의존성 없이
+  // 문자열 시드 → 안정적 난수열을 만든다(xfnv1a 해시 + mulberry32).
+
+  // KST 기준 오늘 날짜 + 캐릭터로 하루짜리 시드 생성
+  private dailySeed(characterId: string): string {
+    const kst = new Date(Date.now() + 9 * 60 * 60 * 1000); // UTC→KST 보정
+    const ymd = kst.toISOString().slice(0, 10); // YYYY-MM-DD
+    return `${ymd}:${characterId}`;
+  }
+
+  private seededRandom(seed: string): () => number {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < seed.length; i++) {
+      h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+    }
+    let a = h >>> 0;
+    return () => {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ── 웹툰 컷(패널) 파싱 ──────────────────────────────────────────────
+  // 캐릭터/LLM이 만든 [N컷 - 묘사] + 이름: "대사" 형식의 콘티 텍스트를
+  // 프론트가 바로 렌더할 수 있는 구조화된 panels[] 로 변환한다.
+  // 컷 표기가 전혀 없는 평문(prose)도 문단 단위로 나눠 나레이션 컷으로 만든다.
+
+  // 화자 이름 문자열을 ToonSpectrum 캐릭터 id로 매칭
+  private matchCharacterId(speaker: string): string | null {
+    const s = speaker.trim();
+    if (!s) return null;
+    for (const c of CHARACTERS) {
+      const short = c.name.split(" ").pop() ?? c.name; // "사서 아라" -> "아라"
+      if (s === c.name || s === short || s.includes(short)) return c.id;
+    }
+    return null;
+  }
+
+  // 대사/나레이션에서 따옴표·군더더기 제거
+  private cleanLine(text: string): string {
+    return text
+      .trim()
+      .replace(/^["“'『「]+/, "")
+      .replace(/["”'』」]+$/, "")
+      .trim();
+  }
+
+  parsePanels(text: string, fallbackCharacterId: string): FortunePanel[] {
+    const sceneRe = /^\[\s*(?:제?\s*)?\d+\s*컷\s*(?:[-–—:|]\s*)?(.*?)\s*\]$/; // [1컷 - 묘사]
+    const bracketRe = /^\[\s*(.+?)\s*\]$/; // [임의 지문]
+    const sfxRe = /(?:효과음|SFX)\s*[:：]\s*(.+)$/i; // 효과음: 두근두근
+    const dialogueRe = /^([^"“'『「:：]{1,18}?)\s*[:：]\s*(.+)$/; // 이름: 대사
+
+    const panels: FortunePanel[] = [];
+    let current: FortunePanel | null = null;
+    const ensurePanel = (scene: string | null = null) => {
+      current = { scene, lines: [] };
+      panels.push(current);
+      return current;
+    };
+
+    const rawLines = text.replace(/\r/g, "").split("\n");
+    for (const raw of rawLines) {
+      const line = raw.trim();
+      if (!line) continue;
+
+      // 1) 컷 헤더 [N컷 - 묘사]
+      const sceneMatch = line.match(sceneRe);
+      if (sceneMatch) {
+        ensurePanel(this.cleanLine(sceneMatch[1]) || null);
+        continue;
+      }
+
+      // 2) 효과음 단독 라인
+      const sfxMatch = line.match(sfxRe);
+      if (sfxMatch && line.length < 40) {
+        const panel = current ?? ensurePanel();
+        panel.lines.push({ speaker: "", characterId: null, text: "", sfx: this.cleanLine(sfxMatch[1]) });
+        continue;
+      }
+
+      // 3) 그 외 대괄호 지문 → 새 컷의 장면 묘사로
+      const bracketMatch = line.match(bracketRe);
+      if (bracketMatch && !line.includes(":") && !line.includes("：")) {
+        ensurePanel(this.cleanLine(bracketMatch[1]) || null);
+        continue;
+      }
+
+      // 4) 대사 "이름: 대사" — 화자가 짧고 캐릭터로 매칭되거나 따옴표가 있을 때만
+      const dm = line.match(dialogueRe);
+      if (dm) {
+        const speaker = dm[1].trim();
+        const characterId = this.matchCharacterId(speaker);
+        const hasQuote = /["“'『「]/.test(dm[2]);
+        const looksLikeName = speaker.length <= 8 && !/[.!?…]/.test(speaker);
+        if (characterId || hasQuote || looksLikeName) {
+          const panel = current ?? ensurePanel();
+          panel.lines.push({ speaker, characterId, text: this.cleanLine(dm[2]) });
+          continue;
+        }
+      }
+
+      // 5) 나레이션
+      const panel = current ?? ensurePanel();
+      panel.lines.push({ speaker: "", characterId: null, text: this.cleanLine(line) });
+    }
+
+    // 컷 표기가 없어 한 덩어리로만 잡힌 평문은 문단(2개 이상 라인) 단위로 쪼개
+    // 캐릭터가 말하는 나레이션 컷들로 재구성한다.
+    if (panels.length <= 1 && panels[0]?.lines.every((l) => !l.speaker)) {
+      const paragraphs = text
+        .replace(/\r/g, "")
+        .split(/\n{2,}/)
+        .map((p) => p.replace(/\n/g, " ").trim())
+        .filter(Boolean);
+      if (paragraphs.length > 1) {
+        return paragraphs.map((p) => ({
+          scene: null,
+          lines: [{ speaker: "", characterId: fallbackCharacterId, text: this.cleanLine(p) }],
+        }));
+      }
+    }
+
+    // 파싱 결과가 비면 통짜 나레이션 1컷으로 폴백
+    if (panels.length === 0) {
+      return [
+        {
+          scene: null,
+          lines: [{ speaker: "", characterId: fallbackCharacterId, text: this.cleanLine(text) }],
+        },
+      ];
+    }
+
+    return panels;
   }
 }

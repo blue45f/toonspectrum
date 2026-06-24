@@ -1,14 +1,29 @@
-import { 
-  Sparkles, 
-  User, 
-  Calendar, 
-  Clock, 
-  ArrowRight, 
-  RotateCcw
+import {
+  Sparkles,
+  User,
+  Calendar,
+  Clock,
+  ArrowRight,
+  RotateCcw,
+  Play,
+  Pause,
+  Square,
+  Volume2,
+  SkipBack,
+  SkipForward,
+  Sparkle,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
+
+
+
+import { TarotCardFace } from "./TarotCardFace";
+import { useFortunePlayback } from "./useFortunePlayback";
+import { WebtoonStrip } from "./WebtoonStrip";
+
+import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/lib/types";
 
 import { TitleCard } from "@/components/title-card";
@@ -62,6 +77,11 @@ interface TodayFortuneData {
   luckyNumber: number;
 }
 
+// 오행 영문키 → 한글 (오늘의 운세 개인화 표시용)
+const ELEMENT_KO: Record<string, string> = {
+  wood: "목(木)", fire: "화(火)", earth: "토(土)", metal: "금(金)", water: "수(水)",
+};
+
 // 오행 색상 매핑 (ToonSpectrum 디자인 토큰을 활용한 프리미엄 컬러 세트)
 const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   "목": { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-500" },
@@ -95,19 +115,20 @@ export function FortunePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [fortuneResult, setFortuneResult] = useState<{
     interpretation: string;
+    panels?: FortunePanel[];
     saju?: SajuData;
     mySaju?: SajuData;
     partnerSaju?: SajuData;
     card?: TarotCardData;
     today?: TodayFortuneData;
+    luckyElement?: string | null;
     score?: number;
     query?: string;
     recommendations: Title[];
   } | null>(null);
 
-  // 캐릭터 말풍선 타이핑 효과 상태
-  const [typedInterpretation, setTypedInterpretation] = useState("");
-  const interpretationRef = useRef<HTMLDivElement>(null);
+  // 운세 웹툰 재생 오케스트레이터 — 음성(Azure/Web Speech) + 컷 애니메이션 동기
+  const playback = useFortunePlayback(fortuneResult?.panels);
 
   // 1. 캐릭터 리스트 가져오기
   useEffect(() => {
@@ -117,45 +138,18 @@ export function FortunePage() {
       .catch((err) => console.error("캐릭터 정보 로드 실패:", err));
   }, []);
 
-  // 2. 캐릭터 말풍선 타이핑 애니메이션 효과
-  useEffect(() => {
-    if (!fortuneResult?.interpretation) {
-      setTypedInterpretation("");
-      return;
-    }
-    
-    let isCancelled = false;
-    let currentIdx = 0;
-    const fullText = fortuneResult.interpretation;
-    
-    // 빠른 타이핑 속도 (글자당 25ms)
-    const interval = setInterval(() => {
-      if (isCancelled) return;
-      
-      currentIdx += 2; // 한 번에 2글자씩 타이핑하여 속도 조절
-      if (currentIdx >= fullText.length) {
-        setTypedInterpretation(fullText);
-        clearInterval(interval);
-      } else {
-        setTypedInterpretation(fullText.slice(0, currentIdx));
-      }
-      
-      // 자동 스크롤
-      if (interpretationRef.current) {
-        interpretationRef.current.scrollTop = interpretationRef.current.scrollHeight;
-      }
-    }, 25);
-
-    return () => {
-      isCancelled = true;
-      clearInterval(interval);
-    };
-  }, [fortuneResult]);
+  // 재생/일시정지/이어듣기 토글
+  const handleTogglePlay = () => {
+    if (playback.status === "playing") playback.pause();
+    else if (playback.status === "paused") playback.resume();
+    else playback.play();
+  };
 
   // 오늘의 운세 API 호출
   const handleAnalyzeToday = async () => {
     if (!selectedChar) return;
 
+    playback.stop();
     setIsLoading(true);
     setFortuneResult(null);
 
@@ -165,6 +159,11 @@ export function FortunePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           characterId: selectedChar.id,
+          // 생년월일을 입력하면 사주 오행으로 개인화된 '오늘의 운세'를 받는다.
+          // (입력 안 하면 일반 운세) 같은 날·같은 사람은 항상 같은 결과.
+          birthDate: birthDate || undefined,
+          birthTime: birthTime || undefined,
+          gender,
         }),
       });
 
@@ -183,6 +182,7 @@ export function FortunePage() {
     e.preventDefault();
     if (!birthDate || !partnerBirthDate || !selectedChar) return;
 
+    playback.stop();
     setIsLoading(true);
     setFortuneResult(null);
 
@@ -214,6 +214,7 @@ export function FortunePage() {
     e.preventDefault();
     if (!prescriptionQuery.trim() || !selectedChar) return;
 
+    playback.stop();
     setIsLoading(true);
     setFortuneResult(null);
 
@@ -242,6 +243,7 @@ export function FortunePage() {
     e.preventDefault();
     if (!birthDate || !selectedChar) return;
 
+    playback.stop();
     setIsLoading(true);
     setFortuneResult(null);
 
@@ -279,6 +281,7 @@ export function FortunePage() {
   const handleSelectTarotCard = async (_cardIdx: number) => {
     if (!selectedChar || tarotStep !== "spread") return;
     
+    playback.stop();
     setIsLoading(true);
     setFortuneResult(null);
 
@@ -304,6 +307,7 @@ export function FortunePage() {
 
   // 상태 초기화
   const handleReset = () => {
+    playback.stop();
     setFortuneResult(null);
     setTarotStep("idle");
     setBirthDate("");
@@ -410,23 +414,49 @@ export function FortunePage() {
               </button>
             </div>
 
-            {/* 에이전트 조언 말풍선 (세리프 서체 적용) */}
-            <div className="flex-1 rounded-2xl border border-line bg-card/40 p-5 min-h-[180px] max-h-[350px] overflow-y-auto flex flex-col" ref={interpretationRef}>
-              <span className="text-[10px] tracking-wider text-accent uppercase font-bold mb-2">AGENTS'S READING</span>
-              <div className="font-serif text-sm leading-relaxed text-fg-2 whitespace-pre-wrap">
-                {isLoading ? (
-                  <div className="flex flex-col gap-2">
-                    <span className="skeleton h-3 w-full" />
-                    <span className="skeleton h-3 w-5/6" />
-                    <span className="skeleton h-3 w-4/5" />
-                    <span className="skeleton h-3 w-2/3" />
-                  </div>
-                ) : typedInterpretation ? (
-                  typedInterpretation
-                ) : (
-                  `"${selectedChar.greeting}"`
-                )}
+            {/* 에이전트 인사말 + 음성 안내 패널 */}
+            <div className="flex-1 rounded-2xl border border-line bg-card/40 p-5 flex flex-col gap-4">
+              <div>
+                <span className="text-[10px] tracking-wider text-accent uppercase font-bold mb-2 block">AGENT'S VOICE</span>
+                <p className="font-serif text-sm leading-relaxed text-fg-2 whitespace-pre-wrap">
+                  {`"${selectedChar.greeting}"`}
+                </p>
               </div>
+
+              {/* 웹툰 재생 상태 — 결과가 있을 때만 노출 */}
+              {fortuneResult?.panels?.length ? (
+                <div className="mt-auto rounded-xl border border-line/70 bg-panel/40 p-3 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-3">웹툰 음성 재생</span>
+                  {playback.supported ? (
+                    <button
+                      type="button"
+                      onClick={handleTogglePlay}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2"
+                    >
+                      {playback.status === "playing" ? (
+                        <><Pause className="h-3.5 w-3.5" /> 일시정지</>
+                      ) : playback.status === "paused" ? (
+                        <><Play className="h-3.5 w-3.5" /> 이어 보기</>
+                      ) : (
+                        <><Play className="h-3.5 w-3.5" /> 웹툰 재생</>
+                      )}
+                    </button>
+                  ) : (
+                    <p className="text-center text-[10px] leading-relaxed text-fg-3">
+                      이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)
+                    </p>
+                  )}
+                  {playback.status === "playing" && (
+                    <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-accent">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                      </span>
+                      {playback.activeStep + 1} / {playback.steps.length} 컷 상영 중…
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           </aside>
 
@@ -538,6 +568,24 @@ export function FortunePage() {
                       
                       {/* 오늘의 운세 지수 원형 도넛/게이지 */}
                       <div className="md:col-span-4 flex flex-col items-center justify-center p-4 border border-line/45 rounded-2xl bg-card/30 relative overflow-hidden">
+                        {/* 고득점 축포 — 게이지 주변 스파클 */}
+                        {fortuneResult.today.score >= 85 &&
+                          [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                            <motion.span
+                              key={i}
+                              aria-hidden
+                              className="pointer-events-none absolute rounded-full bg-accent"
+                              style={{
+                                width: 5,
+                                height: 5,
+                                left: `${50 + Math.cos((i / 8) * Math.PI * 2) * 30}%`,
+                                top: `${48 + Math.sin((i / 8) * Math.PI * 2) * 30}%`,
+                                boxShadow: "0 0 8px var(--color-accent)",
+                              }}
+                              animate={{ scale: [0, 1.4, 0], opacity: [0, 1, 0] }}
+                              transition={{ duration: 1.6, delay: i * 0.18, repeat: Infinity, repeatDelay: 1.2, ease: "easeOut" }}
+                            />
+                          ))}
                         <span className="text-[10px] font-bold text-fg-3 uppercase tracking-wider mb-2">FORTUNE SCORE</span>
                         <div className="relative flex items-center justify-center w-28 h-28">
                           {/* SVG 원형 프로그레스 */}
@@ -589,6 +637,20 @@ export function FortunePage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* 사주 기반 개인화 안내 — 생년월일 입력 시 노출 */}
+                      {fortuneResult.luckyElement && fortuneResult.saju && (
+                        <div className="md:col-span-12 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-accent/20 bg-accent-soft/40 px-4 py-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">내 사주 연동</span>
+                          <span className="text-xs text-fg-2">
+                            일주 <strong className="text-fg">{fortuneResult.saju.dayPillar.kanKorean}{fortuneResult.saju.dayPillar.jiKorean}</strong>
+                          </span>
+                          <span className="text-xs text-fg-2">
+                            오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
+                          </span>
+                          <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
+                        </div>
+                      )}
 
                     </div>
                   )}
@@ -748,41 +810,8 @@ export function FortunePage() {
                   {/* 타로 전용 결과 디스플레이 */}
                   {activeTab === "tarot" && fortuneResult.card && (
                     <div className="flex flex-col md:flex-row gap-6 items-center">
-                      
-                      {/* 타로 카드 앞면 타이포그래픽 포스터 */}
-                      <div 
-                        className="w-52 shrink-0 aspect-[2/3] rounded-2xl border-2 border-amber-500/40 bg-cover bg-center p-4 flex flex-col justify-between text-center relative overflow-hidden shadow-[0_12px_30px_-5px_rgba(217,119,6,0.25)]"
-                        style={{ backgroundImage: "url('/images/tarot/tarot-front-bg.jpg')" }}
-                      >
-                        {/* 텍스트 가독성을 위한 중심 오버레이 */}
-                        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
-                        
-                        <div className="border-b border-amber-500/20 pb-2 z-10">
-                          <span className="font-display text-xs font-bold text-amber-400 tracking-widest uppercase">
-                            NO. {fortuneResult.card.id}
-                          </span>
-                        </div>
-                        
-                        <div className="py-6 flex flex-col justify-center flex-1 z-10">
-                          <span className="font-display text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                            {fortuneResult.card.nameEn}
-                          </span>
-                          <span className="font-serif text-3xl font-extrabold text-white mt-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                            {fortuneResult.card.name}
-                          </span>
-                          <span className="text-[10px] text-amber-300 mt-2.5 font-bold uppercase tracking-wider bg-black/45 px-2 py-0.5 rounded-full mx-auto">
-                            {fortuneResult.card.type === "upright" ? "정방향 (Upright)" : "역방향 (Reversed)"}
-                          </span>
-                        </div>
-
-                        <div className="border-t border-amber-500/20 pt-2 flex flex-wrap justify-center gap-1 z-10">
-                          {fortuneResult.card.keywords.slice(0, 3).map((kw, i) => (
-                            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-amber-200 border border-amber-500/20">
-                              #{kw.replace("(장해/과잉)", "")}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                      {/* 카드별 고유 디자인의 타로 카드 페이스 */}
+                      <TarotCardFace card={fortuneResult.card} className="w-52 shrink-0" />
 
                       {/* 타로 카드 풀이 */}
                       <div className="flex-1 space-y-4 text-left">
@@ -793,10 +822,108 @@ export function FortunePage() {
                           </h4>
                         </div>
                         <p className="text-sm leading-relaxed text-fg-3">
-                          오늘 당신이 드로우한 <strong>{fortuneResult.card.name}</strong> 카드는 {fortuneResult.card.type === "upright" ? "순리적인 출발과 원활한 조화" : "통제하기 어려운 과잉 혹은 억압 상태"}를 상징합니다. 
+                          오늘 당신이 드로우한 <strong>{fortuneResult.card.name}</strong> 카드는 {fortuneResult.card.type === "upright" ? "순리적인 출발과 원활한 조화" : "통제하기 어려운 과잉 혹은 억압 상태"}를 상징합니다.
                           이 기운에 매핑되는 캐릭터 조언을 곱씹으며 오늘 하루 조심스러운 균형을 잡아보시길 바랍니다.
                         </p>
                       </div>
+                    </div>
+                  )}
+
+                  {/* 운세 웹툰 — 캐릭터가 컷·말풍선으로 풀어주는 해석 (음성+애니메이션 재생) */}
+                  {fortuneResult.panels && fortuneResult.panels.length > 0 && (
+                    <div className="border-t border-line/80 pt-6">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-fg-3">
+                          <Sparkle className="h-3.5 w-3.5 text-accent" />
+                          <span>{selectedChar.name}의 운세 웹툰</span>
+                        </h4>
+
+                        {/* 재생 컨트롤바 */}
+                        {playback.supported && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={playback.prev}
+                              aria-label="이전 컷"
+                              disabled={playback.status === "idle"}
+                              className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
+                            >
+                              <SkipBack className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTogglePlay}
+                              className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
+                            >
+                              {playback.status === "playing" ? (
+                                <><Pause className="h-3 w-3" /> 일시정지</>
+                              ) : playback.status === "paused" ? (
+                                <><Play className="h-3 w-3" /> 이어 보기</>
+                              ) : (
+                                <><Play className="h-3 w-3" /> 웹툰 재생</>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={playback.next}
+                              aria-label="다음 컷"
+                              disabled={playback.status === "idle"}
+                              className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
+                            >
+                              <SkipForward className="h-3 w-3" />
+                            </button>
+                            {playback.status !== "idle" && (
+                              <button
+                                type="button"
+                                onClick={playback.stop}
+                                aria-label="정지"
+                                className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card"
+                              >
+                                <Square className="h-3 w-3" />
+                              </button>
+                            )}
+                            {/* 재생 속도 */}
+                            <div className="flex items-center overflow-hidden rounded-full border border-line">
+                              {[0.8, 1, 1.3].map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => playback.setSpeed(s)}
+                                  className={cn(
+                                    "px-2 py-1.5 text-[10px] font-bold transition-colors",
+                                    playback.speed === s ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
+                                  )}
+                                >
+                                  {s}×
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 음성 안내 — 아라·레오나만 음성, 그 외 캐릭터는 무음 자막 재생 */}
+                      {playback.supported && (
+                        <p className="mb-4 flex items-center gap-1.5 text-[11px] text-fg-3">
+                          <Volume2 className="h-3.5 w-3.5" />
+                          {selectedChar.id === "ara" || selectedChar.id === "leona"
+                            ? "유나 보이스로 낭독됩니다."
+                            : "이 캐릭터는 아직 음성이 없어 자막으로 재생돼요. (아라·레오나는 음성 지원)"}
+                        </p>
+                      )}
+
+                      <WebtoonStrip
+                        panels={fortuneResult.panels}
+                        characters={characters}
+                        selectedCharacterId={selectedChar.id}
+                        playback={{
+                          active: playback.status !== "idle",
+                          steps: playback.steps,
+                          activeStep: playback.activeStep,
+                          activePanel: playback.activePanel,
+                          typed: playback.typed,
+                        }}
+                      />
                     </div>
                   )}
 
@@ -818,28 +945,66 @@ export function FortunePage() {
 
               {/* 입력 폼: 오늘의 운세 */}
               {!isLoading && !fortuneResult && activeTab === "today" && (
-                <div className="space-y-6 text-center max-w-md mx-auto w-full py-8">
+                <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
                     <h3 className="text-lg font-bold text-fg">오늘 하루는 어떨까요?</h3>
                     <p className="text-xs text-fg-3 leading-relaxed">
-                      {selectedChar.name}가 당신만을 위한 오늘의 행운 수치와 컬러, 방향, 그리고 따뜻한 하루 가이드를 준비했습니다.
+                      생년월일을 입력하면 {selectedChar.name}가 당신의 사주 오행으로 <strong className="text-fg-2">개인화된</strong> 오늘의 운세를 풀어드려요. 같은 날에는 결과가 바뀌지 않아요.
                     </p>
                   </div>
-                  
-                  <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-line/60 bg-gradient-to-tr from-accent-soft to-panel/30 flex items-center justify-center">
-                    {/* 장식용 별자리 효과 */}
-                    <Sparkles className="absolute h-12 w-12 text-accent-soft/30 animate-pulse" />
-                    <span className="font-serif text-sm italic text-fg-2 z-10 px-6">
-                      "오늘도 당신만의 이야기를 써 내려갈 시간이에요."
+
+                  {/* 생년월일 입력 (선택) — 입력 시 사주 기반 개인화 */}
+                  <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-3">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">
+                      <Calendar className="h-3.5 w-3.5" /> 내 생년월일 (선택 입력 시 개인화)
                     </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label htmlFor="today-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 (양력)</label>
+                        <input
+                          id="today-birth-date"
+                          type="date"
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="today-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <input
+                          id="today-birth-time"
+                          type="time"
+                          value={birthTime}
+                          onChange={(e) => setBirthTime(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {["none", "male", "female"].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => setGender(g)}
+                          className={cn(
+                            "flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all",
+                            gender === g
+                              ? "border-accent bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-3 hover:text-fg"
+                          )}
+                        >
+                          {g === "none" ? "선택 안 함" : g === "male" ? "남성" : "여성"}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleAnalyzeToday}
-                    className="w-full mt-6 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
+                    className="w-full rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>오늘의 운세 확인하기</span>
+                    <span>{birthDate ? "내 사주로 오늘의 운세 보기" : "오늘의 운세 확인하기"}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
