@@ -123,12 +123,11 @@ export function solvePoseToVrmBones(
   if (!worldLandmarks || worldLandmarks.length < 33) return out;
 
   const { mirror = true, zDamp = 0.85, minVisibility = 0.2 } = options;
-  const mirrorSign = mirror ? -1 : 1;
-  // 미러 시 좌우 본 이름을 교차(거울처럼 따라하기).
-  const sideName = (side: "left" | "right") =>
-    mirror ? (side === "left" ? "right" : "left") : side;
+  // 항상 비미러(해부학적) 프레임으로 계산한다. 미러는 마지막에 "회전 거울 반사"로 적용한다 —
+  // 입력 위치 x 를 뒤집어 재계산하면 회전의 손잡이성이 깨져 상하(y)가 뒤집히는 버그가 생긴다.
+  const sideName = (side: "left" | "right") => side;
 
-  const vec = (i: number) => toVrmVec(worldLandmarks[i], mirrorSign, zDamp);
+  const vec = (i: number) => toVrmVec(worldLandmarks[i], 1, zDamp);
   const visOk = (...idx: number[]) =>
     idx.every((i) => (worldLandmarks[i]?.visibility ?? 1) >= minVisibility);
 
@@ -175,5 +174,17 @@ export function solvePoseToVrmBones(
   leg("left", POSE_LM.leftHip, POSE_LM.leftKnee, POSE_LM.leftAnkle, POSE_LM.leftHeel);
   leg("right", POSE_LM.rightHip, POSE_LM.rightKnee, POSE_LM.rightAnkle, POSE_LM.rightHeel);
 
-  return out;
+  if (!mirror) return out;
+  // 거울 모드: 회전(Euler) 본을 YZ평면으로 반사 = 좌우 본 스왑 + y·z 부호 반전.
+  // (수동 포즈 "반전"의 mirrorBone 과 동일한 규약 — 위치 x 반전과 달리 손잡이성을 보존.)
+  const mirrored: Record<string, readonly [number, number, number]> = {};
+  for (const [name, e] of Object.entries(out)) {
+    const swapped = name.startsWith("left")
+      ? `right${name.slice(4)}`
+      : name.startsWith("right")
+        ? `left${name.slice(5)}`
+        : name;
+    mirrored[swapped] = [e[0], -e[1], -e[2]];
+  }
+  return mirrored;
 }

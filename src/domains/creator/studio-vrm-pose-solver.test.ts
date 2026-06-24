@@ -22,6 +22,7 @@ function makeLandmarks(set: Record<number, Partial<PoseLandmark>>): PoseLandmark
 }
 
 const REST_ARM_LEFT = new THREE.Vector3(1, 0, 0);
+const REST_ARM_RIGHT = new THREE.Vector3(-1, 0, 0);
 
 function eulerToQuat(e: readonly [number, number, number]): THREE.Quaternion {
   return new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0], e[1], e[2], "XYZ"));
@@ -123,6 +124,51 @@ describe("studio-vrm-pose-solver", () => {
     const bones = solvePoseToVrmBones(lm, { mirror: true });
     expect(bones.rightUpperArm).toBeDefined();
     expect(bones.leftUpperArm).toBeUndefined();
+  });
+
+  it("거울 모드는 좌우(x)만 반전하고 상하(y)는 보존한다 — 상하 반전 버그 회귀 방지", () => {
+    // 왼팔을 위로(팔꿈치·손목이 어깨보다 위 = 더 작은 y).
+    const lm = makeLandmarks({
+      [POSE_LM.leftShoulder]: { y: -0.3 },
+      [POSE_LM.leftElbow]: { y: -0.6 },
+      [POSE_LM.leftWrist]: { y: -0.9 },
+    });
+    const o = { zDamp: 1, minVisibility: 0.5 } as const;
+    // 비미러: 왼팔 본이 위(+y)를 향한다.
+    const nonMirror = solvePoseToVrmBones(lm, { mirror: false, ...o });
+    const leftDir = REST_ARM_LEFT.clone()
+      .applyQuaternion(eulerToQuat(nonMirror.leftUpperArm))
+      .normalize();
+    expect(leftDir.y).toBeGreaterThan(0.8);
+    expect(leftDir.x).toBeCloseTo(0, 1);
+
+    // 미러: 오른팔 본(스왑)도 위(+y) 보존, x 부호만 반전(여기선 x≈0이라 위 유지가 핵심).
+    const mir = solvePoseToVrmBones(lm, { mirror: true, ...o });
+    expect(mir.rightUpperArm).toBeDefined();
+    const rightDir = REST_ARM_RIGHT.clone()
+      .applyQuaternion(eulerToQuat(mir.rightUpperArm))
+      .normalize();
+    expect(rightDir.y).toBeGreaterThan(0.8); // 상하 보존(위) — 버그면 아래(-y)로 뒤집힘
+  });
+
+  it("거울 모드: x 오프셋이 있으면 좌우(x) 부호만 반전하고 상하(y)는 같은 부호로 보존", () => {
+    // 왼팔을 위+바깥(+x)으로 — x·y 동시 검증.
+    const lm = makeLandmarks({
+      [POSE_LM.leftShoulder]: { x: 0, y: -0.3 },
+      [POSE_LM.leftElbow]: { x: 0.25, y: -0.55 },
+      [POSE_LM.leftWrist]: { x: 0.5, y: -0.8 },
+    });
+    const o = { zDamp: 1, minVisibility: 0.5 } as const;
+    const left = REST_ARM_LEFT.clone()
+      .applyQuaternion(eulerToQuat(solvePoseToVrmBones(lm, { mirror: false, ...o }).leftUpperArm))
+      .normalize();
+    const right = REST_ARM_RIGHT.clone()
+      .applyQuaternion(eulerToQuat(solvePoseToVrmBones(lm, { mirror: true, ...o }).rightUpperArm))
+      .normalize();
+    expect(left.x).toBeGreaterThan(0.1); // 비미러: 바깥(+x)
+    expect(right.x).toBeLessThan(-0.1); // 미러: x 부호 반전
+    expect(Math.sign(right.y)).toBe(Math.sign(left.y)); // 상하는 같은 부호(보존)
+    expect(Math.abs(right.y - left.y)).toBeLessThan(1e-6); // y 크기도 동일
   });
 
   it("랜드마크가 33개 미만이면 빈 맵을 반환한다", () => {

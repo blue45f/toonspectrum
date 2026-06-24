@@ -465,6 +465,9 @@ export function convertChannelsToVrmData(
   const NECK_SHARE = 0.3;
   const HEAD_SHARE = 1 - NECK_SHARE;
 
+  // 본은 three.js 기본 XYZ Euler 로 적용된다: rot[0]=X(끄덕임/pitch), rot[1]=Y(yaw), rot[2]=Z(roll).
+  // eulerFromMatrix 는 항공식(ZYX) 분해라 두 규약은 작은 머리 각도에서만 근사 일치한다(실사용 OK).
+  // 미러(거울) 규약은 [pitch, -yaw, -roll] = [x,-y,-z] 로, 바디 솔버·수동 포즈 미러와 동일하다.
   const bones: Record<string, readonly [number, number, number]> = {
     head: [pitch * HEAD_SHARE, yaw * HEAD_SHARE, roll * HEAD_SHARE] as const,
     neck: [pitch * NECK_SHARE, yaw * NECK_SHARE, roll * NECK_SHARE] as const,
