@@ -93,7 +93,7 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
               className="rounded px-1.5 py-0.5 text-[9px] text-white/85"
               style={{ background: "rgba(0,0,0,0.5)", border: `1px solid ${accent}30` }}
             >
-              #{kw.replace("(장해/과잉)", "")}
+              #{kw}
             </span>
           ))}
         </div>

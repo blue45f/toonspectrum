@@ -282,7 +282,7 @@ function ShareHero({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
             {result.card.keywords.slice(0, 3).map((k, i) => (
               <span key={i} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 999, background: "oklch(0.14 0.01 60 / 0.6)", color: ink }}>
-                #{k.replace("(장해/과잉)", "")}
+                #{k}
               </span>
             ))}
           </div>

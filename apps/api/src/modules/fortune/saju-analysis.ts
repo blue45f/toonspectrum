@@ -167,6 +167,31 @@ export function analyzeTodayByIljin(analysis: SajuAnalysis): TodayIljinAnalysis 
   };
 }
 
+// 오늘의 세부운(애정·금전·직장·건강) — 일진 십성 기반 가중 + 약간의 시드 변주.
+// 명리적으로 재성=재물·애정, 관성=직장, 인성=건강·회복에 영향.
+export interface TodayCategoryScores {
+  love: number;
+  money: number;
+  work: number;
+  health: number;
+}
+
+export function todayCategoryScores(
+  iljin: TodayIljinAnalysis,
+  rand: () => number
+): TodayCategoryScores {
+  const base = iljin.score;
+  const g = iljin.relationTenGod;
+  const jitter = () => Math.round((rand() - 0.5) * 10); // ±5
+  const clamp = (n: number) => Math.max(55, Math.min(98, Math.round(n)));
+  return {
+    love: clamp(base + (g === "재성" ? 8 : g === "비겁" ? 5 : g === "관성" ? -3 : 0) + jitter()),
+    money: clamp(base + (g === "재성" ? 10 : g === "식상" ? 4 : g === "비겁" ? -4 : 0) + jitter()),
+    work: clamp(base + (g === "관성" ? 9 : g === "인성" ? 4 : g === "식상" ? -2 : 0) + jitter()),
+    health: clamp(base + (g === "인성" ? 8 : g === "비겁" ? 4 : g === "관성" ? -5 : 0) + jitter()),
+  };
+}
+
 // ── 궁합: 일간 합충 · 지지 합충 · 오행 상생상극 ──────────────────────
 const KAN_HE: Record<string, string> = {
   갑: "기", 기: "갑", 을: "경", 경: "을", 병: "신", 신: "병", 정: "임", 임: "정", 무: "계", 계: "무",

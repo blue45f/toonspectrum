@@ -6,6 +6,7 @@ import { FortuneService } from "./fortune.service";
 
 export interface TarotRequest {
   characterId: string;
+  cardIdx?: number; // 펼쳐진 카드 중 고른 위치(0~2)
 }
 
 export interface TodayFortuneRequest {
@@ -49,7 +50,7 @@ export class FortuneController {
   @Post("tarot")
   @HttpCode(HttpStatus.OK)
   async drawTarot(@Body() body: TarotRequest) {
-    return this.fortuneService.drawTarot(body.characterId);
+    return this.fortuneService.drawTarot(body.characterId, body.cardIdx ?? 0);
   }
 
   // 사주팔자 분석

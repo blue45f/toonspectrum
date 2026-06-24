@@ -4,7 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import { TITLES } from "../../../../../lib/server/catalog-store";
 
-import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin } from "./saju-analysis";
+import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin, todayCategoryScores } from "./saju-analysis";
 import { calculateSaju, SajuResult } from "./saju-utils";
 
 import type { Title } from "../../../../../lib/types";
@@ -82,28 +82,28 @@ const CHARACTERS: FortuneCharacter[] = [
 ];
 
 const TAROT_CARDS = [
-  { id: 0, name: "광대", nameEn: "The Fool", keywords: ["시작", "자유", "모험", "무모함"] },
-  { id: 1, name: "마법사", nameEn: "The Magician", keywords: ["창조", "재능", "기술", "자신감"] },
-  { id: 2, name: "여사제", nameEn: "The High Priestess", keywords: ["직관", "지혜", "비밀", "침묵"] },
-  { id: 3, name: "여황제", nameEn: "The Empress", keywords: ["풍요", "모성", "자연", "결실"] },
-  { id: 4, name: "황제", nameEn: "The Emperor", keywords: ["권력", "질서", "지배", "책임"] },
-  { id: 5, name: "교황", nameEn: "The Hierophant", keywords: ["전통", "교육", "동맹", "자비"] },
-  { id: 6, name: "연인", nameEn: "The Lovers", keywords: ["사랑", "선택", "조화", "관계"] },
-  { id: 7, name: "전차", nameEn: "The Chariot", keywords: ["돌진", "승리", "통제", "극복"] },
-  { id: 8, name: "힘", nameEn: "Strength", keywords: ["인내", "용기", "부드러운 통제", "내면의 힘"] },
-  { id: 9, name: "은둔자", nameEn: "The Hermit", keywords: ["성찰", "고독", "탐구", "길잡이"] },
-  { id: 10, name: "운명의 수레바퀴", nameEn: "Wheel of Fortune", keywords: ["운명", "변화", "전환점", "순환"] },
-  { id: 11, name: "정의", nameEn: "Justice", keywords: ["균형", "공정", "결정", "원인과 결과"] },
-  { id: 12, name: "매달린 사람", nameEn: "The Hanged Man", keywords: ["희생", "관점의 전환", "정지", "인내"] },
-  { id: 13, name: "죽음", nameEn: "Death", keywords: ["종결", "새로운 시작", "이별", "재생"] },
-  { id: 14, name: "절제", nameEn: "Temperance", keywords: ["조화", "균형", "중용", "정화"] },
-  { id: 15, name: "악마", nameEn: "The Devil", keywords: ["집착", "유혹", "속박", "물욕"] },
-  { id: 16, name: "탑", nameEn: "The Tower", keywords: ["급격한 붕괴", "갑작스러운 변화", "해방", "충격"] },
-  { id: 17, name: "별", nameEn: "The Star", keywords: ["희망", "영감", "치유", "미래"] },
-  { id: 18, name: "달", nameEn: "The Moon", keywords: ["불안", "의혹", "무의식", "변덕"] },
-  { id: 19, name: "태양", nameEn: "The Sun", keywords: ["성공", "기쁨", "활력", "명확함"] },
-  { id: 20, name: "심판", nameEn: "Judgement", keywords: ["부활", "깨달음", "결단", "평가"] },
-  { id: 21, name: "세계", nameEn: "The World", keywords: ["완성", "통합", "조화", "여행의 끝"] }
+  { id: 0, name: "광대", nameEn: "The Fool", keywords: ["시작", "자유", "모험", "무모함"], reversed: ["경솔", "망설임", "무책임"] },
+  { id: 1, name: "마법사", nameEn: "The Magician", keywords: ["창조", "재능", "기술", "자신감"], reversed: ["속임수", "미숙", "자만"] },
+  { id: 2, name: "여사제", nameEn: "The High Priestess", keywords: ["직관", "지혜", "비밀", "침묵"], reversed: ["혼란", "직관 무시", "숨겨진 동기"] },
+  { id: 3, name: "여황제", nameEn: "The Empress", keywords: ["풍요", "모성", "자연", "결실"], reversed: ["결핍", "의존", "정체"] },
+  { id: 4, name: "황제", nameEn: "The Emperor", keywords: ["권력", "질서", "지배", "책임"], reversed: ["독선", "경직", "통제 상실"] },
+  { id: 5, name: "교황", nameEn: "The Hierophant", keywords: ["전통", "교육", "동맹", "자비"], reversed: ["독단", "인습 거부", "위선"] },
+  { id: 6, name: "연인", nameEn: "The Lovers", keywords: ["사랑", "선택", "조화", "관계"], reversed: ["불화", "잘못된 선택", "엇갈림"] },
+  { id: 7, name: "전차", nameEn: "The Chariot", keywords: ["돌진", "승리", "통제", "극복"], reversed: ["폭주", "방향 상실", "조급함"] },
+  { id: 8, name: "힘", nameEn: "Strength", keywords: ["인내", "용기", "부드러운 통제", "내면의 힘"], reversed: ["자기 의심", "충동", "소진"] },
+  { id: 9, name: "은둔자", nameEn: "The Hermit", keywords: ["성찰", "고독", "탐구", "길잡이"], reversed: ["고립", "외로움", "회피"] },
+  { id: 10, name: "운명의 수레바퀴", nameEn: "Wheel of Fortune", keywords: ["운명", "변화", "전환점", "순환"], reversed: ["불운", "정체", "통제 불가"] },
+  { id: 11, name: "정의", nameEn: "Justice", keywords: ["균형", "공정", "결정", "원인과 결과"], reversed: ["불공정", "회피", "편견"] },
+  { id: 12, name: "매달린 사람", nameEn: "The Hanged Man", keywords: ["희생", "관점의 전환", "정지", "인내"], reversed: ["정체", "집착", "무의미한 희생"] },
+  { id: 13, name: "죽음", nameEn: "Death", keywords: ["종결", "새로운 시작", "이별", "재생"], reversed: ["변화 거부", "미련", "정체"] },
+  { id: 14, name: "절제", nameEn: "Temperance", keywords: ["조화", "균형", "중용", "정화"], reversed: ["불균형", "과잉", "조급함"] },
+  { id: 15, name: "악마", nameEn: "The Devil", keywords: ["집착", "유혹", "속박", "물욕"], reversed: ["해방", "집착 탈피", "각성"] },
+  { id: 16, name: "탑", nameEn: "The Tower", keywords: ["급격한 붕괴", "갑작스러운 변화", "해방", "충격"], reversed: ["위기 모면", "지연된 변화", "점진적 회복"] },
+  { id: 17, name: "별", nameEn: "The Star", keywords: ["희망", "영감", "치유", "미래"], reversed: ["실망", "자신감 상실", "비관"] },
+  { id: 18, name: "달", nameEn: "The Moon", keywords: ["불안", "의혹", "무의식", "변덕"], reversed: ["혼란 해소", "진실 직면", "불안 완화"] },
+  { id: 19, name: "태양", nameEn: "The Sun", keywords: ["성공", "기쁨", "활력", "명확함"], reversed: ["일시적 그늘", "지연", "과신"] },
+  { id: 20, name: "심판", nameEn: "Judgement", keywords: ["부활", "깨달음", "결단", "평가"], reversed: ["자기 비판", "후회", "결단 지연"] },
+  { id: 21, name: "세계", nameEn: "The World", keywords: ["완성", "통합", "조화", "여행의 끝"], reversed: ["미완성", "지연", "마무리 부족"] }
 ];
 
 // 오행 영문키 → 한글 (오늘의 운세 개인화 텍스트용)
@@ -133,22 +133,23 @@ export class FortuneService {
   }
 
   // 타로 카드 뽑기 및 해석
-  async drawTarot(characterId: string) {
+  // cardIdx: 사용자가 펼쳐진 3장 중 고른 위치(0~2). 그 선택이 결과를 결정하도록
+  // 날짜+캐릭터+선택위치로 시드해, 같은 날 같은 위치는 항상 같은 카드를 주되
+  // 위치(0/1/2)마다 서로 다른 카드가 나오게 한다(난수로 선택을 버리던 문제 해결).
+  async drawTarot(characterId: string, cardIdx = 0) {
     const character = CHARACTERS.find(c => c.id === characterId) || CHARACTERS[0];
-    
-    // 무작위 카드 1장 선택
-    const randomCardBase = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
-    const isReversed = Math.random() > 0.5;
-    
+
+    const rng = this.seededRandom(`${this.dailySeed(characterId)}:tarot:${cardIdx}`);
+    const base = TAROT_CARDS[Math.floor(rng() * TAROT_CARDS.length)];
+    const isReversed = rng() > 0.58; // 정방향이 조금 더 잦게
+
     const card: TarotCard = {
-      id: randomCardBase.id,
-      name: randomCardBase.name,
-      nameEn: randomCardBase.nameEn,
+      id: base.id,
+      name: base.name,
+      nameEn: base.nameEn,
       type: isReversed ? "reversed" : "upright",
-      keywords: isReversed 
-        ? [...randomCardBase.keywords].reverse().map(kw => kw + "(장해/과잉)") 
-        : randomCardBase.keywords,
-      description: `${randomCardBase.name} 카드 (${isReversed ? "역방향" : "정방향"})`
+      keywords: isReversed ? base.reversed : base.keywords,
+      description: `${base.name} 카드 (${isReversed ? "역방향" : "정방향"})`
     };
 
     // 장르 매칭
@@ -566,6 +567,7 @@ export class FortuneService {
       saju,
       analysis,
       iljin,
+      categories: iljin ? todayCategoryScores(iljin, rng) : null, // 애정·금전·직장·건강
       luckyElement,
       interpretation,
       panels: this.parsePanels(interpretation, character.id),

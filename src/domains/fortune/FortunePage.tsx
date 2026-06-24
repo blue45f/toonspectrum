@@ -20,6 +20,7 @@ import { useState, useEffect, useRef } from "react";
 
 
 
+import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
@@ -114,6 +115,7 @@ export interface FortuneResult {
   today?: TodayFortuneData;
   analysis?: SajuAnalysisData | null;
   iljin?: IljinData | null;
+  categories?: { love: number; money: number; work: number; health: number } | null;
   compat?: CompatData;
   luckyElement?: string | null;
   score?: number;
@@ -300,16 +302,15 @@ export function FortunePage() {
     }, 1800);
   };
 
-  // 타로 카드 선택 및 해석 요청
-  const handleSelectTarotCard = (_cardIdx: number) => {
+  // 타로 카드 선택 및 해석 요청 — 고른 카드 위치(cardIdx)가 결과를 결정한다
+  const handleSelectTarotCard = (cardIdx: number) => {
     if (!selectedChar || tarotStep !== "spread") return;
-    const charId = selectedChar.id;
     callFortune(
       "/api/fortune/tarot",
-      { characterId: charId },
+      { characterId: selectedChar.id, cardIdx },
       () => {
         setTarotStep("spread");
-        handleSelectTarotCard(_cardIdx);
+        handleSelectTarotCard(cardIdx);
       },
       () => setTarotStep("revealed")
     );
@@ -367,12 +368,17 @@ export function FortunePage() {
             </div>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {characters.map((char) => (
-              <button
+            {characters.map((char, idx) => (
+              <motion.button
                 key={char.id}
                 type="button"
                 onClick={() => setSelectedChar(char)}
-                className="group relative text-left w-full block cursor-pointer overflow-hidden rounded-2xl border border-line bg-card/65 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-line-strong hover:bg-raised"
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.45, delay: idx * 0.09, ease: "easeOut" }}
+                whileHover={{ y: -6, boxShadow: "0 18px 44px -14px oklch(0.72 0.185 42 / 0.5)" }}
+                whileTap={{ scale: 0.97 }}
+                className="group relative text-left w-full block cursor-pointer overflow-hidden rounded-2xl border border-line bg-card/65 p-4 hover:border-line-strong hover:bg-raised"
               >
                 {/* 캐릭터 아바타 이미지 (없을 경우 텍스트 fallback) */}
                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gradient-to-br from-accent-soft to-panel/80 flex items-center justify-center border border-line/40">
@@ -404,7 +410,7 @@ export function FortunePage() {
                 <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-accent group-hover:translate-x-1 transition-transform">
                   선택하기 <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
-              </button>
+              </motion.button>
             ))}
           </div>
         </section>
@@ -624,24 +630,8 @@ export function FortunePage() {
                       
                       {/* 오늘의 운세 지수 원형 도넛/게이지 */}
                       <div className="md:col-span-4 flex flex-col items-center justify-center p-4 border border-line/45 rounded-2xl bg-card/30 relative overflow-hidden">
-                        {/* 고득점 축포 — 게이지 주변 스파클 */}
-                        {fortuneResult.today.score >= 85 &&
-                          [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                            <motion.span
-                              key={i}
-                              aria-hidden
-                              className="pointer-events-none absolute rounded-full bg-accent"
-                              style={{
-                                width: 5,
-                                height: 5,
-                                left: `${50 + Math.cos((i / 8) * Math.PI * 2) * 30}%`,
-                                top: `${48 + Math.sin((i / 8) * Math.PI * 2) * 30}%`,
-                                boxShadow: "0 0 8px var(--color-accent)",
-                              }}
-                              animate={{ scale: [0, 1.4, 0], opacity: [0, 1, 0] }}
-                              transition={{ duration: 1.6, delay: i * 0.18, repeat: Infinity, repeatDelay: 1.2, ease: "easeOut" }}
-                            />
-                          ))}
+                        {/* 고득점 축포 — 컨페티 버스트 */}
+                        {fortuneResult.today.score >= 85 && <ConfettiBurst count={28} />}
                         <span className="text-[10px] font-bold text-fg-3 uppercase tracking-wider mb-2">FORTUNE SCORE</span>
                         <div className="relative flex items-center justify-center w-28 h-28">
                           {/* SVG 원형 프로그레스 */}
@@ -667,9 +657,7 @@ export function FortunePage() {
                             />
                           </svg>
                           <div className="absolute flex flex-col items-center">
-                            <span className="text-3xl font-extrabold font-display text-fg">
-                              {fortuneResult.today.score}
-                            </span>
+                            <CountUp value={fortuneResult.today.score} className="text-3xl font-extrabold font-display text-fg" />
                             <span className="text-[9px] font-bold text-accent">SCORE</span>
                           </div>
                         </div>
@@ -705,6 +693,37 @@ export function FortunePage() {
                             오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
                           </span>
                           <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
+                        </div>
+                      )}
+
+                      {/* 세부운 4분면 — 애정·금전·직장·건강 (일진 십성 기반) */}
+                      {fortuneResult.categories && (
+                        <div className="md:col-span-12 grid grid-cols-2 gap-x-5 gap-y-3 rounded-xl border border-line/45 bg-card/20 p-4 sm:grid-cols-4">
+                          {([
+                            { key: "love", label: "애정운", emoji: "💕", hue: 350 },
+                            { key: "money", label: "금전운", emoji: "💰", hue: 90 },
+                            { key: "work", label: "직장운", emoji: "💼", hue: 250 },
+                            { key: "health", label: "건강운", emoji: "🌿", hue: 150 },
+                          ] as const).map((cat) => {
+                            const val = fortuneResult.categories![cat.key];
+                            return (
+                              <div key={cat.key} className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-semibold text-fg-2">{cat.emoji} {cat.label}</span>
+                                  <span className="font-display font-bold text-fg">{val}</span>
+                                </div>
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-card">
+                                  <motion.div
+                                    className="h-full rounded-full"
+                                    style={{ background: `oklch(0.72 0.15 ${cat.hue})` }}
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${val}%` }}
+                                    transition={{ duration: 0.9, ease: "easeOut" }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -748,7 +767,9 @@ export function FortunePage() {
                         <div className="flex items-center gap-3.5 bg-card px-5 py-3.5 rounded-xl border border-line/40">
                           <div className="text-right">
                             <span className="text-[10px] font-bold text-fg-3 block">궁합 지수</span>
-                            <span className="text-2xl font-extrabold text-accent font-display">{fortuneResult.score}%</span>
+                            <span className="text-2xl font-extrabold text-accent font-display">
+                              <CountUp value={fortuneResult.score} />%
+                            </span>
                           </div>
                           <div className="h-8 w-px bg-line" />
                           <span className="text-xs font-semibold text-fg-2">
@@ -866,8 +887,16 @@ export function FortunePage() {
                   {/* 타로 전용 결과 디스플레이 */}
                   {activeTab === "tarot" && fortuneResult.card && (
                     <div className="flex flex-col md:flex-row gap-6 items-center">
-                      {/* 카드별 고유 디자인의 타로 카드 페이스 */}
-                      <TarotCardFace card={fortuneResult.card} className="w-52 shrink-0" />
+                      {/* 카드별 고유 디자인의 타로 카드 페이스 — 3D 플립 리빌 */}
+                      <motion.div
+                        className="w-52 shrink-0"
+                        style={{ perspective: 1000 }}
+                        initial={{ rotateY: 180, scale: 0.7, opacity: 0 }}
+                        animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.8, ease: "easeOut", type: "spring", stiffness: 120, damping: 14 }}
+                      >
+                        <TarotCardFace card={fortuneResult.card} />
+                      </motion.div>
 
                       {/* 타로 카드 풀이 */}
                       <div className="flex-1 space-y-4 text-left">
