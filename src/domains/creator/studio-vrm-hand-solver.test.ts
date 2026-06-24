@@ -80,6 +80,26 @@ describe("studio-vrm-hand-solver", () => {
     expect(bones.rightThumbDistal[2]).toBeGreaterThan(0); // 우측 부호 +
   });
 
+  it("손바닥이 아래를 향하면 손 roll ≈ 0, 위로 뒤집으면 ≈ ±π", () => {
+    // 손 방향(손목→중지MCP) = +x, 너클 폭(검지MCP↔소지MCP)으로 손바닥 방향 결정.
+    const palmDown = makeHand({
+      [HAND_LM.wrist]: [0, 0, 0],
+      [HAND_LM.middleMcp]: [1, 0, 0],
+      [HAND_LM.indexMcp]: [0.5, 0, -0.5],
+      [HAND_LM.littleMcp]: [0.5, 0, 0.5],
+    });
+    const palmUp = makeHand({
+      [HAND_LM.wrist]: [0, 0, 0],
+      [HAND_LM.middleMcp]: [1, 0, 0],
+      [HAND_LM.indexMcp]: [0.5, 0, 0.5],
+      [HAND_LM.littleMcp]: [0.5, 0, -0.5],
+    });
+    const downRoll = Math.abs(solveHandToFingerBones(palmDown, "left").leftHand[0]);
+    const upRoll = Math.abs(solveHandToFingerBones(palmUp, "left").leftHand[0]);
+    expect(downRoll).toBeLessThan(0.2); // 손등 위 → roll ≈ 0
+    expect(upRoll).toBeGreaterThan(Math.PI - 0.3); // 손바닥 뒤집음 → ≈ π
+  });
+
   it("avatarSideForHand: 미러면 좌우를 교차한다", () => {
     expect(avatarSideForHand("Left", false)).toBe("left");
     expect(avatarSideForHand("Right", false)).toBe("right");

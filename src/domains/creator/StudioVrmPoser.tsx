@@ -39,7 +39,6 @@ import {
   applyFullState,
   stripFingerBones,
   applyPoserVisualState,
-  applyFingerRotations,
   planFullStateRestore,
   createFullStateLoadHandlers,
   type PoseBone,
@@ -2020,8 +2019,13 @@ function VrmActor({
           if (faded) bone.quaternion.copy(faded);
         }
 
-        // 손가락 추적 결과 적용(감지된 손만; 없으면 사용자 손 포즈 유지).
-        if (data.fingers) applyFingerRotations(vrm, data.fingers);
+        // 손가락 추적 결과 적용 — 팔다리와 같은 One-Euro quaternion 스무딩으로 떨림 제거.
+        if (data.fingers) {
+          for (const [boneName, rot] of Object.entries(data.fingers)) {
+            const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
+            if (bone) bone.quaternion.copy(smoother.smooth(boneName, rot, dVal));
+          }
+        }
       }
 
       if (expressionManager) {
@@ -2702,7 +2706,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               if (handLm) {
                 const handResult = handLm.detectForVideo(currentVideo, timestamp);
                 const fingers: Record<string, readonly [number, number, number]> = {};
-                const hands = handResult?.landmarks ?? [];
+                // worldLandmarks(미터 3D)는 손바닥 법선·관절각 계산에 더 정밀하다.
+                const hands = handResult?.worldLandmarks ?? [];
                 const handed = handResult?.handednesses ?? [];
                 for (let i = 0; i < hands.length; i++) {
                   const label = handed[i]?.[0]?.categoryName ?? "Right";
