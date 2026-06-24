@@ -201,14 +201,19 @@ export function HomePage() {
           aria-hidden
         />
         <Container size="wide" className="relative flex flex-col gap-12 pt-12 pb-14 lg:gap-14 lg:pb-16">
-          {bannerItems.length > 0 &&
-            (interactiveHeroReady ? (
-              <Suspense fallback={<HeroBannerStatic items={bannerItems} onActivate={activateInteractiveHero} />}>
-                <HeroBanner items={bannerItems} />
-              </Suspense>
-            ) : (
-              <HeroBannerStatic items={bannerItems} onActivate={activateInteractiveHero} />
-            ))}
+          {bannerItems.length > 0 && (
+            // 진입 페이드는 안정적 래퍼에서 단 한 번만 — 정적→인터랙티브(embla) 배너로
+            // 스왑될 때 각 컴포넌트의 fade-up이 재실행돼 배너가 두 번 깜박이던 문제 방지.
+            <div style={{ animation: "fade-up 0.7s var(--ease-out-expo) 0.1s both" }}>
+              {interactiveHeroReady ? (
+                <Suspense fallback={<HeroBannerStatic items={bannerItems} onActivate={activateInteractiveHero} />}>
+                  <HeroBanner items={bannerItems} />
+                </Suspense>
+              ) : (
+                <HeroBannerStatic items={bannerItems} onActivate={activateInteractiveHero} />
+              )}
+            </div>
+          )}
 
           <div className="relative grid items-end gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <div>

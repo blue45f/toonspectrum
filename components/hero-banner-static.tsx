@@ -26,7 +26,6 @@ export function HeroBannerStatic({
   return (
     <div
       className="group relative"
-      style={{ animation: "fade-up 0.7s var(--ease-out-expo) 0.1s both" }}
       role="group"
       aria-label="이 주의 추천 작품"
       onPointerEnter={onActivate}
