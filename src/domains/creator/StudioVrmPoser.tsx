@@ -335,8 +335,9 @@ const COSTUME_PRESETS: CostumePreset[] = [
 
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
-// 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손). 머리·목은 이미 EMA 스무딩됨.
-const LIMB_BONE_RE = /Arm|Leg|Foot|Hand/;
+// 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손 + 척추/가슴).
+// 머리·목은 이미 얼굴 채널에서 EMA 스무딩되므로 제외.
+const LIMB_BONE_RE = /Arm|Leg|Foot|Hand|[Ss]pine|[Cc]hest/;
 // 솔버가 생성할 수 있는 팔다리 본 — 추적이 끊긴 본을 rest 로 페이드할 때 순회 대상.
 const CANONICAL_LIMB_BONES = [
   "leftUpperArm",

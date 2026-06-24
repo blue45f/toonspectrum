@@ -56,6 +56,9 @@ const REST_ARM_LEFT = new THREE.Vector3(1, 0, 0); // 좌완은 +X 바깥
 const REST_ARM_RIGHT = new THREE.Vector3(-1, 0, 0);
 const REST_LEG = new THREE.Vector3(0, -1, 0); // 다리는 아래(-Y)
 const REST_FOOT = new THREE.Vector3(0, 0, 1); // 발끝 앞
+const TORSO_UP = new THREE.Vector3(0, 1, 0); // 곧게 선 척추 방향(+Y)
+// 토르소 기울임 감쇠(0~1) — 단일 카메라 노이즈/과장 억제.
+const TORSO_LEAN = 0.55;
 
 const EULER_ORDER = "XYZ" as const;
 
@@ -80,14 +83,16 @@ function quatToEuler(q: THREE.Quaternion): readonly [number, number, number] {
 
 /**
  * 2-본 체인(상완→하완, 대퇴→하퇴)을 풀어 부모/자식 로컬 회전을 만든다.
- *  - 부모(상완)는 월드 회전(rest→상완방향). 토르소를 항등으로 가정하므로 로컬과 동일.
+ *  - 부모(상완): 부모프레임(parentWorld, 기본 항등=토르소)에서의 로컬 회전.
+ *    토르소를 추적해 척추/가슴을 기울이면 팔도 그 프레임 상대로 계산해야 이중회전이 안 생긴다.
  *  - 자식(하완)은 부모상대: qParentWorld⁻¹ · qChildWorld → 팔꿈치 굽힘만 남는다.
  */
 function solveTwoBone(
   root: THREE.Vector3,
   mid: THREE.Vector3,
   tip: THREE.Vector3,
-  rest: THREE.Vector3
+  rest: THREE.Vector3,
+  parentWorld?: THREE.Quaternion
 ): { parent: THREE.Quaternion; child: THREE.Quaternion } | null {
   const upperDir = dir(root, mid);
   const lowerDir = dir(mid, tip);
@@ -95,7 +100,11 @@ function solveTwoBone(
   const qParentWorld = new THREE.Quaternion().setFromUnitVectors(rest, upperDir);
   const qChildWorld = new THREE.Quaternion().setFromUnitVectors(rest, lowerDir);
   const qChildLocal = qParentWorld.clone().invert().multiply(qChildWorld);
-  return { parent: qParentWorld, child: qChildLocal };
+  // 부모(상완)를 토르소 프레임 상대로: parentWorld⁻¹ · qParentWorld.
+  const parentLocal = parentWorld
+    ? parentWorld.clone().invert().multiply(qParentWorld)
+    : qParentWorld;
+  return { parent: parentLocal, child: qChildLocal };
 }
 
 /** 단일 본(발 등) 월드 방향 회전. */
@@ -131,7 +140,27 @@ export function solvePoseToVrmBones(
   const visOk = (...idx: number[]) =>
     idx.every((i) => (worldLandmarks[i]?.visibility ?? 1) >= minVisibility);
 
-  // ── 팔(상완/하완) ─────────────────────────────────────────────
+  // ── 토르소(척추/가슴) 기울임 ──────────────────────────────────
+  // 어깨중심→골반중심 방향으로 상체를 기울인다. 팔은 이 토르소 프레임 상대로 계산한다.
+  let torsoWorld: THREE.Quaternion | undefined;
+  if (visOk(POSE_LM.leftShoulder, POSE_LM.rightShoulder, POSE_LM.leftHip, POSE_LM.rightHip)) {
+    const shoulderC = vec(POSE_LM.leftShoulder).add(vec(POSE_LM.rightShoulder)).multiplyScalar(0.5);
+    const hipC = vec(POSE_LM.leftHip).add(vec(POSE_LM.rightHip)).multiplyScalar(0.5);
+    const spineDir = shoulderC.sub(hipC);
+    if (spineDir.lengthSq() > 1e-6) {
+      spineDir.normalize();
+      // 감쇠: 항등 → 전체 기울임 사이 슬러프.
+      torsoWorld = new THREE.Quaternion().slerp(
+        new THREE.Quaternion().setFromUnitVectors(TORSO_UP, spineDir),
+        TORSO_LEAN
+      );
+      const e = new THREE.Euler().setFromQuaternion(torsoWorld, EULER_ORDER);
+      out.spine = [e.x * 0.6, e.y * 0.6, e.z * 0.6];
+      out.chest = [e.x * 0.4, e.y * 0.4, e.z * 0.4];
+    }
+  }
+
+  // ── 팔(상완/하완) — 토르소 프레임 상대 ────────────────────────
   const arm = (
     side: "left" | "right",
     sIdx: number,
@@ -140,7 +169,7 @@ export function solvePoseToVrmBones(
     rest: THREE.Vector3
   ) => {
     if (!visOk(sIdx, eIdx, wIdx)) return;
-    const r = solveTwoBone(vec(sIdx), vec(eIdx), vec(wIdx), rest);
+    const r = solveTwoBone(vec(sIdx), vec(eIdx), vec(wIdx), rest, torsoWorld);
     if (!r) return;
     out[`${sideName(side)}UpperArm`] = quatToEuler(r.parent);
     out[`${sideName(side)}LowerArm`] = quatToEuler(r.child);

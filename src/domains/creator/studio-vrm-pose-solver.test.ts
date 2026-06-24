@@ -175,4 +175,34 @@ describe("studio-vrm-pose-solver", () => {
     expect(solvePoseToVrmBones([], opts)).toEqual({});
     expect(solvePoseToVrmBones(undefined, opts)).toEqual({});
   });
+
+  it("상체를 옆으로 기울이면 척추/가슴이 회전하고 팔은 토르소 상대로 보정된다", () => {
+    // 골반은 수평, 어깨가 +x 쪽으로 치우침(옆 기울임) + 왼팔 듦.
+    const base = {
+      [POSE_LM.leftHip]: { x: 0.2, y: 0 },
+      [POSE_LM.rightHip]: { x: -0.2, y: 0 },
+      [POSE_LM.leftElbow]: { x: 0.3, y: -0.6 },
+      [POSE_LM.leftWrist]: { x: 0.4, y: -0.9 },
+    };
+    const upright = makeLandmarks({
+      ...base,
+      [POSE_LM.leftShoulder]: { x: 0.2, y: -0.5 },
+      [POSE_LM.rightShoulder]: { x: -0.2, y: -0.5 },
+    });
+    const leaned = makeLandmarks({
+      ...base,
+      [POSE_LM.leftShoulder]: { x: 0.5, y: -0.5 }, // 어깨가 오른쪽으로 치우침
+      [POSE_LM.rightShoulder]: { x: 0.1, y: -0.5 },
+    });
+    const a = solvePoseToVrmBones(upright, opts);
+    const b = solvePoseToVrmBones(leaned, opts);
+    // 곧게 선 상체: 척추 회전 ≈ 0.
+    expect(Math.hypot(...a.spine)).toBeLessThan(0.05);
+    // 기울인 상체: 척추에 롤(z) 발생.
+    expect(Math.abs(b.spine[2])).toBeGreaterThan(0.05);
+    expect(b.chest).toBeDefined();
+    // 팔은 토르소 프레임 상대 → 기울임에 따라 상완 로컬이 보정되어 달라진다(이중회전 방지).
+    expect(b.leftUpperArm).toBeDefined();
+    expect(Math.abs(b.leftUpperArm[2] - a.leftUpperArm[2])).toBeGreaterThan(0.02);
+  });
 });
