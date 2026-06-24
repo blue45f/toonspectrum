@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 
+import { charHue } from "./fortune-theme";
 import { getTarotVisual, tarotAccent } from "./tarot-visuals";
 
 import type { FortuneResult, FortuneTab } from "./FortunePage";
@@ -8,7 +9,6 @@ import type { FortuneResult, FortuneTab } from "./FortunePage";
 // 공유/저장용 포스터 카드 — html-to-image로 PNG 캡처되는 고정폭 세로 카드.
 // 운세 타입별 핵심 결과 + 하이라이트 대사 + 추천작 + 브랜딩을 한 장에 담는다.
 
-const CHAR_HUE: Record<string, number> = { ara: 162, danwoo: 70, leona: 292, gaon: 248 };
 const TAB_LABEL: Record<FortuneTab, string> = {
   today: "오늘의 운세",
   zodiac: "별자리 운세",
@@ -41,7 +41,7 @@ function highlightLine(result: FortuneResult): string {
 
 export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps>(
   function FortuneShareCard({ result, character, tab, dateLabel }, ref) {
-    const hue = CHAR_HUE[character.id] ?? 42;
+    const hue = charHue(character.id);
     const accent = `oklch(0.84 0.13 ${hue})`;
     const ink = "oklch(0.96 0.01 90)";
     const sub = "oklch(0.74 0.012 78)";

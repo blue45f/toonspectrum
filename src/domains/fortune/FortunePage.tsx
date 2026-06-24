@@ -22,6 +22,7 @@ import { useState, useEffect, useRef } from "react";
 
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
+import { charThemeVars } from "./fortune-theme";
 import { FortuneLoading } from "./FortuneLoading";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
@@ -552,13 +553,13 @@ export function FortunePage() {
           </div>
         </section>
       ) : (
-        /* 캐릭터가 선택되었을 때의 본문 인터페이스 */
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        /* 캐릭터가 선택되었을 때의 본문 인터페이스 — 캐릭터 무드색을 CSS 변수로 주입 */
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12" style={charThemeVars(selectedChar.id)}>
           
           {/* 왼쪽: 에이전트 정보 및 말풍선 (3/12 cols) */}
           <aside className="lg:col-span-4 flex flex-col gap-4">
             <div className="rounded-2xl border border-line bg-panel/35 p-5 flex flex-col items-center text-center">
-              <div className="relative aspect-square w-24 overflow-hidden rounded-full bg-gradient-to-br from-accent/20 to-panel border-2 border-accent flex items-center justify-center shadow-lg">
+              <div className="relative aspect-square w-24 overflow-hidden rounded-full bg-gradient-to-br from-accent/20 to-panel border-2 flex items-center justify-center shadow-lg" style={{ borderColor: "var(--char-accent)" }}>
                 {selectedChar.avatarUrl ? (
                   <img 
                     src={selectedChar.avatarUrl} 
@@ -756,7 +757,8 @@ export function FortunePage() {
                               cx="56"
                               cy="56"
                               r="48"
-                              className="stroke-accent transition-all duration-1000 ease-out"
+                              className="transition-all duration-1000 ease-out"
+                              style={{ stroke: "var(--char-accent)" }}
                               strokeWidth="8"
                               fill="transparent"
                               strokeDasharray={2 * Math.PI * 48}
@@ -862,7 +864,7 @@ export function FortunePage() {
                       {/* 별자리 운세 지수 + 성향 + 행운 */}
                       <div className="md:col-span-8 space-y-4">
                         <div className="flex items-baseline gap-2">
-                          <CountUp value={fortuneResult.zodiac.score} className="font-display text-4xl font-extrabold text-accent" />
+                          <CountUp value={fortuneResult.zodiac.score} className="font-display text-4xl font-extrabold" style={{ color: "var(--char-accent)" }} />
                           <span className="text-sm font-bold text-fg-2">점 · 오늘의 별자리 운세</span>
                         </div>
                         <div className="flex flex-wrap gap-2">

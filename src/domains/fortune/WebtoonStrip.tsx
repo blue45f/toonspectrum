@@ -1,17 +1,13 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 
+import { CHAR_HUE } from "./fortune-theme";
+
 import type { FortuneCharacterInfo, FortunePanel, FortunePanelLine, PlaybackStep } from "./fortune-types";
 
 import { cn } from "@/lib/utils";
 
-// 캐릭터별 무드 색상환(hue) — 컷 배경 그라디언트·프레임·이름·효과음 색을 한 축에서 파생.
-const CHAR_HUE: Record<string, number> = {
-  ara: 162, // 차분한 청록
-  danwoo: 70, // 도깨비 금빛
-  leona: 292, // 신비로운 보랏빛
-  gaon: 248, // 검객의 강철빛
-};
+// 캐릭터별 무드 색상환(hue)은 fortune-theme 단일 출처. 나레이션 기본은 따뜻한 잉크.
 const NARRATION_HUE = 70;
 
 function hueFor(id: string | null): number {

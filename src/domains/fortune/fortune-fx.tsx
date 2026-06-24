@@ -18,7 +18,17 @@ function usePrefersReducedMotion(): boolean {
 }
 
 // 숫자 카운트업 — 0에서 value까지 이징 애니메이션
-export function CountUp({ value, className, durationMs = 950 }: { value: number; className?: string; durationMs?: number }) {
+export function CountUp({
+  value,
+  className,
+  durationMs = 950,
+  style,
+}: {
+  value: number;
+  className?: string;
+  durationMs?: number;
+  style?: React.CSSProperties;
+}) {
   const reduced = usePrefersReducedMotion();
   const [n, setN] = useState(reduced ? value : 0);
 
@@ -39,7 +49,7 @@ export function CountUp({ value, className, durationMs = 950 }: { value: number;
     return () => cancelAnimationFrame(raf);
   }, [value, durationMs, reduced]);
 
-  return <span className={className}>{n}</span>;
+  return <span className={className} style={style}>{n}</span>;
 }
 
 // 컨페티 버스트 — 고득점 등 축하 순간에 방사형으로 터지는 파티클
