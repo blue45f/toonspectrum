@@ -2245,6 +2245,21 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   }, []);
 
+  // 탭 키보드 내비게이션(WAI-ARIA Tabs 패턴): 좌우 방향키 + Home/End. 포커스는 탭 버튼에 둔다.
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const idx = PANEL_TABS.findIndex((t) => t.id === activePanelTab);
+    let next: number;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % PANEL_TABS.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + PANEL_TABS.length) % PANEL_TABS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = PANEL_TABS.length - 1;
+    else return;
+    e.preventDefault();
+    const nextTab = PANEL_TABS[next];
+    handlePanelTabChange(nextTab.id);
+    document.getElementById(`vrm-tab-${nextTab.id}`)?.focus();
+  };
+
   const handleViewportReady = useCallback((api: ViewportApi | null) => {
     viewportApiRef.current = api;
   }, []);
@@ -3844,7 +3859,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     {!viewportHinted ? (
                       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
                         <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
-                          드래그로 회전 · 휠로 확대/축소
+                          끌어서 회전 · 휠·핀치로 확대/축소
                         </span>
                       </div>
                     ) : null}
@@ -3929,10 +3944,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 return (
                   <button
                     key={tab.id}
+                    id={`vrm-tab-${tab.id}`}
                     type="button"
                     role="tab"
                     aria-selected={isActive}
+                    aria-controls="vrm-panel-body"
+                    tabIndex={isActive ? 0 : -1}
                     title={tab.hint}
+                    onKeyDown={handleTabKeyDown}
                     className={cx(
                       "group flex flex-col items-center gap-1 rounded-xl border px-1 py-1.5 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                       isActive
@@ -3947,7 +3966,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 );
               })}
             </div>
-            <div ref={panelScrollRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+            <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
               <section hidden={hideOnTab("character")}>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
