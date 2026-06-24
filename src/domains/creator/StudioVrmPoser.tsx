@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, PersonStanding, RotateCcw, Sliders, Smile, Sparkles, Swords, Trash2, Upload, UserRound, WandSparkles, X, Webcam } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ImagePlus, Loader2, Maximize2, PersonStanding, RotateCcw, RotateCw, Sliders, Smile, Sparkles, Swords, Trash2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -338,6 +338,8 @@ const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
   "inline-grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const VIEWPORT_BTN =
+  "grid size-9 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 // 우측 컨트롤 패널 탭 — 16개 섹션을 작업 흐름별로 묶어 탐색 부담을 줄인다.
 type PanelTab = "character" | "pose" | "face" | "scene" | "props";
@@ -831,13 +833,57 @@ function CaptureBridge({
   return null;
 }
 
-function CameraDirector({ presetId }: { presetId: string }) {
+type OrbitLike = {
+  target?: THREE.Vector3;
+  minDistance?: number;
+  maxDistance?: number;
+  update?: () => void;
+} | null;
+
+type ViewportApi = { zoomBy: (factor: number) => void };
+
+// Canvas 내부에서 OrbitControls/카메라를 잡아 줌 등 명령형 동작을 패널 오버레이로 노출.
+function ViewportController({ onReady }: { onReady: (api: ViewportApi | null) => void }) {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as OrbitLike;
+  const invalidate = useThree((s) => s.invalidate);
+
+  useEffect(() => {
+    onReady({
+      zoomBy: (factor: number) => {
+        const target = controls?.target ?? new THREE.Vector3(0, 1, 0);
+        const offset = camera.position.clone().sub(target);
+        const min = controls?.minDistance ?? 1.3;
+        const max = controls?.maxDistance ?? 5.2;
+        const dist = THREE.MathUtils.clamp(offset.length() * factor, min, max);
+        offset.setLength(dist);
+        camera.position.copy(target).add(offset);
+        camera.updateMatrixWorld();
+        controls?.update?.();
+        invalidate();
+      },
+    });
+    return () => {
+      onReady(null);
+    };
+  }, [camera, controls, invalidate, onReady]);
+
+  return null;
+}
+
+function CameraDirector({ presetId, resetNonce }: { presetId: string; resetNonce: number }) {
   const { camera, invalidate } = useThree();
+  const controls = useThree((s) => s.controls) as OrbitLike;
   const preset = findCameraPreset(presetId);
 
   useEffect(() => {
     applyCameraPreset(camera, preset, invalidate);
-  }, [camera, invalidate, preset]);
+    // 사용자가 궤도를 돌린 뒤에도 시점 초기화가 프리셋 타깃으로 정확히 복귀하도록 동기화.
+    if (controls?.target) {
+      controls.target.set(preset.target[0], preset.target[1], preset.target[2]);
+      controls.update?.();
+    }
+  }, [camera, invalidate, preset, controls, resetNonce]);
 
   return null;
 }
@@ -2100,6 +2146,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
   const [bodyRotation, setBodyRotation] = useState(0);
+  // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
+  const [turntable, setTurntable] = useState(false);
+  const [viewResetNonce, setViewResetNonce] = useState(0);
+  const [viewportHinted, setViewportHinted] = useState(false);
+  const viewportApiRef = useRef<ViewportApi | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
@@ -2170,6 +2221,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setActivePanelTab(tab);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   }, []);
+
+  const handleViewportReady = useCallback((api: ViewportApi | null) => {
+    viewportApiRef.current = api;
+  }, []);
+
+  const zoomViewport = useCallback((factor: number) => {
+    viewportApiRef.current?.zoomBy(factor);
+    setViewportHinted(true);
+  }, []);
+
+  const handleViewReset = useCallback(() => {
+    setViewResetNonce((n) => n + 1);
+    setViewportHinted(true);
+  }, []);
+
+  // 드래그 힌트는 모델이 준비되면 잠깐 보여 주고 일정 시간 뒤 자동으로 사라진다.
+  useEffect(() => {
+    if (!vrm || viewportHinted) return;
+    const timer = setTimeout(() => setViewportHinted(true), 6000);
+    return () => clearTimeout(timer);
+  }, [vrm, viewportHinted]);
 
   // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
   // Removed duplicate here to prevent double application on every render.
@@ -3512,7 +3584,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   }}
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
-                  <CameraDirector presetId={activeCameraId} />
+                  <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} />
+                  <ViewportController onReady={handleViewportReady} />
                   <VrmLighting tone={lightingTone} lighting={lighting} env={envVariant} />
                   {vrm ? (
                     <VrmActor
@@ -3553,11 +3626,50 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     enableDamping
                     dampingFactor={0.08}
                     enablePan={false}
+                    autoRotate={turntable}
+                    autoRotateSpeed={1.6}
                     minDistance={1.3}
                     maxDistance={5.2}
                     target={[activeCamera.target[0], activeCamera.target[1], activeCamera.target[2]]}
+                    onStart={() => setViewportHinted(true)}
                   />
                 </Canvas>
+
+                {vrm ? (
+                  <>
+                    <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
+                      <button type="button" aria-label="확대" title="확대" className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
+                        <ZoomIn size={16} aria-hidden />
+                      </button>
+                      <button type="button" aria-label="축소" title="축소" className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
+                        <ZoomOut size={16} aria-hidden />
+                      </button>
+                      <button type="button" aria-label="시점 초기화" title="시점 초기화" className={VIEWPORT_BTN} onClick={handleViewReset}>
+                        <Maximize2 size={16} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="턴테이블 회전"
+                        title="턴테이블 회전"
+                        aria-pressed={turntable}
+                        className={cx(VIEWPORT_BTN, turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
+                        onClick={() => {
+                          setTurntable((v) => !v);
+                          setViewportHinted(true);
+                        }}
+                      >
+                        <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
+                      </button>
+                    </div>
+                    {!viewportHinted ? (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
+                        <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
+                          드래그로 회전 · 휠로 확대/축소
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
 
                 {status === "empty" ? (
                   <div className="absolute inset-0 grid place-items-center bg-card/50 p-6 text-center backdrop-blur-[1px]">
