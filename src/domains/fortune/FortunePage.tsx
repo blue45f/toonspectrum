@@ -22,6 +22,7 @@ import { useState, useEffect, useRef } from "react";
 
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
+import { FortuneLoading } from "./FortuneLoading";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
 import { useFortunePlayback } from "./useFortunePlayback";
@@ -611,16 +612,10 @@ export function FortunePage() {
                 </div>
               )}
 
-              {/* 로딩 표시 */}
+              {/* 로딩 — 탭별 스켈레톤(DESIGN.md: 스피너 금지) */}
               {isLoading && (
-                <div className="flex flex-col items-center justify-center py-12" role="status">
-                  <div className="relative flex h-10 w-10">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-10 w-10 bg-accent/80"></span>
-                  </div>
-                  <p className="mt-4 font-serif text-sm text-fg-3 animate-pulse">
-                    {selectedChar.name}가 당신의 {activeTab === "today" ? "하루 기운을" : activeTab === "saju" ? "사주와 기운을" : activeTab === "compatibility" ? "궁합 상성을" : activeTab === "prescription" ? "마음 고민을" : activeTab === "zodiac" ? "별자리를" : "카드를"} 읽는 중...
-                  </p>
+                <div role="status">
+                  <FortuneLoading tab={activeTab} characterName={selectedChar.name} avatarUrl={selectedChar.avatarUrl} />
                 </div>
               )}
 
