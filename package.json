@@ -18,7 +18,7 @@
     "crawl": "node scripts/crawl.mjs --json --no-file",
     "ingest": "node scripts/ingest.mjs",
     "catalog:gen": "tsx scripts/build-static-catalog.ts",
-    "catalog:update": "node scripts/crawl.mjs --json --no-file > /tmp/toonspectrum-catalog.json && gzip -9 -c /tmp/toonspectrum-catalog.json > apps/api/data/catalog.json.gz && pnpm catalog:gen",
+    "catalog:update": "node scripts/crawl.mjs --json --no-file > /tmp/toonspectrum-catalog.json && node scripts/merge-catalog.mjs /tmp/toonspectrum-catalog.json && pnpm catalog:gen",
     "predev": "pnpm catalog:gen",
     "prebuild": "pnpm catalog:gen",
     "build:all": "pnpm -r run build",
