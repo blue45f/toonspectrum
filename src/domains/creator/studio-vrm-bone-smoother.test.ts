@@ -41,7 +41,8 @@ describe("studio-vrm-bone-smoother", () => {
     });
 
     it("데드밴드보다 작은 변화는 이전 값을 유지한다", () => {
-      const q = smoothQuaternionStep(IDENT, rotX(0.005), DT, DEFAULT_BONE_SMOOTHER);
+      const tiny = DEFAULT_BONE_SMOOTHER.deadBand / 2;
+      const q = smoothQuaternionStep(IDENT, rotX(tiny), DT, DEFAULT_BONE_SMOOTHER);
       expect(angleBetween(q, IDENT)).toBeLessThan(1e-6);
     });
 

@@ -27,10 +27,11 @@ export interface BoneSmootherOptions {
 }
 
 export const DEFAULT_BONE_SMOOTHER: Readonly<BoneSmootherOptions> = {
-  minCutoff: 1.5,
-  beta: 0.4,
-  deadBand: 0.008,
-  maxStep: 0.7,
+  // 충실도 우선: 정지 시 컷오프를 높여 지연을 줄이고(반응적), 빠른 동작엔 거의 즉각.
+  minCutoff: 3.0,
+  beta: 0.8,
+  deadBand: 0.004,
+  maxStep: 1.2,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

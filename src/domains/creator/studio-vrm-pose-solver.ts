@@ -25,9 +25,9 @@ export interface PoseLandmark {
 export interface PoseSolveOptions {
   /** 좌우 미러(셀카 모드). 기본 true. */
   mirror?: boolean;
-  /** 단일 카메라 깊이(z) 감쇠 계수(0~1). 작을수록 앞뒤 출렁임을 억제. 기본 0.5. */
+  /** 단일 카메라 깊이(z) 감쇠 계수(0~1). 작을수록 앞뒤 출렁임을 억제. 기본 0.85(충실도 우선). */
   zDamp?: number;
-  /** 이 미만 가시성의 관절이 포함된 본은 생략. 기본 0.5. */
+  /** 이 미만 가시성의 관절이 포함된 본은 생략. 기본 0.2(팔이 쉽게 제외되지 않게 낮춤). */
   minVisibility?: number;
 }
 
@@ -122,7 +122,7 @@ export function solvePoseToVrmBones(
   const out: Record<string, readonly [number, number, number]> = {};
   if (!worldLandmarks || worldLandmarks.length < 33) return out;
 
-  const { mirror = true, zDamp = 0.5, minVisibility = 0.5 } = options;
+  const { mirror = true, zDamp = 0.85, minVisibility = 0.2 } = options;
   const mirrorSign = mirror ? -1 : 1;
   // 미러 시 좌우 본 이름을 교차(거울처럼 따라하기).
   const sideName = (side: "left" | "right") =>

@@ -347,8 +347,8 @@ const CANONICAL_LIMB_BONES = [
   "rightFoot",
 ] as const;
 const ZERO_EULER = [0, 0, 0] as const;
-// 추적 끊김 시 rest 복귀 속도(half-life, 초). 작을수록 빨리 복귀.
-const LIMB_FADE_HALF_LIFE = 0.2;
+// 추적 끊김 시 rest 복귀 속도(half-life, 초). 짧은 깜빡임엔 거의 흔들리지 않게 충분히 길게.
+const LIMB_FADE_HALF_LIFE = 0.5;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
