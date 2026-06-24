@@ -325,7 +325,7 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
     // `this`는 Konva.Node — node.attrs에서 노이즈 강도를 읽는다.
     const amount = (this.attrs?.noise as number) || 20;
     for (let i = 0; i < data.length; i += 4) {
-      const noiseVal = (Math.random() - 0.5) * amount * 2.55;
+      const noiseVal = (Math.random() - 0.5) * amount * 2.55; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
       data[i] = Math.min(255, Math.max(0, data[i]! + noiseVal));
       data[i + 1] = Math.min(255, Math.max(0, data[i + 1]! + noiseVal));
       data[i + 2] = Math.min(255, Math.max(0, data[i + 2]! + noiseVal));

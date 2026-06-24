@@ -140,7 +140,7 @@ export function IntroSplash() {
         geometry,
         positions,
         phase: index * 0.5, // staggered start
-        speed: 1.5 + Math.random() * 0.5,
+        speed: 1.5 + Math.random() * 0.5, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
         amplitude: 1.2 + index * 0.15,
         yOffset: (index - (colors.length - 1) / 2) * 0.4, // spread out on Y axis
       });
@@ -151,9 +151,9 @@ export function IntroSplash() {
     const bgStarsGeometry = new THREE.BufferGeometry();
     const bgStarsPositions = new Float32Array(bgStarsCount * 3);
     for (let i = 0; i < bgStarsCount; i++) {
-      bgStarsPositions[i * 3] = (Math.random() - 0.5) * 50;
-      bgStarsPositions[i * 3 + 1] = (Math.random() - 0.5) * 50;
-      bgStarsPositions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+      bgStarsPositions[i * 3] = (Math.random() - 0.5) * 50; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+      bgStarsPositions[i * 3 + 1] = (Math.random() - 0.5) * 50; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+      bgStarsPositions[i * 3 + 2] = (Math.random() - 0.5) * 50; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
     }
     bgStarsGeometry.setAttribute(
       "position",

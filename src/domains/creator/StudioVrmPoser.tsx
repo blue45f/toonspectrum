@@ -2909,7 +2909,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           if (globalThis.confirm(`${validPoses.length}개의 포즈를 가져올까요? (기존 포즈에 추가됩니다)`)) {
             const sanitized = validPoses.map((p) => ({
               ...p,
-              id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+              id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
             }));
             const next = [...savedPoses, ...sanitized];
             setSavedPoses(next);

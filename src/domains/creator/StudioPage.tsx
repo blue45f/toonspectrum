@@ -9001,7 +9001,7 @@ export function StudioPage() {
                         <span className="text-[0.6rem] text-fg-3">너비 (Width)</span>
                         <input
                           type="number"
-                          value={Math.round(selected.type === "text" ? selected.width : selected.width)}
+                          value={Math.round(selected.width)}
                           onChange={(e) => patchEl(selected.id, { width: Math.max(10, Number(e.target.value)) } as Partial<El>)}
                           className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
                         />
@@ -9715,7 +9715,7 @@ export function StudioPage() {
                   <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
                     <span title="필압 변화 민감도를 설정합니다.">필압 곡선</span>
                     <select
-                      value={pressureCurve === 1.0 ? "linear" : pressureCurve === 1.8 ? "soft" : "hard"}
+                      value={Math.abs(pressureCurve - 1.0) < 0.05 ? "linear" : Math.abs(pressureCurve - 1.8) < 0.05 ? "soft" : "hard"}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === "linear") setPressureCurve(1.0);

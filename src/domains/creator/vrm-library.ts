@@ -93,7 +93,7 @@ function createModelId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `vrm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `vrm-${Date.now()}-${Math.random().toString(36).slice(2)}`; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
 }
 
 function normalizeVrmName(fileName: string) {

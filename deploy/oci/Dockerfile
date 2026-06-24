@@ -18,8 +18,11 @@ RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 ENV NODE_ENV=production
 ENV PORT=4001
 # 빌드 산출물 + 워크스페이스 node_modules(.pnpm 심링크 보존) 통째로 복사 — 무료 VM 이라 용량보다 신뢰성 우선.
-COPY --from=build /repo /repo
+# node:24 이미지에 내장된 비루트 사용자(uid 1000)에게 소유권을 넘겨 루트로 실행하지 않는다(S6471).
+COPY --from=build --chown=node:node /repo /repo
 EXPOSE 4001
 WORKDIR /repo/apps/api
+# 비루트 사용자로 구동(읽기 전용 동작 + DB 접속만, 로컬 쓰기 없음).
+USER node
 # main.ts 가 PORT(기본 4001)에 0.0.0.0 바인딩. 컨테이너 env 로 DATABASE_URL/AUTH_SECRET 등 주입.
 CMD ["node", "dist/apps/api/src/main.js"]

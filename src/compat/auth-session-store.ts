@@ -163,5 +163,6 @@ export function persistSession(session: Session) {
 
 export function emitSession(session: Session) {
   currentSession = session;
-  listeners.forEach((listener) => listener(session));
+  // listeners 는 src/compat/auth-session.tsx 의 subscribe 에서 add 된다(교차 모듈이라 정적분석이 빈 Set 으로 오판).
+  listeners.forEach((listener) => listener(session)); // NOSONAR S4158
 }

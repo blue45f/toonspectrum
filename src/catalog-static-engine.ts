@@ -236,7 +236,7 @@ function randomData(sp: URLSearchParams) {
   if (genre) pool = pool.filter((t) => t.genres.includes(genre));
   if (pool.length === 0) pool = TITLES.filter(sfw); // 완화 1: 품질 조건 해제
   if (pool.length === 0) pool = TITLES; // 완화 2: 전부
-  const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
   return {
     slug: pick?.slug ?? pick?.id ?? null,
     id: pick?.id ?? null,

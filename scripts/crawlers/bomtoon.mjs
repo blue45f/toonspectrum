@@ -49,7 +49,7 @@ const WEEKDAY_MENUS = [
 ];
 
 // 제목에 (완결)/(完)/완결 등이 박혀 있으면 완결로 간주(목록 메타에는 완결 플래그가 없다).
-const COMPLETE_RE = /\(\s*완결\s*\)|\[\s*완결\s*\]|\(\s*完\s*\)|완결편|완결$/;
+const COMPLETE_RE = /(?:\(\s*완결\s*\)|\[\s*완결\s*\]|\(\s*完\s*\)|완결편)|완결$/;
 
 // creators[] → 글/그림 분리. type: AUTHOR / ILLUSTRATOR / ORIGINAL_AUTHOR 등.
 function splitCreators(creatorsRaw) {

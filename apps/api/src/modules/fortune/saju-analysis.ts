@@ -92,10 +92,11 @@ export function analyzeSaju(saju: SajuResult): SajuAnalysis {
     const entries: Array<[Element, number]> = [
       ["목", r.wood], ["화", r.fire], ["토", r.earth], ["금", r.metal], ["수", r.water],
     ];
-    useful = entries.reduce((a, b) => (b[1] < a[1] ? b : a))[0];
+    useful = entries.reduce((a, b) => (b[1] < a[1] ? b : a), entries[0])[0];
   }
 
-  const dominantTenGod = (Object.keys(counts) as TenGod[]).reduce((a, b) => (counts[b] > counts[a] ? b : a));
+  const tenGodKeys = Object.keys(counts) as TenGod[];
+  const dominantTenGod = tenGodKeys.reduce((a, b) => (counts[b] > counts[a] ? b : a), tenGodKeys[0]);
 
   const personality = DAY_MASTER_TRAIT[dayKan] ?? "고유한 기운을 지닌 일간";
   const summary =

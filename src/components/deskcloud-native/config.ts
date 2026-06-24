@@ -75,7 +75,7 @@ export function getAnonId(): string {
   const fresh =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
-      : `anon_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+      : `anon_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
   memoryAnonId = fresh;
   try {
     globalThis.localStorage?.setItem(ANON_KEY, fresh);

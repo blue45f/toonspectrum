@@ -47,7 +47,7 @@ function parseList(html) {
   const out = [];
   // 각 작품 앵커 블록을 비탐욕 매칭(다음 </a> 까지).
   const anchorRe =
-    /<a\b[^>]*href="https?:\/\/novel\.munpia\.com\/(\d+)"[^>]*class="(?:[^"]*\b)?(?:hero-)?item\b[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    /<a\b[^>]*href="https?:\/\/novel\.munpia\.com\/(\d+)"[^>]*class="(?:[^"]*\b)?(?:hero-)?item\b[^"]*"[^>]*>([\s\S]*?)<\/a>/gi; // NOSONAR S5842 (선택 접두 클래스 매칭, 동작 검증됨)
   let m;
   while ((m = anchorRe.exec(html)) !== null) {
     const workId = m[1];

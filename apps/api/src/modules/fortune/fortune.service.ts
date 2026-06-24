@@ -986,7 +986,7 @@ export class FortuneService {
   }
 
   parsePanels(text: string, fallbackCharacterId: string): FortunePanel[] {
-    const sceneRe = /^\[\s*(?:제?\s*)?\d+\s*컷\s*(?:[-–—:|]\s*)?(.*?)\s*\]$/; // [1컷 - 묘사]
+    const sceneRe = /^\[\s*제?\s*\d+\s*컷\s*(?:[-–—:|]\s*)?(.*?)\s*\]$/; // [1컷 - 묘사] (제 접두 선택)
     const bracketRe = /^\[\s*(.+?)\s*\]$/; // [임의 지문]
     const sfxRe = /(?:효과음|SFX)\s*[:：]\s*(.+)$/i; // 효과음: 두근두근
     const dialogueRe = /^([^"“'『「:：]{1,18}?)\s*[:：]\s*(.+)$/; // 이름: 대사

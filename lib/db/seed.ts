@@ -62,7 +62,7 @@ async function main() {
 
   // ── 1. 로그인 가능한 테스트 계정 + 데모 작성자 계정 ──────────────────────
   // 비밀번호 로그인용 scrypt 해시(lib/auth-crypto.ts). 멱등을 위해 고정 id 사용.
-  const PASSWORD = "Demo1234!";
+  const PASSWORD = "Demo1234!"; // NOSONAR S2068 데모 테스트 계정 전용 비밀번호(시드 스크립트)
   type SeedUser = {
     id: string;
     name: string;

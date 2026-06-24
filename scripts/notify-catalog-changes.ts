@@ -80,7 +80,7 @@ function adaptationMap(titles: Title[]): { sig: Map<string, string>; rep: Map<st
     const key = normTitle(t.title);
     const s = u.adaptations
       .map((a) => `${a.kind}:${a.name}(${a.year ?? ""})`)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join("|");
     sig.set(key, s);
     // 대표 행: 표지 있는 웹툰 우선(링크 품질)
@@ -107,8 +107,12 @@ async function postDiscord(payload: unknown): Promise<void> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) console.log(`::warning::Discord 웹훅 응답 ${res.status} ${await res.text().catch(() => "")}`);
-    else console.log("Discord 알림 전송 완료");
+    if (!res.ok) {
+      // 응답 본문은 외부 입력이라 GitHub Actions 명령 주입(개행/::)을 막고 길이를 제한해 기록한다.
+      const bodyText = await res.text().catch(() => "");
+      const safeBody = bodyText.replace(/[\r\n]+/g, " ").replace(/::/g, ":​:").slice(0, 200);
+      console.log(`::warning::Discord 웹훅 응답 ${res.status} ${safeBody}`);
+    } else console.log("Discord 알림 전송 완료");
   } catch (e) {
     console.log(`::warning::Discord 전송 실패(무시): ${e instanceof Error ? e.message : e}`);
   }

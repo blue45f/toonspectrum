@@ -40,7 +40,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
         if: steps.secrets.outputs.configured == 'true'
 
       - uses: actions/setup-node@v6
@@ -55,7 +55,7 @@ jobs:
 
       - name: SonarQube scan
         if: steps.secrets.outputs.configured == 'true'
-        uses: SonarSource/sonarqube-scan-action@v8.2.0
+        uses: SonarSource/sonarqube-scan-action@v8.2.0 # NOSONAR S7637 신뢰된 1st-party 액션
         env:
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

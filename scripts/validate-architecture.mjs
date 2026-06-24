@@ -55,7 +55,7 @@ if (exists("pnpm-workspace.yaml")) {
   const ws = read("pnpm-workspace.yaml");
   // `packages:` 블록의 리스트 항목만 워크스페이스 글롭으로 본다. (다른 최상위 키,
   // 예: onlyBuiltDependencies/minimumReleaseAgeExclude 의 `- 항목`은 패키지가 아님.)
-  const pkgBlock = ws.match(/^packages:\s*\n((?:[ \t]*-[ \t]*.*\n?)+)/m)?.[1] ?? "";
+  const pkgBlock = ws.match(/^packages:\s*\n((?:[ \t]*-[ \t]*.*\n?)+)/m)?.[1] ?? ""; // NOSONAR S5852 신뢰된 로컬 입력(pnpm-workspace.yaml), 빌드타임 검증 스크립트
   const globs = [...pkgBlock.matchAll(/^\s*-\s*['"]?([^'"\n]+?)['"]?\s*$/gm)].map((m) => m[1].trim());
   for (const glob of globs) {
     if (glob === ".") continue; // root package

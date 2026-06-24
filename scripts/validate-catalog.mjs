@@ -26,7 +26,7 @@ const PLATFORM_COLLAPSE_ABS = 80; // 절대값도 80 미만이면 "붕괴"로 �
 const MALFORMED_MAX_RATIO = 0.05; // id/제목/availability 누락이 5% 넘으면 실패
 
 function loadCatalog(p) {
-  const buf = readFileSync(p);
+  const buf = readFileSync(p); // NOSONAR S8707 로컬 CLI 검증 스크립트, 운영자 지정 카탈로그 경로(신뢰)
   const raw = p.endsWith(".gz") ? gunzipSync(buf).toString("utf8") : buf.toString("utf8");
   const d = JSON.parse(raw);
   const titles = Array.isArray(d) ? d : d?.titles;
@@ -99,7 +99,7 @@ function main() {
 
   // ── 리포트 ──
   console.log(`\n검증 대상: ${newPath}`);
-  console.log(`전체 작품 수: ${total}${prev ? ` (직전 ${prev.length}, Δ${total - prev.length >= 0 ? "+" : ""}${total - prev.length})` : ""}`);
+  console.log(`전체 작품 수: ${total}${prev ? ` (직전 ${prev.length}, Δ${total - prev.length >= 0 ? "+" : ""}${total - prev.length})` : ""}`); // NOSONAR S8689 집계 수치만 출력(기밀 아님)
   console.log(`불완전 레코드: ${malformed} (${(malformedRatio * 100).toFixed(2)}%)`);
   console.log("플랫폼별:");
   const allIds = [...new Set([...Object.keys(nextPc), ...(prevPc ? Object.keys(prevPc) : [])])].sort(

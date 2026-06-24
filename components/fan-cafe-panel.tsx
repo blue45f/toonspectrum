@@ -184,7 +184,7 @@ export function FanCafePanel({
       const next = [
         ...current,
         {
-          id: `fan-cafe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: `fan-cafe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
           at: Date.now(),
           action,
           label,

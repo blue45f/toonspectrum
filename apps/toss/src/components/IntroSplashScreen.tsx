@@ -49,15 +49,15 @@ export default function IntroSplashScreen() {
     // Create comic cut frames
     for (let i = 0; i < 25; i++) {
       frames.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        w: Math.random() * 80 + 40,
-        h: Math.random() * 110 + 60,
-        alpha: Math.random() * 0.4 + 0.15,
-        scale: Math.random() * 0.5 + 0.5,
-        vx: (Math.random() - 0.5) * 0.8,
-        vy: (Math.random() - 0.5) * 0.8,
-        color: colors[Math.floor(Math.random() * colors.length)] ?? colors[0]!,
+        x: Math.random() * width, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        y: Math.random() * height, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        w: Math.random() * 80 + 40, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        h: Math.random() * 110 + 60, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        alpha: Math.random() * 0.4 + 0.15, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        scale: Math.random() * 0.5 + 0.5, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        vx: (Math.random() - 0.5) * 0.8, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        vy: (Math.random() - 0.5) * 0.8, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+        color: colors[Math.floor(Math.random() * colors.length)] ?? colors[0]!, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
       });
     }
 
