@@ -220,9 +220,12 @@ export function FortunePage() {
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
   const [tarotSpread, setTarotSpread] = useState<"one" | "three">("one");
   
-  // 결과 상태
+  // 결과 상태 — 탭별로 캐시해 탭을 옮겨도 이전 결과가 유지된다
   const [isLoading, setIsLoading] = useState(false);
-  const [fortuneResult, setFortuneResult] = useState<FortuneResult | null>(null);
+  const [resultsByTab, setResultsByTab] = useState<Partial<Record<FortuneTab, FortuneResult>>>({});
+  const fortuneResult = resultsByTab[activeTab] ?? null;
+  const setActiveTabResult = (tab: FortuneTab, data: FortuneResult | null) =>
+    setResultsByTab((prev) => ({ ...prev, [tab]: data ?? undefined }));
 
   // 운세 웹툰 재생 오케스트레이터 — 음성(Web Speech) + 컷 애니메이션 동기
   const playback = useFortunePlayback(fortuneResult?.panels);
@@ -258,7 +261,7 @@ export function FortunePage() {
     setErrorMsg(null);
     setLiveMsg("");
     setIsLoading(true);
-    setFortuneResult(null);
+    setActiveTabResult(activeTab, null);
     retryRef.current = retry;
     try {
       const response = await fetch(url, {
@@ -279,7 +282,7 @@ export function FortunePage() {
         return null;
       }
       const data: FortuneResult = await response.json();
-      setFortuneResult(data);
+      setActiveTabResult(activeTab, data);
       onSuccess?.(data);
       recordView(); // 출석(스트릭)은 실제 새 조회에서만
       if (selectedChar) {
@@ -345,7 +348,7 @@ export function FortunePage() {
     setSelectedChar(char);
     setActiveTab(saved.tab);
     setTarotStep(saved.tab === "tarot" ? "revealed" : "idle");
-    setFortuneResult(saved.result);
+    setResultsByTab({ [saved.tab]: saved.result }); // 복원은 단일 결과로 교체(이전 캐시 제거)
   };
 
   // 재생/일시정지/이어듣기 토글
@@ -440,7 +443,7 @@ export function FortunePage() {
   // 상태 초기화
   const handleReset = () => {
     playback.stop();
-    setFortuneResult(null);
+    setResultsByTab({});
     setTarotStep("idle");
     setBirthDate("");
     setBirthTime("");
@@ -534,7 +537,10 @@ export function FortunePage() {
               <motion.button
                 key={char.id}
                 type="button"
-                onClick={() => setSelectedChar(char)}
+                onClick={() => {
+                  setSelectedChar(char);
+                  setResultsByTab({}); // 캐릭터별 결과라 새 캐릭터 선택 시 캐시 비움
+                }}
                 initial={{ opacity: 0, y: 24, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.45, delay: idx * 0.09, ease: "easeOut" }}
@@ -664,36 +670,37 @@ export function FortunePage() {
           {/* 오른쪽: 메인 입력 및 결과창 (8/12 cols) */}
           <main className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* 탭 네비게이션 (결과 출력 전일 때만 노출) — 모바일 가로 스크롤 칩 + ARIA */}
-            {!fortuneResult && !isLoading && (
-              <div
-                role="tablist"
-                aria-label="운세 종류"
-                className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
-              >
-                {([
-                  { key: "today", label: "오늘의 운세" },
-                  { key: "zodiac", label: "별자리" },
-                  { key: "saju", label: "사주팔자" },
-                  { key: "compatibility", label: "인연 궁합" },
-                  { key: "prescription", label: "독서 처방" },
-                  { key: "tarot", label: "타로 리딩" },
-                ] as const).map((tab) => (
-                  <button
-                    key={tab.key}
-                    role="tab"
-                    aria-selected={activeTab === tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={cn(
-                      "min-h-11 min-w-fit shrink-0 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all",
-                      activeTab === tab.key ? "bg-accent text-on-accent shadow" : "text-fg-3 hover:text-fg"
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* 탭 네비게이션 — 항상 노출(결과를 보면서도 전환, 탭별 결과 유지) · 모바일 가로 스크롤 + ARIA */}
+            <div
+              role="tablist"
+              aria-label="운세 종류"
+              className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
+            >
+              {([
+                { key: "today", label: "오늘의 운세" },
+                { key: "zodiac", label: "별자리" },
+                { key: "saju", label: "사주팔자" },
+                { key: "compatibility", label: "인연 궁합" },
+                { key: "prescription", label: "독서 처방" },
+                { key: "tarot", label: "타로 리딩" },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => {
+                    playback.stop();
+                    setActiveTab(tab.key);
+                  }}
+                  className={cn(
+                    "min-h-11 min-w-fit shrink-0 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all",
+                    activeTab === tab.key ? "bg-accent text-on-accent shadow" : "text-fg-3 hover:text-fg"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
             {/* 컨텐츠 카드 영역 */}
             <div
