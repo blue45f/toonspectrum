@@ -81,6 +81,27 @@ export const STUDIO_LOOKS: StudioLook[] = [
       halftone: { dotSize: 3, angle: 45, mode: "mono", strength: 100 },
     },
   },
+  {
+    id: "webtoon-cel",
+    label: "웹툰 셀",
+    tip: "색을 몇 단계로 평탄화하고 생기·선명도를 끌어올려 깔끔한 컬러 셀 음영을 냅니다. 3D 캐릭터 캡처를 한국형 컬러 웹툰 컷처럼 보이게 합니다.",
+    category: "만화",
+    patch: {
+      contrast: 8,
+      posterize: 5,
+      vibrance: { vibrance: 22, saturation: 4 },
+      clarity: { clarity: 30, dehaze: 0 },
+    },
+  },
+  {
+    id: "clean-lineart",
+    label: "클린 라인아트",
+    tip: "소벨 에지 검출로 윤곽만 검은 선으로 남기고 배경을 하얗게 비워 깔끔한 흑백 선화(콘티·러프 스케치)를 만듭니다.",
+    category: "만화",
+    patch: {
+      lineart: true,
+    },
+  },
 
   // ===== 시네마틱 =====
   {

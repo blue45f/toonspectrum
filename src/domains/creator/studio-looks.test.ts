@@ -117,6 +117,28 @@ describe("STUDIO_LOOKS 카탈로그", () => {
   });
 });
 
+describe("웹툰 컷 룩 (VRM 캡처용)", () => {
+  it("웹툰 셀(webtoon-cel)은 만화 카테고리의 컬러 보존 셀 룩이다", () => {
+    const look = STUDIO_LOOKS.find((l) => l.id === "webtoon-cel");
+    expect(look).toBeDefined();
+    expect(look!.category).toBe("만화");
+    // 컬러 셀 룩이므로 흑백/세피아/반전으로 색을 죽이면 안 된다.
+    expect(look!.patch.grayscale).toBeUndefined();
+    expect(look!.patch.sepia).toBeUndefined();
+    expect(look!.patch.invert).toBeUndefined();
+    // 셀 밴딩의 핵심인 posterize를 활성값(>0)으로 쓴다.
+    expect(typeof look!.patch.posterize).toBe("number");
+    expect(look!.patch.posterize!).toBeGreaterThan(0);
+  });
+
+  it("클린 라인아트(clean-lineart)는 lineart로 윤곽선만 남긴다", () => {
+    const look = STUDIO_LOOKS.find((l) => l.id === "clean-lineart");
+    expect(look).toBeDefined();
+    expect(look!.category).toBe("만화");
+    expect(look!.patch.lineart).toBe(true);
+  });
+});
+
 describe("LOOK_FILTER_KEYS", () => {
   it("키가 중복 없이 유일하다", () => {
     expect(new Set(LOOK_FILTER_KEYS).size).toBe(LOOK_FILTER_KEYS.length);
