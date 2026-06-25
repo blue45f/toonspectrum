@@ -1,0 +1,26 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index fa1fd0e5a98f3c546ddef3b11eac38e6eafb7c20..5a49c7f654d8e2ca07dbb50b636f61a8679c8574 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -463,7 +463,7 @@ function extractPackagePath(path9, packageName) {
+   if (match) {
+     return match[1];
+   }
+-  throw new Error(`Failed to extract path: ${packageName}`);
++  return null;
+ }
+ function normalizePath(path9) {
+   return path9.replace(/\\/g, "/");
+diff --git a/dist/index.js b/dist/index.js
+index 7bb14fb93718302f84fd1cb2435328c3b9ce62d4..ea8e6ea9ba7227c655eff35594beac3533e41d98 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -437,7 +437,7 @@ function extractPackagePath(path9, packageName) {
+   if (match) {
+     return match[1];
+   }
+-  throw new Error(`Failed to extract path: ${packageName}`);
++  return null;
+ }
+ function normalizePath(path9) {
+   return path9.replace(/\\/g, "/");
