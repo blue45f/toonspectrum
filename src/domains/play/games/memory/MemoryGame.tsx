@@ -222,6 +222,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
             </span>
           )}
           <GameHelp
+            id="memory"
             title="웹툰 짝맞추기"
             steps={[
               {
@@ -229,8 +230,8 @@ export function MemoryGame({ onExit }: PlayGameProps) {
                 title: "목표",
                 desc: (
                   <>
-                    뒤집힌 <b className="text-fg">12장의 카드</b>에서 같은 웹툰 표지{" "}
-                    <b className="text-fg">6쌍</b>을 모두 찾으면 클리어예요.
+                    뒤집힌 <b className="text-fg">{PAIRS * 2}장의 카드</b>에서 같은 웹툰 표지{" "}
+                    <b className="text-fg">{PAIRS}쌍</b>을 모두 찾으면 클리어예요.
                   </>
                 ),
               },

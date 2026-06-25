@@ -1,6 +1,7 @@
-import { Heart, HelpCircle, RotateCcw, Swords } from "lucide-react";
+import { Heart, RotateCcw, Swords } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -16,6 +17,7 @@ import {
   type Side,
 } from "./card-battle-engine";
 
+import type { HelpStep } from "../../GameHelp";
 import type { PlayGameProps } from "../../play-types";
 
 import { Button } from "@/components/ui/button";
@@ -148,46 +150,54 @@ function HeroBar({ side, hp, targetable, onClick }: { side: Side; hp: number; ta
   );
 }
 
-/** 처음 진입 시 규칙을 한눈에 보여주는 안내 오버레이(하스스톤식이 낯선 사용자용). */
-function RulesOverlay({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="absolute inset-0 z-20 grid place-items-center rounded-2xl bg-black/70 p-3 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-2xl">
-        <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-fg">
-          <Swords className="h-5 w-5 text-accent" /> 웹툰 카드 배틀 — 이렇게 해요
-        </h3>
-        <ul className="space-y-2.5 text-[0.82rem] leading-relaxed text-fg-2">
-          <li>
-            <b className="text-fg">🎯 목표</b> — 미니언을 소환·공격시켜 <b className="text-rose-500">상대 영웅의 ♥(체력)</b>를 0으로 만들면 승리해요.
-          </li>
-          <li>
-            <b className="text-fg">🃏 소환</b> — 맨 아래 <b>손패 카드</b>를 누르면 내 필드로 나와요. 카드 좌상단{" "}
-            <span className="font-bold text-sky-500">파란 숫자 = 마나 코스트</span>(가진 마나 ●●만큼만 낼 수 있어요).{" "}
-            <span className="text-amber-500">⚔ 공격력</span> · <span className="text-rose-500">♥ 체력</span>.
-          </li>
-          <li>
-            <b className="text-fg">⚔️ 공격</b> — 소환한 그 턴엔 공격 못 해요(다음 턴부터!). <b className="text-emerald-500">내 미니언(초록 테두리)</b>을
-            눌러 고른 다음, <b className="text-rose-500">적 미니언</b>이나 <b className="text-rose-500">상대 영웅</b>을 누르면 공격해요.
-          </li>
-          <li>
-            <b className="text-fg">🔄 턴</b> — 턴마다 마나가 1씩 늘고 카드를 1장 뽑아요. 할 일을 마치면{" "}
-            <b>&ldquo;턴 종료&rdquo;</b>를 누르세요.
-          </li>
-        </ul>
-        <Button variant="solid" className="mt-4 w-full" onClick={onClose}>
-          알겠어요, 시작!
-        </Button>
-      </div>
-    </div>
-  );
-}
+/** 카드 배틀 규칙(목표/소환/공격/턴) — 공용 GameHelp에 주입. */
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: "🎯",
+    title: "목표",
+    desc: (
+      <>
+        미니언을 소환·공격시켜 <b className="text-rose-500">상대 영웅의 ♥(체력)</b>를 0으로 만들면 승리해요.
+      </>
+    ),
+  },
+  {
+    emoji: "🃏",
+    title: "소환",
+    desc: (
+      <>
+        맨 아래 <b>손패 카드</b>를 누르면 내 필드로 나와요. 카드 좌상단{" "}
+        <span className="font-bold text-sky-500">파란 숫자 = 마나 코스트</span>(가진 마나 ●●만큼만 낼 수 있어요).{" "}
+        <span className="text-amber-500">⚔ 공격력</span> · <span className="text-rose-500">♥ 체력</span>.
+      </>
+    ),
+  },
+  {
+    emoji: "⚔️",
+    title: "공격",
+    desc: (
+      <>
+        소환한 그 턴엔 공격 못 해요(다음 턴부터!). <b className="text-emerald-500">내 미니언(초록 테두리)</b>을 눌러 고른 다음,{" "}
+        <b className="text-rose-500">적 미니언</b>이나 <b className="text-rose-500">상대 영웅</b>을 누르면 공격해요.
+      </>
+    ),
+  },
+  {
+    emoji: "🔄",
+    title: "턴",
+    desc: (
+      <>
+        턴마다 마나가 1씩 늘고 카드를 1장 뽑아요. 할 일을 마치면 <b>&ldquo;턴 종료&rdquo;</b>를 누르세요.
+      </>
+    ),
+  },
+];
 
 export function CardBattleGame({ onExit }: PlayGameProps) {
   const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
   const [state, setState] = useState<BattleState | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [seed, setSeed] = useState(1);
-  const [showHelp, setShowHelp] = useState(true);
   const rngRef = useRef(seededRng(1));
 
   const newGame = useCallback(
@@ -272,14 +282,7 @@ export function CardBattleGame({ onExit }: PlayGameProps) {
         <HeroBar side="ai" hp={state.heroHp.ai} targetable={attacking} onClick={onHeroAttack} />
         <div className="flex items-center gap-2 text-[0.7rem] text-fg-3">
           <span>턴 {state.turn}</span>
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-fg-2 transition hover:border-accent/60 hover:text-accent"
-            aria-label="게임 방법 보기"
-          >
-            <HelpCircle className="h-3.5 w-3.5" /> 방법
-          </button>
+          {!state.winner && <GameHelp id="card-battle" title="웹툰 카드 배틀" steps={HELP_STEPS} />}
         </div>
       </div>
 
@@ -360,8 +363,6 @@ export function CardBattleGame({ onExit }: PlayGameProps) {
           </Button>
         </div>
       )}
-
-      {showHelp && !state.winner && <RulesOverlay onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

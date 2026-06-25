@@ -217,6 +217,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-fg">웹툰 가위바위보</h2>
         <GameHelp
+          id="rps"
           title="웹툰 가위바위보"
           steps={[
             {

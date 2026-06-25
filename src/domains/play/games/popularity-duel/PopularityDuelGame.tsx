@@ -140,6 +140,7 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
             <span className="tabular-nums">최고 {best}</span>
           </span>
           <GameHelp
+            id="popularity-duel"
             title="웹툰 인기 대결"
             steps={[
               {

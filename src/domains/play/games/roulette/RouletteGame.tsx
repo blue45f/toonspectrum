@@ -194,7 +194,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
       {/* 헤더 — 게임 방법 안내 */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-fg-2">웹툰 룰렛</span>
-        <GameHelp title="웹툰 룰렛" steps={HELP_STEPS} />
+        <GameHelp id="roulette" title="웹툰 룰렛" steps={HELP_STEPS} />
       </div>
 
       {/* 장르 칩 */}

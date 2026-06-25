@@ -168,6 +168,7 @@ export function DiceBoardGame({ onExit }: PlayGameProps) {
         <div className="flex items-center gap-2">
           <span className="text-[0.7rem] text-fg-3">추천 수집 {state.collected.length}</span>
           <GameHelp
+            id="dice-board"
             title="웹툰 주사위 보드"
             steps={[
               {

@@ -191,6 +191,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
         <span className="flex items-center gap-2 text-fg-2">
           문제 <span className="font-bold tabular-nums text-fg">{round}</span> / {ROUND_COUNT}
           <GameHelp
+            id="quiz"
             title="웹툰 퀴즈"
             steps={[
               {

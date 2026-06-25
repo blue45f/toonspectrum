@@ -15,6 +15,8 @@ export function Button({
   variant?: Variant;
   size?: Size;
   asChild?: boolean;
+  // React 19: function components accept `ref` as a regular prop.
+  ref?: React.Ref<HTMLButtonElement>;
 }) {
   const Comp = asChild ? Slot : "button";
   return <Comp className={buttonClass({ variant, size, className })} {...props} />;
