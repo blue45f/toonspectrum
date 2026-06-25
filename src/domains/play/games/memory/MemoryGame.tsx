@@ -2,6 +2,7 @@ import { Clock, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -58,21 +59,17 @@ function fmtTime(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** 타일 커버 — 실제 이미지 또는 OKLCH 그라디언트 폴백(CardArt 패턴 동일). */
+/** 타일 커버(뒤집힌 앞면) — PlayCover(실제 이미지 또는 타이포 폴백) + 제목 띠. */
 function TileFace({ tile }: { tile: Tile }) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${tile.cover[0]}, ${tile.cover[1]})`;
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-lg" style={{ background: gradient }}>
-      {tile.coverImage && !broken && (
-        <img
-          src={tile.coverImage}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={() => setBroken(true)}
-        />
-      )}
+    <div className="absolute inset-0 overflow-hidden rounded-lg">
+      <PlayCover
+        id={tile.titleId}
+        title={tile.name}
+        cover={tile.cover}
+        coverImage={tile.coverImage}
+        aspectClassName="h-full w-full"
+      />
       <div className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-1 py-0.5 text-[0.58rem] font-medium text-white">
         {tile.name}
       </div>

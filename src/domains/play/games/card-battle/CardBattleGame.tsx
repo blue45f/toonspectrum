@@ -2,6 +2,7 @@ import { Heart, RotateCcw, Swords } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -35,22 +36,17 @@ function seededRng(seed: number): () => number {
   };
 }
 
-/** 카드/미니언 미니 일러스트 — 실제 커버 또는 OKLCH 그라디언트 폴백. */
+/** 카드/미니언 미니 일러스트 — PlayCover(실제 커버 또는 타이포 폴백). */
 function CardArt({ card, className }: { card: Card; className?: string }) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${card.cover[0]}, ${card.cover[1]})`;
   return (
-    <div className={cn("relative overflow-hidden", className)} style={{ background: gradient }}>
-      {card.coverImage && !broken && (
-        <img
-          src={card.coverImage}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover opacity-90"
-          onError={() => setBroken(true)}
-        />
-      )}
-    </div>
+    <PlayCover
+      id={card.titleId}
+      title={card.name}
+      cover={card.cover}
+      coverImage={card.coverImage}
+      aspectClassName="h-full w-full"
+      className={className}
+    />
   );
 }
 

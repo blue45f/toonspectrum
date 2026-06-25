@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
@@ -12,6 +12,8 @@ import {
   setRememberFlag,
   clearAllRememberedFilters,
 } from "@/lib/use-remembered-filters";
+import { formatCount } from "@/lib/utils";
+import { fetchVisitStats, type VisitStats } from "@/lib/visits-api";
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: "ko", label: "한국어" },
@@ -103,7 +105,19 @@ export function SettingsPage() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [imported, setImported] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  // 방문 통계는 best-effort 표시 — 실패하면 조용히 숨긴다(아래 Row가 null 가드).
+  useEffect(() => {
+    let alive = true;
+    fetchVisitStats().then((stats) => {
+      if (alive) setVisitStats(stats);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // 내 서재(별점·읽음·구독·컬렉션)는 이 브라우저에만 저장되므로 JSON 백업으로 내보내기/가져오기 지원.
   const doExport = () => {
@@ -377,6 +391,25 @@ export function SettingsPage() {
             </button>
           )}
         </Row>
+        {visitStats && (
+          <Row
+            icon={BarChart3}
+            title="방문 통계"
+            desc="툰스펙트럼을 찾아준 누적 방문 수예요. (개인 식별 없이 집계)"
+          >
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-fg-2">
+              <span className="tabular-nums">
+                오늘 <span className="font-semibold text-fg">{formatCount(visitStats.todayVisits)}</span>
+              </span>
+              <span className="text-line-strong" aria-hidden>
+                ·
+              </span>
+              <span className="tabular-nums">
+                누적 <span className="font-semibold text-fg">{formatCount(visitStats.totalVisits)}</span>
+              </span>
+            </span>
+          </Row>
+        )}
       </section>
 
       {/* 계정 */}

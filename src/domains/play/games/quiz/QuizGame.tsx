@@ -1,7 +1,8 @@
-import { Check, HelpCircle, RotateCcw, Trophy, X } from "lucide-react";
+import { Check, RotateCcw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -27,36 +28,23 @@ function seededRng(seed: number): () => number {
   };
 }
 
-/** 정답 표지를 흐릿하게 보여주는 힌트 카드 — 제목은 가린다. */
+/** 정답 표지를 흐릿하게 보여주는 힌트 카드 — 공개 전까지 제목/표지를 가린다(PlayCover mystery). */
 function HintCard({ title, revealed }: { title: PlayTitle; revealed: boolean }) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${title.cover[0]}, ${title.cover[1]})`;
   return (
-    <div
-      className="relative mx-auto aspect-[3/4] w-40 overflow-hidden rounded-xl border border-line shadow-sm sm:w-44"
-      style={{ background: gradient }}
-    >
-      {title.coverImage && !broken && (
-        <img
-          src={title.coverImage}
-          alt=""
-          loading="lazy"
-          className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-[filter,opacity] duration-500",
-            revealed ? "opacity-95 blur-0" : "opacity-80 blur-md",
-          )}
-          onError={() => setBroken(true)}
-        />
-      )}
-      {/* 제목 가림막 — 정답 공개 전까지 “?” */}
-      {!revealed && (
-        <div className="absolute inset-0 grid place-items-center bg-black/25">
-          <HelpCircle className="h-12 w-12 text-white/85 drop-shadow" />
-        </div>
-      )}
-      {/* 공개 시 제목 띠 */}
+    <div className="relative mx-auto w-40 sm:w-44">
+      <PlayCover
+        id={title.id}
+        title={title.title}
+        cover={title.cover}
+        coverImage={title.coverImage}
+        mode="mystery"
+        revealed={revealed}
+        big
+        className="w-full rounded-xl border border-line shadow-sm"
+      />
+      {/* 공개 시 제목 띠 — 정답 확인용. */}
       {revealed && (
-        <div className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">
+        <div className="absolute inset-x-0 bottom-0 truncate rounded-b-xl bg-black/60 px-2 py-1 text-center text-xs font-semibold text-white">
           {title.title}
         </div>
       )}

@@ -9,6 +9,7 @@ import { IntroSplash } from "@/components/IntroSplash";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { pingVisit } from "@/lib/visits-api";
 
 const AgeGateHost = lazy(() =>
   import("@/components/age-gate-host").then((mod) => ({
@@ -109,6 +110,13 @@ function useDeferredByScroll(timeoutMs = 6500) {
   return ready;
 }
 
+// 방문 핑 — 앱 마운트 시 하루 1회(localStorage 디바운스). best-effort, 렌더 비차단.
+function useVisitPing() {
+  useEffect(() => {
+    void pingVisit();
+  }, []);
+}
+
 function DeskCloudHost() {
   if (!HAS_DESKCLOUD_MOUNTS) return null;
   return (
@@ -150,6 +158,7 @@ function DeferredBackToTop() {
 }
 
 export default function App() {
+  useVisitPing();
   return (
     <BrowserRouter>
       <AuthSessionProvider>

@@ -2,6 +2,7 @@ import { Dice5, Flag, Gamepad2, RotateCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -39,25 +40,18 @@ const TILE_META: Record<Tile["type"], { glyph: string; label: string; ring: stri
   trap: { glyph: "🕳️", label: "함정", ring: "border-rose-400/70", fill: "bg-rose-400/10" },
 };
 
-/** 추천 웹툰 커버 — 실제 이미지 또는 OKLCH 그라디언트 폴백. */
+/** 추천 웹툰 커버 — PlayCover(실제 이미지 또는 타이포 폴백) + ★ 배지. */
 function RecommendCard({ title }: { title: PlayTitle }) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${title.cover[0]}, ${title.cover[1]})`;
   return (
     <div className="w-[4.6rem] shrink-0">
-      <div
-        className="relative h-[6.1rem] w-full overflow-hidden rounded-lg border border-line"
-        style={{ background: gradient }}
-      >
-        {title.coverImage && !broken && (
-          <img
-            src={title.coverImage}
-            alt=""
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover opacity-90"
-            onError={() => setBroken(true)}
-          />
-        )}
+      <div className="relative">
+        <PlayCover
+          id={title.id}
+          title={title.title}
+          cover={title.cover}
+          coverImage={title.coverImage}
+          className="w-full rounded-lg border border-line"
+        />
         <div className="absolute left-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-amber-400 text-[0.6rem] text-black shadow">
           ★
         </div>

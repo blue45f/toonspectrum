@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp, Eye, RotateCcw, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -15,7 +16,6 @@ import {
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 function seededRng(seed: number): () => number {
   let a = seed >>> 0;
@@ -34,25 +34,6 @@ function formatViews(n: number): string {
   return n.toLocaleString("ko-KR");
 }
 
-/** 웹툰 미니 커버 — 실제 이미지 또는 OKLCH 그라디언트 폴백. */
-function DuelCover({ title, className }: { title: PlayTitle; className?: string }) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${title.cover[0]}, ${title.cover[1]})`;
-  return (
-    <div className={cn("relative overflow-hidden", className)} style={{ background: gradient }}>
-      {title.coverImage && !broken && (
-        <img
-          src={title.coverImage}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover opacity-90"
-          onError={() => setBroken(true)}
-        />
-      )}
-    </div>
-  );
-}
-
 /** 한 쪽 카드 — 앵커는 조회수 공개, 도전자는 ? 표시. */
 function DuelCard({
   title,
@@ -65,7 +46,7 @@ function DuelCard({
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-card">
-      <DuelCover title={title} className="aspect-[3/4] w-full" />
+      <PlayCover id={title.id} title={title.title} cover={title.cover} coverImage={title.coverImage} className="w-full" />
       <div className="flex flex-col gap-1 px-3 py-2.5">
         <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-accent">{badge}</span>
         <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-snug text-fg">{title.title}</h3>

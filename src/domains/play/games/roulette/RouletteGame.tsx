@@ -2,6 +2,7 @@ import { Dices, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -28,31 +29,9 @@ function seededRng(seed: number): () => number {
   };
 }
 
-/** 커버 일러스트 — 실제 커버 또는 OKLCH 그라디언트 폴백. */
-function Cover({
-  title,
-  className,
-  dim,
-}: {
-  title: PlayTitle;
-  className?: string;
-  dim?: boolean;
-}) {
-  const [broken, setBroken] = useState(false);
-  const gradient = `linear-gradient(150deg, ${title.cover[0]}, ${title.cover[1]})`;
-  return (
-    <div className={cn("relative overflow-hidden", className)} style={{ background: gradient }}>
-      {title.coverImage && !broken && (
-        <img
-          src={title.coverImage}
-          alt=""
-          loading="lazy"
-          className={cn("absolute inset-0 h-full w-full object-cover", dim ? "opacity-60" : "opacity-95")}
-          onError={() => setBroken(true)}
-        />
-      )}
-    </div>
-  );
+/** PlayTitle → PlayCover에 필요한 커버 필드. */
+function coverProps(title: PlayTitle) {
+  return { id: title.id, title: title.title, cover: title.cover, coverImage: title.coverImage };
 }
 
 const ALL = "전체";
@@ -235,7 +214,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
           )}
         >
           {shown ? (
-            <Cover title={shown} className="h-full w-full" dim={spinning} />
+            <PlayCover {...coverProps(shown)} aspectClassName="h-full w-full" />
           ) : (
             <div className="grid h-full w-full place-items-center bg-accent-soft/40 text-fg-3">
               <Dices className="h-10 w-10" />
@@ -304,7 +283,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
                 className="flex w-12 shrink-0 flex-col items-center gap-1"
                 title={t.title}
               >
-                <Cover title={t} className="aspect-[3/4] w-12 rounded-md border border-line/60" />
+                <PlayCover {...coverProps(t)} className="w-12 rounded-md border border-line/60" />
                 <span className="w-full truncate text-center text-[0.55rem] text-fg-3">{t.title}</span>
               </div>
             ))}
