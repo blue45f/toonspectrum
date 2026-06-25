@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 
+import { LoadingState } from "@/components/LoadingState";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
@@ -209,24 +210,16 @@ const NotFoundPage = lazyRetry(
   "NotFoundPage"
 );
 
-// 라우트 로딩 폴백 — 스피너 대신 스켈레톤(DESIGN.md: "스켈레톤 로딩, 스피너 금지").
+// 라우트 로딩 폴백 — 공유 LoadingState(웹·토스 단일 출처)의 카드 스켈레톤.
 // 페이지의 대략적 골격(헤더 + 카드 그리드)을 미리 그려 레이아웃 점프와 빈 화면 깜빡임을 줄인다.
-// skeleton 유틸은 토큰화된 shimmer라 prefers-reduced-motion 전역 가드를 그대로 따른다.
+// 스피너 금지(DESIGN.md), prefers-reduced-motion 전역 가드를 그대로 따른다.
 function RouteFallback() {
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-10 sm:px-6" role="status" aria-label="불러오는 중">
-      <div className="flex flex-col gap-3">
-        <span className="skeleton h-3 w-24" />
-        <span className="skeleton h-9 w-2/3 max-w-md" />
-        <span className="skeleton h-4 w-1/2 max-w-sm" />
-      </div>
-      <div className="mt-8 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span key={i} className="skeleton aspect-[3/4] w-full rounded-2xl" />
-        ))}
-      </div>
-      <span className="sr-only">불러오는 중</span>
-    </div>
+    <LoadingState
+      variant="cards"
+      label="불러오는 중"
+      className="mx-auto max-w-[1180px] px-4 py-10 sm:px-6"
+    />
   );
 }
 

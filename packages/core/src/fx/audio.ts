@@ -8,11 +8,21 @@
  *   (`window`/`AudioContext` 가드 + 전역 try/catch). 토스 웹뷰·브라우저 모두에서 안전.
  * - **React/Tailwind/Node 의존 0**: Web Audio + (선택) localStorage 만 씁니다.
  *
+ * BGM 성격(2026-06 리튠)
+ * - **신나고 대중적**: 전부 장조(major) 팝 진행 + 빠른 템포 + 아르페지오 + 가벼운 킥/하이햇 비트 +
+ *   밝은 음색(square/triangle/saw 리드). 5개 무드(밝은 팝 ☀️ · 칩튠 🎮 · 펑키 그루브 🪩 · 신스웨이브 🌃 · 해피 🎉).
+ * - 여전히 **음원 파일 0개**(절차생성)라 저작권 free. 단, `public/audio/*.mp3` 호스티드 플레이리스트가
+ *   있으면 그걸 우선 재생하고(선택), 없으면 생성형으로 graceful 폴백합니다(`registerBgmPlaylist`).
+ *
  * 공개 표면(요약)
  * - 효과음:   `playSfx('tick'|'pop'|'success'|'error')`
- * - BGM:      `bgmPlay` / `bgmPause` / `bgmToggle` / `bgmNext` · 5개 무드 프리셋 자동 로테이션(crossfade)
- * - 마스터:   `setMuted` / `isMuted` · `setMasterVolume` / `getMasterVolume`
+ * - BGM:      `bgmPlay` / `bgmPause` / `bgmToggle` / `bgmNext` / `bgmSetMood` · 5개 무드 자동 로테이션(crossfade)
+ * - 무드:     `BGM_PRESETS`(id·name·emoji) · `getCurrentMoodName` · `bgmSetMood`
+ * - 마스터:   `setMuted` / `isMuted` · `setMasterVolume` / `getMasterVolume`(기본 0.55 — 은은하게)
  * - 영속 opt-in: `setSfxEnabled` / `setBgmEnabled`(localStorage) + `getAudioState` / `onAudioStateChange`
+ * - UX 가드:  기본 OFF(autoplay 금지) · enable 시 fade-in · 탭 숨김(visibilitychange) 시 자동 일시정지 ·
+ *             reduce-motion 이면 SFX 기본 OFF · mute + 영속 opt-in.
+ * - 플레이리스트: `registerBgmPlaylist(urls)`(있으면 mp3 우선, 없으면 생성형)
  * - 언락:     `resumeAudio`(제스처 핸들러에서 호출하면 suspended 컨텍스트를 깨워요)
  */
 
@@ -80,7 +90,9 @@ export const resumeAudio = async (): Promise<void> => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 /** 합성 음량을 은은하게 유지하기 위한 마스터 상한(0~1 사용자 볼륨에 곱해짐). */
-const MASTER_CEILING = 0.6;
+const MASTER_CEILING = 0.55;
+/** 저장된 볼륨이 없을 때의 낮은 기본 볼륨 — 비트가 있는 BGM 이라도 거슬리지 않게 시작. */
+const DEFAULT_VOLUME = 0.55;
 
 let masterGain: GainNode | null = null;
 let userVolume = 1; // 0~1, 사용자 볼륨.
@@ -276,9 +288,6 @@ const secureRandom = (): number => {
   return 0.5;
 };
 
-const pick = <T>(items: readonly T[]): T =>
-  items[Math.min(items.length - 1, Math.floor(secureRandom() * items.length))] as T;
-
 /** MIDI 노트 → 주파수(Hz). A4(69)=440. */
 const midiToFreq = (midi: number): number => 440 * 2 ** ((midi - 69) / 12);
 
@@ -303,7 +312,9 @@ export interface BgmPreset {
   id: string;
   /** 사용자에게 보여줄 한글 무드명. */
   name: string;
-  /** 한 박 길이(초) — 느릴수록 큼(= 템포). */
+  /** 무드를 한눈에 보여줄 이모지(라벨 prefix 용, 선택). */
+  emoji?: string;
+  /** 한 박 길이(초) — 느릴수록 큼(= 템포). 업비트라 모두 짧아요(빠른 BPM). */
   beatDuration: number;
   /** 한 번의 schedule 호출이 채우는 박 수. */
   beatsPerBar: number;
@@ -354,200 +365,407 @@ const scheduleVoice = (
   osc.stop(startAt + duration + 0.05);
 };
 
-// 스케일(루트 기준 반음 오프셋).
+/* ── 리듬 빌딩 블록 — 가벼운 킥/하이햇(전부 합성, 음원 0개) ──────────────────── */
+
+/** 짧은 화이트노이즈 버퍼(하이햇/스네어용) — 컨텍스트당 1회 생성 후 재사용. */
+let noiseBuffer: AudioBuffer | null = null;
+const getNoiseBuffer = (ctx: AudioContext): AudioBuffer => {
+  if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
+  const length = Math.floor(ctx.sampleRate * 0.25);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = secureRandom() * 2 - 1;
+  noiseBuffer = buffer;
+  return buffer;
+};
+
+/** 부드러운 킥 드럼 — 피치 다운 사인 + 빠른 엔벨로프(둥근 '둠'). */
+const scheduleKick = (
+  ctx: AudioContext,
+  out: AudioNode,
+  startAt: number,
+  peak: number,
+): void => {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(125, startAt);
+  osc.frequency.exponentialRampToValueAtTime(46, startAt + 0.12);
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), startAt + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.16);
+  osc.connect(gain);
+  gain.connect(out);
+  osc.start(startAt);
+  osc.stop(startAt + 0.2);
+};
+
+/** 하이햇 — 하이패스 노이즈 버스트(짧으면 closed, 길면 open). */
+const scheduleHat = (
+  ctx: AudioContext,
+  out: AudioNode,
+  startAt: number,
+  peak: number,
+  duration = 0.045,
+): void => {
+  const src = ctx.createBufferSource();
+  src.buffer = getNoiseBuffer(ctx);
+  const filter = ctx.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.setValueAtTime(7000, startAt);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), startAt + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(out);
+  src.start(startAt);
+  src.stop(startAt + duration + 0.02);
+};
+
+/** 스네어/클랩 — 밴드패스 노이즈(2·4박 백비트용). */
+const scheduleSnare = (
+  ctx: AudioContext,
+  out: AudioNode,
+  startAt: number,
+  peak: number,
+): void => {
+  const src = ctx.createBufferSource();
+  src.buffer = getNoiseBuffer(ctx);
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1900, startAt);
+  filter.Q.setValueAtTime(0.7, startAt);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), startAt + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.12);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(out);
+  src.start(startAt);
+  src.stop(startAt + 0.16);
+};
+
+// 스케일(루트 기준 반음 오프셋) — 업비트라 전부 밝은 장조 계열.
+const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const PENTATONIC_MAJOR = [0, 2, 4, 7, 9];
-const DORIAN = [0, 2, 3, 5, 7, 9, 10];
-const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10];
-const LYDIAN = [0, 2, 4, 6, 7, 9, 11];
-const MINOR = [0, 2, 3, 5, 7, 8, 10];
+const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10]; // 펑키/그루브용(♭7).
+const LYDIAN = [0, 2, 4, 6, 7, 9, 11]; // 살짝 둥둥 뜨는 밝음(#4).
+
+/** 메이저 트라이어드 화음 톤(루트 반음 오프셋 묶음). */
+const MAJOR_TRIAD = [0, 4, 7];
+const MAJOR_SEVENTH = [0, 4, 7, 11];
+const ADD9 = [0, 4, 7, 14];
 
 /**
- * 5개 생성형 무드 프리셋 — 각기 다른 scale · chord-progression · timbre · tempo.
- * 배열 순서가 곧 기본 로테이션 순서예요(cozy → lofi → dreamy → bright → night).
+ * 메이저 트라이어드 패드 화음을 한 묶음 길이로 깔아요(공통 헬퍼).
+ * 모든 업비트 프리셋의 "코드 베드"로 재사용 — 음색만 type 으로 바꿉니다.
+ */
+const scheduleChordBed = (
+  sc: ScheduleContext,
+  options: {
+    rootMidi: number;
+    chord: readonly number[];
+    type: OscillatorType;
+    peak: number;
+    cutoff: number;
+    attackRatio?: number;
+  },
+): void => {
+  const { ctx, out, startAt, beatDuration, beats } = sc;
+  const { rootMidi, chord, type, peak, cutoff, attackRatio = 0.25 } = options;
+  chord.forEach((semis, i) => {
+    scheduleVoice(ctx, out, {
+      type,
+      frequency: midiToFreq(rootMidi + semis),
+      startAt,
+      duration: beatDuration * beats * 0.98,
+      peak,
+      attackRatio,
+      cutoff,
+      detune: i === 1 ? 5 : i === 2 ? -5 : 0, // 살짝 코러스감.
+    });
+  });
+};
+
+/**
+ * 5개 **업비트** 생성형 무드 — 전부 장조 진행 + 빠른 템포 + 아르페지오 + 가벼운 킥/하이햇.
+ * 배열 순서 = 기본 crossfade 로테이션 순서(pop → chiptune → funky → synthwave → happy).
  */
 export const BGM_PRESETS: readonly BgmPreset[] = [
   {
-    // cozy pad — C 펜타토닉, 느리고 따뜻한 사인 패드(포근).
-    id: "cozy",
-    name: "포근한 오후",
-    beatDuration: 1.6,
-    beatsPerBar: 4,
-    schedule: ({ ctx, out, startAt, beatDuration, beats, bar }) => {
+    // ☀️ bright pop — C 메이저, I–V–vi–IV(가장 대중적인 팝 진행) + 4-on-the-floor 킥 + 통통 리드.
+    id: "pop",
+    name: "밝은 팝",
+    emoji: "☀️",
+    beatDuration: 0.3, // ≈100 BPM(8분음표 그리드).
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
       const root = 60; // C4
-      // I–vi–IV–V 느낌의 느린 화성 진행(마디마다 루트 이동).
-      const progression = [0, -3, -7, -5];
+      // I–V–vi–IV — 마디마다 루트 이동(C·G·Am·F 느낌).
+      const progression = [0, 7, 9, 5];
       const rootShift = progression[bar % progression.length] ?? 0;
-      scheduleVoice(ctx, out, {
-        type: "sine",
-        frequency: midiToFreq(root - 12 + rootShift),
-        startAt,
-        duration: beatDuration * beats,
-        peak: 0.1,
-        attackRatio: 0.5,
-        cutoff: 700,
-        detune: -4,
+      // 메이저7 패드(따뜻+밝음).
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: MAJOR_SEVENTH,
+        type: "triangle",
+        peak: 0.05,
+        cutoff: 2200,
       });
-      for (let b = 0; b < beats; b++) {
-        if (secureRandom() > 0.45) {
-          const degree = PENTATONIC_MAJOR[(bar + b) % PENTATONIC_MAJOR.length] ?? 0;
-          const octave = secureRandom() > 0.7 ? 12 : 0;
-          scheduleVoice(ctx, out, {
-            type: "triangle",
-            frequency: midiToFreq(root + rootShift + degree + octave),
-            startAt: startAt + b * beatDuration,
-            duration: beatDuration * 1.8,
-            peak: 0.07,
-            attackRatio: 0.4,
-            cutoff: 1600,
-          });
-        }
-      }
-    },
-  },
-  {
-    // lo-fi arpeggio — A 도리안, 흐르는 셋잇단 아르페지오 + 둥근 베이스(lo-fi).
-    id: "lofi",
-    name: "로파이 아르페지오",
-    beatDuration: 0.32,
-    beatsPerBar: 8,
-    schedule: ({ ctx, out, startAt, beatDuration, beats, bar }) => {
-      const root = 57; // A3
-      // ii–V 류 베이스 워크(2마디 주기로 루트 이동).
-      const bassCycle = [0, 0, 5, 7];
-      const rootShift = bassCycle[bar % bassCycle.length] ?? 0;
-      scheduleVoice(ctx, out, {
-        type: "sine",
-        frequency: midiToFreq(root + rootShift - 12),
-        startAt,
-        duration: beatDuration * beats,
-        peak: 0.07,
-        attackRatio: 0.55,
-        cutoff: 520,
-      });
-      for (let b = 0; b < beats; b++) {
-        const degree = DORIAN[(bar * 3 + b) % DORIAN.length] ?? 0;
-        const octave = b % 4 >= 2 ? 12 : 0;
+      // 둥근 베이스(루트 한 옥타브 아래, 4분음표).
+      for (let b = 0; b < beats; b += 4) {
         scheduleVoice(ctx, out, {
-          type: "triangle",
+          type: "sine",
+          frequency: midiToFreq(root - 12 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 3.4,
+          peak: 0.11,
+          attackRatio: 0.1,
+          cutoff: 600,
+        });
+      }
+      // 통통 튀는 리드 아르페지오(메이저 펜타토닉, 8분음표).
+      for (let b = 0; b < beats; b++) {
+        const degree = PENTATONIC_MAJOR[(bar * 2 + b) % PENTATONIC_MAJOR.length] ?? 0;
+        const octave = b % 4 === 0 ? 12 : 0;
+        scheduleVoice(ctx, out, {
+          type: "square",
           frequency: midiToFreq(root + rootShift + degree + octave),
           startAt: startAt + b * beatDuration,
-          duration: beatDuration * 2.2,
-          peak: 0.05,
-          attackRatio: 0.18,
-          cutoff: 1900,
+          duration: beatDuration * 0.85,
+          peak: 0.028,
+          attackRatio: 0.06,
+          cutoff: 2600,
         });
       }
-    },
-  },
-  {
-    // dreamy ambient — F 리디안, 희소하게 떨어지는 벨 + 낮은 드론(몽환).
-    id: "dreamy",
-    name: "꿈결 앰비언트",
-    beatDuration: 1.2,
-    beatsPerBar: 6,
-    schedule: ({ ctx, out, startAt, beatDuration, beats, bar }) => {
-      const root = 65; // F4
-      scheduleVoice(ctx, out, {
-        type: "sine",
-        frequency: midiToFreq(root - 24),
-        startAt,
-        duration: beatDuration * beats,
-        peak: 0.055,
-        attackRatio: 0.6,
-        cutoff: 480,
-      });
-      for (let b = 0; b < beats; b++) {
-        // 희소 — 절반 이하만 울려요(공간감).
-        if (secureRandom() > 0.6) {
-          const degree = LYDIAN[(bar + b * 2) % LYDIAN.length] ?? 0;
-          const octave = secureRandom() > 0.5 ? 12 : 0;
-          scheduleVoice(ctx, out, {
-            type: "sine",
-            frequency: midiToFreq(root + degree + octave),
-            startAt: startAt + b * beatDuration,
-            duration: beatDuration * 3,
-            peak: 0.06,
-            attackRatio: 0.04, // 벨처럼 빠른 어택.
-            cutoff: 3200,
-          });
-        }
-      }
-    },
-  },
-  {
-    // bright day — G 믹솔리디안, 경쾌하게 통통 튀는 멜로디 + 펄스 베이스(밝은 낮).
-    id: "bright",
-    name: "맑은 낮",
-    beatDuration: 0.5,
-    beatsPerBar: 8,
-    schedule: ({ ctx, out, startAt, beatDuration, beats, bar }) => {
-      const root = 67; // G4
-      // 루트/4도/5도 번갈아 도는 밝은 베이스 진행.
-      const bassWalk = [0, 5, 7, 5];
+      // 비트: 4-on-the-floor 킥 + 8분 하이햇 + 2·4박 클랩.
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.16);
       for (let b = 0; b < beats; b += 2) {
-        const bassDegree = bassWalk[(bar + b / 2) % bassWalk.length] ?? 0;
+        scheduleHat(ctx, out, startAt + b * beatDuration, b % 4 === 0 ? 0.05 : 0.035);
+      }
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.06);
+    },
+  },
+  {
+    // 🎮 chiptune — D 메이저, 빠른 8비트 square 아르페지오 + 펄스 베이스(게임 BGM 느낌).
+    id: "chiptune",
+    name: "칩튠 8비트",
+    emoji: "🎮",
+    beatDuration: 0.16, // ≈115 BPM 16분음표 — 아주 빠른 아르페지오.
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 62; // D4
+      // I–vi–IV–V(밝고 신나는 진행).
+      const progression = [0, 9, 5, 7];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // 펄스 베이스(8분음표 펌프).
+      for (let b = 0; b < beats; b += 2) {
         scheduleVoice(ctx, out, {
-          type: "triangle",
-          frequency: midiToFreq(root - 12 + bassDegree),
+          type: "square",
+          frequency: midiToFreq(root - 24 + rootShift),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 1.6,
-          peak: 0.06,
-          attackRatio: 0.15,
-          cutoff: 1100,
+          peak: 0.05,
+          attackRatio: 0.04,
+          cutoff: 900,
         });
       }
+      // 메인 칩튠 아르페지오 — 트라이어드를 빠르게 훑어요.
+      const arp = MAJOR_TRIAD;
       for (let b = 0; b < beats; b++) {
-        if (secureRandom() > 0.4) {
-          const degree = pick(MIXOLYDIAN);
-          scheduleVoice(ctx, out, {
-            type: "square",
-            frequency: midiToFreq(root + degree + (b % 3 === 0 ? 12 : 0)),
-            startAt: startAt + b * beatDuration,
-            duration: beatDuration * 1.05,
-            peak: 0.03, // square 는 작게(거칠어서).
-            attackRatio: 0.1,
-            cutoff: 2000,
-          });
-        }
-      }
-    },
-  },
-  {
-    // night glow — A 단조, 느린 톱니 화음 패드 + 가끔의 윗 멜로디(고요한 밤).
-    id: "night",
-    name: "밤의 윤슬",
-    beatDuration: 1.9,
-    beatsPerBar: 3,
-    schedule: ({ ctx, out, startAt, beatDuration, beats, bar }) => {
-      const root = 57; // A3
-      // i–VI–III–VII 단조 진행(쓸쓸하고 따뜻).
-      const progression = [0, -4, -9, -2];
-      const rootShift = progression[bar % progression.length] ?? 0;
-      const chordDegrees = [MINOR[0], MINOR[2], MINOR[4]];
-      chordDegrees.forEach((degree, i) => {
+        const semis = arp[b % arp.length] ?? 0;
+        const octave = b % 6 >= 3 ? 12 : 0;
         scheduleVoice(ctx, out, {
-          type: "sawtooth",
-          frequency: midiToFreq(root + rootShift + (degree ?? 0)),
-          startAt,
-          duration: beatDuration * beats,
-          peak: 0.04,
-          attackRatio: 0.55,
-          cutoff: 880,
-          detune: i === 1 ? 6 : -3,
+          type: "square",
+          frequency: midiToFreq(root + rootShift + semis + octave),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 0.95,
+          peak: 0.03,
+          attackRatio: 0.02,
+          cutoff: 3000,
         });
-      });
-      if (secureRandom() > 0.4) {
-        const degree = MINOR[(bar * 2) % MINOR.length] ?? 0;
+      }
+      // 윗 멜로디 카운터라인(메이저, 듬성듬성).
+      for (let b = 0; b < beats; b += 4) {
+        const degree = MAJOR[(bar + b) % MAJOR.length] ?? 0;
         scheduleVoice(ctx, out, {
           type: "triangle",
           frequency: midiToFreq(root + rootShift + 12 + degree),
-          startAt: startAt + beatDuration * (secureRandom() > 0.5 ? 1 : 0),
-          duration: beatDuration * 2,
-          peak: 0.05,
-          attackRatio: 0.45,
-          cutoff: 1500,
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 3,
+          peak: 0.035,
+          attackRatio: 0.05,
+          cutoff: 3400,
         });
       }
+      // 가벼운 비트(빠른 템포라 4박 킥 + 오프비트 하이햇).
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.13);
+      for (let b = 2; b < beats; b += 4) scheduleHat(ctx, out, startAt + b * beatDuration, 0.03);
+    },
+  },
+  {
+    // 🪩 funky groove — E 믹솔리디안(♭7), 당김음 베이스 + 와카 코드 스탭 + 백비트(펑크/디스코).
+    id: "funky",
+    name: "펑키 그루브",
+    emoji: "🪩",
+    beatDuration: 0.214, // ≈140 BPM 16분 그리드.
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 64; // E4
+      const progression = [0, 0, 5, 7]; // I–I–IV–V 그루브 루프.
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // 당김음(syncopated) 펑크 베이스 — 16분 자리 일부만 때려 그루브를 만들어요.
+      const bassHits = [0, 3, 6, 7, 10, 11, 14];
+      bassHits.forEach((b) => {
+        const degree = MIXOLYDIAN[(bar + b) % MIXOLYDIAN.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "sawtooth",
+          frequency: midiToFreq(root - 24 + rootShift + (b % 7 === 0 ? 0 : degree % 12)),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.4,
+          peak: 0.06,
+          attackRatio: 0.04,
+          cutoff: 1100,
+        });
+      });
+      // 와카(wah) 코드 스탭 — 오프비트에 짧게 끊어 치는 메이저 화음.
+      const stabAt = [2, 6, 10, 14];
+      stabAt.forEach((b) => {
+        MAJOR_TRIAD.forEach((semis, i) => {
+          scheduleVoice(ctx, out, {
+            type: "square",
+            frequency: midiToFreq(root + rootShift + semis),
+            startAt: startAt + b * beatDuration,
+            duration: beatDuration * 1.1,
+            peak: 0.022,
+            attackRatio: 0.05,
+            cutoff: 2400,
+            detune: i === 1 ? 6 : 0,
+          });
+        });
+      });
+      // 디스코 비트: 4-on-the-floor 킥 + 백비트 스네어 + 오픈 하이햇 오프비트.
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.15);
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.07);
+      for (let b = 2; b < beats; b += 4) scheduleHat(ctx, out, startAt + b * beatDuration, 0.05, 0.08);
+    },
+  },
+  {
+    // 🌃 synthwave — A 리디안, 넓은 saw 패드 + 옥타브 베이스 펄스 + 반짝이는 리드(레트로 신스).
+    id: "synthwave",
+    name: "신스웨이브",
+    emoji: "🌃",
+    beatDuration: 0.34, // ≈88 BPM, 8분 펄스.
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 69; // A4
+      const progression = [0, 5, 7, 4]; // I–IV–V–iii(살짝 드라마틱한 밝음).
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // 넓은 saw add9 패드.
+      scheduleChordBed(sc, {
+        rootMidi: root - 12 + rootShift,
+        chord: ADD9,
+        type: "sawtooth",
+        peak: 0.035,
+        cutoff: 1500,
+        attackRatio: 0.3,
+      });
+      // 신스웨이브 옥타브 베이스 펄스(8분음표, 루트↔옥타브).
+      for (let b = 0; b < beats; b += 2) {
+        const oct = (b / 2) % 2 === 0 ? 0 : 12;
+        scheduleVoice(ctx, out, {
+          type: "sawtooth",
+          frequency: midiToFreq(root - 24 + rootShift + oct),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.7,
+          peak: 0.05,
+          attackRatio: 0.05,
+          cutoff: 800,
+        });
+      }
+      // 반짝이는 리드 아르페지오(리디안 #4 가 레트로 느낌).
+      for (let b = 0; b < beats; b++) {
+        if (b % 2 === 0 || secureRandom() > 0.6) {
+          const degree = LYDIAN[(bar * 2 + b) % LYDIAN.length] ?? 0;
+          scheduleVoice(ctx, out, {
+            type: "triangle",
+            frequency: midiToFreq(root + rootShift + degree + (b % 8 >= 4 ? 12 : 0)),
+            startAt: startAt + b * beatDuration,
+            duration: beatDuration * 1.3,
+            peak: 0.03,
+            attackRatio: 0.04,
+            cutoff: 3600,
+          });
+        }
+      }
+      // 가벼운 비트: 4박 킥 + 백비트 스네어 + 8분 하이햇.
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.14);
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.05);
+      for (let b = 1; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.03);
+    },
+  },
+  {
+    // 🎉 happy — F 메이저, 점프하는 트라이어드 아르페지오 + 밝은 멜로디 + 박수 비트(축제/파티).
+    id: "happy",
+    name: "해피 파티",
+    emoji: "🎉",
+    beatDuration: 0.27, // ≈110 BPM, 8분 그리드.
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 65; // F4
+      // I–IV–V–I(가장 밝고 결정적인 진행).
+      const progression = [0, 5, 7, 0];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // add9 패드로 활기.
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: ADD9,
+        type: "triangle",
+        peak: 0.045,
+        cutoff: 2600,
+      });
+      // 점프하는 베이스(루트→5도 바운스).
+      for (let b = 0; b < beats; b += 2) {
+        const fifth = (b / 2) % 2 === 1 ? 7 : 0;
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root - 12 + rootShift + fifth),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.5,
+          peak: 0.08,
+          attackRatio: 0.08,
+          cutoff: 900,
+        });
+      }
+      // 밝은 멜로디 아르페지오(트라이어드 + 옥타브 점프, 신나게).
+      const jump = [...MAJOR_TRIAD, 12, 7, 4];
+      for (let b = 0; b < beats; b++) {
+        const semis = jump[(bar + b) % jump.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "square",
+          frequency: midiToFreq(root + rootShift + semis),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 0.9,
+          peak: 0.03,
+          attackRatio: 0.05,
+          cutoff: 2900,
+        });
+      }
+      // 축제 비트: 4박 킥 + 2·4박 박수(스네어×2 살짝 겹쳐 박수감) + 8분 하이햇.
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.15);
+      for (let b = 4; b < beats; b += 8) {
+        scheduleSnare(ctx, out, startAt + b * beatDuration, 0.06);
+        scheduleSnare(ctx, out, startAt + b * beatDuration + 0.02, 0.04); // 박수 더블.
+      }
+      for (let b = 2; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.035);
     },
   },
 ];
@@ -581,6 +799,18 @@ let schedulerTimer: ReturnType<typeof setInterval> | null = null;
 let rotationTimer: ReturnType<typeof setTimeout> | null = null;
 let presetIndex = 0;
 let bgmPlaying = false;
+
+/**
+ * (선택) 호스티드 플레이리스트 트랙. `registerBgmPlaylist(['/audio/a.mp3', …])` 로 등록하면
+ * 생성형 대신 이 mp3 들을 crossfade 로테이션해요. 비어 있으면 항상 생성형으로 폴백.
+ */
+interface PlaylistTrack {
+  url: string;
+  /** 라벨에 쓸 무드명(없으면 파일명에서 추론). */
+  label: string;
+}
+let playlist: PlaylistTrack[] = [];
+let playlistIndex = 0;
 
 const createPresetOut = (ctx: AudioContext): GainNode => {
   const out = ctx.createGain();
@@ -709,6 +939,159 @@ const engineStop = (): void => {
 };
 
 /* ────────────────────────────────────────────────────────────────────────── *
+ * 4b. (선택) 호스티드 mp3 플레이리스트 엔진 — 있으면 우선, 없으면 생성형 폴백
+ *      HTMLAudioElement → MediaElementSource → masterGain 으로 라우팅해
+ *      mute/volume/visibility 가드를 생성형과 똑같이 공유해요.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+interface PlaylistVoice {
+  el: HTMLAudioElement;
+  node: GainNode;
+  /** 한 트랙당 1번만 만드는 MediaElementSource(재사용 불가라 el 과 1:1). */
+  src: MediaElementAudioSourceNode | null;
+}
+let playlistVoice: PlaylistVoice | null = null;
+let playlistPlaying = false;
+
+/** mp3 URL → 사람이 읽을 라벨(파일명 베이스). */
+const labelFromUrl = (url: string): string => {
+  try {
+    const base = url.split("/").pop() ?? url;
+    return decodeURIComponent(base.replace(/\.[a-z0-9]+$/i, "")).replace(/[-_]+/g, " ").trim() || "트랙";
+  } catch {
+    return "트랙";
+  }
+};
+
+/** 한 트랙을 새 <audio> 로 만들어 master 로 라우팅하고 fade-in 재생. */
+const startPlaylistTrack = (index: number): void => {
+  const ctx = getAudioContext();
+  if (!ctx || playlist.length === 0) return;
+  playlistIndex = ((index % playlist.length) + playlist.length) % playlist.length;
+  const track = playlist[playlistIndex];
+  if (!track) return;
+
+  let el: HTMLAudioElement;
+  try {
+    el = new Audio(track.url);
+  } catch {
+    return;
+  }
+  el.crossOrigin = "anonymous";
+  el.preload = "auto";
+  el.loop = false;
+
+  const node = ctx.createGain();
+  node.gain.setValueAtTime(0.0001, ctx.currentTime);
+  node.connect(ensureMasterGain(ctx));
+
+  // CORS/미지원이면 라우팅 실패 → 엘리먼트 직접 재생(볼륨 가드만 못 받음).
+  const src = ((): MediaElementAudioSourceNode | null => {
+    try {
+      const created = ctx.createMediaElementSource(el);
+      created.connect(node);
+      return created;
+    } catch {
+      return null;
+    }
+  })();
+
+  const voice: PlaylistVoice = { el, node, src };
+  playlistVoice = voice;
+  syncTrackName(track.label);
+
+  try {
+    node.gain.setValueAtTime(0.0001, ctx.currentTime);
+    node.gain.exponentialRampToValueAtTime(1, ctx.currentTime + FADE_S);
+  } catch {
+    // 무시.
+  }
+  // 트랙 끝나면 다음 트랙으로(crossfade).
+  el.addEventListener(
+    "ended",
+    () => {
+      if (playlistPlaying) advancePlaylist(1);
+    },
+    { once: true },
+  );
+  void el.play().catch(() => {
+    // 자동재생 차단 등 — 다음 제스처에서 재시도되도록 조용히 무시.
+  });
+};
+
+/** 현재 트랙을 페이드아웃 후 정리. */
+const disposePlaylistVoice = (voice: PlaylistVoice): void => {
+  const ctx = getAudioContext();
+  try {
+    if (ctx) {
+      const now = ctx.currentTime;
+      voice.node.gain.cancelScheduledValues(now);
+      voice.node.gain.setValueAtTime(Math.max(0.0002, voice.node.gain.value), now);
+      voice.node.gain.exponentialRampToValueAtTime(0.0001, now + FADE_S);
+    }
+  } catch {
+    // 무시.
+  }
+  setTimeout(
+    () => {
+      try {
+        voice.el.pause();
+        voice.src?.disconnect();
+        voice.node.disconnect();
+      } catch {
+        // 무시.
+      }
+    },
+    (FADE_S + 1) * 1000,
+  );
+};
+
+/** delta 만큼 플레이리스트 트랙 전환(crossfade). */
+const advancePlaylist = (delta: number): void => {
+  if (!getAudioContext() || playlist.length === 0) return;
+  const previous = playlistVoice;
+  startPlaylistTrack(playlistIndex + delta);
+  if (previous) disposePlaylistVoice(previous);
+};
+
+const playlistStart = (): void => {
+  const ctx = getAudioContext();
+  if (!ctx || playlist.length === 0) return;
+  void resumeAudio();
+  ensureMasterGain(ctx);
+  if (playlistPlaying) return;
+  playlistPlaying = true;
+  startPlaylistTrack(playlistIndex);
+};
+
+const playlistStop = (): void => {
+  playlistPlaying = false;
+  if (playlistVoice) {
+    disposePlaylistVoice(playlistVoice);
+    playlistVoice = null;
+  }
+};
+
+/* ── 디스패처 — 플레이리스트가 있으면 그쪽, 없으면 생성형 ───────────────────── */
+
+const usingPlaylist = (): boolean => playlist.length > 0;
+
+/** BGM 시작(제스처 안에서). 호스티드 플레이리스트 우선, 없으면 생성형. */
+const bgmStart = (): void => {
+  if (usingPlaylist()) playlistStart();
+  else engineStart();
+};
+
+/** BGM 정지(페이드아웃 + 정리). 두 엔진 모두 안전하게 멈춰요. */
+const bgmStop = (): void => {
+  if (playlistPlaying) playlistStop();
+  if (bgmPlaying) engineStop();
+};
+
+/** 어느 엔진이든 재생 중인지. */
+const anyBgmPlaying = (): boolean => bgmPlaying || playlistPlaying;
+
+/* ────────────────────────────────────────────────────────────────────────── *
  * 5. 상태 · 영속(opt-in) · 구독 — 엔진의 "두뇌"
  * ────────────────────────────────────────────────────────────────────────── */
 
@@ -791,7 +1174,7 @@ const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
 // 영속값을 모듈 로드 시 1회 읽어 초기 상태/마스터에 반영.
 const initialMuted = readStoredBool(MUTE_KEY) ?? false;
-const initialVolume = clamp01(readStoredNumber(VOL_KEY) ?? 1);
+const initialVolume = clamp01(readStoredNumber(VOL_KEY) ?? DEFAULT_VOLUME);
 muted = initialMuted;
 userVolume = initialVolume;
 
@@ -827,10 +1210,10 @@ const emit = (): void => {
   });
 };
 
-/** 엔진의 무드명 변경을 상태에 반영. */
+/** 엔진의 무드명 변경을 상태에 반영. 플레이리스트 모드면 트랙 인덱스를 id 로. */
 const syncTrackName = (name: string): void => {
-  const preset = BGM_PRESETS[presetIndex];
-  const id = preset?.id ?? "";
+  const id =
+    playlist.length > 0 ? `playlist:${playlistIndex}` : (BGM_PRESETS[presetIndex]?.id ?? "");
   if (state.currentMood !== name || state.currentMoodId !== id) {
     state.currentMood = name;
     state.currentMoodId = id;
@@ -845,14 +1228,15 @@ const ensureWired = (): void => {
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") {
-        if (state.bgmEnabled && bgmPlaying) {
+        // 탭/앱이 숨겨지면 두 엔진(생성형·플레이리스트) 모두 자동 일시정지(배터리/예의).
+        if (state.bgmEnabled && anyBgmPlaying()) {
           pausedByVisibility = true;
-          engineStop();
+          bgmStop();
         }
       } else if (document.visibilityState === "visible") {
         if (pausedByVisibility && state.bgmEnabled) {
           pausedByVisibility = false;
-          engineStart();
+          bgmStart();
         }
         pausedByVisibility = false;
       }
@@ -901,8 +1285,8 @@ export const setBgmEnabled = (enabled: boolean): void => {
   state.bgmEnabled = enabled;
   writeStoredBool(BGM_KEY, enabled);
   pausedByVisibility = false;
-  if (enabled) engineStart();
-  else engineStop();
+  if (enabled) bgmStart();
+  else bgmStop();
   emit();
 };
 
@@ -918,9 +1302,21 @@ export const bgmToggle = (): boolean => {
   return state.bgmEnabled;
 };
 
-/** 다음 무드 프리셋으로 전환. 정지 상태면 다음 인덱스만 기억해 둬요(다음 시작 시 반영). */
+/**
+ * 다음 무드/트랙으로 전환. 정지 상태면 다음 인덱스만 기억해 둬요(다음 시작 시 반영).
+ * 플레이리스트 모드면 다음 mp3 트랙으로 넘어가요.
+ */
 export const bgmNext = (): void => {
   ensureWired();
+  if (usingPlaylist()) {
+    if (!playlistPlaying) {
+      playlistIndex = (playlistIndex + 1) % playlist.length;
+      syncTrackName(playlist[playlistIndex]?.label ?? "");
+      return;
+    }
+    advancePlaylist(1);
+    return;
+  }
   if (!bgmPlaying) {
     presetIndex = normalizeIndex(presetIndex + 1);
     syncTrackName(BGM_PRESETS[presetIndex]?.name ?? "");
@@ -929,9 +1325,24 @@ export const bgmNext = (): void => {
   advance(1);
 };
 
-/** 특정 무드 id 로 직접 전환(없으면 무시). 재생 중이면 즉시 crossfade. */
+/**
+ * 특정 무드 id 로 직접 전환(없으면 무시). 재생 중이면 즉시 crossfade.
+ * 플레이리스트 모드에서는 `playlist:<index>` 형태 id 또는 순수 인덱스 문자열도 받아요.
+ */
 export const bgmSetMood = (moodId: string): void => {
   ensureWired();
+  if (usingPlaylist()) {
+    const raw = moodId.startsWith("playlist:") ? moodId.slice("playlist:".length) : moodId;
+    const index = Number.parseInt(raw, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= playlist.length) return;
+    if (!playlistPlaying) {
+      playlistIndex = index;
+      syncTrackName(playlist[index]?.label ?? "");
+      return;
+    }
+    advancePlaylist(index - playlistIndex);
+    return;
+  }
   const index = BGM_PRESETS.findIndex((p) => p.id === moodId);
   if (index < 0) return;
   if (!bgmPlaying) {
@@ -945,8 +1356,41 @@ export const bgmSetMood = (moodId: string): void => {
 /** 현재(또는 다음 시작할) 무드명. */
 export const getCurrentMoodName = (): string => state.currentMood;
 
-/** BGM 재생 중 여부(엔진 기준). */
-export const isBgmPlaying = (): boolean => bgmPlaying;
+/** BGM 재생 중 여부(생성형/플레이리스트 어느 엔진이든). */
+export const isBgmPlaying = (): boolean => anyBgmPlaying();
+
+/**
+ * (선택) 호스티드 mp3 플레이리스트를 등록해요. 비어 있지 않으면 BGM 켤 때 생성형 대신
+ * 이 트랙들을 crossfade 로테이션합니다(없으면 생성형 폴백). 항목은 URL 문자열 또는
+ * `{ url, label }`. 보통 앱 부팅 시 `public/audio/*.mp3` 존재를 확인하고 1회 호출하세요.
+ *
+ * 예) `registerBgmPlaylist(['/audio/upbeat-1.mp3', { url: '/audio/funky.mp3', label: '펑키' }])`
+ * 빈 배열을 넘기면 등록 해제(생성형으로 복귀).
+ */
+export const registerBgmPlaylist = (
+  tracks: ReadonlyArray<string | { url: string; label?: string }>,
+): void => {
+  ensureWired();
+  const wasPlaying = anyBgmPlaying();
+  // 전환 전에 현재 재생을 깔끔히 멈춰요(엔진 교체).
+  if (wasPlaying) bgmStop();
+  playlist = tracks
+    .map((t) => (typeof t === "string" ? { url: t } : t))
+    .filter((t): t is { url: string; label?: string } => Boolean(t?.url))
+    .map((t) => ({ url: t.url, label: t.label?.trim() || labelFromUrl(t.url) }));
+  playlistIndex = 0;
+  // 라벨/상태를 새 소스 기준으로 갱신.
+  syncTrackName(
+    playlist.length > 0
+      ? (playlist[0]?.label ?? "")
+      : (BGM_PRESETS[presetIndex]?.name ?? ""),
+  );
+  // opt-in 이 켜져 있었고 막 재생 중이었다면 새 엔진으로 이어 재생.
+  if (wasPlaying && state.bgmEnabled) bgmStart();
+};
+
+/** 등록된 호스티드 플레이리스트 트랙 수(0 이면 생성형 사용 중). */
+export const getBgmPlaylistSize = (): number => playlist.length;
 
 /** 마스터 음소거 on/off(영속). 모든 SFX/BGM 출력에 즉시 반영. */
 export const setMuted = (value: boolean): void => {

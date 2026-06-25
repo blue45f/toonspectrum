@@ -5,12 +5,10 @@ import { BrowserRouter, useLocation } from "react-router-dom";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/components/auth/session-provider";
-import { BgmToggle } from "@/components/bgm-toggle";
 import { CommandPaletteHost } from "@/components/command-palette-host";
-import { IntroSplash } from "@/components/IntroSplash";
-import { LanguageSwitcher } from "@/components/language-switcher";
+import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SplashScreen } from "@/components/SplashScreen";
 import { pingVisit } from "@/lib/visits-api";
 
 // 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
@@ -170,7 +168,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthSessionProvider>
-        <IntroSplash />
+        <SplashScreen />
         <Suspense fallback={null}>
           <StoreSync />
         </Suspense>
@@ -193,11 +191,8 @@ export default function App() {
         <CommandPaletteHost />
         <DeferredGlobalOverlays />
         <DeferredBackToTop />
-        <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20 max-md:left-auto max-md:right-4">
-          <BgmToggle />
-          <ThemeSwitcher />
-          <LanguageSwitcher />
-        </div>
+        {/* 자동 숨김 플로팅 컨트롤(사운드·BGM·테마·언어) — 좌하단(모바일 우하단). */}
+        <FloatingControls placement="bottom-left" />
         {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
         <DeskCloudHost />
       </AuthSessionProvider>

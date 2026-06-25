@@ -3816,8 +3816,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       aria-modal="true"
       className="fixed inset-0 z-50 bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
       role="dialog"
+      style={{
+        // 노치/홈인디케이터 안전영역을 모달 바깥 패딩에 반영해 하단(웹캠/푸터)이 잘리지 않게 한다.
+        paddingTop: "max(0.5rem, env(safe-area-inset-top))",
+        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+      }}
     >
-      <div className="mx-auto flex h-full max-h-[calc(100dvh-1rem)] max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)] sm:max-h-[calc(100dvh-2rem)]">
+      <div className="mx-auto flex h-full max-h-full max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
@@ -3834,14 +3839,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="relative min-h-[420px] overflow-hidden bg-card lg:min-h-0">
+        {/* 모바일: 뷰포트(상단)+컨트롤(하단) 두 행을 명시적으로 나눠 컨트롤 패널이 자체 스크롤되게 한다
+            (행을 안 잡으면 패널이 모달 밖으로 흘러 하단의 웹캠/푸터가 잘림). 데스크톱(lg): 2단 컬럼. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,44dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
+          <section className="relative min-h-0 overflow-hidden bg-card lg:min-h-0">
             <div
               aria-hidden
               className="absolute inset-0 opacity-80 [background-image:linear-gradient(45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(-45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%),linear-gradient(-45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%)] [background-position:0_0,0_12px,12px_-12px,-12px_0] [background-size:24px_24px]"
             />
-            <div className="relative mx-auto flex h-full max-h-[calc(100dvh-12rem)] min-h-[420px] w-full max-w-[min(82vw,720px)] items-center justify-center p-3 sm:p-5 lg:max-h-none">
-              <div className="relative aspect-[9/13] h-full max-h-full min-h-[390px] w-auto overflow-hidden rounded-xl border border-line/80 bg-transparent shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)]">
+            <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(82vw,720px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
+              <div className="relative aspect-[9/13] h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-transparent shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]">
                 <Canvas
                   camera={{ fov: activeCamera.fov, position: [...activeCamera.position], near: 0.1, far: 20 }}
                   className="h-full w-full"
@@ -5413,14 +5420,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </p>
 
                     {webcamActive && (
-                      <div className="relative overflow-hidden rounded-lg bg-black aspect-video border border-line mb-3">
+                      <div className="relative mx-auto mb-3 aspect-video max-h-[28dvh] w-full max-w-[min(100%,16rem)] overflow-hidden rounded-lg border border-line bg-black sm:max-h-none sm:max-w-none">
                         <video
                           ref={videoRef}
                           autoPlay
                           playsInline
                           muted
                           className={cx(
-                            "w-full h-full object-cover",
+                            "h-full w-full object-cover",
                             trackingOptions.mirrorMode ? "scale-x-[-1]" : ""
                           )}
                         />

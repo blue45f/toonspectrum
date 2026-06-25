@@ -5252,13 +5252,14 @@ export function StudioPage() {
       )}
 
       {/* 툴바 */}
-      <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
+      {/* 도구막대는 wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록). 모바일에선 버튼이 작아 여러 줄로 흐르되 가로 깨짐은 없음. */}
+      <div className="sticky top-2 z-20 mb-3 flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
         <div ref={menu === "template" ? menuRef : undefined} className="relative">
           <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} aria-haspopup="menu" aria-expanded={menu === "template"} className={toolBtn(menu === "template")}>
             <LayoutTemplate size={14} /> 템플릿
           </button>
           {menu === "template" && (
-            <div className="absolute left-0 top-full z-30 mt-1 grid max-h-80 w-64 gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 grid max-h-80 w-64 max-w-[calc(100vw-1.5rem)] gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-lg">
               {TEMPLATE_GROUPS.map((group) => (
                 <div key={group.group} className="grid gap-1">
                   <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
@@ -5357,7 +5358,7 @@ export function StudioPage() {
             <ImageIcon size={14} /> 배경 씬
           </button>
           {menu === "bgScene" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
@@ -5444,7 +5445,7 @@ export function StudioPage() {
             <Grid2x2 size={14} /> 톤
           </button>
           {menu === "tone" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
@@ -5481,7 +5482,7 @@ export function StudioPage() {
             <PenTool size={14} /> 이메레스
           </button>
           {menu === "emeres" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
@@ -5566,7 +5567,7 @@ export function StudioPage() {
             <Sparkles size={14} /> 장면
           </button>
           {menu === "scene" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
@@ -5609,7 +5610,7 @@ export function StudioPage() {
             <Bookmark size={14} /> 클립
           </button>
           {menu === "clip" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
               <button
                 type="button"
@@ -5663,7 +5664,7 @@ export function StudioPage() {
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <div className="grid gap-1">
                 {BUBBLE_VARIANTS.map((v) => (
                   <button
@@ -5709,7 +5710,7 @@ export function StudioPage() {
             <Sparkles size={14} /> 효과
           </button>
           {menu === "sticker" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
               <div className="relative mb-2">
                 <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
                 <input

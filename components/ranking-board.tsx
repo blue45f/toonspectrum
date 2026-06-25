@@ -221,7 +221,7 @@ function SignalWorkbench({
   const trustTone = confidenceTone(reliability?.level);
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-line bg-[linear-gradient(135deg,oklch(0.205_0.01_66),oklch(0.17_0.012_72))] p-4 surface-hl">
+    <section className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-card to-panel p-4 surface-hl">
       <div className="absolute inset-x-0 top-0 h-1" style={{ background: gradient }} />
       <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-canvas/55 px-2.5 py-1 text-xs font-medium text-fg-2">
         <FunctionSquare size={12} className="text-accent" />

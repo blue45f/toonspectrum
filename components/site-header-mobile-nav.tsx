@@ -82,7 +82,7 @@ export function MobileHeaderNavigation({
             role="dialog"
             aria-modal="true"
             aria-label={t("nav.allMenu")}
-            className="absolute inset-x-0 top-0 border-b border-line-strong bg-panel/95 bg-[linear-gradient(to_bottom,oklch(0.21_0.02_68/0.97),oklch(0.185_0.018_68/0.96))] shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
+            className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto border-b border-line-strong bg-gradient-to-b from-panel/95 to-card/90 shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] backdrop-blur-xl motion-safe:animate-fade-up"
           >
             <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between px-4 sm:px-6">
               <span className="font-display text-sm font-semibold text-fg-2">{t("nav.menu")}</span>

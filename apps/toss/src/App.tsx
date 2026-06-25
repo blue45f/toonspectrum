@@ -1,7 +1,9 @@
-import { useAmbientBgm, useClickSfx, useFx } from "@toonspectrum/core/fx";
+import { useClickSfx, useFx } from "@toonspectrum/core/fx";
 import "@toonspectrum/core/fx/fx.css";
 
-import IntroSplashScreen from "./components/IntroSplashScreen.tsx";
+import { FloatingControls } from "@/components/FloatingControls";
+import { SplashScreen } from "@/components/SplashScreen";
+
 import { CalendarPage } from "./pages/CalendarPage.tsx";
 import { CommunityPage } from "./pages/CommunityPage.tsx";
 import { CreatePage } from "./pages/CreatePage.tsx";
@@ -131,52 +133,6 @@ function BottomNav({ tab }: { tab: TabId }) {
   );
 }
 
-// 🎵 BGM opt-in 토글 — 기본 OFF(autoplay 정책). 켜는 순간이 사용자 제스처라 그때
-// 오디오 컨텍스트가 언락되고 첫 무드가 재생된다. data-no-sfx 로 전역 'tick' 중복을 막는다.
-function BgmToggle() {
-  const bgm = useAmbientBgm();
-  const on = bgm.enabled;
-  return (
-    <button
-      type="button"
-      className="pressable"
-      data-no-sfx
-      aria-pressed={on}
-      aria-label={on ? `배경음악 끄기 (현재 ${bgm.mood})` : "배경음악 켜기"}
-      title={on ? `배경음악 켜짐 · ${bgm.mood}` : "배경음악 켜기"}
-      onClick={() => {
-        bgm.toggle(); // 제스처: 컨텍스트 언락 + 첫 무드 재생.
-        hapticFeedback("tickWeak");
-      }}
-      style={{
-        position: "fixed",
-        right: 14,
-        bottom: "calc(78px + env(safe-area-inset-bottom))",
-        zIndex: 60,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        minHeight: 40,
-        padding: "8px 12px",
-        borderRadius: 999,
-        border: `1px solid ${on ? theme.accent : theme.border}`,
-        background: on ? theme.accentSoft : "rgba(21,16,12,0.82)",
-        backdropFilter: "blur(8px)",
-        color: on ? theme.accent : theme.textMuted,
-        fontSize: 12,
-        fontWeight: 800,
-        cursor: "pointer",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.28)",
-      }}
-    >
-      <span aria-hidden style={{ fontSize: 16 }}>
-        {on ? "🎵" : "🎧"}
-      </span>
-      <span>{on ? "배경음악" : "음악 켜기"}</span>
-    </button>
-  );
-}
-
 export function App() {
   const path = useHashPath();
   const tab = activeTab(path);
@@ -194,12 +150,22 @@ export function App() {
 
   return (
     <>
+      {/* 공유 동적 인트로/스플래시(NO fork) — 토스는 매 진입(앱 재오픈)마다 노출하므로 once={false}.
+          타이틀 카드 탭 시 파티클 '팡' + 'pop' + 토스 햅틱(축포) 으로 동적 연출. */}
       <div onPointerDown={onTitleCardTap} data-no-sfx>
-        <IntroSplashScreen />
+        <SplashScreen once={false} />
       </div>
       <div style={{ paddingBottom: immersive ? 0 : 72 }}>{renderRoute(path)}</div>
       {!immersive && <BottomNav tab={tab} />}
-      {!immersive && <BgmToggle />}
+      {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).
+          하단 탭바 위(above-nav)로 띄우고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
+      {!immersive && (
+        <FloatingControls
+          showTheme={false}
+          showLang={false}
+          placement="above-nav"
+        />
+      )}
     </>
   );
 }

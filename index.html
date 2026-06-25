@@ -11,7 +11,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="툰스펙트럼" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover 가 있어야 노치/홈인디케이터 기기에서 env(safe-area-inset-*) 가 0이 아닌 실제 값으로 해석된다 (스튜디오 바텀시트·툴바·웹캠 프리뷰가 잘리지 않도록). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="웹툰·웹소설 통합 인덱스. 플랫폼을 가로질러 무엇을, 어디서, 왜 봐야 하는지 찾습니다."

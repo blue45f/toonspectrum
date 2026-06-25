@@ -348,7 +348,7 @@ export function WebtoonFxPlayer({
 
   return (
     <>
-      <div className="relative mb-8 overflow-hidden rounded-2xl border border-line bg-[oklch(0.13_0.006_70)]">
+      <div className="relative mb-8 overflow-hidden rounded-2xl border border-line bg-panel">
         {pages.length === 0 ? (
           <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
         ) : (
