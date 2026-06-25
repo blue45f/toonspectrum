@@ -19,7 +19,7 @@ export const PLAY_GAMES: PlayGameMeta[] = [
   {
     id: "rps",
     label: "웹툰 가위바위보",
-    tagline: "손동작 인식으로 웹툰봇과 가위바위보 (버튼 플레이도 가능)",
+    tagline: "손동작·음성으로 웹툰봇과 가위바위보 · 묵찌빠 (버튼 플레이도 가능)",
     Icon: Hand,
     hue: 142,
     category: "트래킹",

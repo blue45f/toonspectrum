@@ -97,6 +97,44 @@ export function matchOver(score: Score, target = 3): "player" | "ai" | null {
   return null;
 }
 
+/* ── 묵찌빠 ───────────────────────────────────────────────────────────── */
+// 묵=바위(rock), 찌=가위(scissors), 빠=보(paper).
+export const MUK_LABEL: Record<Hand, string> = { rock: "묵", scissors: "찌", paper: "빠" };
+
+/** 선(공격권) 보유자. null이면 아직 가위바위보로 정하는 단계. */
+export type Initiative = "player" | "ai" | null;
+
+export interface MukStep {
+  /** 다음 선 보유자(또는 동일 유지). */
+  initiative: Initiative;
+  /** 이번 한 판으로 매치 승자가 결정됐으면 그 쪽, 아니면 null. */
+  matchWinner: "player" | "ai" | null;
+  /** 결정 단계에서 비겨 다시 내야 하면 true. */
+  replay: boolean;
+  /** 결과 후 단계: "decide"(선 정하기) | "attack"(묵찌빠 던지기). */
+  phase: "decide" | "attack";
+}
+
+/**
+ * 묵찌빠 한 판 전이(순수).
+ *  - 선 미정(decide): 가위바위보로 선을 정한다. 비기면 replay. 이긴 쪽이 선 → attack 단계.
+ *  - 선 있음(attack): 두 손이 같으면 현재 선 보유자가 매치 승리. 다르면 이긴 쪽이 선을 가져가 계속.
+ */
+export function mukjjippaStep(initiative: Initiative, player: Hand, ai: Hand): MukStep {
+  if (initiative === null) {
+    const out = resolveRound(player, ai);
+    if (out === "draw") return { initiative: null, matchWinner: null, replay: true, phase: "decide" };
+    const holder = out === "win" ? "player" : "ai";
+    return { initiative: holder, matchWinner: null, replay: false, phase: "attack" };
+  }
+  if (player === ai) {
+    return { initiative, matchWinner: initiative, replay: false, phase: "attack" };
+  }
+  const out = resolveRound(player, ai);
+  const holder = out === "win" ? "player" : "ai";
+  return { initiative: holder, matchWinner: null, replay: false, phase: "attack" };
+}
+
 /**
  * 디바운스 — 최근 N프레임 동안 동일 손이 유지될 때만 그 손을 확정(흔들림 방지).
  * 샘플이 부족하거나 불안정하면 null.

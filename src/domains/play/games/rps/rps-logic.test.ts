@@ -5,6 +5,7 @@ import {
   classifyGesture,
   EMPTY_SCORE,
   matchOver,
+  mukjjippaStep,
   pickAiHand,
   resolveRound,
   scoreReducer,
@@ -93,6 +94,33 @@ describe("rps-logic", () => {
     expect(sc.win).toBe(3);
     expect(sc.round).toBe(4);
     expect(matchOver(sc, 3)).toBe("player");
+  });
+
+  it("mukjjippaStep 결정 단계: 비기면 replay, 이기면 선 확정 후 attack", () => {
+    expect(mukjjippaStep(null, "rock", "rock")).toEqual({
+      initiative: null,
+      matchWinner: null,
+      replay: true,
+      phase: "decide",
+    });
+    expect(mukjjippaStep(null, "rock", "scissors")).toEqual({
+      initiative: "player",
+      matchWinner: null,
+      replay: false,
+      phase: "attack",
+    });
+    expect(mukjjippaStep(null, "scissors", "rock").initiative).toBe("ai");
+  });
+
+  it("mukjjippaStep 공격 단계: 같은 손이면 선 보유자 승, 다르면 이긴 쪽이 선 가져감", () => {
+    // 플레이어가 선인데 같은 손 → 플레이어 매치 승
+    expect(mukjjippaStep("player", "paper", "paper").matchWinner).toBe("player");
+    // ai가 선인데 같은 손 → ai 매치 승
+    expect(mukjjippaStep("ai", "rock", "rock").matchWinner).toBe("ai");
+    // 다른 손: 이긴 쪽이 선을 가져가고 매치는 계속(winner null)
+    const r = mukjjippaStep("ai", "rock", "scissors"); // rock>scissors, player 승
+    expect(r.matchWinner).toBeNull();
+    expect(r.initiative).toBe("player");
   });
 
   it("stabilizeGesture: N프레임 동일할 때만 확정", () => {

@@ -5,7 +5,9 @@ import {
   EMPTY_SCORE,
   HAND_EMOJI,
   HAND_LABEL,
+  type Initiative,
   matchOver,
+  mukjjippaStep,
   pickAiHand,
   resolveRound,
   scoreReducer,
@@ -37,6 +39,7 @@ function seededRng(seed: number): () => number {
 const TARGET = 3;
 const ALL: Hand[] = ["rock", "paper", "scissors"];
 type Phase = "idle" | "counting" | "result" | "over";
+type Mode = "rps" | "muk";
 
 const OUTCOME_KO: Record<Outcome, string> = { win: "승!", lose: "패…", draw: "무승부" };
 
@@ -46,8 +49,10 @@ export function RpsGame({ onExit }: PlayGameProps) {
   const [use3d, setUse3d] = useState(true);
   const [vrmReady, setVrmReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
-  const { speak, supported: voiceSupported } = useRpsVoice(voiceOn);
+  const { speak, supported: voiceSupported, voices, voiceURI, setVoiceURI } = useRpsVoice(voiceOn);
 
+  const [mode, setMode] = useState<Mode>("rps");
+  const [initiative, setInitiative] = useState<Initiative>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(3);
   const [score, setScore] = useState<Score>(EMPTY_SCORE);
@@ -60,6 +65,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
   const historyRef = useRef<Hand[]>([]);
   const liveGesture = useRef<Hand | null>(null);
   const speakRef = useRef(speak);
+  const modeRef = useRef(mode);
+  const initiativeRef = useRef<Initiative>(null);
+  const resolveShotRef = useRef<(h: Hand | null) => void>(() => {});
 
   useEffect(() => {
     liveGesture.current = gesture;
@@ -67,8 +75,47 @@ export function RpsGame({ onExit }: PlayGameProps) {
   useEffect(() => {
     speakRef.current = speak;
   }, [speak]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  useEffect(() => {
+    resolveShotRef.current = resolveShot;
+  });
+
+  const setInit = (v: Initiative) => {
+    initiativeRef.current = v;
+    setInitiative(v);
+  };
 
   const winner = matchOver(score, TARGET);
+
+  function resolveMuk(playerHand: Hand, aiHand: Hand) {
+    const step = mukjjippaStep(initiativeRef.current, playerHand, aiHand);
+    if (step.replay) {
+      setOutcome("draw");
+      setMessage("비겼어요 — 다시!");
+      setPhase("result");
+      speakRef.current("비겼다!");
+      return;
+    }
+    if (step.matchWinner) {
+      const won = step.matchWinner === "player";
+      setOutcome(won ? "win" : "lose");
+      setScore((s) => scoreReducer(s, won ? "win" : "lose"));
+      setInit(null); // 다음 매치는 다시 선 정하기부터
+      setMessage(won ? "묵찌빠 — 내가 이겼다!" : "묵찌빠 — 내가 졌다…");
+      setPhase("result");
+      speakRef.current(won ? "이겼다!" : "졌다…");
+      return;
+    }
+    // 매치 계속 — 선 갱신.
+    setInit(step.initiative);
+    const mine = step.initiative === "player";
+    setOutcome(null);
+    setMessage(mine ? "내가 선공!" : "상대 선공!");
+    setPhase("result");
+    speakRef.current(mine ? "선공!" : "상대 선공!");
+  }
 
   function resolveShot(playerHand: Hand | null) {
     if (!playerHand) {
@@ -78,9 +125,13 @@ export function RpsGame({ onExit }: PlayGameProps) {
     }
     historyRef.current = [...historyRef.current.slice(-8), playerHand];
     const aiHand = pickAiHand(rngRef.current, historyRef.current, true);
-    const out = resolveRound(playerHand, aiHand);
     setPlayer(playerHand);
     setAi(aiHand);
+    if (modeRef.current === "muk") {
+      resolveMuk(playerHand, aiHand);
+      return;
+    }
+    const out = resolveRound(playerHand, aiHand);
     setOutcome(out);
     setScore((s) => scoreReducer(s, out));
     setMessage("");
@@ -88,19 +139,18 @@ export function RpsGame({ onExit }: PlayGameProps) {
     speakRef.current(out === "win" ? "이겼다!" : out === "lose" ? "졌다…" : "비겼어!");
   }
 
-  // 카운트다운(3→2→1→샷) — 카메라 모드. "가위·바위·보!" 구호를 음성으로.
+  // 카운트다운(3→2→1→샷). 구호는 단계별 — 묵찌빠 공격 단계면 "묵·찌·빠!", 그 외 "가위·바위·보!".
   useEffect(() => {
     if (phase !== "counting") return;
-    if (count === 3) speakRef.current("가위");
-    else if (count === 2) speakRef.current("바위");
-    else if (count === 1) speakRef.current("보!");
+    const muk = modeRef.current === "muk" && initiativeRef.current !== null;
+    const words = muk ? ["묵", "찌", "빠!"] : ["가위", "바위", "보!"];
+    if (count >= 1 && count <= 3) speakRef.current(words[3 - count]);
     if (count > 0) {
-      const t = setTimeout(() => setCount((c) => c - 1), 700);
+      const t = setTimeout(() => setCount((c) => c - 1), muk ? 520 : 700);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => resolveShot(liveGesture.current), 350);
+    const t = setTimeout(() => resolveShotRef.current(liveGesture.current), 350);
     return () => clearTimeout(t);
-     
   }, [phase, count]);
 
   // 결과 후 다음 라운드(또는 매치 종료).
@@ -139,7 +189,15 @@ export function RpsGame({ onExit }: PlayGameProps) {
     setOutcome(null);
     setMessage("");
     setCount(3);
+    setInit(null);
     setPhase("idle");
+  }
+
+  function switchMode(next: Mode) {
+    if (next === mode) return;
+    setMode(next);
+    modeRef.current = next;
+    restart();
   }
 
   function toggleCamera() {
@@ -153,11 +211,36 @@ export function RpsGame({ onExit }: PlayGameProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 모드 전환 */}
+      <div className="flex items-center justify-center gap-1 rounded-full border border-line bg-card/50 p-1 text-sm" role="tablist" aria-label="게임 모드">
+        {(["rps", "muk"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => switchMode(m)}
+            className={cn(
+              "flex-1 rounded-full px-3 py-1.5 font-medium transition",
+              mode === m ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg",
+            )}
+          >
+            {m === "rps" ? "가위바위보" : "묵찌빠"}
+          </button>
+        ))}
+      </div>
+
       {/* 점수판 */}
       <div className="flex items-center justify-between rounded-xl border border-line bg-card/50 px-4 py-2 text-sm">
-        <span className="font-semibold text-emerald-500">나 {score.win}</span>
-        <span className="text-fg-3">선승 {TARGET} · {score.draw}무</span>
-        <span className="font-semibold text-rose-500">{score.lose} 봇</span>
+        <span className="font-semibold text-emerald-500">
+          나 {score.win}
+          {mode === "muk" && initiative === "player" && <span className="ml-1 text-[0.7rem] text-amber-500">●선</span>}
+        </span>
+        <span className="text-fg-3">선승 {TARGET}{mode === "rps" ? ` · ${score.draw}무` : ""}</span>
+        <span className="font-semibold text-rose-500">
+          {mode === "muk" && initiative === "ai" && <span className="mr-1 text-[0.7rem] text-amber-500">선●</span>}
+          {score.lose} 봇
+        </span>
       </div>
 
       {/* 대결 무대 */}
@@ -225,7 +308,11 @@ export function RpsGame({ onExit }: PlayGameProps) {
 
       {/* 중앙 상태 */}
       <div className="min-h-[2.2rem] text-center" aria-live="polite">
-        {phase === "counting" && <span className="text-2xl font-extrabold text-accent">{count > 0 ? count : "냅다!"}</span>}
+        {phase === "counting" && (
+          <span className="text-2xl font-extrabold text-accent">
+            {count > 0 ? count : mode === "muk" && initiative !== null ? "빠!" : "냅다!"}
+          </span>
+        )}
         {phase === "result" && outcome && (
           <span
             className={cn(
@@ -235,7 +322,12 @@ export function RpsGame({ onExit }: PlayGameProps) {
               outcome === "draw" && "text-fg-2",
             )}
           >
-            {OUTCOME_KO[outcome]} {player && ai && `(${HAND_LABEL[player]} vs ${HAND_LABEL[ai]})`}
+            {message || OUTCOME_KO[outcome]} {player && ai && `(${HAND_LABEL[player]} vs ${HAND_LABEL[ai]})`}
+          </span>
+        )}
+        {phase === "result" && !outcome && message && (
+          <span className="text-lg font-bold text-amber-500">
+            {message} {player && ai && `(${HAND_LABEL[player]} vs ${HAND_LABEL[ai]})`}
           </span>
         )}
         {phase === "over" && (
@@ -286,6 +378,20 @@ export function RpsGame({ onExit }: PlayGameProps) {
                 {voiceOn ? <Volume2 className="mr-1 h-4 w-4" /> : <VolumeX className="mr-1 h-4 w-4" />}
                 음성 {voiceOn ? "켬" : "끔"}
               </Button>
+            )}
+            {voiceSupported && voiceOn && voices.length > 1 && (
+              <select
+                aria-label="음성 선택"
+                value={voiceURI ?? ""}
+                onChange={(e) => setVoiceURI(e.target.value)}
+                className="max-w-[11rem] rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] text-fg-2"
+              >
+                {voices.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name.replace(/Microsoft|Google|\(.*?\)/g, "").trim() || v.name}
+                  </option>
+                ))}
+              </select>
             )}
             {!camera && (
               <span className="inline-flex items-center gap-1 text-[0.7rem] text-fg-3">
