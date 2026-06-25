@@ -3,15 +3,17 @@
 
 import { useEffect, useState } from 'react';
 
-import { fetchTitles, type Title } from '../lib/api';
+import { coverUrl, fetchTitles, type Title } from '../lib/api';
 
 export interface GameTitle {
   id: string;
   title: string;
   author: string;
   genres: string[];
-  /** OKLCH 그라디언트 2색 — 자체 타이포그래픽 커버 배경(플랫폼 표지 미사용, 저작권 안전). */
+  /** OKLCH 그라디언트 2색 — 타이포그래픽 커버 배경 + 표지 미노출/실패 시 폴백. */
   cover: [string, string];
+  /** 표지 썸네일(프록시 경유 — 표지 정책 킬스위치 적용, off면 차단되어 타이포로 폴백). */
+  coverImage?: string;
   views: number;
   likes: number;
   bookmarks: number;
@@ -36,6 +38,7 @@ export function toGameTitles(titles: Title[]): GameTitle[] {
     author: t.author ?? '작자미상',
     genres: Array.isArray(t.genres) ? t.genres.slice(0, 4) : [],
     cover: gradientOf(t),
+    coverImage: coverUrl(t) ?? undefined,
     views: t.stats?.views ?? 0,
     likes: t.stats?.likes ?? 0,
     bookmarks: t.stats?.bookmarks ?? 0,

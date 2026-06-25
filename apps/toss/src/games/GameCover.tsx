@@ -1,7 +1,8 @@
-// 자체 타이포그래픽 커버 — 플랫폼 표지(저작물) 대신 그라디언트 + 패턴 + 제목 타이포로
-// 시각적으로 풍부하게. 저작권 안전(색상 + 사실정보인 제목 텍스트만 사용).
+// 게임 커버 — 표지 썸네일(프록시·킬스위치 적용)을 우선 노출하되, 미노출/차단/실패 시
+// 자체 타이포그래픽 커버(그라디언트 + 패턴 + 글로우 + 제목 타이포)로 폴백한다.
+// → 표지 정책 off(COVER_IMAGE_POLICY=off)면 프록시가 막혀 자동으로 타이포만 남는다.
 
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 
 import type { GameTitle } from './types';
 
@@ -40,12 +41,13 @@ export function GameCover({
   big?: boolean;
   style?: CSSProperties;
 }) {
+  const [broken, setBroken] = useState(false);
+  const mystery = mode === 'mystery';
   const grad = `linear-gradient(150deg, ${t.cover[0]}, ${t.cover[1]})`;
   const h = hash(t.id);
   const p = PATTERNS[h % PATTERNS.length];
-  const text = mode === 'mystery' ? '?' : t.title;
-  const fontSize = mode === 'mystery' ? (big ? 72 : 44) : titleFont(t.title.length, big);
   const glowX = h % 2 === 0 ? '-12%' : '70%';
+  const showImg = !!t.coverImage && !broken;
 
   return (
     <div
@@ -59,24 +61,53 @@ export function GameCover({
         ...style,
       }}
     >
+      {/* 타이포 베이스(폴백) */}
       <div style={{ position: 'absolute', top: '-22%', left: glowX, width: '80%', height: '68%', background: 'radial-gradient(circle, rgba(255,255,255,0.24), transparent 68%)' }} />
       <div style={{ position: 'absolute', inset: 0, opacity: 0.1, backgroundImage: p.image, backgroundSize: p.size }} />
-      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 12 }}>
-        <span
+      {!mystery && (
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 12 }}>
+          <span
+            style={{
+              fontSize: titleFont(t.title.length, big),
+              fontWeight: 900,
+              color: 'rgba(255,255,255,0.95)',
+              textShadow: '0 3px 14px rgba(0,0,0,0.45)',
+              textAlign: 'center',
+              lineHeight: 1.16,
+              wordBreak: 'keep-all',
+              letterSpacing: -0.5,
+            }}
+          >
+            {t.title}
+          </span>
+        </div>
+      )}
+
+      {/* 표지 썸네일(있으면 위에 덮음; 퀴즈는 블러) */}
+      {showImg && (
+        <img
+          src={t.coverImage}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
           style={{
-            fontSize,
-            fontWeight: 900,
-            color: 'rgba(255,255,255,0.95)',
-            textShadow: '0 3px 14px rgba(0,0,0,0.45)',
-            textAlign: 'center',
-            lineHeight: 1.16,
-            wordBreak: 'keep-all',
-            letterSpacing: mode === 'mystery' ? 0 : -0.5,
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: mystery ? 'blur(9px) brightness(0.8)' : 'none',
+            transform: mystery ? 'scale(1.18)' : 'none',
           }}
-        >
-          {text}
-        </span>
-      </div>
+        />
+      )}
+
+      {/* 미스터리(퀴즈) 마커 */}
+      {mystery && (
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: big ? 72 : 44, fontWeight: 900, color: 'rgba(255,255,255,0.92)', textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
+          ?
+        </div>
+      )}
     </div>
   );
 }

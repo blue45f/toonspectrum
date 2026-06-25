@@ -20,9 +20,26 @@ function Poster({ t, reveal }: { t: GameTitle; reveal: boolean }) {
       <GameCover t={t} />
       <div
         style={{
-          marginTop: 10,
+          marginTop: 8,
           textAlign: 'center',
-          fontSize: 20,
+          fontSize: 13,
+          fontWeight: 700,
+          color: theme.text,
+          lineHeight: 1.3,
+          height: 34,
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+        }}
+      >
+        {t.title}
+      </div>
+      <div
+        style={{
+          marginTop: 4,
+          textAlign: 'center',
+          fontSize: 19,
           fontWeight: 900,
           color: reveal ? theme.accent : theme.textMuted,
           letterSpacing: reveal ? 0 : 4,
