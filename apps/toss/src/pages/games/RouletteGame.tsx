@@ -8,6 +8,7 @@ import { navigate } from '../../router';
 import { theme, pageShell } from '../../theme';
 import { genreChips, pickRandom, reasonFor, tierLabel } from '../../games/roulette-engine';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
+import { ShareResult } from '../../games/ShareResult';
 
 const HELP_STEPS: HelpStep[] = [
   {
@@ -127,6 +128,9 @@ export function RouletteGame() {
       <Button onClick={spin} loading={spinning} style={{ width: '100%' }}>
         {pick ? '다시 돌리기' : '돌리기'}
       </Button>
+      {pick && !spinning && (
+        <ShareResult message={`툰스펙트럼 룰렛이 오늘의 웹툰으로 「${pick.title}」를 골라줬어요! 🎰 (${pick.author}) 너의 추천은?`} />
+      )}
     </div>
   );
 }

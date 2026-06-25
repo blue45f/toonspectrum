@@ -14,6 +14,7 @@ import {
   type QuizQuestion,
 } from '../../games/quiz-engine';
 import { liveRng, useGameTitles } from '../../games/types';
+import { ShareResult } from '../../games/ShareResult';
 
 export function QuizGame() {
   const { titles, loading } = useGameTitles();
@@ -74,6 +75,9 @@ export function QuizGame() {
         <div style={{ fontSize: 22, fontWeight: 800, margin: '12px 0' }}>{ROUND_COUNT}문제 중 {score}개 정답!</div>
         <div style={{ color: theme.textMuted, marginBottom: 22 }}>최고 연속 정답 {best}</div>
         <Button onClick={restart}>다시 풀기</Button>
+        <div style={{ maxWidth: 280, margin: '0 auto' }}>
+          <ShareResult message={`툰스펙트럼 웹툰 퀴즈 ${ROUND_COUNT}문제 중 ${score}개 정답! 🧠 (최고 연속 ${best}) 너의 점수는?`} />
+        </div>
       </div>
     );
   }

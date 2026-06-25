@@ -14,6 +14,7 @@ import {
 import { GameCover } from '../../games/GameCover';
 import { GameHelp } from '../../games/GameHelp';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
+import { ShareResult } from '../../games/ShareResult';
 
 function Poster({ t, reveal }: { t: GameTitle; reveal: boolean }) {
   return (
@@ -178,6 +179,7 @@ export function DuelGame() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: theme.danger, marginBottom: 16 }}>💀 게임 오버 · {state.score}연승</div>
           <Button onClick={restart} style={{ width: '100%' }}>다시 도전</Button>
+          <ShareResult message={`툰스펙트럼 인기 대결 ${state.score}연승! 🔥 (최고 ${state.best}연승) 너도 도전해봐`} />
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 12 }}>

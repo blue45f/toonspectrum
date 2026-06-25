@@ -11,6 +11,7 @@ import {
   type Tile,
 } from '../../games/memory-engine';
 import { liveRng, useGameTitles } from '../../games/types';
+import { ShareResult } from '../../games/ShareResult';
 import { navigate } from '../../router';
 import { theme, pageShell } from '../../theme';
 
@@ -292,6 +293,9 @@ export function MemoryGame() {
         <Button onClick={restart} style={{ width: '100%' }}>
           {solved ? '🎉 다시 도전' : '🔄 새 보드'}
         </Button>
+        {solved && (
+          <ShareResult message={`툰스펙트럼 웹툰 짝맞추기 클리어! 🃏 ${PAIRS}쌍을 ${state.moves}수 · ${fmtTime(elapsed)} 만에! 너의 기록은?`} />
+        )}
       </div>
     </div>
   );

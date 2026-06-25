@@ -7,6 +7,8 @@ const GAMES = [
   { id: 'quiz', emoji: '❓', label: '웹툰 퀴즈', tag: '작가·장르 힌트로 제목 맞히기', hue: '#5bb0ff' },
   { id: 'roulette', emoji: '🎰', label: '웹툰 룰렛', tag: '돌려서 오늘의 추천 받기', hue: '#e07bff' },
   { id: 'memory', emoji: '🃏', label: '웹툰 짝맞추기', tag: '같은 표지 6쌍을 기억해서 맞히기', hue: '#6be4a6' },
+  { id: 'dice', emoji: '🎲', label: '웹툰 주사위 보드', tag: '주사위 굴려 골인 + 추천 웹툰 수집', hue: '#fbbf24' },
+  { id: 'cardbattle', emoji: '⚔️', label: '웹툰 카드 배틀', tag: '웹툰 카드로 상대 영웅 무찌르기', hue: '#fb7185' },
 ];
 
 export function PlayHubPage() {
