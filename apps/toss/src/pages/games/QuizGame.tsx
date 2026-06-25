@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../tds-shim';
 import { Badge } from '../../ui';
 import { GameCover } from '../../games/GameCover';
+import { GameHelp } from '../../games/GameHelp';
 import { navigate } from '../../router';
 import { theme, pageShell } from '../../theme';
 import {
@@ -84,8 +85,66 @@ export function QuizGame() {
       <button type="button" className="pressable" onClick={() => navigate('/play')} style={{ background: 'none', border: 'none', color: theme.textMuted, padding: '14px 0', cursor: 'pointer' }}>
         ← 놀이터
       </button>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-        <span style={{ color: theme.textMuted }}>{round} / {ROUND_COUNT}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, color: theme.textMuted }}>
+          {round} / {ROUND_COUNT}
+          <GameHelp
+            id="quiz"
+            title="웹툰 퀴즈"
+            steps={[
+              {
+                emoji: '🎯',
+                title: '목표',
+                desc: (
+                  <>
+                    흐릿하게 가려진 <b style={{ color: theme.text }}>표지</b>와 단서를 보고 그 웹툰의{' '}
+                    <b style={{ color: theme.text }}>제목</b>을 맞혀요.
+                  </>
+                ),
+              },
+              {
+                emoji: '🃏',
+                title: '단서',
+                desc: (
+                  <>
+                    표지 옆에 <b style={{ color: theme.text }}>작가</b>와{' '}
+                    <b style={{ color: theme.text }}>장르</b>(최대 3개)가 힌트로 주어져요.
+                  </>
+                ),
+              },
+              {
+                emoji: '🔘',
+                title: '정답 고르기',
+                desc: (
+                  <>
+                    <b style={{ color: theme.text }}>4개 보기</b> 중 하나를 누르면 바로 채점돼요. 정답은{' '}
+                    <span style={{ color: '#4ade80', fontWeight: 700 }}>초록</span>, 틀린 선택은{' '}
+                    <span style={{ color: theme.danger, fontWeight: 700 }}>빨강</span>으로 표시돼요.
+                  </>
+                ),
+              },
+              {
+                emoji: '🔥',
+                title: '점수와 연속',
+                desc: (
+                  <>
+                    맞힐 때마다 <b style={{ color: theme.text }}>1점</b>, 연속으로 맞히면{' '}
+                    <b style={{ color: theme.text }}>연속 기록</b>이 쌓여요(틀리면 0으로 초기화).
+                  </>
+                ),
+              },
+              {
+                emoji: '🏁',
+                title: '한 판',
+                desc: (
+                  <>
+                    총 <b style={{ color: theme.text }}>{ROUND_COUNT}문제</b>를 풀면 최종 점수와 최고 연속 기록을 보여줘요.
+                  </>
+                ),
+              },
+            ]}
+          />
+        </span>
         <span style={{ color: theme.accent }}>점수 {score} · 연속 {streak}</span>
       </div>
 

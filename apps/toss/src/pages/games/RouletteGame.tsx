@@ -3,10 +3,52 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../tds-shim';
 import { Badge, Chips } from '../../ui';
 import { GameCover } from '../../games/GameCover';
+import { GameHelp, type HelpStep } from '../../games/GameHelp';
 import { navigate } from '../../router';
 import { theme, pageShell } from '../../theme';
 import { genreChips, pickRandom, reasonFor, tierLabel } from '../../games/roulette-engine';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: '🎯',
+    title: '목표',
+    desc: (
+      <>
+        오늘 뭐 볼지 고민될 때, 룰렛이 인기 웹툰 중 <b style={{ color: theme.text }}>한 편</b>을 골라줘요.
+      </>
+    ),
+  },
+  {
+    emoji: '🏷️',
+    title: '장르 고르기',
+    desc: (
+      <>
+        위쪽 <b style={{ color: theme.text }}>장르 칩</b>으로 범위를 좁혀요.{' '}
+        <span style={{ color: theme.accent }}>전체</span>면 모든 인기작에서 뽑아요.
+      </>
+    ),
+  },
+  {
+    emoji: '🎲',
+    title: '돌리기',
+    desc: (
+      <>
+        <b style={{ color: theme.text }}>돌리기</b> 버튼을 누르면 표지가 두구두구 돌다가 한 편에서 멈춰요.
+      </>
+    ),
+  },
+  {
+    emoji: '✨',
+    title: '결과 보기',
+    desc: (
+      <>
+        제목·작가·장르와 <b style={{ color: theme.text }}>추천 이유</b>가 떠요. 마음에 안 들면{' '}
+        <span style={{ color: theme.accent }}>다시 돌리기</span>로 또 뽑아요.
+      </>
+    ),
+  },
+];
 
 export function RouletteGame() {
   const { titles, loading } = useGameTitles();
@@ -47,6 +89,10 @@ export function RouletteGame() {
       <button type="button" className="pressable" onClick={() => navigate('/play')} style={{ background: 'none', border: 'none', color: theme.textMuted, padding: '14px 0', cursor: 'pointer' }}>
         ← 놀이터
       </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: theme.textMuted }}>웹툰 룰렛</span>
+        <GameHelp id="roulette" title="웹툰 룰렛" steps={HELP_STEPS} />
+      </div>
       <div style={{ marginBottom: 14 }}>
         <Chips items={chips} active={genre} onPick={setGenre} />
       </div>

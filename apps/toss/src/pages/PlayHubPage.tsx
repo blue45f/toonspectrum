@@ -6,6 +6,7 @@ const GAMES = [
   { id: 'duel', emoji: '📈', label: '웹툰 인기 대결', tag: '둘 중 더 인기 있는 웹툰 맞히기', hue: '#ff8a5b' },
   { id: 'quiz', emoji: '❓', label: '웹툰 퀴즈', tag: '작가·장르 힌트로 제목 맞히기', hue: '#5bb0ff' },
   { id: 'roulette', emoji: '🎰', label: '웹툰 룰렛', tag: '돌려서 오늘의 추천 받기', hue: '#e07bff' },
+  { id: 'memory', emoji: '🃏', label: '웹툰 짝맞추기', tag: '같은 표지 6쌍을 기억해서 맞히기', hue: '#6be4a6' },
 ];
 
 export function PlayHubPage() {

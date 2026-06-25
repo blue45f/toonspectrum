@@ -12,6 +12,7 @@ import {
   type Guess,
 } from '../../games/duel-engine';
 import { GameCover } from '../../games/GameCover';
+import { GameHelp } from '../../games/GameHelp';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
 
 function Poster({ t, reveal }: { t: GameTitle; reveal: boolean }) {
@@ -90,13 +91,57 @@ export function DuelGame() {
         ← 놀이터
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <span style={{ padding: '6px 14px', borderRadius: 999, background: theme.accentSoft, color: theme.accent, fontWeight: 800, fontSize: 14 }}>
           🔥 {state.score}연승
         </span>
         <span style={{ padding: '6px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: theme.textMuted, fontWeight: 700, fontSize: 14 }}>
           최고 {state.best}
         </span>
+        <GameHelp
+          id="duel"
+          title="웹툰 인기 대결"
+          steps={[
+            {
+              emoji: '🎯',
+              title: '목표',
+              desc: (
+                <>
+                  두 웹툰 중 <b style={{ color: theme.text }}>조회수가 더 많은 작품</b>을 맞히며 연승을 쌓아요.
+                </>
+              ),
+            },
+            {
+              emoji: '👀',
+              title: '비교 기준',
+              desc: (
+                <>
+                  왼쪽 <b style={{ color: theme.text }}>기준 작품</b>의 조회수는 공개되고, 오른쪽{' '}
+                  <b style={{ color: theme.text }}>도전 작품</b>의 조회수는 <span style={{ color: theme.textMuted }}>???</span>로 가려져요.
+                </>
+              ),
+            },
+            {
+              emoji: '🔼',
+              title: '선택',
+              desc: (
+                <>
+                  도전 작품의 조회수가 기준보다 <b style={{ color: theme.text }}>더 높다 / 더 낮다</b>를 골라요.
+                </>
+              ),
+            },
+            {
+              emoji: '🔥',
+              title: '연승',
+              desc: (
+                <>
+                  맞히면 <b style={{ color: theme.text }}>점수 +1</b>, 직전 도전 작품이 다음 기준이 돼요. 한 번이라도 틀리면{' '}
+                  <b style={{ color: theme.text }}>게임 종료</b>—최고 점수는 계속 이어집니다.
+                </>
+              ),
+            },
+          ]}
+        />
       </div>
 
       <div style={{ position: 'relative', display: 'flex', gap: 16, alignItems: 'flex-start' }}>

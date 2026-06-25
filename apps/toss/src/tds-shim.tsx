@@ -4,7 +4,7 @@
  * 마운트가 막혀요. PREVIEW_NO_TDS=1 빌드에서만 vite alias로 이 파일을 대신 사용해 미니앱 UI를
  * 브라우저에서 미리 볼 수 있게 해요. 실제 .ait(앱인토스) 빌드는 진짜 TDS를 그대로 사용합니다.
  */
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, Ref } from 'react';
 
 const ACCENT = '#13c2a3';
 const ACCENT_INK = '#041412';
@@ -25,12 +25,14 @@ interface ButtonProps {
   variant?: 'weak' | string;
   loading?: boolean;
   disabled?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
-export function Button({ children, onClick, style, variant, loading, disabled }: ButtonProps) {
+export function Button({ children, onClick, style, variant, loading, disabled, ref }: ButtonProps) {
   const weak = variant === 'weak';
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       disabled={disabled || loading}

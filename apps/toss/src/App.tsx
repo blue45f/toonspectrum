@@ -1,5 +1,6 @@
 import IntroSplashScreen from "./components/IntroSplashScreen.tsx";
 import { DuelGame } from "./pages/games/DuelGame.tsx";
+import { MemoryGame } from "./pages/games/MemoryGame.tsx";
 import { QuizGame } from "./pages/games/QuizGame.tsx";
 import { RouletteGame } from "./pages/games/RouletteGame.tsx";
 import { PlayHubPage } from "./pages/PlayHubPage.tsx";
@@ -14,6 +15,7 @@ function renderRoute(path: string) {
   if (path === "/play/duel") return <DuelGame />;
   if (path === "/play/quiz") return <QuizGame />;
   if (path === "/play/roulette") return <RouletteGame />;
+  if (path === "/play/memory") return <MemoryGame />;
   if (path.startsWith("/play")) return <PlayHubPage />;
   return <TitleListPage />;
 }
