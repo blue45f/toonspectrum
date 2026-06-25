@@ -1,6 +1,4 @@
 import IntroSplashScreen from "./components/IntroSplashScreen.tsx";
-import { CardBattleGame } from "./pages/games/CardBattleGame.tsx";
-import { DiceBoardGame } from "./pages/games/DiceBoardGame.tsx";
 import { DuelGame } from "./pages/games/DuelGame.tsx";
 import { MemoryGame } from "./pages/games/MemoryGame.tsx";
 import { QuizGame } from "./pages/games/QuizGame.tsx";
@@ -18,8 +16,6 @@ function renderRoute(path: string) {
   if (path === "/play/quiz") return <QuizGame />;
   if (path === "/play/roulette") return <RouletteGame />;
   if (path === "/play/memory") return <MemoryGame />;
-  if (path === "/play/dice") return <DiceBoardGame />;
-  if (path === "/play/cardbattle") return <CardBattleGame />;
   if (path.startsWith("/play")) return <PlayHubPage />;
   return <TitleListPage />;
 }

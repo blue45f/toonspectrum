@@ -1,21 +1,12 @@
 // 아케이드 게임 레지스트리 — 새 게임은 여기에 한 줄 추가하면 허브/라우팅에 자동 노출.
 // 게임 본체는 lazy 로드해 무거운 의존(3D/웹캠)이 /play 진입 청크를 부풀리지 않게 한다.
 
-import { Dice5, Dices, Grid3x3, Hand, HelpCircle, Swords, TrendingUp } from "lucide-react";
+import { Dices, Grid3x3, Hand, HelpCircle, TrendingUp } from "lucide-react";
 import { lazy } from "react";
 
 import type { PlayGameMeta } from "./play-types";
 
 export const PLAY_GAMES: PlayGameMeta[] = [
-  {
-    id: "card-battle",
-    label: "웹툰 카드 배틀",
-    tagline: "인기 웹툰을 카드로 — 수집형 턴제 카드 대전",
-    Icon: Swords,
-    hue: 268,
-    category: "배틀",
-    Component: lazy(() => import("./games/card-battle/CardBattleGame")),
-  },
   {
     id: "rps",
     label: "웹툰 가위바위보",
@@ -52,15 +43,6 @@ export const PLAY_GAMES: PlayGameMeta[] = [
     hue: 150,
     category: "퍼즐",
     Component: lazy(() => import("./games/memory/MemoryGame")),
-  },
-  {
-    id: "dice-board",
-    label: "웹툰 주사위 보드",
-    tagline: "주사위를 굴려 추천 웹툰을 모으며 골인",
-    Icon: Dice5,
-    hue: 280,
-    category: "보드",
-    Component: lazy(() => import("./games/dice-board/DiceBoardGame")),
   },
   {
     id: "roulette",
