@@ -1,17 +1,10 @@
-// 운세 웹툰 패널(컷) — 백엔드 fortune.service의 FortunePanel과 동일 형태.
-// 백엔드가 [N컷 - 묘사] + 이름: "대사" 콘티를 파싱해 내려준다.
+// 운세 웹툰 패널(컷) 타입은 @toonspectrum/core/fortune 엔진과 동일 형태(웹·토스·백엔드
+// 공유). 백엔드가 [N컷 - 묘사] + 이름: "대사" 콘티를 파싱해 내려주며, 같은 엔진을 토스가
+// 직접 호출해도 동일 구조를 얻는다. 여기서는 코어 타입을 그대로 재-export 한다.
 
-export interface FortunePanelLine {
-  speaker: string; // 화자 이름. 나레이션이면 빈 문자열
-  characterId: string | null; // 매칭된 캐릭터 id (ara/danwoo/leona/gaon)
-  text: string;
-  sfx?: string; // 효과음(있으면 컷에 스티커로 표시)
-}
+import type { FortunePanel, FortunePanelLine } from "@toonspectrum/core";
 
-export interface FortunePanel {
-  scene: string | null; // 컷의 장면 묘사
-  lines: FortunePanelLine[];
-}
+export type { FortunePanel, FortunePanelLine };
 
 export interface FortuneCharacterInfo {
   id: string;

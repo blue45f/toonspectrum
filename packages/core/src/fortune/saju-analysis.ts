@@ -5,7 +5,9 @@
 // 대비 운세, 두 사람의 궁합(일간 합충·지지 합충·오행 상생상극)을 계산한다.
 // 난수가 아니라 명리 규칙에 기반하므로 같은 입력은 항상 같은 해석을 돌려준다.
 
-import { calculateSaju, SajuResult } from "./saju-utils";
+import { calculateSaju } from "./saju-utils";
+
+import type { SajuResult } from "./saju-utils";
 
 // 오행 한글
 type Element = "목" | "화" | "토" | "금" | "수";

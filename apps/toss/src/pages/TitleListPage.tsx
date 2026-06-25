@@ -15,6 +15,7 @@ import {
 import { navigate } from '../router';
 import { fetchTitles, coverUrl, type Title } from '../lib/api';
 import { SearchBar, Chips, Badge, Cover } from '../ui';
+import { BannerAd } from '../components/BannerAd';
 import { theme, pageShell } from '../theme';
 
 const ALL = '전체';
@@ -227,6 +228,9 @@ export function TitleListPage() {
             </p>
           )
         )}
+
+        {/* 인기 스트립/그리드가 끝나는 자연 지점(below-fold)에 광고 — SSP 정책 준수 */}
+        {!loading && !error && total > 0 && <BannerAd />}
       </div>
     </div>
   );

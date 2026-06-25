@@ -19,6 +19,7 @@ import {
 } from '@toonspectrum/core';
 import { fetchTitles, coverUrl, type Title } from '../lib/api';
 import { GameCover } from '../games/GameCover';
+import { BannerAd } from '../components/BannerAd';
 import { theme, pageShell } from '../theme';
 import { navigate } from '../router';
 
@@ -383,6 +384,9 @@ export function RankingPage() {
             추정값임을 뜻하며, 라이브 실시간 수치가 아니에요.
           </p>
         )}
+
+        {/* 긴 랭킹 리스트가 끝나는 지점(below-fold)에 광고 — SSP 정책 준수 */}
+        {!loading && !error && ranked.length > 0 && <BannerAd />}
       </div>
     </div>
   );

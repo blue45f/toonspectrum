@@ -5,6 +5,7 @@ import { fetchTitles, getCached, coverUrl, platform, type Title } from '../lib/a
 import { similarTitles, statsAreEstimated, formatCount } from '@toonspectrum/core';
 import { shareMessage } from '../lib/toss';
 import { Badge, Cover, StatStrip } from '../ui';
+import { BannerAd } from '../components/BannerAd';
 import { theme } from '../theme';
 
 export function TitleDetailPage({ id = '' }: { id?: string }) {
@@ -132,6 +133,9 @@ export function TitleDetailPage({ id = '' }: { id?: string }) {
         <div style={{ marginTop: 24 }}>
           <Button style={{ width: '100%' }} onClick={share}>공유하기</Button>
         </div>
+
+        {/* 상세 본문·추천이 끝나는 지점(below-fold)에 광고 — 핵심 액션(공유) 아래 · SSP 정책 준수 */}
+        <BannerAd />
       </div>
 
       {toast && <div role="status" style={{ position: 'fixed', bottom: 'calc(28px + env(safe-area-inset-bottom))', left: '50%',

@@ -46,3 +46,21 @@ export {
   type Guess,
   type DuelState,
 } from "./duel-engine";
+
+export {
+  HAND_EMOJI,
+  HAND_LABEL,
+  MUK_LABEL,
+  EMPTY_SCORE,
+  beats,
+  resolveRound,
+  pickAiHand,
+  scoreReducer,
+  matchOver,
+  mukjjippaStep,
+  type Hand,
+  type Outcome,
+  type Score,
+  type Initiative,
+  type MukStep,
+} from "./rps-engine";

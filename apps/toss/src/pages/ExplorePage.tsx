@@ -41,6 +41,7 @@ import { fetchTitles, coverUrl, type Title } from '../lib/api';
 import { navigate } from '../router';
 import { theme, pageShell } from '../theme';
 import { Badge, Cover } from '../ui';
+import { BannerAd } from '../components/BannerAd';
 
 // ── 장르 색상(코스메틱) ─────────────────────────────────────────────
 // 웹 lib/genre-color.ts 의 oklch hue 매핑을 그대로 옮긴 브라우저-안전 헬퍼. 순수 표시용이라
@@ -127,6 +128,40 @@ export function ExplorePage() {
       />
 
       <div style={pageShell}>
+        {/* 더보기 진입 — 하단 탭이 5개로 꽉 차 있어 부가 기능은 탐색 오버플로로 연다 */}
+        <div className="chips" style={{ marginBottom: 16 }}>
+          {[
+            { to: '/library', emoji: '★', label: '내 서재' },
+            { to: '/community', emoji: '💬', label: '커뮤니티' },
+            { to: '/fortune', emoji: '🔮', label: '운세' },
+          ].map((m) => (
+            <button
+              key={m.to}
+              type="button"
+              className="pressable"
+              onClick={() => navigate(m.to)}
+              style={{
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                height: 36,
+                padding: '0 14px',
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: `1px solid ${theme.border}`,
+                background: theme.surface,
+                color: theme.text,
+              }}
+            >
+              <span aria-hidden>{m.emoji}</span>
+              {m.label}
+            </button>
+          ))}
+        </div>
+
         {/* 장르 스펙트럼 — 그라디언트 바 + 탭 가능한 GENRES 칩 */}
         <div className="rise" style={{ marginBottom: 16 }}>
           <div
@@ -390,6 +425,9 @@ export function ExplorePage() {
             )}
           </div>
         )}
+
+        {/* 탐색 결과 그리드가 끝나는 지점(below-fold)에 광고 — SSP 정책 준수 */}
+        {!loading && results.length > 0 && <BannerAd />}
       </div>
 
       {/* 패싯 바텀시트 — 모바일에서 패널을 접어 올린다 */}

@@ -1,10 +1,10 @@
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import { ReviewControls, type ReviewSort } from "./reviews-components/review-controls";
+import { ReviewControls } from "./reviews-components/review-controls";
 
 
-import type { SeedReview, Title } from "@/lib/types";
+import type { ReviewSort, ReviewsResponse } from "@/lib/types";
 
 import { CoverImage } from "@/components/cover-image";
 import { ReviewCard } from "@/components/review-card";
@@ -17,20 +17,6 @@ import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 
 
-
-interface ReviewsResponse {
-  sort: ReviewSort;
-  feed: Array<SeedReview & { title: Title }>;
-  topReviewed: { title: Title; count: number }[];
-  stats: {
-    total: number;
-    avg: number;
-    spoilerPct: number;
-    distinctTitles: number;
-  };
-  generatedAt: string;
-  source: "database";
-}
 
 export function ReviewsPage() {
   const [searchParams] = useSearchParams();

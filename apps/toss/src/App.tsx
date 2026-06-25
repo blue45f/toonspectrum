@@ -1,10 +1,14 @@
 import IntroSplashScreen from "./components/IntroSplashScreen.tsx";
 import { CalendarPage } from "./pages/CalendarPage.tsx";
+import { CommunityPage } from "./pages/CommunityPage.tsx";
 import { ExplorePage } from "./pages/ExplorePage.tsx";
+import { FortunePage } from "./pages/FortunePage.tsx";
 import { DuelGame } from "./pages/games/DuelGame.tsx";
 import { MemoryGame } from "./pages/games/MemoryGame.tsx";
 import { QuizGame } from "./pages/games/QuizGame.tsx";
 import { RouletteGame } from "./pages/games/RouletteGame.tsx";
+import { RpsGame } from "./pages/games/RpsGame.tsx";
+import { LibraryPage } from "./pages/LibraryPage.tsx";
 import { PlayHubPage } from "./pages/PlayHubPage.tsx";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RecommendPage } from "./pages/RecommendPage.tsx";
@@ -28,10 +32,12 @@ type TabId = (typeof NAV)[number]["id"];
 
 // 경로 → 활성 탭. 검색/추천/상세 등 비탭 라우트는 가장 가까운 primary 탭으로 귀속(없으면 홈).
 function activeTab(path: string): TabId {
-  if (path.startsWith("/play")) return "play";
+  // 운세는 놀이터 허브 배너로 진입하므로 '놀이터' 탭에 귀속.
+  if (path.startsWith("/play") || path.startsWith("/fortune")) return "play";
   if (path.startsWith("/ranking")) return "ranking";
   if (path.startsWith("/calendar")) return "calendar";
-  if (path.startsWith("/explore")) return "explore";
+  // 내 서재·커뮤니티는 '탐색' 오버플로로 진입하므로 '탐색' 탭에 귀속.
+  if (path.startsWith("/explore") || path.startsWith("/library") || path.startsWith("/community")) return "explore";
   return "home";
 }
 
@@ -42,12 +48,16 @@ function renderRoute(path: string) {
   if (path === "/play/quiz") return <QuizGame />;
   if (path === "/play/roulette") return <RouletteGame />;
   if (path === "/play/memory") return <MemoryGame />;
+  if (path === "/play/rps") return <RpsGame />;
   if (path.startsWith("/play")) return <PlayHubPage />;
   if (path.startsWith("/ranking")) return <RankingPage />;
   if (path.startsWith("/calendar")) return <CalendarPage />;
   if (path.startsWith("/explore")) return <ExplorePage />;
   if (path.startsWith("/search")) return <SearchPage />;
   if (path.startsWith("/recommend")) return <RecommendPage />;
+  if (path.startsWith("/library")) return <LibraryPage />;
+  if (path.startsWith("/fortune")) return <FortunePage />;
+  if (path.startsWith("/community")) return <CommunityPage />;
   return <TitleListPage />;
 }
 

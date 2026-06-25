@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 import { addRecentSearch, removeRecentSearch } from "./recent-searches";
+import { deriveSavedTitleIds } from "./types";
 
 import type { ReadState, UserReview } from "./types";
 
@@ -277,14 +278,11 @@ export function useIsBookmarked(titleId: string): boolean {
 }
 
 // '내 찜·서재' = 사용자가 저장/구독/컬렉션에 담은 모든 작품 id 집합(하차 제외).
-// 페이지 필터의 "내 찜만 보기"에 사용. 세 레코드 참조는 안정적이라 React Compiler가 메모이즈한다.
+// 페이지 필터의 "내 찜만 보기"에 사용. 합집합 규칙은 @toonspectrum/core 의 순수
+// deriveSavedTitleIds 로 추출돼 웹·토스가 공유한다(세 레코드 참조는 안정적이라 React Compiler가 메모이즈).
 export function useSavedTitleIds(): Set<string> {
   const reads = useApp((s) => s.reads);
   const subscriptions = useApp((s) => s.subscriptions);
   const collections = useApp((s) => s.collections);
-  const set = new Set<string>();
-  for (const [id, state] of Object.entries(reads)) if (state && state !== "dropped") set.add(id);
-  for (const [id, on] of Object.entries(subscriptions)) if (on) set.add(id);
-  for (const col of collections) for (const id of col.titleIds) set.add(id);
-  return set;
+  return deriveSavedTitleIds(reads, subscriptions, collections);
 }

@@ -24,6 +24,7 @@ import { fetchTitles, coverUrl, type Title } from '../lib/api';
 import { navigate } from '../router';
 import { theme, pageShell } from '../theme';
 import { Badge, Chips, Cover } from '../ui';
+import { BannerAd } from '../components/BannerAd';
 
 const ALL = '전체';
 
@@ -266,6 +267,9 @@ export function CalendarPage() {
                 전체 연재 ≈{formatCount(totalScheduled)}편 색인 · 조회순 정렬
               </p>
             )}
+
+            {/* 요일별 연재 리스트가 끝나는 지점(below-fold)에 광고 — SSP 정책 준수 */}
+            {selItems.length > 0 && <BannerAd />}
           </>
         )}
       </div>
