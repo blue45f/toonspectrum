@@ -1,7 +1,8 @@
 "use client";
 
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 
 import { Container } from "@/components/section";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -375,6 +376,23 @@ export function SettingsPage() {
               <Trash2 size={14} /> 초기화
             </button>
           )}
+        </Row>
+      </section>
+
+      {/* 계정 */}
+      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">계정</h2>
+      <section className="rounded-2xl border border-line bg-panel/40 px-5">
+        <Row
+          icon={UserCog}
+          title="계정 관리 · 회원 탈퇴"
+          desc="프로필 수정과 회원 탈퇴는 내 정보 페이지에서 할 수 있어요. 탈퇴 시 로그인 정보가 삭제되고 세션이 만료됩니다."
+        >
+          <Link
+            to="/me"
+            className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+          >
+            내 정보 <ChevronRight size={14} />
+          </Link>
         </Row>
       </section>
     </Container>
