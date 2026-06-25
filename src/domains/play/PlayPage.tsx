@@ -89,6 +89,11 @@ export function PlayPage() {
           </li>
         ))}
       </ul>
+
+      <p className="mt-6 text-[0.68rem] leading-relaxed text-fg-3">
+        놀이터 게임은 공개 카탈로그의 메타데이터(제목·작가·장르·지표)만 사용하며, 게임 화면의 카드·타일은
+        플랫폼 표지 저작물이 아니라 작품별 색상 그라디언트로 표현됩니다. 모든 지표 중 일부는 추정값(≈)입니다.
+      </p>
     </Container>
   );
 }

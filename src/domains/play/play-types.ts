@@ -65,7 +65,7 @@ export function normalizePlayTitle(raw: unknown): PlayTitle | null {
     title,
     author: typeof t.author === "string" ? t.author : "작자미상",
     cover,
-    coverImage: typeof t.coverImage === "string" ? t.coverImage : undefined,
+    coverImage: undefined, // 저작권: 게임엔 표지 원본 미사용(아래 주석). 그라디언트만.
     genres: Array.isArray(t.genres) ? t.genres.map(String).slice(0, 4) : [],
     ageRating: typeof t.ageRating === "string" ? t.ageRating : "전체",
     type: typeof t.type === "string" ? t.type : "webtoon",
@@ -75,3 +75,8 @@ export function normalizePlayTitle(raw: unknown): PlayTitle | null {
     bookmarks: num(stats.bookmarks),
   };
 }
+
+// 저작권: 표지 정책(lib/server/cover-policy)은 표지 노출을 "색인·발견 목적 썸네일"로 한정해
+// 정당화한다. 게임(엔터테인먼트)은 그 범위 밖이라 플랫폼 표지 원본을 게임 자산으로 복제하지
+// 않는다 — 게임은 추상 OKLCH 그라디언트 + 제목/작가(사실정보)만 쓴다. (normalizePlayTitle 이
+// coverImage 를 비워 모든 게임의 표지 렌더가 그라디언트 폴백으로 떨어진다.)

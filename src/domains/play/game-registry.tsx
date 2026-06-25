@@ -10,7 +10,7 @@ export const PLAY_GAMES: PlayGameMeta[] = [
   {
     id: "card-battle",
     label: "웹툰 카드 배틀",
-    tagline: "인기 웹툰을 카드로 — 하스스톤式 턴제 대전",
+    tagline: "인기 웹툰을 카드로 — 수집형 턴제 카드 대전",
     Icon: Swords,
     hue: 268,
     category: "배틀",

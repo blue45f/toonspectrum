@@ -1,4 +1,4 @@
-import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw } from "lucide-react";
+import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import {
@@ -14,6 +14,7 @@ import {
   type Score,
 } from "./rps-logic";
 import { useHandGesture } from "./use-hand-gesture";
+import { useRpsVoice } from "./use-rps-voice";
 
 import type { PlayGameProps } from "../../play-types";
 
@@ -44,6 +45,8 @@ export function RpsGame({ onExit }: PlayGameProps) {
   const { videoRef, gesture, status } = useHandGesture(camera);
   const [use3d, setUse3d] = useState(true);
   const [vrmReady, setVrmReady] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const { speak, supported: voiceSupported } = useRpsVoice(voiceOn);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(3);
@@ -56,10 +59,14 @@ export function RpsGame({ onExit }: PlayGameProps) {
   const rngRef = useRef(seededRng(1));
   const historyRef = useRef<Hand[]>([]);
   const liveGesture = useRef<Hand | null>(null);
+  const speakRef = useRef(speak);
 
   useEffect(() => {
     liveGesture.current = gesture;
   }, [gesture]);
+  useEffect(() => {
+    speakRef.current = speak;
+  }, [speak]);
 
   const winner = matchOver(score, TARGET);
 
@@ -78,11 +85,15 @@ export function RpsGame({ onExit }: PlayGameProps) {
     setScore((s) => scoreReducer(s, out));
     setMessage("");
     setPhase("result");
+    speakRef.current(out === "win" ? "이겼다!" : out === "lose" ? "졌다…" : "비겼어!");
   }
 
-  // 카운트다운(3→2→1→샷) — 카메라 모드.
+  // 카운트다운(3→2→1→샷) — 카메라 모드. "가위·바위·보!" 구호를 음성으로.
   useEffect(() => {
     if (phase !== "counting") return;
+    if (count === 3) speakRef.current("가위");
+    else if (count === 2) speakRef.current("바위");
+    else if (count === 1) speakRef.current("보!");
     if (count > 0) {
       const t = setTimeout(() => setCount((c) => c - 1), 700);
       return () => clearTimeout(t);
@@ -265,11 +276,17 @@ export function RpsGame({ onExit }: PlayGameProps) {
               ))}
             </div>
           )}
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button variant={camera ? "solid" : "outline"} size="sm" onClick={toggleCamera}>
               {camera ? <CameraOff className="mr-1 h-4 w-4" /> : <Camera className="mr-1 h-4 w-4" />}
               {camera ? "버튼으로 플레이" : "손동작으로 플레이"}
             </Button>
+            {voiceSupported && (
+              <Button variant={voiceOn ? "solid" : "outline"} size="sm" onClick={() => setVoiceOn((v) => !v)}>
+                {voiceOn ? <Volume2 className="mr-1 h-4 w-4" /> : <VolumeX className="mr-1 h-4 w-4" />}
+                음성 {voiceOn ? "켬" : "끔"}
+              </Button>
+            )}
             {!camera && (
               <span className="inline-flex items-center gap-1 text-[0.7rem] text-fg-3">
                 <HandIcon className="h-3.5 w-3.5" /> 버튼을 눌러 한 판

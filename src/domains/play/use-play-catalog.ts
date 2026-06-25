@@ -48,7 +48,11 @@ export function usePlayTitles(
       .then((json: unknown) => {
         if (!active) return;
         const items = extractItems(json);
-        const titles = items.map(normalizePlayTitle).filter((t): t is PlayTitle => t !== null);
+        const titles = items
+          .map(normalizePlayTitle)
+          .filter((t): t is PlayTitle => t !== null)
+          // 청소년보호/법적 안전: 캐주얼 게임 풀에서 19+(성인) 작품 제외.
+          .filter((t) => !/19|성인|adult/i.test(t.ageRating));
         cache.set(key, titles);
         setState({ titles: titles.slice(0, limitRef.current), loading: false, error: null });
       })
