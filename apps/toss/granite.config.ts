@@ -19,5 +19,6 @@ export default defineConfig({
   ],
   outdir: 'dist',
   webViewProps: { type: 'partner' },
-  navigationBar: { withBackButton: true, withHomeButton: true },
+  // 다크 앱이라 토스 네이티브 내비게이션 바도 다크로(SDK 2.8.0+ 지원, 2026-06-22 공지).
+  navigationBar: { withBackButton: true, withHomeButton: true, theme: 'dark' },
 });
