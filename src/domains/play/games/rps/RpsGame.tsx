@@ -1,6 +1,8 @@
 import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
+
 import {
   EMPTY_SCORE,
   HAND_EMOJI,
@@ -211,6 +213,64 @@ export function RpsGame({ onExit }: PlayGameProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 헤더 — 제목 + 게임 방법 */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-fg">웹툰 가위바위보</h2>
+        <GameHelp
+          title="웹툰 가위바위보"
+          steps={[
+            {
+              emoji: "🎯",
+              title: "목표",
+              desc: (
+                <>
+                  <b className="text-fg">웹툰봇</b>을 이겨 <b className="text-fg">선승 {TARGET}점</b>을 먼저 따내요.
+                </>
+              ),
+            },
+            {
+              emoji: "✊",
+              title: "손 내기",
+              desc: (
+                <>
+                  <span className="text-emerald-500">손동작</span>(웹캠)·<span className="text-amber-500">음성 구호</span> 따라 내거나,
+                  카메라를 끄면 <b className="text-fg">가위·바위·보 버튼</b>으로 골라요.
+                </>
+              ),
+            },
+            {
+              emoji: "⏱️",
+              title: "타이밍",
+              desc: (
+                <>
+                  <b className="text-fg">"가위·바위·보!"</b> 구호의 <b className="text-fg">"보!"</b> 순간에 든 손이 그 판의 선택이에요.
+                </>
+              ),
+            },
+            {
+              emoji: "🤜",
+              title: "묵찌빠",
+              desc: (
+                <>
+                  탭을 <b className="text-fg">묵찌빠</b>로 바꾸면 먼저 <span className="text-amber-500">선(先)</span>을 잡고,
+                  같은 손이 나오는 순간 선을 쥔 쪽이 이겨요.
+                </>
+              ),
+            },
+            {
+              emoji: "🏆",
+              title: "승부",
+              desc: (
+                <>
+                  이기면 <span className="text-emerald-500">내 점수</span>, 지면 <span className="text-rose-500">봇 점수</span>가 올라가요.
+                  먼저 <b className="text-fg">{TARGET}점</b>이면 최종 승리!
+                </>
+              ),
+            },
+          ]}
+        />
+      </div>
+
       {/* 모드 전환 */}
       <div className="flex items-center justify-center gap-1 rounded-full border border-line bg-card/50 p-1 text-sm" role="tablist" aria-label="게임 모드">
         {(["rps", "muk"] as const).map((m) => (

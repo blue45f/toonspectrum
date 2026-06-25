@@ -1,6 +1,7 @@
 import { Clock, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -213,12 +214,60 @@ export function MemoryGame({ onExit }: PlayGameProps) {
             {fmtTime(elapsed)}
           </span>
         </div>
-        {best !== null && (
-          <span className="flex items-center gap-1 text-[0.72rem] text-fg-3">
-            <Trophy className="h-3.5 w-3.5 text-accent" />
-            최고 {best}수
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {best !== null && (
+            <span className="flex items-center gap-1 text-[0.72rem] text-fg-3">
+              <Trophy className="h-3.5 w-3.5 text-accent" />
+              최고 {best}수
+            </span>
+          )}
+          <GameHelp
+            title="웹툰 짝맞추기"
+            steps={[
+              {
+                emoji: "🎯",
+                title: "목표",
+                desc: (
+                  <>
+                    뒤집힌 <b className="text-fg">12장의 카드</b>에서 같은 웹툰 표지{" "}
+                    <b className="text-fg">6쌍</b>을 모두 찾으면 클리어예요.
+                  </>
+                ),
+              },
+              {
+                emoji: "👆",
+                title: "맞추기",
+                desc: (
+                  <>
+                    카드를 눌러 한 번에 <b className="text-fg">두 장</b>을 뒤집고, 같은 웹툰이면
+                    그대로 <span className="text-accent">고정</span>돼요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🔄",
+                title: "안 맞으면",
+                desc: (
+                  <>
+                    다르면 잠깐 보여준 뒤 카드가 <b className="text-fg">다시 뒤집혀요</b>. 표지
+                    위치를 기억해 두세요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🏆",
+                title: "점수",
+                desc: (
+                  <>
+                    <b className="text-fg">이동 횟수</b>와 <b className="text-fg">시간</b>이
+                    기록되며, 가장 적은 이동 수가 <span className="text-accent">최고 기록</span>으로
+                    남아요.
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* 보드 */}

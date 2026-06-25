@@ -1,6 +1,7 @@
 import { Dices, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -11,6 +12,7 @@ import {
   tierLabel,
 } from "./roulette-engine";
 
+import type { HelpStep } from "../../GameHelp";
 import type { PlayGameProps, PlayTitle } from "../../play-types";
 
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,47 @@ function Cover({
 }
 
 const ALL = "전체";
+
+const HELP_STEPS: HelpStep[] = [
+  {
+    emoji: "🎯",
+    title: "목표",
+    desc: (
+      <>
+        오늘 뭐 볼지 고민될 때, 룰렛이 인기 웹툰 중 <b className="text-fg">한 편</b>을 골라줘요.
+      </>
+    ),
+  },
+  {
+    emoji: "🏷️",
+    title: "장르 고르기",
+    desc: (
+      <>
+        위쪽 <b className="text-fg">장르 칩</b>으로 범위를 좁혀요.{" "}
+        <span className="text-accent">전체</span>면 모든 인기작에서 뽑아요.
+      </>
+    ),
+  },
+  {
+    emoji: "🎲",
+    title: "돌리기",
+    desc: (
+      <>
+        <b className="text-fg">스핀!</b> 버튼을 누르면 표지가 두구두구 돌다가 한 편에서 멈춰요.
+      </>
+    ),
+  },
+  {
+    emoji: "✨",
+    title: "결과 보기",
+    desc: (
+      <>
+        제목·작가·장르와 <b className="text-fg">추천 이유</b>가 떠요. 마음에 안 들면{" "}
+        <span className="text-accent">다시 돌리기</span>로 또 뽑아요.
+      </>
+    ),
+  },
+];
 
 export function RouletteGame({ onExit }: PlayGameProps) {
   const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
@@ -148,6 +191,12 @@ export function RouletteGame({ onExit }: PlayGameProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 헤더 — 게임 방법 안내 */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-fg-2">웹툰 룰렛</span>
+        <GameHelp title="웹툰 룰렛" steps={HELP_STEPS} />
+      </div>
+
       {/* 장르 칩 */}
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="장르 필터">
         {chips.map((g) => {

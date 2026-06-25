@@ -1,6 +1,7 @@
 import { Check, HelpCircle, RotateCcw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -187,8 +188,66 @@ export function QuizGame({ onExit }: PlayGameProps) {
     <div className="flex flex-col gap-4">
       {/* 상단 진행/점수 */}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-fg-2">
+        <span className="flex items-center gap-2 text-fg-2">
           문제 <span className="font-bold tabular-nums text-fg">{round}</span> / {ROUND_COUNT}
+          <GameHelp
+            title="웹툰 퀴즈"
+            steps={[
+              {
+                emoji: "🎯",
+                title: "목표",
+                desc: (
+                  <>
+                    흐릿하게 가려진 <b className="text-fg">표지</b>와 단서를 보고 그 웹툰의{" "}
+                    <b className="text-fg">제목</b>을 맞혀요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🃏",
+                title: "단서",
+                desc: (
+                  <>
+                    표지 아래에 <b className="text-fg">작가</b>와{" "}
+                    <b className="text-fg">장르</b>(최대 3개)가 힌트로 주어져요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🔘",
+                title: "정답 고르기",
+                desc: (
+                  <>
+                    <b className="text-fg">4개 보기</b> 중 하나를 누르면 바로 채점돼요. 정답은{" "}
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">초록</span>
+                    , 틀린 선택은{" "}
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">빨강</span>으로
+                    표시돼요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🔥",
+                title: "점수와 연속",
+                desc: (
+                  <>
+                    맞힐 때마다 <b className="text-fg">1점</b>, 연속으로 맞히면{" "}
+                    <b className="text-fg">연속 기록</b>이 쌓여요(틀리면 0으로 초기화).
+                  </>
+                ),
+              },
+              {
+                emoji: "🏁",
+                title: "한 판",
+                desc: (
+                  <>
+                    총 <b className="text-fg">{ROUND_COUNT}문제</b>를 풀면 최종 점수와 최고 연속
+                    기록을 보여줘요.
+                  </>
+                ),
+              },
+            ]}
+          />
         </span>
         <span className="flex items-center gap-3">
           <span className="text-fg-2">

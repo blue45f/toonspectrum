@@ -1,12 +1,14 @@
 import { Dice5, Flag, Gamepad2, RotateCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
   BOARD_SIZE,
   isFinished,
   makeInitialState,
+  RECOMMEND_SCORE,
   rollAndMove,
   type BoardState,
   type Tile,
@@ -163,7 +165,54 @@ export function DiceBoardGame({ onExit }: PlayGameProps) {
           </span>
           <span className="text-fg-3">턴 {state.rolls}</span>
         </div>
-        <div className="text-[0.7rem] text-fg-3">추천 수집 {state.collected.length}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-[0.7rem] text-fg-3">추천 수집 {state.collected.length}</span>
+          <GameHelp
+            title="웹툰 주사위 보드"
+            steps={[
+              {
+                emoji: "🎯",
+                title: "목표",
+                desc: (
+                  <>
+                    <b className="text-fg">{BOARD_SIZE}칸</b> 트랙을 달려 마지막{" "}
+                    <span className="text-accent">🏁 골</span>에 도달하면 완주예요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🎲",
+                title: "주사위 굴리기",
+                desc: (
+                  <>
+                    <b className="text-fg">주사위 굴리기</b> 버튼으로 1~6칸 전진해요. 한 칸당{" "}
+                    <b className="text-fg">+1점</b>씩 쌓여요.
+                  </>
+                ),
+              },
+              {
+                emoji: "⭐",
+                title: "이벤트 칸",
+                desc: (
+                  <>
+                    <span className="text-amber-400">⭐추천</span> 칸은 웹툰 한 편 발견 +{RECOMMEND_SCORE}점,{" "}
+                    <span className="text-emerald-400">⏩전진</span>·<span className="text-sky-400">⏪후퇴</span>는 위치
+                    이동, <span className="text-rose-400">🕳️함정</span>은 다음 턴 쉼이에요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🏆",
+                title: "완주",
+                desc: (
+                  <>
+                    골에 도착하면 끝! <b className="text-fg">점수·턴·수집한 추천 웹툰</b>으로 결과를 확인해요.
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* 진행 게이지 */}

@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Eye, RotateCcw, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { GameHelp } from "../../GameHelp";
 import { usePlayTitles } from "../../use-play-catalog";
 
 import {
@@ -133,10 +134,55 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
       {/* 점수 보드 */}
       <div className="flex items-center justify-between text-sm">
         <span className="rounded-full bg-accent-soft px-3 py-1 font-bold text-accent">점수 {score}</span>
-        <span className="flex items-center gap-1 text-fg-2">
-          <Trophy className="h-4 w-4 text-amber-500" />
-          <span className="tabular-nums">최고 {best}</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-fg-2">
+            <Trophy className="h-4 w-4 text-amber-500" />
+            <span className="tabular-nums">최고 {best}</span>
+          </span>
+          <GameHelp
+            title="웹툰 인기 대결"
+            steps={[
+              {
+                emoji: "🎯",
+                title: "목표",
+                desc: (
+                  <>
+                    두 웹툰 중 <b className="text-fg">조회수가 더 많은 작품</b>을 맞히며 연승을 쌓아요.
+                  </>
+                ),
+              },
+              {
+                emoji: "👀",
+                title: "비교 기준",
+                desc: (
+                  <>
+                    왼쪽 <b className="text-fg">기준 작품</b>의 조회수는 공개되고, 오른쪽{" "}
+                    <b className="text-fg">도전 작품</b>의 조회수는 <span className="text-fg-3">???</span>로 가려져요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🔼",
+                title: "선택",
+                desc: (
+                  <>
+                    도전 작품의 조회수가 기준보다 <b className="text-fg">더 높다 / 더 낮다</b>를 골라요.
+                  </>
+                ),
+              },
+              {
+                emoji: "🔥",
+                title: "연승",
+                desc: (
+                  <>
+                    맞히면 <b className="text-fg">점수 +1</b>, 직전 도전 작품이 다음 기준이 돼요. 한 번이라도 틀리면{" "}
+                    <b className="text-fg">게임 종료</b>—최고 점수는 계속 이어집니다.
+                  </>
+                ),
+              },
+            ]}
+          />
+        </div>
       </div>
 
       {/* 대결 카드 두 장 */}
