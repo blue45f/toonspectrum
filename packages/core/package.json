@@ -16,6 +16,12 @@
       "types": "./src/server/index.ts",
       "import": "./src/server/index.ts",
       "default": "./src/server/index.ts"
-    }
+    },
+    "./fx": {
+      "types": "./src/fx/index.ts",
+      "import": "./src/fx/index.ts",
+      "default": "./src/fx/index.ts"
+    },
+    "./fx/fx.css": "./src/fx/fx.css"
   }
 }

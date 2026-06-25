@@ -131,6 +131,7 @@ export function ExplorePage() {
         {/* 더보기 진입 — 하단 탭이 5개로 꽉 차 있어 부가 기능은 탐색 오버플로로 연다 */}
         <div className="chips" style={{ marginBottom: 16 }}>
           {[
+            { to: '/create', emoji: '🎨', label: '창작 스튜디오', accent: true },
             { to: '/library', emoji: '★', label: '내 서재' },
             { to: '/community', emoji: '💬', label: '커뮤니티' },
             { to: '/fortune', emoji: '🔮', label: '운세' },
@@ -151,9 +152,9 @@ export function ExplorePage() {
                 fontSize: 13,
                 fontWeight: 700,
                 cursor: 'pointer',
-                border: `1px solid ${theme.border}`,
-                background: theme.surface,
-                color: theme.text,
+                border: `1px solid ${m.accent ? theme.accent : theme.border}`,
+                background: m.accent ? theme.accentSoft : theme.surface,
+                color: m.accent ? theme.accent : theme.text,
               }}
             >
               <span aria-hidden>{m.emoji}</span>

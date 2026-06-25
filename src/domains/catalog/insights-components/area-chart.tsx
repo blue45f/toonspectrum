@@ -130,16 +130,18 @@ export function AreaChart({
             );
           })}
       </svg>
-      {/* x축 라벨 (양끝 + 중간 일부) */}
-      <div className="mt-1 flex justify-between px-1">
+      {/* x축 라벨 (양끝 + 중간 일부) — 숨김 라벨은 0폭으로 접어 데이터 포인트가 많아도
+          라벨 행이 컨테이너를 넘어 가로 오버플로를 만들지 않게 한다(모바일 가드). */}
+      <div className="mt-1 flex justify-between gap-1 overflow-hidden px-1">
         {xy.map((p, i) => {
           const show = n <= 7 || i === 0 || i === n - 1 || i % Math.ceil(n / 6) === 0;
           return (
             <span
               key={i}
+              aria-hidden={!show}
               className={cn(
-                "tnum text-[0.62rem] text-fg-3",
-                !show && "opacity-0",
+                "tnum whitespace-nowrap text-[0.62rem] text-fg-3",
+                !show && "w-0 overflow-hidden opacity-0",
                 highlightLast && i === n - 1 && "font-medium text-fg-2"
               )}
             >

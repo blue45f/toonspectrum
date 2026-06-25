@@ -1,3 +1,5 @@
+import { playSfx, triggerParticleBurst } from "@toonspectrum/core/fx";
+
 import { AvailabilityDots, PlatformTags } from "./availability";
 import { bestPricing } from "./availability-utils";
 import { BookmarkButton } from "./bookmark-button";
@@ -13,6 +15,17 @@ import { useIsBookmarked } from "@/lib/store";
 import { STATUS_LABEL } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
+
+// 작품 카드 탭 — 탭 지점에 파티클 "팡" + 'pop' 효과음. 전역 클릭 'tick' 은 [data-no-sfx] 로
+// 억제하고 여기서 'pop' 만 울린다(중복 방지). 북마크 등 카드 내부 컨트롤 탭에는 반응하지 않는다.
+function popOnTitleTap(event: React.PointerEvent<HTMLElement>) {
+  if (event.defaultPrevented) return;
+  // 카드 안의 다른 인터랙티브 요소(북마크 버튼 등)에서 시작한 탭은 제외.
+  const interactive = (event.target as Element | null)?.closest?.("button, [data-no-sfx-skip]");
+  if (interactive && interactive !== event.currentTarget) return;
+  playSfx("pop");
+  triggerParticleBurst(event.clientX, event.clientY, { count: 14, spread: 0.85 });
+}
 
 // 표준 그리드 카드 — 포스터 + 메타.
 // feature: 그리드의 리드 카드(가로 에디토리얼 레이아웃, 2칸 span).
@@ -39,6 +52,8 @@ export function TitleCard({
     return (
       <Link
         href={`/title/${title.slug}`}
+        data-no-sfx
+        onPointerDown={popOnTitleTap}
         className={cn("group block rounded-2xl focus-visible:outline-none", className)}
       >
         <div className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[transform,box-shadow,border-color] duration-200 surface-hl group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
@@ -84,6 +99,8 @@ export function TitleCard({
   return (
     <Link
       href={`/title/${title.slug}`}
+      data-no-sfx
+      onPointerDown={popOnTitleTap}
       className={cn("group block rounded-2xl focus-visible:outline-none", className)}
     >
       <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)]">
@@ -127,6 +144,8 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
   return (
     <Link
       href={`/title/${title.slug}`}
+      data-no-sfx
+      onPointerDown={popOnTitleTap}
       className={cn(
         "group flex gap-3.5 rounded-xl border border-line bg-card/85 p-3 transition-colors duration-150 hover:border-line-strong hover:bg-raised",
         className

@@ -4,11 +4,15 @@
  */
 import {
   appLogin,
+  generateHapticFeedback,
   getAnonymousKey,
   getOperationalEnvironment,
   getSchemeUri,
   share,
+  type HapticFeedbackType,
 } from '@apps-in-toss/web-framework';
+
+export type { HapticFeedbackType };
 
 export type TossEnv = 'toss' | 'sandbox' | 'web';
 
@@ -52,6 +56,21 @@ export async function tossAppLogin(): Promise<{
     return result ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * 디바이스 햅틱 진동(토스 네이티브). 토스 밖(일반 브라우저/개발)에서는 조용히 no-op.
+ * 'tickWeak'(가벼운 탭) ~ 'confetti'(축포) 등 — fx 파티클/효과음과 함께 써요.
+ */
+export function hapticFeedback(type: HapticFeedbackType): void {
+  if (!isInToss()) return;
+  try {
+    void generateHapticFeedback({ type }).catch(() => {
+      // 미지원 디바이스/환경은 조용히 무시
+    });
+  } catch {
+    // 미지원 디바이스/환경은 조용히 무시
   }
 }
 

@@ -47,6 +47,35 @@ export function PlayHubPage() {
         <span style={{ color: theme.accent, fontSize: 18 }}>›</span>
       </button>
 
+      {/* 3D 캐릭터 스튜디오 배너 — VRM 포저(/studio) 진입점 */}
+      <button
+        type="button"
+        className="pressable"
+        onClick={() => navigate('/studio')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          width: '100%',
+          padding: 16,
+          marginTop: 12,
+          borderRadius: 18,
+          border: `1px solid ${theme.border}`,
+          background: 'linear-gradient(135deg, rgba(91,176,255,0.22), rgba(107,228,166,0.16))',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 30 }}>🧍</span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 16, fontWeight: 800, color: theme.text }}>3D 캐릭터 스튜디오</span>
+          <span style={{ display: 'block', fontSize: 13, color: theme.textMuted, marginTop: 3 }}>
+            VRM 모델로 포즈 만들고 투명 PNG로 저장하기
+          </span>
+        </span>
+        <span style={{ color: theme.accent, fontSize: 18 }}>›</span>
+      </button>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
         {GAMES.map((g) => (
           <button

@@ -121,7 +121,7 @@ export function SiteHeader() {
                 툰스펙트럼
               </span>
               <span
-                className="rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent"
+                className="hidden rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent min-[400px]:inline"
                 title="베타 서비스 — 데이터·기능이 변경될 수 있습니다"
               >
                 BETA
@@ -177,13 +177,13 @@ export function SiteHeader() {
               </kbd>
             </button>
 
-            {/* 내 서재 */}
+            {/* 내 서재 — 모바일(<sm)에선 하단 탭바에 동일 항목이 있어 헤더 혼잡을 줄이려 숨긴다 */}
             <Link
               href="/library"
               aria-label={t("nav.library")}
               aria-current={isActive("/library") ? "page" : undefined}
               className={cx(
-                "group flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors",
+                "group hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium [text-wrap:nowrap] [word-break:keep-all] transition-colors sm:flex",
                 isActive("/library")
                   ? "bg-accent text-on-accent"
                   : "border border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"

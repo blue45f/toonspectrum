@@ -5155,7 +5155,7 @@ export function StudioPage() {
             {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div ref={exportMenuRef} className="relative flex items-center">
             <button
               type="button"

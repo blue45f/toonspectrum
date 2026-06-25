@@ -61,8 +61,8 @@
   --color-fg: oklch(0.26 0.02 60);
   --color-fg-2: oklch(0.42 0.018 66);
   --color-fg-3: oklch(0.52 0.016 70); /* light card 에서 WCAG AA 통과 */
-  --color-accent: oklch(0.6 0.2 40); /* 흰 글자 대비 위해 약간 진하게 */
-  --color-accent-2: oklch(0.55 0.21 36);
+  --color-accent: oklch(0.5 0.2 41); /* 밝은 배경 위 강조 텍스트(타이틀·링크)와 흰글자 버튼 양쪽 WCAG AA(≈4.5:1) 위해 진하게 */
+  --color-accent-2: oklch(0.47 0.2 36);
   --color-accent-soft: oklch(0.62 0.2 40 / 0.12);
   --color-on-accent: oklch(0.99 0.01 85);
   --color-cool: oklch(0.52 0.13 232);
@@ -200,6 +200,11 @@
     color-scheme: dark;
     -webkit-text-size-adjust: 100%;
     scrollbar-color: var(--color-line-strong) transparent;
+    /* 가로 오버플로 전역 가드 — body 의 overflow-x 는 스크롤포트(html)로 전파되지 않아
+       단독으로는 가로 스크롤을 막지 못한다. html 에 clip 을 둬 어떤 stray 오버플로도
+       가로 스크롤바를 만들지 못하게 한다(clip 은 hidden 과 달리 스크롤 컨테이너를 만들지
+       않아 자손의 position:sticky 를 보존). */
+    overflow-x: clip;
   }
 
   body {
@@ -210,7 +215,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   ::selection {

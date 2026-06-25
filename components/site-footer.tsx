@@ -54,7 +54,7 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="relative mt-24 border-t border-line/60 bg-[linear-gradient(to_bottom,oklch(0.185_0.018_68/0.55),oklch(0.17_0.018_68/0.32))]">
+    <footer className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25">
       {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
       <span
         aria-hidden

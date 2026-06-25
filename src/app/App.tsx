@@ -1,15 +1,20 @@
+import { useClickSfx } from "@toonspectrum/core/fx";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/components/auth/session-provider";
+import { BgmToggle } from "@/components/bgm-toggle";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { IntroSplash } from "@/components/IntroSplash";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { pingVisit } from "@/lib/visits-api";
+
+// 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
+import "@toonspectrum/core/fx/fx.css";
 
 const AgeGateHost = lazy(() =>
   import("@/components/age-gate-host").then((mod) => ({
@@ -159,6 +164,9 @@ function DeferredBackToTop() {
 
 export default function App() {
   useVisitPing();
+  // 전역 클릭 'tick' — 인터랙티브 요소(버튼·링크) 탭마다 미묘한 효과음. opt-out 은 [data-no-sfx].
+  // SFX 는 기본 ON(동작 최소화 선호 시 자동 OFF), 첫 제스처에서 오디오 컨텍스트가 언락된다.
+  useClickSfx();
   return (
     <BrowserRouter>
       <AuthSessionProvider>
@@ -186,6 +194,7 @@ export default function App() {
         <DeferredGlobalOverlays />
         <DeferredBackToTop />
         <div className="fixed bottom-4 left-4 z-[90] flex items-center gap-2 max-md:bottom-20 max-md:left-auto max-md:right-4">
+          <BgmToggle />
           <ThemeSwitcher />
           <LanguageSwitcher />
         </div>
