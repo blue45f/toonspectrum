@@ -1,11 +1,11 @@
 // search·taxonomy 는 core 동급 모듈(브라우저-세이프)이라 sibling import.
-import { PLATFORMS } from "../platforms";
+import { platformCoverage } from "../derive";
 import { searchTitles, type SearchFilters, type SortKey } from "../search";
 import { GENRES } from "../taxonomy";
 
 import { TITLES, activeTags } from "./catalog-store";
 
-import type { AgeRating, PlatformId, SerialStatus, Title, WorkType } from "../types";
+import type { AgeRating, PlatformId, SerialStatus, WorkType } from "../types";
 
 export type ExploreSearchParams = Record<string, string | undefined>;
 export type ExploreSort = SortKey;
@@ -134,22 +134,4 @@ export async function getExploreData(sp: ExploreSearchParams) {
     generatedAt: new Date().toISOString(),
     source: "server-catalog",
   };
-}
-
-// 플랫폼별 작품 수/점유율(빈 플랫폼은 패널에서 숨김). 캘린더/검색과 동일 형태.
-function platformCoverage(titles: Title[]) {
-  const counts = new Map<PlatformId, number>();
-  for (const title of titles) {
-    const ids = new Set(title.availability.map((entry) => entry.platformId));
-    ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
-  }
-  return [...counts.entries()]
-    .map(([id, count]) => ({
-      id,
-      label: PLATFORMS[id]?.short ?? id,
-      color: PLATFORMS[id]?.color ?? "oklch(0.72 0.02 70)",
-      count,
-      share: titles.length ? Math.round((count / titles.length) * 100) : 0,
-    }))
-    .sort((a, b) => b.count - a.count);
 }

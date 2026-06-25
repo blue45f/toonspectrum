@@ -1,10 +1,8 @@
 import { groupByWeekday, kstTodayIdx } from "../calendar";
-import { PLATFORMS } from "../platforms";
+import { platformCoverage } from "../derive";
 import { WEEK_DAYS } from "../taxonomy";
 
 import { TITLES } from "./catalog-store";
-
-import type { PlatformId, Title } from "../types";
 
 export async function getCalendarData() {
   const todayIdx = kstTodayIdx();
@@ -22,21 +20,4 @@ export async function getCalendarData() {
     platformCoverage: platformCoverage(ongoing),
     generatedAt: new Date().toISOString(),
   };
-}
-
-function platformCoverage(titles: Title[]) {
-  const counts = new Map<PlatformId, number>();
-  for (const title of titles) {
-    const ids = new Set(title.availability.map((entry) => entry.platformId));
-    ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
-  }
-  return [...counts.entries()]
-    .map(([id, count]) => ({
-      id,
-      label: PLATFORMS[id]?.short ?? id,
-      color: PLATFORMS[id]?.color ?? "oklch(0.72 0.02 70)",
-      count,
-      share: titles.length ? Math.round((count / titles.length) * 100) : 0,
-    }))
-    .sort((a, b) => b.count - a.count);
 }

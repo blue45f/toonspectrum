@@ -9,13 +9,14 @@ import { Top } from '@toss/tds-mobile';
 import {
   WEEK_DAYS,
   groupByWeekday,
+  topGenres,
+  platformCoverage,
   kstTodayIdx,
   applyTitleFilters,
   statsAreEstimated,
   platform,
   formatCount,
   EMPTY_TITLE_FILTERS,
-  type PlatformId,
 } from '@toonspectrum/core';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -48,19 +49,8 @@ export function CalendarPage() {
     [items],
   );
 
-  // 장르 칩(연재 작품에 2편 이상 등장하는 장르만, 빈도순). 전체 + 상위 7개.
-  const genres = useMemo(() => {
-    const c = new Map<string, number>();
-    for (const t of ongoing) for (const g of t.genres || []) c.set(g, (c.get(g) || 0) + 1);
-    return [
-      ALL,
-      ...[...c.entries()]
-        .filter(([, n]) => n >= 2)
-        .sort((a, b) => b[1] - a[1])
-        .map(([g]) => g)
-        .slice(0, 7),
-    ];
-  }, [ongoing]);
+  // 장르 칩 — core.topGenres 단일 소스(연재 작품 빈도순 상위 7).
+  const genres = useMemo(() => [ALL, ...topGenres(ongoing, { limit: 7 })], [ongoing]);
 
   // 선택 장르로 좁히기 — 공용 applyTitleFilters 재사용(별도 로직 없음).
   const scoped = useMemo(() => {
@@ -71,18 +61,11 @@ export function CalendarPage() {
   // 요일별·조회순 그룹화 — 코어 groupByWeekday(서버 라우트와 동일 함수).
   const byDay = useMemo(() => groupByWeekday(scoped), [scoped]);
 
-  // 플랫폼 커버리지(연재 작품을 플랫폼별로 카운트, 많은 순). 원시 id 대신 platform().name 노출.
-  const coverage = useMemo(() => {
-    const counts = new Map<PlatformId, number>();
-    for (const t of scoped) {
-      const ids = new Set(t.availability.map((a) => a.platformId));
-      ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
-    }
-    return [...counts.entries()]
-      .map(([id, count]) => ({ id, name: platform(id).name, color: platform(id).color, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-  }, [scoped]);
+  // 플랫폼 커버리지 — core.platformCoverage 단일 소스(캘린더·탐색·검색 공용). 표시명만 덧붙임.
+  const coverage = useMemo(
+    () => platformCoverage(scoped).slice(0, 6).map((c) => ({ ...c, name: platform(c.id).name })),
+    [scoped],
+  );
 
   const selDay = Math.min(dayIdx, WEEK_DAYS.length - 1);
   const selItems = byDay[selDay] ?? [];

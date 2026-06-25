@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   searchTitles,
   suggest,
+  topGenres,
   statsAreEstimated,
   platform,
   type Title,
@@ -59,13 +60,8 @@ export function SearchPage() {
 
   const query = q.trim();
 
-  // 데이터에서 상위 장르를 도출(2편 이상). 칩 = [전체, 무료·기다무, ...장르]
-  const genres = useMemo(() => {
-    const c = new Map<string, number>();
-    for (const t of items) for (const g of t.genres || []) c.set(g, (c.get(g) || 0) + 1);
-    const top = [...c.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([g]) => g).slice(0, 8);
-    return [ALL, FREE, ...top];
-  }, [items]);
+  // 데이터에서 상위 장르를 도출 — core.topGenres 단일 소스. 칩 = [전체, 무료·기다무, ...장르]
+  const genres = useMemo(() => [ALL, FREE, ...topGenres(items, { limit: 8 })], [items]);
 
   // 칩은 "무료" 토글 + 단일 장르를 한 줄에 섞어 보여준다(active 표시는 합성).
   const activeChip = freeOnly ? FREE : genre;
