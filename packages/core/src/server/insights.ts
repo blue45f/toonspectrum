@@ -1,6 +1,5 @@
-import { TYPE_LABEL } from "../../../../lib/taxonomy";
 import { PLATFORMS, PRICING_LABEL } from "../platforms";
-// taxonomy 는 core 미이전(브라우저-세이프)이라 웹 레포 lib/ 에서 climb 해 참조한다.
+import { TYPE_LABEL } from "../taxonomy";
 
 import { TITLES, activeTags, adaptationsOf, titlesByType } from "./catalog-store";
 

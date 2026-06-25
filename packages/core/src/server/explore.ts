@@ -1,7 +1,7 @@
-// search·taxonomy 는 아직 core 로 이전 전이라 웹 레포 lib/ 에서 climb 해 참조한다(둘 다 브라우저-세이프).
-import { searchTitles, type SearchFilters, type SortKey } from "../../../../lib/search";
-import { GENRES } from "../../../../lib/taxonomy";
+// search·taxonomy 는 core 동급 모듈(브라우저-세이프)이라 sibling import.
 import { PLATFORMS } from "../platforms";
+import { searchTitles, type SearchFilters, type SortKey } from "../search";
+import { GENRES } from "../taxonomy";
 
 import { TITLES, activeTags } from "./catalog-store";
 

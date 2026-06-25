@@ -1,6 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+// kstDayOfWeek 는 연재 캘린더 그룹화(groupByWeekday)와 한 짝이라 @toonspectrum/core 의 calendar 모듈을
+// 단일 출처로 삼는다(웹·토스·API 공유). cn/keepInlineText 등 UI 의존(clsx/Tailwind) 유틸은 여기 남는다.
+export { kstDayOfWeek } from "../packages/core/src/calendar";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -49,12 +53,6 @@ export function relativeDate(iso: string, now = new Date("2025-05-29T00:00:00Z")
 
 export function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
-}
-
-// 한국 표준시(KST) 기준 요일 (0=일 … 6=토). 서버 타임존(UTC 등)과 무관하게 한국 날짜로 계산.
-// getDay()는 서버 로컬 TZ를 쓰므로 UTC 배포 시 KST 자정 부근에 요일이 어긋난다 → 이 헬퍼로 통일.
-export function kstDayOfWeek(): number {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay();
 }
 
 // 결정적 의사난수 (시드 기반) — 아바타/스켈레톤 등 SSR 안전한 변주에 사용

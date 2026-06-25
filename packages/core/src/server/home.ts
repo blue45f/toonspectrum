@@ -1,15 +1,14 @@
-// ranking·search·taxonomy·utils 는 core 미이전(브라우저-세이프)이라 웹 레포 lib/ 에서 climb. reviews 는
-// drizzle/db 를 쓰는 서버 전용이라 lib/server/ 에 남는다(웹은 getHomeData 를 value 로 import 안 해 번들 미유입).
-import { rankBy } from "../../../../lib/ranking";
-import { sortTitles } from "../../../../lib/search";
+// ranking·search·taxonomy·calendar 는 core 동급 모듈(브라우저-세이프)이라 sibling import. reviews 는
+// drizzle/db 를 쓰는 서버 전용이라 웹 레포 lib/server/ 에서 climb 한다(웹은 getHomeData 를 value 로
+// import 안 해 번들 미유입).
 import { getReviewGlobalStats } from "../../../../lib/server/reviews";
-import { GENRES, WEEK_DAYS } from "../../../../lib/taxonomy";
-import { kstDayOfWeek } from "../../../../lib/utils";
+import { kstTodayIdx } from "../calendar";
 import { PLATFORM_LIST } from "../platforms";
+import { rankBy } from "../ranking";
+import { sortTitles } from "../search";
+import { GENRES, WEEK_DAYS } from "../taxonomy";
 
 import { TITLES, adaptationsOf, activeTags } from "./catalog-store";
-
-const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
 
 export async function getHomeData() {
   const featured = TITLES.filter((t) => t.featured);
@@ -27,7 +26,7 @@ export async function getHomeData() {
     .sort((a, b) => b.original.stats.views - a.original.stats.views)
     .slice(0, 3);
   const tags = activeTags().slice(0, 14);
-  const todayDay = WEEK_DAYS[DAY_IDX_FROM_GETDAY[kstDayOfWeek()]];
+  const todayDay = WEEK_DAYS[kstTodayIdx()];
   const todayReleases = TITLES.filter(
     (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.includes(todayDay)
   )

@@ -1,15 +1,5 @@
-// estimate·ranking·taxonomy 는 core 미이전(브라우저-세이프)이라 웹 레포 lib/ 에서 climb. live 는
+// estimate·ranking·taxonomy 는 core 동급 모듈(브라우저-세이프)이라 sibling import. live 는
 // 서버 전용(process.env·network)이라 lib/server/ 에 남고, 웹은 기존처럼 disableLive 로 코드만 번들·실행 안 함.
-import { statsAreEstimated } from "../../../../lib/estimate";
-import {
-  PERIODS,
-  RANK_AXES,
-  rankBy,
-  rankablePoolSize,
-  type RankedTitle,
-  type RankAxis,
-  type RankPeriod,
-} from "../../../../lib/ranking";
 import {
   getLiveRanking,
   getLiveStatusSignals,
@@ -23,8 +13,18 @@ import {
   type LiveStatusResult,
   type LiveStatusSignal,
 } from "../../../../lib/server/live";
-import { GENRES } from "../../../../lib/taxonomy";
+import { statsAreEstimated } from "../estimate";
 import { PLATFORM_LIST, PLATFORMS, PRICING_LABEL } from "../platforms";
+import {
+  PERIODS,
+  RANK_AXES,
+  rankBy,
+  rankablePoolSize,
+  type RankedTitle,
+  type RankAxis,
+  type RankPeriod,
+} from "../ranking";
+import { GENRES } from "../taxonomy";
 
 import { TITLES } from "./catalog-store";
 

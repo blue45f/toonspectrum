@@ -1,24 +1,17 @@
-// taxonomy·utils 는 core 미이전(브라우저-세이프)이라 웹 레포 lib/ 에서 climb 해 참조한다.
-import { WEEK_DAYS } from "../../../../lib/taxonomy";
-import { kstDayOfWeek } from "../../../../lib/utils";
+import { groupByWeekday, kstTodayIdx } from "../calendar";
 import { PLATFORMS } from "../platforms";
+import { WEEK_DAYS } from "../taxonomy";
 
 import { TITLES } from "./catalog-store";
 
 import type { PlatformId, Title } from "../types";
 
-const DAY_IDX_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
-
 export async function getCalendarData() {
-  const todayIdx = DAY_IDX_FROM_GETDAY[kstDayOfWeek()];
+  const todayIdx = kstTodayIdx();
   const ongoing = TITLES.filter(
     (t) => t.type === "webtoon" && t.status === "ongoing" && t.updateDays?.length
   );
-  const byDay = WEEK_DAYS.map((day) =>
-    ongoing
-      .filter((t) => t.updateDays!.includes(day))
-      .sort((a, b) => b.stats.views - a.stats.views)
-  );
+  const byDay = groupByWeekday(ongoing);
 
   return {
     todayIdx,
