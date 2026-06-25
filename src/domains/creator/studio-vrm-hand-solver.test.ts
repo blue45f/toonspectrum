@@ -80,11 +80,14 @@ describe("studio-vrm-hand-solver", () => {
     expect(bones.rightThumbDistal[2]).toBeGreaterThan(0); // 우측 부호 +
   });
 
-  it("avatarSideForHand: 미러면 좌우를 교차한다", () => {
-    expect(avatarSideForHand("Left", false)).toBe("left");
-    expect(avatarSideForHand("Right", false)).toBe("right");
-    expect(avatarSideForHand("Left", true)).toBe("right");
-    expect(avatarSideForHand("Right", true)).toBe("left");
+  it("avatarSideForHand: HandLandmarker 라벨은 미러 기준 — 미러면 그대로, 비미러면 스왑", () => {
+    // HandLandmarker handedness 는 셀카(미러) 입력을 가정해 분류되므로 Pose 의 해부학적 라벨과 반대다.
+    // 미러(거울 따라하기): 라벨을 그대로 써야 팔(pose 솔버의 좌↔우 스왑 결과)과 같은 손에 손가락이 얹힌다.
+    expect(avatarSideForHand("Left", true)).toBe("left");
+    expect(avatarSideForHand("Right", true)).toBe("right");
+    // 비미러: 라벨을 스왑해 해부학적 측으로 되돌린다(pose 솔버 non-mirror 와 일치).
+    expect(avatarSideForHand("Left", false)).toBe("right");
+    expect(avatarSideForHand("Right", false)).toBe("left");
   });
 
   it("랜드마크가 21개 미만이면 빈 맵", () => {

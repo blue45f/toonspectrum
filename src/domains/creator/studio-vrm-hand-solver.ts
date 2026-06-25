@@ -103,9 +103,18 @@ export function solveHandToFingerBones(
   return out;
 }
 
-/** MediaPipe handedness("Left"/"Right") + 미러 → 아바타 측. */
+/**
+ * MediaPipe HandLandmarker handedness("Left"/"Right") + 미러 → 아바타 측.
+ *
+ * 주의: HandLandmarker 의 handedness 는 "셀카(미러)" 입력을 가정해 분류된다 — 즉
+ * PoseLandmarker 의 해부학적 left/right 랜드마크 라벨과 반대다(같은 물리적 손인데 라벨이 뒤집힘).
+ * 손가락은 팔(pose 솔버)이 올려놓은 아바타 손에 얹혀야 손바닥 방향이 팔과 일치한다.
+ * pose 솔버는 미러 시 좌우를 스왑해 "거울 따라하기"를 만들므로, 손가락도 같은 측을 골라야 한다:
+ *   - mirror(셀카 거울): HandLandmarker 라벨을 그대로 사용(이미 미러 기준이라 스왑하면 이중반전 → 손바닥 반대).
+ *   - non-mirror: 라벨을 스왑해 해부학적 측으로 되돌린다.
+ */
 export function avatarSideForHand(handedness: string, mirror: boolean): "left" | "right" {
-  const anatomical = handedness.toLowerCase().startsWith("l") ? "left" : "right";
-  if (!mirror) return anatomical;
-  return anatomical === "left" ? "right" : "left";
+  const labelSide = handedness.toLowerCase().startsWith("l") ? "left" : "right";
+  if (mirror) return labelSide;
+  return labelSide === "left" ? "right" : "left";
 }
