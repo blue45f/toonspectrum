@@ -1,4 +1,4 @@
-import { Newspaper, BookText, Mic, Search, ArrowUpRight } from "lucide-react";
+import { Newspaper, BookText, Mic, Search, ArrowUpRight, PlayCircle, PenLine } from "lucide-react";
 
 import { Section } from "./section";
 
@@ -18,6 +18,18 @@ function links(title: Title) {
       label: "줄거리·설정 더보기",
       sub: "나무위키",
       href: `https://namu.wiki/Search?q=${enc(t)}`,
+    },
+    {
+      icon: PlayCircle,
+      label: "유튜브 리뷰 영상",
+      sub: "리뷰·추천·정주행 영상",
+      href: `https://www.youtube.com/results?search_query=${enc(`${t} ${kind} 리뷰`)}`,
+    },
+    {
+      icon: PenLine,
+      label: "블로그 후기",
+      sub: "네이버 블로그",
+      href: `https://search.naver.com/search.naver?where=blog&query=${enc(`${t} ${kind} 리뷰`)}`,
     },
     {
       icon: Newspaper,
@@ -50,7 +62,7 @@ export function TitleExternal({ title }: { title: Title }) {
       className="mt-14"
       eyebrow="MORE"
       title="관련 정보 더 보기"
-      desc="상세 줄거리·뉴스·작가 인터뷰는 원 출처에서 확인하세요. 툰스펙트럼은 연결만 합니다."
+      desc="유튜브 리뷰 영상·블로그 후기·줄거리·뉴스를 원 출처에서 확인하세요. 툰스펙트럼은 검색으로 연결만 합니다."
     >
       <ul className="grid gap-2.5 sm:grid-cols-2">
         {items.map((it) => (
