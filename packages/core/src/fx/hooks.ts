@@ -10,7 +10,7 @@
  * 모든 훅은 SSR-safe(서버 스냅샷 제공) 합니다.
  */
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   BGM_PRESETS,
@@ -192,4 +192,63 @@ export function useFx(): UseFx {
     setVolume: setMasterVolume,
     audio,
   };
+}
+
+/* ── useReveal — 스크롤-진입 모션(IntersectionObserver, once) ──────────────────── */
+
+export interface UseRevealOptions {
+  /** 진입 판정 임계(0~1). 기본 0.12. */
+  threshold?: number;
+  /** 루트 마진(IO rootMargin). 기본 "0px 0px -10% 0px"(살짝 먼저 발화). */
+  rootMargin?: string;
+  /** false 면 관찰하지 않고 즉시 보임 처리(런타임 토글용). 기본 true. */
+  enabled?: boolean;
+}
+
+/**
+ * 요소가 처음 뷰포트에 들어오면 한 번만 `revealed=true` 로 전환한다(IntersectionObserver, once).
+ * 반환한 ref 를 대상에 달고, `revealed` 가 true 면 fx.css 의 `is-revealed` 클래스를 붙이세요:
+ *   const { ref, revealed } = useReveal();
+ *   <section ref={ref} className={`reveal ${revealed ? "is-revealed" : ""}`}>…
+ *
+ * SSR/IO 미지원/비브라우저면 즉시 revealed=true 로 폴백(콘텐츠가 항상 보임 — CLS 0).
+ * fx.css 가 reduced-motion 에서 from-state 를 무효화하므로 모션만 빠지고 가시성은 유지됩니다.
+ */
+export function useReveal<T extends Element = HTMLElement>(
+  options: UseRevealOptions = {},
+): { ref: (node: T | null) => void; revealed: boolean } {
+  const { threshold = 0.12, rootMargin = "0px 0px -10% 0px", enabled = true } = options;
+  const [revealed, setRevealed] = useState(false);
+  const nodeRef = useRef<T | null>(null);
+
+  // 콜백 ref — 노드 부착 시점에 IO 를 건다(once). 부착 해제 시 정리.
+  const ref = useCallback(
+    (node: T | null) => {
+      nodeRef.current = node;
+      if (!node || !enabled) return;
+      // IO 미지원·비브라우저면 즉시 보임 처리.
+      if (typeof IntersectionObserver === "undefined") {
+        setRevealed(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            setRevealed(true);
+            observer.disconnect(); // once
+          }
+        },
+        { threshold, rootMargin },
+      );
+      observer.observe(node);
+    },
+    [enabled, threshold, rootMargin],
+  );
+
+  // enabled=false 면(또는 비활성→되면) 즉시 보임 처리.
+  useEffect(() => {
+    if (!enabled) setRevealed(true);
+  }, [enabled]);
+
+  return { ref, revealed };
 }

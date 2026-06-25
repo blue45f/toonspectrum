@@ -1,3 +1,5 @@
+import { BUSINESS_INFO } from "@toonspectrum/core";
+
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { spectrumGradient } from "@/lib/genre-color";
@@ -106,21 +108,22 @@ export function SiteFooter() {
       <div className="border-t border-line/60">
         <div className="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 text-[11px] text-fg-3 space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 leading-relaxed">
+            {/* 사업자 표기 = @toonspectrum/core BUSINESS_INFO 단일 소스(토스 InfoPage와 공유) */}
             <div>
-              <p className="font-semibold text-fg-2">상호: 에이치준랩스</p>
-              <p>대표자: 김희준 | 개인정보보호책임자: 김희준</p>
+              <p className="font-semibold text-fg-2">상호: {BUSINESS_INFO.name}</p>
+              <p>대표자: {BUSINESS_INFO.ceo} | 개인정보보호책임자: {BUSINESS_INFO.privacyOfficer}</p>
             </div>
             <div>
-              <p>사업자등록번호: 355-07-03473</p>
-              <p>주소: 서울특별시 송파구 가락로34길 13, 101호(방이동)</p>
+              <p>사업자등록번호: {BUSINESS_INFO.registrationNumber}</p>
+              <p>주소: {BUSINESS_INFO.address}</p>
             </div>
             <div>
-              <p>이메일: blue45f@gmail.com</p>
-              <p>전화번호: 010-3873-4197</p>
+              <p>이메일: {BUSINESS_INFO.email}</p>
+              <p>전화번호: {BUSINESS_INFO.phone}</p>
             </div>
             <div>
-              <p>호스팅 서비스: Vercel (Frontend)</p>
-              <p>플랫폼 형태: 웹툰·웹소설 통합 검색 및 분석 인덱스</p>
+              <p>호스팅 서비스: {BUSINESS_INFO.hosting}</p>
+              <p>플랫폼 형태: {BUSINESS_INFO.serviceType}</p>
             </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-line/40 pt-4 sm:flex-row sm:items-center sm:justify-between">

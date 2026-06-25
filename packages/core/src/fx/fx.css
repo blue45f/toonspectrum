@@ -2,14 +2,22 @@
  * @toonspectrum/core/fx/fx.css — 웹·토스 공유 fx 키프레임/유틸(프레임워크 비종속 CSS).
  *
  * 클래스 1개만 붙이면 동작하도록 keyframes + .pf-* 헬퍼를 함께 제공합니다.
- *   - pf-jelly-pop : 탭 스프링(눌렀다 통 튀는 젤리감) — 1회성
- *   - pf-sparkle   : 연속 반짝임(밝기/스케일 미세 펄스)
- *   - pf-aurora    : 아주 느린 배경 그라데이션 흐름(오로라)
- *   - pf-glow      : 부드러운 발광 펄스(그림자 호흡)
+ *   - pf-jelly-pop  : 탭 스프링(눌렀다 통 튀는 젤리감) — 1회성
+ *   - pf-sparkle    : 연속 반짝임(밝기/스케일 미세 펄스)
+ *   - pf-aurora     : 아주 느린 배경 그라데이션 흐름(오로라)
+ *   - pf-glow       : 부드러운 발광 펄스(그림자 호흡)
+ *   - shimmer-title : 화려한 타이틀(그라데이션 시머 + 글로우, bg-clip-text). 탭=파티클+사운드.
+ *   - count-pop     : 숫자가 "톡" 솟구쳤다 안착(카운트업과 함께). .is-revealed 로 opt-in.
+ *   - reveal / reveal-soft : 스크롤-진입 모션(IO 가 .is-revealed 부여). 가시성은 모션과 분리(CLS 0).
+ *   - pulse-dot / pulse-ring : 라이브/실시간 신호 표시점(레이더처럼 확산하는 링).
+ *   - sheen-sweep   : 표면을 한 번 가로지르는 빛 띠(히어로/피처 카드 프리미엄 질감).
  *
  * 색은 토큰(--ts-fx-glow 등)으로 빼서 앱별 브랜드 색을 주입할 수 있게 했어요.
  * 미지정 시 웹툰 웜 액센트(oklch ~42 hue)로 폴백합니다.
  * prefers-reduced-motion 사용자는 모든 fx 애니메이션을 정지(접근성).
+ *
+ * easing 토큰(--ts-ease-*)은 앱 전역 var(--ease-out-expo 등)를 폴백 체인으로 흡수하되,
+ * 토스처럼 그 변수가 없어도 동작하도록 cubic-bezier 리터럴로 끝맺습니다(self-contained).
  */
 
 :root {
@@ -17,6 +25,16 @@
   --ts-fx-aurora-1: oklch(0.72 0.185 42 / 0.5);
   --ts-fx-aurora-2: oklch(0.78 0.16 290 / 0.45);
   --ts-fx-aurora-3: oklch(0.8 0.11 232 / 0.4);
+
+  /* 라이브 표시점 펄스 색(웜 퍼시몬). 앱이 --ts-fx-pulse 로 덮어쓸 수 있어요. */
+  --ts-fx-pulse: oklch(0.72 0.185 42);
+  /* 시머 타이틀 글로우 색(drop-shadow). 기본은 웜 액센트. */
+  --ts-fx-shimmer-glow: oklch(0.72 0.185 42 / 0.5);
+
+  /* easing — 앱 전역 변수가 있으면 그걸 쓰고, 없으면 리터럴로 폴백(토스 self-contained). */
+  --ts-ease-out-expo: var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  --ts-ease-out-quint: var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1));
+  --ts-ease-out-quart: var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
 }
 
 /* ── pf-jelly-pop — 탭 스프링(눌렀다 통 튀는 젤리) ─────────────────────────── */
@@ -111,12 +129,219 @@
   animation: pf-glow 2.4s ease-in-out infinite;
 }
 
+/* ── shimmer-title — 화려한 타이틀(그라데이션 시머 + 글로우, bg-clip-text) ────────
+ * aidigestdesk의 aidShimmer/aidGlow 곡선·타이밍을 그대로 이식하되, 색을 툰스펙트럼
+ * 웜 스펙트럼(퍼시몬→골드→로즈→바이올렛)으로 바꿔 브랜드 hue 축(≈42)에 정합시킵니다.
+ * 탭 시 ShimmerTitle 컴포넌트가 파티클 버스트 + 'pop' 사운드를 발화(active=scale).
+ */
+@keyframes ts-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+@keyframes ts-shimmer-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 1px color-mix(in oklch, var(--ts-fx-shimmer-glow) 40%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px var(--ts-fx-shimmer-glow));
+  }
+}
+.shimmer-title {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* 웜 스펙트럼 그라데이션 — 퍼시몬→골드→로즈→바이올렛→퍼시몬(끊김 없는 루프). */
+  background-image: linear-gradient(
+    100deg,
+    oklch(0.72 0.185 42) 0%,
+    oklch(0.78 0.16 60) 22%,
+    oklch(0.7 0.19 18) 42%,
+    oklch(0.7 0.17 320) 60%,
+    oklch(0.72 0.185 42) 80%,
+    oklch(0.78 0.16 60) 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation:
+    ts-shimmer 3.6s linear infinite,
+    ts-shimmer-glow 2.4s ease-in-out infinite;
+  transition: transform 0.12s var(--ts-ease-out-quint);
+}
+.shimmer-title:active {
+  transform: scale(0.97);
+}
+
+/* ── count-pop — 숫자가 "톡" 솟구쳤다 안착(카운트업과 함께) ─────────────────────── */
+.count-pop {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.count-pop.is-revealed {
+  animation: ts-count-pop 0.55s var(--ts-ease-out-expo) both;
+}
+@keyframes ts-count-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── reveal / reveal-soft — 스크롤-진입 모션(IO 가 .is-revealed 부여) ─────────────
+ * 기본은 from-state(살짝 내려가 투명). IO 가 화면 진입을 감지하면 .is-revealed 가 붙어
+ * 키프레임으로 안착. 가시성은 모션과 분리돼 JS/IO 미지원·reduced-motion 에선 그냥 보임(CLS 0).
+ * --reveal-delay(ms)로 형제 목록 스태거.
+ */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px) scale(0.985);
+  will-change: opacity, transform;
+}
+.reveal.is-revealed {
+  animation: ts-reveal-up 0.62s var(--ts-ease-out-quint) both;
+  animation-delay: calc(var(--reveal-delay, 0) * 1ms);
+}
+.reveal-soft {
+  opacity: 0;
+  will-change: opacity;
+}
+.reveal-soft.is-revealed {
+  animation: ts-reveal-fade 0.6s var(--ts-ease-out-quart) both;
+  animation-delay: calc(var(--reveal-delay, 0) * 1ms);
+}
+@keyframes ts-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes ts-reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── pulse-dot / pulse-ring — 라이브/실시간 신호 표시점 ────────────────────────────
+ * 진행중·실시간 상태 옆에서 웜 점이 레이더처럼 확산하는 링을 주기적으로 내보냅니다.
+ * 장식이라 a11y 이름엔 포함하지 않고(aria-hidden), reduced-motion 에선 정적 점으로 멈춥니다.
+ */
+.pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ts-fx-pulse);
+  box-shadow: 0 0 0 0 color-mix(in oklch, var(--ts-fx-pulse) 55%, transparent);
+  animation: ts-pulse-ring 2.4s var(--ts-ease-out-quint) infinite;
+}
+@keyframes ts-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--ts-fx-pulse) 50%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px color-mix(in oklch, var(--ts-fx-pulse) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--ts-fx-pulse) 0%, transparent);
+  }
+}
+
+/* ── sheen-sweep — 표면을 한 번 가로지르는 빛 띠(프리미엄 질감) ─────────────────────
+ * 비스듬한 반투명 띠가 표면을 가로질러 '빛이 스치는' 느낌. 포인터 호버에서만 1회(루프 금지),
+ * 터치 기기엔 발화하지 않습니다. 부모에 position/overflow:hidden 이 필요해요.
+ */
+.sheen-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.sheen-sweep::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -130%;
+  width: 55%;
+  z-index: 1;
+  transform: skewX(-16deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, white 16%, transparent),
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) and (pointer: fine) {
+  .sheen-sweep:hover::after {
+    animation: ts-sheen 0.9s var(--ts-ease-out-quart);
+  }
+}
+@keyframes ts-sheen {
+  0% {
+    left: -130%;
+    opacity: 1;
+  }
+  100% {
+    left: 230%;
+    opacity: 1;
+  }
+}
+
 /* 접근성 — 모션 최소화 사용자에겐 fx 애니메이션을 멈춥니다. */
 @media (prefers-reduced-motion: reduce) {
   .pf-jelly-pop,
   .pf-sparkle,
   .pf-aurora,
   .pf-glow {
+    animation: none;
+  }
+  /* 시머 off → 또렷한 솔리드 제목으로 복원(클립된 투명 글자 그대로 멈추면 제목이 사라짐). */
+  .shimmer-title {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--ts-fx-glow);
+    filter: none;
+  }
+  /* 진입 모션 — 모션을 끄고 from-state(투명/이동)를 무효화해 콘텐츠가 항상 또렷이 보이게. */
+  .reveal,
+  .reveal-soft {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .count-pop.is-revealed {
+    animation: none;
+  }
+  /* 라이브 점은 확산 링을 멈추고 정적 점으로 유지. */
+  .pulse-dot {
+    animation: none;
+  }
+  /* 호버 시머는 멈춥니다. */
+  .sheen-sweep:hover::after {
     animation: none;
   }
 }

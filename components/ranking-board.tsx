@@ -828,6 +828,8 @@ export function RankingBoard({
         <div className="grid gap-2 sm:grid-cols-2">
           {visibleRanked.map((r) => {
             const mm = metric(r.title);
+            // 별점 축은 RatingInline이 ≈를 붙이므로 지표 컬럼 중복 표기를 피한다.
+            const mmEstimated = statsAreEstimated(r.title) && axis !== "rating" && axis !== "hidden";
             return (
               <Link
                 key={r.title.id}
@@ -853,7 +855,10 @@ export function RankingBoard({
                     <PlatformTags availability={r.title.availability} max={1} />
                   </span>
                 </span>
-                <span className="numeral shrink-0 text-xs text-fg-2">{mm.value}</span>
+                <span className="numeral shrink-0 text-xs text-fg-2">
+                  {mmEstimated && <span className="text-fg-3" aria-hidden>≈</span>}
+                  {mm.value}
+                </span>
               </Link>
             );
           })}

@@ -132,9 +132,11 @@ export function ExplorePage() {
         <div className="chips" style={{ marginBottom: 16 }}>
           {[
             { to: '/create', emoji: '🎨', label: '창작 스튜디오', accent: true },
+            { to: '/recommend', emoji: '✨', label: '맞춤 추천' },
             { to: '/library', emoji: '★', label: '내 서재' },
             { to: '/community', emoji: '💬', label: '커뮤니티' },
             { to: '/fortune', emoji: '🔮', label: '운세' },
+            { to: '/info', emoji: 'ℹ️', label: '정보·약관' },
           ].map((m) => (
             <button
               key={m.to}

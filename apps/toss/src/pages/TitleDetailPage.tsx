@@ -3,10 +3,60 @@ import { navigate } from '../router';
 import { Button } from '@toss/tds-mobile';
 import { fetchTitles, getCached, coverUrl, platform, type Title } from '../lib/api';
 import { similarTitles, statsAreEstimated, formatCount } from '@toonspectrum/core';
-import { shareMessage } from '../lib/toss';
+import { shareMessage, hapticFeedback } from '../lib/toss';
+import { useRating, setRating } from '../lib/library';
 import { Badge, Cover, StatStrip } from '../ui';
 import { BannerAd } from '../components/BannerAd';
+import { Carousel } from '../components/Carousel';
 import { theme } from '../theme';
+
+/* ── 내 평점 입력(0.5 단위) — 라이브러리 평점 스토어(useRating/setRating)에 직접 기록한다.
+   여기서 남긴 별점이 곧 '내 서재 > 평가' 탭에 그대로 나타난다(같은 단일 스토어). ───────── */
+function MyRating({ id }: { id: string }) {
+  const value = useRating(id);
+  return (
+    <div style={{ marginTop: 26 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>내 평점</h2>
+      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: theme.textMuted }}>
+        별을 눌러 평가하면 내 서재와 취향 분석에 바로 반영돼요. {value > 0 ? `(현재 ${value.toFixed(1)}점)` : '아직 평가 전'}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} role="group" aria-label="내 별점">
+        {[1, 2, 3, 4, 5].map((n) => {
+          const filled = value >= n;
+          const half = !filled && value >= n - 0.5;
+          return (
+            <button
+              key={n}
+              type="button"
+              className="pressable"
+              // 누른 별의 같은 값 재선택=‑0.5 → 0(해제) 순환(LibraryPage StarInput 과 동일 규약).
+              onClick={() => {
+                const next = value === n ? n - 0.5 : value === n - 0.5 ? 0 : n;
+                setRating(id, next);
+                hapticFeedback('tickWeak');
+              }}
+              aria-label={`${n}점`}
+              aria-pressed={filled}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 30, lineHeight: 1, padding: '2px 1px', color: filled || half ? theme.accent : theme.textMuted }}
+            >
+              {filled ? '★' : half ? '⯨' : '☆'}
+            </button>
+          );
+        })}
+        {value > 0 && (
+          <button
+            type="button"
+            className="pressable"
+            onClick={() => setRating(id, 0)}
+            style={{ marginLeft: 10, background: 'none', border: 'none', color: theme.textMuted, fontSize: 13, cursor: 'pointer' }}
+          >
+            지우기
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function TitleDetailPage({ id = '' }: { id?: string }) {
   // 전체 카탈로그(이미 캐시됨)와 현재 작품을 함께 보관 — similarTitles 는 풀 리스트가 필요하다.
@@ -112,14 +162,17 @@ export function TitleDetailPage({ id = '' }: { id?: string }) {
           </div>
         </div> : null}
 
+        {/* 내 평점 — 라이브러리 평점 스토어에 직접 기록(내 서재 '평가' 탭과 동일 소스). */}
+        <MyRating id={t.id} />
+
         {/* 비슷한 작품 — recommend.ts 의 similarTitles(장르·태그·어댑테이션 유사도) 결과를 가로 스트립으로. */}
         {similar.length ? <div style={{ marginTop: 28 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>비슷한 작품</h2>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+          <Carousel itemWidth={116} gap={12} ariaLabel="비슷한 작품">
             {similar.map((s) => (
               <button key={s.id} type="button" onClick={() => openTitle(s)} className="pressable"
                 aria-label={`${s.title} 상세 보기`}
-                style={{ flexShrink: 0, width: 116, textAlign: 'left', padding: 0, border: 'none',
+                style={{ width: '100%', textAlign: 'left', padding: 0, border: 'none',
                   background: 'transparent', color: theme.text, cursor: 'pointer' }}>
                 <Cover gradient={s.cover} src={coverUrl(s)} alt={s.title} height={158} radius={12} />
                 <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, marginTop: 8,
@@ -127,7 +180,7 @@ export function TitleDetailPage({ id = '' }: { id?: string }) {
                 {s.genres?.[0] && <div style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 3 }}>{s.genres[0]}</div>}
               </button>
             ))}
-          </div>
+          </Carousel>
         </div> : null}
 
         <div style={{ marginTop: 24 }}>

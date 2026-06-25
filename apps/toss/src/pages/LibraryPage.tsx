@@ -442,8 +442,8 @@ function RatedTab({
       <EmptyTeach
         icon="⭐"
         title="평가한 작품이 없어요"
-        desc="별점을 남기면 취향 분석과 추천이 정교해져요."
-        cta={{ label: '랭킹에서 평가하기', to: '/ranking' }}
+        desc="작품을 열어 별점을 남기면 여기에 모이고, 취향 분석과 추천이 정교해져요."
+        cta={{ label: '작품 둘러보기', to: '/explore' }}
       />
     );
   }
@@ -601,8 +601,8 @@ function TasteTab({
       <EmptyTeach
         icon="🧭"
         title="취향 데이터를 모으는 중"
-        desc="작품을 평가하거나 서재에 담으면 당신의 취향 스펙트럼을 분석해 드려요."
-        cta={{ label: '지금 평가하기', to: '/ranking' }}
+        desc="작품을 열어 평가하거나 서재에 담으면 당신의 취향 스펙트럼을 분석해 드려요."
+        cta={{ label: '작품 둘러보기', to: '/explore' }}
       />
     );
   }

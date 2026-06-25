@@ -9,6 +9,7 @@ import { CommunityPage } from "./pages/CommunityPage.tsx";
 import { CreatePage } from "./pages/CreatePage.tsx";
 import { ExplorePage } from "./pages/ExplorePage.tsx";
 import { FortunePage } from "./pages/FortunePage.tsx";
+import { InfoPage } from "./pages/InfoPage.tsx";
 import { DuelGame } from "./pages/games/DuelGame.tsx";
 import { MemoryGame } from "./pages/games/MemoryGame.tsx";
 import { QuizGame } from "./pages/games/QuizGame.tsx";
@@ -39,14 +40,25 @@ const NAV = [
 
 type TabId = (typeof NAV)[number]["id"];
 
-// 경로 → 활성 탭. 검색/추천/상세 등 비탭 라우트는 가장 가까운 primary 탭으로 귀속(없으면 홈).
+// 경로 → 활성 탭. 비탭 라우트는 "어디서 진입하는지"로 가장 가까운 primary 탭에 귀속한다.
 function activeTab(path: string): TabId {
-  // 운세·3D 스튜디오는 놀이터 허브에서 진입하므로 '놀이터' 탭에 귀속.
+  // 운세·3D 스튜디오는 놀이터 허브(/play)에서 진입하므로 '놀이터' 탭에 귀속.
   if (path.startsWith("/play") || path.startsWith("/fortune") || path.startsWith("/studio")) return "play";
   if (path.startsWith("/ranking")) return "ranking";
   if (path.startsWith("/calendar")) return "calendar";
-  // 창작 스튜디오·내 서재·커뮤니티는 '탐색' 오버플로로 진입하므로 '탐색' 탭에 귀속.
-  if (path.startsWith("/explore") || path.startsWith("/create") || path.startsWith("/library") || path.startsWith("/community")) return "explore";
+  // 탐색 오버플로(ExplorePage 상단 칩)로 진입하는 부가 화면들 — 창작 스튜디오·내 서재·커뮤니티·추천·정보/약관.
+  // 검색(/search)도 어느 탭에서든 Top 검색 버튼으로 열리지만, 비탭 라우트라 가장 가까운 '탐색'에 귀속한다.
+  if (
+    path.startsWith("/explore") ||
+    path.startsWith("/create") ||
+    path.startsWith("/library") ||
+    path.startsWith("/community") ||
+    path.startsWith("/recommend") ||
+    path.startsWith("/search") ||
+    path.startsWith("/info")
+  )
+    return "explore";
+  // 작품 상세(/title/..)·검증용 샘플 등 그 외는 홈에 귀속.
   return "home";
 }
 
@@ -59,7 +71,8 @@ function isImmersiveEditor(path: string): boolean {
 function renderRoute(path: string) {
   const detail = path.match(/^\/title\/(.+)$/);
   if (detail) return <TitleDetailPage id={decodeURIComponent(detail[1])} />;
-  if (path === "/play/duel") return <DuelGame />;
+  // 게임 id 는 웹 play 레지스트리와 통일(popularity-duel). 구 경로(/play/duel)는 호환을 위해 함께 받는다.
+  if (path === "/play/popularity-duel" || path === "/play/duel") return <DuelGame />;
   if (path === "/play/quiz") return <QuizGame />;
   if (path === "/play/roulette") return <RouletteGame />;
   if (path === "/play/memory") return <MemoryGame />;
@@ -72,6 +85,7 @@ function renderRoute(path: string) {
   if (path.startsWith("/recommend")) return <RecommendPage />;
   if (path.startsWith("/library")) return <LibraryPage />;
   if (path.startsWith("/fortune")) return <FortunePage />;
+  if (path.startsWith("/info")) return <InfoPage />;
   if (path.startsWith("/studio")) return <StudioPage />;
   // 창작 스튜디오 — 웹(루트)의 Konva 컷툰 에디터를 lazy 재사용. 자체 모바일 레이아웃으로 렌더.
   if (path.startsWith("/create")) return <CreatePage />;
@@ -79,6 +93,39 @@ function renderRoute(path: string) {
   // 숨은 검증 라우트 — 웹 Tailwind 컴포넌트가 토스에서 렌더되는지 확인용(#/sample). 하단 탭 비노출.
   if (path.startsWith("/sample")) return <WebComponentSample />;
   return <TitleListPage />;
+}
+
+// 토스 셸 검색 어포던스 — 어느 탭에서든 통합 검색(/search)으로 진입. 하단 탭은 5개로 꽉 차 있어
+// 검색은 우상단 플로팅 버튼(셸 크롬)으로 노출한다. 검색·상세·몰입형 에디터 화면에선 숨긴다.
+function SearchFab() {
+  return (
+    <button
+      type="button"
+      className="pressable"
+      onClick={() => navigate("/search")}
+      aria-label="통합 검색"
+      title="검색"
+      style={{
+        position: "fixed",
+        top: "calc(10px + env(safe-area-inset-top))",
+        right: 12,
+        zIndex: 60,
+        width: 42,
+        height: 42,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: 999,
+        border: `1px solid ${theme.border}`,
+        background: "rgba(34,26,19,0.82)",
+        backdropFilter: "blur(8px)",
+        color: theme.text,
+        fontSize: 19,
+        cursor: "pointer",
+      }}
+    >
+      🔍
+    </button>
+  );
 }
 
 function BottomNav({ tab }: { tab: TabId }) {
@@ -140,6 +187,9 @@ export function App() {
   useClickSfx(); // 전역 위임 클릭 'tick'(인터랙티브 요소 탭마다).
   // 몰입형 에디터에서는 토스 셸 크롬(하단 탭·BGM 토글)을 숨겨 에디터 자체 UI 와 겹치지 않게 한다.
   const immersive = isImmersiveEditor(path);
+  // 검색 FAB 은 몰입형 에디터·검색 페이지(중복)·상세 페이지(자체 sticky 헤더와 겹침)에선 숨긴다.
+  const showSearchFab =
+    !immersive && !path.startsWith("/search") && !path.startsWith("/title/");
 
   // 타이틀 카드(인트로 스플래시) 탭 — 파티클 '팡' + 'pop' 효과음 + 토스 햅틱(축포).
   const onTitleCardTap = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -155,6 +205,7 @@ export function App() {
       <div onPointerDown={onTitleCardTap} data-no-sfx>
         <SplashScreen once={false} />
       </div>
+      {showSearchFab && <SearchFab />}
       <div style={{ paddingBottom: immersive ? 0 : 72 }}>{renderRoute(path)}</div>
       {!immersive && <BottomNav tab={tab} />}
       {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).

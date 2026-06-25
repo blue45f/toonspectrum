@@ -47,6 +47,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
   const existing = useApp((s) => s.reviews[titleId]);
   const upsert = useApp((s) => s.upsertReview);
   const remove = useApp((s) => s.deleteReview);
+  const loggedIn = useApp((s) => Boolean(s.userId));
 
   const [saved, setSaved] = useState(false);
 
@@ -188,7 +189,10 @@ export function ReviewForm({ titleId }: { titleId: string }) {
         </div>
       </div>
       <p className="text-[0.7rem] text-fg-3">
-        평가는 이 브라우저에만 저장됩니다 (localStorage). 별점은 {`'`}내 서재{`'`}의 취향 분석에 반영돼요.
+        {loggedIn
+          ? "평가는 계정에 저장되어 어느 기기에서나 이어집니다."
+          : "평가는 이 브라우저에만 저장됩니다 (localStorage). 로그인하면 계정에 동기화돼요."}{" "}
+        별점은 {`'`}내 서재{`'`}의 취향 분석에 반영돼요.
       </p>
     </form>
   );

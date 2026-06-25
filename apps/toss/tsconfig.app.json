@@ -23,7 +23,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
+    // baseUrl 없이 paths 만 사용(TS5+ 는 paths 를 이 설정 파일 위치 기준으로 해석).
+    // baseUrl 은 TS6 에서 TS5101(deprecated)을 발생시키므로 루트 tsconfig 와 동일하게 제거.
     "paths": {
       // 웹과 동일한 "@/…" → 레포 루트 매핑(cross-app import 해소). 루트 tsconfig 의 paths 와 일치.
       "@/*": ["../../*"]

@@ -16,11 +16,13 @@ export const HERO_BANNER_AUTOPLAY_MS = 5500;
 
 export function HeroBannerSlide({ title }: { title: Title }) {
   const hue = genreColor(title.genres[0] ?? "드라마", 0.72);
+  // 19+ 작품은 흐릿한 배경 표지 레이어도 노출하지 않는다(hero-banner-static와 동일 가드).
+  const isRestricted = title.ageRating === "19";
 
   return (
     <Link href={`/title/${title.slug}`} className="group/slide relative block">
       <div className="absolute inset-0" aria-hidden>
-        {title.coverImage ? (
+        {title.coverImage && !isRestricted ? (
           <img
             src={title.coverImage}
             alt=""
@@ -66,6 +68,7 @@ export function HeroBannerSlide({ title }: { title: Title }) {
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
             <AvailabilityDots availability={title.availability} max={4} />
             <span className="numeral text-[0.72rem] text-fg-3 tnum">
+              {statsAreEstimated(title) && <span aria-hidden>≈</span>}
               {formatCount(title.stats.views)} 조회
             </span>
             <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-semibold text-on-accent transition-transform duration-150 ease-out-expo group-hover/slide:translate-x-0.5">

@@ -64,16 +64,39 @@ function notify(): void {
   for (const l of listeners) l();
 }
 
-function readJson<T>(key: string, fallback: T): T {
+// 스냅샷 안정 캐시 — useSyncExternalStore 는 getSnapshot 결과를 참조 비교한다. 매 호출
+// localStorage 를 재파싱해 새 객체/배열을 돌려주면 무한 루프(React #185)가 난다. 그래서 raw
+// 문자열이 같으면 직전에 파싱한 동일 참조를 돌려준다(쓰기/크로스탭 변경 시에만 무효화).
+const snapshotCache = new Map<string, { raw: string | null; value: unknown }>();
+
+function readCached<T>(key: string, fallback: T, parse: (parsed: unknown) => T): T {
   if (typeof window === 'undefined') return fallback;
+  let raw: string | null;
   try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? { ...fallback, ...(parsed as object) } : fallback;
+    raw = window.localStorage.getItem(key);
   } catch {
-    return fallback;
+    raw = null;
   }
+  const cached = snapshotCache.get(key);
+  if (cached && cached.raw === raw) return cached.value as T;
+  let value: T;
+  if (raw == null) {
+    value = fallback;
+  } else {
+    try {
+      value = parse(JSON.parse(raw));
+    } catch {
+      value = fallback;
+    }
+  }
+  snapshotCache.set(key, { raw, value });
+  return value;
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  return readCached(key, fallback, (parsed) =>
+    parsed && typeof parsed === 'object' ? { ...fallback, ...(parsed as object) } : fallback,
+  );
 }
 
 function writeJson(key: string, value: unknown): void {
@@ -82,6 +105,8 @@ function writeJson(key: string, value: unknown): void {
   } catch {
     /* 비공개 모드 등 — 무시 */
   }
+  // 다음 read 가 재파싱하도록 캐시 무효화(쓴 값과 직렬화 차이가 있을 수 있어 raw 를 비운다).
+  snapshotCache.delete(key);
   notify();
 }
 
@@ -146,15 +171,9 @@ export function useStreak(): FortuneStreak {
 /* ── 보관함(최근 본 운세) ─────────────────────────────────────────────────── */
 
 function readArray<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
+  return readCached<T[]>(key, EMPTY_HISTORY as unknown as T[], (parsed) =>
+    Array.isArray(parsed) ? (parsed as T[]) : (EMPTY_HISTORY as unknown as T[]),
+  );
 }
 
 export function getHistory(): FortuneHistoryEntry[] {

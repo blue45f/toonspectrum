@@ -316,7 +316,8 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                         <span className="numeral text-sm text-accent">{r.toFixed(1)}</span>
                       </span>
                       <span className="text-[0.7rem] text-fg-3">
-                        평균 {t.stats.ratingAvg.toFixed(1)}
+                        평균 {statsAreEstimated(t) ? "≈" : ""}
+                        {t.stats.ratingAvg.toFixed(1)}
                       </span>
                     </div>
                   </Link>

@@ -100,7 +100,7 @@ export function DuelGame() {
           최고 {state.best}
         </span>
         <GameHelp
-          id="duel"
+          id="popularity-duel"
           title="웹툰 인기 대결"
           steps={[
             {

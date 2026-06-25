@@ -17,6 +17,9 @@ import { fetchTitles, coverUrl, type Title } from '../lib/api';
 import { SearchBar, Chips, Badge, Cover } from '../ui';
 import { BannerAd } from '../components/BannerAd';
 import { theme, pageShell } from '../theme';
+// 웹(루트)의 공유 컴포넌트를 그대로 재사용(NO fork) — 시머 타이틀 + 카운트업 팝.
+import { CountUp } from '@/components/count-up';
+import { ShimmerTitle } from '@/components/shimmer-title';
 
 const ALL = '전체';
 const TOP_STRIP = 8; // 인기 스트립 상위 N (스포트라이트 1 + 그리드)
@@ -87,7 +90,14 @@ export function TitleListPage() {
       <Top
         title={<Top.TitleParagraph size={22}>📚 툰스펙트럼</Top.TitleParagraph>}
         subtitleBottom={
-          <Top.SubtitleParagraph size={15}>흩어진 이야기를, 한 권의 색인으로</Top.SubtitleParagraph>
+          <Top.SubtitleParagraph size={15}>
+            흩어진 이야기를,{' '}
+            {/* 공유 ShimmerTitle(NO fork) — 웹 히어로의 accent 구간과 동일 결(웜 스펙트럼 시머+탭 파티클). */}
+            <ShimmerTitle as="span" style={{ fontSize: 15, fontWeight: 700 }}>
+              한 권의 색인
+            </ShimmerTitle>
+            으로
+          </Top.SubtitleParagraph>
         }
       />
       <div style={pageShell}>
@@ -112,13 +122,30 @@ export function TitleListPage() {
         )}
 
         {!loading && !error && total > 0 && (
-          <p
-            style={{ fontSize: 12.5, color: theme.textMuted, margin: '0 0 14px', textAlign: 'right' }}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 6,
+              fontSize: 12.5,
+              color: theme.textMuted,
+              margin: '0 0 14px',
+            }}
           >
-            {browsing
-              ? `${formatCount(total)}편 색인 · 실시간 인기순`
-              : `검색 결과 ${formatCount(strip.length)}편`}
-          </p>
+            {browsing ? (
+              <>
+                {/* 카운트업 + count-pop(공유) — 수록 편수가 "톡" 솟구쳤다 안착. */}
+                <CountUp value={total} separator className="numeral" style={{ color: theme.text, fontWeight: 700 }} />
+                <span>편 색인 ·</span>
+                {/* 실시간 신호 — fx.css pulse-dot(레이더 확산 링). 장식이라 aria-hidden. */}
+                <span aria-hidden className="pulse-dot" style={{ marginLeft: 2 }} />
+                <span>실시간 인기순</span>
+              </>
+            ) : (
+              <span>검색 결과 {formatCount(strip.length)}편</span>
+            )}
+          </div>
         )}
 
         {/* 스포트라이트 — rankBy('popular') #1. featured 대신 '왜 #1인가'가 산식으로 설명되는 작품. */}

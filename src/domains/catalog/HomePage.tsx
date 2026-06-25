@@ -7,6 +7,7 @@ import { Container } from "@/components/container";
 import { CountUp } from "@/components/count-up";
 import { HeroBannerStatic } from "@/components/hero-banner-static";
 import { OpenSearchButton } from "@/components/open-search-button";
+import { ShimmerTitle } from "@/components/shimmer-title";
 import { spectrumGradient } from "@/lib/genre-color";
 import Link from "@/src/compat/router-link";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
@@ -235,14 +236,19 @@ export function HomePage() {
                   흩어진 이야기를,
                 </span>
                 <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.26s_both]">
-                  <span className="relative inline-block font-serif font-normal italic text-accent">
+                  <ShimmerTitle
+                    as="span"
+                    className="relative font-serif font-normal italic"
+                    particleCount={24}
+                    particleSpread={1.2}
+                  >
                     한 권의 색인
                     {/* 핸드드로운 강조 밑줄 — fill-in 후 정지. accent 톤. */}
                     <span
                       aria-hidden
                       className="absolute -bottom-0.5 left-0 h-[0.14em] w-full origin-left rounded-full bg-[linear-gradient(90deg,var(--color-accent),transparent)] motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.9s_both]"
                     />
-                  </span>
+                  </ShimmerTitle>
                   으로.
                 </span>
               </h1>
@@ -286,7 +292,7 @@ export function HomePage() {
 
             {/* 시그니처 인덱스 넘버럴 — 대형 tabular grotesque. ledger 격자 패널(데이터 대장 느낌). */}
             <dl
-              className="grid gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl"
+              className="sheen-sweep grid gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl"
               style={{
                 animation: "fade-up 0.6s var(--ease-out-expo) 0.55s both",
                 gridTemplateColumns: `repeat(${Math.min(heroStats.length, 4)}, minmax(0, 1fr))`,

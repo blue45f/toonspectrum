@@ -8,6 +8,7 @@ import {
   getAnonymousKey,
   getOperationalEnvironment,
   getSchemeUri,
+  openURL,
   share,
   type HapticFeedbackType,
 } from '@apps-in-toss/web-framework';
@@ -71,6 +72,29 @@ export function hapticFeedback(type: HapticFeedbackType): void {
     });
   } catch {
     // 미지원 디바이스/환경은 조용히 무시
+  }
+}
+
+/**
+ * 외부 웹 URL 을 기기 기본 브라우저로 연다(토스 네이티브 openURL → 일반 브라우저 window.open 폴백).
+ * 약관·개인정보처리방침 등 운영 사이트(자사 서비스) 정책 문서 아웃링크에 사용한다.
+ * (앱 설치 유도가 아니라 동일 서비스의 법적 고지 문서로의 이동이라 외부링크 가이드라인에 부합.)
+ */
+export function openExternalUrl(url: string): void {
+  if (isInToss()) {
+    try {
+      void openURL(url);
+      return;
+    } catch {
+      // fall through to web fallback
+    }
+  }
+  try {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  } catch {
+    // 차단/미지원 환경은 조용히 무시
   }
 }
 

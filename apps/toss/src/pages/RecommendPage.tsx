@@ -16,6 +16,7 @@ import {
   type TasteProfile,
 } from '@toonspectrum/core';
 
+import { Carousel } from '../components/Carousel';
 import { GameCover } from '../games/GameCover';
 import { toGameTitles } from '../games/types';
 import { fetchTitles, type Title } from '../lib/api';
@@ -407,11 +408,11 @@ export function RecommendPage() {
                   <p style={{ fontSize: 13, color: theme.textMuted, margin: '0 0 14px', lineHeight: 1.5 }}>
                     인생작에 ♥를 눌러보세요. 누른 작품과 닮은 결의 작품이 가중 추천됩니다.
                   </p>
-                  <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none' }}>
+                  <Carousel itemWidth={96} gap={10} ariaLabel="인생작 고르기">
                     {popular.slice(0, 8).map((t) => {
                       const loved = ratings[t.id] === 5;
                       return (
-                        <div key={t.id} style={{ width: 96, flexShrink: 0 }}>
+                        <div key={t.id}>
                           <button
                             type="button"
                             onClick={() => toggleLove(t)}
@@ -460,7 +461,7 @@ export function RecommendPage() {
                         </div>
                       );
                     })}
-                  </div>
+                  </Carousel>
                   {ONBOARDING_GENRES.length > 0 && picked.length === 0 && (
                     <div style={{ marginTop: 16 }}>
                       <p style={{ fontSize: 12, color: theme.textMuted, margin: '0 0 8px' }}>
@@ -484,7 +485,7 @@ export function RecommendPage() {
                 title="이 작품과 비슷한"
                 desc="기준 작품을 고르면 장르·태그·어댑테이션으로 닮은 작품을 찾아줘요."
               />
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+              <Carousel itemWidth={64} gap={8} ariaLabel="비슷한 작품의 기준 고르기">
                 {popular.map((t) => {
                   const on = seed?.id === t.id;
                   return (
@@ -497,8 +498,7 @@ export function RecommendPage() {
                       aria-label={`${t.title} 기준으로 비슷한 작품 보기`}
                       title={t.title}
                       style={{
-                        width: 64,
-                        flexShrink: 0,
+                        width: '100%',
                         padding: 0,
                         border: on ? `2px solid ${theme.accent}` : 'none',
                         borderRadius: 10,
@@ -511,7 +511,7 @@ export function RecommendPage() {
                     </button>
                   );
                 })}
-              </div>
+              </Carousel>
 
               {seed && (
                 <div style={{ marginTop: 16 }}>

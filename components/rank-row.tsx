@@ -83,6 +83,10 @@ export function RankRow({
   const top3 = rank <= 3;
   const m = metric?.(title);
   const live = ranked.evidence?.liveMatched ? ranked.evidence : null;
+  // 추정 작품의 비-별점 지표(조회·관심·완독률·몰입·트렌드)엔 ≈ 표시.
+  // 별점 축(rating·hidden)은 RatingInline이 이미 ≈를 붙이므로 중복 표기를 피한다.
+  const estimated = statsAreEstimated(title);
+  const metricEstimated = estimated && axis !== "rating" && axis !== "hidden";
 
   return (
     <div
@@ -167,7 +171,10 @@ export function RankRow({
             )}
           >
             <div className="text-right">
-              <div className="numeral tnum text-sm text-fg font-semibold">{m ? m.value : formatCount(title.stats.views)}</div>
+              <div className="numeral tnum text-sm text-fg font-semibold">
+                {metricEstimated && <span className="text-fg-3" aria-hidden>≈</span>}
+                {m ? m.value : formatCount(title.stats.views)}
+              </div>
               <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
             </div>
             <div className="flex flex-col items-center justify-center border-l border-line/50 pl-2 text-fg-3 hover:text-accent">

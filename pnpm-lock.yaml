@@ -325,6 +325,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      embla-carousel-react:
+        specifier: ^8.6.0
+        version: 8.6.0(react@19.2.7)
       konva:
         specifier: ^10.3.0
         version: 10.3.0
@@ -378,7 +381,11 @@ importers:
         specifier: '>=8.0.16'
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0)
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      embla-carousel-react:
+        specifier: ^8.6.0
+        version: 8.6.0(react@19.2.7)
 
   packages/play-core: {}
 

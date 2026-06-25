@@ -25,14 +25,17 @@ type Metric = {
   get: (t: Title) => number;
   fmt: (v: number) => string;
   better: "high" | "none";
+  // 추정 가능 지표면 statsAreEstimated 작품의 셀에 ≈를 붙인다.
+  // 연재 시작연도는 실수집 메타데이터라 추정 표기 대상이 아니다.
+  estimable?: boolean;
 };
 const METRICS: Metric[] = [
-  { label: "별점", get: (t) => t.stats.ratingAvg, fmt: (v) => v.toFixed(1), better: "high" },
-  { label: "평가 수", get: (t) => t.stats.ratingCount, fmt: formatCount, better: "high" },
-  { label: "누적 조회", get: (t) => t.stats.views, fmt: formatCount, better: "high" },
-  { label: "관심", get: (t) => t.stats.bookmarks, fmt: formatCount, better: "high" },
-  { label: "완독률", get: (t) => t.stats.completionRate, fmt: (v) => `${v}%`, better: "high" },
-  { label: "정주행 몰입", get: (t) => t.stats.bingeIndex, fmt: (v) => String(v), better: "high" },
+  { label: "별점", get: (t) => t.stats.ratingAvg, fmt: (v) => v.toFixed(1), better: "high", estimable: true },
+  { label: "평가 수", get: (t) => t.stats.ratingCount, fmt: formatCount, better: "high", estimable: true },
+  { label: "누적 조회", get: (t) => t.stats.views, fmt: formatCount, better: "high", estimable: true },
+  { label: "관심", get: (t) => t.stats.bookmarks, fmt: formatCount, better: "high", estimable: true },
+  { label: "완독률", get: (t) => t.stats.completionRate, fmt: (v) => `${v}%`, better: "high", estimable: true },
+  { label: "정주행 몰입", get: (t) => t.stats.bingeIndex, fmt: (v) => String(v), better: "high", estimable: true },
   { label: "연재 시작", get: (t) => t.releaseYear, fmt: (v) => String(v), better: "none" },
 ];
 
@@ -264,6 +267,9 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
                 const vb = m.get(b);
                 const aWin = m.better === "high" && va > vb && !eitherEstimated;
                 const bWin = m.better === "high" && vb > va && !eitherEstimated;
+                // 추정 가능 지표 셀에 한해 작품별 추정 여부로 ≈ 표기(피커 헤더와 일치).
+                const aEst = !!m.estimable && statsAreEstimated(a);
+                const bEst = !!m.estimable && statsAreEstimated(b);
 
                 // 비교 바 비중 계산
                 let pctA: number;
@@ -293,14 +299,16 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                       {/* Left value (A) */}
                       <div className={cn("text-right numeral text-lg font-bold transition-all", aWin ? "text-accent text-xl" : "text-fg-2")}>
+                        {aEst && <span className="text-fg-3" aria-hidden>≈</span>}
                         {m.fmt(va)}
                       </div>
-                      
+
                       {/* Metric Label */}
                       <div className="w-24 text-center text-xs font-semibold text-fg-3">{m.label}</div>
-                      
+
                       {/* Right value (B) */}
                       <div className={cn("text-left numeral text-lg font-bold transition-all", bWin ? "text-accent text-xl" : "text-fg-2")}>
+                        {bEst && <span className="text-fg-3" aria-hidden>≈</span>}
                         {m.fmt(vb)}
                       </div>
                     </div>

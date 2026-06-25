@@ -74,7 +74,10 @@ export function RatingInline({
         {value.toFixed(1)}
       </span>
       {count != null && (
-        <span className="text-xs text-fg-3 tnum">({count.toLocaleString("ko-KR")})</span>
+        <span className="text-xs text-fg-3 tnum">
+          ({estimated ? "약 " : ""}
+          {count.toLocaleString("ko-KR")})
+        </span>
       )}
     </span>
   );

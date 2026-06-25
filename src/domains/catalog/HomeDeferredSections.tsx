@@ -6,6 +6,7 @@ import { AdSlot } from "@/components/ad-slot";
 import { AdaptationGraph } from "@/components/adaptation-graph";
 import { Container } from "@/components/container";
 import { HomePersonal } from "@/components/home-personal";
+import { RevealOnScroll } from "@/components/reveal-on-scroll";
 import { Rail, Section } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { buttonClass } from "@/components/ui/button-utils";
@@ -36,25 +37,30 @@ export function HomeDeferredSections({
   newest,
 }: HomeDeferredSectionsProps) {
   return (
-    <Container size="wide" className="reveal-children flex flex-col gap-20 py-16">
-      <HomePersonal />
+    <Container size="wide" className="flex flex-col gap-20 py-16">
+      <RevealOnScroll>
+        <HomePersonal />
+      </RevealOnScroll>
 
       {todayReleases.length > 0 && (
-        <Section
-          tick
-          eyebrow="TODAY"
-          title={`오늘(${todayDay}) 새로 올라오는`}
-          desc="오늘 새 회차가 공개되는 연재작"
-          action={{ label: "연재 캘린더", href: "/calendar" }}
-        >
-          <Rail>
-            {todayReleases.map((title) => (
-              <TitleCard key={title.id} title={title} />
-            ))}
-          </Rail>
-        </Section>
+        <RevealOnScroll as="section">
+          <Section
+            live
+            eyebrow="TODAY"
+            title={`오늘(${todayDay}) 새로 올라오는`}
+            desc="오늘 새 회차가 공개되는 연재작"
+            action={{ label: "연재 캘린더", href: "/calendar" }}
+          >
+            <Rail>
+              {todayReleases.map((title) => (
+                <TitleCard key={title.id} title={title} />
+              ))}
+            </Rail>
+          </Section>
+        </RevealOnScroll>
       )}
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="GENRE SPECTRUM"
@@ -86,7 +92,9 @@ export function HomeDeferredSections({
           ))}
         </div>
       </Section>
+      </RevealOnScroll>
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="ADAPTATION GRAPH"
@@ -105,7 +113,9 @@ export function HomeDeferredSections({
           ))}
         </div>
       </Section>
+      </RevealOnScroll>
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="EDITOR'S PICK"
@@ -119,10 +129,12 @@ export function HomeDeferredSections({
           ))}
         </Rail>
       </Section>
+      </RevealOnScroll>
 
       {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 콘텐츠 레일 사이 광고 지면. */}
       <AdSlot />
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="TOP RATED"
@@ -136,7 +148,9 @@ export function HomeDeferredSections({
           ))}
         </Rail>
       </Section>
+      </RevealOnScroll>
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="FREE TO START"
@@ -150,8 +164,9 @@ export function HomeDeferredSections({
           ))}
         </Rail>
       </Section>
+      </RevealOnScroll>
 
-      <div className="grid gap-12 lg:grid-cols-[0.9fr_1.4fr]">
+      <RevealOnScroll className="grid gap-12 lg:grid-cols-[0.9fr_1.4fr]">
         <Section tick eyebrow="BY MOOD" title="코드로 찾기" desc="작품의 결을 나타내는 특성 태그">
           <div className="flex flex-wrap gap-2">
             {tags.map(({ tag, count }) => (
@@ -191,8 +206,9 @@ export function HomeDeferredSections({
             )}
           </div>
         </Section>
-      </div>
+      </RevealOnScroll>
 
+      <RevealOnScroll as="section">
       <Section
         tick
         eyebrow="CREATOR STUDIO"
@@ -240,6 +256,7 @@ export function HomeDeferredSections({
           </Link>
         </div>
       </Section>
+      </RevealOnScroll>
     </Container>
   );
 }

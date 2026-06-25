@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 
-// 마운트 시 0 → value 카운트업 (ease-out-quart). reduced-motion 이면 즉시 표시.
+import { cn } from "@/lib/utils";
+
+// 마운트 시 0 → value 카운트업 (ease-out-quart) + fx.css `count-pop`(톡 솟구쳤다 안착).
+// reduced-motion 이면 카운트업은 즉시 표시되고, fx.css 가 pop 모션을 무효화한다(가시성 유지).
 export function CountUp({
   value,
   duration = 1.1,
   suffix = "",
   className,
   separator = false,
+  style,
 }: {
   value: number;
   duration?: number;
@@ -16,6 +20,8 @@ export function CountUp({
   className?: string;
   /** 천 단위 구분 기호(ko-KR) 적용 — 대형 인덱스 넘버럴 가독성. */
   separator?: boolean;
+  /** 인라인 스타일 — 토스(인라인 스타일 위주) 재사용 시 색/굵기 주입용. */
+  style?: React.CSSProperties;
 }) {
   const [n, setN] = useState(0);
 
@@ -37,7 +43,7 @@ export function CountUp({
 
   const rounded = Math.round(n);
   return (
-    <span className={className}>
+    <span className={cn("count-pop is-revealed", className)} style={style}>
       {separator ? rounded.toLocaleString("ko-KR") : rounded}
       {suffix}
     </span>

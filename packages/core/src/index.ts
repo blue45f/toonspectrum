@@ -6,6 +6,7 @@
 // 도메인 코어 본체는 여전히 React/DOM 비종속이며, fx 는 `@toonspectrum/core/fx` 서브패스로도 직접 import 가능.
 
 export * from "./types";
+export * from "./business";
 export * from "./platforms";
 export * from "./format";
 export * from "./catalog-slim";

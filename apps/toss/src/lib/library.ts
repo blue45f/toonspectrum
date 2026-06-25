@@ -44,9 +44,18 @@ const savedStore = createBookmarkStore<SavedTitle>(
   // remote: mTLS 라이브 후 createFavoritesRemote 류 어댑터 주입(현재는 로컬 전용). undefined.
 );
 
+// 정렬 결과 메모 — useSyncExternalStore 는 스냅샷을 참조 비교하므로, 매 호출 새 배열을
+// 돌려주면 무한 루프(React #185)가 난다. 소스 스냅샷(안정 참조)이 바뀔 때만 재정렬한다.
+let savedSortedSrc: SavedTitle[] | null = null;
+let savedSortedOut: SavedTitle[] = [];
 export function getSaved(): SavedTitle[] {
-  // 최근 담은 순(savedAt desc) — 토글 시 [item, ...] 로 앞에 붙지만 명시적으로 안정 정렬한다.
-  return [...savedStore.getSnapshot()].sort((a, b) => b.savedAt - a.savedAt);
+  const src = savedStore.getSnapshot();
+  if (src !== savedSortedSrc) {
+    savedSortedSrc = src;
+    // 최근 담은 순(savedAt desc) — 토글 시 [item, ...] 로 앞에 붙지만 명시적으로 안정 정렬한다.
+    savedSortedOut = [...src].sort((a, b) => b.savedAt - a.savedAt);
+  }
+  return savedSortedOut;
 }
 export function isSaved(id: string): boolean {
   return savedStore.has(id);
@@ -210,9 +219,18 @@ export function useSubscriptions(): Record<string, boolean> {
 
 const collectionStore = createRecordStore<Collection>('toonspectrum.library.collections.v1');
 
+// 정렬 결과 메모 — getSaved 와 같은 이유(useSyncExternalStore 참조 비교). RecordStore.get 은
+// raw 가 같으면 동일 Record 참조를 돌려주므로, 그 참조가 바뀔 때만 재정렬한다.
+let collectionsSortedSrc: Record<string, Collection> | null = null;
+let collectionsSortedOut: Collection[] = [];
 /** 컬렉션 목록(생성 순). RecordStore 에 id→Collection 으로 보관한다. */
 export function getCollections(): Collection[] {
-  return Object.values(collectionStore.get()).sort((a, b) => a.createdAt - b.createdAt);
+  const src = collectionStore.get();
+  if (src !== collectionsSortedSrc) {
+    collectionsSortedSrc = src;
+    collectionsSortedOut = Object.values(src).sort((a, b) => a.createdAt - b.createdAt);
+  }
+  return collectionsSortedOut;
 }
 export function useCollections(): Collection[] {
   return useSyncExternalStore(collectionStore.subscribe, getCollections, getCollections);

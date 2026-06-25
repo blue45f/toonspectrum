@@ -33,7 +33,7 @@ export function HeroBannerStatic({
     >
       <HeroBannerBadge />
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-card surface-hl">
+      <div className="sheen-sweep overflow-hidden rounded-2xl border border-line bg-card surface-hl">
         <Link href={`/title/${first.slug}`} className="group/slide relative block">
           <div className="absolute inset-0" aria-hidden>
             {first.coverImage && !isRestricted ? (
