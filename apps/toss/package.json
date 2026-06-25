@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^2.9.1",
+    "@toonspectrum/core": "workspace:*",
     "@toonspectrum/play-core": "workspace:*",
     "@emotion/react": "^11.14.0",
     "@toss/tds-mobile": "^2.5.0",

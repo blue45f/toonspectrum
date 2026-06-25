@@ -1,9 +1,13 @@
 // 놀이터(아케이드) 공용 타입 — 토스앱 Title을 게임 친화 GameTitle로 정규화한다.
 // 저작권: 게임은 플랫폼 표지 원본을 쓰지 않고 추상 그라디언트 + 제목/작가(사실정보)만 사용.
 
+import { formatCount } from '@toonspectrum/core';
 import { useEffect, useState } from 'react';
 
 import { coverUrl, fetchTitles, type Title } from '../lib/api';
+
+// 정식 포맷터는 @toonspectrum/core 단일 소스에서 재-export(웹과 동일한 "1.2만" 표기).
+export { formatCount };
 
 export interface GameTitle {
   id: string;
@@ -65,10 +69,3 @@ export function useGameTitles(): { titles: GameTitle[]; loading: boolean } {
 
 /** 게임용 rng — 라이브 플레이는 Math.random. (엔진은 순수, rng 주입식.) */
 export const liveRng = (): number => Math.random();
-
-export function formatCount(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
-  if (n >= 10_000) return `${Math.round(n / 10_000)}만`;
-  if (n >= 1_000) return `${(n / 1000).toFixed(1)}천`;
-  return String(n);
-}

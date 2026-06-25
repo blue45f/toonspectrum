@@ -2,7 +2,7 @@
 
 import { Injectable } from "@nestjs/common";
 
-import { TITLES } from "../../../../../lib/server/catalog-store";
+import { TITLES } from "../../../../../packages/core/src/server";
 
 import { analyzeCompatibility, analyzeSaju, analyzeTodayByIljin, analyzeYearLuck, todayCategoryScores } from "./saju-analysis";
 import { calculateSaju, SajuResult } from "./saju-utils";

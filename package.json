@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@heejun/deskcloud": "^0.1.0",
+    "@toonspectrum/core": "workspace:*",
     "@toonspectrum/play-core": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
     "@libsql/client": "^0.17.3",

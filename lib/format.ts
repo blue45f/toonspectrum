@@ -1,13 +1,3 @@
-// 12345 -> "1.2만", 123456789 -> "1.2억", 980 -> "980"
-export function formatCount(n: number): string {
-  if (n >= 1e8) {
-    const v = n / 1e8;
-    return `${v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")}억`;
-  }
-  if (n >= 1e4) {
-    const v = n / 1e4;
-    return `${v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")}만`;
-  }
-  if (n >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, "")}천`;
-  return String(n);
-}
+// 시밍: formatCount 등 포맷터는 @toonspectrum/core 패키지(packages/core/src/format.ts)로 이전됨.
+// 상대 경로 재-export — plain-node(API-from-dist) 런타임이 컴파일된 .js 로 해석되도록(bare 지정자 부적합).
+export * from "../packages/core/src";

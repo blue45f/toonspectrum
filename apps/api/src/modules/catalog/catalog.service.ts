@@ -15,15 +15,25 @@ import { rateLimit } from "../../../../../lib/rate-limit";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
 import { isAdminUser } from "../../../../../lib/server/app-config";
-import { getAuthorData } from "../../../../../lib/server/author";
-import { getCalendarData } from "../../../../../lib/server/calendar";
 import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
-import { activeTags, getAuthorDirectory, getCatalogState, getTitle, TITLES } from "../../../../../lib/server/catalog-store";
-import { getExploreData } from "../../../../../lib/server/explore";
-import { getHomeData } from "../../../../../lib/server/home";
-import { getInsightsData } from "../../../../../lib/server/insights";
-import { getRankingData, getRankingHealth } from "../../../../../lib/server/ranking-service";
 import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
+// 브라우저-세이프 카탈로그 read-model 7종은 @toonspectrum/core 패키지(packages/core/src/server)로 이전됨
+// (웹·토스와 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
+// 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
+import {
+  activeTags,
+  getAuthorData,
+  getAuthorDirectory,
+  getCalendarData,
+  getCatalogState,
+  getExploreData,
+  getHomeData,
+  getInsightsData,
+  getRankingData,
+  getRankingHealth,
+  getTitle,
+  TITLES,
+} from "../../../../../packages/core/src/server";
 
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../../lib/types";
 import type { OnModuleInit } from "@nestjs/common";

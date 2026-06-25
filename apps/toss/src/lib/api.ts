@@ -1,20 +1,21 @@
+import { type Title, type PlatformId, platform } from '@toonspectrum/core';
+
 import sample from '../sample-data.json';
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://toonspectrum.vercel.app').replace(/\/+$/, '');
 
-export interface Availability { platformId: string; pricing?: string; url?: string }
-export interface Title {
-  id: string; slug: string; type: string; title: string; author?: string; artist?: string;
-  genres?: string[]; tags?: string[]; synopsis?: string; cover?: string[]; coverImage?: string;
-  status?: string; ageRating?: string; releaseYear?: number; availability?: Availability[];
-  stats?: { views?: number; likes?: number; bookmarks?: number; ratingAvg?: number; ratingCount?: number };
-}
+// 정식 도메인 타입은 @toonspectrum/core 에서 가져온다(웹·토스 단일 소스). /api/titles?limit=80 은
+// 풀 Title[] 를 반환하므로 카드형(TitleCard)이 아닌 Title 을 그대로 소비한다.
+export type { Title, PlatformId };
+export { platform };
 
 const isAdult = (t: Title) => /19|adult/i.test(t.ageRating || ''); // 토스 콘텐츠 정책: 성인물 제외
 export const coverUrl = (t: Title): string | null =>
   t.coverImage ? (t.coverImage.startsWith('http') ? t.coverImage : `${API_BASE}${t.coverImage}`) : null;
 
-const seed: Title[] = ((sample as { items?: Title[] }).items || []).filter((t) => !isAdult(t));
+// sample-data.json 은 실제 카탈로그 스냅샷이지만 JSON 추론 타입은 리터럴 유니온(WorkType·
+// SerialStatus·AgeRating·PlatformId)이 아닌 넓은 string 이라 unknown 을 거쳐 Title[] 로 단언한다.
+const seed: Title[] = ((sample as unknown as { items?: Title[] }).items || []).filter((t) => !isAdult(t));
 let cache: Title[] = seed;
 
 export async function fetchTitles(): Promise<Title[]> {

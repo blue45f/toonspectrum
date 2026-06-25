@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { navigate } from '../router';
 import { Button } from '@toss/tds-mobile';
-import { fetchTitles, getCached, coverUrl, type Title } from '../lib/api';
+import { fetchTitles, getCached, coverUrl, platform, type Title } from '../lib/api';
 import { shareMessage } from '../lib/toss';
 import { Badge, Cover, StatStrip } from '../ui';
 import { theme } from '../theme';
@@ -70,7 +70,7 @@ export function TitleDetailPage({ id = '' }: { id?: string }) {
               <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="pressable"
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px',
                   borderRadius: theme.radius, background: theme.surface, border: `1px solid ${theme.border}`, textTransform: 'capitalize' }}>
-                <span style={{ fontWeight: 600 }}>{a.platformId}</span>
+                <span style={{ fontWeight: 600 }}>{platform(a.platformId).name}</span>
                 <span style={{ color: theme.accent, fontSize: 13, fontWeight: 600 }}>{a.pricing || '바로가기'} ›</span>
               </a>
             ))}
