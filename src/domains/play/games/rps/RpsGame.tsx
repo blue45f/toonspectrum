@@ -1,5 +1,5 @@
-import { Camera, CameraOff, Hand as HandIcon, RotateCcw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import {
   EMPTY_SCORE,
@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 
+const RpsVrmStage = lazy(() => import("./RpsVrmStage"));
+
 function seededRng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -40,6 +42,8 @@ const OUTCOME_KO: Record<Outcome, string> = { win: "승!", lose: "패…", draw:
 export function RpsGame({ onExit }: PlayGameProps) {
   const [camera, setCamera] = useState(false);
   const { videoRef, gesture, status } = useHandGesture(camera);
+  const [use3d, setUse3d] = useState(true);
+  const [vrmReady, setVrmReady] = useState(false);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(3);
@@ -173,12 +177,38 @@ export function RpsGame({ onExit }: PlayGameProps) {
           <span className="text-xs font-medium text-fg-2">나</span>
         </div>
 
-        {/* 봇 */}
+        {/* 봇 — 3D VRM 캐릭터 상대(폴백: 이모지) */}
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-rose-500/40 bg-rose-500/5 p-3">
-          <div className="grid aspect-[4/3] w-full place-items-center rounded-xl bg-rose-500/10 text-5xl">
-            {phase === "result" && ai ? HAND_EMOJI[ai] : phase === "counting" ? "❓" : aiFace}
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/15 to-violet-500/10">
+            {use3d ? (
+              <>
+                <Suspense fallback={null}>
+                  <RpsVrmStage
+                    hand={phase === "result" ? ai : null}
+                    outcome={phase === "result" ? outcome : null}
+                    onReady={() => setVrmReady(true)}
+                  />
+                </Suspense>
+                {!vrmReady && <div className="absolute inset-0 grid place-items-center text-5xl">{aiFace}</div>}
+                {/* 제스처 가독성 보조 오버레이 */}
+                {phase === "result" && ai && (
+                  <div className="absolute bottom-1 right-1 rounded-md bg-black/55 px-1.5 py-0.5 text-2xl">{HAND_EMOJI[ai]}</div>
+                )}
+                {phase === "counting" && <div className="absolute bottom-1 right-1 text-2xl">❓</div>}
+              </>
+            ) : (
+              <div className="grid h-full w-full place-items-center text-5xl">
+                {phase === "result" && ai ? HAND_EMOJI[ai] : phase === "counting" ? "❓" : aiFace}
+              </div>
+            )}
           </div>
-          <span className="text-xs font-medium text-fg-2">웹툰봇</span>
+          <button
+            type="button"
+            onClick={() => setUse3d((v) => !v)}
+            className="inline-flex items-center gap-1 text-[0.66rem] text-fg-3 hover:text-fg-2"
+          >
+            <Box className="h-3 w-3" /> {use3d ? "웹툰봇 (3D)" : "웹툰봇 (2D)"}
+          </button>
         </div>
       </div>
 
