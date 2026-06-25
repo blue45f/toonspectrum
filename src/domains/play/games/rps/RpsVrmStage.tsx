@@ -17,8 +17,16 @@ import {
 const VRM_URL = "/vrm/sample.vrm";
 const d = (deg: number) => (deg * Math.PI) / 180;
 
-// 오른팔을 들어 손을 카메라 쪽으로 보여주는 검증된 프리셋.
-const WAVE_POSE: PoseBoneMap = POSE_PRESETS.find((p) => p.id === "wave")?.bones ?? {};
+// RPS 던지기 포즈 — "present"(앞으로 내민 팔)의 자연스러운 몸/다리/왼팔을 base 로 쓰되,
+// 오른팔을 팔꿈치는 내리고 손은 앞·중앙·가슴높이로 올려 제스처가 카메라를 향하게 한다.
+// aim(sideX, y, z): sideX=바깥(+)/안(-), y=위(+)/아래(-), z=앞(+, 카메라 쪽).
+const PRESENT_POSE: PoseBoneMap = POSE_PRESETS.find((p) => p.id === "present")?.bones ?? {};
+const RPS_POSE: PoseBoneMap = {
+  ...PRESENT_POSE,
+  rightUpperArm: { direction: { sideX: 0.3, y: -0.55, z: 0.5 } }, // 팔꿈치를 옆·아래로
+  rightLowerArm: { direction: { sideX: -0.05, y: 0.42, z: 0.92 } }, // 손을 앞·중앙·위로
+  rightHand: { rotation: [d(-12), d(-6), d(-8)] }, // 손등이 카메라를 보도록 살짝 틀기
+};
 
 // 가위/바위/보 → 오른손 손가락 회전(스튜디오 손모양 프리셋과 동일 규약, 우측 sign=+1).
 function handFingers(hand: Hand): FingerRotationMap {
@@ -110,7 +118,7 @@ function VrmModel({ hand, outcome, onReady }: { hand: Hand | null; outcome: Outc
   // 포즈(팔 들기) + 손가락 제스처.
   useEffect(() => {
     if (!vrm) return;
-    applyPoseToVrm(vrm, WAVE_POSE, 0);
+    applyPoseToVrm(vrm, RPS_POSE, 0);
     if (hand) applyFingerRotations(vrm, handFingers(hand));
   }, [vrm, hand]);
 
@@ -136,8 +144,8 @@ function VrmModel({ hand, outcome, onReady }: { hand: Hand | null; outcome: Outc
 export function RpsVrmStage({ hand, outcome, onReady }: { hand: Hand | null; outcome: Outcome | null; onReady?: () => void }) {
   return (
     <Canvas
-      camera={{ position: [0, 1.32, 1.05], fov: 30 }}
-      onCreated={({ camera }) => camera.lookAt(0, 1.18, 0)}
+      camera={{ position: [0, 1.35, 1.25], fov: 34 }}
+      onCreated={({ camera }) => camera.lookAt(0, 1.2, 0.15)}
       gl={{ alpha: true }}
       style={{ background: "transparent" }}
     >
