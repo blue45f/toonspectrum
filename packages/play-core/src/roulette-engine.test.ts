@@ -9,7 +9,7 @@ import {
   tierLabel,
 } from "./roulette-engine";
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 // 결정적 rng(mulberry32).
 function rng(seed: number): () => number {
@@ -23,23 +23,19 @@ function rng(seed: number): () => number {
   };
 }
 
-function makeTitle(i: number, genres: string[], views = 1_000_000): PlayTitle {
+function makeTitle(i: number, genres: string[], views = 1_000_000): PlayCoreTitle {
   return {
     id: `t${i}`,
     title: `웹툰${i}`,
-    author: `작가${i}`,
     cover: ["oklch(0.4 0.1 200)", "oklch(0.3 0.1 240)"],
     genres,
-    ageRating: "전체",
-    type: "webtoon",
-    status: "ongoing",
     views,
     likes: views / 100,
     bookmarks: views / 200,
   };
 }
 
-const pool: PlayTitle[] = [
+const pool: PlayCoreTitle[] = [
   makeTitle(0, ["로맨스"], 5_000_000),
   makeTitle(1, ["액션", "판타지"], 300_000_000),
   makeTitle(2, ["로맨스", "드라마"], 12_000),

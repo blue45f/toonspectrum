@@ -1,3 +1,10 @@
+import {
+  filterByGenre,
+  genreChips,
+  pickRandom,
+  reasonFor,
+  tierLabel,
+} from "@toonspectrum/play-core";
 import { Dices, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -5,13 +12,6 @@ import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
-import {
-  filterByGenre,
-  genreChips,
-  pickRandom,
-  reasonFor,
-  tierLabel,
-} from "./roulette-engine";
 
 import type { HelpStep } from "../../GameHelp";
 import type { PlayGameProps, PlayTitle } from "../../play-types";

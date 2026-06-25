@@ -2,17 +2,17 @@
 // 풀에서 무작위(주입 rng) 한 편을 뽑고(선택적 장르 필터), 그 작품에 대한
 // 결정적 추천 이유 문구를 인기도 티어 + 장르로 생성한다(React/DOM 의존 없음 → 단위 테스트).
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 /** 작품의 인기도 종합 점수(조회수 가중 + 좋아요/북마크 보너스). 결정적. */
-export function popularityScore(title: PlayTitle): number {
+export function popularityScore(title: PlayCoreTitle): number {
   return title.views + title.likes * 12 + title.bookmarks * 6;
 }
 
 export type PopularityTier = "legend" | "hit" | "rising" | "hidden";
 
 /** 인기도 점수 → 티어. 경계는 결정적(조회수 스케일 기준). */
-export function popularityTier(title: PlayTitle): PopularityTier {
+export function popularityTier(title: PlayCoreTitle): PopularityTier {
   const score = popularityScore(title);
   if (score >= 100_000_000) return "legend";
   if (score >= 10_000_000) return "hit";
@@ -21,7 +21,7 @@ export function popularityTier(title: PlayTitle): PopularityTier {
 }
 
 /** 풀에 등장하는 장르 칩 목록(빈도순, 중복 제거). */
-export function genreChips(pool: readonly PlayTitle[]): string[] {
+export function genreChips(pool: readonly PlayCoreTitle[]): string[] {
   const count = new Map<string, number>();
   for (const t of pool) {
     for (const g of t.genres) {
@@ -35,7 +35,7 @@ export function genreChips(pool: readonly PlayTitle[]): string[] {
 }
 
 /** 장르로 풀을 거른다(genre 미지정 시 원본 그대로). 매칭 0건이면 원본으로 폴백. */
-export function filterByGenre(pool: readonly PlayTitle[], genre?: string): PlayTitle[] {
+export function filterByGenre<T extends PlayCoreTitle>(pool: readonly T[], genre?: string): T[] {
   if (!genre) return pool.slice();
   const matched = pool.filter((t) => t.genres.includes(genre));
   return matched.length > 0 ? matched : pool.slice();
@@ -45,11 +45,11 @@ export function filterByGenre(pool: readonly PlayTitle[], genre?: string): PlayT
  * 풀에서 한 편을 무작위로 뽑는다(주입 rng). genre가 주어지면 해당 장르만 후보.
  * 후보가 비면 null. 입력 불변.
  */
-export function pickRandom(
-  pool: readonly PlayTitle[],
+export function pickRandom<T extends PlayCoreTitle>(
+  pool: readonly T[],
   rng: () => number,
   genre?: string,
-): PlayTitle | null {
+): T | null {
   const candidates = genre ? pool.filter((t) => t.genres.includes(genre)) : pool;
   if (candidates.length === 0) return null;
   const idx = Math.floor(rng() * candidates.length) % candidates.length;
@@ -86,7 +86,7 @@ const GENRE_LINE: Record<string, string> = {
  * 작품에 대한 추천 이유 문구를 생성한다 — 장르 + 인기도 티어 기반, 결정적.
  * 같은 입력 → 항상 같은 문장.
  */
-export function reasonFor(title: PlayTitle): string {
+export function reasonFor(title: PlayCoreTitle): string {
   const tier = popularityTier(title);
   const genre = title.genres[0];
   const genreLine = genre ? (GENRE_LINE[genre] ?? `${genre} 장르를 좋아한다면 추천`) : "오늘 같은 날 보기 좋아요";
@@ -94,7 +94,7 @@ export function reasonFor(title: PlayTitle): string {
 }
 
 /** 추천 이유에 곁들일 짧은 인기도 배지 라벨. 결정적. */
-export function tierLabel(title: PlayTitle): string {
+export function tierLabel(title: PlayCoreTitle): string {
   switch (popularityTier(title)) {
     case "legend":
       return "전설의 흥행작";

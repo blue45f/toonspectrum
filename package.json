@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@heejun/deskcloud": "^0.1.0",
+    "@toonspectrum/play-core": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
     "@libsql/client": "^0.17.3",
     "@mediapipe/tasks-vision": "^0.10.35",

@@ -1,3 +1,10 @@
+import {
+  answerOf,
+  buildQuestion,
+  isCorrect,
+  ROUND_COUNT,
+  type QuizQuestion,
+} from "@toonspectrum/play-core";
 import { Check, RotateCcw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -5,13 +12,6 @@ import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
-import {
-  answerOf,
-  buildQuestion,
-  isCorrect,
-  ROUND_COUNT,
-  type QuizQuestion,
-} from "./quiz-engine";
 
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
@@ -59,7 +59,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
   const [seed, setSeed] = useState(1);
   const rngRef = useRef(seededRng(1));
 
-  const [question, setQuestion] = useState<QuizQuestion | null>(null);
+  const [question, setQuestion] = useState<QuizQuestion<PlayTitle> | null>(null);
   const [round, setRound] = useState(1);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);

@@ -9,7 +9,7 @@ import {
   isFaceUp,
   isSolved,
   type Tile,
-} from '../../games/memory-engine';
+} from '@toonspectrum/play-core';
 import { liveRng, useGameTitles } from '../../games/types';
 import { ShareResult } from '../../games/ShareResult';
 import { navigate } from '../../router';

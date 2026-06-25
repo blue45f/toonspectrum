@@ -2,16 +2,16 @@
 // 실제 웹툰 풀에서 정답 1편 + 오답 3편을 뽑아 보기 4개를 섞고, 정답 판정을 한다.
 // React/DOM 의존 없음 → 단위 테스트 가능. 무작위성은 주입 rng(() => number)로만.
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 export const ROUND_COUNT = 10;
 export const CHOICE_COUNT = 4;
 
 /** 한 문제 — 정답 id + 보기 4개(정답 포함, 섞인 순서). */
-export interface QuizQuestion {
+export interface QuizQuestion<T extends PlayCoreTitle = PlayCoreTitle> {
   answerId: string;
   /** 정답 1 + 오답 3 = 4개(섞인 순서). 첫 인덱스가 정답이 아님. */
-  choices: PlayTitle[];
+  choices: T[];
 }
 
 /** Fisher–Yates(주입 rng) — 입력 불변. */
@@ -30,13 +30,16 @@ export function shuffle<T>(arr: readonly T[], rng: () => number): T[] {
  * - 풀이 4편 미만이면 가능한 만큼만(중복 없이) 채운다(최소 1).
  * 결정적(rng 주입).
  */
-export function buildQuestion(titles: readonly PlayTitle[], rng: () => number): QuizQuestion {
+export function buildQuestion<T extends PlayCoreTitle>(
+  titles: readonly T[],
+  rng: () => number,
+): QuizQuestion<T> {
   if (titles.length === 0) {
     throw new Error("buildQuestion: titles 풀이 비어 있습니다");
   }
   // id 기준 중복 제거(같은 작품이 두 번 보기에 뜨지 않도록).
   const seen = new Set<string>();
-  const unique: PlayTitle[] = [];
+  const unique: T[] = [];
   for (const t of titles) {
     if (!seen.has(t.id)) {
       seen.add(t.id);
@@ -57,7 +60,7 @@ export function isCorrect(question: QuizQuestion, pickedId: string): boolean {
   return question.answerId === pickedId;
 }
 
-/** 문제에서 정답 PlayTitle 조회(렌더용 헬퍼). */
-export function answerOf(question: QuizQuestion): PlayTitle | undefined {
+/** 문제에서 정답 타이틀 조회(렌더용 헬퍼). */
+export function answerOf<T extends PlayCoreTitle>(question: QuizQuestion<T>): T | undefined {
   return question.choices.find((c) => c.id === question.answerId);
 }

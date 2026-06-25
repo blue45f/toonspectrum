@@ -11,7 +11,7 @@ import {
   type Tile,
 } from "./memory-engine";
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 // 결정적 rng(mulberry32).
 function rng(seed: number): () => number {
@@ -25,24 +25,20 @@ function rng(seed: number): () => number {
   };
 }
 
-function makeTitle(i: number): PlayTitle {
+function makeTitle(i: number): PlayCoreTitle {
   return {
     id: `t${i}`,
     title: `웹툰${i}`,
-    author: `작가${i}`,
     cover: ["oklch(0.4 0.1 200)", "oklch(0.3 0.1 240)"],
     coverImage: `https://example.test/${i}.jpg`,
     genres: ["액션"],
-    ageRating: "전체",
-    type: "webtoon",
-    status: "ongoing",
     views: 1_000 * (i + 1),
     likes: 10 * (i + 1),
     bookmarks: 5 * (i + 1),
   };
 }
 
-const pool = (n: number): PlayTitle[] => Array.from({ length: n }, (_, i) => makeTitle(i));
+const pool = (n: number): PlayCoreTitle[] => Array.from({ length: n }, (_, i) => makeTitle(i));
 
 /** 보드에서 titleId가 같은 두 타일(한 쌍)의 id를 찾는다. */
 function pairFor(tiles: Tile[], titleId: string): [string, string] {

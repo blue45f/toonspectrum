@@ -6,7 +6,7 @@ import { GameCover } from '../../games/GameCover';
 import { GameHelp, type HelpStep } from '../../games/GameHelp';
 import { navigate } from '../../router';
 import { theme, pageShell } from '../../theme';
-import { genreChips, pickRandom, reasonFor, tierLabel } from '../../games/roulette-engine';
+import { genreChips, pickRandom, reasonFor, tierLabel } from '@toonspectrum/play-core';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
 import { ShareResult } from '../../games/ShareResult';
 

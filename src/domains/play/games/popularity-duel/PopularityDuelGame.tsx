@@ -1,3 +1,10 @@
+import {
+  guessNext,
+  hasEnoughTitles,
+  startDuel,
+  type DuelState,
+  type Guess,
+} from "@toonspectrum/play-core";
 import { ChevronDown, ChevronUp, Eye, RotateCcw, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -5,13 +12,6 @@ import { GameHelp } from "../../GameHelp";
 import { PlayCover } from "../../PlayCover";
 import { usePlayTitles } from "../../use-play-catalog";
 
-import {
-  guessNext,
-  hasEnoughTitles,
-  startDuel,
-  type DuelState,
-  type Guess,
-} from "./popularity-duel-engine";
 
 import type { PlayGameProps, PlayTitle  } from "../../play-types";
 
@@ -66,7 +66,7 @@ function DuelCard({
 
 export function PopularityDuelGame({ onExit }: PlayGameProps) {
   const { titles, loading } = usePlayTitles("popular", "webtoon", 120);
-  const [state, setState] = useState<DuelState | null>(null);
+  const [state, setState] = useState<DuelState<PlayTitle> | null>(null);
   const [seed, setSeed] = useState(1);
   const rngRef = useRef(seededRng(1));
 

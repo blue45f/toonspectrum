@@ -2,15 +2,15 @@
 // 앵커 웹툰의 조회수가 공개된 상태에서, 도전자 웹툰이 조회수가 더 많은지/적은지를 맞힌다.
 // 상태 전이/도전자 추첨/판정을 순수 함수로 처리한다(React/DOM 의존 없음 → 단위 테스트).
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 export type Guess = "higher" | "lower";
 
-export interface DuelState {
+export interface DuelState<T extends PlayCoreTitle = PlayCoreTitle> {
   /** 기준이 되는(조회수 공개된) 웹툰. */
-  anchor: PlayTitle;
+  anchor: T;
   /** 비교 대상(아직 조회수 미공개) 웹툰. */
-  challenger: PlayTitle;
+  challenger: T;
   score: number;
   best: number;
   /** 게임 종료(오답) 여부. */
@@ -20,7 +20,7 @@ export interface DuelState {
 }
 
 /** 게임에 충분한 풀이 있는지(최소 2편). */
-export function hasEnoughTitles(pool: readonly PlayTitle[]): boolean {
+export function hasEnoughTitles(pool: readonly PlayCoreTitle[]): boolean {
   return pool.length >= 2;
 }
 
@@ -28,15 +28,15 @@ export function hasEnoughTitles(pool: readonly PlayTitle[]): boolean {
  * 앵커가 아닌 도전자 1편을 무작위로 뽑는다(주입 rng).
  * 절대 앵커와 같은 id를 반환하지 않는다. 후보가 없으면(풀이 앵커뿐) 앵커를 그대로 반환.
  */
-export function nextChallenger(
-  pool: readonly PlayTitle[],
+export function nextChallenger<T extends PlayCoreTitle>(
+  pool: readonly T[],
   currentId: string,
   rng: () => number,
-): PlayTitle {
+): T {
   const candidates = pool.filter((t) => t.id !== currentId);
   if (candidates.length === 0) {
     // 풀에 다른 후보가 전혀 없음 — 호출 측 가드용 폴백.
-    return pool[0] ?? ({ id: currentId } as PlayTitle);
+    return pool[0] ?? ({ id: currentId } as T);
   }
   const idx = Math.floor(rng() * candidates.length);
   return candidates[Math.min(idx, candidates.length - 1)];
@@ -52,7 +52,11 @@ export function judge(anchorViews: number, challengerViews: number, guess: Guess
 }
 
 /** 새 게임 시작 — 앵커 + 첫 도전자 추첨. best는 이어받는다. */
-export function startDuel(pool: readonly PlayTitle[], rng: () => number, best = 0): DuelState {
+export function startDuel<T extends PlayCoreTitle>(
+  pool: readonly T[],
+  rng: () => number,
+  best = 0,
+): DuelState<T> {
   const anchorIdx = Math.floor(rng() * pool.length);
   const anchor = pool[Math.min(anchorIdx, pool.length - 1)];
   const challenger = nextChallenger(pool, anchor.id, rng);
@@ -70,12 +74,12 @@ export function startDuel(pool: readonly PlayTitle[], rng: () => number, best = 
  * 추측 처리 — 정답이면 점수 +1, 도전자가 새 앵커가 되고 신선한 도전자가 들어온다(무한 런).
  * 오답이면 게임 종료(over). best 갱신.
  */
-export function guessNext(
-  state: DuelState,
+export function guessNext<T extends PlayCoreTitle>(
+  state: DuelState<T>,
   guess: Guess,
-  pool: readonly PlayTitle[],
+  pool: readonly T[],
   rng: () => number,
-): DuelState {
+): DuelState<T> {
   if (state.over) return state;
   const correct = judge(state.anchor.views, state.challenger.views, guess);
   if (!correct) {

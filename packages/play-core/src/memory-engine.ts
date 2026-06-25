@@ -1,9 +1,9 @@
-// 웹툰 짝맞추기(집중력/메모리 매치) — 순수 엔진(toonspectrum 본 레포 이식).
+// 웹툰 짝맞추기(집중력/메모리 매치) — 순수 엔진.
 // 실제 웹툰 카탈로그에서 N쌍을 뽑아 같은 커버를 가진 2N개의 타일 보드를 구성하고,
 // 뒤집기/판정(매치·미스매치)/이동 횟수의 상태 전이를 순수 함수로 처리한다
 // (React/DOM 의존 없음 → 단위 테스트). 무작위성은 주입된 rng로만.
 
-import type { GameTitle as PlayTitle } from './types';
+import type { PlayCoreTitle } from "./play-title";
 
 /** 보드 타일 1개 — 같은 titleId를 가진 두 타일이 한 쌍. */
 export interface Tile {
@@ -33,9 +33,9 @@ export interface MemoryState {
 }
 
 export type MemoryAction =
-  | { type: 'flip'; id: string }
-  | { type: 'resolve' }
-  | { type: 'reset'; tiles: Tile[] };
+  | { type: "flip"; id: string }
+  | { type: "resolve" }
+  | { type: "reset"; tiles: Tile[] };
 
 /** Fisher–Yates(주입 rng) — 입력 불변. */
 export function shuffle<T>(arr: readonly T[], rng: () => number): T[] {
@@ -52,13 +52,13 @@ export function shuffle<T>(arr: readonly T[], rng: () => number): T[] {
  * 전체를 섞는다. 결정적(rng 주입). titles가 부족하면 가능한 만큼만 만든다.
  */
 export function buildBoard(
-  titles: readonly PlayTitle[],
+  titles: readonly PlayCoreTitle[],
   pairs: number,
   rng: () => number,
 ): Tile[] {
   // 같은 웹툰이 두 쌍으로 중복되지 않도록 titleId 기준 중복 제거.
   const seen = new Set<string>();
-  const unique: PlayTitle[] = [];
+  const unique: PlayCoreTitle[] = [];
   for (const t of titles) {
     if (seen.has(t.id)) continue;
     seen.add(t.id);
@@ -108,16 +108,16 @@ function tileById(state: MemoryState, id: string): Tile | undefined {
  */
 export function flipReducer(state: MemoryState, action: MemoryAction): MemoryState {
   switch (action.type) {
-    case 'reset':
+    case "reset":
       return initState(action.tiles);
 
-    case 'resolve': {
+    case "resolve": {
       // 미스매치로 잠긴 경우에만 두 장을 닫는다.
       if (!state.locked || state.flipped.length < 2) return state;
       return { ...state, flipped: [], locked: false };
     }
 
-    case 'flip': {
+    case "flip": {
       const { id } = action;
       if (state.locked) return state;
       if (state.matched.includes(id) || state.flipped.includes(id)) return state;

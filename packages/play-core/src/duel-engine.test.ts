@@ -7,9 +7,9 @@ import {
   nextChallenger,
   startDuel,
   type DuelState,
-} from "./popularity-duel-engine";
+} from "./duel-engine";
 
-import type { PlayTitle } from "../../play-types";
+import type { PlayCoreTitle } from "./play-title";
 
 // 결정적 rng(mulberry32).
 function rng(seed: number): () => number {
@@ -23,23 +23,19 @@ function rng(seed: number): () => number {
   };
 }
 
-function makeTitle(i: number, views: number): PlayTitle {
+function makeTitle(i: number, views: number): PlayCoreTitle {
   return {
     id: `t${i}`,
     title: `웹툰${i}`,
-    author: `작가${i}`,
     cover: ["oklch(0.4 0.1 200)", "oklch(0.3 0.1 240)"],
     genres: ["액션"],
-    ageRating: "전체",
-    type: "webtoon",
-    status: "ongoing",
     views,
     likes: views / 100,
     bookmarks: views / 200,
   };
 }
 
-const pool = (n: number, base = 1_000_000): PlayTitle[] =>
+const pool = (n: number, base = 1_000_000): PlayCoreTitle[] =>
   Array.from({ length: n }, (_, i) => makeTitle(i, base * (i + 1)));
 
 describe("popularity-duel-engine", () => {

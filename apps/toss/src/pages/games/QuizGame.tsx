@@ -12,13 +12,13 @@ import {
   isCorrect,
   ROUND_COUNT,
   type QuizQuestion,
-} from '../../games/quiz-engine';
-import { liveRng, useGameTitles } from '../../games/types';
+} from '@toonspectrum/play-core';
+import { liveRng, useGameTitles, type GameTitle } from '../../games/types';
 import { ShareResult } from '../../games/ShareResult';
 
 export function QuizGame() {
   const { titles, loading } = useGameTitles();
-  const [q, setQ] = useState<QuizQuestion | null>(null);
+  const [q, setQ] = useState<QuizQuestion<GameTitle> | null>(null);
   const [round, setRound] = useState(1);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);

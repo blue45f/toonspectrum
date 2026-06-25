@@ -1,10 +1,3 @@
-import { Clock, RotateCcw, Sparkles, Trophy } from "lucide-react";
-import { useEffect, useReducer, useRef, useState } from "react";
-
-import { GameHelp } from "../../GameHelp";
-import { PlayCover } from "../../PlayCover";
-import { usePlayTitles } from "../../use-play-catalog";
-
 import {
   buildBoard,
   flipReducer,
@@ -13,7 +6,14 @@ import {
   isSolved,
   type MemoryState,
   type Tile,
-} from "./memory-engine";
+} from "@toonspectrum/play-core";
+import { Clock, RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { useEffect, useReducer, useRef, useState } from "react";
+
+import { GameHelp } from "../../GameHelp";
+import { PlayCover } from "../../PlayCover";
+import { usePlayTitles } from "../../use-play-catalog";
+
 
 import type { PlayGameProps } from "../../play-types";
 

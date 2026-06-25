@@ -10,7 +10,7 @@ import {
   startDuel,
   type DuelState,
   type Guess,
-} from '../../games/duel-engine';
+} from '@toonspectrum/play-core';
 import { GameCover } from '../../games/GameCover';
 import { GameHelp } from '../../games/GameHelp';
 import { formatCount, liveRng, useGameTitles, type GameTitle } from '../../games/types';
@@ -56,7 +56,7 @@ function Poster({ t, reveal }: { t: GameTitle; reveal: boolean }) {
 
 export function DuelGame() {
   const { titles, loading } = useGameTitles();
-  const [state, setState] = useState<DuelState | null>(null);
+  const [state, setState] = useState<DuelState<GameTitle> | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState<boolean | null>(null);
 
