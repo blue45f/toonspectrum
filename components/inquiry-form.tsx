@@ -1,21 +1,49 @@
 import { CheckCircle2, Send } from "lucide-react";
 import { useId, useState } from "react";
 
-import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 import {
   INQUIRY_BODY_MAX,
-  INQUIRY_CATEGORIES,
   INQUIRY_TITLE_MAX,
-  validateInquiryInput,
-  type InquiryCategory,
-} from "@/lib/inquiry";
+  submitInquiry,
+  type InquiryCategory as DeskInquiryCategory,
+} from "@/lib/inquiry-api";
 
-// 인앱 문의 폼 — /contact·/feedback 공용. 자체 API(/api/support/inquiries)가 검증·허니팟 처리 후
-// TermsDesk 비공개 문의함으로 전달한다(공개 게시판과 달리 본문이 외부에 노출되지 않음).
-// website 필드는 허니팟: 사람에겐 보이지 않고, 채워지면 서버가 조용히 폐기한다.
-export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?: InquiryCategory }) {
+// 인앱 문의 폼 — /contact·/feedback 공용. desk-platform 공개 문의 API로 클라이언트에서 직접 POST한다
+// (POST /api/v1/apps/webtoon-index/inquiries — lib/inquiry-api.ts submitInquiry). /support 게시판과
+// 동일한 백엔드를 쓰며, 등록된 문의는 그 게시판에 공개로 표시된다.
+// website 필드는 허니팟: 사람에겐 보이지 않고, 채워지면 전송을 생략하고 성공처럼 응답한다(봇 무음 처리).
+
+// 이 폼에서 노출하는 문의 유형. desk-platform 카테고리(partnership|bug|feedback|usage)에 매핑된다.
+type FormCategory = "contact" | "partnership" | "bug" | "qa" | "question";
+
+const FORM_CATEGORIES: {
+  value: FormCategory;
+  label: string;
+  description: string;
+}[] = [
+  { value: "contact", label: "일반 문의", description: "서비스 이용, 계정, 데이터 표시 등 일반적인 문의" },
+  { value: "partnership", label: "광고·제휴", description: "광고 집행, 플랫폼 연동, 콘텐츠 제휴, 비즈니스 제안" },
+  { value: "bug", label: "버그 제보", description: "오류 화면, 재현 경로, 기대 동작" },
+  { value: "qa", label: "데이터 검수", description: "랭킹·카탈로그 수치 오류, 잘못 연결된 작품 정보" },
+  { value: "question", label: "기타 질문", description: "그 밖의 모든 질문" },
+];
+
+// 폼 카테고리 → desk-platform 카테고리 매핑. contact·qa·question은 일반 문의(usage)로 묶는다.
+const CATEGORY_MAP: Record<FormCategory, DeskInquiryCategory> = {
+  contact: "usage",
+  partnership: "partnership",
+  bug: "bug",
+  qa: "usage",
+  question: "usage",
+};
+
+const INQUIRY_TITLE_MIN = 2;
+const INQUIRY_BODY_MIN = 10;
+const SIMPLE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?: FormCategory }) {
   const formId = useId();
-  const [category, setCategory] = useState<InquiryCategory>(defaultCategory);
+  const [category, setCategory] = useState<FormCategory>(defaultCategory);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [contact, setContact] = useState("");
@@ -24,33 +52,55 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const selectedCategory = INQUIRY_CATEGORIES.find((item) => item.value === category);
+  const selectedCategory = FORM_CATEGORIES.find((item) => item.value === category);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (sending) return;
-    const parsed = validateInquiryInput({ category, title, body, contact, website });
-    if (parsed.error || !parsed.value) {
-      setError(parsed.error ?? "문의 내용을 확인해 주세요.");
+
+    // 허니팟이 채워졌으면 봇으로 간주하고 조용히 성공 처리한다(봇에게 신호를 주지 않음).
+    if (website.trim()) {
+      setDone(true);
       return;
     }
+
+    const trimmedTitle = title.trim();
+    const trimmedBody = body.replace(/\r\n/g, "\n").trim();
+    const trimmedContact = contact.trim();
+    if (trimmedTitle.length < INQUIRY_TITLE_MIN) {
+      setError(`제목은 ${INQUIRY_TITLE_MIN}자 이상 입력해 주세요.`);
+      return;
+    }
+    if (trimmedTitle.length > INQUIRY_TITLE_MAX) {
+      setError(`제목은 ${INQUIRY_TITLE_MAX}자 이하로 입력해 주세요.`);
+      return;
+    }
+    if (trimmedBody.length < INQUIRY_BODY_MIN) {
+      setError(`내용은 ${INQUIRY_BODY_MIN}자 이상 입력해 주세요.`);
+      return;
+    }
+    if (trimmedBody.length > INQUIRY_BODY_MAX) {
+      setError(`내용은 ${INQUIRY_BODY_MAX}자 이하로 입력해 주세요.`);
+      return;
+    }
+
+    // 이메일 연락처는 contactEmail로, 그 외(전화번호 등)는 본문 푸터로 합친다.
+    const isEmail = SIMPLE_EMAIL_RE.test(trimmedContact);
+    const footer = trimmedContact && !isEmail ? `\n\n— 답변 받을 연락처: ${trimmedContact}` : "";
+    const payloadBody = `${trimmedBody}${footer}`.slice(0, INQUIRY_BODY_MAX);
+
     setSending(true);
     setError(null);
     try {
-      const res = await fetch("/api/support/inquiries", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.value),
+      await submitInquiry({
+        category: CATEGORY_MAP[category],
+        title: trimmedTitle,
+        body: payloadBody,
+        ...(isEmail ? { contactEmail: trimmedContact } : {}),
       });
-      if (!res.ok) {
-        const data = await safeParseJson<unknown>(res);
-        setError(resolveApiError(data, "문의를 접수하지 못했어요. 잠시 후 다시 시도해 주세요."));
-        return;
-      }
       setDone(true);
-    } catch {
-      setError("문의를 접수하지 못했어요. 네트워크 상태를 확인해 주세요.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "문의를 접수하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSending(false);
     }
@@ -89,10 +139,10 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
         <select
           id={`${formId}-category`}
           value={category}
-          onChange={(event) => setCategory(event.target.value as InquiryCategory)}
+          onChange={(event) => setCategory(event.target.value as FormCategory)}
           className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50"
         >
-          {INQUIRY_CATEGORIES.map((item) => (
+          {FORM_CATEGORIES.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -144,7 +194,7 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
           className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50"
         />
       </div>
-      {/* 허니팟 — 시각적으로 숨김. 자동입력 봇이 채우면 서버가 전송을 폐기한다. */}
+      {/* 허니팟 — 시각적으로 숨김. 자동입력 봇이 채우면 전송을 폐기한다. */}
       <div aria-hidden="true" className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden">
         <label htmlFor={`${formId}-website`}>웹사이트 (비워 두세요)</label>
         <input
@@ -170,7 +220,7 @@ export function InquiryForm({ defaultCategory = "contact" }: { defaultCategory?:
         {sending ? "접수 중..." : "문의 보내기"}
       </button>
       <p className="text-[0.68rem] leading-relaxed text-fg-3">
-        접수된 문의는 운영팀 전용 보드(TermsDesk)로 비공개 전달되며, 게시판에 공개되지 않습니다.
+        접수된 문의는 운영팀이 확인하는 공개 문의 게시판으로 전달됩니다.
       </p>
     </form>
   );
