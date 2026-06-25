@@ -1,11 +1,6 @@
 import IntroSplashScreen from "./components/IntroSplashScreen.tsx";
 import { CalendarPage } from "./pages/CalendarPage.tsx";
 import { ExplorePage } from "./pages/ExplorePage.tsx";
-import { DuelGame } from "./pages/games/DuelGame.tsx";
-import { MemoryGame } from "./pages/games/MemoryGame.tsx";
-import { QuizGame } from "./pages/games/QuizGame.tsx";
-import { RouletteGame } from "./pages/games/RouletteGame.tsx";
-import { PlayHubPage } from "./pages/PlayHubPage.tsx";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RecommendPage } from "./pages/RecommendPage.tsx";
 import { SearchPage } from "./pages/SearchPage.tsx";
@@ -14,35 +9,30 @@ import { TitleListPage } from "./pages/TitleListPage.tsx";
 import { navigate, useHashPath } from "./router";
 import { theme } from "./theme";
 
-// 하단 네비 = plan.nav (홈·랭킹·연재·탐색·놀이터). 검색은 Top 바 어포던스, 추천은 홈 섹션/오버플로로
-// 진입하므로 하단 탭에는 넣지 않는다(라우트는 등록). 5개 primary 탭만 노출.
+// 하단 네비 = 홈·랭킹·연재·탐색·추천 (5개 catalog primary 탭). 검색은 Top 바 어포던스로 진입.
+// 비게임 미니앱 정책상 놀이터(미니게임)는 토스 버전에서 제외(웹 전용) — 검토 카테고리 정합.
 const NAV = [
   { id: "home", label: "홈", emoji: "📚", to: "/" },
   { id: "ranking", label: "랭킹", emoji: "🏆", to: "/ranking" },
   { id: "calendar", label: "연재", emoji: "📅", to: "/calendar" },
   { id: "explore", label: "탐색", emoji: "🧭", to: "/explore" },
-  { id: "play", label: "놀이터", emoji: "🎮", to: "/play" },
+  { id: "recommend", label: "추천", emoji: "✨", to: "/recommend" },
 ] as const;
 
 type TabId = (typeof NAV)[number]["id"];
 
 // 경로 → 활성 탭. 검색/추천/상세 등 비탭 라우트는 가장 가까운 primary 탭으로 귀속(없으면 홈).
 function activeTab(path: string): TabId {
-  if (path.startsWith("/play")) return "play";
   if (path.startsWith("/ranking")) return "ranking";
   if (path.startsWith("/calendar")) return "calendar";
   if (path.startsWith("/explore")) return "explore";
+  if (path.startsWith("/recommend")) return "recommend";
   return "home";
 }
 
 function renderRoute(path: string) {
   const detail = path.match(/^\/title\/(.+)$/);
   if (detail) return <TitleDetailPage id={decodeURIComponent(detail[1])} />;
-  if (path === "/play/duel") return <DuelGame />;
-  if (path === "/play/quiz") return <QuizGame />;
-  if (path === "/play/roulette") return <RouletteGame />;
-  if (path === "/play/memory") return <MemoryGame />;
-  if (path.startsWith("/play")) return <PlayHubPage />;
   if (path.startsWith("/ranking")) return <RankingPage />;
   if (path.startsWith("/calendar")) return <CalendarPage />;
   if (path.startsWith("/explore")) return <ExplorePage />;

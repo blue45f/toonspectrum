@@ -20,7 +20,7 @@ let cache: Title[] = seed;
 
 export async function fetchTitles(): Promise<Title[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/titles?limit=80`);
+    const res = await fetch(`${API_BASE}/api/titles?limit=500`);
     if (!res.ok) throw new Error(String(res.status));
     const data = await res.json();
     const items: Title[] = Array.isArray(data?.items) ? data.items : [];

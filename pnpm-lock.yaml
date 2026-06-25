@@ -301,9 +301,6 @@ importers:
       '@toonspectrum/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@toonspectrum/play-core':
-        specifier: workspace:*
-        version: link:../../packages/play-core
       '@toss/tds-mobile':
         specifier: ^2.5.0
         version: 2.5.0(@emotion/react@11.14.0(@types/react@19.2.15)(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
