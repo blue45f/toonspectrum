@@ -187,6 +187,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { cn } from "@/lib/utils";
+import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
@@ -4063,7 +4064,9 @@ export function StudioPage() {
   }
   function addBgScene(bg: StudioBgScene) {
     setMenu(null);
-    const src = bg.imgSrc || svgToDataUrl(bg.svg || "");
+    // 토스 WebView(교차 출처)에서 root-relative /assets 가 404 → resolveAssetUrl 로 배포 오리진에 절대화.
+    // svgToDataUrl 결과(data: URL)나 웹(동일 출처)에선 무변경(no-op).
+    const src = resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""));
     if (selected?.type === "frame") {
       patchEl(selected.id, { bg: src } as Partial<El>);
       setTool("select");
@@ -5428,7 +5431,7 @@ export function StudioPage() {
                           className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
                         >
                           <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                            <img src={bg.imgSrc || svgToDataUrl(bg.svg || "")} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                            <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                           </div>
                           <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
                         </button>

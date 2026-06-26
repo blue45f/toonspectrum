@@ -232,17 +232,18 @@ export function HomeDeferredSections({
               title: "3D 캐릭터 포즈",
               body: "3D 캐릭터에 원하는 포즈를 잡아 컷에 내려놓습니다. VRM 모델도 불러올 수 있어요.",
             },
-          ].map((f) => (
-            <div
-              key={f.title}
-              className="group rounded-2xl border border-line bg-card/30 p-5 surface-hl transition-all duration-200 ease-out-expo hover:-translate-y-0.5 hover:border-accent/40 hover:bg-card/50"
-            >
-              <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent transition-transform duration-200 ease-out-expo group-hover:scale-110 group-hover:-rotate-3">
-                <f.icon size={18} />
-              </span>
-              <h3 className="mt-3 font-bold text-fg transition-colors group-hover:text-accent">{f.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{f.body}</p>
-            </div>
+          ].map((f, i) => (
+            // 진입 모션(reveal)과 호버 transform 을 분리: reveal 의 fill:both 가 호버 translate 를
+            // 덮어쓰지 않도록 바깥 래퍼에 reveal, 안쪽 카드에 호버 리프트를 둔다.
+            <RevealOnScroll key={f.title} delayMs={i * 90}>
+              <div className="sheen-sweep group relative h-full overflow-hidden rounded-2xl border border-line bg-card/30 p-5 surface-hl transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out-expo hover:-translate-y-0.5 hover:border-accent/40 hover:bg-card/50 hover:shadow-[0_14px_36px_-18px_oklch(0.72_0.185_42/0.5)]">
+                <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent transition-transform duration-200 ease-out-expo group-hover:scale-110 group-hover:-rotate-3">
+                  <f.icon size={18} />
+                </span>
+                <h3 className="mt-3 font-bold text-fg transition-colors group-hover:text-accent">{f.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{f.body}</p>
+              </div>
+            </RevealOnScroll>
           ))}
         </div>
         <div className="mt-6 flex flex-wrap items-center gap-3">

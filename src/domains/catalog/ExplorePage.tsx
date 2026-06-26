@@ -1,4 +1,5 @@
-import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal } from "lucide-react";
+import { useFx } from "@toonspectrum/core/fx";
+import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -7,7 +8,10 @@ import type { SortKey } from "@/lib/search";
 import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/lib/types";
 
 import { AdSlot } from "@/components/ad-slot";
+import { CountUp } from "@/components/count-up";
+import { RevealOnScroll } from "@/components/reveal-on-scroll";
 import { Container } from "@/components/section";
+import { ShimmerTitle } from "@/components/shimmer-title";
 import { TitleCard } from "@/components/title-card";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
 import { genreBorder, genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
@@ -143,6 +147,7 @@ export function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const savedIds = useSavedTitleIds();
   const [panelOpen, setPanelOpen] = useState(false);
+  const fx = useFx();
 
   const sort = (SORTS.find((entry) => entry.key === searchParams.get("sort"))?.key ?? "popular") as SortKey;
   const sortExplicit = Boolean(searchParams.get("sort"));
@@ -208,47 +213,103 @@ export function ExplorePage() {
   return (
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
+        {/* 상단 장르-스펙트럼 스트립 — 데이터 시그니처(홈과 톤 정합). 좌→우 fill-in. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden" aria-hidden>
+          <div
+            className="size-full origin-left motion-safe:[animation:spectrum-grow_0.9s_var(--ease-out-expo)_0.1s_both]"
+            style={{ background: spectrumGradient([...GENRES], 90) }}
+          />
+        </div>
+        {/* warm-ink 깊이 — persimmon 상단 글로(호흡). hue 42 축 유지(장르 선택 시 그 색으로 보강). */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-44 opacity-70"
+          style={{
+            background:
+              "linear-gradient(to bottom, oklch(0.72 0.185 42 / 0.12), oklch(0.155 0.008 70 / 0))",
+          }}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-24 -top-16 size-[30rem] rounded-full opacity-60 blur-3xl motion-safe:[animation:hero-bloom_11s_ease-in-out_infinite]"
+          style={{
+            background: heroGenre
+              ? `radial-gradient(closest-side, ${genreTint(heroGenre, 0.22)}, transparent 70%)`
+              : "radial-gradient(closest-side, oklch(0.66 0.2 38 / 0.15), oklch(0.62 0.16 60 / 0.05) 58%, transparent 72%)",
+          }}
+          aria-hidden
+        />
         {heroGenre && (
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               background: `radial-gradient(120% 90% at 18% -10%, ${genreTint(
                 heroGenre,
-                0.22
+                0.2
               )}, transparent 60%)`,
             }}
             aria-hidden
           />
         )}
         <Container size="wide" className="relative py-7 sm:py-12 lg:py-16">
-          <div className="flex items-center gap-2 text-accent">
-            <Compass size={15} strokeWidth={2} />
-            <p className="eyebrow">GENRE SPECTRUM / 탐색</p>
-          </div>
+          <p
+            className="eyebrow inline-flex items-center gap-2 text-accent"
+            style={{ animation: "fade-up 0.5s var(--ease-out-expo) 0.05s both" }}
+          >
+            {/* 시그니처 스펙트럼 틱 — 살아있는 브랜드 맥동(데이터 맥락, 홈 히어로와 동일 언어). */}
+            <span
+              aria-hidden
+              className="h-2.5 w-9 rounded-full bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
+              style={{ backgroundImage: spectrumGradient([...GENRES], 90) }}
+            />
+            <Compass size={14} strokeWidth={2} />
+            GENRE SPECTRUM / 탐색
+          </p>
 
           <div className="mt-3 max-w-2xl sm:mt-4">
-            <h1 className="text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl">
+            <h1
+              className="text-pretty text-[clamp(1.7rem,7vw,2.25rem)] font-bold leading-[1.1] sm:text-4xl"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.14s both" }}
+            >
               색을 따라 떠나는{" "}
               {heroGenre ? (
-                <span style={{ color: accent }}>{heroGenre}</span>
+                <span className="relative font-serif font-normal italic" style={{ color: accent }}>
+                  {heroGenre}
+                  {/* 선택 장르 강조 밑줄 — 그 장르색으로 fill-in. */}
+                  <span
+                    aria-hidden
+                    className="absolute -bottom-0.5 left-0 h-[0.12em] w-full origin-left rounded-full motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.5s_both]"
+                    style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }}
+                  />
+                </span>
               ) : (
-                <span className="font-serif font-normal italic text-accent">스펙트럼 탐색</span>
+                <ShimmerTitle
+                  as="span"
+                  className="relative font-serif font-normal italic"
+                  particleCount={22}
+                  particleSpread={1.2}
+                >
+                  스펙트럼 탐색
+                </ShimmerTitle>
               )}
             </h1>
-            <p className="lede mt-2.5 text-pretty text-sm leading-relaxed text-fg-2 sm:mt-3.5 sm:text-base">
+            <p
+              className="lede mt-2.5 text-pretty text-sm leading-relaxed text-fg-2 sm:mt-3.5 sm:text-base"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.24s both" }}
+            >
               장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께
               표시되어 무슨 작품인지 바로 판단할 수 있습니다.
             </p>
             <Link
               href={heroGenre ? `/random?genre=${encodeURIComponent(heroGenre)}` : "/random"}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent sm:mt-5"
+              className="sheen-sweep group mt-4 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-accent/50 hover:bg-accent-soft hover:text-accent hover:shadow-[0_8px_24px_-12px_oklch(0.72_0.185_42/0.5)] sm:mt-5"
+              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.32s both" }}
             >
-              <Shuffle size={16} />
+              <Shuffle size={16} className="transition-transform duration-300 ease-out-expo group-hover:rotate-180" />
               {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
             </Link>
           </div>
 
-          <div className="mt-8">
+          <RevealOnScroll className="mt-8" delayMs={60}>
             <div className="h-2 w-full rounded-full" style={{ background: spectrumGradient([...GENRES]) }} aria-hidden />
             <div className="mt-4 flex flex-wrap gap-2">
               {GENRES.map((entry) => {
@@ -257,18 +318,32 @@ export function ExplorePage() {
                   <button
                     key={entry}
                     type="button"
-                    onClick={() => applyFilters({ ...filters, genres: toggleValue(filters.genres, entry) })}
+                    data-no-sfx
+                    onClick={(event) => {
+                      // 선택(off→on)되는 순간만 그 장르색으로 파티클 "팡" — 색을 고르는 보상감.
+                      if (!active) {
+                        fx.sfx("pop");
+                        fx.burstAt(event.currentTarget, {
+                          count: 12,
+                          spread: 0.8,
+                          colors: [genreColor(entry, 0.82), genreColor(entry, 0.66), "oklch(0.95 0.02 85)"],
+                        });
+                      }
+                      applyFilters({ ...filters, genres: toggleValue(filters.genres, entry) });
+                    }}
                     aria-pressed={active}
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium",
                       "transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out-expo",
-                      "hover:-translate-y-px",
+                      "hover:-translate-y-px active:scale-[0.96]",
                       active && "ring-1"
                     )}
                     style={{
                       color: genreColor(entry, active ? 0.92 : 0.82),
                       backgroundColor: genreTint(entry, active ? 0.3 : 0.12),
                       borderColor: genreBorder(entry, active ? 0.7 : 0.26),
+                      // 선택된 칩엔 그 장르색 글로우로 "켜진" 느낌을 강화.
+                      boxShadow: active ? `0 6px 20px -10px ${genreColor(entry, 0.62)}` : undefined,
                     }}
                   >
                     {entry}
@@ -276,12 +351,12 @@ export function ExplorePage() {
                 );
               })}
             </div>
-          </div>
+          </RevealOnScroll>
         </Container>
       </section>
 
       <Container size="wide" className="flex flex-col gap-8 py-10">
-        <div>
+        <RevealOnScroll variant="fade">
           <p className="eyebrow mb-3 text-fg-3">BY CODE / 코드로 좁히기</p>
           <div className="flex flex-wrap gap-2">
             {tags.map(({ tag: entry, count }) => {
@@ -290,12 +365,19 @@ export function ExplorePage() {
                 <button
                   key={entry}
                   type="button"
-                  onClick={() => applyFilters({ ...filters, tags: toggleValue(filters.tags, entry) })}
+                  data-no-sfx
+                  onClick={(event) => {
+                    if (!active) {
+                      fx.sfx("pop");
+                      fx.burstAt(event.currentTarget, { count: 10, spread: 0.7 });
+                    }
+                    applyFilters({ ...filters, tags: toggleValue(filters.tags, entry) });
+                  }}
                   aria-pressed={active}
                   className={cn(
-                    "group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
+                    "group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.96]",
                     active
-                      ? "border-accent/60 bg-accent-soft text-accent"
+                      ? "border-accent/60 bg-accent-soft text-accent shadow-[0_4px_16px_-8px_oklch(0.72_0.185_42/0.5)]"
                       : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
                   )}
                 >
@@ -306,7 +388,7 @@ export function ExplorePage() {
               );
             })}
           </div>
-        </div>
+        </RevealOnScroll>
 
         <div className="flex flex-col gap-4 border-y border-line py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -379,7 +461,15 @@ export function ExplorePage() {
 
           <div className="flex items-center gap-4">
             <p className="text-sm text-fg-2">
-              작품 <span className="numeral text-base text-fg">{results.length.toLocaleString("ko-KR")}</span>편
+              작품{" "}
+              <CountUp
+                key={results.length}
+                value={results.length}
+                duration={0.7}
+                separator={results.length >= 1000}
+                className="numeral text-base text-fg"
+              />
+              편
             </p>
             <button
               type="button"
@@ -449,15 +539,28 @@ export function ExplorePage() {
             )}
           </>
         ) : (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
-            <p className="text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
-            <p className="mt-1 text-xs text-fg-3">
+          <div className="relative flex flex-col items-center overflow-hidden rounded-3xl border border-dashed border-line bg-gradient-to-b from-card/55 to-panel/30 p-12 text-center">
+            {/* 은은한 액센트 글로우 — 배경에만 깔려 가독성 영향 없음(창작 게시판 빈-상태와 톤 정합). */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-2 h-32 w-32 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
+              style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)" }}
+            />
+            <span
+              aria-hidden
+              className="pf-glow relative mb-4 grid size-14 place-items-center rounded-2xl border border-accent/30 bg-accent-soft/60 text-accent"
+            >
+              <Compass size={26} />
+              <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
+            </span>
+            <p className="relative text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
+            <p className="relative mt-1 text-xs text-fg-3">
               {hasFilter ? "필터를 조금 넓히거나 초기화해 보세요." : "다른 장르나 태그로 탐색해 보세요."}
             </p>
             {hasFilter && (
               <Link
                 href="/explore"
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
+                className="relative mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
               >
                 <RotateCcw size={14} />
                 필터 초기화

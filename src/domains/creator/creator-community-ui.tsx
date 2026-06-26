@@ -48,22 +48,28 @@ export function AuthorAvatar({
 }
 
 // 작품 카드 — 갤러리/프로필/챌린지/팔로잉 피드 공용. 시리즈·챌린지 배지 표시.
+// 모바일 2열 그리드 친화: 호버=리프트+테두리 강조, 탭=눌림 스프링(active:scale). sheen 으로 프리미엄 질감.
 export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showAuthor?: boolean }) {
   return (
     <Link
       href={`/create/${work.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/30 transition-colors hover:border-line-strong"
+      className="sheen-sweep group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/30 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg hover:shadow-black/25 active:scale-[0.98]"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
         <CoverImage
           src={work.cover}
           alt={work.title}
-          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.05]"
           fallback={
             <span className="grid h-full w-full place-items-center bg-gradient-to-br from-raised to-card text-fg-3">
               <PenLine size={28} />
             </span>
           }
+        />
+        {/* 하단 그라데이션 — 배지·썸 가독성 보강(저작 이미지 위 텍스트 대비). */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[oklch(0.14_0.01_70/0.55)] to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         />
         <span className="absolute left-2 top-2 inline-flex items-center rounded-full border border-line/60 bg-[oklch(0.16_0.01_70/0.7)] px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 backdrop-blur-md">
           {FORMAT_LABEL[work.format]}
@@ -84,7 +90,7 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-fg group-hover:text-accent">
+        <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-fg transition-colors duration-150 group-hover:text-accent">
           {work.seriesTitle ? `${work.seriesTitle} · ` : ""}
           {work.title}
         </h3>
@@ -94,7 +100,7 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
             <span className="truncate">{work.author.name}</span>
           </div>
         )}
-        <div className="mt-auto flex items-center gap-3 pt-1.5 text-[0.72rem] text-fg-3">
+        <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5 text-[0.72rem] text-fg-3">
           <span className="inline-flex items-center gap-1">
             <Heart size={12} className={cn(work.liked && "fill-accent text-accent")} />
             <span className="numeral">{formatCount(work.likes)}</span>

@@ -306,8 +306,14 @@ export function HomePage() {
               {heroStats.map((item, i) => (
                 <div
                   key={item.label}
-                  className="group flex flex-col gap-1 bg-card/70 px-3.5 py-4 transition-colors duration-200 hover:bg-card sm:px-5 sm:py-5"
+                  className="group relative flex flex-col gap-1 overflow-hidden bg-card/70 px-3.5 py-4 transition-colors duration-200 hover:bg-card sm:px-5 sm:py-5"
+                  style={{ animation: `fade-up 0.5s var(--ease-out-expo) ${0.55 + i * 0.08}s both` }}
                 >
+                  {/* 호버 시 상단에 퍼시몬 빛줄 — 데이터 셀이 "켜지는" 느낌(가독성 영향 0). */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-[linear-gradient(90deg,transparent,var(--color-accent),transparent)] transition-transform duration-300 ease-out-expo group-hover:scale-x-100"
+                  />
                   <dd className="numeral text-[clamp(1.4rem,6vw,1.7rem)] leading-none text-fg transition-colors duration-200 group-hover:text-accent sm:text-[2rem]">
                     <CountUp value={item.v} suffix={item.suffix} separator={item.v >= 10000} duration={1.1 + i * 0.1} />
                   </dd>
