@@ -1,21 +1,41 @@
 import { TDSMobileAITProvider } from '@toss/tds-mobile-ait';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HashRouter } from 'react-router-dom';
+
+// 웹의 레거시 스토리지 키 이관(스토어 hydrate 전에 최상단). 웹 main 과 동일 출처.
+import '@/src/compat/storage-migrate';
+import { installStaticCatalog } from '@/src/catalog-static';
 
 import config from '../granite.config.ts';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { API_BASE, isAdultTitle } from './lib/api.ts';
 // 웹 디자인 시스템(Tailwind v4 + 토큰 + 커스텀 유틸리티)을 먼저 로드해 웹 feature
-// 컴포넌트(/studio·/create)가 그대로 렌더되게 한다. 토스 셸의 기본 스타일은 그 다음
-// index.css 가 덮어써 기존 TDS/인라인 페이지의 외형을 보존한다.
+// 컴포넌트(전 페이지)가 그대로 렌더되게 한다. 토스 셸의 기본 스타일은 그 다음
+// index.css 가 덮어써 기존 인라인 크롬(BottomNav 등)의 외형을 보존한다.
 import './web-theme.css';
 import './index.css';
+
+// 공유 카탈로그 데이터 레이어(웹과 단일 출처) 설치 — 토스 정책만 옵션으로 주입한다:
+//  ① dataBase: 교차 출처 WebView 라 /data·/api 를 배포 오리진(API_BASE)에서 가져온다.
+//  ② filterTitle: 19+ 성인물 제외(비게임 미니앱 심사 요건). 카탈로그 시드에서 빠져 전 표면 일관.
+// 렌더 전에 설치해 첫 fetch 부터 적용한다(웹 main.tsx 와 동일 순서).
+installStaticCatalog({
+  dataBase: API_BASE,
+  filterTitle: (t) => !isAdultTitle(t),
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TDSMobileAITProvider brandPrimaryColor={config.brand.primaryColor}>
       <ErrorBoundary>
-        <App />
+        {/* 토스 WebView 는 실 URL/history 가 없어 HashRouter(#/path)로 라우팅한다. 웹 호환 레이어
+            (usePathname/useRouter/Link)와 AppRouter 가 100% react-router-dom 기반이라 그대로 동작하고,
+            기존 토스 해시 URL 규약(#/ranking …)·딥링크도 보존된다. */}
+        <HashRouter>
+          <App />
+        </HashRouter>
       </ErrorBoundary>
     </TDSMobileAITProvider>
   </StrictMode>,

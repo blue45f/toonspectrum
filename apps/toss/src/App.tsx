@@ -1,32 +1,15 @@
-import { useClickSfx, useFx } from "@toonspectrum/core/fx";
+import { useFx } from "@toonspectrum/core/fx";
 import "@toonspectrum/core/fx/fx.css";
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SplashScreen } from "@/components/SplashScreen";
+import { AppShell } from "@/src/app/AppShell";
 
-import { CalendarPage } from "./pages/CalendarPage.tsx";
-import { CommunityPage } from "./pages/CommunityPage.tsx";
-import { CreatePage } from "./pages/CreatePage.tsx";
-import { ExplorePage } from "./pages/ExplorePage.tsx";
-import { FortunePage } from "./pages/FortunePage.tsx";
-import { InfoPage } from "./pages/InfoPage.tsx";
-import { DuelGame } from "./pages/games/DuelGame.tsx";
-import { MemoryGame } from "./pages/games/MemoryGame.tsx";
-import { QuizGame } from "./pages/games/QuizGame.tsx";
-import { RouletteGame } from "./pages/games/RouletteGame.tsx";
-import { RpsGame } from "./pages/games/RpsGame.tsx";
-import { LibraryPage } from "./pages/LibraryPage.tsx";
-import { PlayHubPage } from "./pages/PlayHubPage.tsx";
-import { RankingPage } from "./pages/RankingPage.tsx";
-import { RecommendPage } from "./pages/RecommendPage.tsx";
-import { SearchPage } from "./pages/SearchPage.tsx";
-import { StudioPage } from "./pages/StudioPage.tsx";
-import { TitleDetailPage } from "./pages/TitleDetailPage.tsx";
-import { TitleListPage } from "./pages/TitleListPage.tsx";
-import { WebComponentSample } from "./pages/WebComponentSample.tsx";
-import { navigate, useHashPath } from "./router";
-import { theme } from "./theme";
+import { BannerAd } from "./components/BannerAd.tsx";
 import { hapticFeedback } from "./lib/toss.ts";
+import { theme } from "./theme";
 
 // 하단 네비 = plan.nav (홈·랭킹·연재·탐색·놀이터). 검색은 Top 바 어포던스, 추천은 홈 섹션/오버플로로
 // 진입하므로 하단 탭에는 넣지 않는다(라우트는 등록). 5개 primary 탭만 노출.
@@ -46,7 +29,7 @@ function activeTab(path: string): TabId {
   if (path.startsWith("/play") || path.startsWith("/fortune") || path.startsWith("/studio")) return "play";
   if (path.startsWith("/ranking")) return "ranking";
   if (path.startsWith("/calendar")) return "calendar";
-  // 탐색 오버플로(ExplorePage 상단 칩)로 진입하는 부가 화면들 — 창작 스튜디오·내 서재·커뮤니티·추천·정보/약관.
+  // 탐색 오버플로(ExplorePage 상단 칩)로 진입하는 부가 화면들 — 창작·내 서재·커뮤니티·추천·정보/약관 등.
   // 검색(/search)도 어느 탭에서든 Top 검색 버튼으로 열리지만, 비탭 라우트라 가장 가까운 '탐색'에 귀속한다.
   if (
     path.startsWith("/explore") ||
@@ -54,55 +37,68 @@ function activeTab(path: string): TabId {
     path.startsWith("/library") ||
     path.startsWith("/community") ||
     path.startsWith("/recommend") ||
+    path.startsWith("/reviews") ||
+    path.startsWith("/insights") ||
+    path.startsWith("/tags") ||
+    path.startsWith("/authors") ||
+    path.startsWith("/news") ||
+    path.startsWith("/compare") ||
+    path.startsWith("/random") ||
     path.startsWith("/search") ||
+    path.startsWith("/settings") ||
+    path.startsWith("/me") ||
+    path.startsWith("/about") ||
+    path.startsWith("/guide") ||
+    path.startsWith("/sitemap") ||
+    path.startsWith("/design") ||
+    path.startsWith("/feedback") ||
+    path.startsWith("/support") ||
+    path.startsWith("/contact") ||
+    path.startsWith("/terms") ||
+    path.startsWith("/privacy") ||
+    path.startsWith("/copyright") ||
     path.startsWith("/info")
   )
     return "explore";
-  // 작품 상세(/title/..)·검증용 샘플 등 그 외는 홈에 귀속.
+  // 작품 상세(/title/..)·작가/카페·홈 등 그 외는 홈에 귀속.
   return "home";
 }
 
-// 몰입형 에디터(자체 하단 도구막대/풀스크린 캔버스 보유) — 토스 BottomNav·BGM 토글을 숨겨
-// 자체 UI 와 겹치지 않게 한다. /create(Konva 컷툰), /studio(3D 캐릭터 포저)가 해당.
+// 몰입형 에디터(자체 하단 도구막대/풀스크린 캔버스 보유) — 토스 BottomNav·플로팅 컨트롤을 숨겨
+// 자체 UI 와 겹치지 않게 한다. /studio(3D 캐릭터 포저), /create/:id·/create/series/:id(Konva 컷툰)가 해당.
 function isImmersiveEditor(path: string): boolean {
-  return path.startsWith("/create") || path.startsWith("/studio");
+  if (path.startsWith("/studio")) return true;
+  // /create 갤러리(목록)는 일반 화면. /create/<id>·/create/series/<id>·/create/challenges 만 에디터/세부.
+  if (path.startsWith("/create/")) return true;
+  return false;
 }
 
-function renderRoute(path: string) {
-  const detail = path.match(/^\/title\/(.+)$/);
-  if (detail) return <TitleDetailPage id={decodeURIComponent(detail[1])} />;
-  // 게임 id 는 웹 play 레지스트리와 통일(popularity-duel). 구 경로(/play/duel)는 호환을 위해 함께 받는다.
-  if (path === "/play/popularity-duel" || path === "/play/duel") return <DuelGame />;
-  if (path === "/play/quiz") return <QuizGame />;
-  if (path === "/play/roulette") return <RouletteGame />;
-  if (path === "/play/memory") return <MemoryGame />;
-  if (path === "/play/rps") return <RpsGame />;
-  if (path.startsWith("/play")) return <PlayHubPage />;
-  if (path.startsWith("/ranking")) return <RankingPage />;
-  if (path.startsWith("/calendar")) return <CalendarPage />;
-  if (path.startsWith("/explore")) return <ExplorePage />;
-  if (path.startsWith("/search")) return <SearchPage />;
-  if (path.startsWith("/recommend")) return <RecommendPage />;
-  if (path.startsWith("/library")) return <LibraryPage />;
-  if (path.startsWith("/fortune")) return <FortunePage />;
-  if (path.startsWith("/info")) return <InfoPage />;
-  if (path.startsWith("/studio")) return <StudioPage />;
-  // 창작 스튜디오 — 웹(루트)의 Konva 컷툰 에디터를 lazy 재사용. 자체 모바일 레이아웃으로 렌더.
-  if (path.startsWith("/create")) return <CreatePage />;
-  if (path.startsWith("/community")) return <CommunityPage />;
-  // 숨은 검증 라우트 — 웹 Tailwind 컴포넌트가 토스에서 렌더되는지 확인용(#/sample). 하단 탭 비노출.
-  if (path.startsWith("/sample")) return <WebComponentSample />;
-  return <TitleListPage />;
+// 리스트형(카드 그리드) 화면 — 콘텐츠가 끝나는 자연스러운 지점에 토스 인앱 배너 광고를 1회 배치한다
+// (ATF·핵심 액션 위 금지). 상세·에디터·운세·놀이터 등 비리스트 화면엔 넣지 않는다.
+function isListPage(path: string): boolean {
+  return (
+    path === "/" ||
+    path.startsWith("/ranking") ||
+    path.startsWith("/calendar") ||
+    path.startsWith("/explore") ||
+    path.startsWith("/recommend") ||
+    path.startsWith("/search") ||
+    path.startsWith("/library") ||
+    path.startsWith("/tags") ||
+    path.startsWith("/authors") ||
+    path.startsWith("/news") ||
+    path.startsWith("/reviews")
+  );
 }
 
 // 토스 셸 검색 어포던스 — 어느 탭에서든 통합 검색(/search)으로 진입. 하단 탭은 5개로 꽉 차 있어
 // 검색은 우상단 플로팅 버튼(셸 크롬)으로 노출한다. 검색·상세·몰입형 에디터 화면에선 숨긴다.
-function SearchFab() {
+function SearchFab({ onPress }: { onPress: () => void }) {
   return (
     <button
       type="button"
       className="pressable"
-      onClick={() => navigate("/search")}
+      onClick={onPress}
       aria-label="통합 검색"
       title="검색"
       style={{
@@ -128,7 +124,7 @@ function SearchFab() {
   );
 }
 
-function BottomNav({ tab }: { tab: TabId }) {
+function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) => void }) {
   return (
     <nav
       style={{
@@ -153,7 +149,7 @@ function BottomNav({ tab }: { tab: TabId }) {
             key={it.id}
             type="button"
             className="pressable"
-            onClick={() => navigate(it.to)}
+            onClick={() => onNavigate(it.to)}
             aria-current={on ? "page" : undefined}
             style={{
               display: "flex",
@@ -180,16 +176,54 @@ function BottomNav({ tab }: { tab: TabId }) {
   );
 }
 
-export function App() {
-  const path = useHashPath();
-  const tab = activeTab(path);
-  const fx = useFx();
-  useClickSfx(); // 전역 위임 클릭 'tick'(인터랙티브 요소 탭마다).
-  // 몰입형 에디터에서는 토스 셸 크롬(하단 탭·BGM 토글)을 숨겨 에디터 자체 UI 와 겹치지 않게 한다.
-  const immersive = isImmersiveEditor(path);
+/**
+ * 토스 셸 크롬 — 공유 AppShell(웹 페이지 전체) 둘레에 토스 정책 크롬을 두른다.
+ * 라우터 컨텍스트(HashRouter) 안에서 마운트되므로 react-router 의 useLocation/useNavigate 로
+ * 현재 경로·탭을 읽는다(웹 호환 레이어와 동일 출처).
+ */
+function TossChrome() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const tab = activeTab(pathname);
+  const immersive = isImmersiveEditor(pathname);
   // 검색 FAB 은 몰입형 에디터·검색 페이지(중복)·상세 페이지(자체 sticky 헤더와 겹침)에선 숨긴다.
   const showSearchFab =
-    !immersive && !path.startsWith("/search") && !path.startsWith("/title/");
+    !immersive && !pathname.startsWith("/search") && !pathname.startsWith("/title/");
+
+  // 본문 하단 여백 — 고정 BottomNav 가 마지막 콘텐츠를 가리지 않게 탭바 높이만큼 띄운다.
+  // 몰입형 에디터(자체 풀스크린/도구막대)에선 탭이 없으므로 여백 0(스크롤·100dvh 캔버스 보존).
+  useEffect(() => {
+    const main = document.getElementById("main-content");
+    if (!main) return;
+    main.style.paddingBottom = immersive ? "0px" : "calc(72px + env(safe-area-inset-bottom))";
+  }, [immersive]);
+
+  return (
+    <>
+      {showSearchFab && <SearchFab onPress={() => navigate("/search")} />}
+      {/* 리스트형 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
+      {!immersive && isListPage(pathname) && (
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px 8px" }}>
+          <BannerAd format="feed" />
+        </div>
+      )}
+      {!immersive && <BottomNav tab={tab} onNavigate={(to) => navigate(to)} />}
+      {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).
+          하단 탭바 위(above-nav)로 띄우고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
+      {!immersive && (
+        <FloatingControls showTheme={false} showLang={false} placement="above-nav" />
+      )}
+    </>
+  );
+}
+
+/**
+ * 본문 여백/스플래시 — 몰입형 에디터에선 하단 탭이 없어 여백 0, 그 외엔 탭바 높이만큼 띄운다.
+ * 라우터 컨텍스트 안에서 경로를 읽어야 하므로 AppShell 의 mainClassName 으로는 못 갈라(정적) 셸에서 처리한다.
+ */
+function TossSplash() {
+  const fx = useFx();
 
   // 타이틀 카드(인트로 스플래시) 탭 — 파티클 '팡' + 'pop' 효과음 + 토스 햅틱(축포).
   const onTitleCardTap = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -199,24 +233,29 @@ export function App() {
   };
 
   return (
-    <>
-      {/* 공유 동적 인트로/스플래시(NO fork) — 토스는 매 진입(앱 재오픈)마다 노출하므로 once={false}.
-          타이틀 카드 탭 시 파티클 '팡' + 'pop' + 토스 햅틱(축포) 으로 동적 연출. */}
-      <div onPointerDown={onTitleCardTap} data-no-sfx>
-        <SplashScreen once={false} />
-      </div>
-      {showSearchFab && <SearchFab />}
-      <div style={{ paddingBottom: immersive ? 0 : 72 }}>{renderRoute(path)}</div>
-      {!immersive && <BottomNav tab={tab} />}
-      {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).
-          하단 탭바 위(above-nav)로 띄우고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
-      {!immersive && (
-        <FloatingControls
-          showTheme={false}
-          showLang={false}
-          placement="above-nav"
-        />
-      )}
-    </>
+    // 공유 동적 인트로/스플래시(NO fork) — 토스는 매 진입(앱 재오픈)마다 노출하므로 once={false}.
+    // 타이틀 카드 탭 시 파티클 '팡' + 'pop' + 토스 햅틱(축포) 으로 동적 연출.
+    <div onPointerDown={onTitleCardTap} data-no-sfx>
+      <SplashScreen once={false} />
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <AppShell
+      // 토스는 웹 SiteHeader/SiteFooter 대신 TDS BottomNav·검색 FAB(자체 크롬)을 쓴다(심사 요건: 네이티브 내비).
+      header={null}
+      footer={null}
+      // 토스는 토글 일부만(사운드·BGM) — TossChrome 안에서 경로별 노출을 갈라 직접 렌더한다.
+      floatingControls={null}
+      splash={<TossSplash />}
+      // 스킵 링크는 BottomNav 가 본문 포커스를 담당하는 토스 WebView 에선 생략.
+      showSkipLink={false}
+      // 하단 탭바 높이만큼 본문 여백(몰입형 에디터는 자체 풀스크린이라 따로 음수 마진 불필요 —
+      // BannerAd/탭이 숨겨져 여백이 남아도 빈 영역일 뿐이라 안전하게 일괄 패딩).
+      mainClassName="min-h-screen outline-none"
+      chromeOverlay={<TossChrome />}
+    />
   );
 }

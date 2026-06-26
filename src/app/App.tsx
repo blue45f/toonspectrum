@@ -1,24 +1,11 @@
-import { useClickSfx } from "@toonspectrum/core/fx";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { BrowserRouter, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { BrowserRouter } from "react-router-dom";
 
-import { AppRouter } from "./routes/AppRouter";
+import { AppShell } from "./AppShell";
 
-import { AuthSessionProvider } from "@/components/auth/session-provider";
-import { CommandPaletteHost } from "@/components/command-palette-host";
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
-import { SplashScreen } from "@/components/SplashScreen";
-import { pingVisit } from "@/lib/visits-api";
 
-// 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
-import "@toonspectrum/core/fx/fx.css";
-
-const AgeGateHost = lazy(() =>
-  import("@/components/age-gate-host").then((mod) => ({
-    default: mod.AgeGateHost,
-  })),
-);
 const BackToTop = lazy(() =>
   import("@/components/back-to-top").then((mod) => ({
     default: mod.BackToTop,
@@ -28,14 +15,6 @@ const DeskCloudMounts = lazy(() =>
   import("@/src/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
     default: mod.DeskCloudMounts,
   })),
-);
-const StoreSync = lazy(() =>
-  import("@/components/auth/store-sync").then((mod) => ({
-    default: mod.StoreSync,
-  })),
-);
-const ToastHost = lazy(() =>
-  import("@/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
 );
 const SiteFooter = lazy(() =>
   import("@/components/site-footer").then((mod) => ({
@@ -48,49 +27,6 @@ const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_CHANGELOGDESK_URL ||
   import.meta.env.VITE_NOTIFYDESK_URL,
 );
-
-// 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
-// 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다.
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  const isFirstRender = useRef(true);
-
-  useEffect(() => {
-    globalThis.scrollTo({ top: 0, left: 0 });
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    document.getElementById("main-content")?.focus({ preventScroll: true });
-  }, [pathname]);
-
-  return null;
-}
-
-function useDeferredByInput(timeoutMs = 4500) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (ready) return;
-    let timeoutId = 0;
-    const activate = () => setReady(true);
-    const options = { passive: true } as const;
-
-    timeoutId = window.setTimeout(activate, timeoutMs);
-    window.addEventListener("pointerdown", activate, options);
-    window.addEventListener("keydown", activate);
-    window.addEventListener("scroll", activate, options);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      window.removeEventListener("pointerdown", activate);
-      window.removeEventListener("keydown", activate);
-      window.removeEventListener("scroll", activate);
-    };
-  }, [ready, timeoutMs]);
-
-  return ready;
-}
 
 function useDeferredByScroll(timeoutMs = 6500) {
   const [ready, setReady] = useState(false);
@@ -113,13 +49,6 @@ function useDeferredByScroll(timeoutMs = 6500) {
   return ready;
 }
 
-// 방문 핑 — 앱 마운트 시 하루 1회(localStorage 디바운스). best-effort, 렌더 비차단.
-function useVisitPing() {
-  useEffect(() => {
-    void pingVisit();
-  }, []);
-}
-
 function DeskCloudHost() {
   if (!HAS_DESKCLOUD_MOUNTS) return null;
   return (
@@ -139,17 +68,6 @@ function DeferredFooter() {
   );
 }
 
-function DeferredGlobalOverlays() {
-  const ready = useDeferredByInput();
-  if (!ready) return null;
-  return (
-    <Suspense fallback={null}>
-      <AgeGateHost />
-      <ToastHost />
-    </Suspense>
-  );
-}
-
 function DeferredBackToTop() {
   const ready = useDeferredByScroll();
   if (!ready) return null;
@@ -160,42 +78,23 @@ function DeferredBackToTop() {
   );
 }
 
+// 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
+// 콘텐츠 트리(라우터·페이지·커맨드 팔레트·오버레이·인증)는 토스와 단일 출처(AppShell)로 공유한다.
 export default function App() {
-  useVisitPing();
-  // 전역 클릭 'tick' — 인터랙티브 요소(버튼·링크) 탭마다 미묘한 효과음. opt-out 은 [data-no-sfx].
-  // SFX 는 기본 ON(동작 최소화 선호 시 자동 OFF), 첫 제스처에서 오디오 컨텍스트가 언락된다.
-  useClickSfx();
   return (
     <BrowserRouter>
-      <AuthSessionProvider>
-        <SplashScreen />
-        <Suspense fallback={null}>
-          <StoreSync />
-        </Suspense>
-        <ScrollToTop />
-        <a
-          href="#main-content"
-          className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas"
-        >
-          본문으로 건너뛰기
-        </a>
-        <SiteHeader />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="min-h-screen pb-20 outline-none md:pb-0"
-        >
-          <AppRouter />
-        </main>
-        <DeferredFooter />
-        <CommandPaletteHost />
-        <DeferredGlobalOverlays />
-        <DeferredBackToTop />
-        {/* 자동 숨김 플로팅 컨트롤(사운드·BGM·테마·언어) — 좌하단(모바일 우하단). */}
-        <FloatingControls placement="bottom-left" />
-        {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
-        <DeskCloudHost />
-      </AuthSessionProvider>
+      <AppShell
+        header={<SiteHeader />}
+        footer={<DeferredFooter />}
+        floatingControls={<FloatingControls placement="bottom-left" />}
+        chromeOverlay={
+          <>
+            <DeferredBackToTop />
+            {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
+            <DeskCloudHost />
+          </>
+        }
+      />
     </BrowserRouter>
   );
 }

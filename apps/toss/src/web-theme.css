@@ -4,16 +4,16 @@
      @layer base + 커스텀 @utility(numeral·eyebrow·tnum·rail·skeleton 등)까지 단일 출처로 공유한다
      (로직/스타일 복제 0 — NO fork 규칙).
    - Tailwind v4 는 기본적으로 "이 CSS 파일이 있는 디렉터리"만 클래스 소스로 스캔한다.
-     웹 feature 컴포넌트(/studio·/create)는 토스 밖(레포 루트 src/·components/)에 살므로
-     @source 로 그 경로들을 명시 스캔해야 유틸리티가 생성된다.
+     이제 토스는 웹 페이지 전체(src/domains/*)를 그대로 렌더하므로, 웹의 모든 소스 디렉터리를
+     @source 로 명시 스캔해 트리쉐이크로 유틸리티가 누락되지 않게 한다(토스 디렉터리 밖 경로).
    ============================================================ */
 
 /* 루트 디자인 토큰·베이스·커스텀 유틸리티 (@import "tailwindcss" 포함) */
 @import "../../../src/styles/globals.css";
 
-/* 웹 feature 컴포넌트가 사용하는 Tailwind 클래스가 트리쉐이크로 누락되지 않도록
-   레포 루트의 컴포넌트 소스를 명시적으로 스캔한다(토스 디렉터리 밖 경로). */
-@source "../../../src/domains/creator";
-@source "../../../src/components";
+/* 웹 페이지/컴포넌트 전체가 사용하는 Tailwind 클래스를 빠짐없이 생성하도록 레포 루트의 웹 소스
+   디렉터리를 모두 명시 스캔한다. (src=도메인 페이지·앱 셸·인프라, components·lib=공유 UI/유틸) */
+@source "../../../src";
 @source "../../../components";
+@source "../../../lib";
 @source "../src";

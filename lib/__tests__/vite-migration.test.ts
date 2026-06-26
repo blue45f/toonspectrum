@@ -41,11 +41,14 @@ describe("vite migration", () => {
   });
 
   it("loads the command palette implementation lazily from a lightweight app host", () => {
+    // 커맨드 팔레트 호스트는 웹·토스 공유 셸(AppShell)에서 마운트한다(App.tsx 는 라우터+크롬만 조립).
     const app = readFileSync(join(process.cwd(), "src/app/App.tsx"), "utf8");
+    const shell = readFileSync(join(process.cwd(), "src/app/AppShell.tsx"), "utf8");
     const host = readFileSync(join(process.cwd(), "components/command-palette-host.tsx"), "utf8");
 
-    expect(app).toContain("@/components/command-palette-host");
+    expect(shell).toContain("@/components/command-palette-host");
     expect(app).not.toMatch(/from\s+["']@\/components\/command-palette["']/);
+    expect(shell).not.toMatch(/from\s+["']@\/components\/command-palette["']/);
     expect(host).toContain('lazy(() => import("./command-palette")');
   });
 

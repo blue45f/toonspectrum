@@ -30,11 +30,12 @@ describe("design token discipline", () => {
   });
 
   it("renders the skip link with theme tokens so contrast holds in both themes", () => {
-    const app = read("src/app/App.tsx");
+    // 스킵 링크는 웹·토스 공유 셸(AppShell)에 산다(App.tsx 는 라우터+크롬만 조립).
+    const shell = read("src/app/AppShell.tsx");
 
-    expect(app).not.toContain("bg-white");
-    expect(app).not.toContain("#1a1410");
-    expect(app).toContain("focus:bg-fg");
-    expect(app).toContain("focus:text-canvas");
+    expect(shell).not.toContain("bg-white");
+    expect(shell).not.toContain("#1a1410");
+    expect(shell).toContain("focus:bg-fg");
+    expect(shell).toContain("focus:text-canvas");
   });
 });
