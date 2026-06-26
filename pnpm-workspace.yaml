@@ -55,6 +55,3 @@ overrides:
 auditConfig:
   ignoreGhsas:
     - GHSA-2p57-rm9w-gvfp
-
-patchedDependencies:
-  '@apps-in-toss/plugins@2.9.1': patches/@apps-in-toss__plugins@2.9.1.patch

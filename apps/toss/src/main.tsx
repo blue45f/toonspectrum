@@ -8,7 +8,7 @@ import { HashRouter } from 'react-router-dom';
 import '@/src/compat/storage-migrate';
 import { installStaticCatalog } from '@/src/catalog-static';
 
-import config from '../granite.config.ts';
+import config from '../apps-in-toss.config.ts';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { API_BASE, isAdultTitle } from './lib/api.ts';

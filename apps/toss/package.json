@@ -4,15 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "granite dev",
+    "dev": "vite --host localhost --port 5181",
     "build:preview": "PREVIEW_NO_TDS=1 vite build",
     "deploy": "ait deploy",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "build:ait": "ait build"
+    "build:ait": "vite build && ait build",
+    "build": "vite build && ait build"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "^2.9.1",
+    "@apps-in-toss/web-framework": "^3.0.0-beta.b36d7b5",
     "@heejun/platform-bridge": "^0.1.0",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@pixiv/three-vrm": "^3.5.3",
