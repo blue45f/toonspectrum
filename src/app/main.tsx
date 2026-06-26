@@ -1,4 +1,5 @@
 import "../compat/storage-migrate"; // 반드시 최상단 — 스토어 hydrate 전에 레거시 키 이관
+import { PlatformContext, webPlatformBridge } from "@heejun/platform-bridge";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -13,7 +14,9 @@ installStaticCatalog();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <PlatformContext.Provider value={webPlatformBridge}>
+      <App />
+    </PlatformContext.Provider>
   </StrictMode>
 )
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

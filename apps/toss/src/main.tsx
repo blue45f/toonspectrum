@@ -1,3 +1,4 @@
+import { PlatformContext } from '@heejun/platform-bridge';
 import { TDSMobileAITProvider } from '@toss/tds-mobile-ait';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -11,6 +12,7 @@ import config from '../granite.config.ts';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { API_BASE, isAdultTitle } from './lib/api.ts';
+import { tossPlatformBridge } from './platform/tossBridge.ts';
 // 웹 디자인 시스템(Tailwind v4 + 토큰 + 커스텀 유틸리티)을 먼저 로드해 웹 feature
 // 컴포넌트(전 페이지)가 그대로 렌더되게 한다. 토스 셸의 기본 스타일은 그 다음
 // index.css 가 덮어써 기존 인라인 크롬(BottomNav 등)의 외형을 보존한다.
@@ -29,14 +31,16 @@ installStaticCatalog({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TDSMobileAITProvider brandPrimaryColor={config.brand.primaryColor}>
-      <ErrorBoundary>
-        {/* 토스 WebView 는 실 URL/history 가 없어 HashRouter(#/path)로 라우팅한다. 웹 호환 레이어
-            (usePathname/useRouter/Link)와 AppRouter 가 100% react-router-dom 기반이라 그대로 동작하고,
-            기존 토스 해시 URL 규약(#/ranking …)·딥링크도 보존된다. */}
-        <HashRouter>
-          <App />
-        </HashRouter>
-      </ErrorBoundary>
+      <PlatformContext.Provider value={tossPlatformBridge}>
+        <ErrorBoundary>
+          {/* 토스 WebView 는 실 URL/history 가 없어 HashRouter(#/path)로 라우팅한다. 웹 호환 레이어
+              (usePathname/useRouter/Link)와 AppRouter 가 100% react-router-dom 기반이라 그대로 동작하고,
+              기존 토스 해시 URL 규약(#/ranking …)·딥링크도 보존된다. */}
+          <HashRouter>
+            <App />
+          </HashRouter>
+        </ErrorBoundary>
+      </PlatformContext.Provider>
     </TDSMobileAITProvider>
   </StrictMode>,
 );
