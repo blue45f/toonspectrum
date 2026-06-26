@@ -139,14 +139,14 @@ export function CalendarPage() {
 
   return (
     <Container size="wide" className="py-10">
-      <header className="mb-7 rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 surface-hl sm:mb-7 sm:p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <CalendarDays size={14} /> RELEASE CALENDAR
             </p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
-            <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
+            <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
               연재요일 정보가 있는 작품을 요일별로 모두 표시합니다. 오늘은{" "}
               <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가 올라오는 작품이{" "}
               <span className="numeral text-fg">{todayCount.toLocaleString("ko-KR")}</span>편입니다.

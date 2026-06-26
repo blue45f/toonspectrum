@@ -201,7 +201,7 @@ export function HomePage() {
           }}
           aria-hidden
         />
-        <Container size="wide" className="relative flex flex-col gap-12 pt-12 pb-14 lg:gap-14 lg:pb-16">
+        <Container size="wide" className="relative flex flex-col gap-7 pt-7 pb-9 sm:gap-12 sm:pt-12 sm:pb-14 lg:gap-14 lg:pb-16">
           {bannerItems.length > 0 && (
             // 진입 페이드는 안정적 래퍼에서 단 한 번만 — 정적→인터랙티브(embla) 배너로
             // 스왑될 때 각 컴포넌트의 fade-up이 재실행돼 배너가 두 번 깜박이던 문제 방지.
@@ -216,7 +216,7 @@ export function HomePage() {
             </div>
           )}
 
-          <div className="relative grid items-end gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="relative grid items-end gap-x-10 gap-y-6 sm:gap-y-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <div>
               <p
                 className="eyebrow inline-flex items-center gap-2 text-accent"
@@ -231,7 +231,7 @@ export function HomePage() {
                 WEBTOON × WEBNOVEL
               </p>
 
-              <h1 className="mt-4 text-balance [word-break:keep-all] text-[clamp(2rem,8.5vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.02em] sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
+              <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.75rem,7.5vw,2.4rem)] font-bold leading-[1.1] tracking-[-0.02em] sm:mt-4 sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
                 <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.12s_both]">
                   흩어진 이야기를,
                 </span>
@@ -254,7 +254,7 @@ export function HomePage() {
               </h1>
 
               <p
-                className="mt-5 max-w-md text-pretty text-base leading-relaxed text-fg-2"
+                className="mt-3 line-clamp-2 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-fg-2 sm:mt-5 sm:line-clamp-none sm:text-base"
                 style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.4s both" }}
               >
                 네이버 웹툰·시리즈와 카카오웹툰을 가로질러 검색하고, 실시간 신호와 독자 취향을 함께
@@ -262,13 +262,14 @@ export function HomePage() {
               </p>
 
               <div
-                className="mt-7 flex flex-wrap items-center gap-3"
+                className="mt-5 flex flex-wrap items-center gap-3 sm:mt-7"
                 style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.5s both" }}
               >
                 <OpenSearchButton className={HERO_PRIMARY_BUTTON_CLASS}>
                   <Search size={18} />
                   작품·작가·태그 검색
-                  <kbd className="ml-1 rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem]">⌘K</kbd>
+                  {/* 키보드 단축키 힌트는 정밀 포인터(데스크톱)에서만 — 터치 기기엔 의미 없음. */}
+                  <kbd className="ml-1 hidden rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem] pointer-fine:inline-block">⌘K</kbd>
                 </OpenSearchButton>
                 <Link href="/ranking" className={HERO_OUTLINE_BUTTON_CLASS}>
                   통합 랭킹 보기
@@ -276,7 +277,7 @@ export function HomePage() {
                 </Link>
               </div>
               <div
-                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-fg-3"
+                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-fg-2"
                 style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.58s both" }}
               >
                 <Link href="/studio" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
@@ -319,7 +320,8 @@ export function HomePage() {
       </section>
 
       {deferredSectionsReady && (
-        <Suspense fallback={null}>
+        // 지연 로드 구간 높이를 미리 점유(min-h)해 콘텐츠가 들어오며 bodyHeight 가 폭증하는 CLS 를 줄인다.
+        <Suspense fallback={<div className="min-h-[60vh]" aria-hidden />}>
           <HomeDeferredSections
             todayReleases={todayReleases}
             todayDay={todayDay}

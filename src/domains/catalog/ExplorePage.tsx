@@ -220,13 +220,13 @@ export function ExplorePage() {
             aria-hidden
           />
         )}
-        <Container size="wide" className="relative py-12 lg:py-16">
+        <Container size="wide" className="relative py-7 sm:py-12 lg:py-16">
           <div className="flex items-center gap-2 text-accent">
             <Compass size={15} strokeWidth={2} />
             <p className="eyebrow">GENRE SPECTRUM / 탐색</p>
           </div>
 
-          <div className="mt-4 max-w-2xl">
+          <div className="mt-3 max-w-2xl sm:mt-4">
             <h1 className="text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl">
               색을 따라 떠나는{" "}
               {heroGenre ? (
@@ -235,13 +235,13 @@ export function ExplorePage() {
                 <span className="font-serif font-normal italic text-accent">스펙트럼 탐색</span>
               )}
             </h1>
-            <p className="mt-3.5 text-pretty text-sm leading-relaxed text-fg-2 sm:text-base">
+            <p className="lede mt-2.5 text-pretty text-sm leading-relaxed text-fg-2 sm:mt-3.5 sm:text-base">
               장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께
               표시되어 무슨 작품인지 바로 판단할 수 있습니다.
             </p>
             <Link
               href={heroGenre ? `/random?genre=${encodeURIComponent(heroGenre)}` : "/random"}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent sm:mt-5"
             >
               <Shuffle size={16} />
               {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}

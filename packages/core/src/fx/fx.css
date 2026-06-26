@@ -203,22 +203,20 @@
 }
 
 /* ── reveal / reveal-soft — 스크롤-진입 모션(IO 가 .is-revealed 부여) ─────────────
- * 기본은 from-state(살짝 내려가 투명). IO 가 화면 진입을 감지하면 .is-revealed 가 붙어
- * 키프레임으로 안착. 가시성은 모션과 분리돼 JS/IO 미지원·reduced-motion 에선 그냥 보임(CLS 0).
- * --reveal-delay(ms)로 형제 목록 스태거.
+ * 핵심: 기본 상태는 **항상 보임**(opacity:1). 콘텐츠 가시성을 모션에 의존시키지 않는다.
+ * IO 가 진입을 감지하면 .is-revealed 가 붙어 "투명→불투명" 키프레임을 *덧입혀* 진입 모션만 추가한다.
+ * 빠른 플링·앵커 점프·뷰포트보다 큰 섹션·headless·IO 미지원·reduced-motion 에서 IO 가 안 터져도
+ * 콘텐츠는 그냥 보인다(검은 공백 방지, CLS 0). --reveal-delay(ms)로 형제 목록 스태거.
  */
 .reveal {
-  opacity: 0;
-  transform: translateY(22px) scale(0.985);
-  will-change: opacity, transform;
+  opacity: 1;
 }
 .reveal.is-revealed {
   animation: ts-reveal-up 0.62s var(--ts-ease-out-quint) both;
   animation-delay: calc(var(--reveal-delay, 0) * 1ms);
 }
 .reveal-soft {
-  opacity: 0;
-  will-change: opacity;
+  opacity: 1;
 }
 .reveal-soft.is-revealed {
   animation: ts-reveal-fade 0.6s var(--ts-ease-out-quart) both;

@@ -48,12 +48,13 @@ export function HeroBannerStatic({
             <div
               className="absolute inset-0"
               style={{
-                background: `radial-gradient(120% 120% at 84% 12%, ${hue}1f, transparent 56%), linear-gradient(100deg, oklch(0.18 0.012 70 / 0.97) 34%, oklch(0.18 0.012 70 / 0.55))`,
+                // 모바일은 아래→위 강한 다크 스크림으로 텍스트 대비 확보(hero-banner-slide와 동일).
+                background: `radial-gradient(120% 120% at 84% 12%, ${hue}1f, transparent 56%), linear-gradient(to top, oklch(0.16 0.012 70 / 0.97) 12%, oklch(0.17 0.012 70 / 0.82) 52%, oklch(0.18 0.012 70 / 0.6))`,
               }}
             />
           </div>
 
-          <div className="relative grid grid-cols-[5.5rem_1fr] items-center gap-4 p-4 sm:grid-cols-[11rem_1fr] sm:gap-6 sm:p-6">
+          <div className="relative grid grid-cols-[4.5rem_1fr] items-center gap-3.5 p-3.5 sm:grid-cols-[11rem_1fr] sm:gap-6 sm:p-6">
             <div
               className="relative aspect-[3/4] overflow-hidden rounded-xl shadow-[0_20px_44px_-22px_oklch(0.1_0.02_70/0.85)] ring-1 ring-line/60 transition-transform duration-500 ease-out-expo group-hover/slide:-translate-y-0.5"
               style={{
@@ -105,18 +106,19 @@ export function HeroBannerStatic({
                   </span>
                 ))}
               </div>
-              <div className="text-pretty text-xl font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
+              <div className="text-pretty text-lg font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
                 {first.title}
               </div>
-              <p className="truncate text-xs text-fg-3">
+              <p className="truncate text-xs text-fg-2">
                 {first.author}
                 {first.artist && first.artist !== first.author ? ` · 그림 ${first.artist}` : ""}
               </p>
-              <p className="line-clamp-2 max-w-prose font-serif text-sm italic leading-relaxed text-fg-2">
+              {/* 모바일은 한 줄(스크롤 억제), sm 이상은 두 줄. */}
+              <p className="line-clamp-1 max-w-prose font-serif text-[0.8125rem] italic leading-relaxed text-fg-2 sm:line-clamp-2 sm:text-sm">
                 {first.editorNote ?? first.synopsis}
               </p>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="rounded-full border border-line bg-card/50 px-2.5 py-1 text-[0.72rem] font-medium text-fg-3">
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-1">
+                <span className="rounded-full border border-line bg-card/50 px-2.5 py-1 text-[0.72rem] font-medium text-fg-2">
                   {first.availability.length > 0 ? `${first.availability.length}개 플랫폼` : "플랫폼 확인 중"}
                 </span>
                 <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-semibold text-on-accent transition-transform duration-150 ease-out-expo group-hover/slide:translate-x-0.5">

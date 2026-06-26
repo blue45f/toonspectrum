@@ -40,16 +40,16 @@ export function ReviewsPage() {
   return (
     <div>
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-12 lg:py-16">
+        <Container size="wide" className="py-7 sm:py-12 lg:py-16">
           <p className="eyebrow text-accent">READER REVIEWS</p>
-          <h1 className="mt-3 text-pretty text-3xl font-bold leading-[1.1] sm:text-4xl lg:text-[2.9rem]">
+          <h1 className="mt-2.5 text-pretty text-3xl font-bold leading-[1.1] sm:mt-3 sm:text-4xl lg:text-[2.9rem]">
             독자들이 남긴 한 줄
           </h1>
-          <p className="mt-4 max-w-xl text-pretty font-serif text-lg italic leading-relaxed text-fg-2">
+          <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-4 sm:text-lg">
             정주행의 끝에서, 누군가는 별점 대신 문장을 남겼다.
           </p>
 
-          <dl className="mt-9 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-6">
+          <dl className="mt-6 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-5 sm:mt-9 sm:pt-6">
             <div className="flex flex-col gap-1">
               <dt className="text-xs text-fg-3">총 리뷰</dt>
               <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>

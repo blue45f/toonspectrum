@@ -4,7 +4,6 @@ import { AlertTriangle, Camera, Clapperboard, FlipHorizontal2, ImagePlus, Loader
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
-
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
 import { VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
@@ -96,6 +95,8 @@ import {
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
+// 채널별 자산 오리진 해소(토스 교차 출처 WebView 에서 root-relative /vrm/.. 절대화, 웹은 무변경).
+import { resolveAssetUrl } from "@/src/catalog-static";
 import {
   publishAsset,
   listSharedAssets,
@@ -659,7 +660,10 @@ async function assertLoadableVrmUrl(url: string) {
 }
 
 async function loadVrmAsset(url: string) {
-  await assertLoadableVrmUrl(url);
+  // 토스(교차 출처 WebView)에서 root-relative /vrm/.. 를 배포 오리진으로 절대화한다(웹은 무변경).
+  // HEAD 프리플라이트와 실제 GLTFLoader 로드가 같은 절대 URL 을 쓰도록 한 번만 해석한다.
+  const resolvedUrl = resolveAssetUrl(url);
+  await assertLoadableVrmUrl(resolvedUrl);
 
   const [{ GLTFLoader }, { VRMLoaderPlugin, VRMUtils }] = await Promise.all([
     import("three/examples/jsm/loaders/GLTFLoader.js"),
@@ -669,7 +673,7 @@ async function loadVrmAsset(url: string) {
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
 
-  return loader.loadAsync(url).then((gltf) => {
+  return loader.loadAsync(resolvedUrl).then((gltf) => {
     VRMUtils.combineSkeletons?.(gltf.scene);
 
     const loadedVrm = gltf.userData.vrm as VRM | undefined;

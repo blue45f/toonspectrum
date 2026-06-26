@@ -32,7 +32,7 @@ export function CommunityPage() {
           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">작품·작가·펜카페 커뮤니티</h1>
-              <p className="mt-2 max-w-xl text-sm text-fg-3">
+              <p className="lede mt-2 max-w-xl text-sm text-fg-2">
                 작품 해석부터 번역/팬카페 이슈까지. 스코프별로 분리된 실시간 팬카페를 탐색하세요.
               </p>
             </div>

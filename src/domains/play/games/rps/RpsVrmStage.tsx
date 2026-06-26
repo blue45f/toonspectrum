@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Hand, Outcome } from "./rps-logic";
 import type { VRM } from "@pixiv/three-vrm";
 
+import { resolveAssetUrl } from "@/src/catalog-static";
 import {
   applyExpressionWeightsToVrm,
   applyFingerRotations,
@@ -14,6 +15,8 @@ import {
   type PoseBoneMap,
 } from "@/src/domains/creator/studio-vrm-poser-utils";
 
+// 토스(교차 출처 WebView)에서 root-relative /vrm 은 토스 오리진으로 해소돼 HTML(SPA index)이 와
+// 3D 로드가 깨진다. resolveAssetUrl 로 배포 오리진에 절대화한다(웹은 동일 출처라 무변경).
 const VRM_URL = "/vrm/sample.vrm";
 const d = (deg: number) => (deg * Math.PI) / 180;
 
@@ -99,7 +102,7 @@ function VrmModel({ hand, outcome, onReady }: { hand: Hand | null; outcome: Outc
   useEffect(() => {
     let alive = true;
     let loaded: VRM | null = null;
-    loadVrm(VRM_URL)
+    loadVrm(resolveAssetUrl(VRM_URL))
       .then((v) => {
         if (!alive) return;
         loaded = v;

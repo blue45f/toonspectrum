@@ -357,3 +357,20 @@
 .rail::-webkit-scrollbar {
   display: none;
 }
+
+/* 에디토리얼 헤더 리드(prose) — 좁은 화면(<640px)에선 2줄로 클램프해 콘텐츠를 폴드 위로 끌어올리고,
+   sm+ 에선 전문을 펼친다. 페이지마다 반복되는 무거운 산문 헤더가 첫 360×760 뷰포트를 다 잡아먹는
+   문제(콘텐츠 first 약화)를 해소한다. 구조는 그대로 두고 모바일에서만 시각적으로 압축. */
+@utility lede {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .lede {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+}

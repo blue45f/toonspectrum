@@ -506,6 +506,7 @@ export function FanCafePanel({
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
+            aria-label="팬카페 글 검색 (제목·본문 키워드)"
             placeholder="제목·본문 키워드 검색"
             className="h-7 w-52 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
           />

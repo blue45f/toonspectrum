@@ -37,7 +37,7 @@ export function HomeDeferredSections({
   newest,
 }: HomeDeferredSectionsProps) {
   return (
-    <Container size="wide" className="flex flex-col gap-20 py-16">
+    <Container size="wide" className="flex flex-col gap-12 py-9 sm:gap-20 sm:py-16">
       <RevealOnScroll>
         <HomePersonal />
       </RevealOnScroll>

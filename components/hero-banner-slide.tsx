@@ -33,12 +33,14 @@ export function HeroBannerSlide({ title }: { title: Title }) {
         <div
           className="absolute inset-0"
           style={{
-            background: `radial-gradient(120% 120% at 84% 12%, ${genreColor(title.genres[0] ?? "드라마", 0.72)}1f, transparent 56%), linear-gradient(100deg, oklch(0.18 0.012 70 / 0.97) 34%, oklch(0.18 0.012 70 / 0.55))`,
+            // 모바일은 텍스트가 표지 위에 얹히므로 아래→위 강한 다크 스크림으로 대비 확보,
+            // sm 이상은 좌측 패널 톤으로 자연스럽게 전환(좌→우 그라디언트).
+            background: `radial-gradient(120% 120% at 84% 12%, ${genreColor(title.genres[0] ?? "드라마", 0.72)}1f, transparent 56%), linear-gradient(to top, oklch(0.16 0.012 70 / 0.97) 12%, oklch(0.17 0.012 70 / 0.82) 52%, oklch(0.18 0.012 70 / 0.6))`,
           }}
         />
       </div>
 
-      <div className="relative grid grid-cols-[5.5rem_1fr] items-center gap-4 p-4 sm:grid-cols-[11rem_1fr] sm:gap-6 sm:p-6">
+      <div className="relative grid grid-cols-[4.5rem_1fr] items-center gap-3.5 p-3.5 sm:grid-cols-[11rem_1fr] sm:gap-6 sm:p-6">
         <div className="overflow-hidden rounded-xl shadow-[0_20px_44px_-22px_oklch(0.1_0.02_70/0.85)] ring-1 ring-line/60 transition-transform duration-500 ease-out-expo group-hover/slide:-translate-y-0.5">
           <TitlePoster title={title} size="lg" priority unframed titleAs="div" />
         </div>
@@ -49,10 +51,10 @@ export function HeroBannerSlide({ title }: { title: Title }) {
               <GenreChip key={genre} genre={genre} size="sm" />
             ))}
           </div>
-          <div className="text-pretty text-xl font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
+          <div className="text-pretty text-lg font-bold leading-tight text-fg sm:text-2xl lg:text-[1.75rem]">
             {title.title}
           </div>
-          <p className="truncate text-xs text-fg-3">
+          <p className="truncate text-xs text-fg-2">
             {title.author}
             {title.artist && title.artist !== title.author ? ` · 그림 ${title.artist}` : ""}
           </p>
@@ -62,12 +64,13 @@ export function HeroBannerSlide({ title }: { title: Title }) {
             estimated={statsAreEstimated(title)}
             size="sm"
           />
-          <p className="line-clamp-2 max-w-prose font-serif text-sm italic leading-relaxed text-fg-2">
+          {/* 모바일은 짧게 한 줄(스크롤 억제), sm 이상은 두 줄까지 노출. */}
+          <p className="line-clamp-1 max-w-prose font-serif text-[0.8125rem] italic leading-relaxed text-fg-2 sm:line-clamp-2 sm:text-sm">
             {title.editorNote ?? title.synopsis}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-1">
             <AvailabilityDots availability={title.availability} max={4} />
-            <span className="numeral text-[0.72rem] text-fg-3 tnum">
+            <span className="numeral text-[0.72rem] text-fg-2 tnum">
               {statsAreEstimated(title) && <span aria-hidden>≈</span>}
               {formatCount(title.stats.views)} 조회
             </span>

@@ -197,9 +197,9 @@ export function useFx(): UseFx {
 /* ── useReveal — 스크롤-진입 모션(IntersectionObserver, once) ──────────────────── */
 
 export interface UseRevealOptions {
-  /** 진입 판정 임계(0~1). 기본 0.12. */
+  /** 진입 판정 임계(0~1). 기본 0.01(픽셀 한 줄만 보여도 발화 — 큰 섹션이 늦게 안 뜨도록). */
   threshold?: number;
-  /** 루트 마진(IO rootMargin). 기본 "0px 0px -10% 0px"(살짝 먼저 발화). */
+  /** 루트 마진(IO rootMargin). 기본 "200px 0px 200px 0px"(뷰포트 200px 전부터 미리 발화 — 빠른 플링/앵커 점프에도 공백 방지). */
   rootMargin?: string;
   /** false 면 관찰하지 않고 즉시 보임 처리(런타임 토글용). 기본 true. */
   enabled?: boolean;
@@ -217,7 +217,7 @@ export interface UseRevealOptions {
 export function useReveal<T extends Element = HTMLElement>(
   options: UseRevealOptions = {},
 ): { ref: (node: T | null) => void; revealed: boolean } {
-  const { threshold = 0.12, rootMargin = "0px 0px -10% 0px", enabled = true } = options;
+  const { threshold = 0.01, rootMargin = "200px 0px 200px 0px", enabled = true } = options;
   const [revealed, setRevealed] = useState(false);
   const nodeRef = useRef<T | null>(null);
 

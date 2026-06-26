@@ -26,16 +26,16 @@ export function RankingPage() {
   };
 
   return (
-    <Container size="wide" className="py-10">
-      <header className="mb-8 rounded-2xl border border-line bg-panel/55 p-4 sm:p-6">
+    <Container size="wide" className="py-6 sm:py-10">
+      <header className="mb-6 rounded-2xl border border-line bg-panel/55 p-4 sm:mb-8 sm:p-6">
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
-        <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
+        <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
           검증된 카탈로그 스냅샷에 투명 산식을 적용해 지금 볼 작품을 고릅니다. 기간(일간·주간·월간·전체)은
           무작위 변주가 아니라 실 신호(순위 변동·트렌드·누적 조회/관심/평점)의 가중 블렌딩으로 달라집니다.
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-6">
           <a
             href="#ranking-board"
             onClick={jumpToBoard}

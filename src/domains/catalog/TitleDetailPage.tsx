@@ -241,8 +241,8 @@ export function TitleDetailPage() {
       </div>
 
       <section className="mt-14">
-        <p className="eyebrow mb-1 text-accent">METRICS · 지표</p>
-        <p className="mb-4 text-xs text-fg-3">완독률·몰입·분포는 수집값과 추정값을 함께 사용합니다.</p>
+        <h2 className="eyebrow mb-1 text-accent">METRICS · 지표</h2>
+        <p className="mb-4 text-xs text-fg-2">완독률·몰입·분포는 수집값과 추정값을 함께 사용합니다.</p>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-line bg-card p-5">
             <h3 className="mb-4 text-sm font-semibold text-fg">평점 분포</h3>

@@ -16,6 +16,20 @@ type StaticCatalogEngine = typeof import("./catalog-static-engine");
 
 let enginePromise: Promise<StaticCatalogEngine> | null = null;
 
+/**
+ * 정적 에셋 경로를 채널 오리진에 맞춰 해소한다.
+ *  - 웹(동일 출처): base 미설정 → 입력을 그대로 반환(무변경, NO fork).
+ *  - 토스(교차 출처 WebView): 루트상대 경로(`/vrm/...` 등)를 배포 오리진으로 절대화한다.
+ * 단일 출처는 installStaticCatalog 가 설정하는 globalThis.__toonspectrumAssetBase.
+ * fetch 패치가 닿지 않는 로더(THREE FileLoader/XHR, <img src>)가 사용 시점에 호출한다.
+ * 이미 루트상대가 아니면(절대 URL·blob·data) 그대로 둔다.
+ */
+export function resolveAssetUrl(url: string): string {
+  const base = (globalThis as { __toonspectrumAssetBase?: string }).__toonspectrumAssetBase ?? "";
+  if (!base || !url.startsWith("/")) return url;
+  return `${base}${url}`;
+}
+
 function loadEngine(): Promise<StaticCatalogEngine> {
   enginePromise ??= import("./catalog-static-engine");
   return enginePromise;
@@ -95,13 +109,24 @@ export function installStaticCatalog(options: StaticCatalogOptions = {}): void {
       filterTitle;
   }
 
-  // base 가 있으면 상대 /data·/api 경로를 배포 오리진으로 절대화한다(교차 출처 WebView 대응).
-  // base 가 없으면(웹) 입력을 그대로 통과시켜 기존 동일 출처 동작을 보존한다.
+  // base(토스)면 자산 오리진을 globalThis.__toonspectrumAssetBase 에 기록한다(resolveAssetUrl 단일 출처).
+  // fetch 패치가 닿지 않는 직접 자산 로드(GLTFLoader 의 .vrm, HEAD 프리플라이트, <img src> 등)가
+  // resolveAssetUrl 로 root-relative(/vrm/..) 경로를 배포 오리진으로 절대화하는 데 쓴다. 토스 WebView
+  // 오리진은 .vrm 대신 HTML(SPA index)을 돌려줘 3D 로드가 깨지므로 필수다. 웹(동일 출처)은 base 가 "" 라 무변경.
+  (globalThis as { __toonspectrumAssetBase?: string }).__toonspectrumAssetBase = base;
+
+  // base 가 있으면 상대 /data·/api·/vrm 경로를 배포 오리진으로 절대화한다(교차 출처 WebView 대응).
+  // /vrm 은 StudioVrmPoser 의 HEAD 프리플라이트(assertLoadableVrmUrl)가 fetch 로 가므로 여기서
+  // 커버한다. GLTFLoader 본 로드는 XHR(FileLoader)이라 fetch 패치가 닿지 않아 호출부에서
+  // resolveAssetUrl 로 절대화한다(이중 방어). base 가 없으면(웹) 그대로 통과 — 동일 출처 동작 보존.
   const rawFetch = globalThis.fetch.bind(window);
   const origFetch: typeof fetch = base
     ? (input, init) => {
         const url = toUrl(input);
-        if (typeof input === "string" && (url.startsWith("/data/") || url.startsWith("/api/"))) {
+        if (
+          typeof input === "string" &&
+          (url.startsWith("/data/") || url.startsWith("/api/") || url.startsWith("/vrm/"))
+        ) {
           return rawFetch(`${base}${url}`, init);
         }
         return rawFetch(input, init);

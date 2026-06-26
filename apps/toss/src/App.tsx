@@ -1,5 +1,16 @@
 import { useFx } from "@toonspectrum/core/fx";
 import "@toonspectrum/core/fx/fx.css";
+import {
+  BookMarked,
+  CalendarDays,
+  Compass,
+  Gamepad2,
+  Home,
+  Menu,
+  Search,
+  Trophy,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -12,18 +23,24 @@ import { MoreMenu } from "./components/MoreMenu.tsx";
 import { hapticFeedback } from "./lib/toss.ts";
 import { theme } from "./theme";
 
+// 반투명 글래스 표면 — 토큰 색을 살짝 투과시켜(backdrop-blur 위) warm-ink 위에 떠 있게 한다.
+// raw rgba 대신 color-mix(토큰) 로 팔레트 단일 출처 유지(DESIGN.md: #000/#fff·raw 금지).
+const NAV_GLASS = "color-mix(in oklab, var(--color-panel) 90%, transparent)";
+const FAB_GLASS = "color-mix(in oklab, var(--color-panel) 82%, transparent)";
+
 // 하단 네비 = 홈·랭킹·연재·탐색·서재·놀이터. 내 서재는 핵심 기능이라 primary 탭으로 노출한다.
 // 검색은 셸 검색 FAB, 추천은 홈 섹션/오버플로로 진입하므로 하단 탭엔 넣지 않는다(라우트는 등록).
-const NAV = [
-  { id: "home", label: "홈", emoji: "📚", to: "/" },
-  { id: "ranking", label: "랭킹", emoji: "🏆", to: "/ranking" },
-  { id: "calendar", label: "연재", emoji: "📅", to: "/calendar" },
-  { id: "explore", label: "탐색", emoji: "🧭", to: "/explore" },
-  { id: "library", label: "서재", emoji: "📖", to: "/library" },
-  { id: "play", label: "놀이터", emoji: "🎮", to: "/play" },
-] as const;
+// 아이콘은 웹과 동일한 lucide(에디토리얼 브랜드 일관 — 이모지 표류 제거).
+type TabId = "home" | "ranking" | "calendar" | "explore" | "library" | "play";
 
-type TabId = (typeof NAV)[number]["id"];
+const NAV: { id: TabId; label: string; Icon: LucideIcon; to: string }[] = [
+  { id: "home", label: "홈", Icon: Home, to: "/" },
+  { id: "ranking", label: "랭킹", Icon: Trophy, to: "/ranking" },
+  { id: "calendar", label: "연재", Icon: CalendarDays, to: "/calendar" },
+  { id: "explore", label: "탐색", Icon: Compass, to: "/explore" },
+  { id: "library", label: "서재", Icon: BookMarked, to: "/library" },
+  { id: "play", label: "놀이터", Icon: Gamepad2, to: "/play" },
+];
 
 // 경로 → 활성 탭. 비탭 라우트는 "어디서 진입하는지"로 가장 가까운 primary 탭에 귀속한다.
 function activeTab(path: string): TabId {
@@ -94,77 +111,78 @@ function isListPage(path: string): boolean {
   );
 }
 
-// 토스 셸 검색 어포던스 — 어느 탭에서든 통합 검색(/search)으로 진입. 하단 탭은 5개로 꽉 차 있어
-// 검색은 우상단 플로팅 버튼(셸 크롬)으로 노출한다. 검색·상세·몰입형 에디터 화면에선 숨긴다.
-function SearchFab({ onPress }: { onPress: () => void }) {
+// 우상단 플로팅 FAB(검색·더보기) 공통 스타일 — 토큰 글래스 표면 + warm-ink 보더. 44px 터치 타깃.
+const fabStyle: React.CSSProperties = {
+  width: 42,
+  height: 42,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 999,
+  border: `1px solid ${theme.border}`,
+  background: FAB_GLASS,
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  color: theme.text2,
+  cursor: "pointer",
+};
+
+/**
+ * 우상단 셸 크롬 클러스터 — 검색(통합 검색 진입)과 더보기(전 라우트 시트)를 하나의 그룹으로 묶는다.
+ * 두 FAB 이 따로 떠 검색바와 겹치던 충돌을 없애고, 한 인셋 안에 정렬해 어포던스를 정돈한다.
+ * 아이콘은 웹과 동일한 lucide(에디토리얼 브랜드 일관). 검색은 화면에 따라 숨길 수 있다(showSearch).
+ */
+function TopChrome({
+  showSearch,
+  onSearch,
+  onMore,
+}: {
+  showSearch: boolean;
+  onSearch: () => void;
+  onMore: () => void;
+}) {
   return (
-    <button
-      type="button"
-      className="pressable"
-      onClick={onPress}
-      aria-label="통합 검색"
-      title="검색"
+    <div
       style={{
         position: "fixed",
         top: "calc(10px + env(safe-area-inset-top))",
         right: 12,
         zIndex: 60,
-        width: 44,
-        height: 44,
-        display: "grid",
-        placeItems: "center",
-        borderRadius: 999,
-        border: `1px solid ${theme.border}`,
-        background: "rgba(34,26,19,0.82)",
-        backdropFilter: "blur(8px)",
-        color: theme.text,
-        fontSize: 19,
-        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
       }}
     >
-      🔍
-    </button>
-  );
-}
-
-// 토스 셸 "더보기"(More) 어포던스 — 웹 SiteHeader 오버플로 메뉴(☰)의 토스판.
-// 하단 탭 6개로 못 담는 부가 기능(창작 게시판·커뮤니티·추천·운세·리뷰·비교 등) 전부로 가는 진입점.
-// 검색 FAB 왼쪽(우상단)에 두고, 몰입형 에디터에선 검색 FAB과 함께 숨긴다.
-function MoreFab({ onPress }: { onPress: () => void }) {
-  return (
-    <button
-      type="button"
-      className="pressable"
-      onClick={onPress}
-      aria-label="더보기 메뉴"
-      aria-haspopup="dialog"
-      title="더보기"
-      style={{
-        position: "fixed",
-        top: "calc(10px + env(safe-area-inset-top))",
-        right: 64,
-        zIndex: 60,
-        width: 44,
-        height: 44,
-        display: "grid",
-        placeItems: "center",
-        borderRadius: 999,
-        border: `1px solid ${theme.border}`,
-        background: "rgba(34,26,19,0.82)",
-        backdropFilter: "blur(8px)",
-        color: theme.text,
-        fontSize: 19,
-        cursor: "pointer",
-      }}
-    >
-      ☰
-    </button>
+      {showSearch && (
+        <button
+          type="button"
+          className="pressable"
+          onClick={onSearch}
+          aria-label="통합 검색"
+          title="검색"
+          style={fabStyle}
+        >
+          <Search size={18} aria-hidden />
+        </button>
+      )}
+      <button
+        type="button"
+        className="pressable"
+        onClick={onMore}
+        aria-label="더보기 메뉴"
+        aria-haspopup="dialog"
+        title="더보기"
+        style={fabStyle}
+      >
+        <Menu size={18} aria-hidden />
+      </button>
+    </div>
   );
 }
 
 function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) => void }) {
   return (
     <nav
+      aria-label="주요 탐색"
       style={{
         position: "fixed",
         left: 0,
@@ -173,15 +191,19 @@ function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) =
         display: "flex",
         justifyContent: "center",
         gap: 1,
-        padding: "6px 2px calc(6px + env(safe-area-inset-bottom))",
-        background: "rgba(21,16,12,0.92)",
-        backdropFilter: "blur(8px)",
+        padding: "7px 4px calc(7px + env(safe-area-inset-bottom))",
+        background: NAV_GLASS,
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
         borderTop: `1px solid ${theme.border}`,
+        // 상단 미세 하이라이트(다크 표면 깊이감) — warm-ink 축.
+        boxShadow: "inset 0 1px 0 0 color-mix(in oklab, var(--color-fg) 5%, transparent)",
         zIndex: 50,
       }}
     >
       {NAV.map((it) => {
         const on = tab === it.id;
+        const Icon = it.Icon;
         return (
           <button
             key={it.id}
@@ -194,25 +216,40 @@ function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) =
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 2,
+              gap: 3,
               flex: 1,
               minWidth: 0,
-              maxWidth: 88,
+              maxWidth: 84,
               // 6개 탭이 320px 폭에서도 44px 터치 타깃을 확보하도록 최소 높이 보장.
-              minHeight: 48,
-              padding: "4px 1px",
+              minHeight: 50,
+              padding: "5px 1px",
               background: "none",
               border: "none",
               cursor: "pointer",
               color: on ? theme.accent : theme.textMuted,
-              fontWeight: on ? 800 : 600,
+              fontWeight: on ? 700 : 600,
               // 라벨이 좁은 폭에서 줄바꿈/오버플로 없이 한 줄 유지(작은 화면 대비 clamp).
               fontSize: "clamp(9.5px, 2.9vw, 11px)",
               whiteSpace: "nowrap",
               lineHeight: 1.1,
+              transition: "color 0.15s ease",
             }}
           >
-            <span style={{ fontSize: "clamp(18px, 5.4vw, 20px)" }}>{it.emoji}</span>
+            {/* 액티브 탭은 아이콘 뒤에 persimmon-soft 알약 — 활성 신호를 또렷하게(layout 안정). */}
+            <span
+              aria-hidden
+              style={{
+                display: "grid",
+                placeItems: "center",
+                width: 40,
+                height: 26,
+                borderRadius: 999,
+                background: on ? theme.accentSoft : "transparent",
+                transition: "background 0.15s ease",
+              }}
+            >
+              <Icon size={21} strokeWidth={on ? 2.4 : 2} aria-hidden />
+            </span>
             {it.label}
           </button>
         );
@@ -233,9 +270,14 @@ function TossChrome() {
 
   const tab = activeTab(pathname);
   const immersive = isImmersiveEditor(pathname);
-  // 검색 FAB 은 몰입형 에디터·검색 페이지(중복)·상세 페이지(자체 sticky 헤더와 겹침)에선 숨긴다.
+  // 검색 FAB 은 다음에서 숨긴다: 몰입형 에디터, 검색 페이지(중복), 상세(자체 sticky 헤더와 겹침),
+  // 그리고 홈(히어로에 큰 '작품·작가·태그 검색' 버튼이 이미 있어 FAB 이 그 위에 겹치며 중복됨).
+  // → 진입점을 하나로 정리해 첫인상의 어색함을 없앤다.
   const showSearchFab =
-    !immersive && !pathname.startsWith("/search") && !pathname.startsWith("/title/");
+    !immersive &&
+    pathname !== "/" &&
+    !pathname.startsWith("/search") &&
+    !pathname.startsWith("/title/");
   // "더보기"(☰) FAB 은 몰입형 에디터(자체 풀스크린)에서만 숨기고, 그 외 모든 화면에서 노출한다.
   // (전 라우트로 가는 유일한 진입점이라 검색/상세 화면에서도 살려둔다.)
   const showMoreFab = !immersive;
@@ -250,8 +292,13 @@ function TossChrome() {
 
   return (
     <>
-      {showMoreFab && <MoreFab onPress={() => setMoreOpen(true)} />}
-      {showSearchFab && <SearchFab onPress={() => navigate("/search")} />}
+      {showMoreFab && (
+        <TopChrome
+          showSearch={showSearchFab}
+          onSearch={() => navigate("/search")}
+          onMore={() => setMoreOpen(true)}
+        />
+      )}
       <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
       {/* 리스트형 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
       {!immersive && isListPage(pathname) && (
