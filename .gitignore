@@ -73,3 +73,8 @@ test-accounts.local.*
 /web-home-*.jpeg
 /web-mobile-*.jpeg
 /.playwright-mcp/
+
+# stray screenshot artifacts at repo root
+/*.jpeg
+/*.jpg
+/*.png
