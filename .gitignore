@@ -65,3 +65,11 @@ test-accounts.local.*
 # Grok Build TUI / AI agent session data (로컬 전용, 절대 커밋 금지)
 .grok/
 .grok/**/*
+
+# CDP/playwright scratch screenshots (repo root)
+/console-*.jpeg
+/toss-home-*.jpeg
+/toss-preview-*.jpeg
+/web-home-*.jpeg
+/web-mobile-*.jpeg
+/.playwright-mcp/
