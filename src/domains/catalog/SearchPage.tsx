@@ -21,12 +21,12 @@ export function SearchPage() {
 
   return (
     <Container size="wide" className="py-10">
-      <header className="mb-8 rounded-2xl border border-line bg-panel/45 p-5 sm:p-6">
+      <header className="mb-8 rounded-2xl border border-line bg-panel/45 p-4 sm:p-6">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/35 bg-accent-soft/45 px-2.5 py-1 text-xs font-medium text-accent">
           <Search size={14} />
           통합 검색
         </div>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">작품을 바로 찾는 작업공간</h1>
+        <h1 className="text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight [word-break:keep-all] sm:text-4xl">작품을 바로 찾는 작업공간</h1>
         <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
           작품명, 작가, 태그를 한 번에 찾고 플랫폼과 가격 조건으로 바로 좁혀보세요.
         </p>

@@ -108,7 +108,29 @@ export function installStaticCatalog(options: StaticCatalogOptions = {}): void {
       }
     : rawFetch;
 
-  const patched: typeof fetch = async (input, init) => {
+  // base(토스)면 카탈로그 JSON 응답의 상대 커버 프록시(/api/cover?u=..)를 배포 오리진으로 절대화한다.
+  // <img src> 는 fetch 패치 대상이 아니라(이미지 직접 로드) 데이터 레벨에서 절대화해야 교차 출처
+  // WebView(토스)에서 표지가 뜬다. 이미 절대 URL(http..)인 커버는 따옴표 직후 매칭이 안 돼 무시된다.
+  const absolutizeCovers = async (res: Response): Promise<Response> => {
+    if (!base) return res;
+    if (!(res.headers.get("content-type") || "").includes("json")) return res;
+    // 응답 본문을 읽어 커버 프록시를 절대화한다. 한 번 읽은 스트림은 소비되므로(드레인) 원본 res 를
+    // 그대로 돌려주면 소비측의 res.json()/res.text() 가 'body stream already read' 로 던진다.
+    // → 매치 여부와 무관하게 항상 읽은 텍스트로 새 Response 를 만들어 반환한다(매치 없으면 replace 는 no-op).
+    const text = await res.text();
+    const body = text.includes('"/api/cover')
+      ? text.replaceAll('"/api/cover', `"${base}/api/cover`)
+      : text;
+    const headers = new Headers(res.headers);
+    headers.delete("content-length");
+    return new Response(body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers,
+    });
+  };
+
+  const route: typeof fetch = async (input, init) => {
     let pathname: string;
     let sp: URLSearchParams;
     try {
@@ -143,6 +165,9 @@ export function installStaticCatalog(options: StaticCatalogOptions = {}): void {
     return engine.handleStaticCatalogRequest(pathname, sp, init, origFetch);
   };
 
+  const patched: typeof fetch = base
+    ? async (input, init) => absolutizeCovers(await route(input, init))
+    : route;
   (patched as { __toonspectrumStatic?: boolean }).__toonspectrumStatic = true;
   globalThis.fetch = patched;
 }

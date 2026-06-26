@@ -69,10 +69,17 @@ function toOptions(opts?: ApiOptions): Options {
 }
 
 // 응답 본문을 타입 T 로 파싱한다. 204/빈 본문은 undefined.
+// 비 JSON 본문(예: 미배포 엔드포인트의 HTML 404 페이지)은 JSON.parse 의 원시 SyntaxError
+// ("Unexpected token '<'") 가 그대로 UI 로 새지 않도록 깔끔한 한국어 메시지로 감싼다.
 async function toJson<T>(response: KyResponse): Promise<T> {
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  return text ? (JSON.parse(text) as T) : (undefined as T);
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("서버 응답을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.");
+  }
 }
 
 /**

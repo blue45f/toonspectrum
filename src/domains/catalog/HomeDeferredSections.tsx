@@ -79,7 +79,7 @@ export function HomeDeferredSections({
           {GENRES.map((genre) => (
             <Link key={genre} href={`/explore?genre=${encodeURIComponent(genre)}`}>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-transform duration-150 hover:scale-105"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium [word-break:keep-all] transition-transform duration-150 hover:scale-105"
                 style={{
                   color: genreColor(genre, 0.85),
                   backgroundColor: `color-mix(in oklch, ${genreColor(genre, 0.6)} 14%, transparent)`,
@@ -173,7 +173,7 @@ export function HomeDeferredSections({
               <Link
                 key={tag}
                 href={`/explore?tag=${encodeURIComponent(tag)}`}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-sm text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
+                className="group inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-2 text-sm text-fg-2 [word-break:keep-all] transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
               >
                 <span className="text-fg-3 group-hover:text-accent">#</span>
                 {tag}

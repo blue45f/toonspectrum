@@ -231,7 +231,7 @@ export function HomePage() {
                 WEBTOON × WEBNOVEL
               </p>
 
-              <h1 className="mt-4 text-balance text-[2.6rem] font-bold leading-[1.06] tracking-[-0.02em] sm:text-5xl lg:text-[3.7rem]">
+              <h1 className="mt-4 text-balance [word-break:keep-all] text-[clamp(2rem,8.5vw,2.6rem)] font-bold leading-[1.08] tracking-[-0.02em] sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
                 <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.12s_both]">
                   흩어진 이야기를,
                 </span>
@@ -290,20 +290,24 @@ export function HomePage() {
               </div>
             </div>
 
-            {/* 시그니처 인덱스 넘버럴 — 대형 tabular grotesque. ledger 격자 패널(데이터 대장 느낌). */}
+            {/* 시그니처 인덱스 넘버럴 — 대형 tabular grotesque. ledger 격자 패널(데이터 대장 느낌).
+                작은 화면(320~360px)에선 4칼럼이 천 단위 숫자를 넘치게 만들어 2칼럼으로 떨어뜨리고,
+                sm 이상에선 stat 개수(--stat-cols)만큼 한 줄로 편다(가로 스크롤·숫자 절단 방지). */}
             <dl
-              className="sheen-sweep grid gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl"
-              style={{
-                animation: "fade-up 0.6s var(--ease-out-expo) 0.55s both",
-                gridTemplateColumns: `repeat(${Math.min(heroStats.length, 4)}, minmax(0, 1fr))`,
-              }}
+              className="sheen-sweep grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl sm:[grid-template-columns:repeat(var(--stat-cols),minmax(0,1fr))]"
+              style={
+                {
+                  animation: "fade-up 0.6s var(--ease-out-expo) 0.55s both",
+                  "--stat-cols": Math.min(heroStats.length, 4),
+                } as React.CSSProperties
+              }
             >
               {heroStats.map((item, i) => (
                 <div
                   key={item.label}
-                  className="group flex flex-col gap-1 bg-card/70 px-4 py-5 transition-colors duration-200 hover:bg-card sm:px-5"
+                  className="group flex flex-col gap-1 bg-card/70 px-3.5 py-4 transition-colors duration-200 hover:bg-card sm:px-5 sm:py-5"
                 >
-                  <dd className="numeral text-[1.7rem] leading-none text-fg transition-colors duration-200 group-hover:text-accent sm:text-[2rem]">
+                  <dd className="numeral text-[clamp(1.4rem,6vw,1.7rem)] leading-none text-fg transition-colors duration-200 group-hover:text-accent sm:text-[2rem]">
                     <CountUp value={item.v} suffix={item.suffix} separator={item.v >= 10000} duration={1.1 + i * 0.1} />
                   </dd>
                   <dt className="mt-0.5 text-xs text-fg-3">{item.label}</dt>

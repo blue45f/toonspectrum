@@ -96,15 +96,15 @@ export function RankRow({
         className
       )}
     >
-      {/* Main Row Content */}
-      <div className="grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 px-2 py-2.5 sm:gap-4 sm:px-3">
+      {/* Main Row Content — 좁은 화면(320px)에선 표지/메트릭 칼럼을 좁히고 gap을 줄여 제목 폭을 확보 */}
+      <div className="grid grid-cols-[2.5rem_2.25rem_1fr_auto] items-center gap-2 px-2 py-2.5 sm:grid-cols-[2.75rem_2.5rem_1fr_auto] sm:gap-4 sm:px-3">
         {/* 인덱스 넘버럴 */}
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
           title="순위 산식 및 상세 점수 보기"
           className={cn(
-            "relative flex flex-col items-center rounded-xl border px-1.5 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/30",
+            "relative flex min-h-11 flex-col items-center justify-center rounded-xl border px-1.5 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/30",
             top3 ? "border-accent/45 bg-accent/10 text-accent" : "border-line/70 bg-canvas/40 text-fg-3",
             expanded && "border-accent bg-accent-soft/40 ring-2 ring-accent/10"
           )}
@@ -123,8 +123,8 @@ export function RankRow({
           )}
         </button>
 
-        <Link href={`/title/${title.slug}`} className="w-10">
-          <MiniPoster title={title} className="w-10 transition-transform group-hover/row:scale-105" />
+        <Link href={`/title/${title.slug}`} className="w-9 sm:w-10">
+          <MiniPoster title={title} className="w-9 transition-transform group-hover/row:scale-105 sm:w-10" />
         </Link>
 
         <Link href={`/title/${title.slug}`} className="min-w-0 flex-1">

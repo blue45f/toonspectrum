@@ -6,7 +6,7 @@ import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { CommandPaletteHost } from "@/components/command-palette-host";
-import { SplashScreen } from "@/components/SplashScreen";
+import { RandomIntro } from "@/components/RandomIntro";
 import { pingVisit } from "@/lib/visits-api";
 
 // 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
@@ -104,7 +104,7 @@ export interface AppShellProps {
    * 웹=BackToTop·DeskCloud 마운트, 토스=BottomNav·검색 FAB.
    */
   chromeOverlay?: ReactNode;
-  /** 인트로/스플래시 노출. 기본 노출(once 기본값=세션 1회). 토스는 once={false} 엘리먼트를 직접 넘긴다. */
+  /** 인트로/스플래시 노출. 기본=RandomIntro(구 IntroSplash/현행 SplashScreen 랜덤, 세션 1회). 토스는 once={false} 엘리먼트를 직접 넘긴다. */
   splash?: ReactNode;
   /** 'sr-only' 스킵 링크 노출(웹 키보드 a11y). 토스 WebView 는 BottomNav 가 본문 포커스를 담당해 생략. */
   showSkipLink?: boolean;
@@ -135,7 +135,7 @@ export function AppShell({
   useClickSfx();
   return (
     <AuthSessionProvider>
-      {splash ?? <SplashScreen />}
+      {splash ?? <RandomIntro />}
       <Suspense fallback={null}>
         <StoreSync />
       </Suspense>

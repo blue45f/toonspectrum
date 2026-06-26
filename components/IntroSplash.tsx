@@ -3,19 +3,32 @@ import * as THREE from "three";
 
 import styles from "./IntroSplash.module.css";
 
-export function IntroSplash() {
+const SESSION_KEY = "toonspectrum-intro-shown";
+
+export interface IntroSplashProps {
+  /**
+   * 세션당 1회만 노출(sessionStorage). 기본 true(현행 웹 동작).
+   * false 면 마운트마다 노출한다 — 토스 앱 재오픈마다 인트로를 다시 보여줄 때 사용.
+   */
+  once?: boolean;
+}
+
+export function IntroSplash({ once = true }: IntroSplashProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isInitialized = useRef(false);
-  // 세션 기준 최초 사이트 진입 시에만 인트로 노출
-  const isFirstVisit = typeof window !== "undefined" && !sessionStorage.getItem("toonspectrum-intro-shown");
+  // once=true: 세션 기준 최초 사이트 진입 시에만 인트로 노출. once=false: 매 마운트 노출.
+  const isFirstVisit =
+    !once || (typeof window !== "undefined" && !sessionStorage.getItem(SESSION_KEY));
   const [isVisible, setIsVisible] = useState(isFirstVisit);
   const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
     if (!isFirstVisit) return;
 
-    // 방문 기록 세션에 플래그 저장
-    sessionStorage.setItem("toonspectrum-intro-shown", "true");
+    // once 일 때만 방문 기록 세션에 플래그 저장(이후 마운트에서 스킵).
+    if (once && typeof window !== "undefined") {
+      sessionStorage.setItem(SESSION_KEY, "true");
+    }
 
     const fadeTimer = setTimeout(() => {
       setIsFading(true);
@@ -29,7 +42,7 @@ export function IntroSplash() {
       clearTimeout(fadeTimer);
       clearTimeout(removeTimer);
     };
-  }, [isFirstVisit]);
+  }, [isFirstVisit, once]);
 
   useEffect(() => {
     if (!isVisible) return;

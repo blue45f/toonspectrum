@@ -74,7 +74,8 @@ function facetClass(active: boolean) {
 
 function tinyPill(active: boolean) {
   return cn(
-    "rounded-full border px-2.5 py-1 text-[0.72rem] font-medium transition-colors",
+    // 좁은 화면에서도 읽히고 누르기 편하도록 최소 높이(32px)·12px 본문 + 한 줄 유지(줄바꿈 방지).
+    "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors",
     active
       ? "border-accent/55 bg-accent-soft text-accent"
       : "border-line bg-card text-fg-3 hover:text-fg hover:border-line-strong"

@@ -182,7 +182,7 @@ export function TitleDetailPage() {
               )}
             </div>
 
-            <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            <h1 className="mt-3 text-pretty [word-break:keep-all] text-[clamp(1.6rem,6.5vw,1.875rem)] font-bold leading-tight tracking-tight sm:text-4xl">
               {title.title}
             </h1>
             {title.altTitles && title.altTitles.length > 0 && (

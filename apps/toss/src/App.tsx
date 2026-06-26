@@ -1,23 +1,25 @@
 import { useFx } from "@toonspectrum/core/fx";
 import "@toonspectrum/core/fx/fx.css";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { FloatingControls } from "@/components/FloatingControls";
-import { SplashScreen } from "@/components/SplashScreen";
+import { RandomIntro } from "@/components/RandomIntro";
 import { AppShell } from "@/src/app/AppShell";
 
 import { BannerAd } from "./components/BannerAd.tsx";
+import { MoreMenu } from "./components/MoreMenu.tsx";
 import { hapticFeedback } from "./lib/toss.ts";
 import { theme } from "./theme";
 
-// 하단 네비 = plan.nav (홈·랭킹·연재·탐색·놀이터). 검색은 Top 바 어포던스, 추천은 홈 섹션/오버플로로
-// 진입하므로 하단 탭에는 넣지 않는다(라우트는 등록). 5개 primary 탭만 노출.
+// 하단 네비 = 홈·랭킹·연재·탐색·서재·놀이터. 내 서재는 핵심 기능이라 primary 탭으로 노출한다.
+// 검색은 셸 검색 FAB, 추천은 홈 섹션/오버플로로 진입하므로 하단 탭엔 넣지 않는다(라우트는 등록).
 const NAV = [
   { id: "home", label: "홈", emoji: "📚", to: "/" },
   { id: "ranking", label: "랭킹", emoji: "🏆", to: "/ranking" },
   { id: "calendar", label: "연재", emoji: "📅", to: "/calendar" },
   { id: "explore", label: "탐색", emoji: "🧭", to: "/explore" },
+  { id: "library", label: "서재", emoji: "📖", to: "/library" },
   { id: "play", label: "놀이터", emoji: "🎮", to: "/play" },
 ] as const;
 
@@ -29,6 +31,7 @@ function activeTab(path: string): TabId {
   if (path.startsWith("/play") || path.startsWith("/fortune") || path.startsWith("/studio")) return "play";
   if (path.startsWith("/ranking")) return "ranking";
   if (path.startsWith("/calendar")) return "calendar";
+  if (path.startsWith("/library")) return "library";
   // 탐색 오버플로(ExplorePage 상단 칩)로 진입하는 부가 화면들 — 창작·내 서재·커뮤니티·추천·정보/약관 등.
   // 검색(/search)도 어느 탭에서든 Top 검색 버튼으로 열리지만, 비탭 라우트라 가장 가까운 '탐색'에 귀속한다.
   if (
@@ -106,8 +109,8 @@ function SearchFab({ onPress }: { onPress: () => void }) {
         top: "calc(10px + env(safe-area-inset-top))",
         right: 12,
         zIndex: 60,
-        width: 42,
-        height: 42,
+        width: 44,
+        height: 44,
         display: "grid",
         placeItems: "center",
         borderRadius: 999,
@@ -124,6 +127,41 @@ function SearchFab({ onPress }: { onPress: () => void }) {
   );
 }
 
+// 토스 셸 "더보기"(More) 어포던스 — 웹 SiteHeader 오버플로 메뉴(☰)의 토스판.
+// 하단 탭 6개로 못 담는 부가 기능(창작 게시판·커뮤니티·추천·운세·리뷰·비교 등) 전부로 가는 진입점.
+// 검색 FAB 왼쪽(우상단)에 두고, 몰입형 에디터에선 검색 FAB과 함께 숨긴다.
+function MoreFab({ onPress }: { onPress: () => void }) {
+  return (
+    <button
+      type="button"
+      className="pressable"
+      onClick={onPress}
+      aria-label="더보기 메뉴"
+      aria-haspopup="dialog"
+      title="더보기"
+      style={{
+        position: "fixed",
+        top: "calc(10px + env(safe-area-inset-top))",
+        right: 64,
+        zIndex: 60,
+        width: 44,
+        height: 44,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: 999,
+        border: `1px solid ${theme.border}`,
+        background: "rgba(34,26,19,0.82)",
+        backdropFilter: "blur(8px)",
+        color: theme.text,
+        fontSize: 19,
+        cursor: "pointer",
+      }}
+    >
+      ☰
+    </button>
+  );
+}
+
 function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) => void }) {
   return (
     <nav
@@ -134,8 +172,8 @@ function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) =
         bottom: 0,
         display: "flex",
         justifyContent: "center",
-        gap: 2,
-        padding: "8px 0 calc(8px + env(safe-area-inset-bottom))",
+        gap: 1,
+        padding: "6px 2px calc(6px + env(safe-area-inset-bottom))",
         background: "rgba(21,16,12,0.92)",
         backdropFilter: "blur(8px)",
         borderTop: `1px solid ${theme.border}`,
@@ -155,19 +193,26 @@ function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) =
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
+              justifyContent: "center",
               gap: 2,
               flex: 1,
+              minWidth: 0,
               maxWidth: 88,
-              padding: "4px 0",
+              // 6개 탭이 320px 폭에서도 44px 터치 타깃을 확보하도록 최소 높이 보장.
+              minHeight: 48,
+              padding: "4px 1px",
               background: "none",
               border: "none",
               cursor: "pointer",
               color: on ? theme.accent : theme.textMuted,
               fontWeight: on ? 800 : 600,
-              fontSize: 11,
+              // 라벨이 좁은 폭에서 줄바꿈/오버플로 없이 한 줄 유지(작은 화면 대비 clamp).
+              fontSize: "clamp(9.5px, 2.9vw, 11px)",
+              whiteSpace: "nowrap",
+              lineHeight: 1.1,
             }}
           >
-            <span style={{ fontSize: 20 }}>{it.emoji}</span>
+            <span style={{ fontSize: "clamp(18px, 5.4vw, 20px)" }}>{it.emoji}</span>
             {it.label}
           </button>
         );
@@ -184,12 +229,16 @@ function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) =
 function TossChrome() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const tab = activeTab(pathname);
   const immersive = isImmersiveEditor(pathname);
   // 검색 FAB 은 몰입형 에디터·검색 페이지(중복)·상세 페이지(자체 sticky 헤더와 겹침)에선 숨긴다.
   const showSearchFab =
     !immersive && !pathname.startsWith("/search") && !pathname.startsWith("/title/");
+  // "더보기"(☰) FAB 은 몰입형 에디터(자체 풀스크린)에서만 숨기고, 그 외 모든 화면에서 노출한다.
+  // (전 라우트로 가는 유일한 진입점이라 검색/상세 화면에서도 살려둔다.)
+  const showMoreFab = !immersive;
 
   // 본문 하단 여백 — 고정 BottomNav 가 마지막 콘텐츠를 가리지 않게 탭바 높이만큼 띄운다.
   // 몰입형 에디터(자체 풀스크린/도구막대)에선 탭이 없으므로 여백 0(스크롤·100dvh 캔버스 보존).
@@ -201,7 +250,9 @@ function TossChrome() {
 
   return (
     <>
+      {showMoreFab && <MoreFab onPress={() => setMoreOpen(true)} />}
       {showSearchFab && <SearchFab onPress={() => navigate("/search")} />}
+      <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
       {/* 리스트형 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
       {!immersive && isListPage(pathname) && (
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px 8px" }}>
@@ -234,9 +285,10 @@ function TossSplash() {
 
   return (
     // 공유 동적 인트로/스플래시(NO fork) — 토스는 매 진입(앱 재오픈)마다 노출하므로 once={false}.
+    // RandomIntro 가 마운트마다 구 IntroSplash(Three.js 웨이브)/현행 SplashScreen 을 랜덤 노출한다.
     // 타이틀 카드 탭 시 파티클 '팡' + 'pop' + 토스 햅틱(축포) 으로 동적 연출.
     <div onPointerDown={onTitleCardTap} data-no-sfx>
-      <SplashScreen once={false} />
+      <RandomIntro once={false} />
     </div>
   );
 }

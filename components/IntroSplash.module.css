@@ -9,6 +9,10 @@
   background: #060309; /* deep violet black */
   overflow: hidden;
   user-select: none;
+  /* 노치/홈 인디케이터 안전영역 반영(좁은 모바일에서도 콘텐츠가 화면 밖으로 안 나가게). */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
   transition:
     opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
     filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
@@ -25,8 +29,11 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  max-width: 100%;
   pointer-events: none;
   z-index: 1;
+  /* 캔버스는 뷰포트를 꽉 덮되 가로 오버플로(스크롤바)를 만들지 않는다. */
+  display: block;
 }
 
 .splashContent {
@@ -36,7 +43,11 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 24px;
+  /* 좁은 화면에서 워드마크/부제가 가장자리에 닿지 않게 패딩 + 폭 100% 제한. */
+  width: 100%;
+  max-width: 100%;
+  padding: 24px 20px;
+  box-sizing: border-box;
 }
 
 .logoContainer {
@@ -120,12 +131,16 @@
 
 .splashTitle {
   font-family: "Inter", system-ui, sans-serif;
-  font-size: 2.3rem;
+  /* 좁은 모바일(360–390px)에서도 한 줄로 안 잘리게 fluid 사이징. 데스크톱은 기존 2.3rem 상한 유지. */
+  font-size: clamp(1.6rem, 8vw, 2.3rem);
   font-weight: 900;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.14em;
   color: #ffffff;
   margin: 0;
-  text-indent: 0.15em;
+  /* text-indent 는 letter-spacing 으로 인한 우측 치우침 보정용이지만, 좁은 폭에선 넘침을 유발할 수
+     있어 제거하고 letter-spacing 을 살짝 줄여 균형을 맞춘다. */
+  max-width: 100%;
+  white-space: nowrap;
   animation: textSlideUp 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -162,12 +177,15 @@
 }
 
 .splashSubtitle {
-  font-size: 10.5px;
+  font-size: clamp(9px, 2.6vw, 10.5px);
   font-weight: 700;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.25em;
   margin-bottom: 20px;
   opacity: 0;
+  /* 넓은 자간 + 긴 부제가 좁은 폭에서 넘치지 않게 폭 제한 + 필요 시 줄바꿈 허용. */
+  max-width: 100%;
+  text-wrap: balance;
   animation: fadeIn 1s 0.6s forwards ease-out;
 }
 
