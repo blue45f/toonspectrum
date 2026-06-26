@@ -157,14 +157,14 @@ export function CafeDetailPage() {
         <span className="text-fg-2">{cafe.name}</span>
       </nav>
 
-      <header className="rounded-3xl border border-line bg-panel/55 p-6 md:p-8">
+      <header className="rounded-3xl border border-line bg-panel/55 p-5 sm:p-6 md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <Coffee size={14} />
               GENRE CAFE
             </p>
-            <h1 className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            <h1 className="mt-2 flex flex-wrap items-center gap-2 text-[clamp(1.4rem,6vw,1.5rem)] font-bold tracking-tight sm:text-3xl">
               {cafe.name}
               <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-[0.68rem] font-medium text-fg-3">
                 {cafe.genre || "자유"}

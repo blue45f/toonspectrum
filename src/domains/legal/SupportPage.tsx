@@ -241,11 +241,11 @@ export function SupportPage() {
   };
 
   return (
-    <Container size="prose" className="py-12 lg:py-16">
+    <Container size="prose" className="py-8 sm:py-12 lg:py-16">
       <div className="space-y-8">
         <header>
           <p className="eyebrow text-accent">SUPPORT · 문의</p>
-          <h1 ref={headingRef} tabIndex={-1} className="mt-3 text-pretty text-3xl font-bold leading-tight outline-none sm:text-4xl">
+          <h1 ref={headingRef} tabIndex={-1} className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight outline-none sm:text-4xl">
             무엇을 도와드릴까요?
           </h1>
           <p className="mt-4 text-pretty text-base leading-relaxed text-fg-2">
@@ -259,7 +259,7 @@ export function SupportPage() {
             <h2 className="inline-flex items-center gap-1.5 text-lg font-bold text-fg">
               <MessageSquarePlus size={16} className="text-accent" aria-hidden /> 문의 남기기
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-fg-3">
+            <p className="mt-1 text-sm leading-relaxed text-fg-2">
               카테고리를 고르고 제목과 내용을 작성하세요. 이름·이메일은 선택 사항입니다.
             </p>
           </div>

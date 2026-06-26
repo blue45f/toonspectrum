@@ -460,12 +460,12 @@ export function FanCafePanel({
               <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.65rem]">{COMMUNITY_SCOPE_LABEL_WITH_ALL[scope]}</span> {targetLabel}
             </p>
           )}
-          <p className="mt-1 max-w-xl text-sm leading-relaxed text-fg-3">
+          <p className="mt-1 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
             {FAN_CAFE_SCOPE_COPY[scope]}
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-line bg-canvas/45 px-3 py-2 text-xs text-fg-3">
-          <BookOpenText size={14} />
+        <div className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-canvas/45 px-3 py-2 text-xs text-fg-2">
+          <BookOpenText size={14} className="text-accent" />
           게시글 <span className="numeral text-fg">{posts.length}</span>
         </div>
       </div>
@@ -500,29 +500,29 @@ export function FanCafePanel({
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 py-2 text-xs">
-          <Search size={14} />
+        <div className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs transition-colors focus-within:border-accent/50 sm:basis-56">
+          <Search size={14} className="shrink-0 text-fg-3" />
           <input
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
             aria-label="팬카페 글 검색 (제목·본문 키워드)"
             placeholder="제목·본문 키워드 검색"
-            className="h-7 w-52 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
+            className="h-full w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-fg-3"
           />
         </div>
         <button
           type="button"
           onClick={() => setSelectedTagFilter(null)}
           className={cn(
-            "inline-flex items-center gap-1 rounded-xl border border-line bg-raised/45 px-2 py-1.5 text-xs font-medium transition-colors",
-            selectedTag === null ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-canvas/55 hover:text-fg"
+            "inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-raised/45 px-2.5 text-xs font-medium transition-colors",
+            selectedTag === null ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-canvas/55 hover:text-fg"
           )}
         >
           <Tag size={12} />
           태그 전체
         </button>
-        <div className="inline-flex rounded-xl border border-line bg-raised/40">
+        <div className="inline-flex h-9 rounded-xl border border-line bg-raised/40">
           {COMMUNITY_SORT_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -533,8 +533,8 @@ export function FanCafePanel({
                 setSort(option.value);
               }}
               className={cn(
-                "px-2.5 py-1.5 text-xs font-medium transition-colors first:rounded-l-xl last:rounded-r-xl",
-                sort === option.value ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-canvas/55 hover:text-fg"
+                "px-3 text-xs font-medium transition-colors first:rounded-l-xl last:rounded-r-xl",
+                sort === option.value ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-canvas/55 hover:text-fg"
               )}
             >
               {COMMUNITY_SORT_LABEL[option.value]}

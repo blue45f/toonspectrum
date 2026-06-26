@@ -126,10 +126,10 @@ export function TermsPage() {
   };
 
   return (
-    <Container size="prose" className="py-12 lg:py-16">
+    <Container size="prose" className="py-8 sm:py-12 lg:py-16">
       <p className="eyebrow text-accent">LEGAL</p>
-      <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">이용약관</h1>
-      <p className="mt-2 text-sm text-fg-3">시행일: 2026년 6월 4일</p>
+      <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">이용약관</h1>
+      <p className="mt-2 text-sm text-fg-2">시행일: 2026년 6월 4일</p>
 
       <section className="mt-8 rounded-2xl border border-line bg-panel/65 p-4 surface-hl sm:p-5" aria-labelledby="terms-demo-check-title">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

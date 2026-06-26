@@ -455,20 +455,20 @@ export function FortunePage() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-8 sm:px-6">
+    <div className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-6 sm:px-6 sm:py-8">
       {/* 스크린리더 전용 라이브 영역 — 운세 결과 도착 안내 */}
       <p className="sr-only" role="status" aria-live="polite">{liveMsg}</p>
 
       {/* 타이틀 헤더 */}
-      <header className="mb-10 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-1 text-xs font-semibold text-accent mb-3">
+      <header className="mb-7 text-center sm:mb-10">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-1 text-xs font-semibold text-accent">
           <Sparkles className="h-3 w-3" />
           <span>페르소나 캐릭터 운세 레이어</span>
         </div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">
+        <h1 className="font-display text-[clamp(1.6rem,8vw,1.875rem)] font-extrabold tracking-tight text-fg sm:text-4xl">
           CHARACTER FORTUNE
         </h1>
-        <p className="mt-2 text-sm text-fg-3">
+        <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-fg-2">
           최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션
         </p>
       </header>
@@ -561,7 +561,7 @@ export function FortunePage() {
                       {char.name[0]}
                     </span>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.13_0.012_70/0.85)] via-transparent to-transparent opacity-80" />
                   <div className="absolute bottom-3 left-3 text-left z-10">
                     <span className="text-[10px] uppercase tracking-wider text-accent font-semibold block">
                       {char.origin}
@@ -1316,7 +1316,7 @@ export function FortunePage() {
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
                     <h3 className="text-lg font-bold text-fg">오늘 하루는 어떨까요?</h3>
-                    <p className="text-xs text-fg-3 leading-relaxed">
+                    <p className="text-xs text-fg-2 leading-relaxed">
                       생년월일을 입력하면 {selectedChar.name}가 당신의 사주 오행으로 <strong className="text-fg-2">개인화된</strong> 오늘의 운세를 풀어드려요. 같은 날에는 결과가 바뀌지 않아요.
                     </p>
                   </div>
@@ -1334,7 +1334,7 @@ export function FortunePage() {
                           type="date"
                           value={birthDate}
                           onChange={(e) => setBirthDate(e.target.value)}
-                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="w-full rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-fg focus:border-accent focus:outline-none"
                         />
                       </div>
                       <div className="space-y-1">
@@ -1344,7 +1344,7 @@ export function FortunePage() {
                           type="time"
                           value={birthTime}
                           onChange={(e) => setBirthTime(e.target.value)}
-                          className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="w-full rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-fg focus:border-accent focus:outline-none"
                         />
                       </div>
                     </div>
@@ -1355,10 +1355,10 @@ export function FortunePage() {
                           type="button"
                           onClick={() => setGender(g)}
                           className={cn(
-                            "flex-1 rounded-lg border py-1.5 text-[11px] font-semibold transition-all",
+                            "min-h-10 flex-1 rounded-lg border py-2 text-[11px] font-semibold transition-all",
                             gender === g
                               ? "border-accent bg-accent-soft text-accent"
-                              : "border-line bg-card text-fg-3 hover:text-fg"
+                              : "border-line bg-card text-fg-2 hover:text-fg"
                           )}
                         >
                           {g === "none" ? "선택 안 함" : g === "male" ? "남성" : "여성"}
@@ -1383,7 +1383,7 @@ export function FortunePage() {
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
                     <h3 className="text-lg font-bold text-fg">생일로 보는 별자리 운세</h3>
-                    <p className="text-xs text-fg-3 leading-relaxed">
+                    <p className="text-xs text-fg-2 leading-relaxed">
                       생년월일만 입력하면 {selectedChar.name}가 당신의 별자리와 오늘의 별빛 흐름을 풀어드려요. (월·일만 사용)
                     </p>
                   </div>

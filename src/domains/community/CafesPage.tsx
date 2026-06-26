@@ -95,21 +95,21 @@ export function CafesPage() {
   }
 
   return (
-    <Container size="wide" className="relative py-8 lg:py-10">
-      <header className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <Container size="wide" className="relative py-6 sm:py-8 lg:py-10">
+      <header className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-accent">
             <Coffee size={14} />
             GENRE CAFES
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">장르 카페</h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-3">
+          <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">장르 카페</h1>
+          <p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
             같은 장르를 파는 독자들의 소모임. 누구나 읽을 수 있고, 가입하면 게시판에 글을 쓸 수 있어요.
           </p>
         </div>
         <Link
           href="/community"
-          className="inline-flex items-center gap-2 self-start rounded-full border border-line bg-canvas/45 px-3 py-2 text-xs font-medium text-fg-3 transition-colors hover:text-fg"
+          className="inline-flex min-h-11 items-center gap-2 self-start rounded-full border border-line bg-canvas/45 px-3.5 py-2 text-xs font-medium text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
         >
           <UsersRound size={14} />
           통합 커뮤니티
@@ -119,17 +119,18 @@ export function CafesPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="order-2 lg:order-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 py-2 text-xs">
-              <Search size={14} />
+            <div className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs transition-colors focus-within:border-accent/50 sm:basis-48">
+              <Search size={14} className="shrink-0 text-fg-3" />
               <input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
                 maxLength={60}
+                aria-label="카페 검색"
                 placeholder="카페 이름·소개 검색"
-                className="h-7 w-44 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
+                className="h-full w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-fg-3"
               />
             </div>
-            <div className="inline-flex rounded-xl border border-line bg-raised/40">
+            <div className="inline-flex h-9 rounded-xl border border-line bg-raised/40">
               {SORTS.map((option) => (
                 <button
                   key={option.value}
@@ -137,8 +138,8 @@ export function CafesPage() {
                   onClick={() => setSort(option.value)}
                   aria-pressed={sort === option.value}
                   className={cn(
-                    "px-2.5 py-1.5 text-xs font-medium transition-colors first:rounded-l-xl last:rounded-r-xl",
-                    sort === option.value ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-canvas/55 hover:text-fg"
+                    "px-3 text-xs font-medium transition-colors first:rounded-l-xl last:rounded-r-xl",
+                    sort === option.value ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-canvas/55 hover:text-fg"
                   )}
                 >
                   {option.label}
@@ -147,14 +148,14 @@ export function CafesPage() {
             </div>
           </div>
 
-          <div className="mb-5 flex flex-wrap gap-1.5">
+          <div className="rail -mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pb-0">
             <button
               type="button"
               onClick={() => setGenre("")}
               aria-pressed={genre === ""}
               className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                genre === "" ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-raised/45 text-fg-3 hover:text-fg"
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                genre === "" ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-raised/45 text-fg-2 hover:border-line-strong hover:text-fg"
               )}
             >
               전체
@@ -166,8 +167,8 @@ export function CafesPage() {
                 onClick={() => setGenre((current) => (current === item ? "" : item))}
                 aria-pressed={genre === item}
                 className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                  genre === item ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-raised/45 text-fg-3 hover:text-fg"
+                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  genre === item ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-raised/45 text-fg-2 hover:border-line-strong hover:text-fg"
                 )}
               >
                 {item}
@@ -223,7 +224,7 @@ export function CafesPage() {
                         </p>
                       </div>
                     </div>
-                    <p className="line-clamp-2 text-xs leading-relaxed text-fg-3">{cafe.description}</p>
+                    <p className="line-clamp-2 text-xs leading-relaxed text-fg-2">{cafe.description}</p>
                     <p className="mt-auto pt-1 text-[0.68rem] text-fg-3">
                       멤버 <span className="numeral text-fg-2">{cafe.memberCount}</span> · 글{" "}
                       <span className="numeral text-fg-2">{cafe.postCount}</span> · {relativeDate(cafe.createdAt)} 개설

@@ -74,8 +74,8 @@ function ProfileWorksTab({ userId }: { userId: string }) {
   if (loading) return <WorkGridSkeleton count={5} />;
   if (works.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-        <PenLine size={24} className="mx-auto mb-2.5" />이 회원이 아직 공개한 창작 작품이 없습니다.
+      <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
+        <PenLine size={24} className="mx-auto mb-2.5 text-fg-3" />이 회원이 아직 공개한 창작 작품이 없습니다.
       </div>
     );
   }
@@ -130,8 +130,8 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
   }
   if (series.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-        <BookOpen size={24} className="mx-auto mb-2.5" />이 회원이 아직 만든 연재 시리즈가 없습니다.
+      <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
+        <BookOpen size={24} className="mx-auto mb-2.5 text-fg-3" />이 회원이 아직 만든 연재 시리즈가 없습니다.
       </div>
     );
   }
@@ -222,11 +222,11 @@ export function UserProfilePage() {
   return (
     <div>
       <section className="border-b border-line bg-ledger">
-        <Container size="wide" className="py-12 lg:py-16">
+        <Container size="wide" className="py-8 sm:py-12 lg:py-16">
           <p className="eyebrow text-accent">READER PROFILE</p>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <span
-              className="grid size-16 shrink-0 place-items-center rounded-full text-2xl font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.16)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]"
+              className="grid size-14 shrink-0 place-items-center rounded-full text-2xl font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.16)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)] sm:size-16"
               style={{ background: `linear-gradient(140deg, ${avatar}, oklch(0.3 0.05 60))` }}
               aria-hidden
             >
@@ -234,7 +234,7 @@ export function UserProfilePage() {
             </span>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-2xl font-bold leading-tight sm:text-3xl">{author}</h1>
-              <p className="mt-1 text-sm text-fg-3">{profile?.bio || "독자가 남긴 리뷰와 창작 활동"}</p>
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">{profile?.bio || "독자가 남긴 리뷰와 창작 활동"}</p>
             </div>
             {/* 팔로우 버튼 — 본인 프로필이면 숨김, 비로그인은 비활성 안내 */}
             {profile && !isSelf && (
@@ -256,35 +256,35 @@ export function UserProfilePage() {
             )}
           </div>
 
-          <dl className="mt-8 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-6">
+          <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:flex sm:flex-wrap sm:items-end sm:gap-x-9">
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">팔로워</dt>
+              <dt className="text-xs text-fg-2">팔로워</dt>
               <dd className="numeral tnum text-2xl text-fg">{formatCount(profile?.followers ?? 0)}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">작성한 리뷰</dt>
+              <dt className="text-xs text-fg-2">작성한 리뷰</dt>
               <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">평균 별점</dt>
+              <dt className="text-xs text-fg-2">평균 별점</dt>
               <dd className="flex items-center gap-2">
                 <Stars value={avg} size="sm" />
                 <span className="numeral tnum text-2xl text-fg">{avg.toFixed(2)}</span>
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">창작 작품</dt>
+              <dt className="text-xs text-fg-2">창작 작품</dt>
               <dd className="numeral tnum text-2xl text-fg">{(profile?.works ?? 0).toLocaleString("ko-KR")}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">연재 시리즈</dt>
+              <dt className="text-xs text-fg-2">연재 시리즈</dt>
               <dd className="numeral tnum text-2xl text-fg">{(profile?.series ?? 0).toLocaleString("ko-KR")}</dd>
             </div>
           </dl>
         </Container>
       </section>
 
-      <Container size="wide" className="py-10 lg:py-12">
+      <Container size="wide" className="py-8 sm:py-10 lg:py-12">
         {/* 탭: 리뷰 / 창작 작품 / 시리즈 */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <div role="tablist" aria-label="프로필 콘텐츠" className="flex flex-wrap gap-1.5">
@@ -338,7 +338,7 @@ export function UserProfilePage() {
         ) : error ? (
           <ErrorState title="프로필을 불러오지 못했습니다." message={error} onRetry={reload} />
         ) : feed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
+          <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
             이 회원이 아직 작성한 리뷰가 없습니다.
           </div>
         ) : (

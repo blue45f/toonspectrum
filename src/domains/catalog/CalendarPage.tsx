@@ -138,14 +138,14 @@ export function CalendarPage() {
   };
 
   return (
-    <Container size="wide" className="py-10">
+    <Container size="wide" className="py-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 surface-hl sm:mb-7 sm:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <CalendarDays size={14} /> RELEASE CALENDAR
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
+            <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
             <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
               연재요일 정보가 있는 작품을 요일별로 모두 표시합니다. 오늘은{" "}
               <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가 올라오는 작품이{" "}
@@ -228,7 +228,7 @@ export function CalendarPage() {
                     onClick={() => togglePlatform(platform.id)}
                     aria-pressed={on}
                     className={cn(
-                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[0.72rem] transition-colors",
+                      "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[0.72rem] transition-colors pointer-coarse:h-9 pointer-coarse:px-3 pointer-coarse:text-xs",
                       on
                         ? "border-accent/60 bg-accent-soft/50 text-fg"
                         : "border-line bg-card text-fg-2 hover:bg-raised",
@@ -304,7 +304,7 @@ export function CalendarPage() {
                     aria-selected={on}
                     onClick={() => setSelectedDayIdx(index)}
                     className={cn(
-                      "relative inline-flex shrink-0 flex-col items-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
+                      "relative inline-flex min-h-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-4 py-2 transition-colors",
                       on
                         ? "border-accent/60 text-fg"
                         : "border-line bg-panel/30 text-fg-2 hover:bg-raised"

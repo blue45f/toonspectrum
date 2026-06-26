@@ -213,9 +213,9 @@ function PolicyPageShell({
   }, [fallbackDoc, slug, reloadKey]);
 
   return (
-    <Container size="prose" className="py-12 lg:py-16">
+    <Container size="prose" className="py-8 sm:py-12 lg:py-16">
       <p className="eyebrow text-accent">{eyebrow}</p>
-      <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">
+      <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">
         {doc?.name || fallbackName}
       </h1>
       {error && doc ? (

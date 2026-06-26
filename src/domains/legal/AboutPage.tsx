@@ -95,7 +95,7 @@ export function AboutPage() {
       {/* 히어로 */}
       <header>
         <p className="eyebrow text-accent">소개 · GETTING STARTED</p>
-        <h1 className="mt-2 text-balance font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+        <h1 className="mt-2 text-balance font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight text-fg sm:text-4xl">
           무엇을, 어디서, 왜 볼지 한 곳에서
         </h1>
         <p className="mt-3 text-base leading-relaxed text-fg-2">

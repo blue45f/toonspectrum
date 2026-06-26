@@ -71,6 +71,9 @@ import {
   Undo2,
   Search,
   X,
+  Layers,
+  Palette,
+  Hand,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
@@ -753,6 +756,8 @@ function elementLabel(el: El): string {
 }
 const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
+// 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
+const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
 
 // 내보내기 캔버스에 워터마크/서명을 합성한다(출력 픽셀에 직접 그림). 켜짐+텍스트가 있을 때만.
@@ -792,6 +797,24 @@ function storeQuickStartDismissed() {
   if (typeof window === "undefined") return;
   try {
     globalThis.localStorage.setItem(QUICK_START_DISMISSED_KEY, "1");
+  } catch {
+    // localStorage may be unavailable in private or embedded browser contexts.
+  }
+}
+
+function readMobileHintDismissed() {
+  if (typeof window === "undefined") return false;
+  try {
+    return globalThis.localStorage.getItem(MOBILE_HINT_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeMobileHintDismissed() {
+  if (typeof window === "undefined") return;
+  try {
+    globalThis.localStorage.setItem(MOBILE_HINT_DISMISSED_KEY, "1");
   } catch {
     // localStorage may be unavailable in private or embedded browser contexts.
   }
@@ -2002,10 +2025,11 @@ export function StudioPage() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
   const isMobile = useIsMobile();
-  // 모바일에서 열려 있는 바텀시트(페이지 목록 / 속성). null=캔버스 전체.
-  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props">(null);
+  // 모바일에서 열려 있는 바텀시트(페이지 목록 / 속성 / 브러시 설정). null=캔버스 전체.
+  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw">(null);
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
+  const drawSheetRef = useRef<HTMLDivElement>(null);
   const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
@@ -2021,7 +2045,12 @@ export function StudioPage() {
     }
     sheetReturnFocusRef.current = document.activeElement as HTMLElement | null;
     const id = requestAnimationFrame(() => {
-      const sheet = mobileSheet === "pages" ? pagesSheetRef.current : propsSheetRef.current;
+      const sheet =
+        mobileSheet === "pages"
+          ? pagesSheetRef.current
+          : mobileSheet === "draw"
+            ? drawSheetRef.current
+            : propsSheetRef.current;
       sheet?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     });
     return () => cancelAnimationFrame(id);
@@ -2214,6 +2243,7 @@ export function StudioPage() {
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
+  const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -3609,6 +3639,12 @@ export function StudioPage() {
     setQuickStartDismissed(true);
     storeQuickStartDismissed();
   }
+  function dismissMobileHint() {
+    setMobileHintDismissed(true);
+    storeMobileHintDismissed();
+  }
+  // 모바일 첫 사용 안내를 띄울지: 모바일 + 미해제 + 하이드레이션 완료 + 빠른시작 패널이 떠 있지 않을 때만.
+  const showMobileHint = isMobile && !mobileHintDismissed && workHydrated && !showQuickStart;
   function openQuickStartMenu(nextMenu: Extract<StudioMenu, "template" | "char" | "bubble">) {
     setTool("select");
     setSelectedId(null);
@@ -4895,17 +4931,26 @@ export function StudioPage() {
     }
   }
 
+  // 터치 기기(작은 폰)에서는 도구 버튼을 키워 thumb 로 누르기 쉽게 한다(pointer-coarse: h-10).
+  // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
   const toolBtn = (active: boolean) =>
     cn(
-      "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors",
+      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-10 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
-  // 모바일 하단 도구막대 버튼 — 아이콘 + 작은 라벨 세로 스택.
+  // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   const mobileBarBtn = (active: boolean) =>
     cn(
       "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.62rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
+    );
+
+  // 모바일 하단 '드로잉 도구' 버튼 — 한 손 조작용 큰 터치 타깃(>=44px). 활성 도구는 감귤색으로 또렷하게.
+  const mobileDrawToolBtn = (active: boolean) =>
+    cn(
+      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+      active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
 
   async function handleDownload() {
@@ -5149,21 +5194,23 @@ export function StudioPage() {
         maximized && "fixed inset-0 z-[60] overflow-y-auto bg-canvas"
       )}
     >
-    <Container size="wide" className={cn("py-6", !(isFullscreen || maximized) && "xl:max-w-[1600px] 2xl:max-w-[1880px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <Container size="wide" className={cn("py-3 lg:py-6", !(isFullscreen || maximized) && "xl:max-w-[1600px] 2xl:max-w-[1880px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
+      <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">창작 스튜디오</h1>
-          <p className="mt-1 text-sm text-fg-3">
+          {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
+          <h1 className="text-lg font-bold tracking-tight lg:text-2xl">창작 스튜디오</h1>
+          <p className="mt-1 hidden text-sm text-fg-3 lg:block">
             이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
             {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div ref={exportMenuRef} className="relative flex items-center">
+        {/* 모바일: 액션 버튼을 한 줄 가로 스크롤로 압축(모든 기능 유지하되 세로를 잡아먹지 않게). 데스크톱은 wrap. */}
+        <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:overflow-visible">
+          <div ref={exportMenuRef} className="relative flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => handleDownload()}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 pr-2" })}
+              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" })}
               title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
             >
               <Download size={14} /> 다운로드
@@ -5221,24 +5268,24 @@ export function StudioPage() {
               className={buttonClass({
                 size: "sm",
                 variant: "quiet",
-                className: "gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
+                className: "shrink-0 whitespace-nowrap gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
               })}
               title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
             >
               <Download size={14} /> 웹툰 연합 스크롤
             </button>
           )}
-          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })} title="편집 중인 모든 레이아웃과 요소를 .json 파일로 PC에 저장">
+          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="편집 중인 모든 레이아웃과 요소를 .json 파일로 PC에 저장">
             <Download size={14} /> 백업 (.json)
           </button>
-          <label className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" }), "cursor-pointer")} title="백업해둔 .json 파일을 불러와 작업을 이어함">
+          <label className={cn(buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }), "cursor-pointer")} title="백업해둔 .json 파일을 불러와 작업을 이어함">
             <Upload size={14} /> 복구 (.json)
             <input type="file" accept=".json" className="hidden" onChange={handleImportProject} />
           </label>
-          <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet" })}>
+          <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap" })}>
             임시저장
           </button>
-          <button type="button" onClick={() => handleSave("published")} disabled={saving} className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}>
+          <button type="button" onClick={() => handleSave("published")} disabled={saving} className={buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5" })}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
             {workId ? "수정 게시" : "게시하기"}
           </button>
@@ -5255,14 +5302,20 @@ export function StudioPage() {
       )}
 
       {/* 툴바 */}
-      {/* 도구막대는 wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록). 모바일에선 버튼이 작아 여러 줄로 흐르되 가로 깨짐은 없음. */}
-      <div className="sticky top-2 z-20 mb-3 flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-line bg-panel/80 p-2 backdrop-blur">
+      {/* 데스크톱: wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록).
+          모바일: 한 줄 가로 스크롤로 압축해 캔버스 세로 공간을 확보한다(여러 줄 wrap이 화면을 잡아먹지 않게).
+          이때 각 메뉴 팝오버는 모바일에서 fixed 로 뜨므로 overflow 스크롤에 잘리지 않는다(아래 메뉴들 참조). */}
+      {/* 모바일은 backdrop-blur 를 빼고 불투명 bg-panel 을 쓴다 — backdrop-filter 는 fixed 자식의 containing block 을 만들어
+          메뉴 팝오버(fixed)가 이 가로 스크롤 도구막대 안에 갇혀(overflow 클리핑) 안 보이게 되기 때문. 데스크톱은 기존 blur 유지. */}
+      <div className="sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur">
+        {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
+        <span aria-hidden className="pointer-events-none sticky left-0 -ml-2 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel/80 to-transparent lg:hidden" />
         <div ref={menu === "template" ? menuRef : undefined} className="relative">
           <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} aria-haspopup="menu" aria-expanded={menu === "template"} className={toolBtn(menu === "template")}>
             <LayoutTemplate size={14} /> 템플릿
           </button>
           {menu === "template" && (
-            <div className="absolute left-0 top-full z-30 mt-1 grid max-h-80 w-64 max-w-[calc(100vw-1.5rem)] gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 grid max-h-[calc(100dvh-9.5rem)] w-auto gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-80 lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:shadow-lg">
               {TEMPLATE_GROUPS.map((group) => (
                 <div key={group.group} className="grid gap-1">
                   <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
@@ -5361,7 +5414,7 @@ export function StudioPage() {
             <ImageIcon size={14} /> 배경 씬
           </button>
           {menu === "bgScene" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
@@ -5448,7 +5501,7 @@ export function StudioPage() {
             <Grid2x2 size={14} /> 톤
           </button>
           {menu === "tone" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
@@ -5485,7 +5538,7 @@ export function StudioPage() {
             <PenTool size={14} /> 이메레스
           </button>
           {menu === "emeres" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
@@ -5570,7 +5623,7 @@ export function StudioPage() {
             <Sparkles size={14} /> 장면
           </button>
           {menu === "scene" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
@@ -5613,7 +5666,7 @@ export function StudioPage() {
             <Bookmark size={14} /> 클립
           </button>
           {menu === "clip" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
               <button
                 type="button"
@@ -5667,7 +5720,7 @@ export function StudioPage() {
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <div className="grid gap-1">
                 {BUBBLE_VARIANTS.map((v) => (
                   <button
@@ -5713,7 +5766,7 @@ export function StudioPage() {
             <Sparkles size={14} /> 효과
           </button>
           {menu === "sticker" && (
-            <div className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-line bg-panel p-2 shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <div className="relative mb-2">
                 <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
                 <input
@@ -5937,7 +5990,8 @@ export function StudioPage() {
           />
         </span>
         {tool === "draw" && (
-          <div className="flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md">
+          // 모바일: 이 인라인 브러시 바는 하단 드로잉 도구막대 + "브러시" 시트가 대체하므로 숨긴다(가로 스크롤 폭 절약·캔버스 우선).
+          <div className="hidden max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md lg:flex">
             {/* Brush Presets Group — 펜 전용. 지우개/도형에선 invisible로 '같은 너비·높이'를 유지해
                 상위 스티키 툴바의 줄바꿈이 변하지 않게 한다(펜↔지우개 전환 시 캔버스 점프 방지).
                 visibility:hidden이라 탭 포커스에서도 제외됨. */}
@@ -6222,7 +6276,7 @@ export function StudioPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0">
+      <div className="flex flex-col gap-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0">
         {/* 모바일 바텀시트 백드롭 — 탭하면 닫힘 */}
         {isMobile && mobileSheet && (
           <button
@@ -6253,7 +6307,7 @@ export function StudioPage() {
           className={cn(
             "flex flex-col gap-2 border border-line p-3",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(6.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
             "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
@@ -6562,7 +6616,9 @@ export function StudioPage() {
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
-              "max-h-[calc(100dvh-21rem)] min-h-[20rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] transition-all",
+              // 모바일: 상단 도구막대 1줄 + 하단 도구막대만 차감해 캔버스를 최대한 키운다(작은 폰에서 '그릴 면적' 우선).
+              // 데스크톱(lg): 좌/우 패널·줌 컨트롤이 있는 기존 레이아웃이라 21rem 차감 유지.
+              "max-h-[calc(100dvh-13rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] transition-all lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
@@ -7735,7 +7791,7 @@ export function StudioPage() {
           className={cn(
             "flex flex-col gap-4",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(4rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
             "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
@@ -10013,69 +10069,446 @@ export function StudioPage() {
           </div>
         </aside>
 
-        {/* 모바일 하단 도구막대 — 패널 토글·추가·줌을 한 손에 */}
-        {isMobile && (
-          <nav
-            aria-label="스튜디오 모바일 도구막대"
-            className="fixed inset-x-0 bottom-0 z-[55] flex items-stretch gap-0.5 border-t border-line bg-panel/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden"
+        {/* 모바일 첫 사용 안내 — 하단 도구막대 + 두 손가락 이동/확대를 한 줄로. 1회만, 시트가 떠 있지 않을 때만. */}
+        {showMobileHint && !mobileSheet && (
+          <div
+            role="status"
+            className="fixed inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-300 lg:hidden"
           >
-            <button
-              type="button"
-              onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
-              aria-pressed={mobileSheet === "pages"}
-              className={mobileBarBtn(mobileSheet === "pages")}
-            >
-              <Files size={18} />
-              <span>페이지</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileSheet(null);
-                setQuickStartOpen(true);
-              }}
-              className={mobileBarBtn(false)}
-            >
-              <Plus size={18} />
-              <span>추가</span>
-            </button>
-            <div className="flex flex-[1.4] items-center justify-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => setZoom((z) => clampZoom(z - 0.25))}
-                disabled={zoom <= ZOOM_MIN}
-                className="grid size-9 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                aria-label="축소"
-              >
-                <Minus size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoom(1)}
-                className="min-w-[2.7rem] rounded-lg px-1 py-1.5 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
-                aria-label="확대·축소 100%로 맞춤"
-              >
-                {Math.round(zoom * 100)}%
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoom((z) => clampZoom(z + 0.25))}
-                disabled={zoom >= ZOOM_MAX}
-                className="grid size-9 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                aria-label="확대"
-              >
-                <Plus size={16} />
-              </button>
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Hand size={15} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
+              <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
+                아래 막대에서 <span className="font-medium text-fg-2">펜·지우개·도형</span>을 고르고,{" "}
+                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로 화면을 밀면 이동·확대돼요.
+              </p>
             </div>
             <button
               type="button"
-              onClick={() => setMobileSheet((s) => (s === "props" ? null : "props"))}
-              aria-pressed={mobileSheet === "props"}
-              className={mobileBarBtn(mobileSheet === "props")}
+              onClick={dismissMobileHint}
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+              aria-label="안내 닫기"
             >
-              <SlidersHorizontal size={18} />
-              <span>속성</span>
+              <X size={15} aria-hidden />
             </button>
+          </div>
+        )}
+
+        {/* 모바일 브러시 설정 시트 — 드로잉 도크 바로 위에 떠서 도구를 보며 굵기·색·프리셋·도형을 조절한다.
+            도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
+        {isMobile && (
+          <div
+            ref={drawSheetRef}
+            role="dialog"
+            aria-label="브러시 설정"
+            aria-modal={false}
+            className={cn(
+              "fixed inset-x-0 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-h-[44vh] max-w-[34rem] overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              mobileSheet === "draw"
+                ? "pointer-events-auto translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-3 opacity-0"
+            )}
+            inert={mobileSheet === "draw" ? undefined : true}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-semibold text-fg">
+                {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
+              </p>
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+                aria-label="브러시 설정 닫기"
+                data-autofocus
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+
+            {/* 모드 전환 — 시트 안에서도 펜↔지우개↔도형 빠르게 */}
+            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1">
+              {([
+                { v: "pen" as const, label: "펜", icon: Pencil },
+                { v: "eraser" as const, label: "지우개", icon: Eraser },
+                { v: "shape" as const, label: "도형", icon: Square },
+              ]).map((m) => {
+                const Icon = m.icon;
+                const active = drawMode === m.v;
+                return (
+                  <button
+                    key={m.v}
+                    type="button"
+                    onClick={() => {
+                      setTool("draw");
+                      setDrawMode(m.v);
+                    }}
+                    aria-pressed={active}
+                    className={cn(
+                      "flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors",
+                      active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    <Icon size={15} aria-hidden /> {m.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 펜 프리셋 — 가로 스크롤 칩(굵기·투명도·색 기본값 적용) */}
+            {drawMode === "pen" && (
+              <div className="mb-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">브러시</p>
+                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {BRUSH_PRESETS.map((p) => {
+                    const active = brush === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setBrush(p.id);
+                          setStrokeWidth(p.defaultWidth);
+                          setBrushOpacity(p.defaultOpacity);
+                          if (p.defaultColor) setColor(p.defaultColor);
+                        }}
+                        aria-pressed={active}
+                        className={cn(
+                          "min-h-[2.25rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
+                          active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
+            {drawMode !== "eraser" && (
+              <div className="mb-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRAW_COLOR_SWATCHES.map((swatch) => (
+                    <button
+                      key={swatch}
+                      type="button"
+                      onClick={() => setColor(swatch)}
+                      aria-label={`색상 ${swatch}`}
+                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
+                      className={cn(
+                        "size-8 rounded-lg transition-transform active:scale-95",
+                        color.toLowerCase() === swatch.toLowerCase()
+                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
+                          : "border border-line/60"
+                      )}
+                      style={{ background: swatch }}
+                    />
+                  ))}
+                  <label
+                    className="relative grid size-8 cursor-pointer place-items-center overflow-hidden rounded-lg border border-line shadow-sm"
+                    title="사용자 정의 색상"
+                    style={{ background: color }}
+                  >
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    />
+                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
+            <div className="space-y-2.5">
+              <label className="block">
+                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
+                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
+                </span>
+                <input
+                  type="range"
+                  min={1}
+                  max={48}
+                  value={strokeWidth}
+                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                  className="h-6 w-full accent-accent"
+                  aria-label="브러시 굵기"
+                />
+              </label>
+              {drawMode !== "eraser" && (
+                <label className="block">
+                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                    <span>투명도</span>
+                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={Math.round(brushOpacity * 100)}
+                    onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                    className="h-6 w-full accent-accent"
+                    aria-label="브러시 투명도"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* 도형 모양 + 채우기 — 도형 모드에서만 */}
+            {drawMode === "shape" && (
+              <div className="mt-2.5 border-t border-line/60 pt-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">도형 모양</p>
+                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {([
+                    { kind: "line" as const, label: "선", icon: Minus },
+                    { kind: "rect" as const, label: "사각형", icon: Square },
+                    { kind: "ellipse" as const, label: "타원", icon: Circle },
+                    { kind: "star" as const, label: "별", icon: StarIcon },
+                    { kind: "arrow" as const, label: "화살표", icon: ArrowRight },
+                    { kind: "triangle" as const, label: "삼각형", icon: Triangle },
+                    { kind: "polygon" as const, label: "다각형", icon: Hexagon },
+                  ]).map((item) => {
+                    const Icon = item.icon;
+                    const active = drawShape === item.kind;
+                    return (
+                      <button
+                        key={item.kind}
+                        type="button"
+                        onClick={() => {
+                          setTool("draw");
+                          setDrawMode("shape");
+                          setDrawShape(item.kind);
+                        }}
+                        aria-pressed={active}
+                        title={item.label}
+                        className={cn(
+                          "flex min-h-[2.25rem] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
+                          active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                        )}
+                      >
+                        <Icon size={14} aria-hidden /> {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label
+                  className={cn(
+                    "mt-2 flex min-h-[2.5rem] items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
+                    drawShape === "line"
+                      ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
+                      : shapeFill
+                        ? "border-accent/60 bg-accent-soft/50 text-fg"
+                        : "border-line bg-card text-fg-2"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={shapeFill}
+                    disabled={drawShape === "line"}
+                    onChange={(e) => setShapeFill(e.target.checked)}
+                    className="size-4 accent-[var(--color-accent)]"
+                  />
+                  <PaintBucket size={15} aria-hidden />
+                  채우기
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
+            1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
+        {isMobile && (
+          <nav
+            aria-label="스튜디오 모바일 도구막대"
+            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 px-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden"
+          >
+            {/* 1행: 핵심 드로잉 도구 (>=44px 터치 타깃, 활성 도구 감귤색) */}
+            <div className="flex items-stretch gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setTool("select");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "select"}
+                className={mobileDrawToolBtn(tool === "select")}
+              >
+                <MousePointer2 size={19} aria-hidden />
+                <span>선택</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // 펜이 이미 활성이면 같은 버튼으로 브러시 설정 시트를 연다(굵기·색·프리셋).
+                  if (tool === "draw" && drawMode === "pen") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "pen"}
+                className={mobileDrawToolBtn(tool === "draw" && drawMode === "pen")}
+              >
+                <Pencil size={19} aria-hidden />
+                <span>펜</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTool("draw");
+                  setDrawMode("eraser");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "eraser"}
+                className={mobileDrawToolBtn(tool === "draw" && drawMode === "eraser")}
+              >
+                <Eraser size={19} aria-hidden />
+                <span>지우개</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // 도형이 이미 활성이면 같은 버튼으로 도형/색 설정 시트를 연다.
+                  if (tool === "draw" && drawMode === "shape") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("shape");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "shape"}
+                className={mobileDrawToolBtn(tool === "draw" && drawMode === "shape")}
+              >
+                <Square size={18} aria-hidden />
+                <span>도형</span>
+              </button>
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <button
+                type="button"
+                onClick={undo}
+                disabled={hi === 0}
+                className={cn(mobileDrawToolBtn(false), "disabled:opacity-35")}
+                aria-label="실행취소"
+              >
+                <Undo2 size={19} aria-hidden />
+                <span>되돌리기</span>
+              </button>
+              <button
+                type="button"
+                onClick={redo}
+                disabled={hi >= history.length - 1}
+                className={cn(mobileDrawToolBtn(false), "disabled:opacity-35")}
+                aria-label="다시실행"
+              >
+                <Redo2 size={19} aria-hidden />
+                <span>다시</span>
+              </button>
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <button
+                type="button"
+                onClick={() => {
+                  // 브러시 설정 시트(굵기·색·프리셋·도형). 드로잉 도구가 아니면 펜으로 전환해 바로 그릴 수 있게.
+                  if (tool !== "draw") {
+                    setTool("draw");
+                    setDrawMode("pen");
+                    setMenu(null);
+                  }
+                  setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                }}
+                aria-pressed={mobileSheet === "draw"}
+                aria-label="브러시 설정 (굵기·색·프리셋)"
+                className={mobileDrawToolBtn(mobileSheet === "draw")}
+              >
+                <span
+                  aria-hidden
+                  className="size-[19px] rounded-full border-2 border-current"
+                  style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "rgba(255,255,255,0.45)" }}
+                />
+                <span>브러시</span>
+              </button>
+            </div>
+
+            {/* 2행: 보조 내비 — 페이지·추가·속성(레이어)·줌 */}
+            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1">
+              <button
+                type="button"
+                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+                aria-pressed={mobileSheet === "pages"}
+                className={mobileBarBtn(mobileSheet === "pages")}
+              >
+                <Files size={17} aria-hidden />
+                <span>페이지</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSheet(null);
+                  setQuickStartOpen(true);
+                }}
+                className={mobileBarBtn(false)}
+              >
+                <Plus size={17} aria-hidden />
+                <span>추가</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileSheet((s) => (s === "props" ? null : "props"))}
+                aria-pressed={mobileSheet === "props"}
+                className={mobileBarBtn(mobileSheet === "props")}
+              >
+                <Layers size={17} aria-hidden />
+                <span>속성·레이어</span>
+              </button>
+              <div className="flex flex-[1.3] items-center justify-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                  disabled={zoom <= ZOOM_MIN}
+                  className="grid size-10 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="축소"
+                >
+                  <Minus size={16} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // 너비 맞춤: 컨테이너 폭에 캔버스를 다시 채운다(줌 100% 복귀가 아니라 '폭맞춤'이 작은 폰에 자연스럽다).
+                    const wrap = wrapRef.current;
+                    if (wrap) setScale(Math.min(2.5, Math.max(0.1, wrap.clientWidth / CANVAS_W)));
+                    setZoom(1);
+                  }}
+                  className="min-w-[2.6rem] rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                  aria-label="화면 폭에 맞춤"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                  disabled={zoom >= ZOOM_MAX}
+                  className="grid size-10 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="확대"
+                >
+                  <Plus size={16} aria-hidden />
+                </button>
+              </div>
+            </div>
           </nav>
         )}
       </div>

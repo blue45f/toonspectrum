@@ -36,9 +36,9 @@ const TYPES = [
 
 export function ContactPage() {
   return (
-    <Container size="default" className="py-12 lg:py-16">
+    <Container size="default" className="py-8 sm:py-12 lg:py-16">
       <p className="eyebrow text-accent">CONTACT</p>
-      <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">광고·제휴 문의</h1>
+      <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">광고·제휴 문의</h1>
       <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-fg-2">
         툰스펙트럼은 웹툰·웹소설 독자가 매일 찾는 통합 발견 서비스입니다. 아래 폼으로 보내시면 운영팀
         비공개 보드로 바로 접수돼요. 공개 논의가 필요한 버그·QA는 TermsDesk 지원 보드도 이용할 수 있습니다.
@@ -52,7 +52,7 @@ export function ContactPage() {
               <div key={t.title} className="rounded-2xl border border-line bg-card/60 p-5">
                 <t.icon className="mb-2 text-accent" size={20} />
                 <p className="font-semibold text-fg">{t.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-fg-3">{t.body}</p>
+                <p className="mt-1 text-sm leading-relaxed text-fg-2">{t.body}</p>
               </div>
             ))}
           </div>
@@ -72,7 +72,7 @@ export function ContactPage() {
                   {link.title}
                   <ExternalLink size={13} className="text-fg-3" />
                 </span>
-                <span className="text-sm leading-relaxed text-fg-3">{link.body}</span>
+                <span className="text-sm leading-relaxed text-fg-2">{link.body}</span>
               </a>
             ))}
           </div>

@@ -116,12 +116,12 @@ export function FeedbackPage() {
   });
 
   return (
-    <Container size="default" className="py-10">
+    <Container size="default" className="py-6 sm:py-10">
       <header className="mb-6">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <MessagesSquare size={14} /> Q&amp;A · FEEDBACK
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">의견 게시판</h1>
+        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">의견 게시판</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
           서비스 이용 중 궁금한 점(Q&amp;A), 기능 제안, 버그를 남겨주세요. 운영자가 확인하고 답변하면 <b className="text-good">답변완료</b>로 표시됩니다.
         </p>

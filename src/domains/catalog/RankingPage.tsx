@@ -7,8 +7,10 @@ import type { MouseEvent } from "react";
 import { RankingBoard } from "@/components/ranking-board";
 import { RankingMethod } from "@/components/ranking-method";
 import { Container } from "@/components/section";
+import { spectrumGradient } from "@/lib/genre-color";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { RANK_AXES, type RankAxis } from "@/lib/ranking";
+import { GENRES } from "@/lib/taxonomy";
 
 export function RankingPage() {
   const [searchParams] = useSearchParams();
@@ -27,7 +29,13 @@ export function RankingPage() {
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
-      <header className="mb-6 rounded-2xl border border-line bg-panel/55 p-4 sm:mb-8 sm:p-6">
+      <header className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-panel/55 p-4 surface-hl sm:mb-8 sm:p-6">
+        {/* 시그니처 스펙트럼 틱 — 상단을 따라 흐르는 살아있는 데이터 맥동(홈·탐색 히어로와 동일 언어) */}
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-1 bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
+          style={{ backgroundImage: spectrumGradient([...GENRES], 90) }}
+        />
         <p className="eyebrow text-accent">UNIFIED RANKING</p>
         <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">통합 랭킹</h1>
         <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
@@ -39,14 +47,14 @@ export function RankingPage() {
           <a
             href="#ranking-board"
             onClick={jumpToBoard}
-            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-3 transition-colors hover:border-accent/55 hover:text-fg"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg"
           >
-            <ChevronRight size={14} />
+            <ChevronRight size={14} className="text-accent" />
             랭킹 시작점으로 이동
           </a>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1.5 text-xs text-fg-3">
-            <ListFilter size={14} />
-            현재 축: {axis}
+          <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-2">
+            <ListFilter size={14} className="text-fg-3" />
+            현재 축: <span className="font-medium text-fg">{axis}</span>
           </span>
         </div>
       </header>

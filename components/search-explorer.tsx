@@ -826,7 +826,7 @@ export function SearchExplorer({
         ) : !hasResult ? (
           <div className="mt-10 rounded-xl border border-dashed border-line bg-card/40 px-5 py-12 text-center">
             <p className="text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
-            <p className="mt-1 text-sm text-fg-3">
+            <p className="mt-1 text-sm text-fg-2">
               {q ? "검색어를 바꾸거나 필터를 줄여보세요." : "필터를 줄이거나 다른 조건으로 찾아보세요."}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">

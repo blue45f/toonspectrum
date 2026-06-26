@@ -219,7 +219,7 @@ export function TitleDetailPage() {
                 <Link
                   key={tag}
                   href={`/explore?tags=${encodeURIComponent(tag)}`}
-                  className="rounded-full border border-line bg-raised/50 px-2.5 py-1 text-xs text-fg-3 transition-colors hover:border-accent/50 hover:text-accent"
+                  className="inline-flex items-center rounded-full border border-line bg-raised/50 px-2.5 py-1 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft/40 hover:text-accent pointer-coarse:px-3 pointer-coarse:py-1.5"
                 >
                   #{tag}
                 </Link>
@@ -240,7 +240,7 @@ export function TitleDetailPage() {
         </div>
       </div>
 
-      <section className="mt-14">
+      <section className="mt-10 sm:mt-14">
         <h2 className="eyebrow mb-1 text-accent">METRICS · 지표</h2>
         <p className="mb-4 text-xs text-fg-2">완독률·몰입·분포는 수집값과 추정값을 함께 사용합니다.</p>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -261,11 +261,11 @@ export function TitleDetailPage() {
         </div>
       </section>
 
-      <ScoreBreakdown title={title} className="mt-14" />
+      <ScoreBreakdown title={title} className="mt-10 sm:mt-14" />
 
       {(hasFamily || hasExternalMedia) && (
         <Section
-          className="mt-14"
+          className="mt-10 sm:mt-14"
           eyebrow="ADAPTATION"
           title="같은 이야기, 다른 형태"
           desc="원작·웹툰부터 드라마·영화·애니메이션까지, 하나의 우주로 연결했습니다."
@@ -290,7 +290,7 @@ export function TitleDetailPage() {
       <TitleExternal title={title} />
 
       <Section
-        className="mt-14"
+        className="mt-10 sm:mt-14"
         eyebrow="COMMUNITY"
         title={`${title.title} 팬카페`}
         desc="작품 해석, 정주행 메모, 팬아트 아이디어를 독자들과 나눕니다."
@@ -301,7 +301,7 @@ export function TitleDetailPage() {
       <TitleFanWorks titleId={title.id} />
 
       <Section
-        className="mt-14"
+        className="mt-10 sm:mt-14"
         eyebrow="REVIEWS"
         title={
           <span className="flex items-baseline gap-3">
@@ -334,7 +334,7 @@ export function TitleDetailPage() {
 
       {byAuthor.length > 0 && (
         <Section
-          className="mt-14"
+          className="mt-10 sm:mt-14"
           eyebrow="BY THIS AUTHOR"
           title={`${title.author}의 다른 작품`}
           desc="같은 작가가 그린·쓴 다른 작품"
@@ -349,7 +349,7 @@ export function TitleDetailPage() {
 
       {similar.length > 0 && (
         <Section
-          className="mt-14"
+          className="mt-10 sm:mt-14"
           eyebrow="SIMILAR"
           title="이 작품과 비슷한"
           desc="장르·태그·어댑테이션 관계로 찾은 추천"

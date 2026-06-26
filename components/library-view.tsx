@@ -75,12 +75,12 @@ function EmptyTeach({
       </div>
       <div>
         <p className="font-semibold text-fg">{title}</p>
-        <p className="mt-1 max-w-xs text-sm text-fg-3">{desc}</p>
+        <p className="mt-1 max-w-xs text-sm leading-relaxed text-fg-2">{desc}</p>
       </div>
       {cta && (
         <Link
           href={cta.href}
-          className="mt-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent"
+          className="mt-1 inline-flex min-h-11 items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
         >
           {cta.label}
         </Link>
@@ -511,14 +511,14 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         </span>
         <button
           onClick={() => setAdultVerified(!adultVerified)}
-          className="rounded-md border border-line px-2 py-0.5 transition-colors hover:text-fg"
+          className="inline-flex min-h-8 items-center rounded-md border border-line px-2.5 py-1 transition-colors hover:border-line-strong hover:text-fg"
         >
           {adultVerified ? "인증 해제" : "성인 인증하기 (만 19세+)"}
         </button>
         {(readIds.length > 0 || ratedIds.length > 0) && (
           <button
             onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
-            className="hover:text-bad"
+            className="inline-flex min-h-8 items-center rounded-md px-1.5 py-1 transition-colors hover:text-bad"
           >
             서재 데이터 초기화
           </button>

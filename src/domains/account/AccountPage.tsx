@@ -47,17 +47,24 @@ function isTab(value: string | null): value is Tab {
 function SignInPrompt() {
   const [modal, setModal] = useState(false);
   return (
-    <Container size="prose" className="py-16">
-      <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center">
-        <UserRound size={28} className="mx-auto mb-3 text-fg-3" />
-        <h1 className="text-lg font-bold text-fg">로그인이 필요해요</h1>
-        <p className="mt-1.5 text-sm leading-relaxed text-fg-3">
+    <Container size="prose" className="py-10 sm:py-16">
+      <div className="relative overflow-hidden rounded-2xl border border-dashed border-line bg-gradient-to-b from-card/55 to-panel/30 p-8 text-center sm:p-12">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-2 h-28 w-28 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
+          style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.3), transparent 70%)" }}
+        />
+        <span className="pf-glow relative mx-auto mb-3 grid size-12 place-items-center rounded-2xl border border-accent/30 bg-accent-soft/60 text-accent">
+          <UserRound size={24} />
+        </span>
+        <h1 className="relative text-lg font-bold text-fg">로그인이 필요해요</h1>
+        <p className="relative mt-1.5 text-sm leading-relaxed text-fg-2">
           내 게시물과 활동, 프로필을 확인하려면 로그인해 주세요.
         </p>
         <button
           type="button"
           onClick={() => setModal(true)}
-          className={buttonClass({ variant: "solid", className: "mt-5 gap-1.5" })}
+          className={buttonClass({ variant: "solid", className: "relative mt-5 gap-1.5" })}
         >
           <UserRound size={16} />
           로그인
@@ -379,7 +386,7 @@ function ProfileTab() {
     <div className="max-w-xl space-y-6">
       <section className="rounded-2xl border border-line bg-panel/40 p-5">
         <h2 className="mb-1 text-sm font-semibold text-fg">프로필 사진</h2>
-        <p className="mb-4 text-[0.78rem] text-fg-3">메뉴와 댓글 등 내 이름이 보이는 곳에 표시돼요.</p>
+        <p className="mb-4 text-[0.78rem] leading-relaxed text-fg-2">메뉴와 댓글 등 내 이름이 보이는 곳에 표시돼요.</p>
         <AvatarUploader
           value={image}
           fallbackText={fallbackInitial}
@@ -479,18 +486,18 @@ export function AccountPage() {
   };
 
   return (
-    <Container size="wide" className="py-10">
-      <header className="mb-7">
+    <Container size="wide" className="py-6 sm:py-10">
+      <header className="mb-6 sm:mb-7">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <UserRound size={14} /> MY ACCOUNT
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">내 정보</h1>
-        <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
+        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">내 정보</h1>
+        <p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
           내가 올린 게시물과 활동 기록을 확인하고 프로필을 관리합니다.
         </p>
       </header>
 
-      <div role="tablist" aria-label="내 정보 탭" className="mb-6 flex flex-wrap gap-1.5 border-b border-line">
+      <div role="tablist" aria-label="내 정보 탭" className="rail -mx-4 mb-6 flex gap-1.5 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
         {TABS.map((option) => {
           const on = option.id === tab;
           return (
@@ -501,10 +508,10 @@ export function AccountPage() {
               aria-selected={on}
               onClick={() => setTab(option.id)}
               className={cn(
-                "-mb-px border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
+                "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
                 on
                   ? "border-accent text-fg"
-                  : "border-transparent text-fg-3 hover:text-fg"
+                  : "border-transparent text-fg-2 hover:text-fg"
               )}
             >
               {option.label}

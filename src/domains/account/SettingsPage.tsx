@@ -42,8 +42,8 @@ function Choice<T extends string>({
           type="button"
           onClick={() => onChange(o.id)}
           aria-pressed={value === o.id}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-            value === o.id ? "bg-accent text-on-accent" : "text-fg-3 hover:text-fg"
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            value === o.id ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
           }`}
         >
           {o.label}
@@ -72,7 +72,7 @@ function Row({
         </span>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-fg">{title}</p>
-          <p className="mt-0.5 text-[0.78rem] leading-relaxed text-fg-3">{desc}</p>
+          <p className="mt-0.5 text-[0.78rem] leading-relaxed text-fg-2">{desc}</p>
         </div>
       </div>
       <div className="shrink-0 sm:pl-4">{children}</div>
@@ -190,13 +190,13 @@ export function SettingsPage() {
   };
 
   return (
-    <Container size="prose" className="py-10 sm:py-14">
+    <Container size="prose" className="py-6 sm:py-14">
       <header className="mb-6">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
           <Settings size={14} /> SETTINGS
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">설정</h1>
-        <p className="mt-2 text-sm leading-relaxed text-fg-2">
+        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">설정</h1>
+        <p className="lede mt-2 text-pretty text-sm leading-relaxed text-fg-2">
           표시 방식과 필터를 저장하거나 초기화합니다. 모든 설정은 이 브라우저에만 저장됩니다.
         </p>
       </header>

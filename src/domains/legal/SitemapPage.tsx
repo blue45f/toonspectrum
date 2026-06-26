@@ -48,10 +48,10 @@ const routes = [
 
 export function SitemapPage() {
   return (
-    <main className="mx-auto max-w-[1180px] px-4 py-10 sm:px-6">
-      <section className="rounded-2xl border border-line bg-card p-6">
+    <main className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 sm:py-10">
+      <section className="rounded-2xl border border-line bg-card p-5 sm:p-6">
         <p className="eyebrow text-accent">BETA Sitemap</p>
-        <h1 className="mt-2 font-display text-3xl font-bold">툰스펙트럼 사이트맵</h1>
+        <h1 className="mt-2 font-display text-[clamp(1.6rem,7vw,1.875rem)] font-bold sm:text-4xl">툰스펙트럼 사이트맵</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-2">
           탐색, 커뮤니티, 창작, 계정, 정책, 디자인 시스템 경로를 한 화면에 정리했습니다.
         </p>

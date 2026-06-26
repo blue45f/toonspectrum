@@ -4,10 +4,10 @@ import Link from "@/src/compat/router-link";
 // 개인정보처리방침(/privacy).
 export function PrivacyPage() {
   return (
-    <Container size="prose" className="py-12 lg:py-16">
+    <Container size="prose" className="py-8 sm:py-12 lg:py-16">
       <p className="eyebrow text-accent">PRIVACY</p>
-      <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight sm:text-4xl">개인정보처리방침</h1>
-      <p className="mt-2 text-sm text-fg-3">시행일: 2026년 6월 4일</p>
+      <h1 className="mt-3 text-pretty text-[clamp(1.6rem,7vw,1.875rem)] font-bold leading-tight sm:text-4xl">개인정보처리방침</h1>
+      <p className="mt-2 text-sm text-fg-2">시행일: 2026년 6월 4일</p>
 
       <div className="mt-8 space-y-7 text-sm leading-relaxed text-fg-2">
         <section>
