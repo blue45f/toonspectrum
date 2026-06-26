@@ -120,16 +120,29 @@ export function installStaticCatalog(options: StaticCatalogOptions = {}): void {
   // 커버한다. GLTFLoader 본 로드는 XHR(FileLoader)이라 fetch 패치가 닿지 않아 호출부에서
   // resolveAssetUrl 로 절대화한다(이중 방어). base 가 없으면(웹) 그대로 통과 — 동일 출처 동작 보존.
   const rawFetch = globalThis.fetch.bind(window);
+  // base(토스)면 same-origin /data·/api·/vrm 요청을 배포 오리진으로 절대화한다.
+  // ★string 뿐 아니라 URL·Request 입력도 처리해야 한다: ky(창작/리뷰 클라이언트)는 Request 객체를
+  // 넘기는데 그 .url 은 이미 토스 WebView 오리진으로 해석된 절대 URL이라, string 체크만 하면 절대화에서
+  // 누락돼 토스 오리진(/api/creator…)으로 가서 403 이 난다(정적 catalog 는 string fetch 라 무탈했음).
+  // pathname 기준 same-origin 만 골라 dataBase 로 바꾸고, Request 면 새 Request 로 감싸 URL만 교체한다.
   const origFetch: typeof fetch = base
     ? (input, init) => {
-        const url = toUrl(input);
-        if (
-          typeof input === "string" &&
-          (url.startsWith("/data/") || url.startsWith("/api/") || url.startsWith("/vrm/"))
-        ) {
-          return rawFetch(`${base}${url}`, init);
+        let abs: string | null = null;
+        try {
+          const u = new URL(toUrl(input), globalThis.location.origin);
+          if (
+            u.origin === globalThis.location.origin &&
+            (u.pathname.startsWith("/data/") ||
+              u.pathname.startsWith("/api/") ||
+              u.pathname.startsWith("/vrm/"))
+          ) {
+            abs = `${base}${u.pathname}${u.search}`;
+          }
+        } catch {
+          /* URL 파싱 실패 — 원본 그대로 통과 */
         }
-        return rawFetch(input, init);
+        if (!abs) return rawFetch(input, init);
+        return input instanceof Request ? rawFetch(new Request(abs, input), init) : rawFetch(abs, init);
       }
     : rawFetch;
 
