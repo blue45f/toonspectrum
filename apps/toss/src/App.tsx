@@ -69,7 +69,7 @@ function isImmersiveEditor(path: string): boolean {
 }
 
 // 리스트형(카드 그리드) 화면 — 콘텐츠가 끝나는 자연스러운 지점에 토스 인앱 배너 광고를 1회 배치한다
-// (ATF·핵심 액션 위 금지). 상세·에디터·운세·놀이터 등 비리스트 화면엔 넣지 않는다.
+// (ATF·핵심 액션 위 금지). 에디터·운세·놀이터 등 비리스트 화면엔 넣지 않는다.
 function isListPage(path: string): boolean {
   return (
     path === "/" ||
@@ -84,6 +84,13 @@ function isListPage(path: string): boolean {
     path.startsWith("/news") ||
     path.startsWith("/reviews")
   );
+}
+
+// 토스 인앱 배너 광고를 노출할 화면 = 리스트형 전체 + 작품 상세(`/title/:id`).
+// 상세는 앱 최고 트래픽·긴 콘텐츠라 끝부분 배너가 자연스럽고(전환 CTA 위가 아닌 정보 끝),
+// 셸이 본문(main) 뒤에 얹으므로 콘텐츠 끝 = ATF 가 아니다(SSP 정책 준수). 광고그룹 미설정 시 자동 미노출.
+function showsBannerAd(path: string): boolean {
+  return isListPage(path) || path.startsWith("/title/");
 }
 
 function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: string) => void }) {
@@ -213,8 +220,8 @@ function TossChrome() {
         />
       )}
       <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
-      {/* 리스트형 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
-      {!immersive && isListPage(pathname) && (
+      {/* 리스트형·작품 상세 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
+      {!immersive && showsBannerAd(pathname) && (
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px 8px" }}>
           <BannerAd format="feed" />
         </div>
