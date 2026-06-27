@@ -20,6 +20,7 @@ import {
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
 import { signSession } from "../../../../../lib/server/session";
+import { handleTossLogin, isTossLoginConfigured } from "../../../../../lib/server/toss-login";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
@@ -106,6 +107,26 @@ export class AuthController {
   oauthExchange(@Body() body: { token?: unknown }) {
     const user = consumeHandoff(typeof body?.token === "string" ? body.token : undefined);
     if (!user) throw new HttpException({ error: "만료되었거나 잘못된 로그인 토큰이에요." }, HttpStatus.UNAUTHORIZED);
+    return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
+  }
+
+  // 토스 로그인 — 미니앱 appLogin 이 받은 인가코드를 mTLS 서버 교환해 세션을 발급한다(토스 네이티브 로그인).
+  // 토스 WebView 에서 깨지는 소셜 OAuth 리다이렉트 대신 쓰는 토스 전용 경로.
+  @Post("toss/exchange")
+  async tossExchange(@Body() body: { authorizationCode?: unknown; referrer?: unknown }, @Req() req: Request) {
+    const authorizationCode = typeof body?.authorizationCode === "string" ? body.authorizationCode : "";
+    const referrer = body?.referrer === "SANDBOX" ? "SANDBOX" : "DEFAULT";
+    if (!authorizationCode) throw new BadRequestException({ error: "인가 코드가 필요해요." });
+    if (!isTossLoginConfigured()) {
+      throw new HttpException({ error: "토스 로그인이 아직 설정되지 않았어요." }, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    enforceRateLimit(`toss-login:${clientIp(req)}`, 30, 10 * 60_000);
+    let user;
+    try {
+      user = await handleTossLogin(authorizationCode, referrer);
+    } catch {
+      throw new HttpException({ error: "토스 로그인에 실패했어요." }, HttpStatus.UNAUTHORIZED);
+    }
     return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }
 

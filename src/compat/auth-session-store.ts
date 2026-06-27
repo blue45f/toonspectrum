@@ -57,6 +57,44 @@ export async function signInWithGoogleIdToken(idToken: string) {
   return { ok: true, error: null, status: response.status };
 }
 
+// ── 토스 로그인(앱인토스 네이티브) ──
+// 토스 미니앱이 startup 에 주입하는 인가코드 발급 함수. 웹(토스 밖)에선 undefined.
+declare global {
+  var __toonspectrumTossLogin:
+    | undefined
+    | (() => Promise<{ authorizationCode: string; referrer: string } | null>);
+}
+
+/** 토스 네이티브 로그인이 가능한 환경인지(미니앱이 인가코드 발급 함수를 주입했는지). */
+export function isTossLoginAvailable(): boolean {
+  return typeof globalThis.__toonspectrumTossLogin === "function";
+}
+
+/**
+ * 토스 로그인 흐름: 미니앱 appLogin 으로 인가코드 → 서버 mTLS 교환(/auth/toss/exchange) → 세션 확정.
+ * 토스 WebView 에서 깨지는 소셜 OAuth 리다이렉트 대신 쓰는 네이티브 경로.
+ */
+export async function tossLoginFlow(): Promise<{ ok: boolean; error: string | null }> {
+  const requestCode = globalThis.__toonspectrumTossLogin;
+  if (typeof requestCode !== "function") return { ok: false, error: "toss-unavailable" };
+  const granted = await requestCode().catch(() => null);
+  if (!granted?.authorizationCode) return { ok: false, error: "toss-cancelled" };
+  const { api, apiPath } = await import("@/src/infrastructure/api");
+  const response = await api.raw(apiPath("/auth/toss/exchange"), {
+    method: "POST",
+    throwHttpErrors: false,
+    json: { authorizationCode: granted.authorizationCode, referrer: granted.referrer },
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
+    | null;
+  if (!response.ok || !payload?.user) {
+    return { ok: false, error: payload?.error ?? "toss-auth-failed" };
+  }
+  persistSession({ user: payload.user, token: payload.token ?? null });
+  return { ok: true, error: null };
+}
+
 export async function signIn(provider?: string, options?: Record<string, unknown>) {
   // 소셜 로그인(Google·Kakao): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
   // 백엔드가 설정 여부에 따라 실제 제공자 또는 데모 폴백(/auth/callback#demo=)으로 분기한다.
