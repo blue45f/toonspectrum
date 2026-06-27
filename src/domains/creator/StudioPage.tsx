@@ -4935,7 +4935,7 @@ export function StudioPage() {
   // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
   const toolBtn = (active: boolean) =>
     cn(
-      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-10 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
+      "inline-flex h-9 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-10 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 

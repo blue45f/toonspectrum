@@ -2,12 +2,10 @@ import { useFx } from "@toonspectrum/core/fx";
 import "@toonspectrum/core/fx/fx.css";
 import {
   BookMarked,
-  CalendarDays,
   Compass,
-  Gamepad2,
   Home,
-  Menu,
-  Search,
+  MessageCircle,
+  Sparkles,
   Trophy,
   type LucideIcon,
 } from "lucide-react";
@@ -20,68 +18,45 @@ import { AppShell } from "@/src/app/AppShell";
 
 import { BannerAd } from "./components/BannerAd.tsx";
 import { MoreMenu } from "./components/MoreMenu.tsx";
+import { TossTopBar, TOP_BAR_HEIGHT } from "./components/TossTopBar.tsx";
 import { hapticFeedback } from "./lib/toss.ts";
 import { theme } from "./theme";
 
 // 반투명 글래스 표면 — 토큰 색을 살짝 투과시켜(backdrop-blur 위) warm-ink 위에 떠 있게 한다.
 // raw rgba 대신 color-mix(토큰) 로 팔레트 단일 출처 유지(DESIGN.md: #000/#fff·raw 금지).
 const NAV_GLASS = "color-mix(in oklab, var(--color-panel) 90%, transparent)";
-const FAB_GLASS = "color-mix(in oklab, var(--color-panel) 82%, transparent)";
 
-// 하단 네비 = 홈·랭킹·연재·탐색·서재·놀이터. 내 서재는 핵심 기능이라 primary 탭으로 노출한다.
-// 검색은 셸 검색 FAB, 추천은 홈 섹션/오버플로로 진입하므로 하단 탭엔 넣지 않는다(라우트는 등록).
-// 아이콘은 웹과 동일한 lucide(에디토리얼 브랜드 일관 — 이모지 표류 제거).
-type TabId = "home" | "ranking" | "calendar" | "explore" | "library" | "play";
+// 하단 네비 = 홈·랭킹·추천·탐색·커뮤니티·서재 — 웹 모바일 탭바와 동일 멤버십/순서로 맞춘다(웹↔토스 sync).
+// 연재·놀이터·운세 등은 More 시트와 Explore/Home 섹션으로 한 탭 거리에 둔다(라우트는 모두 등록).
+// 아이콘은 웹 모바일 내비와 동일한 lucide(에디토리얼 브랜드 일관 — 이모지 표류 제거).
+type TabId = "home" | "ranking" | "recommend" | "explore" | "community" | "library";
+
+// 비탭 라우트일 때 어떤 탭도 활성으로 칠하지 않는 센티넬. nav 가 위치를 거짓말하지 않게 한다.
+const NO_TAB = "" as const;
+type ActiveTab = TabId | typeof NO_TAB;
 
 const NAV: { id: TabId; label: string; Icon: LucideIcon; to: string }[] = [
   { id: "home", label: "홈", Icon: Home, to: "/" },
   { id: "ranking", label: "랭킹", Icon: Trophy, to: "/ranking" },
-  { id: "calendar", label: "연재", Icon: CalendarDays, to: "/calendar" },
+  { id: "recommend", label: "추천", Icon: Sparkles, to: "/recommend" },
   { id: "explore", label: "탐색", Icon: Compass, to: "/explore" },
+  { id: "community", label: "커뮤니티", Icon: MessageCircle, to: "/community" },
   { id: "library", label: "서재", Icon: BookMarked, to: "/library" },
-  { id: "play", label: "놀이터", Icon: Gamepad2, to: "/play" },
 ];
 
-// 경로 → 활성 탭. 비탭 라우트는 "어디서 진입하는지"로 가장 가까운 primary 탭에 귀속한다.
-function activeTab(path: string): TabId {
-  // 운세·3D 스튜디오는 놀이터 허브(/play)에서 진입하므로 '놀이터' 탭에 귀속.
-  if (path.startsWith("/play") || path.startsWith("/fortune") || path.startsWith("/studio")) return "play";
+// 경로 → 활성 탭. primary 탭에 정확히 매칭되는 라우트만 칠하고, 그 외(커뮤니티 하위·창작·운세·
+// 놀이터·검색·정보/약관 등)는 NO_TAB 을 돌려 '아무 탭도 활성 아님' 으로 둔다 — 하단 nav 가
+// 실제 위치와 다른 탭을 활성으로 보여주며 위치를 거짓말하던 문제를 없앤다(웹과 동일한 정확 매칭).
+function activeTab(path: string): ActiveTab {
+  if (path === "/") return "home";
   if (path.startsWith("/ranking")) return "ranking";
-  if (path.startsWith("/calendar")) return "calendar";
+  if (path.startsWith("/recommend")) return "recommend";
+  if (path.startsWith("/explore")) return "explore";
+  if (path.startsWith("/community")) return "community";
   if (path.startsWith("/library")) return "library";
-  // 탐색 오버플로(ExplorePage 상단 칩)로 진입하는 부가 화면들 — 창작·내 서재·커뮤니티·추천·정보/약관 등.
-  // 검색(/search)도 어느 탭에서든 Top 검색 버튼으로 열리지만, 비탭 라우트라 가장 가까운 '탐색'에 귀속한다.
-  if (
-    path.startsWith("/explore") ||
-    path.startsWith("/create") ||
-    path.startsWith("/library") ||
-    path.startsWith("/community") ||
-    path.startsWith("/recommend") ||
-    path.startsWith("/reviews") ||
-    path.startsWith("/insights") ||
-    path.startsWith("/tags") ||
-    path.startsWith("/authors") ||
-    path.startsWith("/news") ||
-    path.startsWith("/compare") ||
-    path.startsWith("/random") ||
-    path.startsWith("/search") ||
-    path.startsWith("/settings") ||
-    path.startsWith("/me") ||
-    path.startsWith("/about") ||
-    path.startsWith("/guide") ||
-    path.startsWith("/sitemap") ||
-    path.startsWith("/design") ||
-    path.startsWith("/feedback") ||
-    path.startsWith("/support") ||
-    path.startsWith("/contact") ||
-    path.startsWith("/terms") ||
-    path.startsWith("/privacy") ||
-    path.startsWith("/copyright") ||
-    path.startsWith("/info")
-  )
-    return "explore";
-  // 작품 상세(/title/..)·작가/카페·홈 등 그 외는 홈에 귀속.
-  return "home";
+  // 그 외(작품 상세·연재·놀이터·운세·창작·검색·정보 등)는 어떤 primary 탭에도 속하지 않는다.
+  // 더보기(☰)가 이 목적지들의 진입점이라, nav 대신 More 버튼이 오버플로를 책임진다.
+  return NO_TAB;
 }
 
 // 몰입형 에디터(자체 하단 도구막대/풀스크린 캔버스 보유) — 토스 BottomNav·플로팅 컨트롤을 숨겨
@@ -111,75 +86,7 @@ function isListPage(path: string): boolean {
   );
 }
 
-// 우상단 플로팅 FAB(검색·더보기) 공통 스타일 — 토큰 글래스 표면 + warm-ink 보더. 44px 터치 타깃.
-const fabStyle: React.CSSProperties = {
-  width: 42,
-  height: 42,
-  display: "grid",
-  placeItems: "center",
-  borderRadius: 999,
-  border: `1px solid ${theme.border}`,
-  background: FAB_GLASS,
-  backdropFilter: "blur(10px)",
-  WebkitBackdropFilter: "blur(10px)",
-  color: theme.text2,
-  cursor: "pointer",
-};
-
-/**
- * 우상단 셸 크롬 클러스터 — 검색(통합 검색 진입)과 더보기(전 라우트 시트)를 하나의 그룹으로 묶는다.
- * 두 FAB 이 따로 떠 검색바와 겹치던 충돌을 없애고, 한 인셋 안에 정렬해 어포던스를 정돈한다.
- * 아이콘은 웹과 동일한 lucide(에디토리얼 브랜드 일관). 검색은 화면에 따라 숨길 수 있다(showSearch).
- */
-function TopChrome({
-  showSearch,
-  onSearch,
-  onMore,
-}: {
-  showSearch: boolean;
-  onSearch: () => void;
-  onMore: () => void;
-}) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: "calc(10px + env(safe-area-inset-top))",
-        right: 12,
-        zIndex: 60,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
-      {showSearch && (
-        <button
-          type="button"
-          className="pressable"
-          onClick={onSearch}
-          aria-label="통합 검색"
-          title="검색"
-          style={fabStyle}
-        >
-          <Search size={18} aria-hidden />
-        </button>
-      )}
-      <button
-        type="button"
-        className="pressable"
-        onClick={onMore}
-        aria-label="더보기 메뉴"
-        aria-haspopup="dialog"
-        title="더보기"
-        style={fabStyle}
-      >
-        <Menu size={18} aria-hidden />
-      </button>
-    </div>
-  );
-}
-
-function BottomNav({ tab, onNavigate }: { tab: TabId; onNavigate: (to: string) => void }) {
+function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: string) => void }) {
   return (
     <nav
       aria-label="주요 탐색"
@@ -270,31 +177,37 @@ function TossChrome() {
 
   const tab = activeTab(pathname);
   const immersive = isImmersiveEditor(pathname);
-  // 검색 FAB 은 다음에서 숨긴다: 몰입형 에디터, 검색 페이지(중복), 상세(자체 sticky 헤더와 겹침),
-  // 그리고 홈(히어로에 큰 '작품·작가·태그 검색' 버튼이 이미 있어 FAB 이 그 위에 겹치며 중복됨).
-  // → 진입점을 하나로 정리해 첫인상의 어색함을 없앤다.
-  const showSearchFab =
-    !immersive &&
+  // 상단 바의 검색 액션은 다음에서 숨긴다: 검색 페이지(중복), 작품 상세(자체 sticky 헤더가 검색을 가짐),
+  // 홈(히어로에 큰 '작품·작가·태그 검색' CTA 가 이미 있어 중복). 그 외엔 상단 바가 검색을 소유한다.
+  const showSearch =
     pathname !== "/" &&
     !pathname.startsWith("/search") &&
     !pathname.startsWith("/title/");
-  // "더보기"(☰) FAB 은 몰입형 에디터(자체 풀스크린)에서만 숨기고, 그 외 모든 화면에서 노출한다.
-  // (전 라우트로 가는 유일한 진입점이라 검색/상세 화면에서도 살려둔다.)
-  const showMoreFab = !immersive;
 
-  // 본문 하단 여백 — 고정 BottomNav 가 마지막 콘텐츠를 가리지 않게 탭바 높이만큼 띄운다.
-  // 몰입형 에디터(자체 풀스크린/도구막대)에선 탭이 없으므로 여백 0(스크롤·100dvh 캔버스 보존).
+  // 본문 인셋 — 고정 상단 바/하단 탭바가 콘텐츠를 가리지 않게 위·아래로 띄운다.
+  //  · 상단: 브랜드 바 높이 + safe-area(상태바). 재사용 페이지 eyebrow/히어로가 바 아래에서 시작한다.
+  //  · 하단: 탭바 높이 + safe-area. 몰입형 에디터(자체 풀스크린/도구막대)에선 위·아래 모두 0
+  //    (100dvh 캔버스·스크롤 보존). 기존 paddingBottom 로직을 미러링한다.
   useEffect(() => {
     const main = document.getElementById("main-content");
     if (!main) return;
+    main.style.paddingTop = immersive ? "0px" : `calc(${TOP_BAR_HEIGHT}px + env(safe-area-inset-top))`;
     main.style.paddingBottom = immersive ? "0px" : "calc(72px + env(safe-area-inset-bottom))";
+    return () => {
+      // 라우트 전환/언마운트 시 인셋을 되돌려, 몰입형↔일반 전환에서 잔여 패딩이 남지 않게 한다.
+      main.style.paddingTop = "";
+      main.style.paddingBottom = "";
+    };
   }, [immersive]);
 
   return (
     <>
-      {showMoreFab && (
-        <TopChrome
-          showSearch={showSearchFab}
+      {/* 상단 브랜드 바 — 몰입형 에디터(자체 풀스크린)에서만 숨긴다. 그 외엔 항상 노출해
+          상태바 스크림 + 브랜딩 + 검색/더보기 액션을 책임진다(작품 상세 포함: full-bleed 아트가
+          토스 상태바 밑으로 파고드는 충돌을 이 바의 warm-ink 스크림이 막는다). */}
+      {!immersive && (
+        <TossTopBar
+          showSearch={showSearch}
           onSearch={() => navigate("/search")}
           onMore={() => setMoreOpen(true)}
         />
