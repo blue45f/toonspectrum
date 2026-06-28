@@ -170,6 +170,11 @@ export function StudioAssetMenuPanel({
             <Sparkles size={12} className="text-accent" />
             AI 에셋 생성
           </div>
+          {/* 생성형 AI 고지(정책 필수) — 결과물이 생성형 AI 산출물임을 항상 명시한다. */}
+          <p className="mb-1.5 rounded-md border border-line bg-panel/60 px-2 py-1 text-[0.58rem] leading-relaxed text-fg-3">
+            생성형 AI(OpenAI)로 이미지를 만들어요. 결과물에는 <span className="font-semibold text-accent">AI</span> 배지가 표시되며,
+            타인의 저작물·실존 인물은 생성하지 않아요.
+          </p>
           <textarea
             value={assetPrompt}
             onChange={(event) => setAssetPrompt(event.target.value.slice(0, 1000))}
@@ -343,14 +348,20 @@ function LocalAssetGrid({
           <button
             type="button"
             onClick={() => onUseLocalAsset(asset)}
-            className="flex h-16 w-full cursor-pointer items-center justify-center overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800"
-            title={asset.name}
+            className="relative flex h-16 w-full cursor-pointer items-center justify-center overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800"
+            title={asset.kind === "ai" ? `${asset.name} · AI 생성 이미지` : asset.name}
           >
             <img
               src={asset.dataUrl}
-              alt={asset.name}
+              alt={asset.kind === "ai" ? `${asset.name} (AI 생성)` : asset.name}
               className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
             />
+            {/* 생성형 AI 결과물 라벨(정책 필수) — 콘텐츠로 위장하지 않도록 항상 보이는 배지. */}
+            {asset.kind === "ai" && (
+              <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-accent px-1 py-px text-[0.5rem] font-bold uppercase leading-none tracking-wide text-white shadow">
+                <Sparkles size={7} aria-hidden /> AI
+              </span>
+            )}
           </button>
           {renamingAssetId === asset.id ? (
             <RenameAssetInline

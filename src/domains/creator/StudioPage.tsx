@@ -759,6 +759,27 @@ const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
+// 생성형 AI(이미지 생성) 최초 사용 고지 — 정책상 사용자가 처음 쓸 때 "생성형 AI를 활용한다"는
+// 사실을 인지하도록 알려야 한다(앱인토스 서비스 오픈 정책). 1회 확인하면 localStorage 에 저장.
+const AI_ASSET_NOTICE_ACK_KEY = "toonspectrum-studio-ai-notice-ack";
+
+function readAiNoticeAck() {
+  if (typeof window === "undefined") return false;
+  try {
+    return globalThis.localStorage.getItem(AI_ASSET_NOTICE_ACK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeAiNoticeAck() {
+  if (typeof window === "undefined") return;
+  try {
+    globalThis.localStorage.setItem(AI_ASSET_NOTICE_ACK_KEY, "1");
+  } catch {
+    // localStorage 사용 불가(시크릿/임베드) 시에도 동작은 유지(고지는 패널 안내문이 담당).
+  }
+}
 
 // 내보내기 캔버스에 워터마크/서명을 합성한다(출력 픽셀에 직접 그림). 켜짐+텍스트가 있을 때만.
 function drawWatermarkOnCanvas(canvas: HTMLCanvasElement, s: WatermarkSettings) {
@@ -1353,6 +1374,83 @@ function PoserLoadingOverlay() {
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
         <span>포저를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그(앱인토스 서비스 오픈 정책 필수).
+ * 사용자가 처음 "생성"을 누를 때 1회 노출하고, 확인하면 곧바로 생성을 이어서 실행한다.
+ * a11y: role=dialog + aria-modal, Esc 닫기, 진입 시 기본(확인) 버튼 포커스, 스크림 클릭으로 닫기.
+ */
+function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAcknowledge: () => void }) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const raf = requestAnimationFrame(() => confirmRef.current?.focus());
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(raf);
+    };
+  }, [onCancel]);
+
+  return (
+    <div
+      role="presentation"
+      onClick={(e) => {
+        // 스크림(다이얼로그 바깥) 클릭일 때만 닫는다 — 내부 클릭은 currentTarget 이 아니라 무시.
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      className="fixed inset-0 z-[70] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-notice-title"
+        className="w-full max-w-sm rounded-2xl border border-line bg-panel p-5 shadow-xl"
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
+            <Sparkles size={16} aria-hidden />
+          </span>
+          <h2 id="ai-notice-title" className="text-base font-bold text-fg">
+            생성형 AI 이미지 안내
+          </h2>
+        </div>
+        <p className="text-sm leading-relaxed text-fg-2">
+          이 기능은 <span className="font-semibold text-accent">생성형 AI(OpenAI)</span>로 이미지를 만들어요. 만들어진
+          결과물에는 <span className="font-semibold">AI</span> 배지가 표시돼요.
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg-3">
+          <li>타인의 저작물·캐릭터, 실존 인물의 얼굴은 생성하지 않아요.</li>
+          <li>AI 결과물은 부정확하거나 의도와 다를 수 있어요.</li>
+          <li>만든 이미지의 사용 책임은 본인에게 있어요.</li>
+        </ul>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-line bg-card px-3 py-2 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
+          >
+            취소
+          </button>
+          <button
+            ref={confirmRef}
+            type="button"
+            onClick={onAcknowledge}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+          >
+            이해했어요, 생성하기
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -3122,6 +3220,8 @@ export function StudioPage() {
   const [assetPromptSize, setAssetPromptSize] = useState<GeneratedAssetSize>("1024x1024");
   const [assetPromptQuality, setAssetPromptQuality] = useState<GeneratedAssetQuality>("medium");
   const [assetGenerating, setAssetGenerating] = useState(false);
+  // 생성형 AI 최초 사용 고지 모달(정책 필수). 미확인 상태에서 '생성'을 누르면 먼저 띄운다.
+  const [aiNoticeOpen, setAiNoticeOpen] = useState(false);
 
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
@@ -3142,6 +3242,11 @@ export function StudioPage() {
       setError("AI 에셋을 생성하려면 로그인이 필요해요.");
       return;
     }
+    // 생성형 AI 최초 사용 고지(정책 필수) — 아직 확인 전이면 먼저 안내 모달을 띄우고 생성은 보류한다.
+    if (!readAiNoticeAck()) {
+      setAiNoticeOpen(true);
+      return;
+    }
     setAssetGenerating(true);
     setError(null);
     try {
@@ -3156,10 +3261,12 @@ export function StudioPage() {
         quality: assetPromptQuality,
       });
       const saved = await saveAsset({
+        // 결과물이 생성형 AI 산출물임을 라이브러리에서도 식별할 수 있게 kind 로 표시(라벨/배지용).
         name: generated.name,
         dataUrl: generated.dataUrl,
         width: generated.width,
         height: generated.height,
+        kind: "ai",
       });
       setAssetPrompt("");
       setAssetPromptName("");
@@ -3171,6 +3278,13 @@ export function StudioPage() {
     } finally {
       setAssetGenerating(false);
     }
+  }
+
+  // 사용자가 최초 사용 고지를 확인하면 저장하고, 곧바로 생성을 이어서 실행한다.
+  function acknowledgeAiNotice() {
+    storeAiNoticeAck();
+    setAiNoticeOpen(false);
+    void onGenerateAsset();
   }
 
   // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
@@ -7695,6 +7809,12 @@ export function StudioPage() {
             <Suspense fallback={null}>
               <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
             </Suspense>
+          )}
+
+          {/* 생성형 AI 최초 사용 고지(정책 필수) — 확인을 누르면 1회 저장 후 생성을 이어서 실행한다.
+              스크림 클릭(자기 자신 대상일 때만)·Esc 로 닫히고, 포커스는 기본 확인 버튼이 받는다. */}
+          {aiNoticeOpen && (
+            <AiAssetNotice onCancel={() => setAiNoticeOpen(false)} onAcknowledge={acknowledgeAiNotice} />
           )}
 
           {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 (모바일은 하단 도구막대로 대체) */}

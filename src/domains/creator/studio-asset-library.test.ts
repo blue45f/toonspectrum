@@ -52,6 +52,25 @@ describe("studio-asset-library pure helpers", () => {
       expect(record.height).toBe(1);
     });
 
+    it("should carry kind='ai' for generative-AI outputs (label/badge) and omit it otherwise", () => {
+      const ai = createAssetRecord({
+        name: "magic.webp",
+        dataUrl: "data:image/webp;base64,abc",
+        width: 1024,
+        height: 1024,
+        kind: "ai",
+      });
+      expect(ai.kind).toBe("ai");
+
+      const upload = createAssetRecord({
+        name: "upload.png",
+        dataUrl: "data:image/png;base64,abc",
+        width: 64,
+        height: 64,
+      });
+      expect(upload.kind).toBeUndefined();
+    });
+
     it("should allow overriding id and now", () => {
       const mockId = "custom-id";
       const mockNow = 1234567890;

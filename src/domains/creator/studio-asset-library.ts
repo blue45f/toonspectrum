@@ -12,6 +12,11 @@ export interface StudioAsset {
   width: number;
   height: number;
   createdAt: number;
+  /**
+   * 에셋 출처 종류. "ai" 면 생성형 AI(이미지 생성)로 만든 결과물 — 정책상 결과물에 AI 라벨/배지를
+   * 표시해야 하므로 그리드 썸네일에 'AI' 배지를 노출한다. 업로드 등 일반 에셋은 생략(undefined).
+   */
+  kind?: string;
 }
 
 function createAssetId() {
@@ -26,7 +31,7 @@ export function normalizeAssetName(fileName: string): string {
 }
 
 export function createAssetRecord(
-  input: { name: string; dataUrl: string; width: number; height: number },
+  input: { name: string; dataUrl: string; width: number; height: number; kind?: string },
   id = createAssetId(),
   now = Date.now()
 ): StudioAsset {
@@ -37,6 +42,7 @@ export function createAssetRecord(
     width: Math.max(1, Math.round(input.width)),
     height: Math.max(1, Math.round(input.height)),
     createdAt: now,
+    ...(input.kind ? { kind: input.kind } : {}),
   };
 }
 
@@ -87,7 +93,7 @@ async function withDatabase<T>(callback: (db: IDBDatabase) => Promise<T>) {
   }
 }
 
-export async function saveAsset(input: { name: string; dataUrl: string; width: number; height: number }): Promise<StudioAsset> {
+export async function saveAsset(input: { name: string; dataUrl: string; width: number; height: number; kind?: string }): Promise<StudioAsset> {
   const record = createAssetRecord(input);
   await withDatabase(async (db) => {
     const tx = db.transaction(STORE, "readwrite");
