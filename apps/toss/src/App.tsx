@@ -90,7 +90,8 @@ function isListPage(path: string): boolean {
 // 상세는 앱 최고 트래픽·긴 콘텐츠라 끝부분 배너가 자연스럽고(전환 CTA 위가 아닌 정보 끝),
 // 셸이 본문(main) 뒤에 얹으므로 콘텐츠 끝 = ATF 가 아니다(SSP 정책 준수). 광고그룹 미설정 시 자동 미노출.
 function showsBannerAd(path: string): boolean {
-  return isListPage(path) || path.startsWith("/title/");
+  // 리스트형 + 작품 상세 + 커뮤니티(피드가 길게 스크롤되는 화면). 모두 폴드 아래 1회 배너.
+  return isListPage(path) || path.startsWith("/title/") || path.startsWith("/community");
 }
 
 function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: string) => void }) {
