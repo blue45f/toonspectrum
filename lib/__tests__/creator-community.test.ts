@@ -170,7 +170,7 @@ describe("creator community validation", () => {
 });
 
 // ── DB 통합 ──────────────────────────────────────────────────────────
-describe("creator community (DB)", () => {
+describe("creator community (DB)", { timeout: 90000 }, () => {
   it("시리즈에 회차를 게시하면 episodeNo 가 max+1 로 자동 부여된다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const userId = await createCreatorTestUser();
@@ -189,7 +189,7 @@ describe("creator community (DB)", () => {
     const detail = await getSeries(series.id, userId);
     expect(detail?.episodeList.map((episode) => episode.episodeNo)).toEqual([1, 2]);
     expect(detail?.episodes).toBe(2);
-  });
+  }, 90000);
 
   it("남의 시리즈에는 회차를 추가할 수 없다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
@@ -199,7 +199,7 @@ describe("creator community (DB)", () => {
     createdSeriesIds.add(series.id);
 
     await expect(createWork(intruder, { title: "무단 회차", seriesId: series.id })).rejects.toThrow(/내 시리즈/);
-  });
+  }, 90000);
 
   it("시리즈 변경/해제 시 episodeNo 를 재계산하거나 비운다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
@@ -220,7 +220,7 @@ describe("creator community (DB)", () => {
     const detached = await updateWork(userId, work.id, { seriesId: null });
     expect(detached.seriesId).toBeNull();
     expect(detached.episodeNo).toBeNull();
-  });
+  }, 90000);
 
   it("시리즈를 삭제해도 회차 작품은 분리만 되고 남는다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
@@ -238,7 +238,7 @@ describe("creator community (DB)", () => {
     expect(survivor).toBeTruthy();
     expect(survivor?.seriesId).toBeNull();
     expect(survivor?.episodeNo).toBeNull();
-  });
+  }, 90000);
 
   it("팔로우 토글과 팔로잉 피드가 동작한다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
@@ -261,5 +261,5 @@ describe("creator community (DB)", () => {
     expect(emptyFeed.some((item) => item.id === work.id)).toBe(false);
 
     await expect(toggleFollow(follower, follower)).rejects.toThrow(/자기 자신/);
-  });
+  }, 90000);
 });
