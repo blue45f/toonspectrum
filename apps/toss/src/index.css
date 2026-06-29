@@ -9,9 +9,11 @@
    ============================================================ */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --r-md: 14px;
   --r-lg: 18px;
+  /* 이미지/짙은 커버 위의 명시적 white 유틸은 라이트 테마에서도 밝게 유지한다. */
+  --color-overlay-text: oklch(0.98 0.006 85);
 }
 
 * {
@@ -77,8 +79,40 @@ p {
    배경만 강제로 투명하게(부트스트랩 a{background-color:transparent} 동일·무해). */
 a {
   color: inherit;
-  background-color: transparent !important;
+  background-color: transparent;
   text-decoration: none;
+}
+
+/* TDS의 unlayered `a { background-color: transparent }`가 Tailwind의 layered 배경 유틸보다
+   우선해 링크형 CTA 배경을 지우는 문제를 막는다. 스크린샷의 어두운 CTA는
+   bg-accent만 사라지고 text-on-accent만 남아서 발생했다. 링크/버튼에 실제 쓰는 토큰 배경을
+   unlayered + !important로 복원해 같은 계열의 고대비 실패를 전역에서 차단한다. */
+.bg-accent {
+  background-color: var(--color-accent) !important;
+}
+.bg-accent-2 {
+  background-color: var(--color-accent-2) !important;
+}
+.bg-accent-soft {
+  background-color: var(--color-accent-soft) !important;
+}
+.bg-canvas {
+  background-color: var(--color-canvas) !important;
+}
+.bg-panel {
+  background-color: var(--color-panel) !important;
+}
+.bg-card {
+  background-color: var(--color-card) !important;
+}
+.bg-raised {
+  background-color: var(--color-raised) !important;
+}
+.hover\:bg-accent-2:hover {
+  background-color: var(--color-accent-2) !important;
+}
+.hover\:bg-raised:hover {
+  background-color: var(--color-raised) !important;
 }
 
 /* ── Tailwind 텍스트색 유틸리티가 TDS 글로벌(unlayered a/body)을 이기게 한다 ──────────
@@ -115,7 +149,25 @@ a {
   color: var(--color-cool) !important;
 }
 .text-white {
-  color: var(--color-fg) !important;
+  color: var(--color-overlay-text) !important;
+}
+.text-white\/50 {
+  color: oklch(0.98 0.006 85 / 0.5) !important;
+}
+.text-white\/70 {
+  color: oklch(0.98 0.006 85 / 0.7) !important;
+}
+.text-white\/72 {
+  color: oklch(0.98 0.006 85 / 0.72) !important;
+}
+.text-white\/80 {
+  color: oklch(0.98 0.006 85 / 0.8) !important;
+}
+.text-white\/85 {
+  color: oklch(0.98 0.006 85 / 0.85) !important;
+}
+.text-white\/90 {
+  color: oklch(0.98 0.006 85 / 0.9) !important;
 }
 .text-canvas {
   color: var(--color-canvas) !important;

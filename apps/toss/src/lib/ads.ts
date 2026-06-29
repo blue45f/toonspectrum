@@ -1,5 +1,10 @@
-import { TossAds, type TossAdsAttachBannerOptions } from '@apps-in-toss/web-framework';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  loadFullScreenAd,
+  showFullScreenAd,
+  TossAds,
+  type TossAdsAttachBannerOptions,
+} from '@apps-in-toss/web-framework';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * 앱인토스 인앱 배너 광고 헬퍼.
@@ -16,6 +21,7 @@ const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
 
 /** 배너 광고 배치 위치 라벨(슬롯 종류 X, 광고 타입 X) — 어느 콘솔 광고 그룹 ID를 쓸지 고르는 키. */
 export type AdFormat = 'banner' | 'feed';
+export type FullScreenAdFormat = 'interstitial' | 'rewarded';
 
 /**
  * 노출할 배너 광고 그룹 ID.
@@ -32,6 +38,18 @@ export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
   }
   if (banner) return banner;
   return import.meta.env.DEV ? TEST_BANNER_AD_GROUP_ID : null;
+}
+
+/**
+ * 전면 광고 그룹 ID. 운영 콘솔에서 발급받은 값만 사용하고, 미설정 시 광고를 요청하지 않아요.
+ * 전면형은 배너와 달리 사용자의 진행을 가리므로 개발 환경에서도 임의 테스트 ID로 폴백하지 않아요.
+ */
+export function getFullScreenAdGroupId(format: FullScreenAdFormat): string | null {
+  const value =
+    format === 'rewarded'
+      ? import.meta.env.VITE_TOSS_REWARDED_AD_GROUP_ID
+      : import.meta.env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
+  return value?.trim() || null;
 }
 
 // SDK는 앱 전체에서 한 번만 초기화(중복 초기화 금지) — 모듈 스코프로 상태 공유.
@@ -88,4 +106,130 @@ export function useTossBanner() {
   );
 
   return { ready, attach, supported: isAdsSupported() };
+}
+
+type FullScreenAdCallbacks = Readonly<{
+  /** 보상형 광고에서 SDK의 userEarnedReward 이벤트가 온 경우에만 호출해요. */
+  onReward?: (reward: { unitType: string; unitAmount: number }) => void;
+  onError?: (error: Error) => void;
+}>;
+
+function isFullScreenAdSupported(): boolean {
+  try {
+    return Boolean(loadFullScreenAd.isSupported() && showFullScreenAd.isSupported());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 앱인토스 IntegratedAd 전면/보상형 광고 훅.
+ *
+ * 공식 순서인 `load → loaded 확인 → show → dismissed 후 다음 load`를 보장하고,
+ * 언마운트·재로딩 때 SDK 이벤트 리스너를 반드시 해제해요. `show()`는 사용자 액션에서만
+ * 호출해야 하며 자동 노출하지 않습니다. 보상은 `userEarnedReward` 수신 때만 지급해야 해요.
+ */
+export function useTossFullScreenAd(
+  format: FullScreenAdFormat,
+  callbacks: FullScreenAdCallbacks = {},
+) {
+  const adGroupId = getFullScreenAdGroupId(format);
+  const supported = isFullScreenAdSupported();
+  const [ready, setReady] = useState(false);
+  const loadUnregisterRef = useRef<(() => void) | null>(null);
+  const showUnregisterRef = useRef<(() => void) | null>(null);
+  const loadRef = useRef<() => void>(() => undefined);
+  const onRewardRef = useRef(callbacks.onReward);
+  const onErrorRef = useRef(callbacks.onError);
+
+  onRewardRef.current = callbacks.onReward;
+  onErrorRef.current = callbacks.onError;
+
+  const unregisterLoad = () => {
+    loadUnregisterRef.current?.();
+    loadUnregisterRef.current = null;
+  };
+
+  const unregisterShow = () => {
+    showUnregisterRef.current?.();
+    showUnregisterRef.current = null;
+  };
+
+  loadRef.current = () => {
+    unregisterLoad();
+    setReady(false);
+    if (!adGroupId || !supported) return;
+
+    try {
+      loadUnregisterRef.current = loadFullScreenAd({
+        options: { adGroupId },
+        onEvent: ({ type }) => {
+          if (type !== 'loaded') return;
+          unregisterLoad();
+          setReady(true);
+        },
+        onError: (error) => {
+          unregisterLoad();
+          setReady(false);
+          onErrorRef.current?.(error);
+        },
+      });
+    } catch (error) {
+      setReady(false);
+      onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+
+  useEffect(() => {
+    loadRef.current();
+    return () => {
+      unregisterLoad();
+      unregisterShow();
+    };
+  }, [adGroupId, supported]);
+
+  const show = (): boolean => {
+    if (!ready || !adGroupId || !supported) return false;
+
+    unregisterShow();
+    setReady(false);
+    let finished = false;
+    const finishAndReload = () => {
+      if (finished) return;
+      finished = true;
+      unregisterShow();
+      loadRef.current();
+    };
+
+    try {
+      showUnregisterRef.current = showFullScreenAd({
+        options: { adGroupId },
+        onEvent: (event) => {
+          if (event.type === 'userEarnedReward') {
+            onRewardRef.current?.(event.data);
+          }
+          if (event.type === 'dismissed' || event.type === 'failedToShow') {
+            finishAndReload();
+          }
+        },
+        onError: (error) => {
+          onErrorRef.current?.(error);
+          finishAndReload();
+        },
+      });
+      return true;
+    } catch (error) {
+      onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+      finishAndReload();
+      return false;
+    }
+  };
+
+  return {
+    configured: Boolean(adGroupId),
+    ready,
+    reload: () => loadRef.current(),
+    show,
+    supported,
+  };
 }

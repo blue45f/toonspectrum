@@ -193,6 +193,7 @@ export function MoreMenu({ open, onClose }: { open: boolean; onClose: () => void
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-popup-kind="sheet"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: theme.panel,

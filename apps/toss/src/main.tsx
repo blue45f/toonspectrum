@@ -8,7 +8,7 @@ import { HashRouter } from 'react-router-dom';
 import '@/src/compat/storage-migrate';
 import { installStaticCatalog } from '@/src/catalog-static';
 
-import config from '../apps-in-toss.config.ts';
+import config from '../granite.config.ts';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { API_BASE, isAdultTitle } from './lib/api.ts';
@@ -19,6 +19,11 @@ import { tossPlatformBridge } from './platform/tossBridge.ts';
 // index.css 가 덮어써 기존 인라인 크롬(BottomNav 등)의 외형을 보존한다.
 import './web-theme.css';
 import './index.css';
+
+// 앱인토스는 시스템 테마 연동을 지원하지 않고 라이트 모드 기준 출시를 요구한다.
+// 웹 본체의 사용자 테마는 건드리지 않고, 토스 WebView 엔트리에서만 정책 테마를 고정한다.
+document.documentElement.dataset.theme = 'light';
+document.documentElement.style.colorScheme = 'light';
 
 // 공유 카탈로그 데이터 레이어(웹과 단일 출처) 설치 — 토스 정책만 옵션으로 주입한다:
 //  ① dataBase: 교차 출처 WebView 라 /data·/api 를 배포 오리진(API_BASE)에서 가져온다.
@@ -35,7 +40,12 @@ globalThis.__toonspectrumTossLogin = () => tossAppLogin();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <TDSMobileAITProvider brandPrimaryColor={config.brand.primaryColor}>
+    <TDSMobileAITProvider
+      brandPrimaryColor={config.brand.primaryColor}
+      // 공유 Tailwind 디자인 시스템이 body/a/p 등 기본값을 소유한다. TDS reset을 함께 켜면
+      // Emotion의 늦은 전역 규칙이 임의 text/background 유틸을 덮어 대비가 무너진다.
+      resetGlobalCss={false}
+    >
       <PlatformContext.Provider value={tossPlatformBridge}>
         <ErrorBoundary>
           {/* 토스 WebView 는 실 URL/history 가 없어 HashRouter(#/path)로 라우팅한다. 웹 호환 레이어

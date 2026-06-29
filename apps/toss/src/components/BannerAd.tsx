@@ -27,7 +27,7 @@ export function BannerAd({ format = 'banner', gap = 14 }: BannerAdProps) {
   useEffect(() => {
     if (!ready || !adGroupId || !containerRef.current) return;
     const attached = attach(adGroupId, containerRef.current, {
-      theme: 'dark', // 앱 다크 분위기 일치
+      theme: 'light', // 앱인토스 비게임 미니앱은 라이트 모드 기준으로 출시
       tone: 'blackAndWhite',
       variant: 'card', // 좌우 패딩 + border-radius로 카드 리스트에 자연스럽게
       callbacks: {
