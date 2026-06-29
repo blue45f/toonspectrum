@@ -167,90 +167,90 @@ const playTone = (
   osc.stop(startAt + duration + 0.02);
 };
 
-/** SFX 합성 레시피 — 종류별 음색/엔벨로프. (peak 는 SFX 마스터 기준 상대값.) */
+/** SFX 합성 레시피 — 애니메이션 UI처럼 짧고 맑되 귀를 찌르지 않는 음색. */
 const SFX_RECIPES: Record<SfxName, (ctx: AudioContext, master: GainNode, now: number) => void> = {
-  // tick — 짧고 미묘한 틱(<80ms). 클릭/탭/포커스용. 두 톤을 살짝 겹쳐 둥근 클릭감.
+  // tick — 종이 책갈피를 톡 건드리는 낮은 삼각파 + 아주 작은 반짝임.
   tick: (ctx, master, now) => {
     playTone(ctx, master, {
-      type: "sine",
-      frequency: 880,
+      type: "triangle",
+      frequency: 520,
       startAt: now,
-      duration: 0.055,
-      peak: 0.28,
-      attackRatio: 0.16,
-      glideToFrequency: 640,
+      duration: 0.06,
+      peak: 0.1,
+      attackRatio: 0.18,
+      glideToFrequency: 440,
     });
     playTone(ctx, master, {
+      type: "sine",
+      frequency: 1046.5,
+      startAt: now + 0.006,
+      duration: 0.038,
+      peak: 0.034,
+      attackRatio: 0.16,
+    });
+  },
+  // pop — 말풍선이 열리는 듯한 5도 상승. 반복 탭에도 거슬리지 않게 고역 피크를 억제한다.
+  pop: (ctx, master, now) => {
+    playTone(ctx, master, {
       type: "triangle",
-      frequency: 1320,
+      frequency: 392,
       startAt: now,
-      duration: 0.04,
-      peak: 0.14,
+      duration: 0.13,
+      peak: 0.145,
+      attackRatio: 0.12,
+      glideToFrequency: 659.25,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 987.77,
+      startAt: now + 0.018,
+      duration: 0.075,
+      peak: 0.042,
       attackRatio: 0.1,
     });
   },
-  // pop — 살짝 위로 솟는 '뽁'(버블/추가/좋아요). 빠른 상승 글라이드.
-  pop: (ctx, master, now) => {
-    playTone(ctx, master, {
-      type: "sine",
-      frequency: 420,
-      startAt: now,
-      duration: 0.12,
-      peak: 0.34,
-      attackRatio: 0.08,
-      glideToFrequency: 760,
-    });
-    playTone(ctx, master, {
-      type: "triangle",
-      frequency: 1180,
-      startAt: now + 0.01,
-      duration: 0.08,
-      peak: 0.1,
-      attackRatio: 0.06,
-    });
-  },
-  // success — 밝은 상승 메이저 아르페지오(C E G C). 완료/저장/달성.
+  // success — 애니메이션 아이캐치처럼 빠르게 솟는 E 메이저 펜타토닉 아르페지오.
   success: (ctx, master, now) => {
-    const notes = [523.25, 659.25, 783.99, 1046.5];
+    const notes = [659.25, 783.99, 987.77, 1318.51];
     notes.forEach((frequency, index) => {
       playTone(ctx, master, {
         type: "sine",
         frequency,
-        startAt: now + index * 0.07,
-        duration: 0.42 - index * 0.04,
-        peak: 0.26 - index * 0.02,
-        attackRatio: 0.08,
+        startAt: now + index * 0.055,
+        duration: 0.31 - index * 0.025,
+        peak: 0.13 - index * 0.012,
+        attackRatio: 0.12,
       });
     });
     // 윗배음 반짝임.
     playTone(ctx, master, {
       type: "triangle",
-      frequency: 2093.0,
-      startAt: now + 0.21,
-      duration: 0.3,
-      peak: 0.07,
-      attackRatio: 0.1,
+      frequency: 2637.02,
+      startAt: now + 0.17,
+      duration: 0.2,
+      peak: 0.025,
+      attackRatio: 0.16,
     });
   },
-  // error — 낮게 떨어지는 단2도(부드러운 거절음, 거슬리지 않게). 실패/취소/유효성.
+  // error — 위협적인 버저 대신 낮게 내려앉는 단3도. 실패를 알리되 흐름을 끊지 않는다.
   error: (ctx, master, now) => {
     playTone(ctx, master, {
       type: "triangle",
-      frequency: 330,
+      frequency: 293.66,
       startAt: now,
-      duration: 0.16,
-      peak: 0.26,
-      attackRatio: 0.12,
-      glideToFrequency: 247,
+      duration: 0.18,
+      peak: 0.11,
+      attackRatio: 0.16,
+      glideToFrequency: 246.94,
     });
     playTone(ctx, master, {
       type: "sine",
-      frequency: 220,
-      startAt: now + 0.07,
-      duration: 0.18,
-      peak: 0.18,
-      attackRatio: 0.14,
-      glideToFrequency: 175,
+      frequency: 196,
+      startAt: now + 0.065,
+      duration: 0.2,
+      peak: 0.055,
+      attackRatio: 0.18,
+      glideToFrequency: 164.81,
     });
   },
 };
@@ -491,15 +491,15 @@ const scheduleChordBed = (
 };
 
 /**
- * 5개 **업비트** 생성형 무드 — 전부 장조 진행 + 빠른 템포 + 아르페지오 + 가벼운 킥/하이햇.
- * 배열 순서 = 기본 crossfade 로테이션 순서(pop → chiptune → funky → synthwave → happy).
+ * 5개 **애니메이션 OST풍** 생성형 무드 — 청춘·마법·로맨스·모험·엔딩의 장면 문법을
+ * 장조 진행과 맑은 삼각파 중심으로 재구성했다. 기존 id는 저장 설정 호환을 위해 유지한다.
  */
 export const BGM_PRESETS: readonly BgmPreset[] = [
   {
-    // ☀️ bright pop — C 메이저, I–V–vi–IV(가장 대중적인 팝 진행) + 4-on-the-floor 킥 + 통통 리드.
+    // 🌅 청춘 오프닝 — C 메이저 I–V–vi–IV + 질주하는 펜타토닉 리드.
     id: "pop",
-    name: "밝은 팝",
-    emoji: "☀️",
+    name: "청춘 오프닝",
+    emoji: "🌅",
     beatDuration: 0.3, // ≈100 BPM(8분음표 그리드).
     beatsPerBar: 16,
     schedule: (sc) => {
@@ -533,11 +533,11 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
         const degree = PENTATONIC_MAJOR[(bar * 2 + b) % PENTATONIC_MAJOR.length] ?? 0;
         const octave = b % 4 === 0 ? 12 : 0;
         scheduleVoice(ctx, out, {
-          type: "square",
+          type: "triangle",
           frequency: midiToFreq(root + rootShift + degree + octave),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 0.85,
-          peak: 0.028,
+          peak: 0.024,
           attackRatio: 0.06,
           cutoff: 2600,
         });
@@ -551,11 +551,11 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
     },
   },
   {
-    // 🎮 chiptune — D 메이저, 빠른 8비트 square 아르페지오 + 펄스 베이스(게임 BGM 느낌).
+    // ✨ 별빛 마법소녀 — D 메이저, 종소리 같은 빠른 아르페지오와 가벼운 펄스.
     id: "chiptune",
-    name: "칩튠 8비트",
-    emoji: "🎮",
-    beatDuration: 0.16, // ≈115 BPM 16분음표 — 아주 빠른 아르페지오.
+    name: "별빛 마법소녀",
+    emoji: "✨",
+    beatDuration: 0.2,
     beatsPerBar: 16,
     schedule: (sc) => {
       const { ctx, out, startAt, beatDuration, beats, bar } = sc;
@@ -566,11 +566,11 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       // 펄스 베이스(8분음표 펌프).
       for (let b = 0; b < beats; b += 2) {
         scheduleVoice(ctx, out, {
-          type: "square",
+          type: "triangle",
           frequency: midiToFreq(root - 24 + rootShift),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 1.6,
-          peak: 0.05,
+          peak: 0.045,
           attackRatio: 0.04,
           cutoff: 900,
         });
@@ -581,11 +581,11 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
         const semis = arp[b % arp.length] ?? 0;
         const octave = b % 6 >= 3 ? 12 : 0;
         scheduleVoice(ctx, out, {
-          type: "square",
+          type: "triangle",
           frequency: midiToFreq(root + rootShift + semis + octave),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 0.95,
-          peak: 0.03,
+          peak: 0.025,
           attackRatio: 0.02,
           cutoff: 3000,
         });
@@ -609,11 +609,11 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
     },
   },
   {
-    // 🪩 funky groove — E 믹솔리디안(♭7), 당김음 베이스 + 와카 코드 스탭 + 백비트(펑크/디스코).
+    // 🌸 로맨스 산책 — E 믹솔리디안, 살짝 엇박인 발걸음과 부드러운 코드 스탭.
     id: "funky",
-    name: "펑키 그루브",
-    emoji: "🪩",
-    beatDuration: 0.214, // ≈140 BPM 16분 그리드.
+    name: "로맨스 산책",
+    emoji: "🌸",
+    beatDuration: 0.25,
     beatsPerBar: 16,
     schedule: (sc) => {
       const { ctx, out, startAt, beatDuration, beats, bar } = sc;
@@ -625,7 +625,7 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       bassHits.forEach((b) => {
         const degree = MIXOLYDIAN[(bar + b) % MIXOLYDIAN.length] ?? 0;
         scheduleVoice(ctx, out, {
-          type: "sawtooth",
+          type: "triangle",
           frequency: midiToFreq(root - 24 + rootShift + (b % 7 === 0 ? 0 : degree % 12)),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 1.4,
@@ -639,7 +639,7 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       stabAt.forEach((b) => {
         MAJOR_TRIAD.forEach((semis, i) => {
           scheduleVoice(ctx, out, {
-            type: "square",
+            type: "triangle",
             frequency: midiToFreq(root + rootShift + semis),
             startAt: startAt + b * beatDuration,
             duration: beatDuration * 1.1,
@@ -657,10 +657,10 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
     },
   },
   {
-    // 🌃 synthwave — A 리디안, 넓은 saw 패드 + 옥타브 베이스 펄스 + 반짝이는 리드(레트로 신스).
+    // ⚔️ 판타지 모험 — A 리디안, 넓은 add9 패드 + 옥타브 베이스 + 영웅적인 리드.
     id: "synthwave",
-    name: "신스웨이브",
-    emoji: "🌃",
+    name: "판타지 모험",
+    emoji: "⚔️",
     beatDuration: 0.34, // ≈88 BPM, 8분 펄스.
     beatsPerBar: 16,
     schedule: (sc) => {
@@ -672,7 +672,7 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       scheduleChordBed(sc, {
         rootMidi: root - 12 + rootShift,
         chord: ADD9,
-        type: "sawtooth",
+        type: "triangle",
         peak: 0.035,
         cutoff: 1500,
         attackRatio: 0.3,
@@ -681,7 +681,7 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       for (let b = 0; b < beats; b += 2) {
         const oct = (b / 2) % 2 === 0 ? 0 : 12;
         scheduleVoice(ctx, out, {
-          type: "sawtooth",
+          type: "triangle",
           frequency: midiToFreq(root - 24 + rootShift + oct),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 1.7,
@@ -712,10 +712,10 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
     },
   },
   {
-    // 🎉 happy — F 메이저, 점프하는 트라이어드 아르페지오 + 밝은 멜로디 + 박수 비트(축제/파티).
+    // 🌈 엔딩 크레딧 — F 메이저, 여운 있는 add9와 웃으며 돌아보는 상승 멜로디.
     id: "happy",
-    name: "해피 파티",
-    emoji: "🎉",
+    name: "엔딩 크레딧",
+    emoji: "🌈",
     beatDuration: 0.27, // ≈110 BPM, 8분 그리드.
     beatsPerBar: 16,
     schedule: (sc) => {
@@ -750,7 +750,7 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       for (let b = 0; b < beats; b++) {
         const semis = jump[(bar + b) % jump.length] ?? 0;
         scheduleVoice(ctx, out, {
-          type: "square",
+          type: "triangle",
           frequency: midiToFreq(root + rootShift + semis),
           startAt: startAt + b * beatDuration,
           duration: beatDuration * 0.9,

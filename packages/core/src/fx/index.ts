@@ -2,7 +2,7 @@
 //
 // 구성
 //  - audio.ts     : lazy AudioContext 싱글톤 · 합성 SFX(tick/pop/success/error) ·
-//                   생성형 앰비언트 BGM(5 무드 프리셋, crossfade 로테이션) · mute/volume ·
+//                   애니메이션 OST풍 생성형 BGM(5 무드 프리셋, crossfade 로테이션) · mute/volume ·
 //                   영속 opt-in 토글 + 상태 구독. (Web Audio only, 프레임워크 비종속)
 //  - particles.ts : triggerParticleBurst — DOM 파티클 "팡"(self-cleaning). (DOM + WAAPI only)
 //  - fx.css       : pf-jelly-pop · pf-sparkle · pf-aurora · pf-glow 키프레임/유틸. (앱에서 import)
