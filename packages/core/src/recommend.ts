@@ -1,31 +1,48 @@
 import type { Title, ReadState } from "./types";
 
 // 두 작품의 콘텐츠 유사도 (장르/태그/유형/이용가 기반 자카드 가중)
+// 메모리 할당(Set/Array)을 최소화하여 수만 건의 작품 추천 연산 속도를 극대화합니다.
 export function similarity(a: Title, b: Title): number {
   if (a.id === b.id) return 0;
-  const genreA = new Set(a.genres);
-  const genreB = new Set(b.genres);
-  const tagA = new Set(a.tags);
-  const tagB = new Set(b.tags);
 
-  const gInter = [...genreA].filter((g) => genreB.has(g)).length;
-  const gUnion = new Set([...genreA, ...genreB]).size || 1;
-  const tInter = [...tagA].filter((t) => tagB.has(t)).length;
-  const tUnion = new Set([...tagA, ...tagB]).size || 1;
+  let gInter = 0;
+  const lenGA = a.genres.length;
+  const lenGB = b.genres.length;
+  for (let i = 0; i < lenGA; i++) {
+    if (b.genres.includes(a.genres[i])) gInter++;
+  }
+  const gUnion = lenGA + lenGB - gInter || 1;
+
+  let tInter = 0;
+  const lenTA = a.tags.length;
+  const lenTB = b.tags.length;
+  for (let i = 0; i < lenTA; i++) {
+    if (b.tags.includes(a.tags[i])) tInter++;
+  }
+  const tUnion = lenTA + lenTB - tInter || 1;
 
   let s = (gInter / gUnion) * 0.55 + (tInter / tUnion) * 0.35;
   if (a.type === b.type) s += 0.06;
   if (a.ageRating === b.ageRating) s += 0.02;
-  // 같은 어댑테이션 패밀리면 강하게
+
+  // 같은 어댑테이션 패밀리면 강하게 가산
   if (a.adaptedFrom && (a.adaptedFrom === b.id || a.adaptedFrom === b.adaptedFrom)) s += 0.4;
   if (b.adaptedFrom === a.id) s += 0.4;
   return s;
 }
 
 export function similarTitles(all: Title[], target: Title, limit = 8): Title[] {
-  return all
-    .map((t) => ({ t, s: similarity(target, t) }))
-    .filter((x) => x.s > 0.05)
+  const scored: { t: Title; s: number }[] = [];
+  const len = all.length;
+  for (let i = 0; i < len; i++) {
+    const t = all[i];
+    const s = similarity(target, t);
+    if (s > 0.05) {
+      scored.push({ t, s });
+    }
+  }
+
+  return scored
     .sort((a, b) => b.s - a.s || b.t.stats.ratingAvg - a.t.stats.ratingAvg)
     .slice(0, limit)
     .map((x) => x.t);
@@ -53,13 +70,23 @@ export function buildTasteProfile(
   let n = 0;
 
   const consider = (t: Title, weight: number) => {
-    t.genres.forEach((g) => genreW.set(g, (genreW.get(g) ?? 0) + weight));
-    t.tags.forEach((tag) => tagW.set(tag, (tagW.get(tag) ?? 0) + weight * 0.7));
+    const gLen = t.genres.length;
+    for (let i = 0; i < gLen; i++) {
+      const g = t.genres[i];
+      genreW.set(g, (genreW.get(g) ?? 0) + weight);
+    }
+    const tagLen = t.tags.length;
+    for (let i = 0; i < tagLen; i++) {
+      const tag = t.tags[i];
+      tagW.set(tag, (tagW.get(tag) ?? 0) + weight * 0.7);
+    }
     if (t.type === "webtoon") typeWebtoon += weight;
     else typeNovel += weight;
   };
 
-  for (const t of all) {
+  const len = all.length;
+  for (let i = 0; i < len; i++) {
+    const t = all[i];
     const r = ratings[t.id];
     const read = reads[t.id];
     if (r != null) {
@@ -110,37 +137,55 @@ export function recommendForTaste(
   const gw = new Map(profile.topGenres.map((g) => [g.name, g.weight]));
   const tw = new Map(profile.topTags.map((t) => [t.name, t.weight]));
 
-  return all
-    .filter((t) => !seen.has(t.id))
-    .map((t) => {
-      let score = 0;
-      const matchedG: string[] = [];
-      const matchedT: string[] = [];
-      t.genres.forEach((g) => {
-        if (gw.has(g)) {
-          score += gw.get(g)!;
-          matchedG.push(g);
-        }
-      });
-      t.tags.forEach((tag) => {
-        if (tw.has(tag)) {
-          score += tw.get(tag)! * 0.6;
-          matchedT.push(tag);
-        }
-      });
-      score += (t.stats.ratingAvg - 3.5) * 2; // 품질 보정
+  const scored: { title: Title; score: number; reason: string; hasAffinity: boolean }[] = [];
+  const len = all.length;
+
+  for (let i = 0; i < len; i++) {
+    const t = all[i];
+    if (seen.has(t.id)) continue;
+
+    let scoreVal = 0;
+    let matchedGFirst: string | undefined;
+    let matchedTFirst: string | undefined;
+    let hasAffinity = false;
+
+    const gLen = t.genres.length;
+    for (let j = 0; j < gLen; j++) {
+      const g = t.genres[j];
+      const w = gw.get(g);
+      if (w !== undefined) {
+        scoreVal += w;
+        if (!matchedGFirst) matchedGFirst = g;
+        hasAffinity = true;
+      }
+    }
+
+    const tLen = t.tags.length;
+    for (let j = 0; j < tLen; j++) {
+      const tag = t.tags[j];
+      const w = tw.get(tag);
+      if (w !== undefined) {
+        scoreVal += w * 0.6;
+        if (!matchedTFirst) matchedTFirst = tag;
+        hasAffinity = true;
+      }
+    }
+
+    if (hasAffinity) {
+      scoreVal += (t.stats.ratingAvg - 3.5) * 2;
       const reason =
-        matchedG[0] && matchedT[0]
-          ? `'${matchedG[0]}' 취향 + ${matchedT[0]} 코드`
-          : matchedG[0]
-            ? `즐겨보는 '${matchedG[0]}' 장르`
-            : matchedT[0]
-              ? `${matchedT[0]} 코드 일치`
+        matchedGFirst && matchedTFirst
+          ? `'${matchedGFirst}' 취향 + ${matchedTFirst} 코드`
+          : matchedGFirst
+            ? `즐겨보는 '${matchedGFirst}' 장르`
+            : matchedTFirst
+              ? `${matchedTFirst} 코드 일치`
               : "평점 높은 추천작";
-      return { title: t, score, reason, hasAffinity: matchedG.length > 0 || matchedT.length > 0 };
-    })
-    // 취향(장르·태그) 일치가 있는 작품만 — 평점만 높은 무관 작품이 'FOR YOU'에 섞이지 않도록
-    .filter((x) => x.hasAffinity)
+      scored.push({ title: t, score: scoreVal, reason, hasAffinity: true });
+    }
+  }
+
+  return scored
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ title, reason }) => ({ title, reason }));
