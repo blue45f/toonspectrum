@@ -28,8 +28,8 @@ const BRAND_COLORS: readonly string[] = [
   "oklch(0.95 0.02 85)", // near-white
 ];
 
-/** 웹툰 브랜드 기본 이모지(작품/반응 결). */
-const BRAND_CHARS: readonly string[] = ["✨", "💖", "⭐", "🎉", "💫", "🔖"];
+/** 웹툰 브랜드 기본 이모지(작품/반응/토스 결). */
+const BRAND_CHARS: readonly string[] = ["✨", "💖", "⭐", "🎉", "💫", "🔖", "🪙", "💎", "⚡", "🌸", "✦", "★"];
 
 /** triggerParticleBurst 옵션. */
 export interface ParticleBurstOptions {

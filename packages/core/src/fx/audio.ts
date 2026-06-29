@@ -129,7 +129,18 @@ const applyMasterGain = (): void => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 /** 재생 가능한 효과음 종류. */
-export type SfxName = "tick" | "pop" | "success" | "error";
+export type SfxName =
+  | "tick"
+  | "pop"
+  | "success"
+  | "error"
+  | "sparkle"
+  | "woosh"
+  | "open"
+  | "close"
+  | "tab"
+  | "heart"
+  | "toss_coin";
 
 /**
  * 단일 오실레이터 톤을 soft attack/decay 엔벨로프로 마스터 버스에 재생해요(SFX 빌딩 블록).
@@ -251,6 +262,116 @@ const SFX_RECIPES: Record<SfxName, (ctx: AudioContext, master: GainNode, now: nu
       peak: 0.055,
       attackRatio: 0.18,
       glideToFrequency: 164.81,
+    });
+  },
+  // sparkle — 애니메이션 마법 및 아이템 획득 반짝임 효과음.
+  sparkle: (ctx, master, now) => {
+    const freqs = [1046.5, 1318.51, 1567.98, 2093.0, 2637.02];
+    freqs.forEach((freq, i) => {
+      playTone(ctx, master, {
+        type: "sine",
+        frequency: freq,
+        startAt: now + i * 0.032,
+        duration: 0.22,
+        peak: 0.08 - i * 0.01,
+        attackRatio: 0.1,
+      });
+    });
+  },
+  // woosh — 화면 전환 및 슬라이드 연출 시 바람 스치는 소리.
+  woosh: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "triangle",
+      frequency: 240,
+      startAt: now,
+      duration: 0.16,
+      peak: 0.08,
+      attackRatio: 0.4,
+      glideToFrequency: 680,
+    });
+  },
+  // open — 팝업/모달/메뉴 열림 연출용 맑은 울림.
+  open: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "triangle",
+      frequency: 523.25,
+      startAt: now,
+      duration: 0.18,
+      peak: 0.12,
+      attackRatio: 0.15,
+      glideToFrequency: 880,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 1318.51,
+      startAt: now + 0.02,
+      duration: 0.22,
+      peak: 0.06,
+      attackRatio: 0.1,
+    });
+  },
+  // close — 팝업/모달/메뉴 닫힘 연출용 경쾌한 안착음.
+  close: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "triangle",
+      frequency: 659.25,
+      startAt: now,
+      duration: 0.14,
+      peak: 0.1,
+      attackRatio: 0.1,
+      glideToFrequency: 440,
+    });
+  },
+  // tab — 탭 전환 및 탭 필터 클릭 시의 착붙 피드백.
+  tab: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "triangle",
+      frequency: 698.46,
+      startAt: now,
+      duration: 0.07,
+      peak: 0.09,
+      attackRatio: 0.12,
+      glideToFrequency: 880,
+    });
+  },
+  // heart — 좋아요/즐겨찾기 선택 시 발랄한 두근거림.
+  heart: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 587.33,
+      startAt: now,
+      duration: 0.12,
+      peak: 0.11,
+      attackRatio: 0.1,
+      glideToFrequency: 880,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 1174.66,
+      startAt: now + 0.04,
+      duration: 0.18,
+      peak: 0.08,
+      attackRatio: 0.1,
+    });
+  },
+  // toss_coin — 토스 인앱 스타일 청량한 동전/포인트 차링 소리.
+  toss_coin: (ctx, master, now) => {
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 987.77,
+      startAt: now,
+      duration: 0.15,
+      peak: 0.12,
+      attackRatio: 0.08,
+      glideToFrequency: 1975.53,
+    });
+    playTone(ctx, master, {
+      type: "triangle",
+      frequency: 2959.96,
+      startAt: now + 0.03,
+      duration: 0.25,
+      peak: 0.07,
+      attackRatio: 0.06,
     });
   },
 };
@@ -766,6 +887,179 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
         scheduleSnare(ctx, out, startAt + b * beatDuration + 0.02, 0.04); // 박수 더블.
       }
       for (let b = 2; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.035);
+    },
+  },
+  {
+    // ⚡ 열혈 배틀 — E 마이너 / 왕도 펜타토닉, 강렬한 리프와 하이텐션 비트.
+    id: "battle",
+    name: "열혈 배틀",
+    emoji: "⚡",
+    beatDuration: 0.22, // 쾌속 BPM
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 64; // E4
+      const progression = [0, 3, 5, 7]; // i-III-iv-V 강렬한 배틀 루프
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // 옥타브 파워 듀얼 베이스
+      for (let b = 0; b < beats; b += 2) {
+        scheduleVoice(ctx, out, {
+          type: "sawtooth",
+          frequency: midiToFreq(root - 24 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.5,
+          peak: 0.06,
+          attackRatio: 0.02,
+          cutoff: 1400,
+        });
+      }
+      // 배틀 펜타토닉 질주 리드
+      const riff = [0, 3, 5, 7, 10, 12, 10, 7];
+      for (let b = 0; b < beats; b++) {
+        const semis = riff[b % riff.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "square",
+          frequency: midiToFreq(root + rootShift + semis),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 0.8,
+          peak: 0.025,
+          attackRatio: 0.03,
+          cutoff: 2800,
+        });
+      }
+      // 드럼 타격감 (헤비 킥 + 연속 하이햇 + 백비트 스네어)
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.18);
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.08);
+      for (let b = 1; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.045);
+    },
+  },
+  {
+    // 🎐 일상 코미디 — G 메이저, 목금/글록켄슈필 같은 톡톡 튀는 멜로디.
+    id: "slice_of_life",
+    name: "일상 코미디",
+    emoji: "🎐",
+    beatDuration: 0.24,
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 67; // G4
+      const progression = [0, 5, 7, 0];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      // 통통 튀는 바운스 베이스
+      for (let b = 0; b < beats; b += 4) {
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root - 19 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.5,
+          peak: 0.07,
+          attackRatio: 0.05,
+          cutoff: 900,
+        });
+      }
+      // 맑은 16분음표 목금/벨 아르페지오
+      for (let b = 0; b < beats; b++) {
+        if (b % 3 !== 0) {
+          const degree = PENTATONIC_MAJOR[(b + bar) % PENTATONIC_MAJOR.length] ?? 0;
+          scheduleVoice(ctx, out, {
+            type: "sine",
+            frequency: midiToFreq(root + 12 + rootShift + degree),
+            startAt: startAt + b * beatDuration,
+            duration: beatDuration * 0.7,
+            peak: 0.035,
+            attackRatio: 0.02,
+            cutoff: 4000,
+          });
+        }
+      }
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.12);
+      for (let b = 2; b < beats; b += 4) scheduleHat(ctx, out, startAt + b * beatDuration, 0.03);
+    },
+  },
+  {
+    // 🌌 감성 시티팝 — A 메이저 7th, 플랑크톤 빛나는 레트로 레전드 OST 분위기.
+    id: "citypop",
+    name: "감성 시티팝",
+    emoji: "🌌",
+    beatDuration: 0.28,
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 69; // A4
+      const progression = [0, 5, 2, 7]; // IV-V-iii-vi 변형
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root - 12 + rootShift,
+        chord: MAJOR_SEVENTH,
+        type: "triangle",
+        peak: 0.04,
+        cutoff: 1800,
+        attackRatio: 0.3,
+      });
+      // 슬랩 느낌의 엇박 신스 베이스
+      const bassPattern = [0, 3, 6, 10, 12, 14];
+      bassPattern.forEach((b) => {
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root - 24 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.2,
+          peak: 0.055,
+          attackRatio: 0.04,
+          cutoff: 1200,
+        });
+      });
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.14);
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.06);
+      for (let b = 2; b < beats; b += 4) scheduleHat(ctx, out, startAt + b * beatDuration, 0.045, 0.09);
+    },
+  },
+  {
+    // 🏆 영웅의 각성 — D 클라이맥스, 벅차오르는 하모닉 팡파레와 웅장한 아르페지오.
+    id: "climax",
+    name: "영웅의 각성",
+    emoji: "🏆",
+    beatDuration: 0.26,
+    beatsPerBar: 16,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 62; // D4
+      const progression = [0, 7, 9, 5]; // 벅차오르는 왕도 진행
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: ADD9,
+        type: "triangle",
+        peak: 0.05,
+        cutoff: 2400,
+        attackRatio: 0.2,
+      });
+      for (let b = 0; b < beats; b += 2) {
+        scheduleVoice(ctx, out, {
+          type: "sawtooth",
+          frequency: midiToFreq(root - 12 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.6,
+          peak: 0.06,
+          attackRatio: 0.05,
+          cutoff: 1000,
+        });
+      }
+      for (let b = 0; b < beats; b++) {
+        const semis = MAJOR[(bar + b) % MAJOR.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root + 12 + rootShift + semis),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 0.9,
+          peak: 0.03,
+          attackRatio: 0.04,
+          cutoff: 3200,
+        });
+      }
+      for (let b = 0; b < beats; b += 4) scheduleKick(ctx, out, startAt + b * beatDuration, 0.16);
+      for (let b = 4; b < beats; b += 8) scheduleSnare(ctx, out, startAt + b * beatDuration, 0.07);
+      for (let b = 1; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.04);
     },
   },
 ];

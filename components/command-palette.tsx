@@ -1,5 +1,6 @@
 "use client";
 
+import { playSfx } from "@toonspectrum/core/fx";
 import { Command } from "cmdk";
 import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock, Shuffle, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -53,6 +54,11 @@ export function CommandPalette({
   const isSearching = Boolean(trimmedQ) && (searchSettling || searchLoading);
 
   useEffect(() => {
+    if (open) {
+      playSfx("open");
+    } else {
+      playSfx("close");
+    }
     document.body.style.overflow = open ? "hidden" : "";
     // 닫힐 때 질의 초기화 (effect 동기 setState 회피 위해 다음 틱으로 지연)
     const id = open ? undefined : setTimeout(() => setQ(""), 0);
@@ -119,6 +125,7 @@ export function CommandPalette({
   }, [open, recentKey, trimmedQ]);
 
   const go = (href: string) => {
+    playSfx("close");
     onOpenChange(false);
     router.push(href);
   };
@@ -129,7 +136,10 @@ export function CommandPalette({
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]">
       <button
         aria-label="닫기"
-        onClick={() => onOpenChange(false)}
+        onClick={() => {
+          playSfx("close");
+          onOpenChange(false);
+        }}
         className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm"
         style={{ animation: "fade-up 0.18s ease-out" }}
       />
@@ -137,7 +147,7 @@ export function CommandPalette({
         shouldFilter={false}
         loop
         label="통합 검색"
-        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)]"
+        className="pf-popup-open relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
         <div className="flex items-center gap-3 border-b border-line px-4">

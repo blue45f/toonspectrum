@@ -100,7 +100,7 @@ export function FloatingControls({
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
   const fx = useFx();
-  const { enabled: bgmOn, mood: bgmMood, toggle: toggleBgm } = useAmbientBgm();
+  const { enabled: bgmOn, mood: bgmMood, toggle: toggleBgm, next: nextBgm } = useAmbientBgm();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
   const isDark = theme === "dark";
@@ -150,8 +150,16 @@ export function FloatingControls({
   }, [wakeRadiusPx, reveal]);
 
   const toggleSound = () => {
-    if (fx.audio.muted) fx.setMuted(false); // 음소거였다면 먼저 해제하고 SFX 켬.
+    if (fx.audio.muted) fx.setMuted(false);
     fx.setSfxEnabled(!soundOn);
+  };
+
+  const handleBgmClick = (e: React.MouseEvent) => {
+    if (bgmOn && e.shiftKey) {
+      nextBgm();
+    } else {
+      toggleBgm();
+    }
   };
 
   // 펼쳐진 컨트롤들(데스크톱 행 / 모바일 펼침 패널 공용).
@@ -177,20 +185,32 @@ export function FloatingControls({
 
       {/* 배경음악(생성형 앰비언트 BGM) — 기본 OFF, 켜면 첫 클릭에서 언락 + 무드 로테이션 */}
       {showBgm && (
-        <button
-          type="button"
-          onClick={() => toggleBgm()}
-          aria-label={bgmOn ? "배경음악 끄기" : "배경음악 켜기"}
-          aria-pressed={bgmOn}
-          title={bgmOn ? `배경음악 켜짐 · ${bgmMood}` : "배경음악 켜기"}
-          data-no-sfx
-          className={cx(
-            PILL,
-            bgmOn ? "border-accent/45 text-accent" : "border-line text-fg-2 hover:text-fg"
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleBgmClick}
+            aria-label={bgmOn ? "배경음악 끄기" : "배경음악 켜기"}
+            aria-pressed={bgmOn}
+            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다음 곡)` : "배경음악 켜기"}
+            data-no-sfx
+            className={cx(
+              PILL,
+              bgmOn ? "border-accent/45 text-accent" : "border-line text-fg-2 hover:text-fg"
+            )}
+          >
+            <Music size={16} className={bgmOn ? "animate-pulse" : "opacity-70"} />
+          </button>
+          {bgmOn && (
+            <button
+              type="button"
+              onClick={() => nextBgm()}
+              title={`다음 애니 BGM 무드로 변경 (현재: ${bgmMood})`}
+              className="inline-flex h-11 items-center rounded-full border border-line bg-panel/95 px-2.5 text-xs font-semibold text-fg-2 shadow-lg backdrop-blur hover:bg-raised hover:text-fg"
+            >
+              🔄 {bgmMood}
+            </button>
           )}
-        >
-          <Music size={16} className={bgmOn ? undefined : "opacity-70"} />
-        </button>
+        </div>
       )}
 
       {/* 다크/주간 테마 토글 — 토스에선 showTheme={false} */}

@@ -308,13 +308,109 @@
   }
 }
 
+/* ── toss-spring — 토스 인앱 스타일 스프링 바운스 ───────────────────────────── */
+.toss-spring {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
+  will-change: transform;
+}
+.toss-spring:active {
+  transform: scale(0.92);
+  filter: brightness(1.12);
+}
+
+/* ── pf-click-ripple — 클릭시 방사형 후광 리플 ──────────────────────────────── */
+@keyframes pf-click-ripple-anim {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--ts-fx-glow) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 16px color-mix(in oklch, var(--ts-fx-glow) 0%, transparent);
+  }
+}
+.pf-click-ripple:active {
+  animation: pf-click-ripple-anim 0.4s ease-out;
+}
+
+/* ── pf-popup-open / pf-popup-close — 팝업/모달 개폐 모션 ───────────────────── */
+@keyframes pf-popup-open-anim {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(16px);
+    filter: blur(8px);
+  }
+  70% {
+    transform: scale(1.02) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+.pf-popup-open {
+  animation: pf-popup-open-anim 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pf-popup-close-anim {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+    filter: blur(6px);
+  }
+}
+.pf-popup-close {
+  animation: pf-popup-close-anim 0.25s cubic-bezier(0.7, 0, 0.84, 0) both;
+}
+
+/* ── pf-menu-expand / pf-menu-collapse — 메뉴/드롭다운 펼침/닫힘 ────────────── */
+@keyframes pf-menu-expand-anim {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.92);
+    transform-origin: top center;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+.pf-menu-expand {
+  animation: pf-menu-expand-anim 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── pf-neon-border — 네온 발광 테두리 ────────────────────────────────────────── */
+@keyframes pf-neon-border-anim {
+  0%, 100% {
+    border-color: color-mix(in oklch, var(--ts-fx-glow) 70%, transparent);
+    box-shadow: 0 0 12px color-mix(in oklch, var(--ts-fx-glow) 30%, transparent);
+  }
+  50% {
+    border-color: color-mix(in oklch, oklch(0.78 0.16 290) 80%, transparent);
+    box-shadow: 0 0 20px color-mix(in oklch, oklch(0.78 0.16 290) 40%, transparent);
+  }
+}
+.pf-neon-border {
+  animation: pf-neon-border-anim 3s ease-in-out infinite;
+}
+
 /* 접근성 — 모션 최소화 사용자에겐 fx 애니메이션을 멈춥니다. */
 @media (prefers-reduced-motion: reduce) {
   .pf-jelly-pop,
   .pf-sparkle,
   .pf-aurora,
-  .pf-glow {
+  .pf-glow,
+  .toss-spring,
+  .pf-click-ripple,
+  .pf-popup-open,
+  .pf-popup-close,
+  .pf-menu-expand,
+  .pf-neon-border {
     animation: none;
+    transition: none;
   }
   /* 시머 off → 또렷한 솔리드 제목으로 복원(클립된 투명 글자 그대로 멈추면 제목이 사라짐). */
   .shimmer-title {

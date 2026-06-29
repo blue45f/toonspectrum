@@ -1,4 +1,4 @@
-import { triggerParticleBurst, useClickSfx } from "@toonspectrum/core/fx";
+import { playSfx, triggerParticleBurst, useClickSfx } from "@toonspectrum/core/fx";
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -77,8 +77,7 @@ function useVisitPing() {
 }
 
 /**
- * 전역 포인터 피드백. 모든 인터랙티브 요소에는 작은 스펙트럼 점을, 핵심 CTA에는 별 파티클을
- * 짧게 더해 화면 밀도를 높여요. DOM 위임 1개만 사용하고 reduced-motion에서는 완전 비활성화합니다.
+ * 전역 포인터 피드백. 모든 인터랙티브 요소에는 화려한 파티클 버스트와 상황별 맞춤 SFX를 더해요.
  */
 function useClickVisualFeedback() {
   useEffect(() => {
@@ -100,27 +99,61 @@ function useClickVisualFeedback() {
       }
 
       const now = performance.now();
-      if (now - lastBurstAt < 45) return;
+      if (now - lastBurstAt < 40) return;
       lastBurstAt = now;
 
-      const strong = target.matches(
-        ".bg-accent, .bg-accent-2, [data-fx='celebrate'], [data-state='active']",
-      );
+      // 요소 종류 및 클래스에 따른 맞춤 연출 결정
+      const isTossAction = target.matches("[data-toss], .toss-btn, [data-coin], [data-points]");
+      const isLikeHeart = target.matches("[data-like], [data-favorite], .like-btn, .heart-btn");
+      const isTab = target.matches("[role='tab'], .tab-item, [data-tab]");
+      const isPrimaryCta = target.matches(".bg-accent, .bg-accent-2, [data-fx='celebrate'], [data-state='active']");
+
+      let chars: string[] = ["✨", "⚡", "⭐"];
+      let count = 8;
+      let durationMs = 480;
+      let spread = 0.65;
+
+      if (isTossAction) {
+        chars = ["🪙", "💎", "✨"];
+        count = 12;
+        durationMs = 650;
+        spread = 0.9;
+        playSfx("toss_coin");
+      } else if (isLikeHeart) {
+        chars = ["💖", "🌸", "✨"];
+        count = 14;
+        durationMs = 700;
+        spread = 0.95;
+        playSfx("heart");
+      } else if (isTab) {
+        chars = ["✨", "✦"];
+        count = 6;
+        durationMs = 400;
+        spread = 0.5;
+        playSfx("tab");
+      } else if (isPrimaryCta) {
+        chars = ["✦", "✧", "★", "⚡"];
+        count = 16;
+        durationMs = 720;
+        spread = 1.0;
+        playSfx("sparkle");
+      }
+
       triggerParticleBurst(event.clientX, event.clientY, {
-        count: strong ? 14 : 7,
-        chars: strong ? ["✦", "✧", "★"] : [],
-        durationMs: strong ? 680 : 430,
-        spread: strong ? 0.95 : 0.58,
+        count,
+        chars,
+        durationMs,
+        spread,
       });
 
       if (typeof target.animate === "function") {
         target.animate(
           [
-            { filter: "brightness(1) saturate(1)" },
-            { filter: "brightness(1.16) saturate(1.2)", offset: 0.34 },
-            { filter: "brightness(1) saturate(1)" },
+            { transform: "scale(1)", filter: "brightness(1) saturate(1)" },
+            { transform: "scale(0.94)", filter: "brightness(1.22) saturate(1.3)", offset: 0.35 },
+            { transform: "scale(1)", filter: "brightness(1) saturate(1)" },
           ],
-          { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+          { duration: 240, easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)" },
         );
       }
     };

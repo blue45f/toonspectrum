@@ -1,3 +1,4 @@
+import { playSfx } from "@toonspectrum/core/fx";
 import {
   BarChart3,
   BookMarked,
@@ -131,9 +132,11 @@ export function MoreMenu({ open, onClose }: { open: boolean; onClose: () => void
   // 열릴 때: Esc 닫기 + 본문 스크롤 잠금 + 첫 포커스 + Tab 포커스 트랩.
   useEffect(() => {
     if (!open) return;
+    playSfx("open");
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        playSfx("close");
         onClose();
         return;
       }
@@ -165,8 +168,14 @@ export function MoreMenu({ open, onClose }: { open: boolean; onClose: () => void
 
   if (!open) return null;
 
+  const handleClose = () => {
+    playSfx("close");
+    onClose();
+  };
+
   const go = (to: string) => {
     hapticFeedback("tickWeak");
+    playSfx("close");
     onClose();
     navigate(to);
   };
