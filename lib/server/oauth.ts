@@ -30,9 +30,8 @@ function str(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-// 카카오·네이버는 일단 데모 고정(실 OAuth 연동 보류) — 키가 설정돼 있어도 데모로 라우팅한다.
-// 실연동 재개 시 이 집합에서 제거하면 됨(키 설정 시 자동 oauth). Google 은 키 있으면 실연동.
-const DEMO_ONLY_PROVIDERS = new Set<OAuthProviderId>(["kakao", "naver"]);
+// 소셜 로그인(Google·Kakao·Naver) 실연동 활성화
+const DEMO_ONLY_PROVIDERS = new Set<OAuthProviderId>();
 
 export interface OAuthUser {
   id: string;
@@ -114,6 +113,7 @@ export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
   const c = providerConfig(id);
   // Google 은 GIS(ID 토큰) 흐름이라 client id 만 있으면 실연동(클라이언트 시크릿 불필요).
   if (id === "google") return c.clientId ? "oauth" : "demo";
+  if (id === "kakao") return c.clientId ? "oauth" : "demo";
   return c.clientId && c.clientSecret ? "oauth" : "demo";
 }
 
@@ -125,9 +125,10 @@ export interface AuthProviderInfo {
 }
 
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
-// 제공자 노출 — google 은 항상, kakao/naver 는 관리자 설정(앱 config)으로 켜야 노출(기본 off).
 export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
   const googleMode = providerMode("google");
+  const kakaoMode = providerMode("kakao");
+  const naverMode = providerMode("naver");
   const out: Record<string, AuthProviderInfo> = {
     google: {
       label: "Google",
@@ -136,8 +137,8 @@ export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
       ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
     },
   };
-  if (opts?.kakao) out.kakao = { label: "카카오", mode: providerMode("kakao") };
-  if (opts?.naver) out.naver = { label: "네이버", mode: providerMode("naver") };
+  if (opts?.kakao || kakaoMode === "oauth") out.kakao = { label: "카카오", mode: kakaoMode };
+  if (opts?.naver || naverMode === "oauth") out.naver = { label: "네이버", mode: naverMode };
   return out;
 }
 
@@ -187,9 +188,13 @@ export function verifyState(id: OAuthProviderId, state: string | undefined, maxA
 
 // ── authorize URL ──
 export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | null {
-  if (DEMO_ONLY_PROVIDERS.has(id)) return null; // 데모 고정 — authorize URL 미발급(시작 시 데모 핸드오프로 라우팅)
+  if (DEMO_ONLY_PROVIDERS.has(id)) return null;
   const c = providerConfig(id);
-  if (!c.clientId || !c.clientSecret) return null;
+  if (id === "kakao") {
+    if (!c.clientId) return null;
+  } else if (!c.clientId || !c.clientSecret) {
+    return null;
+  }
   const u = new URL(c.authorizeUrl);
   u.searchParams.set("client_id", c.clientId);
   u.searchParams.set("redirect_uri", redirectUri(id));
@@ -212,13 +217,16 @@ interface NormalizedProfile {
 
 async function exchangeCode(id: OAuthProviderId, code: string): Promise<Record<string, unknown>> {
   const c = providerConfig(id);
-  const body = new URLSearchParams({
+  const params: Record<string, string> = {
     grant_type: "authorization_code",
     client_id: c.clientId ?? "",
-    client_secret: c.clientSecret ?? "",
     redirect_uri: redirectUri(id),
     code,
-  });
+  };
+  if (c.clientSecret) {
+    params.client_secret = c.clientSecret;
+  }
+  const body = new URLSearchParams(params);
   const res = await fetch(c.tokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
