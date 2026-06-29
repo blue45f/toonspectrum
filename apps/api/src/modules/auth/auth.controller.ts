@@ -96,8 +96,10 @@ export class AuthController {
     let user;
     try {
       user = await handleGoogleIdToken(idToken);
-    } catch {
-      throw new HttpException({ error: "구글 로그인 검증에 실패했어요." }, HttpStatus.UNAUTHORIZED);
+    } catch (err: unknown) {
+      if (err instanceof HttpException) throw err;
+      const msg = err instanceof Error ? err.message : "구글 로그인 검증에 실패했어요.";
+      throw new HttpException({ error: msg }, HttpStatus.UNAUTHORIZED);
     }
     return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }
@@ -134,7 +136,8 @@ export class AuthController {
   @Post("oauth/:provider/demo")
   async oauthDemo(@Param("provider") provider: string, @Req() req: Request) {
     if (!isOAuthProvider(provider)) throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
-    if (providerMode(provider) !== "demo") {
+    const codeFlowUrl = buildAuthorizeUrl(provider, "check");
+    if (providerMode(provider) !== "demo" && codeFlowUrl !== null) {
       throw new HttpException({ error: "이 제공자는 실제 OAuth가 설정되어 데모를 쓸 수 없어요." }, HttpStatus.CONFLICT);
     }
     enforceRateLimit(`oauth-demo:${clientIp(req)}`, 20, 10 * 60_000);

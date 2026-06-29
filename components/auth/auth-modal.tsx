@@ -102,6 +102,7 @@ function GoogleGisButton({ clientId, onSuccess, onError }: { clientId: string; o
     loadGis()
       .then(() => {
         if (cancelled || !holderRef.current || !window.google?.accounts?.id) return;
+        if (holderRef.current) holderRef.current.innerHTML = "";
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: (resp: { credential?: string }) => {
@@ -110,8 +111,11 @@ function GoogleGisButton({ clientId, onSuccess, onError }: { clientId: string; o
               return;
             }
             void signInWithGoogleIdToken(resp.credential).then((r) => {
-              if (r.ok) onSuccess();
-              else onError("구글 로그인에 실패했어요. 다시 시도해 주세요.");
+              if (r.ok) {
+                onSuccess();
+              } else {
+                onError(r.error ? `구글 로그인 실패: ${r.error}` : "구글 로그인에 실패했어요. 다시 시도해 주세요.");
+              }
             });
           },
         });
