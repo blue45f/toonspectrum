@@ -87,14 +87,47 @@ function clampLimit(raw: string | null | undefined) {
   if (!Number.isFinite(n)) return 24;
   return Math.min(Math.max(Math.floor(n), 1), 80);
 }
+let cachedStaticCoverage: Array<{ id: PlatformId; count: number; share: number }> | null = null;
+let cachedStaticCoverageRevision = -1;
+
 function platformCoverage(titles: Title[]) {
-  const counts = new Map<PlatformId, number>();
-  for (const t of titles) {
-    new Set(t.availability.map((a) => a.platformId)).forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+  const isStaticTitles = titles === TITLES;
+  const state = getCatalogState();
+  if (isStaticTitles && cachedStaticCoverage && cachedStaticCoverageRevision === state.revision) {
+    return cachedStaticCoverage;
   }
-  return [...counts.entries()]
-    .map(([id, count]) => ({ id, count, share: titles.length ? Math.round((count / titles.length) * 100) : 0 }))
-    .sort((a, b) => b.count - a.count);
+
+  const counts = new Map<PlatformId, number>();
+  const seen = new Set<PlatformId>();
+  const tLen = titles.length;
+
+  for (let i = 0; i < tLen; i++) {
+    const avail = titles[i].availability;
+    const aLen = avail.length;
+    seen.clear();
+    for (let j = 0; j < aLen; j++) {
+      const id = avail[j].platformId;
+      if (!seen.has(id)) {
+        seen.add(id);
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+    }
+  }
+
+  const entries = Array.from(counts.entries());
+  const eLen = entries.length;
+  const result = new Array<{ id: PlatformId; count: number; share: number }>(eLen);
+  for (let i = 0; i < eLen; i++) {
+    const [id, count] = entries[i];
+    result[i] = { id, count, share: tLen ? Math.round((count / tLen) * 100) : 0 };
+  }
+  result.sort((a, b) => b.count - a.count);
+
+  if (isStaticTitles) {
+    cachedStaticCoverage = result;
+    cachedStaticCoverageRevision = state.revision;
+  }
+  return result;
 }
 const bayes = (t: Title) => (4 * 800 + t.stats.ratingAvg * t.stats.ratingCount) / (800 + t.stats.ratingCount);
 
@@ -115,12 +148,20 @@ function searchData(sp: URLSearchParams) {
     adaptedOnly: boolParam(sp.get("adaptedOnly")),
   };
   const items = searchTitles(TITLES, filters, sort);
+  let webtoonCount = 0;
+  let webnovelCount = 0;
+  const iLen = items.length;
+  for (let i = 0; i < iLen; i++) {
+    if (items[i].type === "webtoon") webtoonCount++;
+    else if (items[i].type === "webnovel") webnovelCount++;
+  }
+
   return {
     items,
-    total: items.length,
+    total: iLen,
     typeCount: {
-      webtoon: items.filter((t) => t.type === "webtoon").length,
-      webnovel: items.filter((t) => t.type === "webnovel").length,
+      webtoon: webtoonCount,
+      webnovel: webnovelCount,
     },
     catalog: {
       ...getCatalogState(),
