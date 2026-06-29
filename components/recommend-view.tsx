@@ -10,7 +10,7 @@ import { TitleCard } from "./title-card";
 import type { PlatformId, Title } from "@/lib/types";
 
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { genreColor } from "@/lib/genre-color";
+import { genreColor, genreTextColor } from "@/lib/genre-color";
 import { useApp, useHydrated, useSavedTitleIds } from "@/lib/store";
 import { GENRES } from "@/lib/taxonomy";
 import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
@@ -445,7 +445,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
                   on && "ring-1"
                 )}
                 style={{
-                  color: genreColor(g, on ? 0.92 : 0.82),
+                  color: genreTextColor(g, on ? 0.92 : 0.82),
                   backgroundColor: `color-mix(in oklch, ${genreColor(g, 0.6)} ${on ? 26 : 12}%, transparent)`,
                   borderColor: `color-mix(in oklch, ${genreColor(g, 0.6)} ${on ? 60 : 28}%, transparent)`,
                 }}

@@ -19,39 +19,40 @@ type LiveRefreshMode = "off" | "fixed" | "adaptive";
 // 플랫폼별 어댑터만 구현하면 라이브 보정 파이프라인은 동일하게 동작합니다.
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const REVALIDATE = parseConfigNumber(process.env.WEBTOON_LIVE_TTL_SECONDS, 120, 30, 1800);
+const LIVE_ENV = typeof process === "undefined" ? {} : process.env;
+const REVALIDATE = parseConfigNumber(LIVE_ENV.WEBTOON_LIVE_TTL_SECONDS, 120, 30, 1800);
 const TIMEOUT_MS = 3500;
 const STATUS_FINISHED_PAGE_CAP = 12;
 const WEEK = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const LIVE_CACHE_TTL_MS = REVALIDATE * 1000;
 const LIVE_REFRESH_INTERVAL_SECONDS = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_INTERVAL_SECONDS,
+  LIVE_ENV.WEBTOON_LIVE_REFRESH_INTERVAL_SECONDS,
   Math.min(300, Math.max(60, REVALIDATE)),
   30,
   1800
 );
-const LIVE_REFRESH_MODE = parseRefreshMode(process.env.WEBTOON_LIVE_REFRESH_MODE, "fixed");
+const LIVE_REFRESH_MODE = parseRefreshMode(LIVE_ENV.WEBTOON_LIVE_REFRESH_MODE, "fixed");
 const LIVE_REFRESH_BURST_SECONDS = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_BURST_SECONDS,
+  LIVE_ENV.WEBTOON_LIVE_REFRESH_BURST_SECONDS,
   Math.max(30, Math.floor(LIVE_REFRESH_INTERVAL_SECONDS * 0.5)),
   30,
   1800
 );
 const LIVE_REFRESH_IDLE_SECONDS = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_IDLE_SECONDS,
+  LIVE_ENV.WEBTOON_LIVE_REFRESH_IDLE_SECONDS,
   Math.min(900, Math.max(120, LIVE_REFRESH_INTERVAL_SECONDS * 4)),
   30,
   1800
 );
 const LIVE_REFRESH_DEMAND_WINDOW_SECONDS = parseConfigNumber(
   // 정규 표기. 구 표기(WEBTOON_LIVE_DEMAND_*)도 폴백 허용 — .env 불일치로 설정이 조용히 무시되던 버그 방지
-  process.env.WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS ?? process.env.WEBTOON_LIVE_DEMAND_WINDOW_SECONDS,
+  LIVE_ENV.WEBTOON_LIVE_REFRESH_DEMAND_WINDOW_SECONDS ?? LIVE_ENV.WEBTOON_LIVE_DEMAND_WINDOW_SECONDS,
   120,
   30,
   900
 );
 const LIVE_REFRESH_DEMAND_THRESHOLD = parseConfigNumber(
-  process.env.WEBTOON_LIVE_REFRESH_DEMAND_THRESHOLD ?? process.env.WEBTOON_LIVE_DEMAND_THRESHOLD,
+  LIVE_ENV.WEBTOON_LIVE_REFRESH_DEMAND_THRESHOLD ?? LIVE_ENV.WEBTOON_LIVE_DEMAND_THRESHOLD,
   4,
   1,
   40

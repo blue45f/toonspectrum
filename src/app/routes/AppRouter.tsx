@@ -227,9 +227,10 @@ export function AppRouter() {
   const { pathname } = useLocation();
   useRouteTitle(pathname);
   return (
-    <ErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
+    <div key={pathname} className="route-stage">
+      <ErrorBoundary resetKey={pathname}>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/ranking" element={<RankingPage />} />
           <Route path="/search" element={<SearchPage />} />
@@ -277,8 +278,9 @@ export function AppRouter() {
           <Route path="/fortune" element={<FortunePage />} />
           <Route path="/play" element={<PlayPage />} />
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
-    </ErrorBoundary>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
+    </div>
   );
 }

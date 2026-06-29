@@ -3,7 +3,7 @@ import { useState } from "react";
 
 
 import { Container } from "@/components/section";
-import { genreTint, genreBorder, genreColor } from "@/lib/genre-color";
+import { genreTint, genreBorder, genreTextColor } from "@/lib/genre-color";
 import { useT } from "@/lib/i18n";
 import { formatCount } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
@@ -112,7 +112,7 @@ export function AuthorsPage() {
                     <span
                       key={g}
                       className="rounded-full border px-1.5 py-0.5 text-[0.62rem] font-medium leading-none"
-                      style={{ color: genreColor(g, 0.85), backgroundColor: genreTint(g, 0.12), borderColor: genreBorder(g, 0.3) }}
+                      style={{ color: genreTextColor(g, 0.85), backgroundColor: genreTint(g, 0.12), borderColor: genreBorder(g, 0.3) }}
                     >
                       {g}
                     </span>

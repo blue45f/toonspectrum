@@ -40,6 +40,17 @@ export function genreColor(genre: string, l = 0.78): string {
   return `oklch(${l} ${g.c ?? 0.15} ${g.h})`;
 }
 
+/**
+ * 장르 칩/라벨 텍스트용 적응 색상. 장르 hue는 유지하되 주간 모드에서는 명도를 낮춰
+ * warm-white 표면에서 WCAG AA를 확보하고, 야간 모드에서는 기존의 밝은 스펙트럼을 유지한다.
+ * `light-dark()`는 루트 color-scheme을 따르므로 웹 테마와 토스 고정 라이트 테마가 같은 함수를 쓴다.
+ */
+export function genreTextColor(genre: string, darkLightness = 0.82, lightLightness = 0.44): string {
+  const g = GENRE_HUE[genre] ?? FALLBACK;
+  const chroma = g.c ?? 0.15;
+  return `light-dark(oklch(${lightLightness} ${chroma} ${g.h}), oklch(${darkLightness} ${chroma} ${g.h}))`;
+}
+
 // 칩 배경 틴트 (저명도/저채도 + 알파)
 export function genreTint(genre: string, alpha = 0.16): string {
   const g = GENRE_HUE[genre] ?? FALLBACK;

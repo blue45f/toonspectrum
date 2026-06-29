@@ -11,7 +11,7 @@ import { Rail, Section } from "@/components/section";
 import { TitleCard } from "@/components/title-card";
 import { buttonClass } from "@/components/ui/button-utils";
 import { GenreSpectrum } from "@/components/ui/spectrum-bar";
-import { genreColor } from "@/lib/genre-color";
+import { genreColor, genreTextColor } from "@/lib/genre-color";
 import { GENRES } from "@/lib/taxonomy";
 import Link from "@/src/compat/router-link";
 
@@ -81,7 +81,7 @@ export function HomeDeferredSections({
               <span
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium [word-break:keep-all] transition-transform duration-150 hover:scale-105"
                 style={{
-                  color: genreColor(genre, 0.85),
+                  color: genreTextColor(genre, 0.85),
                   backgroundColor: `color-mix(in oklch, ${genreColor(genre, 0.6)} 14%, transparent)`,
                   borderColor: `color-mix(in oklch, ${genreColor(genre, 0.6)} 32%, transparent)`,
                 }}

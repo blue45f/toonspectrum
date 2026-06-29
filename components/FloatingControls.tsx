@@ -76,12 +76,12 @@ const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, s
   static: "",
 };
 
-// above-nav(토스)·static 은 모바일 토글로 접지 않고 펼친 행을 그대로 쓴다(토스는 컨트롤 2개라 작음,
-// 토스 크롬은 별도 소유). bottom-left/right(웹)만 좁은 화면에서 단일 토글로 접는다.
+// 좁은 화면의 fixed 컨트롤은 본문을 가리지 않도록 모두 단일 토글로 접는다.
+// static만 부모가 레이아웃을 소유하므로 항상 펼친다.
 const COLLAPSIBLE: Record<NonNullable<FloatingControlsProps["placement"]>, boolean> = {
   "bottom-left": true,
   "bottom-right": true,
-  "above-nav": false,
+  "above-nav": true,
   static: false,
 };
 

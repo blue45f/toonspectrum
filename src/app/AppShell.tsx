@@ -1,4 +1,4 @@
-import { useClickSfx } from "@toonspectrum/core/fx";
+import { triggerParticleBurst, useClickSfx } from "@toonspectrum/core/fx";
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -76,6 +76,60 @@ function useVisitPing() {
   }, []);
 }
 
+/**
+ * 전역 포인터 피드백. 모든 인터랙티브 요소에는 작은 스펙트럼 점을, 핵심 CTA에는 별 파티클을
+ * 짧게 더해 화면 밀도를 높여요. DOM 위임 1개만 사용하고 reduced-motion에서는 완전 비활성화합니다.
+ */
+function useClickVisualFeedback() {
+  useEffect(() => {
+    const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (reducedMotion?.matches) return;
+
+    let lastBurstAt = 0;
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      const target = event.target.closest<HTMLElement>(
+        "button, a[href], [role='button'], [role='tab'], [role='menuitem'], .pressable",
+      );
+      if (
+        !target ||
+        target.matches(":disabled, [aria-disabled='true'], [data-no-fx]") ||
+        target.closest("[data-no-fx]")
+      ) {
+        return;
+      }
+
+      const now = performance.now();
+      if (now - lastBurstAt < 45) return;
+      lastBurstAt = now;
+
+      const strong = target.matches(
+        ".bg-accent, .bg-accent-2, [data-fx='celebrate'], [data-state='active']",
+      );
+      triggerParticleBurst(event.clientX, event.clientY, {
+        count: strong ? 14 : 7,
+        chars: strong ? ["✦", "✧", "★"] : [],
+        durationMs: strong ? 680 : 430,
+        spread: strong ? 0.95 : 0.58,
+      });
+
+      if (typeof target.animate === "function") {
+        target.animate(
+          [
+            { filter: "brightness(1) saturate(1)" },
+            { filter: "brightness(1.16) saturate(1.2)", offset: 0.34 },
+            { filter: "brightness(1) saturate(1)" },
+          ],
+          { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+        );
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown, { passive: true });
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+}
+
 function DeferredGlobalOverlays() {
   const ready = useDeferredByInput();
   if (!ready) return null;
@@ -133,6 +187,7 @@ export function AppShell({
   // 전역 클릭 'tick' — 인터랙티브 요소(버튼·링크) 탭마다 미묘한 효과음. opt-out 은 [data-no-sfx].
   // SFX 는 기본 ON(동작 최소화 선호 시 자동 OFF), 첫 제스처에서 오디오 컨텍스트가 언락된다.
   useClickSfx();
+  useClickVisualFeedback();
   return (
     <AuthSessionProvider>
       {splash ?? <RandomIntro />}

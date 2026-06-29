@@ -1,5 +1,5 @@
 import { cx } from "@/lib/cx";
-import { genreColor, genreTint, genreBorder } from "@/lib/genre-color";
+import { genreTint, genreBorder, genreTextColor } from "@/lib/genre-color";
 
 // 장르 스펙트럼 칩 — 장르별 고유 hue 틴트
 export function GenreChip({
@@ -21,7 +21,7 @@ export function GenreChip({
         className
       )}
       style={{
-        color: genreColor(genre, active ? 0.92 : 0.82),
+        color: genreTextColor(genre, active ? 0.92 : 0.82),
         backgroundColor: genreTint(genre, active ? 0.26 : 0.13),
         borderColor: genreBorder(genre, active ? 0.6 : 0.28),
       }}

@@ -133,20 +133,13 @@ export function SplashScreen({
               />
             ))}
           </div>
-          <div className="pf-glow flex h-[clamp(40px,11vw,52px)] w-[clamp(40px,11vw,52px)] items-center justify-center rounded-2xl">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="ts-splash-logo h-[clamp(28px,8vw,40px)] w-[clamp(28px,8vw,40px)]"
-              style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.6))" }}
-            >
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10M6 10h10M6 14h10" />
-            </svg>
+          <div className="pf-glow flex h-[clamp(46px,13vw,58px)] w-[clamp(46px,13vw,58px)] items-center justify-center overflow-hidden rounded-2xl">
+            <img
+              src="/icon-192.png"
+              alt=""
+              className="ts-splash-logo size-full object-cover"
+              decoding="async"
+            />
           </div>
         </div>
 

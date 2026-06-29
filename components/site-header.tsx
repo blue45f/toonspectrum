@@ -132,7 +132,7 @@ export function SiteHeader() {
           {/* 데스크탑 내비 (≥1024px) — 9개 항목이 좁은 폭을 침범하지 않도록 lg에서만 노출.
               텍스트 전용 링크: 항목별 아이콘 박스는 EN 라벨 합산 폭이 컨테이너 상한(1320px)을
               넘겨 어느 뷰포트에서도 한 줄에 들어가지 않는다(아이콘은 오버플로/모바일 메뉴 담당). */}
-          <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
+          <nav className="ml-2 hidden items-center gap-0.5 min-[1360px]:flex">
             {NAV.map((n) => {
               const active = isActive(n.href, n.exact);
               return (
@@ -195,7 +195,9 @@ export function SiteHeader() {
               </span>
             </Link>
             {/* 통합 회원 로그인(Firebase 이메일/게스트) — 기존 세션 AuthMenu 와 별개로 추가 */}
-            <MemberAuthControlShell />
+            <div className="hidden min-[380px]:contents">
+              <MemberAuthControlShell />
+            </div>
             <AuthMenuShell />
 
             {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}
@@ -206,7 +208,7 @@ export function SiteHeader() {
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg lg:hidden"
+              className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg min-[1360px]:hidden"
             >
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>

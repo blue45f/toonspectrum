@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useInView } from "@/components/use-in-view";
-import { spectrumGradient, genreColor } from "@/lib/genre-color";
+import { spectrumGradient, genreColor, genreTextColor } from "@/lib/genre-color";
 import { cn } from "@/lib/utils";
 
 // 장르 믹스 스펙트럼 — 작품의 장르들을 가로 그라디언트로.
@@ -84,7 +84,7 @@ export function GenreSpectrum({
           className="pointer-events-none absolute -top-7 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-panel px-2 py-0.5 text-[0.68rem] font-medium shadow-sm"
           style={{
             left: `${Math.min(92, Math.max(8, scrub.x * 100))}%`,
-            color: genreColor(scrub.genre, 0.82),
+            color: genreTextColor(scrub.genre, 0.82),
           }}
           aria-hidden
         >

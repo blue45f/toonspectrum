@@ -116,8 +116,8 @@ export function CafesPage() {
         </Link>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="order-2 lg:order-1">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="order-2 min-w-0 lg:order-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="inline-flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 text-xs transition-colors focus-within:border-accent/50 sm:basis-48">
               <Search size={14} className="shrink-0 text-fg-3" />
@@ -236,7 +236,7 @@ export function CafesPage() {
           )}
         </div>
 
-        <aside className="order-1 lg:order-2">
+        <aside className="order-1 min-w-0 lg:order-2">
           <div className="sticky top-20 rounded-2xl border border-line bg-panel/40 p-4">
             <h2 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold text-fg">
               <Plus size={14} className="text-accent" />새 카페 만들기

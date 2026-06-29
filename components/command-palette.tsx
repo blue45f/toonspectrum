@@ -10,7 +10,7 @@ import { RatingInline } from "./ui/stars";
 import type { Title } from "@/lib/types";
 
 import { statsAreEstimated } from "@/lib/estimate";
-import { genreColor } from "@/lib/genre-color";
+import { genreTextColor } from "@/lib/genre-color";
 import { useApp } from "@/lib/store";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { useRouter } from "@/src/compat/navigation";
@@ -193,7 +193,7 @@ export function CommandPalette({
                     <span className="block truncate text-sm font-medium text-fg">{t.title}</span>
                     <span className="flex items-center gap-1.5 text-xs text-fg-3">
                       <Clock size={11} className="text-fg-3" />
-                      <span style={{ color: genreColor(t.genres[0], 0.8) }}>{TYPE_LABEL[t.type]}</span>
+                      <span style={{ color: genreTextColor(t.genres[0], 0.8) }}>{TYPE_LABEL[t.type]}</span>
                       · {t.author}
                     </span>
                   </span>
@@ -242,7 +242,7 @@ export function CommandPalette({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-fg">{t.title}</span>
                     <span className="flex items-center gap-1.5 text-xs text-fg-3">
-                      <span style={{ color: genreColor(t.genres[0], 0.8) }}>
+                      <span style={{ color: genreTextColor(t.genres[0], 0.8) }}>
                         {TYPE_LABEL[t.type]}
                       </span>
                       · {t.author}

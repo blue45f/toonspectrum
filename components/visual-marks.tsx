@@ -359,43 +359,12 @@ export function ToonSpectrumMark({ className }: { className?: string }) {
   return (
     <span
       className={cx(
-        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-[oklch(0.95_0.01_85/0.14)] bg-[#1c1613] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
+        "relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[0.65rem] border border-line/70 bg-canvas shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]",
         className
       )}
       aria-hidden
     >
-      <svg className="relative size-full" viewBox="0 0 32 32" fill="none" focusable="false">
-        {/* 머리 위 스펙트럼 안테나/방울들 */}
-        <circle cx="16" cy="4.5" r="2.2" fill="#ff5e62" /> {/* 빨강 */}
-        <circle cx="11" cy="6" r="1.8" fill="#ff9966" />   {/* 주황 */}
-        <circle cx="21" cy="6" r="1.8" fill="#ffd15c" />   {/* 노랑 */}
-        <circle cx="7" cy="9.5" r="1.4" fill="#4fe090" />   {/* 초록 */}
-        <circle cx="25" cy="9.5" r="1.4" fill="#4ca3f5" />  {/* 파랑 */}
-
-        {/* 말풍선 꼬리 */}
-        <path d="M 12 25 L 7 28.5 L 9 23 Z" fill="#ffffff" stroke="#251c17" strokeWidth="1.8" strokeLinejoin="round" />
-
-        {/* 귀여운 말풍선 몸통 */}
-        <rect x="6" y="8" width="20" height="17" rx="5.5" ry="5.5" fill="#ffffff" stroke="#251c17" strokeWidth="1.8" />
-        
-        {/* 볼터치 */}
-        <ellipse cx="9.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
-        <ellipse cx="22.5" cy="18.5" rx="2.2" ry="1.3" fill="#ffaab3" />
-
-        {/* 똘망똘망한 눈 */}
-        {/* 왼쪽 눈 */}
-        <circle cx="12.2" cy="16" r="1.6" fill="#251c17" />
-        <circle cx="11.7" cy="15.5" r="0.5" fill="#ffffff" />
-        {/* 오른쪽 눈 */}
-        <circle cx="19.8" cy="16" r="1.6" fill="#251c17" />
-        <circle cx="19.3" cy="15.5" r="0.5" fill="#ffffff" />
-
-        {/* 귀여운 웃는 입 */}
-        <path d="M 14.5 18 Q 16 19.5 17.5 18" stroke="#251c17" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-
-        {/* 반짝이 노란 별 */}
-        <path d="M 23.5 11 L 24 12.3 L 25.3 12.8 L 24 13.3 L 23.5 14.6 L 23 13.3 L 21.7 12.8 L 23 12.3 Z" fill="#ffd15c" />
-      </svg>
+      <img src="/icon-192.png" alt="" className="size-full object-cover" decoding="async" />
     </span>
   );
 }

@@ -14,7 +14,7 @@ import { Container } from "@/components/section";
 import { ShimmerTitle } from "@/components/shimmer-title";
 import { TitleCard } from "@/components/title-card";
 import { TitleFilterPanel } from "@/components/title-filter-panel";
-import { genreBorder, genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
+import { genreBorder, genreColor, genreTextColor, genreTint, spectrumGradient } from "@/lib/genre-color";
 import { useSavedTitleIds } from "@/lib/store";
 import { GENRES, TYPE_LABEL } from "@/lib/taxonomy";
 import {
@@ -339,7 +339,7 @@ export function ExplorePage() {
                       active && "ring-1"
                     )}
                     style={{
-                      color: genreColor(entry, active ? 0.92 : 0.82),
+                      color: genreTextColor(entry, active ? 0.92 : 0.82),
                       backgroundColor: genreTint(entry, active ? 0.3 : 0.12),
                       borderColor: genreBorder(entry, active ? 0.7 : 0.26),
                       // 선택된 칩엔 그 장르색 글로우로 "켜진" 느낌을 강화.

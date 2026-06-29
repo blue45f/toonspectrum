@@ -4,7 +4,7 @@ import { HeroBannerBadge } from "./hero-banner-badge";
 
 import type { Title } from "@/lib/types";
 
-import { genreColor } from "@/lib/genre-color";
+import { genreColor, genreTextColor } from "@/lib/genre-color";
 import Link from "@/src/compat/router-link";
 
 export function HeroBannerStatic({
@@ -79,7 +79,7 @@ export function HeroBannerStatic({
               )}
               <div className="absolute inset-0 bg-[linear-gradient(to_top,oklch(0.13_0.012_70/0.86),oklch(0.13_0.012_70/0.22)_46%,oklch(0.13_0.012_70/0.08))]" />
               <div className="absolute left-0 top-0 flex items-center gap-1.5 p-4">
-                <span className="rounded-md border border-[oklch(0.95_0.01_85/0.28)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-0.5 text-xs font-semibold uppercase text-[oklch(0.95_0.01_85/0.9)] backdrop-blur-sm">
+                <span className="rounded-md border border-[oklch(0.95_0.01_85/0.28)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-0.5 text-xs font-semibold uppercase text-white/90 backdrop-blur-sm">
                   {isRestricted ? "19+" : first.type === "webnovel" ? "NOVEL" : "TOON"}
                 </span>
               </div>
@@ -97,7 +97,7 @@ export function HeroBannerStatic({
                     key={genre}
                     className="rounded-full border px-2.5 py-1 text-xs font-semibold"
                     style={{
-                      color: genreColor(genre, 0.84),
+                      color: genreTextColor(genre, 0.84),
                       backgroundColor: `color-mix(in oklch, ${genreColor(genre, 0.6)} 14%, transparent)`,
                       borderColor: `color-mix(in oklch, ${genreColor(genre, 0.6)} 32%, transparent)`,
                     }}

@@ -240,9 +240,9 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="flex flex-col gap-8"
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-6">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-6">
         <Picker value={a} onPick={pickA} onClear={() => setA(null)} />
-        <div className="group mt-16 grid size-11 shrink-0 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-accent hover:text-on-accent shadow-[0_0_12px_var(--color-accent-soft)]">
+        <div className="group mx-auto grid size-11 shrink-0 rotate-90 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent shadow-[0_0_12px_var(--color-accent-soft)] transition-all duration-300 hover:scale-110 hover:bg-accent hover:text-on-accent sm:mx-0 sm:mt-16 sm:rotate-0 sm:hover:rotate-12">
           <Swords size={18} className="transition-transform group-hover:animate-pulse" />
         </div>
         <Picker value={b} onPick={pickB} onClear={() => setB(null)} />

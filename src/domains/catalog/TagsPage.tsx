@@ -2,7 +2,7 @@ import { Hash } from "lucide-react";
 
 
 import { Container } from "@/components/section";
-import { genreTint, genreBorder, genreColor } from "@/lib/genre-color";
+import { genreTint, genreBorder, genreTextColor } from "@/lib/genre-color";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
@@ -58,7 +58,7 @@ export function TagsPage() {
               className="inline-flex items-center gap-1 rounded-full border px-3 py-1 font-medium leading-tight transition-transform duration-150 ease-out-expo hover:-translate-y-0.5"
               style={{
                 fontSize: `${sizeFor(count, max)}rem`,
-                color: genreColor(tag, 0.85),
+                color: genreTextColor(tag, 0.85),
                 backgroundColor: genreTint(tag, 0.12),
                 borderColor: genreBorder(tag, 0.3),
               }}

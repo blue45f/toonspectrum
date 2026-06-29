@@ -156,8 +156,8 @@ export function RankRow({
 
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="hidden items-center gap-1.5 md:flex">
-            {title.genres.slice(0, 2).map((g) => (
-              <GenreChip key={g} genre={g} size="sm" className="hidden lg:inline-flex first:inline-flex" />
+            {title.genres.slice(0, 2).map((g, index) => (
+              <GenreChip key={`${g}-${index}`} genre={g} size="sm" className="hidden lg:inline-flex first:inline-flex" />
             ))}
           </div>
           

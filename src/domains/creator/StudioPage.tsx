@@ -5064,7 +5064,7 @@ export function StudioPage() {
   const mobileDrawToolBtn = (active: boolean) =>
     cn(
       "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-      active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
+      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
 
   async function handleDownload() {
@@ -6135,7 +6135,7 @@ export function StudioPage() {
                         }}
                         className={cn(
                           "h-7 px-2 text-xs font-semibold rounded-md transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                          active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-2 hover:bg-raised hover:text-fg"
+                          active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised hover:text-fg"
                         )}
                       >
                         {p.name}
@@ -8577,7 +8577,7 @@ export function StudioPage() {
                             className={cn(
                               "rounded px-2 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
                               (selected.tail ?? "left") === t.v
-                                ? "bg-accent text-accent-fg shadow-sm font-semibold"
+                                ? "bg-accent text-on-accent shadow-sm font-semibold"
                                 : "text-fg-2 hover:bg-raised"
                             )}
                           >
@@ -8604,7 +8604,7 @@ export function StudioPage() {
                               className={cn(
                                 "rounded px-1.5 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
                                 (selected.tailDirection ?? "bottom") === td.v
-                                  ? "bg-accent text-accent-fg shadow-sm font-semibold"
+                                  ? "bg-accent text-on-accent shadow-sm font-semibold"
                                   : "text-fg-2 hover:bg-raised"
                               )}
                             >
@@ -8722,7 +8722,7 @@ export function StudioPage() {
                               onClick={() => patchEl(selected.id, { align: a } as Partial<El>)}
                               className={cn(
                                 "grid size-7 place-items-center rounded transition-colors cursor-pointer",
-                                active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                                active ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised hover:text-fg-2"
                               )}
                               title={`${a === "left" ? "왼쪽" : a === "center" ? "가운데" : "오른쪽"} 정렬`}
                             >
@@ -10267,7 +10267,7 @@ export function StudioPage() {
                     aria-pressed={active}
                     className={cn(
                       "flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors",
-                      active ? "bg-accent text-accent-fg shadow-sm" : "text-fg-2 hover:bg-raised"
+                      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
                     )}
                   >
                     <Icon size={15} aria-hidden /> {m.label}

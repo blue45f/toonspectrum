@@ -327,9 +327,9 @@ function SignalWorkbench({
         <div>
           <div className="flex h-2 overflow-hidden rounded-full bg-raised">
             {(insights?.topGenres.length ? insights.topGenres : [{ name: "판타지", share: 100, count: 0 }]).map(
-              (genre) => (
+              (genre, index) => (
               <span
-                key={genre.name}
+                key={`${genre.name}-${index}`}
                 className="h-full"
                 style={{
                   width: `${Math.max(genre.share, 6)}%`,
@@ -340,9 +340,9 @@ function SignalWorkbench({
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {insights?.topGenres.slice(0, 5).map((genre) => (
+            {insights?.topGenres.slice(0, 5).map((genre, index) => (
               <span
-                key={genre.name}
+                key={`${genre.name}-${index}`}
                 className="rounded-md border px-2 py-1 text-[0.7rem] text-fg-2"
                 style={{
                   borderColor: genreColor(genre.name, 0.42),
