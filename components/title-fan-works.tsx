@@ -1,5 +1,3 @@
-"use client";
-
 import { Heart, MessageCircle, Palette, PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 

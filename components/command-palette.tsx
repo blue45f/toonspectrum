@@ -1,5 +1,3 @@
-"use client";
-
 import { playSfx } from "@toonspectrum/core/fx";
 import { Command } from "cmdk";
 import { Search, TrendingUp, Library, BarChart3, Compass, CornerDownLeft, Sparkles, CalendarDays, Swords, Clock, Shuffle, Moon } from "lucide-react";

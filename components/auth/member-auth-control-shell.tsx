@@ -1,5 +1,3 @@
-"use client";
-
 import { LogIn } from "lucide-react";
 import { lazy, Suspense, useState, type ComponentType } from "react";
 

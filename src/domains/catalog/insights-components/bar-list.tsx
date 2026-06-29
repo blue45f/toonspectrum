@@ -1,4 +1,3 @@
-"use client";
 
 import { useInView } from "@/components/use-in-view";
 import { cn } from "@/lib/utils";

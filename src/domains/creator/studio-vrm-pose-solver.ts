@@ -1,4 +1,3 @@
-"use client";
 
 // MediaPipe Pose worldLandmarks → VRM 휴머노이드 본 로컬 회전(Euler) 솔버.
 //

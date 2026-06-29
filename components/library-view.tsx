@@ -1,7 +1,5 @@
-"use client";
-
 import { Sparkles, Plus, Trash2, Pencil, Check, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { MiniPoster } from "./rank-row";
 import { TitleCard } from "./title-card";
@@ -110,7 +108,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const [profile, setProfile] = useState<TasteProfile>(EMPTY_PROFILE);
   const [recs, setRecs] = useState<TasteRec[]>([]);
 
-  const titleIds = useMemo(() => {
+  const titleIds = (() => {
     const ids = new Set<string>();
     Object.keys(reads).forEach((id) => ids.add(id));
     Object.keys(ratings).forEach((id) => ids.add(id));
@@ -120,7 +118,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     collections.forEach((collection) => collection.titleIds.forEach((id) => ids.add(id)));
     recentlyViewed.forEach((id) => ids.add(id));
     return Array.from(ids).sort((a, b) => a.localeCompare(b));
-  }, [collections, ratings, reads, subscriptions, recentlyViewed]);
+  })();
 
   const titleIdsKey = titleIds.join(",");
 

@@ -1,5 +1,3 @@
-"use client";
-
 import { useUi } from "@/lib/ui-store";
 
 export function OpenSearchButton({

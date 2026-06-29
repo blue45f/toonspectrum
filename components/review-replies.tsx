@@ -1,5 +1,3 @@
-"use client";
-
 import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 

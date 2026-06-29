@@ -1,5 +1,3 @@
-"use client";
-
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useState, useEffect } from "react";

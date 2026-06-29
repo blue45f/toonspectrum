@@ -1,5 +1,3 @@
-"use client";
-
 import { UserRound } from "lucide-react";
 import { lazy, Suspense, useState, type ComponentType } from "react";
 

@@ -1,5 +1,3 @@
-"use client";
-
 import {
   BarChart3,
   CalendarDays,
@@ -68,9 +66,9 @@ export function MobileHeaderNavigation({
 
   return (
     <>
-      {/* 오버플로 메뉴 (<1024px): 9개 목적지 전부 + 내 서재 */}
+      {/* 오버플로 메뉴 (<1360px): 목적지 전부 + 내 서재 */}
       {menuOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="fixed inset-0 z-[60] min-[1360px]:hidden">
           <button
             aria-label="메뉴 닫기"
             onClick={closeMenu}

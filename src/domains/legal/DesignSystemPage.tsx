@@ -1,4 +1,3 @@
-"use client";
 
 import { Command, MapPin, Search, Sparkles, Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";

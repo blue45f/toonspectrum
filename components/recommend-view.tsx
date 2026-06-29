@@ -1,7 +1,5 @@
-"use client";
-
 import { Sparkles, Wand2, Shuffle, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { MiniPoster } from "./rank-row";
 import { Section, Rail } from "./section";
@@ -59,10 +57,7 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
   const [selectedFormat, setSelectedFormat] = useState<"all" | "webtoon" | "webnovel">("all");
   const [selectedStatus, setSelectedStatus] = useState<"all" | "ongoing" | "completed">("all");
 
-  const requestBody = useMemo(
-    () => JSON.stringify({ picked, seedId, ratings, reads }),
-    [picked, seedId, ratings, reads]
-  );
+  const requestBody = JSON.stringify({ picked, seedId, ratings, reads });
 
   useEffect(() => {
     let alive = true;

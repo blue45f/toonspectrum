@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -30,43 +30,40 @@ export function Card3D({
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      // 터치 포인터이거나 세컨더리 클릭 시엔 3D 틸트를 과도하게 주지 않음
-      if (e.pointerType === "touch") return;
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 터치 포인터이거나 세컨더리 클릭 시엔 3D 틸트를 과도하게 주지 않음
+    if (e.pointerType === "touch") return;
 
-      const card = cardRef.current;
-      if (!card) return;
+    const card = cardRef.current;
+    if (!card) return;
 
-      const rect = card.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
+    const rect = card.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
 
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
 
-      const rotateX = ((y - centerY) / centerY) * -maxTilt;
-      const rotateY = ((x - centerX) / centerX) * maxTilt;
+    const rotateX = ((y - centerY) / centerY) * -maxTilt;
+    const rotateY = ((x - centerX) / centerX) * maxTilt;
 
-      const glareX = (x / rect.width) * 100;
-      const glareY = (y / rect.height) * 100;
+    const glareX = (x / rect.width) * 100;
+    const glareY = (y / rect.height) * 100;
 
-      card.style.setProperty("--rx", `${rotateX.toFixed(2)}deg`);
-      card.style.setProperty("--ry", `${rotateY.toFixed(2)}deg`);
-      card.style.setProperty("--scale", `${scale}`);
-      card.style.setProperty("--glare-x", `${glareX.toFixed(1)}%`);
-      card.style.setProperty("--glare-y", `${glareY.toFixed(1)}%`);
-      card.style.setProperty("--glare-opacity", "1");
-    },
-    [maxTilt, scale],
-  );
+    card.style.setProperty("--rx", `${rotateX.toFixed(2)}deg`);
+    card.style.setProperty("--ry", `${rotateY.toFixed(2)}deg`);
+    card.style.setProperty("--scale", `${scale}`);
+    card.style.setProperty("--glare-x", `${glareX.toFixed(1)}%`);
+    card.style.setProperty("--glare-y", `${glareY.toFixed(1)}%`);
+    card.style.setProperty("--glare-opacity", "1");
+  };
 
-  const handlePointerEnter = useCallback(() => {
+  const handlePointerEnter = () => {
     setIsHovered(true);
-  }, []);
+  };
 
-  const handlePointerLeave = useCallback(() => {
+  const handlePointerLeave = () => {
     setIsHovered(false);
     const card = cardRef.current;
     if (!card) return;
@@ -74,7 +71,7 @@ export function Card3D({
     card.style.setProperty("--ry", "0deg");
     card.style.setProperty("--scale", "1");
     card.style.setProperty("--glare-opacity", "0");
-  }, []);
+  };
 
   return (
     <div

@@ -1,5 +1,3 @@
-"use client";
-
 import { MotionConfig } from "motion/react";
 
 // 전역 모션 설정 — OS 의 prefers-reduced-motion 존중

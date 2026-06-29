@@ -1,5 +1,3 @@
-"use client";
-
 import { EyeOff, Heart } from "lucide-react";
 import { useState } from "react";
 

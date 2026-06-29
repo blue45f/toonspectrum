@@ -1,5 +1,3 @@
-"use client";
-
 import { motion } from "motion/react";
 
 // 스크롤 진입 시 살짝 떠오르는 리빌 (once). reduced-motion 은 MotionConfig 가 처리.

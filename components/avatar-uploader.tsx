@@ -1,5 +1,3 @@
-"use client";
-
 import { Camera, Trash2, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
 

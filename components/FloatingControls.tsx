@@ -1,6 +1,6 @@
 import { useAmbientBgm, useFx } from "@toonspectrum/core/fx";
 import { Languages, Moon, Music, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/lib/cx";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -110,16 +110,16 @@ export function FloatingControls({
   const rootRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scheduleHide = useCallback(() => {
+  const scheduleHide = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setVisible(false), hideAfterMs);
-  }, [hideAfterMs]);
+  };
 
-  const reveal = useCallback(() => {
+  const reveal = () => {
     if (timer.current) clearTimeout(timer.current);
     setVisible(true);
     scheduleHide();
-  }, [scheduleHide]);
+  };
 
   // 초기 노출 후 자동 숨김 예약.
   useEffect(() => {
@@ -127,7 +127,7 @@ export function FloatingControls({
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [scheduleHide]);
+  });
 
   // 근접 포인터 감지 + 스크롤 — 클러스터 근처로 마우스가 오거나 스크롤하면 깨운다(터치는 hover 가 대신).
   useEffect(() => {
@@ -147,7 +147,7 @@ export function FloatingControls({
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [wakeRadiusPx, reveal]);
+  });
 
   const toggleSound = () => {
     if (fx.audio.muted) fx.setMuted(false);

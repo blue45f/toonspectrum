@@ -1,5 +1,3 @@
-"use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

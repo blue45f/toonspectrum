@@ -1,5 +1,3 @@
-"use client";
-
 import { SessionProvider } from "@/src/compat/auth-session";
 
 export function AuthSessionProvider({ children }: { children: React.ReactNode }) {

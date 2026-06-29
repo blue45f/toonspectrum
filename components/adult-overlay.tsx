@@ -1,5 +1,3 @@
-"use client";
-
 import { ShieldAlert } from "lucide-react";
 
 import { useApp, useHydrated } from "@/lib/store";

@@ -1,4 +1,3 @@
-"use client";
 
 import { EyeOff, Eye } from "lucide-react";
 

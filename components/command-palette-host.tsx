@@ -1,5 +1,3 @@
-"use client";
-
 import { lazy, Suspense, useEffect } from "react";
 
 import { useUi } from "@/lib/ui-store";

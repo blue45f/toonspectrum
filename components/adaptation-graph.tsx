@@ -1,5 +1,3 @@
-"use client";
-
 import { Tv, Film, Sparkles, Play } from "lucide-react";
 
 import { MiniPoster } from "./rank-row";

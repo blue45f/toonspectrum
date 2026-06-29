@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter } from "react-router-dom";
 
+import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
+import { BrowserCompatModal } from "../components/browser-compat-modal";
+
 import { AppShell } from "./AppShell";
 
 import { FloatingControls } from "@/components/FloatingControls";
@@ -79,8 +82,25 @@ function DeferredBackToTop() {
 }
 
 // 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
-// 콘텐츠 트리(라우터·페이지·커맨드 팔레트·오버레이·인증)는 토스와 단일 출처(AppShell)로 공유한다.
 export default function App() {
+  const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
+  const [showCompatModal, setShowCompatModal] = useState(false);
+
+  useEffect(() => {
+    const res = checkBrowserCompatibility();
+    setCompatResult(res);
+    // 추천 업데이트 대상이고, 세션 내에서 사용자가 아직 닫지 않았을 때 팝업 표시
+    const dismissed = sessionStorage.getItem("toonspectrum-compat-dismissed");
+    if (res.recommendUpdate && !dismissed) {
+      setShowCompatModal(true);
+    }
+  }, []);
+
+  const handleCloseCompatModal = () => {
+    setShowCompatModal(false);
+    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+  };
+
   return (
     <BrowserRouter>
       <AppShell
@@ -90,8 +110,14 @@ export default function App() {
         chromeOverlay={
           <>
             <DeferredBackToTop />
-            {/* DeskCloud 네이티브 통합(@heejun/deskcloud pk_ SDK — 각 desk env URL 게이팅, 미설정 시 비활성) */}
             <DeskCloudHost />
+            {compatResult && (
+              <BrowserCompatModal
+                isOpen={showCompatModal}
+                onClose={handleCloseCompatModal}
+                missingFeatures={compatResult.missingFeatures}
+              />
+            )}
           </>
         }
       />

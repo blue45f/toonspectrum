@@ -1,4 +1,3 @@
-"use client";
 
 // MediaPipe HandLandmarker(손 21개 랜드마크) → VRM 손가락 본 회전(Euler) 솔버.
 //

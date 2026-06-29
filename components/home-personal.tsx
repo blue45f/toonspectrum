@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 import { Section, Rail } from "./section";
 import { TitleCard } from "./title-card";
@@ -22,10 +20,7 @@ export function HomePersonal() {
 
   const hasEngagement = Object.keys(reads).length > 0 || Object.keys(ratings).length > 0;
   // 저장·평가하지 않고 '둘러보기만' 한 작품 — 재방문 시 빠른 복귀용(최신순).
-  const browseOnlyIds = useMemo(
-    () => recentlyViewed.filter((id) => !reads[id] && ratings[id] === undefined),
-    [recentlyViewed, reads, ratings]
-  );
+  const browseOnlyIds = recentlyViewed.filter((id) => !reads[id] && ratings[id] === undefined);
   const browseKey = browseOnlyIds.join(",");
   const hasData = hydrated && (hasEngagement || browseOnlyIds.length > 0);
 
@@ -75,8 +70,9 @@ export function HomePersonal() {
         if (!alive) return;
         // 응답 순서와 무관하게 방문 순서(최신순)를 유지.
         const byId = new Map((data.items ?? []).map((t) => [t.id, t]));
+        const ids = browseKey.split(",");
         setRecent(
-          browseOnlyIds
+          ids
             .map((id) => byId.get(id))
             .filter((t): t is Title => Boolean(t))
             .slice(0, 12)
@@ -90,7 +86,7 @@ export function HomePersonal() {
       controller.abort();
     };
     // browseKey(쉼표 결합 문자열)가 방문 목록 전체를 대표 — 개별 id 변화를 모두 포함한다.
-  }, [hydrated, browseKey, browseOnlyIds]);
+  }, [hydrated, browseKey]);
 
   if (!hasData) return null;
 

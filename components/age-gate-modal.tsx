@@ -1,5 +1,3 @@
-"use client";
-
 import * as Dialog from "@radix-ui/react-dialog";
 import { ShieldCheck } from "lucide-react";
 import { useState } from "react";

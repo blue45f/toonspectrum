@@ -1,5 +1,3 @@
-"use client";
-
 import {
   AlertCircle,
   BookOpen,
@@ -23,7 +21,7 @@ import {
   TrendingUp,
   Waves,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 
 import { PlatformTags } from "./availability";
 import { RankRow, MiniPoster } from "./rank-row";
@@ -413,7 +411,7 @@ export function RankingBoard({
   // 구글이 JS 렌더링으로 수집해 '웹툰 랭킹' 계열 질의의 사이트 구조 이해·사이트링크 노출에 쓰인다.
   useJsonLd(rankingItemListJsonLd(ranked, axisDetail.label));
 
-  const query = useMemo(() => {
+  const query = (() => {
     const params = new URLSearchParams({
       axis,
       period,
@@ -428,7 +426,7 @@ export function RankingBoard({
       refresh: "false",
     });
     return params.toString();
-  }, [axis, genre, minRating, period, platform, pricing, risingOnly, status, type]);
+  })();
 
   useEffect(() => {
     let alive = true;

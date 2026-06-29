@@ -1,5 +1,3 @@
-"use client";
-
 import { Music, ExternalLink } from "lucide-react";
 
 import { Section } from "./section";

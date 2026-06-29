@@ -1,5 +1,3 @@
-"use client";
-
 import { playSfx, resumeAudio, triggerParticleBurst } from "@toonspectrum/core/fx";
 
 import { cn } from "@/lib/utils";

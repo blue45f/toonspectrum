@@ -1,4 +1,3 @@
-"use client";
 
 // 본 회전 시간축 스무딩 — One-Euro 필터를 quaternion(slerp) 위에서 구현.
 //

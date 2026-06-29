@@ -1,9 +1,7 @@
-"use client";
-
 import Autoplay from "embla-carousel-autoplay";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { HeroBannerBadge } from "./hero-banner-badge";
 import { HERO_BANNER_AUTOPLAY_MS, HeroBannerSlide } from "./hero-banner-slide";
@@ -21,18 +19,17 @@ export function HeroBanner({ items }: { items: Title[] }) {
   const [selected, setSelected] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
 
-  const onSelect = useCallback(() => {
-    if (emblaApi) setSelected(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
-
   useEffect(() => {
     if (!emblaApi) return;
+    const onSelect = () => {
+      setSelected(emblaApi.selectedScrollSnap());
+    };
     onSelect();
     emblaApi.on("select", onSelect).on("reInit", onSelect);
     return () => {
       emblaApi.off("select", onSelect).off("reInit", onSelect);
     };
-  }, [emblaApi, onSelect]);
+  }, [emblaApi]);
 
   // 동작 최소화 선호 시 자동회전을 멈춰 둔다(WCAG 2.3 / 모션 민감 사용자 배려).
   useEffect(() => {
@@ -44,7 +41,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
   }, [emblaApi]);
 
   // 명시적 재생/정지 토글 — 움직이는 콘텐츠를 멈출 수단 제공(WCAG 2.2.2).
-  const toggleAutoplay = useCallback(() => {
+  const toggleAutoplay = () => {
     const autoplay = emblaApi?.plugins().autoplay;
     if (!autoplay) return;
     if (autoplay.isPlaying()) {
@@ -54,20 +51,17 @@ export function HeroBanner({ items }: { items: Title[] }) {
       autoplay.play();
       setIsPlaying(true);
     }
-  }, [emblaApi]);
+  };
 
   // 키보드 포커스가 배너에 들어오면 자동회전 일시정지(마우스 호버와 동일한 배려).
-  const onFocusEnter = useCallback(() => {
+  const onFocusEnter = () => {
     emblaApi?.plugins().autoplay?.stop();
-  }, [emblaApi]);
-  const onFocusLeave = useCallback(
-    (e: React.FocusEvent<HTMLDivElement>) => {
-      if (isPlaying && !e.currentTarget.contains(e.relatedTarget)) {
-        emblaApi?.plugins().autoplay?.play();
-      }
-    },
-    [emblaApi, isPlaying]
-  );
+  };
+  const onFocusLeave = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (isPlaying && !e.currentTarget.contains(e.relatedTarget)) {
+      emblaApi?.plugins().autoplay?.play();
+    }
+  };
 
   if (slides.length === 0) return null;
 

@@ -1,4 +1,3 @@
-"use client";
 
 import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, BarChart3 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";

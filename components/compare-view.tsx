@@ -1,5 +1,3 @@
-"use client";
-
 import { Search, X, Swords, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";

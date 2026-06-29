@@ -1,5 +1,3 @@
-"use client";
-
 import { Check, Info, X } from "lucide-react";
 
 import { useToastStore, type ToastTone } from "@/lib/toast-store";

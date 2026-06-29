@@ -1,5 +1,3 @@
-"use client";
-
 import { MemberAuthControl } from "./member-auth-control";
 
 import { AuthProvider } from "@/lib/firebaseAuth/AuthProvider";

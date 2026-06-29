@@ -1,5 +1,3 @@
-"use client";
-
 import { FolderHeart, Check, Plus } from "lucide-react";
 import { useState } from "react";
 

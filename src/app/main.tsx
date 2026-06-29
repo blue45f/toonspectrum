@@ -1,4 +1,5 @@
-import "../compat/storage-migrate"; // 반드시 최상단 — 스토어 hydrate 전에 레거시 키 이관
+import "../compat/polyfills"; // 최상단 브라우저 API 폴리필 보완
+import "../compat/storage-migrate"; // 스토어 hydrate 전에 레거시 키 이관
 import { PlatformContext, webPlatformBridge } from "@heejun/platform-bridge";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -22,4 +23,4 @@ createRoot(document.getElementById("root")!).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
-;
+

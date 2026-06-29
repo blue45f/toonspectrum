@@ -1,5 +1,3 @@
-"use client";
-
 import { LogIn, LogOut, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 

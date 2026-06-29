@@ -103,6 +103,22 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        if (typeof window === 'undefined') return;
+        var isSupported = typeof Promise !== 'undefined' && typeof fetch !== 'undefined' && typeof Symbol !== 'undefined';
+        if (!isSupported) {
+          var root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = '<div style="padding:40px 20px;text-align:center;font-family:sans-serif;background:#1a1410;color:#fff;min-height:100vh;">' +
+              '<h2 style="font-size:24px;margin-bottom:12px;color:#f59e0b;">브라우저 업데이트가 필요합니다</h2>' +
+              '<p style="font-size:14px;color:#ccc;max-width:480px;margin:0 auto 24px;">현재 사용 중인 브라우저는 최신 웹 표준을 지원하지 않아 웹사이트를 표시할 수 없습니다.<br/>Chrome, Edge, Safari 또는 Firefox 최신 버전으로 업데이트해 주세요.</p>' +
+              '<a href="https://www.google.com/chrome/" target="_blank" style="display:inline-block;padding:12px 24px;background:#f59e0b;color:#000;font-weight:bold;text-decoration:none;border-radius:12px;">Chrome 다운로드</a>' +
+              '</div>';
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>

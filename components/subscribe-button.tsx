@@ -1,5 +1,3 @@
-"use client";
-
 import { Bell, BellRing } from "lucide-react";
 
 import { useApp, useHydrated } from "@/lib/store";

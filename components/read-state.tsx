@@ -1,5 +1,3 @@
-"use client";
-
 import { Bookmark, BookOpen, CheckCircle2, XCircle } from "lucide-react";
 
 import type { ReadState } from "@/lib/types";

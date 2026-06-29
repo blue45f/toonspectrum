@@ -1,5 +1,3 @@
-"use client";
-
 import { useReveal } from "@toonspectrum/core/fx";
 import { createElement } from "react";
 

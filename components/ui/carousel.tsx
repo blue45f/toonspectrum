@@ -1,5 +1,3 @@
-"use client";
-
 import { useCarousel } from "@toonspectrum/core/carousel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
