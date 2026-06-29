@@ -1,4 +1,9 @@
-import { playSfx, triggerParticleBurst, useClickSfx } from "@toonspectrum/core/fx";
+import {
+  type SfxName,
+  playSfx,
+  registerBgmPlaylist,
+  triggerParticleBurst,
+} from "@toonspectrum/core/fx";
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -11,6 +16,13 @@ import { pingVisit } from "@/lib/visits-api";
 
 // 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
 import "@toonspectrum/core/fx/fx.css";
+
+const VOCAL_BGM_PLAYLIST = [
+  {
+    url: "/audio/toonspectrum-anime-vocal-opening.mp3",
+    label: "별빛 페이지 · Vocal Opening",
+  },
+] as const;
 
 const AgeGateHost = lazy(() =>
   import("@/components/age-gate-host").then((mod) => ({
@@ -76,13 +88,19 @@ function useVisitPing() {
   }, []);
 }
 
+/** 웹과 토스가 함께 쓰는 라이선스 보컬 BGM. 파일이 없거나 재생이 막히면 코어의 합성 BGM이 남는다. */
+function useVocalBgmPlaylist() {
+  useEffect(() => {
+    registerBgmPlaylist(VOCAL_BGM_PLAYLIST);
+  }, []);
+}
+
 /**
  * 전역 포인터 피드백. 모든 인터랙티브 요소에는 화려한 파티클 버스트와 상황별 맞춤 SFX를 더해요.
  */
 function useClickVisualFeedback() {
   useEffect(() => {
     const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (reducedMotion?.matches) return;
 
     let lastBurstAt = 0;
     const onPointerDown = (event: PointerEvent) => {
@@ -112,32 +130,41 @@ function useClickVisualFeedback() {
       let count = 8;
       let durationMs = 480;
       let spread = 0.65;
+      let sfx: SfxName = "tick";
 
       if (isTossAction) {
         chars = ["🪙", "💎", "✨"];
         count = 12;
         durationMs = 650;
         spread = 0.9;
-        playSfx("toss_coin");
+        sfx = "toss_coin";
       } else if (isLikeHeart) {
         chars = ["💖", "🌸", "✨"];
         count = 14;
         durationMs = 700;
         spread = 0.95;
-        playSfx("heart");
+        sfx = "heart";
       } else if (isTab) {
         chars = ["✨", "✦"];
         count = 6;
         durationMs = 400;
         spread = 0.5;
-        playSfx("tab");
+        sfx = "tab";
       } else if (isPrimaryCta) {
         chars = ["✦", "✧", "★", "⚡"];
         count = 16;
         durationMs = 720;
         spread = 1.0;
-        playSfx("sparkle");
+        sfx = "sparkle";
       }
+
+      // pointerdown 한 곳에서 상황별 SFX를 정확히 한 번만 재생한다.
+      if (!target.matches("[data-no-sfx]") && !target.closest("[data-no-sfx]")) {
+        playSfx(sfx);
+      }
+
+      // 동작 최소화는 시각 모션만 줄인다. 사용자가 명시적으로 켠 오디오 피드백은 유지한다.
+      if (reducedMotion?.matches) return;
 
       triggerParticleBurst(event.clientX, event.clientY, {
         count,
@@ -217,9 +244,8 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   useVisitPing();
-  // 전역 클릭 'tick' — 인터랙티브 요소(버튼·링크) 탭마다 미묘한 효과음. opt-out 은 [data-no-sfx].
-  // SFX 는 기본 ON(동작 최소화 선호 시 자동 OFF), 첫 제스처에서 오디오 컨텍스트가 언락된다.
-  useClickSfx();
+  useVocalBgmPlaylist();
+  // 전역 포인터 피드백 훅이 기본 클릭음과 상황별 SFX를 한 번만 라우팅한다.
   useClickVisualFeedback();
   return (
     <AuthSessionProvider>

@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 
 import { KIND_LABEL } from "./fan-cafe-utils";
+import { Card3D } from "./ui/card-3d";
 
 import type { FanCafePost, FanCafePostKind, FanCafeReply, FanCafeScopeFilter } from "@/lib/types";
 
@@ -833,8 +834,9 @@ function FanPostCard({
   const displayReplyCount = loadedCount ?? post.replyCount;
 
   return (
-    <article className="group rounded-2xl border border-line bg-card p-4 transition-[border-color,background-color,transform] duration-200 hover:border-line-strong hover:bg-raised/30 sm:p-5">
-      <header className="mb-3 flex items-start gap-3">
+    <Card3D maxTilt={7} scale={1.01}>
+      <article className="group rounded-2xl border border-line bg-card p-4 transition-[border-color,background-color,transform] duration-200 hover:border-line-strong hover:bg-raised/30 sm:p-5 shadow-sm">
+        <header className="mb-3 flex items-start gap-3">
         <span
           className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.14)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)]"
           style={{ background: `linear-gradient(140deg, ${post.author.avatar}, oklch(0.26 0.04 60))` }}
@@ -921,6 +923,7 @@ function FanPostCard({
         )}
       </div>
     </article>
+  </Card3D>
   );
 }
 

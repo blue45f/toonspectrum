@@ -2,8 +2,7 @@ import { motion } from "motion/react";
 
 import { getTarotVisual, tarotAccent, tarotFaceGradient } from "./tarot-visuals";
 
-import { cn } from "@/lib/utils";
-
+import { Card3D } from "@/components/ui/card-3d";
 
 interface TarotCardFaceProps {
   card: {
@@ -24,11 +23,9 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
   const reversed = card.type === "reversed";
 
   return (
-    <div
-      className={cn(
-        "relative flex aspect-[2/3] flex-col justify-between overflow-hidden rounded-2xl p-3 text-center",
-        className
-      )}
+    <Card3D maxTilt={14} scale={1.04} className={className}>
+      <div
+        className="relative flex aspect-[2/3] flex-col justify-between overflow-hidden rounded-2xl p-3 text-center"
       style={{
         backgroundImage: tarotFaceGradient(visual.hue),
         border: `2px solid ${accent}`,
@@ -99,5 +96,6 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
         </div>
       </div>
     </div>
+  </Card3D>
   );
 }

@@ -2,7 +2,8 @@
  * @toonspectrum/core/fx/audio — 웹(/)·토스(apps/toss) 양쪽이 공유하는 **isomorphic 오디오 엔진**.
  *
  * 설계 원칙
- * - **음원 파일 0개**: 모든 소리는 Oscillator/Filter/Gain 으로 코드 생성합니다(전부 절차생성 = 저작권 free).
+ * - **하이브리드 오디오**: SFX와 폴백 BGM은 Web Audio로 합성하고, 앱이 등록한 라이선스 음원은
+ *   호스티드 플레이리스트로 재생합니다.
  * - **단일 lazy AudioContext**: 최초 사용자 제스처 시점에 1개만 만들고 재사용해요(autoplay 정책 준수).
  * - **graceful no-op**: SSR·비브라우저·미지원·차단 환경에서 어떤 호출도 조용히 무시되고 절대 throw 하지 않습니다.
  *   (`window`/`AudioContext` 가드 + 전역 try/catch). 토스 웹뷰·브라우저 모두에서 안전.
@@ -11,8 +12,8 @@
  * BGM 성격(2026-06 리튠)
  * - **신나고 대중적**: 전부 장조(major) 팝 진행 + 빠른 템포 + 아르페지오 + 가벼운 킥/하이햇 비트 +
  *   밝은 음색(square/triangle/saw 리드). 5개 무드(밝은 팝 ☀️ · 칩튠 🎮 · 펑키 그루브 🪩 · 신스웨이브 🌃 · 해피 🎉).
- * - 여전히 **음원 파일 0개**(절차생성)라 저작권 free. 단, `public/audio/*.mp3` 호스티드 플레이리스트가
- *   있으면 그걸 우선 재생하고(선택), 없으면 생성형으로 graceful 폴백합니다(`registerBgmPlaylist`).
+ * - `public/audio/*.mp3` 호스티드 플레이리스트가 있으면 우선 재생하고, 없거나 등록이 해제되면
+ *   생성형으로 graceful 폴백합니다(`registerBgmPlaylist`).
  *
  * 공개 표면(요약)
  * - 효과음:   `playSfx('tick'|'pop'|'success'|'error')`
@@ -95,6 +96,7 @@ const MASTER_CEILING = 0.55;
 const DEFAULT_VOLUME = 0.55;
 
 let masterGain: GainNode | null = null;
+let sfxBus: GainNode | null = null;
 let userVolume = 1; // 0~1, 사용자 볼륨.
 let muted = false;
 
@@ -108,6 +110,39 @@ const ensureMasterGain = (ctx: AudioContext): GainNode => {
   gain.connect(ctx.destination);
   masterGain = gain;
   return gain;
+};
+
+/**
+ * SFX 전용 버스. 클릭이 연속되어도 피크가 튀지 않도록 가벼운 대역 제한과 컴프레서를 거친다.
+ * BGM은 이 버스를 통과하지 않으므로 보컬 음색과 다이내믹은 그대로 유지된다.
+ */
+const ensureSfxBus = (ctx: AudioContext): GainNode => {
+  if (sfxBus) return sfxBus;
+
+  const input = ctx.createGain();
+  const highpass = ctx.createBiquadFilter();
+  const lowpass = ctx.createBiquadFilter();
+  const compressor = ctx.createDynamicsCompressor();
+
+  input.gain.setValueAtTime(0.86, ctx.currentTime);
+  highpass.type = "highpass";
+  highpass.frequency.setValueAtTime(85, ctx.currentTime);
+  highpass.Q.setValueAtTime(0.55, ctx.currentTime);
+  lowpass.type = "lowpass";
+  lowpass.frequency.setValueAtTime(7600, ctx.currentTime);
+  lowpass.Q.setValueAtTime(0.4, ctx.currentTime);
+  compressor.threshold.setValueAtTime(-20, ctx.currentTime);
+  compressor.knee.setValueAtTime(18, ctx.currentTime);
+  compressor.ratio.setValueAtTime(3, ctx.currentTime);
+  compressor.attack.setValueAtTime(0.004, ctx.currentTime);
+  compressor.release.setValueAtTime(0.12, ctx.currentTime);
+
+  input.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(compressor);
+  compressor.connect(ensureMasterGain(ctx));
+  sfxBus = input;
+  return input;
 };
 
 /** 마스터 게인을 현재 mute/volume 상태로 부드럽게 적용. */
@@ -147,7 +182,7 @@ export type SfxName =
  */
 const playTone = (
   ctx: AudioContext,
-  master: GainNode,
+  output: AudioNode,
   options: {
     type: OscillatorType;
     frequency: number;
@@ -158,13 +193,35 @@ const playTone = (
     attackRatio?: number;
     /** 끝으로 갈수록 주파수를 미끄러뜨려 '딩/뽁' 느낌(선택). */
     glideToFrequency?: number;
+    /** 좌우 공간감(-1~1). 짧은 레이어가 한가운데 겹쳐 답답해지는 것을 방지한다. */
+    pan?: number;
+    /** 오실레이터 미세 피치(cent). 같은 음의 레이어에 자연스러운 폭을 만든다. */
+    detune?: number;
+    /** 레이어별 음색 정리용 필터. */
+    filterFrequency?: number;
+    filterType?: BiquadFilterType;
+    filterQ?: number;
   },
 ): void => {
-  const { type, frequency, startAt, duration, peak, attackRatio = 0.2, glideToFrequency } = options;
+  const {
+    type,
+    frequency,
+    startAt,
+    duration,
+    peak,
+    attackRatio = 0.2,
+    glideToFrequency,
+    pan = 0,
+    detune = 0,
+    filterFrequency,
+    filterType = "lowpass",
+    filterQ = 0.7,
+  } = options;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(frequency, startAt);
+  osc.detune.setValueAtTime(detune, startAt);
   if (glideToFrequency && glideToFrequency > 0) {
     osc.frequency.exponentialRampToValueAtTime(glideToFrequency, startAt + duration);
   }
@@ -173,31 +230,121 @@ const playTone = (
   gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), startAt + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
   osc.connect(gain);
-  gain.connect(master);
+
+  let tail: AudioNode = gain;
+  if (filterFrequency && filterFrequency > 0) {
+    const filter = ctx.createBiquadFilter();
+    filter.type = filterType;
+    filter.frequency.setValueAtTime(filterFrequency, startAt);
+    filter.Q.setValueAtTime(filterQ, startAt);
+    tail.connect(filter);
+    tail = filter;
+  }
+  if (typeof ctx.createStereoPanner === "function" && pan !== 0) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), startAt);
+    tail.connect(panner);
+    tail = panner;
+  }
+  tail.connect(output);
   osc.start(startAt);
   osc.stop(startAt + duration + 0.02);
 };
 
+/**
+ * 종이·유리 표면을 살짝 건드린 듯한 초단 노이즈 트랜지언트.
+ * 단순 오실레이터만 쓸 때 생기는 장난감 같은 전자음을 줄여준다.
+ */
+const playNoiseTransient = (
+  ctx: AudioContext,
+  output: AudioNode,
+  options: {
+    startAt: number;
+    duration: number;
+    peak: number;
+    frequency: number;
+    type?: BiquadFilterType;
+    q?: number;
+    pan?: number;
+  },
+): void => {
+  const {
+    startAt,
+    duration,
+    peak,
+    frequency,
+    type = "bandpass",
+    q = 0.8,
+    pan = 0,
+  } = options;
+  const frames = Math.max(1, Math.ceil(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let seed = (Math.floor(startAt * 1_000_000) ^ frames ^ 0x51f15e) >>> 0;
+  for (let i = 0; i < frames; i += 1) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    data[i] = ((seed >>> 0) / 2147483648 - 1) * (1 - i / frames);
+  }
+
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  filter.type = type;
+  filter.frequency.setValueAtTime(frequency, startAt);
+  filter.Q.setValueAtTime(q, startAt);
+  gain.gain.setValueAtTime(Math.max(0.0002, peak), startAt);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+
+  source.connect(filter);
+  filter.connect(gain);
+  let tail: AudioNode = gain;
+  if (typeof ctx.createStereoPanner === "function" && pan !== 0) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), startAt);
+    tail.connect(panner);
+    tail = panner;
+  }
+  tail.connect(output);
+  source.start(startAt);
+  source.stop(startAt + duration + 0.01);
+};
+
 /** SFX 합성 레시피 — 애니메이션 UI처럼 짧고 맑되 귀를 찌르지 않는 음색. */
 const SFX_RECIPES: Record<SfxName, (ctx: AudioContext, master: GainNode, now: number) => void> = {
-  // tick — 종이 책갈피를 톡 건드리는 낮은 삼각파 + 아주 작은 반짝임.
+  // tick — 종이 책갈피의 촉감 + 짧은 유리 공명. 고역 피크는 SFX 버스에서 한 번 더 정리한다.
   tick: (ctx, master, now) => {
-    playTone(ctx, master, {
-      type: "triangle",
-      frequency: 520,
+    playNoiseTransient(ctx, master, {
       startAt: now,
-      duration: 0.06,
-      peak: 0.1,
-      attackRatio: 0.18,
-      glideToFrequency: 440,
+      duration: 0.022,
+      peak: 0.03,
+      frequency: 1750,
+      q: 0.75,
+      pan: -0.08,
     });
     playTone(ctx, master, {
       type: "sine",
-      frequency: 1046.5,
-      startAt: now + 0.006,
-      duration: 0.038,
-      peak: 0.034,
-      attackRatio: 0.16,
+      frequency: 680,
+      startAt: now,
+      duration: 0.058,
+      peak: 0.064,
+      attackRatio: 0.07,
+      glideToFrequency: 610,
+      filterFrequency: 3000,
+      pan: -0.05,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 1360,
+      startAt: now + 0.004,
+      duration: 0.082,
+      peak: 0.018,
+      attackRatio: 0.08,
+      detune: 4,
+      filterFrequency: 4200,
+      pan: 0.12,
     });
   },
   // pop — 말풍선이 열리는 듯한 5도 상승. 반복 탭에도 거슬리지 않게 고역 피크를 억제한다.
@@ -324,14 +471,35 @@ const SFX_RECIPES: Record<SfxName, (ctx: AudioContext, master: GainNode, now: nu
   },
   // tab — 탭 전환 및 탭 필터 클릭 시의 착붙 피드백.
   tab: (ctx, master, now) => {
-    playTone(ctx, master, {
-      type: "triangle",
-      frequency: 698.46,
+    playNoiseTransient(ctx, master, {
       startAt: now,
-      duration: 0.07,
-      peak: 0.09,
-      attackRatio: 0.12,
-      glideToFrequency: 880,
+      duration: 0.018,
+      peak: 0.022,
+      frequency: 2200,
+      q: 0.9,
+      pan: -0.1,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 659.25,
+      startAt: now,
+      duration: 0.085,
+      peak: 0.07,
+      attackRatio: 0.07,
+      glideToFrequency: 783.99,
+      filterFrequency: 3300,
+      pan: -0.06,
+    });
+    playTone(ctx, master, {
+      type: "sine",
+      frequency: 1318.51,
+      startAt: now + 0.012,
+      duration: 0.11,
+      peak: 0.02,
+      attackRatio: 0.08,
+      detune: -3,
+      filterFrequency: 4700,
+      pan: 0.13,
     });
   },
   // heart — 좋아요/즐겨찾기 선택 시 발랄한 두근거림.
@@ -387,7 +555,7 @@ export const playSfx = (name: SfxName): void => {
   if (!ctx) return;
   void resumeAudio();
   try {
-    const master = ensureMasterGain(ctx);
+    const master = ensureSfxBus(ctx);
     const now = Math.max(audioNow(), ctx.currentTime) + 0.001;
     (SFX_RECIPES[name] ?? SFX_RECIPES.tick)(ctx, master, now);
   } catch {

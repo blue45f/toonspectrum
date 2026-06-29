@@ -4,6 +4,8 @@ import useEmblaCarousel from "embla-carousel-react";
 import { ArrowUpRight, Megaphone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Card3D } from "./ui/card-3d";
+
 import { cn } from "@/lib/utils";
 import { adConfig } from "@/src/components/deskcloud-native/config";
 import { useAppConfig } from "@/src/hooks/use-app-config";
@@ -206,33 +208,35 @@ function AdCard({ creative, client }: { creative: AdCreative; client: AdClient }
   }, [client, creative.creativeId]);
 
   return (
-    <a
-      ref={ref}
-      href={creative.linkUrl}
-      target="_blank"
-      rel="noopener noreferrer sponsored"
-      onClick={() => client.trackClick(creative.creativeId).catch(() => {})}
-      className="group relative block overflow-hidden rounded-2xl border border-line/70 bg-panel/40 surface-hl transition-[transform,box-shadow,border-color] duration-200 ease-out-expo hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-    >
-      <div className="aspect-[16/9] w-full overflow-hidden bg-card">
-        <img
-          src={creative.imageUrl}
-          alt={creative.alt}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition-transform duration-300 ease-out-expo group-hover:scale-[1.03]"
-        />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-[oklch(0.14_0.02_68/0.85)] to-transparent p-3 pt-10">
-        <p className="line-clamp-1 text-sm font-semibold text-on-accent drop-shadow-sm">
-          {creative.alt}
-        </p>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[0.7rem] font-semibold text-on-accent">
-          자세히 보기
-          <ArrowUpRight size={12} aria-hidden />
-        </span>
-      </div>
-    </a>
+    <Card3D maxTilt={10} scale={1.02}>
+      <a
+        ref={ref}
+        href={creative.linkUrl}
+        target="_blank"
+        rel="noopener noreferrer sponsored"
+        onClick={() => client.trackClick(creative.creativeId).catch(() => {})}
+        className="group relative block overflow-hidden rounded-2xl border border-line/70 bg-panel/40 surface-hl transition-[box-shadow,border-color] duration-200 ease-out-expo hover:border-line-strong hover:shadow-[0_22px_45px_-18px_oklch(0.14_0.02_68/0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <div className="aspect-[16/9] w-full overflow-hidden bg-card">
+          <img
+            src={creative.imageUrl}
+            alt={creative.alt}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-300 ease-out-expo group-hover:scale-[1.03]"
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-[oklch(0.14_0.02_68/0.85)] to-transparent p-3 pt-10">
+          <p className="line-clamp-1 text-sm font-semibold text-on-accent drop-shadow-sm">
+            {creative.alt}
+          </p>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[0.7rem] font-semibold text-on-accent">
+            자세히 보기
+            <ArrowUpRight size={12} aria-hidden />
+          </span>
+        </div>
+      </a>
+    </Card3D>
   );
 }
 

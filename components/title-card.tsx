@@ -4,6 +4,7 @@ import { AvailabilityDots, PlatformTags } from "./availability";
 import { bestPricing } from "./availability-utils";
 import { BookmarkButton } from "./bookmark-button";
 import { TitlePoster } from "./title-poster";
+import { Card3D } from "./ui/card-3d";
 import { GenreChip } from "./ui/chip";
 import { GenreSpectrum } from "./ui/spectrum-bar";
 import { RatingInline } from "./ui/stars";
@@ -67,8 +68,8 @@ export function TitleCard({
 
   if (feature) {
     return (
-      <article className={cn("group relative block rounded-2xl", className)}>
-        <div className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[transform,box-shadow,border-color] duration-200 surface-hl group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)] group-focus-within:border-line-strong">
+      <Card3D maxTilt={12} scale={1.02} className={cn("group relative block rounded-2xl", className)}>
+        <article className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[box-shadow,border-color] duration-200 surface-hl group-hover:border-line-strong group-hover:shadow-[0_22px_48px_-16px_oklch(0.14_0.02_68/0.45)] group-focus-within:border-line-strong">
           <div className="w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
             <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.04]">
               <TitlePoster title={title} size={size} rank={rank} />
@@ -100,51 +101,53 @@ export function TitleCard({
               className="mt-1"
             />
           </div>
-        </div>
+        </article>
         <StretchedTitleLink title={title} />
         <div className={cn("absolute right-2 top-2 z-20 transition-opacity duration-150", bookmarkReveal)}>
           <BookmarkButton titleId={title.id} size={14} />
         </div>
-      </article>
+      </Card3D>
     );
   }
 
   return (
-    <article className={cn("group relative block rounded-2xl", className)}>
-      <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-[0_18px_42px_-20px_oklch(0.14_0.02_68/0.4)] group-focus-within:border-line-strong">
-        <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
-          <TitlePoster title={title} size={size} rank={rank} />
+    <Card3D maxTilt={10} scale={1.025} className={cn("group relative block rounded-2xl", className)}>
+      <article className="relative block rounded-2xl">
+        <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[box-shadow,border-color] duration-200 group-hover:border-line-strong group-hover:shadow-[0_20px_45px_-18px_oklch(0.14_0.02_68/0.4)] group-focus-within:border-line-strong">
+          <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
+            <TitlePoster title={title} size={size} rank={rank} />
+          </div>
+          {/* 호버 보더 */}
+          <div className="pointer-events-none absolute inset-1 rounded-[0.9rem] ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />
+          <GenreSpectrum
+            genres={title.genres}
+            height={3}
+            className="absolute inset-x-1 bottom-1 rounded-xl opacity-90"
+          />
         </div>
-        {/* 호버 보더 */}
-        <div className="pointer-events-none absolute inset-1 rounded-[0.9rem] ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />
-        <GenreSpectrum
-          genres={title.genres}
-          height={3}
-          className="absolute inset-x-1 bottom-1 rounded-xl opacity-90"
-        />
-      </div>
 
-      <div className="mt-2.5 flex flex-col gap-1.5 px-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
-          <span className={cn("shrink-0 text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
+        <div className="mt-2.5 flex flex-col gap-1.5 px-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <RatingInline value={title.stats.ratingAvg} estimated={statsAreEstimated(title)} size="xs" />
+            <span className={cn("shrink-0 text-[0.7rem] font-medium", price.tone)}>{price.label}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-xs text-fg-2">
+              {STATUS_LABEL[title.status]} · {title.releaseYear}
+            </span>
+            <AvailabilityDots availability={title.availability} max={3} className="shrink-0" />
+          </div>
+          <p className="mt-1 line-clamp-2 border-t border-line/50 pt-2 text-xs leading-relaxed text-fg-2">
+            {title.synopsis}
+          </p>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 truncate text-xs text-fg-2">
-            {STATUS_LABEL[title.status]} · {title.releaseYear}
-          </span>
-          <AvailabilityDots availability={title.availability} max={3} className="shrink-0" />
-        </div>
-        <p className="mt-1 line-clamp-2 border-t border-line/50 pt-2 text-xs leading-relaxed text-fg-2">
-          {title.synopsis}
-        </p>
-      </div>
 
-      <StretchedTitleLink title={title} />
-      <div className={cn("absolute right-1.5 top-1.5 z-20 transition-opacity duration-150", bookmarkReveal)}>
-        <BookmarkButton titleId={title.id} size={14} />
-      </div>
-    </article>
+        <StretchedTitleLink title={title} />
+        <div className={cn("absolute right-1.5 top-1.5 z-20 transition-opacity duration-150", bookmarkReveal)}>
+          <BookmarkButton titleId={title.id} size={14} />
+        </div>
+      </article>
+    </Card3D>
   );
 }
 

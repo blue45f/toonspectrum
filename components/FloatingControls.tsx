@@ -183,7 +183,7 @@ export function FloatingControls({
         </button>
       )}
 
-      {/* 배경음악(생성형 앰비언트 BGM) — 기본 OFF, 켜면 첫 클릭에서 언락 + 무드 로테이션 */}
+      {/* 배경음악(보컬 애니 오프닝, 합성 BGM 폴백) — 기본 OFF, 첫 클릭에서 언락 */}
       {showBgm && (
         <div className="inline-flex items-center gap-1">
           <button
@@ -191,7 +191,7 @@ export function FloatingControls({
             onClick={handleBgmClick}
             aria-label={bgmOn ? "배경음악 끄기" : "배경음악 켜기"}
             aria-pressed={bgmOn}
-            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다음 곡)` : "배경음악 켜기"}
+            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다시 듣기)` : "보컬 배경음악 켜기"}
             data-no-sfx
             className={cx(
               PILL,
@@ -204,10 +204,10 @@ export function FloatingControls({
             <button
               type="button"
               onClick={() => nextBgm()}
-              title={`다음 애니 BGM 무드로 변경 (현재: ${bgmMood})`}
+              title={`보컬 오프닝 다시 듣기 (현재: ${bgmMood})`}
               className="inline-flex h-11 items-center rounded-full border border-line bg-panel/95 px-2.5 text-xs font-semibold text-fg-2 shadow-lg backdrop-blur hover:bg-raised hover:text-fg"
             >
-              🔄 {bgmMood}
+              ↻ {bgmMood}
             </button>
           )}
         </div>
