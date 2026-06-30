@@ -1,9 +1,10 @@
 import { Menu, Search, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { ToonSpectrumMark } from "@/components/visual-marks";
-
 import { theme } from "../theme";
+
+import { AuthMenuShell } from "@/components/auth/auth-menu-shell";
+import { ToonSpectrumMark } from "@/components/visual-marks";
 
 /**
  * 토스 셸 상단 브랜드 바 — 웹의 sticky SiteHeader 를 토스 크롬에 맞춰 얇게(≈46px) 옮긴 것.
@@ -126,7 +127,7 @@ export function TossTopBar({
         >
           <ToonSpectrumMark className="!size-7 !rounded-[0.55rem]" />
           <span
-            className="font-display"
+            className="hidden font-display min-[350px]:inline"
             style={{
               fontSize: 16,
               fontWeight: 700,
@@ -138,7 +139,7 @@ export function TossTopBar({
             툰스펙트럼
           </span>
           <span
-            className="font-display"
+            className="hidden font-display min-[440px]:inline"
             aria-hidden
             style={{
               fontSize: 9.5,
@@ -157,11 +158,13 @@ export function TossTopBar({
           </span>
         </button>
 
-        {/* 우상단 액션 클러스터 — 검색(통합 검색)·더보기(전 라우트 시트). 바가 소유한다. */}
+        {/* 우상단 액션 클러스터 — 검색·로그인/계정·더보기. 로그인은 공유 AuthMenu를 lazy-load해
+            비로그인 시 토스 appLogin 모달, 로그인 후에는 계정/로그아웃 메뉴를 한 탭에 제공한다. */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           {showSearch && (
             <ActionButton Icon={Search} label="통합 검색" onClick={onSearch} />
           )}
+          <AuthMenuShell />
           <ActionButton Icon={Menu} label="더보기 메뉴" onClick={onMore} haspopup />
         </div>
       </div>

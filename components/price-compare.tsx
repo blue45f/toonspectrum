@@ -97,28 +97,30 @@ function PriceCard({ row: r, multi }: { row: PlatformCost; multi: boolean }) {
   const readLabel = r.monthlyWon > 0 ? "구독" : formatWon(r.readPerEpWon);
   const ownLabel = r.ownPerEpWon > 0 ? formatWon(r.ownPerEpWon) : "—";
   return (
-    <Card3D maxTilt={6} scale={1.02}>
-      <li className="rounded-xl border border-line bg-card/60 p-3 shadow-sm">
-        <a
-          href={r.url}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center justify-between gap-2 text-fg hover:text-accent"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
-            <span className="truncate text-sm font-semibold">{r.name}</span>
-          </span>
-          <span className="shrink-0 rounded-full border border-line bg-raised px-2 py-0.5 text-[0.68rem] font-medium text-fg-2">
-            {r.modelLabel}
-          </span>
-        </a>
-        <div className="mt-2.5 grid grid-cols-2 gap-2">
-          <PriceCell icon={<Eye size={11} />} label="보기" value={readLabel} cheapest={!!r.cheapestRead && multi} />
-          <PriceCell icon={<Crown size={11} />} label="소장" value={ownLabel} cheapest={!!r.cheapestOwn && multi} />
+    <li>
+      <Card3D maxTilt={6} scale={1.02} className="rounded-xl">
+        <div className="rounded-xl border border-line bg-card/60 p-3 shadow-sm">
+          <a
+            href={r.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between gap-2 text-fg hover:text-accent"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
+              <span className="truncate text-sm font-semibold">{r.name}</span>
+            </span>
+            <span className="shrink-0 rounded-full border border-line bg-raised px-2 py-0.5 text-[0.68rem] font-medium text-fg-2">
+              {r.modelLabel}
+            </span>
+          </a>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <PriceCell icon={<Eye size={11} />} label="보기" value={readLabel} cheapest={!!r.cheapestRead && multi} />
+            <PriceCell icon={<Crown size={11} />} label="소장" value={ownLabel} cheapest={!!r.cheapestOwn && multi} />
+          </div>
         </div>
-      </li>
-    </Card3D>
+      </Card3D>
+    </li>
   );
 }
 

@@ -16,6 +16,7 @@ import {
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { isTossLoginAvailable, signIn, signInWithGoogleIdToken, tossLoginFlow } from "@/src/compat/auth-session-store";
+import { apiPath } from "@/src/infrastructure/api";
 
 
 // Google Identity Services(GIS) 클라이언트 — accounts.google.com/gsi/client 가 주입하는 전역.
@@ -187,7 +188,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const emailField = register("email");
 
   useEffect(() => {
-    fetch("/api/auth/providers")
+    fetch(apiPath("/auth/providers"))
       .then((r) => r.json())
       .then((p) => setProviders(p && typeof p === "object" ? p : {}))
       .catch(() => {});
@@ -241,7 +242,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     setErr("");
     try {
       if (mode === "signup") {
-        const r = await fetch("/api/auth/signup", {
+        const r = await fetch(apiPath("/auth/signup"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name, avatar, image }),

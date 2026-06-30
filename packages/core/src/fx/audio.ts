@@ -1462,6 +1462,15 @@ const startPlaylistTrack = (index: number): void => {
   playlistVoice = voice;
   syncTrackName(track.label);
 
+  // 파일 누락·디코딩 실패 시 보컬 플레이리스트 상태에 멈춰 있지 않고 생성형 OST로 복구한다.
+  const fallbackToProcedural = () => {
+    if (!playlistPlaying || playlistVoice !== voice) return;
+    playlistPlaying = false;
+    playlistVoice = null;
+    disposePlaylistVoice(voice);
+    engineStart();
+  };
+
   try {
     node.gain.setValueAtTime(0.0001, ctx.currentTime);
     node.gain.exponentialRampToValueAtTime(1, ctx.currentTime + FADE_S);
@@ -1476,8 +1485,16 @@ const startPlaylistTrack = (index: number): void => {
     },
     { once: true },
   );
-  void el.play().catch(() => {
-    // 자동재생 차단 등 — 다음 제스처에서 재시도되도록 조용히 무시.
+  el.addEventListener("error", fallbackToProcedural, { once: true });
+  void el.play().catch((error: unknown) => {
+    // 정책상 자동재생 차단은 다음 제스처를 기다리고, 실제 미디어 실패만 생성형 OST로 폴백한다.
+    if (
+      error instanceof DOMException &&
+      (error.name === "NotAllowedError" || error.name === "AbortError")
+    ) {
+      return;
+    }
+    fallbackToProcedural();
   });
 };
 
