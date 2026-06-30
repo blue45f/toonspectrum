@@ -7,6 +7,7 @@ import { HashRouter } from 'react-router-dom';
 // 웹의 레거시 스토리지 키 이관(스토어 hydrate 전에 최상단). 웹 main 과 동일 출처.
 import '@/src/compat/storage-migrate';
 import { installStaticCatalog } from '@/src/catalog-static';
+import { setRuntimeApiBase } from '@/src/infrastructure/runtime-api-base';
 
 import config from '../apps-in-toss.config.ts';
 import { App } from './App.tsx';
@@ -24,6 +25,10 @@ import './index.css';
 // 웹 본체의 사용자 테마는 건드리지 않고, 토스 WebView 엔트리에서만 정책 테마를 고정한다.
 document.documentElement.dataset.theme = 'light';
 document.documentElement.style.colorScheme = 'light';
+
+// 공유 API 클라이언트는 웹에선 동일 출처 /api를 쓰지만, 토스 WebView는 별도 호스트에서 실행된다.
+// 빌드 환경변수 유무와 무관하게 로그인·리뷰 등 모든 동적 API를 배포 오리진으로 고정한다.
+setRuntimeApiBase(API_BASE);
 
 // 공유 카탈로그 데이터 레이어(웹과 단일 출처) 설치 — 토스 정책만 옵션으로 주입한다:
 //  ① dataBase: 교차 출처 WebView 라 /data·/api 를 배포 오리진(API_BASE)에서 가져온다.

@@ -5,10 +5,11 @@ import ky, { HTTPError, type KyResponse, type Options } from "ky";
 
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
 import { getAuthToken } from "@/src/compat/auth-session-store";
+import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
 function apiBase() {
-  const env = import.meta.env.VITE_API_BASE?.replace(/\/$/, "");
-  return env ?? "";
+  const env = import.meta.env.VITE_API_BASE?.trim().replace(/\/+$/, "");
+  return env || getRuntimeApiBase();
 }
 
 // `/foo` → `/api/foo`, 이미 `/api/...` 이면 그대로. VITE_API_BASE 가 있으면 앞에 붙인다.

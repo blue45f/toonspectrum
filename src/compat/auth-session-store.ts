@@ -70,29 +70,108 @@ export function isTossLoginAvailable(): boolean {
   return typeof globalThis.__toonspectrumTossLogin === "function";
 }
 
+export type TossLoginErrorCode =
+  | "toss-unavailable"
+  | "toss-cancelled"
+  | "toss-sdk-failed"
+  | "toss-network-failed"
+  | "toss-not-configured"
+  | "toss-authorization-failed"
+  | "toss-upstream-failed"
+  | "toss-access-blocked"
+  | "toss-server-failed";
+
+export type TossLoginResult =
+  | { ok: true; error: null; message: null }
+  | { ok: false; error: TossLoginErrorCode; message: string | null };
+
+function tossLoginFailure(error: TossLoginErrorCode, message: string | null): TossLoginResult {
+  return { ok: false, error, message };
+}
+
+function responseErrorMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === "object" && "error" in payload) {
+    const error = (payload as { error?: unknown }).error;
+    if (typeof error === "string" && error.trim()) return error;
+  }
+  return fallback;
+}
+
 /**
  * 토스 로그인 흐름: 미니앱 appLogin 으로 인가코드 → 서버 mTLS 교환(/auth/toss/exchange) → 세션 확정.
  * 토스 WebView 에서 깨지는 소셜 OAuth 리다이렉트 대신 쓰는 네이티브 경로.
  */
-export async function tossLoginFlow(): Promise<{ ok: boolean; error: string | null }> {
+export async function tossLoginFlow(): Promise<TossLoginResult> {
   const requestCode = globalThis.__toonspectrumTossLogin;
-  if (typeof requestCode !== "function") return { ok: false, error: "toss-unavailable" };
-  const granted = await requestCode().catch(() => null);
-  if (!granted?.authorizationCode) return { ok: false, error: "toss-cancelled" };
-  const { api, apiPath } = await import("@/src/infrastructure/api");
-  const response = await api.raw(apiPath("/auth/toss/exchange"), {
-    method: "POST",
-    throwHttpErrors: false,
-    json: { authorizationCode: granted.authorizationCode, referrer: granted.referrer },
-  });
+  if (typeof requestCode !== "function") {
+    return tossLoginFailure("toss-unavailable", "토스 앱에서 다시 시도해 주세요.");
+  }
+
+  let granted: Awaited<ReturnType<typeof requestCode>>;
+  try {
+    granted = await requestCode();
+  } catch {
+    return tossLoginFailure(
+      "toss-sdk-failed",
+      "토스 로그인 창을 열지 못했어요. 토스 앱을 최신 버전으로 업데이트한 뒤 다시 시도해 주세요.",
+    );
+  }
+  if (!granted?.authorizationCode) return tossLoginFailure("toss-cancelled", null);
+
+  let response: Response;
+  try {
+    const { api, apiPath } = await import("@/src/infrastructure/api");
+    response = await api.raw(apiPath("/auth/toss/exchange"), {
+      method: "POST",
+      throwHttpErrors: false,
+      json: { authorizationCode: granted.authorizationCode, referrer: granted.referrer },
+    });
+  } catch {
+    return tossLoginFailure(
+      "toss-network-failed",
+      "로그인 서버에 연결하지 못했어요. 네트워크 상태를 확인하고 다시 시도해 주세요.",
+    );
+  }
   const payload = (await response.json().catch(() => null)) as
     | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
     | null;
-  if (!response.ok || !payload?.user) {
-    return { ok: false, error: payload?.error ?? "toss-auth-failed" };
+
+  if (!response.ok) {
+    if (response.status === 503) {
+      return tossLoginFailure(
+        "toss-not-configured",
+        responseErrorMessage(payload, "토스 로그인이 아직 설정되지 않았어요."),
+      );
+    }
+    if (response.status === 502) {
+      return tossLoginFailure(
+        "toss-upstream-failed",
+        responseErrorMessage(payload, "토스 로그인 서버가 응답하지 않아요. 잠시 후 다시 시도해 주세요."),
+      );
+    }
+    if (response.status === 401) {
+      return tossLoginFailure(
+        "toss-authorization-failed",
+        responseErrorMessage(payload, "토스 인증이 만료되었어요. 다시 로그인해 주세요."),
+      );
+    }
+    if (response.status === 403) {
+      return tossLoginFailure(
+        "toss-access-blocked",
+        responseErrorMessage(payload, "이 계정은 현재 로그인할 수 없어요."),
+      );
+    }
+    return tossLoginFailure(
+      "toss-server-failed",
+      responseErrorMessage(payload, "로그인 처리 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요."),
+    );
   }
-  persistSession({ user: payload.user, token: payload.token ?? null });
-  return { ok: true, error: null };
+
+  if (!payload?.user?.id || !payload.token) {
+    return tossLoginFailure("toss-server-failed", "로그인 서버 응답이 올바르지 않아요. 다시 시도해 주세요.");
+  }
+  persistSession({ user: payload.user, token: payload.token });
+  return { ok: true, error: null, message: null };
 }
 
 export async function signIn(provider?: string, options?: Record<string, unknown>) {

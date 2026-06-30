@@ -27,13 +27,13 @@ export type FullScreenAdFormat = 'interstitial' | 'rewarded';
  * 노출할 배너 광고 그룹 ID.
  * - 운영: 콘솔 발급값(`VITE_TOSS_AD_GROUP_ID` / `VITE_TOSS_FEED_AD_GROUP_ID`)
  * - 개발: 테스트 ID  · 운영인데 미설정: null → 미노출(빈 슬롯 방지)
+ * - 서로 다른 형식의 그룹 ID를 폴백으로 공유하지 않음(콘솔 형식과 실제 슬롯 불일치 방지)
  */
 export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
   const banner = import.meta.env.VITE_TOSS_AD_GROUP_ID?.trim();
   const feed = import.meta.env.VITE_TOSS_FEED_AD_GROUP_ID?.trim();
   if (format === 'feed') {
     if (feed) return feed;
-    if (banner) return banner;
     return import.meta.env.DEV ? TEST_FEED_AD_GROUP_ID : null;
   }
   if (banner) return banner;

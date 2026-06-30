@@ -16,6 +16,8 @@ const envSchema = z.object({
   // 포트 류: 숫자 문자열만 경고 대상(빈 값/미설정은 폴백 허용).
   PORT: z.string().regex(/^\d+$/, "PORT must be numeric").optional(),
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),
+  // 앱인토스 기본 Origin 외에 허용할 API Origin(쉼표 구분, 선택).
+  API_CORS_ALLOWED_ORIGINS: z.string().optional(),
   // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(lib/db).
   DATABASE_URL: z.string().min(1).optional(),
   // 세션 서명 비밀. 운영에선 AUTH_SESSION_SECRET(없으면 AUTH_STATE_SECRET) 권장.
@@ -30,6 +32,11 @@ const envSchema = z.object({
   // OAuth(선택 — 둘 다 있으면 실제 OAuth, 없으면 데모 폴백).
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+  // 앱인토스 서버 간 API용 mTLS PEM(내용 또는 파일 경로 중 한 쌍).
+  TOSS_MTLS_CERT: z.string().min(1).optional(),
+  TOSS_MTLS_KEY: z.string().min(1).optional(),
+  TOSS_MTLS_CERT_PATH: z.string().min(1).optional(),
+  TOSS_MTLS_KEY_PATH: z.string().min(1).optional(),
 });
 
 export type ValidatedEnv = z.infer<typeof envSchema>;
@@ -50,6 +57,8 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "DATABASE_URL",
   "OPENAI_API_KEY",
   "GOOGLE_OAUTH_CLIENT_SECRET",
+  "TOSS_MTLS_CERT",
+  "TOSS_MTLS_KEY",
 ];
 
 type Logger = Pick<Console, "warn" | "error">;

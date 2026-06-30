@@ -48,9 +48,10 @@ export interface FloatingControlsProps {
    *  - "bottom-left" (기본): 좌하단(웹) — 모바일에선 우하단 단일 토글로 회피.
    *  - "bottom-right": 우하단.
    *  - "above-nav"   : 우하단이되 하단 탭바 위로 띄움(토스 BottomNav 회피, safe-area 반영).
+   *  - "above-ad-nav": 우하단 고정 배너와 하단 탭바를 모두 피해 띄움.
    *  - "static"      : 위치 클래스 없음(부모가 배치 — 기존 웹 래퍼 호환).
    */
-  placement?: "bottom-left" | "bottom-right" | "above-nav" | "static";
+  placement?: "bottom-left" | "bottom-right" | "above-nav" | "above-ad-nav" | "static";
   /** 인터랙션 없을 때 숨김까지(ms). 기본 4000. */
   hideAfterMs?: number;
   /** 근접 포인터로 깨우는 반경(px). 기본 120. 0이면 근접 감지 비활성. */
@@ -73,6 +74,8 @@ const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, s
   "bottom-right": "fixed right-4 bottom-4 z-40",
   // 토스 BottomNav(~66px) 위로 safe-area 반영해 띄운다.
   "above-nav": "fixed right-3.5 z-[60] bottom-[calc(82px+env(safe-area-inset-bottom))]",
+  // 토스 표준 고정 배너(96px) + BottomNav 위. 광고 클릭 영역과 컨트롤이 겹치면 안 된다.
+  "above-ad-nav": "fixed right-3.5 z-[60] bottom-[calc(178px+env(safe-area-inset-bottom))]",
   static: "",
 };
 
@@ -82,6 +85,7 @@ const COLLAPSIBLE: Record<NonNullable<FloatingControlsProps["placement"]>, boole
   "bottom-left": true,
   "bottom-right": true,
   "above-nav": true,
+  "above-ad-nav": true,
   static: false,
 };
 

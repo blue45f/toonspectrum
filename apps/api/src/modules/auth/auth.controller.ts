@@ -20,7 +20,11 @@ import {
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
 import { signSession } from "../../../../../lib/server/session";
-import { handleTossLogin, isTossLoginConfigured } from "../../../../../lib/server/toss-login";
+import {
+  handleTossLogin,
+  isTossLoginConfigured,
+  TossLoginExchangeError,
+} from "../../../../../lib/server/toss-login";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
@@ -126,8 +130,24 @@ export class AuthController {
     let user;
     try {
       user = await handleTossLogin(authorizationCode, referrer);
-    } catch {
-      throw new HttpException({ error: "토스 로그인에 실패했어요." }, HttpStatus.UNAUTHORIZED);
+    } catch (error) {
+      if (error instanceof TossLoginExchangeError) {
+        if (error.code === "invalid-authorization") {
+          throw new HttpException(
+            { error: "토스 인증이 만료되었거나 이미 사용됐어요. 다시 로그인해 주세요." },
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+        if (error.code === "user-blocked") {
+          throw new HttpException({ error: error.message }, HttpStatus.FORBIDDEN);
+        }
+        throw new HttpException(
+          { error: "토스 로그인 서버와 통신하지 못했어요. 잠시 후 다시 시도해 주세요." },
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      // DB/세션 등 예상하지 못한 오류는 전역 예외 필터가 500으로 기록하고 내부 정보는 숨긴다.
+      throw error;
     }
     return { ok: true, user, token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)) };
   }

@@ -9,8 +9,9 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { isTossLoginAvailable, tossLoginFlow, useSession } from "@/src/compat/auth-session-store";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { RandomIntro } from "@/components/RandomIntro";
@@ -19,12 +20,19 @@ import { AppShell } from "@/src/app/AppShell";
 import { BannerAd } from "./components/BannerAd.tsx";
 import { MoreMenu } from "./components/MoreMenu.tsx";
 import { TossTopBar, TOP_BAR_HEIGHT } from "./components/TossTopBar.tsx";
-import { hapticFeedback } from "./lib/toss.ts";
+import { getBannerAdGroupId, useTossFullScreenAd } from "./lib/ads.ts";
+import { hapticFeedback, isInToss } from "./lib/toss.ts";
 import { theme } from "./theme";
 
 // 반투명 글래스 표면 — 토큰 색을 살짝 투과시켜(backdrop-blur 위) warm-ink 위에 떠 있게 한다.
 // raw rgba 대신 color-mix(토큰) 로 팔레트 단일 출처 유지(DESIGN.md: #000/#fff·raw 금지).
 const NAV_GLASS = "color-mix(in oklab, var(--color-panel) 90%, transparent)";
+
+// 광고가 사용자 흐름을 방해하지 않는 상한. 배너는 한 화면 한 슬롯만 유지하고, 전면형은
+// 자연스러운 주요 화면 전환 3회 + 최소 2분 간격을 모두 만족할 때만 사용자 탭에서 노출한다.
+const INTERSTITIAL_NAVIGATION_INTERVAL = 3;
+const INTERSTITIAL_MIN_INTERVAL_MS = 2 * 60 * 1000;
+const CONTENT_BOTTOM_INSET_WITH_BANNER = 168;
 
 // 하단 네비 = 홈·랭킹·추천·탐색·커뮤니티·서재 — 웹 모바일 탭바와 동일 멤버십/순서로 맞춘다(웹↔토스 sync).
 // 연재·놀이터·운세 등은 More 시트와 Explore/Home 섹션으로 한 탭 거리에 둔다(라우트는 모두 등록).
@@ -68,30 +76,10 @@ function isImmersiveEditor(path: string): boolean {
   return false;
 }
 
-// 리스트형(카드 그리드) 화면 — 콘텐츠가 끝나는 자연스러운 지점에 토스 인앱 배너 광고를 1회 배치한다
-// (ATF·핵심 액션 위 금지). 에디터·운세·놀이터 등 비리스트 화면엔 넣지 않는다.
-function isListPage(path: string): boolean {
-  return (
-    path === "/" ||
-    path.startsWith("/ranking") ||
-    path.startsWith("/calendar") ||
-    path.startsWith("/explore") ||
-    path.startsWith("/recommend") ||
-    path.startsWith("/search") ||
-    path.startsWith("/library") ||
-    path.startsWith("/tags") ||
-    path.startsWith("/authors") ||
-    path.startsWith("/news") ||
-    path.startsWith("/reviews")
-  );
-}
-
-// 토스 인앱 배너 광고를 노출할 화면 = 리스트형 전체 + 작품 상세(`/title/:id`).
-// 상세는 앱 최고 트래픽·긴 콘텐츠라 끝부분 배너가 자연스럽고(전환 CTA 위가 아닌 정보 끝),
-// 셸이 본문(main) 뒤에 얹으므로 콘텐츠 끝 = ATF 가 아니다(SSP 정책 준수). 광고그룹 미설정 시 자동 미노출.
-function showsBannerAd(path: string): boolean {
-  // 리스트형 + 작품 상세 + 커뮤니티(피드가 길게 스크롤되는 화면). 모두 폴드 아래 1회 배너.
-  return isListPage(path) || path.startsWith("/title/") || path.startsWith("/community");
+// 인증 처리·몰입형 에디터처럼 임시/전체화면 UI에는 광고를 붙이지 않는다. 나머지 화면은 하단 내비와
+// 본문 사이의 전용 빈 영역에 표준 배너 한 슬롯을 유지해, 핵심 액션을 덮지 않으면서 노출을 넓힌다.
+function canShowPersistentBanner(path: string): boolean {
+  return !isImmersiveEditor(path) && !path.startsWith("/auth/callback");
 }
 
 function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: string) => void }) {
@@ -179,12 +167,37 @@ function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: strin
  * 현재 경로·탭을 읽는다(웹 호환 레이어와 동일 출처).
  */
 function TossChrome() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
+  const interstitial = useTossFullScreenAd("interstitial");
+  const eligibleNavigationCountRef = useRef(0);
+  const lastInterstitialAtRef = useRef(0);
+
+  const { status } = useSession();
+  const hasAttemptedAutoLoginRef = useRef(false);
+
+  // 토스 인앱 환경 진입 시 자동 로그인 시도
+  useEffect(() => {
+    if (status === "unauthenticated" && !hasAttemptedAutoLoginRef.current && isTossLoginAvailable()) {
+      hasAttemptedAutoLoginRef.current = true;
+      void tossLoginFlow().then((result) => {
+        if (result.ok) {
+          console.log("Toss in-app auto login successful");
+        } else {
+          console.warn("Toss in-app auto login failed:", result.error, result.message);
+        }
+      });
+    }
+  }, [status]);
 
   const tab = activeTab(pathname);
   const immersive = isImmersiveEditor(pathname);
+  const persistentBanner =
+    canShowPersistentBanner(pathname) &&
+    !moreOpen &&
+    isInToss() &&
+    Boolean(getBannerAdGroupId("banner"));
   // 상단 바의 검색 액션은 다음에서 숨긴다: 검색 페이지(중복), 작품 상세(자체 sticky 헤더가 검색을 가짐),
   // 홈(히어로에 큰 '작품·작가·태그 검색' CTA 가 이미 있어 중복). 그 외엔 상단 바가 검색을 소유한다.
   const showSearch =
@@ -200,13 +213,37 @@ function TossChrome() {
     const main = document.getElementById("main-content");
     if (!main) return;
     main.style.paddingTop = immersive ? "0px" : `calc(${TOP_BAR_HEIGHT}px + env(safe-area-inset-top))`;
-    main.style.paddingBottom = immersive ? "0px" : "calc(72px + env(safe-area-inset-bottom))";
+    main.style.paddingBottom = immersive
+      ? "0px"
+      : persistentBanner
+        ? `calc(${CONTENT_BOTTOM_INSET_WITH_BANNER}px + env(safe-area-inset-bottom))`
+        : "calc(72px + env(safe-area-inset-bottom))";
     return () => {
       // 라우트 전환/언마운트 시 인셋을 되돌려, 몰입형↔일반 전환에서 잔여 패딩이 남지 않게 한다.
       main.style.paddingTop = "";
       main.style.paddingBottom = "";
     };
-  }, [immersive]);
+  }, [immersive, persistentBanner]);
+
+  const handleNavigate = (to: string) => {
+    if (`${pathname}${search}` === to) return;
+
+    if (interstitial.configured && interstitial.supported) {
+      eligibleNavigationCountRef.current += 1;
+      const now = Date.now();
+      const frequencyReached =
+        eligibleNavigationCountRef.current >= INTERSTITIAL_NAVIGATION_INTERVAL;
+      const intervalReached =
+        now - lastInterstitialAtRef.current >= INTERSTITIAL_MIN_INTERVAL_MS;
+
+      if (interstitial.ready && frequencyReached && intervalReached && interstitial.show()) {
+        eligibleNavigationCountRef.current = 0;
+        lastInterstitialAtRef.current = now;
+      }
+    }
+
+    navigate(to);
+  };
 
   return (
     <>
@@ -216,22 +253,29 @@ function TossChrome() {
       {!immersive && (
         <TossTopBar
           showSearch={showSearch}
-          onSearch={() => navigate("/search")}
+          onSearch={() => handleNavigate("/search")}
           onMore={() => setMoreOpen(true)}
         />
       )}
-      <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
-      {/* 리스트형·작품 상세 화면 콘텐츠 끝에 토스 인앱 배너 광고 1회(ATF 아님). 토스 밖/미설정 시 자동 미노출. */}
-      {!immersive && showsBannerAd(pathname) && (
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px 8px" }}>
-          <BannerAd format="feed" />
-        </div>
+      <MoreMenu
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onNavigate={handleNavigate}
+      />
+      {/* 하단 내비 위 전용 96px 표준 배너. 한 화면에 같은 형식 슬롯은 하나만 유지하며,
+          More 임시 시트·인증 처리·몰입형 에디터에서는 제거한다. */}
+      {persistentBanner && (
+        <BannerAd format="banner" gap={0} placement="above-nav" variant="expanded" />
       )}
-      {!immersive && <BottomNav tab={tab} onNavigate={(to) => navigate(to)} />}
+      {!immersive && <BottomNav tab={tab} onNavigate={handleNavigate} />}
       {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).
-          하단 탭바 위(above-nav)로 띄우고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
+          광고가 있으면 표준 배너까지 피해 올리고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
       {!immersive && (
-        <FloatingControls showTheme={false} showLang={false} placement="above-nav" />
+        <FloatingControls
+          showTheme={false}
+          showLang={false}
+          placement={persistentBanner ? "above-ad-nav" : "above-nav"}
+        />
       )}
     </>
   );

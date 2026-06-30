@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { appRoutes } from "../../src/app/routes/route-manifest";
 import { apiPath } from "../../src/infrastructure/api";
+import { setRuntimeApiBase } from "../../src/infrastructure/runtime-api-base";
 
 describe("vite migration", () => {
   it("declares the primary product routes in the Vite router manifest", () => {
@@ -26,8 +27,17 @@ describe("vite migration", () => {
   });
 
   it("keeps API calls rooted at /api by default for the Vite proxy", () => {
+    setRuntimeApiBase("");
     expect(apiPath("/ranking?limit=3")).toBe("/api/ranking?limit=3");
     expect(apiPath("search")).toBe("/api/search");
+  });
+
+  it("uses the runtime API origin injected by a cross-origin mini-app shell", () => {
+    setRuntimeApiBase("https://toonspectrum.vercel.app/");
+
+    expect(apiPath("/auth/toss/exchange")).toBe("https://toonspectrum.vercel.app/api/auth/toss/exchange");
+
+    setRuntimeApiBase("");
   });
 
   it("keeps the static catalog fetch installer out of the initial catalog engine bundle", () => {

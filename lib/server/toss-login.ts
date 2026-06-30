@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createPrivateKey, createPublicKey, randomUUID, X509Certificate } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { request as httpsRequest } from "node:https";
 
@@ -35,7 +35,24 @@ function readPem(contentEnv: string, pathEnv: string): string | null {
 function mtlsCreds(): { cert: string; key: string } | null {
   const cert = readPem("TOSS_MTLS_CERT", "TOSS_MTLS_CERT_PATH");
   const key = readPem("TOSS_MTLS_KEY", "TOSS_MTLS_KEY_PATH");
-  return cert && key ? { cert, key } : null;
+  if (!cert || !key) return null;
+
+  try {
+    const certificate = new X509Certificate(cert);
+    const privateKey = createPrivateKey(key);
+    const certPublicKey = certificate.publicKey.export({ type: "spki", format: "der" });
+    const keyPublicKey = createPublicKey(privateKey).export({ type: "spki", format: "der" });
+    const now = Date.now();
+    const validFrom = Date.parse(certificate.validFrom);
+    const validTo = Date.parse(certificate.validTo);
+
+    if (!certPublicKey.equals(keyPublicKey)) return null;
+    if (!Number.isFinite(validFrom) || !Number.isFinite(validTo) || now < validFrom || now >= validTo) return null;
+    return { cert, key };
+  } catch {
+    // 값이 존재해도 PEM 파싱 실패·인증서/키 불일치면 구성 완료로 취급하지 않는다.
+    return null;
+  }
 }
 
 /** 토스 로그인 mTLS 자격(인증서·키)이 구성됐는지. 미구성이면 엔드포인트가 503 게이트로 사용한다. */
@@ -46,6 +63,44 @@ export function isTossLoginConfigured(): boolean {
 interface TossResponse {
   status: number;
   body: { resultType?: string; success?: Record<string, unknown>; error?: unknown } | null;
+}
+
+export type TossLoginExchangeErrorCode = "invalid-authorization" | "upstream-unavailable" | "user-blocked";
+
+/** 컨트롤러가 안전한 HTTP 상태/메시지로 변환할 수 있는 토스 로그인 단계 오류. */
+export class TossLoginExchangeError extends Error {
+  constructor(
+    readonly code: TossLoginExchangeErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "TossLoginExchangeError";
+  }
+}
+
+function tossErrorCode(body: TossResponse["body"]): string | null {
+  if (typeof body?.error === "string") return body.error;
+  if (body?.error && typeof body.error === "object" && "errorCode" in body.error) {
+    const errorCode = (body.error as { errorCode?: unknown }).errorCode;
+    return typeof errorCode === "string" ? errorCode : null;
+  }
+  return null;
+}
+
+function tossErrorReason(body: TossResponse["body"]): string | null {
+  if (body?.error && typeof body.error === "object" && "reason" in body.error) {
+    const reason = (body.error as { reason?: unknown }).reason;
+    return typeof reason === "string" ? reason : null;
+  }
+  return null;
+}
+
+/** 토스는 invalid_grant를 HTTP 200 + resultType=FAIL의 중첩 reason으로도 반환한다. */
+export function isInvalidTossAuthorizationResponse(body: TossResponse["body"]): boolean {
+  const code = tossErrorCode(body);
+  const reason = tossErrorReason(body);
+  return code?.toLowerCase() === "invalid_grant" || /\binvalid_grant\b/i.test(reason ?? "");
 }
 
 // mTLS https 요청 — 전역 fetch 는 클라이언트 인증서를 실을 수 없어 node:https 로 직접 호출한다.
@@ -96,20 +151,39 @@ function tossRequest(
 
 // 1. 인가코드 → AccessToken(유효 1시간).
 async function generateAccessToken(authorizationCode: string, referrer: string): Promise<string> {
-  const { status, body } = await tossRequest(GENERATE_TOKEN_PATH, {
-    method: "POST",
-    body: { authorizationCode, referrer },
-  });
+  let response: TossResponse;
+  try {
+    response = await tossRequest(GENERATE_TOKEN_PATH, {
+      method: "POST",
+      body: { authorizationCode, referrer },
+    });
+  } catch (cause) {
+    throw new TossLoginExchangeError("upstream-unavailable", "토스 토큰 서버에 연결하지 못했어요.", { cause });
+  }
+  const { status, body } = response;
   const accessToken = typeof body?.success?.accessToken === "string" ? (body.success.accessToken as string) : null;
-  if (status !== 200 || !accessToken) throw new Error(`toss generate-token failed (${status})`);
+  if (status !== 200 || !accessToken) {
+    if (isInvalidTossAuthorizationResponse(body)) {
+      throw new TossLoginExchangeError("invalid-authorization", "토스 인가 코드가 만료되었거나 이미 사용됐어요.");
+    }
+    throw new TossLoginExchangeError("upstream-unavailable", `토스 토큰 발급에 실패했어요. (${status})`);
+  }
   return accessToken;
 }
 
 // 2. AccessToken → userKey(앱별 고유·평문). PII 는 암호화라 식별엔 쓰지 않는다.
 async function fetchUserKey(accessToken: string): Promise<string> {
-  const { status, body } = await tossRequest(LOGIN_ME_PATH, { method: "GET", accessToken });
+  let response: TossResponse;
+  try {
+    response = await tossRequest(LOGIN_ME_PATH, { method: "GET", accessToken });
+  } catch (cause) {
+    throw new TossLoginExchangeError("upstream-unavailable", "토스 사용자 정보 서버에 연결하지 못했어요.", { cause });
+  }
+  const { status, body } = response;
   const userKey = body?.success?.userKey;
-  if (status !== 200 || userKey == null) throw new Error(`toss login-me failed (${status})`);
+  if (status !== 200 || userKey == null) {
+    throw new TossLoginExchangeError("upstream-unavailable", `토스 사용자 정보를 확인하지 못했어요. (${status})`);
+  }
   return String(userKey);
 }
 
@@ -150,7 +224,7 @@ async function upsertTossUser(userKey: string): Promise<OAuthUser> {
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const block = getUserAuthBlock(user);
-  if (block) throw new Error(block);
+  if (block) throw new TossLoginExchangeError("user-blocked", block);
   return {
     id: userId,
     name: user?.name ?? name,

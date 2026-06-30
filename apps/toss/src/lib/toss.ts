@@ -1,6 +1,7 @@
 /**
  * 앱인토스 WebView 브릿지 래퍼.
- * 토스 환경이 아닐 때(일반 브라우저/개발)도 안전하게 폴백하도록 모두 try/catch로 감싸요.
+ * 토스 환경이 아닐 때(일반 브라우저/개발)는 안전하게 폴백하되, 로그인 오류는 상위 흐름이
+ * 사용자 취소·SDK 실패를 구분해 안내할 수 있도록 숨기지 않아요.
  */
 import {
   appLogin,
@@ -52,12 +53,8 @@ export async function tossAppLogin(): Promise<{
   authorizationCode: string;
   referrer: 'DEFAULT' | 'SANDBOX';
 } | null> {
-  try {
-    const result = await appLogin();
-    return result ?? null;
-  } catch {
-    return null;
-  }
+  const result = await appLogin();
+  return result ?? null;
 }
 
 /**

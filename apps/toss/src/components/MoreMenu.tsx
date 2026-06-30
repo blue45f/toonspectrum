@@ -33,7 +33,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { hapticFeedback } from "../lib/toss.ts";
 import { theme } from "../theme.ts";
@@ -47,7 +46,7 @@ import { theme } from "../theme.ts";
  * 노출해 "아무 것도 잃지 않게" 한다(웹 NAV + site-footer COLS + 홈 창작 링크 미러).
  *
  * 접근성: role=dialog + aria-modal, Esc/백드롭으로 닫기, 열릴 때 본문 스크롤 잠금 +
- * 시트 안 첫 포커스 + 포커스 트랩(Tab 루프). 각 항목 탭 시 navigate() 후 시트를 닫는다.
+ * 시트 안 첫 포커스 + 포커스 트랩(Tab 루프). 각 항목 탭 시 셸의 onNavigate를 거쳐 이동하고 닫는다.
  */
 
 type Item = { label: string; to: string; Icon: LucideIcon; hint?: string };
@@ -123,8 +122,15 @@ function focusable(root: HTMLElement | null): HTMLElement[] {
   );
 }
 
-export function MoreMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const navigate = useNavigate();
+export function MoreMenu({
+  open,
+  onClose,
+  onNavigate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onNavigate: (to: string) => void;
+}) {
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -177,7 +183,7 @@ export function MoreMenu({ open, onClose }: { open: boolean; onClose: () => void
     hapticFeedback("tickWeak");
     playSfx("close");
     onClose();
-    navigate(to);
+    onNavigate(to);
   };
 
   return (

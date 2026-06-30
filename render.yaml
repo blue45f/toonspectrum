@@ -35,6 +35,11 @@ services:
       # (운영에서 둘 다 없으면 토큰 발급이 거부되어 약한 폴백 비밀로의 세션 위조를 차단한다.)
       - key: AUTH_SESSION_SECRET
         generateValue: true
+      # 앱인토스 토스 로그인 서버 간 API용 mTLS PEM — 콘솔에서 발급한 인증서/키를 대시보드에 입력.
+      - key: TOSS_MTLS_CERT
+        sync: false
+      - key: TOSS_MTLS_KEY
+        sync: false
       # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
       - key: CATALOG_INGEST_TRIGGER_TOKEN
         generateValue: true

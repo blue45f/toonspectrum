@@ -6,6 +6,7 @@ import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { sessionAuth } from "./session-middleware";
 
@@ -16,6 +17,7 @@ async function bootstrap() {
   // bufferLogs: nestjs-pino 로거가 준비되기 전 로그를 버퍼링했다가 useLogger 이후 flush 한다.
   const app = await NestFactory.create(AppModule, { bodyParser: false, bufferLogs: true });
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(예외 필터의 5xx 로깅도 이걸 사용)
+  configureCors(app); // 앱인토스 공개/QR 테스트 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
