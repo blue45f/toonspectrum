@@ -114,6 +114,10 @@ type FullScreenAdCallbacks = Readonly<{
   onError?: (error: Error) => void;
 }>;
 
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 function isFullScreenAdSupported(): boolean {
   try {
     return Boolean(loadFullScreenAd.isSupported() && showFullScreenAd.isSupported());
@@ -171,12 +175,12 @@ export function useTossFullScreenAd(
         onError: (error) => {
           unregisterLoad();
           setReady(false);
-          onErrorRef.current?.(error);
+          onErrorRef.current?.(toError(error));
         },
       });
     } catch (error) {
       setReady(false);
-      onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+      onErrorRef.current?.(toError(error));
     }
   };
 
@@ -213,13 +217,13 @@ export function useTossFullScreenAd(
           }
         },
         onError: (error) => {
-          onErrorRef.current?.(error);
+          onErrorRef.current?.(toError(error));
           finishAndReload();
         },
       });
       return true;
     } catch (error) {
-      onErrorRef.current?.(error instanceof Error ? error : new Error(String(error)));
+      onErrorRef.current?.(toError(error));
       finishAndReload();
       return false;
     }
