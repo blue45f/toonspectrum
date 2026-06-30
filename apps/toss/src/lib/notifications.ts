@@ -11,19 +11,39 @@ export function requestPushAgreement(templateCode: string): Promise<'agree' | 'r
         resolve('error');
         return;
       }
-      const cleanup = requestNotificationAgreement({
+      let cleanupFn: (() => void) | null = null;
+      let resolved = false;
+
+      const handleEvent = (type: string) => {
+        if (resolved) return;
+        resolved = true;
+        if (type === 'newAgreement' || type === 'alreadyAgreed') {
+          resolve('agree');
+        } else {
+          resolve('reject');
+        }
+        setTimeout(() => {
+          if (cleanupFn) {
+            cleanupFn();
+          }
+        }, 0);
+      };
+
+      cleanupFn = requestNotificationAgreement({
         options: { templateCode },
         onEvent: ({ type }) => {
-          if (type === 'newAgreement' || type === 'alreadyAgreed') {
-            resolve('agree');
-          } else if (type === 'agreementRejected') {
-            resolve('reject');
-          }
-          cleanup();
+          handleEvent(type);
         },
         onError: () => {
-          resolve('error');
-          cleanup();
+          if (!resolved) {
+            resolved = true;
+            resolve('error');
+          }
+          setTimeout(() => {
+            if (cleanupFn) {
+              cleanupFn();
+            }
+          }, 0);
         },
       });
     } catch {
