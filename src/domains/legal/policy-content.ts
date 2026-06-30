@@ -5,7 +5,7 @@
 import { api, apiPath, httpStatus } from "@/src/infrastructure/api";
 
 export const TERMSDESK_BASE = "https://termsdesk.vercel.app";
-export const TERMSDESK_ORG_SLUG = "webtoon-index";
+export const TERMSDESK_ORG_SLUG = "toonspectrum";
 
 export type PolicySlug = "terms-of-service" | "privacy-policy";
 

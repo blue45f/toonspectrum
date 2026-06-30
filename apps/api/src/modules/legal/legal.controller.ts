@@ -1,7 +1,7 @@
 import { Controller, Get, Header, HttpException, HttpStatus, Param } from "@nestjs/common";
 
 const TERMSDESK_BASE = "https://termsdesk.vercel.app";
-const TERMSDESK_ORG_SLUG = "webtoon-index";
+const TERMSDESK_ORG_SLUG = "toonspectrum";
 const ALLOWED_POLICY_SLUGS = new Set(["terms-of-service", "privacy-policy"]);
 
 function termsdeskPolicyUrl(slug: string): string {

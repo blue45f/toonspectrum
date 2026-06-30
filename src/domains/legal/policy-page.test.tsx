@@ -34,7 +34,7 @@ describe("policy URL builders", () => {
   it("points policy fetches at the same-origin API proxy and source links at TermsDesk", () => {
     expect(policyApiUrl("terms-of-service")).toBe("/api/legal/policies/terms-of-service");
     expect(policyPublicUrl("privacy-policy")).toBe(
-      "https://termsdesk.vercel.app/p/webtoon-index/privacy-policy"
+      "https://termsdesk.vercel.app/p/toonspectrum/privacy-policy"
     );
   });
 });

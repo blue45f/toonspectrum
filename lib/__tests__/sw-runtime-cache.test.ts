@@ -154,10 +154,10 @@ function createWorker() {
 
 describe("service worker runtime caching", () => {
   it("retires superseded cache names so stale runtime caches get purged", () => {
-    expect(cacheName).toMatch(/^webtoon-index-pwa-v\d+$/);
-    expect(cacheName).not.toBe("webtoon-index-pwa-v1");
-    expect(cacheName).not.toBe("webtoon-index-pwa-v2");
-    expect(coverCacheName).toMatch(/^webtoon-index-covers-v\d+$/);
+    expect(cacheName).toMatch(/^toonspectrum-pwa-v\d+$/);
+    expect(cacheName).not.toBe("toonspectrum-pwa-v1");
+    expect(cacheName).not.toBe("toonspectrum-pwa-v2");
+    expect(coverCacheName).toMatch(/^toonspectrum-covers-v\d+$/);
   });
 
   it("precaches the app shell on install so first-run deep links can fall back offline", async () => {
@@ -175,7 +175,7 @@ describe("service worker runtime caching", () => {
 
   it("deletes previous-version caches on activate and claims clients", async () => {
     const worker = createWorker();
-    worker.seed("webtoon-index-pwa-v1", "/", new Response("old shell"));
+    worker.seed("toonspectrum-pwa-v1", "/", new Response("old shell"));
     worker.seed(cacheName, "/", new Response("current shell"));
 
     await worker.dispatchActivate();
@@ -222,7 +222,7 @@ describe("service worker runtime caching", () => {
 
   it("keeps the cover cache across activate while purging stale shell caches", async () => {
     const worker = createWorker();
-    worker.seed("webtoon-index-pwa-v2", "/", new Response("old shell"));
+    worker.seed("toonspectrum-pwa-v2", "/", new Response("old shell"));
     worker.seed(cacheName, "/", new Response("current shell"));
     worker.seed(coverCacheName, coverPath("https://img.ridicdn.net/cover.jpg"), new Response("cover"));
 

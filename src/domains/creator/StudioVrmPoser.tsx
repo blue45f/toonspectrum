@@ -5466,7 +5466,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 현재 비보안(HTTP) 주소로 접속 중입니다. 브라우저 정책상 웹캠은 HTTPS 또는 localhost 에서만 동작합니다.
                                 <br />
                                 {window.location.protocol === "https:" ? "" : (
-                                  window.location.hostname.includes("vercel") || window.location.hostname.includes("webtoon-index")
+                                  window.location.hostname.includes("vercel") || window.location.hostname.includes("toonspectrum")
                                     ? `현재 URL을 https:// 로 시작하게 변경하거나 ${window.location.origin.replace("http:", "https:")}${window.location.pathname} 로 접속하세요.`
                                     : `로컬 개발 시 http://localhost:5173 (또는 현재 dev 서버)로 직접 접속. 운영 환경은 HTTPS(${window.location.hostname.includes(".") ? "현재 도메인" : "https://toonspectrum.vercel.app/studio"})로 접속하세요.`
                                 )}

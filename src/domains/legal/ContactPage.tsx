@@ -3,7 +3,7 @@ import { Bug, Megaphone, Handshake, Database, MessagesSquare, ExternalLink } fro
 import { InquiryForm } from "@/components/inquiry-form";
 import { Container } from "@/components/section";
 
-const SUPPORT_URL = "https://termsdesk.vercel.app/support/webtoon-index";
+const SUPPORT_URL = "https://termsdesk.vercel.app/support/toonspectrum";
 
 const SUPPORT_LINKS = [
   {

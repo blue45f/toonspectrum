@@ -10,7 +10,7 @@
 const BASE = import.meta.env.VITE_DESK_PLATFORM_URL ?? "https://desk-platform.vercel.app";
 
 /** 이 앱의 슬러그(레포 이름). desk-platform이 앱별 집계를 구분하는 키. */
-export const APP_ID = "webtoon-index";
+export const APP_ID = "toonspectrum";
 
 /** 하루 1회 핑을 디바운스하기 위한 localStorage 키(YYYY-MM-DD 저장). */
 const LAST_PING_KEY = "visits:last-ping";

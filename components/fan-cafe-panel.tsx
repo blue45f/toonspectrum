@@ -40,7 +40,7 @@ const FAN_CAFE_REPLY_MAX_LENGTH = 700;
 const FAN_CAFE_POST_TITLE_MAX_LENGTH = 80;
 const FAN_CAFE_POST_TEXT_MAX_LENGTH = 1200;
 const FAN_CAFE_POST_TAGS_MAX_LENGTH = 80;
-const FAN_CAFE_ACTIVITY_STORAGE_KEY = "webtoon-index-fan-cafe-activity-log-v1";
+const FAN_CAFE_ACTIVITY_STORAGE_KEY = "toonspectrum-fan-cafe-activity-log-v1";
 
 type FanCafeKindFilter = FanCafePostKind | "all";
 

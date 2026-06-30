@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 
 import { Container } from "@/components/section";
 
-const FAN_CAFE_ACTIVITY_STORAGE_KEY = "webtoon-index-fan-cafe-activity-log-v1";
-const TERMS_DEMO_CHECKLIST_STORAGE_KEY = "webtoon-index-terms-demo-checklist-v1";
+const FAN_CAFE_ACTIVITY_STORAGE_KEY = "toonspectrum-fan-cafe-activity-log-v1";
+const TERMS_DEMO_CHECKLIST_STORAGE_KEY = "toonspectrum-terms-demo-checklist-v1";
 
 const TERMS_DEMO_CHECKS = [
   {

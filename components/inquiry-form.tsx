@@ -9,7 +9,7 @@ import {
 } from "@/lib/inquiry-api";
 
 // 인앱 문의 폼 — /contact·/feedback 공용. desk-platform 공개 문의 API로 클라이언트에서 직접 POST한다
-// (POST /api/v1/apps/webtoon-index/inquiries — lib/inquiry-api.ts submitInquiry). /support 게시판과
+// (POST /api/v1/apps/toonspectrum/inquiries — lib/inquiry-api.ts submitInquiry). /support 게시판과
 // 동일한 백엔드를 쓰며, 등록된 문의는 그 게시판에 공개로 표시된다.
 // website 필드는 허니팟: 사람에겐 보이지 않고, 채워지면 전송을 생략하고 성공처럼 응답한다(봇 무음 처리).
 

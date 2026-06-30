@@ -1,6 +1,6 @@
  
-const CACHE_NAME = 'webtoon-index-pwa-v3'
-const COVER_CACHE_NAME = 'webtoon-index-covers-v1'
+const CACHE_NAME = 'toonspectrum-pwa-v3'
+const COVER_CACHE_NAME = 'toonspectrum-covers-v1'
 const COVER_CACHE_LIMIT = 300
 
 const cacheCopy = (request, response) => {

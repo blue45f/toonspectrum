@@ -10,7 +10,7 @@
 const BASE = import.meta.env.VITE_DESK_PLATFORM_URL ?? "https://desk-platform.vercel.app";
 
 /** 이 앱의 슬러그(레포 이름). desk-platform이 앱별 게시판을 구분하는 키. */
-export const APP_ID = "webtoon-index";
+export const APP_ID = "toonspectrum";
 
 /** 문의 카테고리 value. @desk/shared의 INQUIRY_CATEGORIES와 동일(가이드 §3). */
 export type InquiryCategory = "partnership" | "bug" | "feedback" | "usage";
