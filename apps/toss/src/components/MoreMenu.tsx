@@ -36,6 +36,8 @@ import { useEffect, useId, useRef } from "react";
 
 import { hapticFeedback } from "../lib/toss.ts";
 import { theme } from "../theme.ts";
+import { useState } from "react";
+import { requestPushAgreement } from "../lib/notifications.ts";
 
 /**
  * 토스 셸 "더보기"(More) 시트.
@@ -134,6 +136,31 @@ export function MoreMenu({
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const [pushAgreed, setPushAgreed] = useState(() => {
+    try {
+      return localStorage.getItem("toonspectrum_toss_push_agreed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handlePushAgreement = async () => {
+    hapticFeedback("tickWeak");
+    const templateCode = import.meta.env.VITE_TOSS_NOTIFICATION_TEMPLATE_CODE || "ALERT_OTP_TEMPLATE";
+    const res = await requestPushAgreement(templateCode);
+    if (res === "agree") {
+      setPushAgreed(true);
+      try {
+        localStorage.setItem("toonspectrum_toss_push_agreed", "true");
+      } catch {}
+    } else if (res === "reject") {
+      setPushAgreed(false);
+      try {
+        localStorage.setItem("toonspectrum_toss_push_agreed", "false");
+      } catch {}
+    }
+  };
 
   // 열릴 때: Esc 닫기 + 본문 스크롤 잠금 + 첫 포커스 + Tab 포커스 트랩.
   useEffect(() => {
@@ -277,6 +304,46 @@ export function MoreMenu({
             WebkitOverflowScrolling: "touch",
           }}
         >
+          {/* 알림 설정 배너 */}
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 14,
+              border: `1px solid ${theme.border}`,
+              background: theme.surfaceAlt,
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <strong style={{ display: "block", fontSize: 14, fontWeight: 800, color: theme.text }}>
+                  알림 설정
+                </strong>
+                <span style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2, display: "block" }}>
+                  오늘의 추천 만화 & 신규 소식 알림 받기
+                </span>
+              </div>
+              <button
+                type="button"
+                className="pressable"
+                onClick={handlePushAgreement}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 10,
+                  border: `1px solid ${pushAgreed ? theme.accent : theme.border}`,
+                  background: pushAgreed ? "rgba(116,214,163,0.1)" : theme.surface,
+                  color: pushAgreed ? theme.accent : theme.text,
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {pushAgreed ? "동의됨" : "받기"}
+              </button>
+            </div>
+          </div>
+
           {GROUPS.map((group) => (
             <section key={group.title} style={{ marginTop: 14 }}>
               <h3

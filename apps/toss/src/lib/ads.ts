@@ -4,6 +4,7 @@ import {
   TossAds,
   type TossAdsAttachBannerOptions,
 } from '@apps-in-toss/web-framework';
+import { pauseAudioForAd, resumeAudioAfterAd } from '@toonspectrum/core/fx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
@@ -14,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * 용어: 여기서 다루는 건 전부 '배너 광고'예요. SDK에는 광고 타입 구분이 없고,
  * 슬롯 종류(일반 배너 / 피드형 배너 등)는 콘솔 광고 그룹(adGroupId)이 결정해요.
  */
+
 
 // WebView 배너 테스트 ID(공식 문서). 실제 광고 ID로 테스트하면 정책 위반이라 dev 전용.
 const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
@@ -202,10 +204,12 @@ export function useTossFullScreenAd(
       if (finished) return;
       finished = true;
       unregisterShow();
+      resumeAudioAfterAd();
       loadRef.current();
     };
 
     try {
+      pauseAudioForAd();
       showUnregisterRef.current = showFullScreenAd({
         options: { adGroupId },
         onEvent: (event) => {

@@ -23,6 +23,7 @@ import { TossTopBar, TOP_BAR_HEIGHT } from "./components/TossTopBar.tsx";
 import { getBannerAdGroupId, useTossFullScreenAd } from "./lib/ads.ts";
 import { hapticFeedback, isInToss } from "./lib/toss.ts";
 import { theme } from "./theme";
+import { Analytics } from "@apps-in-toss/web-framework";
 
 // 반투명 글래스 표면 — 토큰 색을 살짝 투과시켜(backdrop-blur 위) warm-ink 위에 떠 있게 한다.
 // raw rgba 대신 color-mix(토큰) 로 팔레트 단일 출처 유지(DESIGN.md: #000/#fff·raw 금지).
@@ -190,6 +191,43 @@ function TossChrome() {
       });
     }
   }, [status]);
+
+  // 토스 Analytics: 화면 진입 및 전환 로깅
+  useEffect(() => {
+    try {
+      let logName = "home_screen";
+      if (pathname === "/") {
+        logName = "home_screen";
+      } else if (pathname.startsWith("/ranking")) {
+        logName = "ranking_screen";
+      } else if (pathname.startsWith("/recommend")) {
+        logName = "recommend_screen";
+      } else if (pathname.startsWith("/explore")) {
+        logName = "explore_screen";
+      } else if (pathname.startsWith("/community")) {
+        logName = "community_screen";
+      } else if (pathname.startsWith("/library")) {
+        logName = "library_screen";
+      } else if (pathname.startsWith("/studio")) {
+        logName = "studio_screen";
+      } else if (pathname.startsWith("/create")) {
+        logName = "editor_screen";
+      } else if (pathname.startsWith("/search")) {
+        logName = "search_screen";
+      } else if (pathname.startsWith("/title/")) {
+        logName = "title_detail_screen";
+      } else {
+        logName = "other_screen";
+      }
+
+      Analytics.screen({
+        log_name: logName,
+        path: pathname + search,
+      });
+    } catch {
+      // 일반 브라우저/프리뷰 환경 등 Analytics 브릿지가 작동하지 않는 환경에선 조용히 무시
+    }
+  }, [pathname, search]);
 
   const tab = activeTab(pathname);
   const immersive = isImmersiveEditor(pathname);

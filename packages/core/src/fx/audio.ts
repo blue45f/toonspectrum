@@ -1905,3 +1905,64 @@ export const setMasterVolume = (volume: number): void => {
 
 /** 현재 마스터 볼륨(0~1). */
 export const getMasterVolume = (): number => userVolume;
+
+let pausedForAd = false;
+let bgmWasPlayingBeforeAd = false;
+
+/** 광고 재생 시 BGM과 오디오 컨텍스트를 일시정지해요. */
+export const pauseAudioForAd = (): void => {
+  if (pausedForAd) return;
+  pausedForAd = true;
+  ensureWired();
+
+  bgmWasPlayingBeforeAd = state.bgmEnabled && anyBgmPlaying();
+
+  if (bgmWasPlayingBeforeAd) {
+    bgmStop();
+  }
+
+  if (playlistVoice?.el) {
+    try {
+      playlistVoice.el.pause();
+    } catch {
+      // no-op
+    }
+  }
+
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "running") {
+    void ctx.suspend().catch(() => {});
+  }
+};
+
+/** 광고 재생이 끝나면 BGM과 오디오 컨텍스트를 재개해요. */
+export const resumeAudioAfterAd = (): void => {
+  if (!pausedForAd) return;
+  pausedForAd = false;
+
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    void ctx.resume()
+      .then(() => {
+        if (bgmWasPlayingBeforeAd && state.bgmEnabled) {
+          bgmStart();
+          if (playlistVoice?.el) {
+            void playlistVoice.el.play().catch(() => {});
+          }
+        }
+      })
+      .catch(() => {
+        if (bgmWasPlayingBeforeAd && state.bgmEnabled) {
+          bgmStart();
+        }
+      });
+  } else {
+    if (bgmWasPlayingBeforeAd && state.bgmEnabled) {
+      bgmStart();
+      if (playlistVoice?.el) {
+        void playlistVoice.el.play().catch(() => {});
+      }
+    }
+  }
+};
+
