@@ -4,6 +4,7 @@ import {
   BRUSH_PRESETS,
   STABILIZER_MAX,
   gpenSegmentWidths,
+  polylineLength,
   processFreehandPoints,
   processPencilPoints,
   screentoneDotRadius,
@@ -29,6 +30,14 @@ describe("BRUSH_PRESETS", () => {
       expect(preset.defaultOpacity).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("polylineLength", () => {
+  it("sums segment lengths for flat and diagonal strokes", () => {
+    expect(polylineLength([0, 0, 10, 0])).toBe(10);
+    expect(polylineLength([0, 0, 3, 4])).toBe(5);
+    expect(polylineLength([0, 0])).toBe(0);
   });
 });
 

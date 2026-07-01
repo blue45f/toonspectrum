@@ -30,6 +30,18 @@ export function rectContainsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 }
 
+/** StudioPage.spawnCenter — 선택 패널 중심, 없으면 캔버스 중심. */
+export function viewportSpawnCenter(
+  canvasW: number,
+  canvasH: number,
+  selectedFrame?: Rect | null
+): [number, number] {
+  if (selectedFrame) {
+    return [selectedFrame.x + selectedFrame.w / 2, selectedFrame.y + selectedFrame.h / 2];
+  }
+  return [canvasW / 2, canvasH / 2];
+}
+
 /** 마퀴가 의미 있는 크기인지(우발 클릭 제외). */
 export function isMeaningfulMarquee(rect: Rect, minSize = MIN_MARQUEE): boolean {
   return rect.w > minSize && rect.h > minSize;

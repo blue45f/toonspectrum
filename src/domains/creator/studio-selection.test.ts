@@ -9,6 +9,7 @@ import {
   rectsIntersect,
   selectIdsByMarquee,
   unionBounds,
+  viewportSpawnCenter,
 } from "./studio-selection";
 
 describe("studio-selection", () => {
@@ -20,6 +21,12 @@ describe("studio-selection", () => {
     const frame = { x: 24, y: 24, w: 672, h: 560 };
     expect(rectContainsPoint(frame, 360, 300)).toBe(true);
     expect(rectContainsPoint(frame, 0, 0)).toBe(false);
+  });
+
+  it("viewportSpawnCenter matches StudioPage spawnCenter contract", () => {
+    const frame = { x: 100, y: 200, w: 400, h: 300 };
+    expect(viewportSpawnCenter(720, 2000, frame)).toEqual([300, 350]);
+    expect(viewportSpawnCenter(720, 2000, null)).toEqual([360, 1000]);
   });
 
   it("detects rectangle intersection for marquee pick", () => {

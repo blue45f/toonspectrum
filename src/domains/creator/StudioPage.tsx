@@ -111,9 +111,12 @@ import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
-  addDialogueBubbles as shippedAddDialogueBubbles,
-  addSceneTemplate as shippedAddSceneTemplate,
+  runStudioPageAddDialogueBubbles,
+  runStudioPageAddSceneTemplate,
+  studioSpawnCenter,
   type StudioElementLike,
+  type StudioPageInsertState,
+  type StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
 import {
   type ExportFormat,
@@ -4241,10 +4244,27 @@ function StudioCuttoonEditor() {
     return () => globalThis.removeEventListener("paste", onPaste);
   }, []);
 
+  function studioInsertState(): StudioPageInsertState {
+    const selectedFrame: StudioPageSelectedFrame | null =
+      selected?.type === "frame"
+        ? {
+            type: "frame",
+            x: selected.x,
+            y: selected.y,
+            width: selected.width,
+            height: selected.height,
+          }
+        : null;
+    return {
+      elements: elements as StudioElementLike[],
+      canvasH,
+      canvasW: CANVAS_W,
+      selected: selectedFrame,
+    };
+  }
   // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
   function spawnCenter(): [number, number] {
-    if (selected?.type === "frame") return [selected.x + selected.width / 2, selected.y + selected.height / 2];
-    return [CANVAS_W / 2, canvasH / 2];
+    return studioSpawnCenter(studioInsertState());
   }
   function addText() {
     const [cx, cy] = spawnCenter();
@@ -4513,29 +4533,10 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
   }
-  // 장면 템플릿 삽입 — studio-comipo-shipped 와 동일 경로.
+  // 장면 템플릿 삽입 — runStudioPageAddSceneTemplate 단일 shipped 경로.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
-    const [cx, cy] = spawnCenter();
-    const result = shippedAddSceneTemplate(
-      elements as StudioElementLike[],
-      {
-        templateId: template.id,
-        viewCenterX: cx,
-        viewCenterY: cy,
-        selectedFrame:
-          selected?.type === "frame"
-            ? {
-                x: selected.x,
-                y: selected.y,
-                width: selected.width,
-                height: selected.height,
-              }
-            : null,
-      },
-      uid,
-      CANVAS_W
-    );
+    const result = runStudioPageAddSceneTemplate(studioInsertState(), template.id, uid);
     if (!result.ok) {
       setError("장면을 이 컷에 맞출 수 없습니다.");
       return;
@@ -4543,15 +4544,10 @@ function StudioCuttoonEditor() {
     commit(result.elements as El[]);
     setTool("select");
   }
-  // 대사 스크립트 일괄 삽입 — studio-comipo-shipped 와 동일 경로.
+  // 대사 스크립트 일괄 삽입 — runStudioPageAddDialogueBubbles 단일 shipped 경로.
   function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
-    const result = shippedAddDialogueBubbles(
-      elements as StudioElementLike[],
-      dialogueScript,
-      uid,
-      CANVAS_W
-    );
+    const result = runStudioPageAddDialogueBubbles(studioInsertState(), dialogueScript, uid);
     if (!result.ok) {
       setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
       return;

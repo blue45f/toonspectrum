@@ -1,7 +1,6 @@
 /**
- * StudioPage addSceneTemplate / addDialogueBubbles 와 동일한 shipped 경로.
- * snapshot 추출 → action 구성 → mutateComipoSnapshot → commit 병합을 한 모듈에서 제공해
- * UI·단위 테스트가 같은 코드를 호출한다.
+ * StudioPage addSceneTemplate / addDialogueBubbles shipped 경로.
+ * React setState·commit 제외한 본문은 runStudioPageAdd* 한 곳에만 있다.
  */
 
 import { CANVAS_W } from "./studio-assets";
@@ -12,6 +11,7 @@ import {
   type MutateComipoResult,
   type StudioCanvasSnapshot,
 } from "./studio-comipo-insert";
+import { viewportSpawnCenter, type Rect } from "./studio-selection";
 
 import type { StudioDecorElement } from "./studio-comipo-incremental";
 import type { PanelLayoutFrame } from "./studio-panel-layouts";
@@ -32,6 +32,30 @@ export function isStudioDecorElement(el: StudioElementLike): el is StudioDecorEl
   return DECOR_TYPES.has(el.type);
 }
 
+export type StudioPageSelectedFrame = {
+  type: "frame";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** StudioPage 가 addSceneTemplate / addDialogueBubbles 에 넘기는 캔버스·선택 상태. */
+export type StudioPageInsertState = {
+  elements: readonly StudioElementLike[];
+  canvasH: number;
+  canvasW?: number;
+  selected: StudioPageSelectedFrame | null;
+};
+
+export function studioSpawnCenter(state: StudioPageInsertState): [number, number] {
+  const w = state.canvasW ?? CANVAS_W;
+  const selectedRect: Rect | null = state.selected
+    ? { x: state.selected.x, y: state.selected.y, w: state.selected.width, h: state.selected.height }
+    : null;
+  return viewportSpawnCenter(w, state.canvasH, selectedRect);
+}
+
 /** StudioPage.studioCanvasSnapshot 과 동일 계약. */
 export function studioCanvasSnapshotFromElements(
   elements: readonly StudioElementLike[]
@@ -48,29 +72,33 @@ export function studioCanvasSnapshotFromElements(
   };
 }
 
-export type SceneInsertUiContext = {
-  templateId: string;
-  viewCenterX: number;
-  viewCenterY: number;
-  /** 선택된 frame 요소가 있으면 그 bbox. */
-  selectedFrame?: PanelLayoutFrame | null;
-};
+function selectedFrameBbox(selected: StudioPageSelectedFrame | null): PanelLayoutFrame | null {
+  if (!selected || selected.type !== "frame") return null;
+  return {
+    x: selected.x,
+    y: selected.y,
+    width: selected.width,
+    height: selected.height,
+  };
+}
 
-/** StudioPage addSceneTemplate 의 action 분기(pickTarget / off-frame originY). */
-export function buildSceneInsertAction(
+/** StudioPage.addSceneTemplate 의 action 분기(spawnCenter + selected + pickTarget). */
+export function buildSceneInsertActionFromPageState(
   snapshot: StudioCanvasSnapshot,
-  ctx: SceneInsertUiContext
+  state: StudioPageInsertState,
+  templateId: string
 ): ComipoInsertAction {
-  const target =
-    ctx.selectedFrame ?? pickTargetPanelFrame(snapshot.frames, ctx.viewCenterX, ctx.viewCenterY);
+  const [cx, cy] = studioSpawnCenter(state);
+  const selectedFrame = selectedFrameBbox(state.selected);
+  const target = selectedFrame ?? pickTargetPanelFrame(snapshot.frames, cx, cy);
 
   if (target && snapshot.frames.length > 0) {
-    return { kind: "scene", templateId: ctx.templateId, targetFrame: target };
+    return { kind: "scene", templateId, targetFrame: target };
   }
   return {
     kind: "scene",
-    templateId: ctx.templateId,
-    originY: Math.max(20, Math.round(ctx.viewCenterY - 240)),
+    templateId,
+    originY: Math.max(20, Math.round(cy - 240)),
   };
 }
 
@@ -80,7 +108,6 @@ export type CommitMutationPatch = {
   decor: StudioDecorElement[];
 };
 
-/** StudioPage commitMutatedSnapshot 과 동일 병합(프레임 dedupe + decor 교체). */
 export function planCommitFromMutation(
   elements: readonly StudioElementLike[],
   result: MutateComipoResult
@@ -130,45 +157,48 @@ export type ShippedInsertResult =
   | { ok: false }
   | { ok: true; elements: StudioElementLike[]; snapshot: StudioCanvasSnapshot };
 
-/** StudioPage addSceneTemplate shipped path. */
-export function addSceneTemplate(
+function runInsertMutation(
   elements: readonly StudioElementLike[],
-  ctx: SceneInsertUiContext,
+  result: MutateComipoResult,
   createId: () => string,
-  canvasWidth = CANVAS_W
+  fallbackSnapshot: StudioCanvasSnapshot
 ): ShippedInsertResult {
-  const snapshot = studioCanvasSnapshotFromElements(elements);
-  const action = buildSceneInsertAction(snapshot, ctx);
-  const result = mutateComipoSnapshot(snapshot, action, createId, canvasWidth);
   const patch = planCommitFromMutation(elements, result);
   if (!patch) return { ok: false };
   return {
     ok: true,
     elements: applyCommitPatch(patch, createId),
-    snapshot: result.ok ? result.snapshot : snapshot,
+    snapshot: result.ok ? result.snapshot : fallbackSnapshot,
   };
 }
 
-/** StudioPage addDialogueBubbles shipped path. */
-export function addDialogueBubbles(
-  elements: readonly StudioElementLike[],
-  script: string,
-  createId: () => string,
-  canvasWidth = CANVAS_W
+/** StudioPage.addSceneTemplate 본문(React side-effect 제외). */
+export function runStudioPageAddSceneTemplate(
+  state: StudioPageInsertState,
+  templateId: string,
+  createId: () => string
 ): ShippedInsertResult {
-  if (!script.trim()) return { ok: false };
-  const snapshot = studioCanvasSnapshotFromElements(elements);
+  const snapshot = studioCanvasSnapshotFromElements(state.elements);
+  const action = buildSceneInsertActionFromPageState(snapshot, state, templateId);
+  const canvasW = state.canvasW ?? CANVAS_W;
+  const result = mutateComipoSnapshot(snapshot, action, createId, canvasW);
+  return runInsertMutation(state.elements, result, createId, snapshot);
+}
+
+/** StudioPage.addDialogueBubbles 본문(React side-effect 제외). */
+export function runStudioPageAddDialogueBubbles(
+  state: StudioPageInsertState,
+  dialogueScript: string,
+  createId: () => string
+): ShippedInsertResult {
+  if (!dialogueScript.trim()) return { ok: false };
+  const snapshot = studioCanvasSnapshotFromElements(state.elements);
+  const canvasW = state.canvasW ?? CANVAS_W;
   const result = mutateComipoSnapshot(
     snapshot,
-    { kind: "dialogue", script },
+    { kind: "dialogue", script: dialogueScript },
     createId,
-    canvasWidth
+    canvasW
   );
-  const patch = planCommitFromMutation(elements, result);
-  if (!patch) return { ok: false };
-  return {
-    ok: true,
-    elements: applyCommitPatch(patch, createId),
-    snapshot: result.ok ? result.snapshot : snapshot,
-  };
+  return runInsertMutation(state.elements, result, createId, snapshot);
 }

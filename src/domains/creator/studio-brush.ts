@@ -27,6 +27,20 @@ export const BRUSH_PRESETS: BrushPreset[] = [
 // 손떨림 보정 강도 범위(0=끔 ~ 10=최대).
 export const STABILIZER_MAX = 10;
 
+/** 폴리라인 [x0,y0,x1,y1,…] 누적 길이(export·가이드 스냅용). */
+export function polylineLength(points: readonly number[]): number {
+  if (points.length < 4) return 0;
+  let sum = 0;
+  for (let i = 2; i < points.length; i += 2) {
+    const x0 = points[i - 2]!;
+    const y0 = points[i - 1]!;
+    const x1 = points[i]!;
+    const y1 = points[i + 1]!;
+    sum += Math.hypot(x1 - x0, y1 - y0);
+  }
+  return sum;
+}
+
 /** 라이브 드로잉 중 너무 촘촘한 포인트 추가를 건너뛴다(RAF 부하·메모리 절감). */
 export function shouldAppendStrokePoint(
   lastX: number,

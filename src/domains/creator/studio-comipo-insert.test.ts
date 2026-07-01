@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { CANVAS_W } from "./studio-assets";
 import { assembleComipoPage } from "./studio-comipo-assembly";
 import {
   collectStudioDecorRefs,
@@ -7,16 +8,20 @@ import {
 } from "./studio-comipo-incremental";
 import { postInsertFramesComposable, type StudioCanvasSnapshot } from "./studio-comipo-insert";
 import {
-  addDialogueBubbles,
-  addSceneTemplate,
+  runStudioPageAddDialogueBubbles,
+  runStudioPageAddSceneTemplate,
   studioCanvasSnapshotFromElements,
+  studioSpawnCenter,
   type StudioElementLike,
+  type StudioPageInsertState,
 } from "./studio-comipo-shipped";
 import { materializePanelLayout, PANEL_LAYOUTS } from "./studio-panel-layouts";
 
 import type { StudioDecorElement } from "./studio-comipo-incremental";
 
 type TestElement = StudioElementLike & Record<string, unknown>;
+
+const STUDIO_CANVAS_H = 2000;
 
 let idSeq = 0;
 function nextId() {
@@ -57,29 +62,54 @@ function assemblyToElements(layoutId: string): TestElement[] {
   return elements;
 }
 
+/** StudioPage.studioInsertState() 와 동일한 입력 조립. */
+function studioPageState(
+  elements: TestElement[],
+  opts?: { canvasH?: number; selectedId?: string | null }
+): StudioPageInsertState {
+  const selectedEl =
+    opts?.selectedId != null
+      ? elements.find((e) => e.id === opts.selectedId && e.type === "frame")
+      : null;
+  return {
+    elements,
+    canvasH: opts?.canvasH ?? STUDIO_CANVAS_H,
+    canvasW: CANVAS_W,
+    selected:
+      selectedEl &&
+      selectedEl.x != null &&
+      selectedEl.y != null &&
+      selectedEl.width != null &&
+      selectedEl.height != null
+        ? {
+            type: "frame",
+            x: selectedEl.x,
+            y: selectedEl.y,
+            width: selectedEl.width,
+            height: selectedEl.height,
+          }
+        : null,
+  };
+}
+
 function assemblyToSnapshot(layoutId: string): StudioCanvasSnapshot {
   return studioCanvasSnapshotFromElements(assemblyToElements(layoutId));
 }
 
-describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
+describe("runStudioPageAddSceneTemplate / runStudioPageAddDialogueBubbles", () => {
   const talkLayout = PANEL_LAYOUTS.find((l) => l.id === "layout_talk_2_bubbles")!;
   const top = talkLayout.frames[0]!;
 
-  it("addSceneTemplate: snapshot extraction + pickTarget + commit removes layout placeholder", () => {
+  it("addSceneTemplate: spawnCenter + pickTarget + commit removes layout placeholder", () => {
     const elements = assemblyToElements(talkLayout.id);
     const layoutBubble = elements.find(
       (e) => e.type === "bubble" && e.text === "대사를 입력"
     )!;
+    const state = studioPageState(elements, { canvasH: talkLayout.canvasH });
 
-    const result = addSceneTemplate(
-      elements,
-      {
-        templateId: "confession",
-        viewCenterX: top.x + top.width / 2,
-        viewCenterY: top.y + top.height / 2,
-      },
-      nextId
-    );
+    expect(studioSpawnCenter(state)).toEqual([CANVAS_W / 2, talkLayout.canvasH / 2]);
+
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -91,23 +121,32 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
     expect(frameDecorHasNoPairwiseOverlap(top, topSeeds)).toBe(true);
   });
 
-  it("addDialogueBubbles: after scene insert stays composable across frames", () => {
+  it("addSceneTemplate: selected frame drives spawnCenter like StudioPage", () => {
+    const elements = assemblyToElements(talkLayout.id);
+    const frameEl = elements.find((e) => e.type === "frame")!;
+    const state = studioPageState(elements, { selectedId: frameEl.id });
+
+    const [cx, cy] = studioSpawnCenter(state);
+    expect(cx).toBe(frameEl.x! + frameEl.width! / 2);
+    expect(cy).toBe(frameEl.y! + frameEl.height! / 2);
+
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
+    expect(result.ok).toBe(true);
+  });
+
+  it("addDialogueBubbles: scene then dialogue quickstart stays composable", () => {
     let elements = assemblyToElements(talkLayout.id);
-    const scene = addSceneTemplate(
-      elements,
-      {
-        templateId: "confession",
-        viewCenterX: top.x + top.width / 2,
-        viewCenterY: top.y + top.height / 2,
-      },
+    const scene = runStudioPageAddSceneTemplate(
+      studioPageState(elements, { canvasH: talkLayout.canvasH }),
+      "confession",
       nextId
     );
     expect(scene.ok).toBe(true);
     if (!scene.ok) return;
-    elements = scene.elements;
+    elements = scene.elements as TestElement[];
 
-    const dialogue = addDialogueBubbles(
-      elements,
+    const dialogue = runStudioPageAddDialogueBubbles(
+      studioPageState(elements, { canvasH: talkLayout.canvasH }),
       "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터를 써 보세요.",
       nextId
     );
@@ -118,7 +157,7 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
     expect(postInsertFramesComposable(snapshot.frames, snapshot.decor)).toBe(true);
   });
 
-  it("addSceneTemplate: overcrowded frame returns ok:false (no commit)", () => {
+  it("addSceneTemplate: overcrowded selected frame returns ok:false without mutating input", () => {
     const elements: TestElement[] = [
       { id: "f1", type: "frame", x: top.x, y: top.y, width: top.width, height: top.height },
       {
@@ -135,24 +174,19 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
         rotation: 0,
       },
     ];
-    const beforeLen = elements.length;
-    const result = addSceneTemplate(
-      elements,
-      {
-        templateId: "confession",
-        viewCenterX: top.x + top.width / 2,
-        viewCenterY: top.y + top.height / 2,
-        selectedFrame: top,
-      },
+    const before = structuredClone(elements);
+    const result = runStudioPageAddSceneTemplate(
+      studioPageState(elements, { selectedId: "f1" }),
+      "confession",
       nextId
     );
     expect(result.ok).toBe(false);
-    expect(elements).toHaveLength(beforeLen);
+    expect(elements).toEqual(before);
   });
 
-  it("addSceneTemplate off-frame: pre-existing decor overlap blocks insert", () => {
-    const originY = 80;
-    const virtualFrame = { x: 24, y: originY, width: 720 - 48, height: 480 };
+  it("addSceneTemplate off-frame: spawnCenter origin blocks pre-existing decor overlap", () => {
+    const originY = Math.max(20, Math.round(STUDIO_CANVAS_H / 2 - 240));
+    const virtualFrame = { x: 24, y: originY, width: CANVAS_W - 48, height: 480 };
     const elements: TestElement[] = [
       {
         id: "blocker",
@@ -168,20 +202,17 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
         rotation: 0,
       },
     ];
-    const result = addSceneTemplate(
-      elements,
-      { templateId: "action-impact", viewCenterX: 360, viewCenterY: originY + 200 },
+    const result = runStudioPageAddSceneTemplate(
+      studioPageState(elements, { canvasH: STUDIO_CANVAS_H }),
+      "action-impact",
       nextId
     );
     expect(result.ok).toBe(false);
   });
 
-  it("addSceneTemplate off-frame confession: commits frame element + decor", () => {
-    const result = addSceneTemplate(
-      [],
-      { templateId: "confession", viewCenterX: 360, viewCenterY: 320 },
-      nextId
-    );
+  it("addSceneTemplate off-frame confession: commits frame + decor via spawnCenter", () => {
+    const state = studioPageState([], { canvasH: STUDIO_CANVAS_H });
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.elements.some((e) => e.type === "frame")).toBe(true);
@@ -190,7 +221,11 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
   });
 
   it("addDialogueBubbles off-frame: empty canvas commits virtual dialogue frame", () => {
-    const result = addDialogueBubbles([], "민수: 안녕\n지영: 반가워", nextId);
+    const result = runStudioPageAddDialogueBubbles(
+      studioPageState([], { canvasH: STUDIO_CANVAS_H }),
+      "민수: 안녕\n지영: 반가워",
+      nextId
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const snapshot = studioCanvasSnapshotFromElements(result.elements);
@@ -201,14 +236,16 @@ describe("addSceneTemplate / addDialogueBubbles shipped UI path", () => {
 
   it("addDialogueBubbles: empty script returns ok:false", () => {
     const elements = assemblyToElements(talkLayout.id);
-    expect(addDialogueBubbles(elements, "   ", nextId).ok).toBe(false);
+    expect(
+      runStudioPageAddDialogueBubbles(studioPageState(elements), "   ", nextId).ok
+    ).toBe(false);
   });
 });
 
 describe("mutateComipoSnapshot low-level contract", () => {
   const talkLayout = PANEL_LAYOUTS.find((l) => l.id === "layout_talk_2_bubbles")!;
 
-  it("mutateComipoSnapshot rejects vacuous postInsert when decor exists without frames", () => {
+  it("postInsertFramesComposable rejects decor without frames to check", () => {
     const decor: StudioDecorElement[] = [
       {
         id: "solo",
