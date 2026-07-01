@@ -162,6 +162,19 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import {
+  applyBackgroundToAllPages,
+  applyGradeToAllPages,
+  clearPage,
+  createBlankPage,
+  deletePageSafe,
+  duplicateMirroredPage,
+  duplicatePageState,
+  insertBlankPageAt,
+  movePage as movePagePure,
+  reorderPages,
+  type PageLike,
+} from "./studio-pages";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
@@ -3665,36 +3678,57 @@ function StudioCuttoonEditor() {
     );
   };
 
-  // ── 페이지 관련 명령 조작 ──────────────────────────────────────────────
+  // ── 페이지 관련 명령 조작 (pure studio-pages로 위임 — 동일 동작 유지 + 고도화) ──────────────────────────────────────────────
   function addPage() {
-    const newPage: PageState = {
-      id: uid(),
-      elements: [],
-      bg: "#ffffff",
-      bgGrad: null,
-      canvasH: 1080,
-    };
+    // append + activate (기존 동작 유지)
+    const baseH = activePage.canvasH || 1080;
+    const newPage = createBlankPage(uid, baseH) as PageState;
     const nextPages = [...pages, newPage];
     commitPages(nextPages);
     setCurrentPageId(newPage.id);
   }
+  function insertPageBefore(pageId: string) {
+    const idx = findPageIndexInPages(pageId);
+    if (idx < 0) return;
+    const baseH = pages[idx]?.canvasH || 1080;
+    const nextPages = insertBlankPageAt(pages as PageLike[], idx, uid, baseH) as PageState[];
+    commitPages(nextPages);
+    // 새로 삽입된 것을 활성으로
+    const inserted = nextPages[idx];
+    if (inserted) setCurrentPageId(inserted.id);
+  }
+  function insertPageAfter(pageId: string) {
+    const idx = findPageIndexInPages(pageId);
+    if (idx < 0) return;
+    const baseH = pages[idx]?.canvasH || 1080;
+    const nextPages = insertBlankPageAt(pages as PageLike[], idx + 1, uid, baseH) as PageState[];
+    commitPages(nextPages);
+    const inserted = nextPages[idx + 1];
+    if (inserted) setCurrentPageId(inserted.id);
+  }
   function duplicatePage(pageId: string) {
     const pageToDup = pages.find((p) => p.id === pageId);
     if (!pageToDup) return;
-    const newPage: PageState = {
-      ...pageToDup,
-      id: uid(),
-      elements: pageToDup.elements.map((el) => ({ ...el, id: uid() })),
-    };
+    const newPage = duplicatePageState(pageToDup as PageLike, uid) as PageState;
     const idx = pages.findIndex((p) => p.id === pageId);
     const nextPages = [...pages];
     nextPages.splice(idx + 1, 0, newPage);
     commitPages(nextPages);
     setCurrentPageId(newPage.id);
   }
+  function duplicatePageMirrored(pageId: string) {
+    const pageToDup = pages.find((p) => p.id === pageId);
+    if (!pageToDup) return;
+    const mir = duplicateMirroredPage(pageToDup as PageLike, uid, CANVAS_W) as PageState;
+    const idx = pages.findIndex((p) => p.id === pageId);
+    const nextPages = [...pages];
+    nextPages.splice(idx + 1, 0, mir);
+    commitPages(nextPages);
+    setCurrentPageId(mir.id);
+  }
   function deletePage(pageId: string) {
     if (pages.length <= 1) return;
-    const nextPages = pages.filter((p) => p.id !== pageId);
+    const nextPages = deletePageSafe(pages as PageLike[], pageId) as PageState[];
     commitPages(nextPages);
     if (currentPageId === pageId) {
       const idx = pages.findIndex((p) => p.id === pageId);
@@ -3703,22 +3737,30 @@ function StudioCuttoonEditor() {
     }
   }
   function movePageUp(pageId: string) {
-    const idx = pages.findIndex((p) => p.id === pageId);
-    if (idx <= 0) return;
-    const nextPages = [...pages];
-    const temp = nextPages[idx];
-    nextPages[idx] = nextPages[idx - 1];
-    nextPages[idx - 1] = temp;
+    const nextPages = movePagePure(pages as PageLike[], pageId, -1) as PageState[];
+    if (nextPages === pages) return; // no change
     commitPages(nextPages);
   }
   function movePageDown(pageId: string) {
-    const idx = pages.findIndex((p) => p.id === pageId);
-    if (idx === -1 || idx >= pages.length - 1) return;
-    const nextPages = [...pages];
-    const temp = nextPages[idx];
-    nextPages[idx] = nextPages[idx + 1];
-    nextPages[idx + 1] = temp;
+    const nextPages = movePagePure(pages as PageLike[], pageId, 1) as PageState[];
+    if (nextPages === pages) return;
     commitPages(nextPages);
+  }
+  function clearPageFor(pageId: string) {
+    const nextPages = clearPage(pages as PageLike[], pageId) as PageState[];
+    commitPages(nextPages);
+  }
+  function applyGradeToAll() {
+    const nextPages = applyGradeToAllPages(pages as PageLike[], activePage.grade) as PageState[];
+    commitPages(nextPages);
+  }
+  function applyBgToAll() {
+    const nextPages = applyBackgroundToAllPages(pages as PageLike[], activePage.bg, activePage.bgGrad) as PageState[];
+    commitPages(nextPages);
+  }
+  // helper for index (pure not needed for this thin wrapper)
+  function findPageIndexInPages(pageId: string) {
+    return pages.findIndex((p) => p.id === pageId);
   }
   function addRenderedImage(src: string, width: number, height: number) {
     setError(null);
@@ -6586,6 +6628,22 @@ function StudioCuttoonEditor() {
             >
               <Plus size={10} /> 추가
             </button>
+            <button
+              type="button"
+              onClick={applyGradeToAll}
+              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
+              title="현재 페이지의 색보정을 모든 페이지에 적용"
+            >
+              그레이드 전체
+            </button>
+            <button
+              type="button"
+              onClick={applyBgToAll}
+              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
+              title="현재 페이지의 배경을 모든 페이지에 적용"
+            >
+              배경 전체
+            </button>
           </div>
           <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[56vh] lg:max-h-[calc(100dvh-24rem)] pr-1">
             {pages.map((p, idx) => {
@@ -6669,12 +6727,56 @@ function StudioCuttoonEditor() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        insertPageBefore(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 앞에 빈 페이지 삽입"
+                    >
+                      <Plus size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertPageAfter(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 뒤에 빈 페이지 삽입"
+                    >
+                      <Plus size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         duplicatePage(p.id);
                       }}
                       className="rounded p-0.5 text-fg-3 hover:bg-raised"
                       title="페이지 복제"
                     >
                       <Copy size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicatePageMirrored(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="미러 복제 (좌우 반전)"
+                    >
+                      <FlipHorizontal2 size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearPageFor(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 페이지 내용 비우기"
+                    >
+                      <Eraser size={10} />
                     </button>
                     <button
                       type="button"
