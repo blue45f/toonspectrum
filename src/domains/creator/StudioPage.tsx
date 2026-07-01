@@ -111,10 +111,10 @@ import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
-  mutateComipoSnapshot,
-  pickTargetPanelFrame,
-  type StudioCanvasSnapshot,
-} from "./studio-comipo-insert";
+  addDialogueBubbles as shippedAddDialogueBubbles,
+  addSceneTemplate as shippedAddSceneTemplate,
+  type StudioElementLike,
+} from "./studio-comipo-shipped";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -169,7 +169,6 @@ import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
-import type { StudioDecorElement } from "./studio-comipo-incremental";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -4514,97 +4513,50 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
   }
-  function isStudioDecorEl(el: El): el is BubbleEl | TextEl | FocusLinesEl | SpeedLinesEl {
-    return (
-      el.type === "bubble" ||
-      el.type === "text" ||
-      el.type === "focusLines" ||
-      el.type === "speedLines"
-    );
-  }
-  function studioCanvasSnapshot(): StudioCanvasSnapshot {
-    const frames = elements
-      .filter((e): e is FrameEl => e.type === "frame" && !e.hidden)
-      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-    return {
-      frames,
-      decor: elements.filter(isStudioDecorEl) as StudioDecorElement[],
-    };
-  }
-  function commitMutatedSnapshot(
-    result: ReturnType<typeof mutateComipoSnapshot>,
-    errorMessage: string
-  ): boolean {
-    if (!result.ok) {
-      setError(errorMessage);
-      return false;
-    }
-    const decorIds = new Set(elements.filter(isStudioDecorEl).map((e) => e.id));
-    const kept = elements.filter((e) => !decorIds.has(e.id));
-    const existingFrameKeys = new Set(
-      elements
-        .filter((e): e is FrameEl => e.type === "frame")
-        .map((f) => `${f.x},${f.y},${f.width},${f.height}`)
-    );
-    const addedFrames: FrameEl[] = result.snapshot.frames
-      .filter((f) => !existingFrameKeys.has(`${f.x},${f.y},${f.width},${f.height}`))
-      .map((f) => ({
-        id: uid(),
-        type: "frame" as const,
-        x: f.x,
-        y: f.y,
-        width: f.width,
-        height: f.height,
-      }));
-    commit([...kept, ...addedFrames, ...(result.snapshot.decor as El[])]);
-    return true;
-  }
-  // 장면 템플릿 삽입 — mutateComipoSnapshot 단일 shipped path.
+  // 장면 템플릿 삽입 — studio-comipo-shipped 와 동일 경로.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
-    const snapshot = studioCanvasSnapshot();
     const [cx, cy] = spawnCenter();
-    const target =
-      selected?.type === "frame"
-        ? {
-            x: selected.x,
-            y: selected.y,
-            width: selected.width,
-            height: selected.height,
-          }
-        : pickTargetPanelFrame(snapshot.frames, cx, cy);
-
-    const action =
-      target && snapshot.frames.length > 0
-        ? { kind: "scene" as const, templateId: template.id, targetFrame: target }
-        : {
-            kind: "scene" as const,
-            templateId: template.id,
-            originY: Math.max(20, Math.round(cy - 240)),
-          };
-
-    const result = mutateComipoSnapshot(snapshot, action, uid);
-    if (!commitMutatedSnapshot(result, "장면을 이 컷에 맞출 수 없습니다.")) return;
-    setTool("select");
-  }
-  // 대사 스크립트 일괄 삽입 — mutateComipoSnapshot 단일 shipped path.
-  function addDialogueBubbles() {
-    if (!dialogueScript.trim()) return;
-    const snapshot = studioCanvasSnapshot();
-    const result = mutateComipoSnapshot(
-      snapshot,
-      { kind: "dialogue", script: dialogueScript },
+    const result = shippedAddSceneTemplate(
+      elements as StudioElementLike[],
+      {
+        templateId: template.id,
+        viewCenterX: cx,
+        viewCenterY: cy,
+        selectedFrame:
+          selected?.type === "frame"
+            ? {
+                x: selected.x,
+                y: selected.y,
+                width: selected.width,
+                height: selected.height,
+              }
+            : null,
+      },
       uid,
       CANVAS_W
     );
-    if (
-      !commitMutatedSnapshot(
-        result,
-        "대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요."
-      )
-    ) {
+    if (!result.ok) {
+      setError("장면을 이 컷에 맞출 수 없습니다.");
       return;
     }
+    commit(result.elements as El[]);
+    setTool("select");
+  }
+  // 대사 스크립트 일괄 삽입 — studio-comipo-shipped 와 동일 경로.
+  function addDialogueBubbles() {
+    if (!dialogueScript.trim()) return;
+    const result = shippedAddDialogueBubbles(
+      elements as StudioElementLike[],
+      dialogueScript,
+      uid,
+      CANVAS_W
+    );
+    if (!result.ok) {
+      setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
+      return;
+    }
+    commit(result.elements as El[]);
     setDialogueScript("");
     setMenu(null);
     setTool("select");

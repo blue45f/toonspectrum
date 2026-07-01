@@ -121,6 +121,9 @@ function assertSnapshotComposable(
   decor: readonly StudioDecorElement[],
   virtualChecks: readonly PanelLayoutFrame[] = []
 ): boolean {
+  if (decor.length > 0 && frames.length === 0 && virtualChecks.length === 0) {
+    return false;
+  }
   for (const frame of frames) {
     const seeds = collectStudioDecorRefs(frame, decor).map((r) => r.seed);
     if (!frameDecorHasNoPairwiseOverlap(frame, seeds)) return false;
@@ -175,8 +178,10 @@ function mutateScene(
   if (!placed) return { ok: false };
 
   decor = applyIncrementalDecor(decor, decorPatchFromResult(placed), createId);
-  const virtualChecks = checkVirtual && frames.length === 0 ? [checkVirtual] : [];
-  if (!assertSnapshotComposable(frames, decor, virtualChecks)) return { ok: false };
+  if (snapshot.frames.length === 0 && checkVirtual) {
+    frames = [checkVirtual];
+  }
+  if (!assertSnapshotComposable(frames, decor)) return { ok: false };
 
   return { ok: true, snapshot: { frames, decor } };
 }
@@ -214,11 +219,11 @@ function mutateDialogue(
     decor = applyIncrementalDecor(decor, decorPatchFromResult(placed), createId);
   }
 
-  const panelFrames = snapshot.frames;
-  const virtualChecks = checkVirtual && panelFrames.length === 0 ? [checkVirtual] : [];
-  if (!assertSnapshotComposable(panelFrames, decor, virtualChecks)) return { ok: false };
+  const outFrames =
+    snapshot.frames.length === 0 && checkVirtual ? [checkVirtual] : [...snapshot.frames];
+  if (!assertSnapshotComposable(outFrames, decor)) return { ok: false };
 
-  return { ok: true, snapshot: { frames: panelFrames, decor } };
+  return { ok: true, snapshot: { frames: outFrames, decor } };
 }
 
 /**
