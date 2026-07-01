@@ -148,6 +148,18 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import {
+  appendPageState,
+  applyBackgroundToAllPages,
+  applyGradeToAllPages,
+  clearPage,
+  duplicateMirroredPage,
+  duplicatePageState,
+  executeDeletePageTransition,
+  insertBlankPageAt,
+  movePage as movePagePure,
+  reorderPages,
+} from "./studio-pages";
+import {
   computeAlignDeltas,
   computeDistributeDeltas,
   normalizeMarqueeRect,
@@ -162,19 +174,6 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
-import {
-  applyBackgroundToAllPages,
-  applyGradeToAllPages,
-  clearPage,
-  createBlankPage,
-  deletePageSafe,
-  duplicateMirroredPage,
-  duplicatePageState,
-  insertBlankPageAt,
-  movePage as movePagePure,
-  reorderPages,
-  type PageLike,
-} from "./studio-pages";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
@@ -3680,18 +3679,17 @@ function StudioCuttoonEditor() {
 
   // ── 페이지 관련 명령 조작 (pure studio-pages로 위임 — 동일 동작 유지 + 고도화) ──────────────────────────────────────────────
   function addPage() {
-    // append + activate (기존 동작 유지)
+    // thin wrapper over pure shipped command + commit (behavior unchanged)
     const baseH = activePage.canvasH || 1080;
-    const newPage = createBlankPage(uid, baseH) as PageState;
-    const nextPages = [...pages, newPage];
+    const { nextPages, newPageId } = appendPageState(pages, uid, baseH);
     commitPages(nextPages);
-    setCurrentPageId(newPage.id);
+    setCurrentPageId(newPageId);
   }
   function insertPageBefore(pageId: string) {
     const idx = findPageIndexInPages(pageId);
     if (idx < 0) return;
     const baseH = pages[idx]?.canvasH || 1080;
-    const nextPages = insertBlankPageAt(pages as PageLike[], idx, uid, baseH) as PageState[];
+    const nextPages = insertBlankPageAt(pages, idx, uid, baseH);
     commitPages(nextPages);
     // 새로 삽입된 것을 활성으로
     const inserted = nextPages[idx];
@@ -3701,7 +3699,7 @@ function StudioCuttoonEditor() {
     const idx = findPageIndexInPages(pageId);
     if (idx < 0) return;
     const baseH = pages[idx]?.canvasH || 1080;
-    const nextPages = insertBlankPageAt(pages as PageLike[], idx + 1, uid, baseH) as PageState[];
+    const nextPages = insertBlankPageAt(pages, idx + 1, uid, baseH);
     commitPages(nextPages);
     const inserted = nextPages[idx + 1];
     if (inserted) setCurrentPageId(inserted.id);
@@ -3709,7 +3707,7 @@ function StudioCuttoonEditor() {
   function duplicatePage(pageId: string) {
     const pageToDup = pages.find((p) => p.id === pageId);
     if (!pageToDup) return;
-    const newPage = duplicatePageState(pageToDup as PageLike, uid) as PageState;
+    const newPage = duplicatePageState(pageToDup, uid);
     const idx = pages.findIndex((p) => p.id === pageId);
     const nextPages = [...pages];
     nextPages.splice(idx + 1, 0, newPage);
@@ -3719,7 +3717,7 @@ function StudioCuttoonEditor() {
   function duplicatePageMirrored(pageId: string) {
     const pageToDup = pages.find((p) => p.id === pageId);
     if (!pageToDup) return;
-    const mir = duplicateMirroredPage(pageToDup as PageLike, uid, CANVAS_W) as PageState;
+    const mir = duplicateMirroredPage(pageToDup, uid, CANVAS_W);
     const idx = pages.findIndex((p) => p.id === pageId);
     const nextPages = [...pages];
     nextPages.splice(idx + 1, 0, mir);
@@ -3728,39 +3726,65 @@ function StudioCuttoonEditor() {
   }
   function deletePage(pageId: string) {
     if (pages.length <= 1) return;
-    const nextPages = deletePageSafe(pages as PageLike[], pageId) as PageState[];
+    // thin wrapper over pure shipped transition + commit (behavior unchanged)
+    const { nextPages, nextActiveId } = executeDeletePageTransition(pages, pageId, currentPageId);
     commitPages(nextPages);
-    if (currentPageId === pageId) {
-      const idx = pages.findIndex((p) => p.id === pageId);
-      const nextActive = pages[idx - 1] || pages[idx + 1] || pages[0];
-      setCurrentPageId(nextActive.id);
+    if (currentPageId === pageId && nextActiveId) {
+      const found = nextPages.find((p) => p.id === nextActiveId);
+      if (found) setCurrentPageId(found.id);
+      else if (nextPages[0]) setCurrentPageId(nextPages[0].id);
     }
   }
   function movePageUp(pageId: string) {
-    const nextPages = movePagePure(pages as PageLike[], pageId, -1) as PageState[];
-    if (nextPages === pages) return; // no change
+    const idx = pages.findIndex((p) => p.id === pageId);
+    if (idx <= 0) return; // boundary early return (prevents redundant history like pre-refactor)
+    const nextPages = movePagePure(pages, pageId, -1);
     commitPages(nextPages);
   }
   function movePageDown(pageId: string) {
-    const nextPages = movePagePure(pages as PageLike[], pageId, 1) as PageState[];
-    if (nextPages === pages) return;
+    const idx = pages.findIndex((p) => p.id === pageId);
+    if (idx === -1 || idx >= pages.length - 1) return; // boundary early return
+    const nextPages = movePagePure(pages, pageId, 1);
     commitPages(nextPages);
   }
   function clearPageFor(pageId: string) {
-    const nextPages = clearPage(pages as PageLike[], pageId) as PageState[];
+    const target = pages.find((p) => p.id === pageId);
+    if (!target || target.elements.length === 0) return; // no-op guard, no history pollution
+    const nextPages = clearPage(pages, pageId);
     commitPages(nextPages);
   }
   function applyGradeToAll() {
-    const nextPages = applyGradeToAllPages(pages as PageLike[], activePage.grade) as PageState[];
+    const cur = JSON.stringify(activePage.grade ?? null);
+    const allSame = pages.every((p) => JSON.stringify(p.grade ?? null) === cur);
+    if (allSame) return; // no-op guard
+    const nextPages = applyGradeToAllPages(pages, activePage.grade);
     commitPages(nextPages);
   }
   function applyBgToAll() {
-    const nextPages = applyBackgroundToAllPages(pages as PageLike[], activePage.bg, activePage.bgGrad) as PageState[];
+    const curBg = activePage.bg;
+    const curGrad = JSON.stringify(activePage.bgGrad ?? null);
+    const allSame = pages.every((p) => p.bg === curBg && JSON.stringify(p.bgGrad ?? null) === curGrad);
+    if (allSame) return; // no-op guard
+    const nextPages = applyBackgroundToAllPages(pages, activePage.bg, activePage.bgGrad);
     commitPages(nextPages);
   }
   // helper for index (pure not needed for this thin wrapper)
   function findPageIndexInPages(pageId: string) {
     return pages.findIndex((p) => p.id === pageId);
+  }
+  // Arbitrary reorder using the pure (high-value; addresses gap)
+  function movePageToTop(pageId: string) {
+    const from = findPageIndexInPages(pageId);
+    if (from <= 0) return;
+    const nextPages = reorderPages(pages, from, 0);
+    commitPages(nextPages);
+  }
+  function movePageToBottom(pageId: string) {
+    const from = findPageIndexInPages(pageId);
+    const last = pages.length - 1;
+    if (from < 0 || from === last) return;
+    const nextPages = reorderPages(pages, from, last);
+    commitPages(nextPages);
   }
   function addRenderedImage(src: string, width: number, height: number) {
     setError(null);
@@ -6623,6 +6647,7 @@ function StudioCuttoonEditor() {
             </span>
             <button
               type="button"
+              data-testid="studio-add-page"
               onClick={addPage}
               className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[10px] font-semibold text-on-accent hover:bg-accent-hover"
             >
@@ -6651,6 +6676,7 @@ function StudioCuttoonEditor() {
               return (
                 <div
                   key={p.id}
+                  data-testid="studio-page-item"
                   role="button"
                   tabIndex={0}
                   aria-label={`${idx + 1}페이지 선택`}
@@ -6694,6 +6720,30 @@ function StudioCuttoonEditor() {
                         title="아래로 이동"
                       >
                         <ChevronDown size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToTop(p.id);
+                        }}
+                        disabled={idx === 0}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="맨 위로"
+                      >
+                        ⇧
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToBottom(p.id);
+                        }}
+                        disabled={idx === pages.length - 1}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="맨 아래로"
+                      >
+                        ⇩
                       </button>
                     </div>
                   </div>
@@ -6805,8 +6855,8 @@ function StudioCuttoonEditor() {
           <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
         )}
 
-        {/* 중앙: 캔버스 영역 */}
-        <div className="relative flex-1 min-w-0 lg:min-w-[22rem]">
+        {/* 중앙: 캔버스 영역 (editor shell) */}
+        <div className="relative flex-1 min-w-0 lg:min-w-[22rem]" data-studio-logical-w={CANVAS_W}>
           {/* 임시저장 복구 배너 */}
           {hasAutosave && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">

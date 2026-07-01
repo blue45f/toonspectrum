@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendPageState,
   applyBackgroundToAllPages,
   applyGradeToAllPages,
   clearPage,
+  computeNextActiveIdAfterDelete,
   createBlankPage,
   deletePageSafe,
   duplicateMirroredPage,
   duplicatePageState,
+  executeDeletePageTransition,
   findPageIndex,
   insertBlankPageAt,
   movePage,
@@ -142,10 +145,85 @@ describe("studio-pages (pure, real exports)", () => {
     expect(me.points[4]).toBe(720 - 140);
   });
 
+  it("duplicateMirroredPage mirrors bubble tail left<->right and tailXRatio (and text)", () => {
+    resetIds();
+    const bubble = {
+      id: "b1",
+      type: "bubble",
+      x: 80,
+      width: 120,
+      tail: "left",
+      tailDirection: "right",
+      tailXRatio: 0.2,
+      text: "hello",
+    };
+    const txt = { id: "t1", type: "text", x: 30, width: 80, text: "T" };
+    const p = samplePage({ id: "src", elements: [bubble as any, txt as any] });
+    const mir = duplicateMirroredPage(p, makeId, CANVAS_W);
+    const mb = mir.elements.find((e: any) => e.type === "bubble") as any;
+    expect(mb.id).not.toBe("b1");
+    expect(mb.x).toBe(720 - 80 - 120); // 520
+    expect(mb.tail).toBe("right");
+    expect(mb.tailDirection).toBe("left");
+    expect(mb.tailXRatio).toBeCloseTo(0.8);
+    // text also gets id + x flip
+    const mt = mir.elements.find((e: any) => e.type === "text") as any;
+    expect(mt.x).toBe(720 - 30 - 80);
+    expect(mt.id).not.toBe("t1");
+  });
+
   it("findPageIndex works", () => {
     const a = samplePage({ id: "a" });
     const b = samplePage({ id: "b" });
     expect(findPageIndex([a, b], "b")).toBe(1);
     expect(findPageIndex([a, b], "z")).toBe(-1);
+  });
+
+  it("computeNextActiveIdAfterDelete selects correct neighbor (prev || next || [0])", () => {
+    const a = { id: "a" };
+    const b = { id: "b" };
+    const c = { id: "c" };
+    // delete first -> prefer old [1] which is now [0] in remaining
+    expect(computeNextActiveIdAfterDelete([a, b, c], "a")).toBe("b");
+    // delete middle -> prefer prev
+    expect(computeNextActiveIdAfterDelete([a, b, c], "b")).toBe("a");
+    // delete last -> prefer prev
+    expect(computeNextActiveIdAfterDelete([a, b, c], "c")).toBe("b");
+    // single page -> null (caller guards length)
+    expect(computeNextActiveIdAfterDelete([a], "a")).toBeNull();
+  });
+
+  it("deletePage full path simulation (pures + history/commit used by StudioPage) selects correct nextActive and produces immutable new list", () => {
+    const p1 = { id: "p1", elements: [] };
+    const p2 = { id: "p2", elements: [{ id: "e" }] };
+    const p3 = { id: "p3", elements: [] };
+    const before = [p1, p2, p3] as any;
+    // simulate component: current = p2, delete p2
+    const nextPages = deletePageSafe(before, "p2");
+    const nextActiveId = computeNextActiveIdAfterDelete(before, "p2");
+    // history would do commitPages(nextPages) i.e. new array
+    expect(nextPages).not.toBe(before);
+    expect(nextPages.map((p: any) => p.id)).toEqual(["p1", "p3"]);
+    expect(nextActiveId).toBe("p1");
+    // commit simulation: caller would setCurrentPageId(nextActiveId) if was current
+    expect(nextPages.find((p: any) => p.id === nextActiveId)).toBeTruthy();
+  });
+
+  it("appendPageState appends and returns new id (length +1, id present)", () => {
+    const before = [samplePage({ id: "p1" })] as any;
+    const res = appendPageState(before, () => "newp", 1080);
+    expect(res.nextPages).toHaveLength(2);
+    expect(res.newPageId).toBe("newp");
+    expect(res.nextPages[1].id).toBe("newp");
+    expect(res.nextPages).not.toBe(before);
+  });
+
+  it("executeDeletePageTransition deletes and suggests correct nextActiveId (pure)", () => {
+    const p1 = { id: "p1", elements: [] } as any;
+    const p2 = { id: "p2", elements: [] } as any;
+    const before = [p1, p2];
+    const res = executeDeletePageTransition(before, "p2", "p2");
+    expect(res.nextPages.map((p: any) => p.id)).toEqual(["p1"]);
+    expect(res.nextActiveId).toBe("p1");
   });
 });

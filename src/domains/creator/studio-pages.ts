@@ -7,14 +7,29 @@
  * 단위 테스트와 StudioPage가 동일한 진짜 export를 사용한다.
  */
 
+export interface PageElementLike {
+  id: string;
+  type?: unknown;
+  x?: unknown;
+  y?: unknown;
+  width?: unknown;
+  height?: unknown;
+  rotation?: unknown;
+  points?: unknown;
+  tail?: unknown;
+  tailDirection?: unknown;
+  tailXRatio?: unknown;
+  text?: unknown;
+}
+
 export interface PageLike {
   id: string;
-  elements: Array<{ id: string; [k: string]: unknown }>;
+  elements: PageElementLike[];
   bg: string;
   bgGrad: string[] | null;
   canvasH: number;
   grade?: unknown;
-  groups?: Array<{ id: string; [k: string]: unknown }>;
+  groups?: Array<{ id: string }>;
 }
 
 export const DEFAULT_CANVAS_H = 1080;
@@ -114,18 +129,20 @@ export function applyBackgroundToAllPages<P extends PageLike>(
   return pages.map((p) => ({ ...p, bg, bgGrad } as P));
 }
 
-/** 가로 미러(좌우 반전) 복제 — 위치/폭/points x 좌표 반전. draw/image/text/frame 등 지원. */
+/** 가로 미러(좌우 반전) 복제 — 위치/폭/points x 좌표 반전. draw/image/text/frame 등 지원.
+ * 버블 꼬리(left/right)와 tailXRatio도 대칭 보정.
+ */
 export function duplicateMirroredPage<P extends PageLike>(
   page: P,
   makeId: () => string,
   canvasW: number
 ): P {
-  const mirroredEls = page.elements.map((el: any) => {
-    const w = (el.width ?? 0) as number;
-    const x = (el.x ?? 0) as number;
+  const mirroredEls = page.elements.map((el) => {
+    const w = typeof el.width === "number" ? el.width : 0;
+    const x = typeof el.x === "number" ? el.x : 0;
     const newX = canvasW - x - w;
-    const rot = (el.rotation ?? 0) as number;
-    const newEl: any = { ...el, id: makeId(), x: newX, rotation: -rot };
+    const rot = typeof el.rotation === "number" ? el.rotation : 0;
+    const newEl: PageElementLike = { ...el, id: makeId(), x: newX, rotation: -rot };
 
     // draw freehand/shape points: x좌표만 반전
     if (Array.isArray(el.points) && el.points.length > 0) {
@@ -145,6 +162,18 @@ export function duplicateMirroredPage<P extends PageLike>(
       // (기존 사용은 x,y 절대라 동일 로직 OK)
     }
 
+    // Bubble tail 대칭: left <-> right, tailXRatio 1-x 로 반전 (상하 tailDirection은 시각적 유지)
+    if (el.type === "bubble") {
+      if (el.tail === "left") newEl.tail = "right";
+      else if (el.tail === "right") newEl.tail = "left";
+      if (el.tailDirection === "left") newEl.tailDirection = "right";
+      else if (el.tailDirection === "right") newEl.tailDirection = "left";
+      if (typeof el.tailXRatio === "number") {
+        newEl.tailXRatio = 1 - el.tailXRatio;
+      }
+      // tailHeight, top/bottom direction 등은 수평 반전에서 상대적으로 유지
+    }
+
     // lockAspect 등 기타는 복사 유지
     return newEl;
   });
@@ -159,4 +188,55 @@ export function duplicateMirroredPage<P extends PageLike>(
 /** 유틸: id로 페이지 인덱스 찾기. */
 export function findPageIndex<P extends PageLike>(pages: readonly P[], pageId: string): number {
   return pages.findIndex((p) => p.id === pageId);
+}
+
+/**
+ * Compute the id of the page that should become active after deleting one.
+ * Replicates the original preference: pages[idx-1] || pages[idx+1] || pages[0]
+ * (id-based snapshot to avoid stale array bugs).
+ */
+export function computeNextActiveIdAfterDelete<P extends { id: string }>(
+  pages: readonly P[],
+  deletedId: string
+): string | null {
+  if (pages.length <= 1) return null;
+  const idx = pages.findIndex((p) => p.id === deletedId);
+  if (idx < 0) return pages[0]?.id ?? null;
+  const prev = idx > 0 ? pages[idx - 1] : null;
+  const nxt = idx + 1 < pages.length ? pages[idx + 1] : null;
+  const candidate = prev || nxt || pages[0];
+  return candidate ? candidate.id : null;
+}
+
+/**
+ * Pure append for a new blank page (the shipped "추가" command).
+ * Returns the new immutable list and the id of the appended page.
+ * Component does: const {nextPages, newPageId} = append... ; commitPages(nextPages); setCurrent(newPageId);
+ */
+export function appendPageState<P extends PageLike>(
+  pages: readonly P[],
+  makeId: () => string,
+  baseH: number = DEFAULT_CANVAS_H
+): { nextPages: P[]; newPageId: string } {
+  const newPage = createBlankPage(makeId, baseH) as P;
+  const nextPages = [...pages, newPage];
+  return { nextPages, newPageId: newPage.id };
+}
+
+/**
+ * Pure delete transition (the shipped delete command).
+ * Returns the new list and the id that should become active (if the deleted one was current).
+ * Component does the commit + setCurrent based on this.
+ */
+export function executeDeletePageTransition<P extends PageLike>(
+  pages: readonly P[],
+  deletedId: string,
+  currentId: string | null
+): { nextPages: P[]; nextActiveId: string | null } {
+  if (pages.length <= 1) {
+    return { nextPages: [...pages], nextActiveId: currentId };
+  }
+  const nextPages = deletePageSafe(pages, deletedId);
+  const nextActiveId = computeNextActiveIdAfterDelete(pages, deletedId);
+  return { nextPages, nextActiveId };
 }

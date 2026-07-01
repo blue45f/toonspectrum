@@ -40,7 +40,9 @@
     "turbo:build": "pnpm exec turbo run build",
     "turbo:typecheck": "pnpm exec turbo run typecheck",
     "turbo:lint": "pnpm exec turbo run lint",
-    "turbo:test": "pnpm exec turbo run test --concurrency=1"
+    "turbo:test": "pnpm exec turbo run test --concurrency=1",
+    "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
+    "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
     "@heejun/deskcloud": "^0.1.0",
@@ -110,7 +112,8 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.60.0",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "playwright": "^1.48.2"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
