@@ -65,6 +65,11 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "polydancer", name: "폴리댄서", url: "/vrm/Polydancer.vrm" },
   { id: "rose", name: "로즈", url: "/vrm/Rose.vrm" },
   { id: "robert", name: "로버트", url: "/vrm/Robert.vrm" },
+  { id: "bloody", name: "블러디 (빌런)", url: "/vrm/Bloody.vrm" },
+  { id: "rabbit", name: "래빗 (토끼)", url: "/vrm/Rabbit.vrm" },
+  { id: "eggplant", name: "에그플랜트 (가지)", url: "/vrm/Eggplant.vrm" },
+  { id: "coolbanana", name: "쿨바나나", url: "/vrm/CoolBanana.vrm" },
+  { id: "skull", name: "스컬 (해골)", url: "/vrm/Skull.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

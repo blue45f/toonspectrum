@@ -19,6 +19,12 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Polydancer.vrm` | 폴리댄서 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Rose.vrm` | 로즈 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Robert.vrm` | 로버트 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Bloody.vrm` | 블러디 (빌런) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Rabbit.vrm` | 래빗 (토끼) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Eggplant.vrm` | 에그플랜트 (가지) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+
 
 
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).

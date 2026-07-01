@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
 
-// 2026-06 추가된 신규 번들 8종 및 2026-07 추가된 4종 — public/vrm/LICENSES.md 고지 대상.
+// 2026-06 추가된 신규 번들 8종 및 2026-07 추가된 9종 — public/vrm/LICENSES.md 고지 대상.
 const NEW_BUNDLE_FILES = [
   "Sendagaya_Shino.vrm",
   "Sakurada_Fumiriya.vrm",
@@ -19,6 +19,11 @@ const NEW_BUNDLE_FILES = [
   "Polydancer.vrm",
   "Rose.vrm",
   "Robert.vrm",
+  "Bloody.vrm",
+  "Rabbit.vrm",
+  "Eggplant.vrm",
+  "CoolBanana.vrm",
+  "Skull.vrm",
 ] as const;
 
 describe("VRM library helpers", () => {
@@ -48,12 +53,17 @@ describe("VRM library helpers", () => {
       "폴리댄서",
       "로즈",
       "로버트",
+      "블러디 (빌런)",
+      "래빗 (토끼)",
+      "에그플랜트 (가지)",
+      "쿨바나나",
+      "스컬 (해골)",
     ]);
     expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 24 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(24);
+  it("bundles 29 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(29);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
