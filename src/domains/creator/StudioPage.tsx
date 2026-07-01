@@ -110,6 +110,7 @@ import {
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage } from "./studio-comipo-assembly";
+import { composeDialogueIntoFrames, composeSceneIntoFrame } from "./studio-comipo-compose";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -4492,21 +4493,45 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
   }
-  // 장면 템플릿 삽입 — 프레임·말풍선·효과를 한 번에 깐다(코미포/툰스푼 "한 번에" 발상).
-  // 시드는 [0,720] 폭 안에서 좌상단 원점 기준 배치되므로 originX=0(전폭), originY는 현재 보기 부근.
+  // 장면 템플릿 삽입 — 선택/뷰포트 패널 프레임 안에 맞추거나, 프레임 없으면 보기 중앙에 배치.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
-    const [, cy] = spawnCenter();
-    const originY = Math.max(20, Math.round(cy - 240));
-    const newEls = template.build(0, originY).map((s: SceneSeed): El => ({ ...s, id: uid() }));
+    const panelFrames = elements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
+    const [cx, cy] = spawnCenter();
+    let target: { x: number; y: number; width: number; height: number } | null = null;
+
+    if (selected?.type === "frame") {
+      target = selected;
+    } else if (panelFrames.length > 0) {
+      const hit = panelFrames.find(
+        (f) => cx >= f.x && cx <= f.x + f.width && cy >= f.y && cy <= f.y + f.height
+      );
+      const pick = hit ?? [...panelFrames].sort((a, b) => a.y - b.y || a.x - b.x)[0]!;
+      target = pick;
+    }
+
+    const seeds: SceneSeed[] = target
+      ? composeSceneIntoFrame(template.build(0, 0), target)
+      : template.build(0, Math.max(20, Math.round(cy - 240)));
+    const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
     commit([...elements, ...newEls]);
     setTool("select");
   }
-  // 대사 스크립트 일괄 삽입 — 여러 줄을 화자별 좌/우 말풍선으로 자동 배치(웹툰 제작 시간 단축).
+  // 대사 스크립트 일괄 삽입 — 패널 프레임이 있으면 컷별 배치, 없으면 세로 스택.
   async function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
-    const { dialogueToBubbles } = await import("./studio-dialogue");
-    const seeds = dialogueToBubbles(dialogueScript, { canvasWidth: CANVAS_W, startY: 80 });
+    const panelFrames = elements
+      .filter((e): e is FrameEl => e.type === "frame" && !e.hidden)
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+
+    const seeds =
+      panelFrames.length > 0
+        ? composeDialogueIntoFrames(dialogueScript, panelFrames, CANVAS_W)
+        : (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
+            canvasWidth: CANVAS_W,
+            startY: 80,
+          });
     if (seeds.length === 0) return;
     const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
     commit([...elements, ...newEls]);

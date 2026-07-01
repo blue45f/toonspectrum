@@ -1,8 +1,13 @@
 /**
- * 코미포·툰스푼식 원클릭 조립 — 패널 레이아웃 + 장면 템플릿 + 대사 스크립트를 한 번에 시드로 합친다.
+ * 코미포·툰스푼식 원클릭 조립 — 패널 레이아웃 + 장면 템플릿 + 대사 스크립트를
+ * 패널 프레임 안에 공간적으로 배치한다(겹침 없음).
  */
 
-import { dialogueToBubbles } from "./studio-dialogue";
+import {
+  composeDialogueIntoFrames,
+  composeSceneIntoFrame,
+  isComposableAssembly,
+} from "./studio-comipo-compose";
 import { materializePanelLayout, PANEL_LAYOUTS, type PanelLayoutElementSeed } from "./studio-panel-layouts";
 import { SCENE_TEMPLATES, type SceneSeed } from "./studio-scene-templates";
 
@@ -28,14 +33,16 @@ export type ComipoAssemblySeed =
 export interface ComipoAssemblyInput {
   layoutId: string;
   sceneTemplateId?: string;
+  /** 장면을 넣을 패널 프레임 인덱스(기본 0 = 첫 컷). */
+  sceneFrameIndex?: number;
   dialogueScript?: string;
-  dialogueStartY?: number;
 }
 
 export interface ComipoAssemblyResult {
   canvasH: number;
   frameCount: number;
   bubbleCount: number;
+  composable: boolean;
   seeds: ComipoAssemblySeed[];
 }
 
@@ -53,24 +60,38 @@ export function assembleComipoPage(input: ComipoAssemblyInput): ComipoAssemblyRe
   if (!layout) return null;
 
   const { canvasH, seeds: panelSeeds } = materializePanelLayout(layout);
-  const seeds: ComipoAssemblySeed[] = [...panelSeeds];
+  const frameSeeds = panelSeeds.filter((s) => s.type === "frame");
+  const hasDialogue = Boolean(input.dialogueScript?.trim());
+  // 대사 스크립트가 있으면 레이아웃 placeholder 말풍선은 대체한다.
+  const layoutBubbles = hasDialogue ? [] : panelSeeds.filter((s) => s.type === "bubble");
 
-  if (input.sceneTemplateId) {
+  const decor: ComipoAssemblySeed[] = [...layoutBubbles];
+
+  if (input.sceneTemplateId && layout.frames.length > 0) {
     const scene = findSceneTemplate(input.sceneTemplateId);
-    if (scene) seeds.push(...scene.build(0, 0));
+    const frameIndex = Math.min(
+      Math.max(0, input.sceneFrameIndex ?? 0),
+      layout.frames.length - 1
+    );
+    const targetFrame = layout.frames[frameIndex]!;
+    if (scene) {
+      const rawScene = scene.build(0, 0);
+      // 대사 스크립트가 있으면 장면 placeholder 말풍선도 대체한다.
+      const sceneForCompose = hasDialogue
+        ? rawScene.filter((s) => s.type !== "frame" && s.type !== "bubble")
+        : rawScene;
+      decor.push(...composeSceneIntoFrame(sceneForCompose, targetFrame));
+    }
   }
 
-  if (input.dialogueScript?.trim()) {
-    const startY = input.dialogueStartY ?? layout.frames[0]?.y ?? 24;
-    const dialogueSeeds = dialogueToBubbles(input.dialogueScript, {
-      canvasWidth: 720,
-      startY: startY + 48,
-    });
-    seeds.push(...dialogueSeeds);
+  if (hasDialogue) {
+    decor.push(...composeDialogueIntoFrames(input.dialogueScript!, layout.frames));
   }
 
-  const frameCount = seeds.filter((s) => "type" in s && s.type === "frame").length;
+  const seeds: ComipoAssemblySeed[] = [...frameSeeds, ...decor];
+  const frameCount = frameSeeds.length;
   const bubbleCount = seeds.filter((s) => "type" in s && s.type === "bubble").length;
+  const composable = isComposableAssembly(layout.frames, decor, canvasH);
 
-  return { canvasH, frameCount, bubbleCount, seeds };
+  return { canvasH, frameCount, bubbleCount, composable, seeds };
 }
