@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CANVAS_W } from "./studio-assets";
-import { PANEL_LAYOUTS } from "./studio-panel-layouts";
+import { materializePanelLayout, PANEL_LAYOUTS } from "./studio-panel-layouts";
 
 describe("컷(패널) 레이아웃 템플릿 스키마", () => {
   it("provides at least 12 presets with unique ids", () => {
@@ -61,6 +61,15 @@ describe("컷(패널) 레이아웃 템플릿 스키마", () => {
         expect(inside, `${layout.id} bubble inside a frame`).toBe(true);
       }
     }
+  });
+
+  it("materializePanelLayout returns frame and bubble seeds for talk layout", () => {
+    const layout = PANEL_LAYOUTS.find((item) => item.id === "layout_talk_2_bubbles");
+    expect(layout).toBeTruthy();
+    const { canvasH, seeds } = materializePanelLayout(layout!);
+    expect(canvasH).toBe(layout!.canvasH);
+    expect(seeds.filter((s) => s.type === "frame").length).toBe(layout!.frames.length);
+    expect(seeds.filter((s) => s.type === "bubble").length).toBe((layout!.bubbles ?? []).length);
   });
 
   it("covers the comic staples: 1컷·인스타툰 3단·4컷·지그재그·말풍선 틀", () => {

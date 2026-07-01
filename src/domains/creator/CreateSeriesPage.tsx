@@ -17,6 +17,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
 import { SERIES_STATUS_LABEL } from "./creator-community-utils";
+import { buildStudioHref } from "./creator-studio-links";
 
 import { CoverImage } from "@/components/cover-image";
 import { Container } from "@/components/section";
@@ -269,6 +270,15 @@ export function CreateSeriesPage() {
                 </Link>
               )}
               {series.isOwner && (
+                <Link
+                  href={buildStudioHref({ seriesId: series.id })}
+                  className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
+                >
+                  <PenLine size={14} />
+                  다음화 만들기
+                </Link>
+              )}
+              {series.isOwner && (
                 <div className="ml-auto flex items-center gap-2">
                   <button
                     type="button"
@@ -324,16 +334,16 @@ export function CreateSeriesPage() {
             <p className="text-sm font-medium text-fg">아직 등록된 회차가 없습니다.</p>
             <p className="mt-1 text-xs text-fg-3">
               {series.isOwner
-                ? "스튜디오에서 작품을 만들고, 작품 상세의 ‘연재·챌린지 설정’에서 이 시리즈에 연결해 보세요."
+                ? "‘다음화 만들기’를 누르면 이 시리즈에 자동 연결된 상태로 스튜디오가 열립니다."
                 : "창작자가 첫 회차를 준비 중입니다."}
             </p>
             {series.isOwner && (
               <Link
-                href="/studio"
+                href={buildStudioHref({ seriesId: series.id })}
                 className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
               >
                 <PenLine size={14} />
-                스튜디오에서 만들기
+                1화 만들기
               </Link>
             )}
           </div>

@@ -194,23 +194,21 @@ function whiteBalanceCoeffs(img: StudioImageDataLike, lumaHist: Uint32Array, tot
 }
 
 // ---------------------------------------------------------------------------
-// 적용 — 통계 → 모드별 계수 → strength 블렌드(제자리 변형)
+// 통계 수집·계수 계산 — 슬라이더 프리뷰 등에서 픽셀 순회를 재사용한다.
 // ---------------------------------------------------------------------------
 
-/**
- * 자동 보정 제자리 적용 — 항등(none/strength<=0)이면 no-op.
- * 한 번의 순회로 채널 합·히스토그램을 모아 모드별 {scale,offset} 3쌍을 만든 뒤,
- *   corrected = clamp(in*scale + offset)
- *   out       = in + (corrected - in) * (strength/100)
- * 로 원본과 블렌드한다. 알파(+3) 보존. 빈/단색 이미지는 항등 계수로 떨어져 안전.
- */
-export function applyAutoAdjust(img: StudioImageDataLike, a: AutoAdjust): void {
-  if (isIdentityAutoAdjust(a)) return;
-  const data = img.data;
-  const total = (data.length / 4) | 0;
-  if (total <= 0) return;
+export type ImagePixelStats = {
+  total: number;
+  sum: [number, number, number];
+  histR: Uint32Array;
+  histG: Uint32Array;
+  histB: Uint32Array;
+  lumaHist: Uint32Array;
+};
 
-  // 채널별 합·히스토그램 + 휘도 히스토그램을 한 번에 수집.
+/** 채널 합·히스토그램·휘도 히스토그램을 한 번의 순회로 수집한다. */
+export function collectImageStats(data: Uint8ClampedArray | Uint8Array): ImagePixelStats {
+  const total = (data.length / 4) | 0;
   const sum: [number, number, number] = [0, 0, 0];
   const histR = new Uint32Array(256);
   const histG = new Uint32Array(256);
@@ -226,50 +224,46 @@ export function applyAutoAdjust(img: StudioImageDataLike, a: AutoAdjust): void {
     histR[r]!++;
     histG[g]!++;
     histB[b]!++;
-    // 휘도는 반올림해 256칸에 누적.
     const luma = (LUMA_R * r + LUMA_G * g + LUMA_B * b) | 0;
     lumaHist[luma < 0 ? 0 : luma > 255 ? 255 : luma]!++;
   }
+  return { total, sum, histR, histG, histB, lumaHist };
+}
 
-  let coeffs: RgbCoeffs;
-  switch (a.mode) {
+/** 모드별 RGB 계수를 계산한다(항등일 수 있음). */
+export function computeAutoAdjustCoeffs(
+  mode: AutoMode,
+  stats: ImagePixelStats,
+  img?: StudioImageDataLike
+): RgbCoeffs {
+  switch (mode) {
     case "contrast":
-      coeffs = contrastCoeffs(lumaHist, total);
-      break;
+      return contrastCoeffs(stats.lumaHist, stats.total);
     case "tone":
-      coeffs = toneCoeffs([histR, histG, histB], total);
-      break;
+      return toneCoeffs([stats.histR, stats.histG, stats.histB], stats.total);
     case "color":
-      coeffs = colorCoeffs(sum, total);
-      break;
+      return colorCoeffs(stats.sum, stats.total);
     case "whiteBalance":
-      coeffs = whiteBalanceCoeffs(img, lumaHist, total);
-      break;
+      return img ? whiteBalanceCoeffs(img, stats.lumaHist, stats.total) : IDENTITY_RGB;
     default:
-      return;
+      return IDENTITY_RGB;
   }
+}
 
-  // 계수가 전부 항등이면(단색·통계 부족) 굳이 픽셀을 건드리지 않는다.
+function isIdentityCoeffs(coeffs: RgbCoeffs): boolean {
+  return coeffs.every((c) => c.scale === 1 && c.offset === 0);
+}
+
+export function applyCoeffsWithBlend(data: Uint8ClampedArray | Uint8Array, coeffs: RgbCoeffs, strength: number): void {
+  if (isIdentityCoeffs(coeffs)) return;
   const cr = coeffs[0];
   const cg = coeffs[1];
   const cb = coeffs[2];
-  if (
-    cr.scale === 1 &&
-    cr.offset === 0 &&
-    cg.scale === 1 &&
-    cg.offset === 0 &&
-    cb.scale === 1 &&
-    cb.offset === 0
-  ) {
-    return;
-  }
-
-  const blend = Math.min(1, Math.max(0, a.strength / 100));
+  const blend = Math.min(1, Math.max(0, strength / 100));
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]!;
     const g = data[i + 1]!;
     const b = data[i + 2]!;
-    // corrected는 0..255로 클램프(블렌드 전 채널별 한계 고정).
     const cR = clamp255(r * cr.scale + cr.offset);
     const cG = clamp255(g * cg.scale + cg.offset);
     const cB = clamp255(b * cb.scale + cb.offset);
@@ -277,6 +271,23 @@ export function applyAutoAdjust(img: StudioImageDataLike, a: AutoAdjust): void {
     data[i + 1] = g + (cG - g) * blend;
     data[i + 2] = b + (cB - b) * blend;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 적용 — 통계 → 모드별 계수 → strength 블렌드(제자리 변형)
+// ---------------------------------------------------------------------------
+
+/**
+ * 자동 보정 제자리 적용 — 항등(none/strength<=0)이면 no-op.
+ * 한 번의 순회로 채널 합·히스토그램을 모아 모드별 {scale,offset} 3쌍을 만든 뒤,
+ *   corrected = clamp(in*scale + offset)
+ *   out       = in + (corrected - in) * (strength/100)
+ * 로 원본과 블렌드한다. 알파(+3) 보존. 빈/단색 이미지는 항등 계수로 떨어져 안전.
+ */
+export function applyAutoAdjust(img: StudioImageDataLike, a: AutoAdjust): void {
+  const normalized = normalizeAutoAdjust(a);
+  if (isIdentityAutoAdjust(normalized)) return;
+  applyCoeffsWithBlend(img.data, computeAutoAdjustCoeffs(normalized.mode, collectImageStats(img.data), img), normalized.strength);
 }
 
 // 0..255 클램프(블렌드용 — Uint8ClampedArray 대입은 반올림만 보장하므로 사전 클램프).

@@ -8,6 +8,7 @@ import {
   processPencilPoints,
   screentoneDotRadius,
   screentoneDotsForStroke,
+  shouldAppendStrokePoint,
   smoothStrokePoints,
   stabilizePoint,
 } from "./studio-brush";
@@ -28,6 +29,13 @@ describe("BRUSH_PRESETS", () => {
       expect(preset.defaultOpacity).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("shouldAppendStrokePoint (라이브 thinning)", () => {
+  it("skips points that are too close to the previous sample", () => {
+    expect(shouldAppendStrokePoint(0, 0, 0.5, 0.5, 1.5)).toBe(false);
+    expect(shouldAppendStrokePoint(0, 0, 4, 0, 1.5)).toBe(true);
   });
 });
 

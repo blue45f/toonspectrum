@@ -2,7 +2,9 @@ import { BookOpen, PenLine, Plus, Sparkles, Trophy, UserCheck, X } from "lucide-
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { CreateFeaturedSections } from "./CreateFeaturedSections";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
+import { buildStudioHref } from "./creator-studio-links";
 
 import { Container } from "@/components/section";
 import { ShimmerTitle } from "@/components/shimmer-title";
@@ -452,10 +454,21 @@ export function CreateGalleryPage() {
                 창작 챌린지
               </Link>
               <Link
+                href={buildStudioHref({ mode: "upload" })}
+                className={buttonClass({
+                  variant: "ghost",
+                  className:
+                    "h-11 gap-1.5 border border-white/30 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white",
+                })}
+              >
+                <BookOpen size={16} />
+                이미지 업로드
+              </Link>
+              <Link
                 href="/studio"
                 className={buttonClass({
                   variant: "solid",
-                  className: "h-11 gap-1.5 shadow-lg shadow-accent/25",
+                  className: "h-11 gap-1.5 shadow-lg shadow-accent/25 sm:col-span-2",
                 })}
               >
                 <PenLine size={16} />
@@ -511,6 +524,8 @@ export function CreateGalleryPage() {
           </div>
         </div>
       </header>
+
+      {tab === "works" && !tag ? <CreateFeaturedSections /> : null}
 
       {tab === "works" ? <WorksTab sort={sort} tag={tag} /> : tab === "series" ? <SeriesTab sort={sort} /> : <FollowingTab />}
     </Container>

@@ -96,6 +96,54 @@ function yonkomaTitled(): { frames: PanelLayoutFrame[]; canvasH: number } {
 }
 const yonkoma = yonkomaTitled();
 
+/** 패널 레이아웃을 캔버스 시드(프레임·말풍선)로 물질화 — StudioPage applyPanelLayout 과 동일 계약. */
+export type PanelLayoutElementSeed =
+  | {
+      type: "frame";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }
+  | {
+      type: "bubble";
+      variant: "speech" | "box";
+      text: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      fill: string;
+      textFill: string;
+      rotation: number;
+    };
+
+export function materializePanelLayout(layout: PanelLayoutPreset): {
+  canvasH: number;
+  seeds: PanelLayoutElementSeed[];
+} {
+  const frames: PanelLayoutElementSeed[] = layout.frames.map((f) => ({
+    type: "frame",
+    x: f.x,
+    y: f.y,
+    width: f.width,
+    height: f.height,
+  }));
+  const bubbles: PanelLayoutElementSeed[] = (layout.bubbles ?? []).map((b) => ({
+    type: "bubble",
+    variant: b.variant,
+    text: b.text,
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
+    fill: "#ffffff",
+    textFill: "#16100c",
+    rotation: 0,
+  }));
+  return { canvasH: layout.canvasH, seeds: [...frames, ...bubbles] };
+}
+
 export const PANEL_LAYOUTS: PanelLayoutPreset[] = [
   {
     id: "layout_single_hero",

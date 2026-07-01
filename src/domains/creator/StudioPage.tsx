@@ -102,12 +102,14 @@ import {
   processPencilPoints,
   screentoneDotRadius,
   screentoneDotsForStroke,
+  shouldAppendStrokePoint,
   smoothStrokePoints,
   stabilizePoint,
   STABILIZER_MAX,
 } from "./studio-brush";
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
+import { assembleComipoPage } from "./studio-comipo-assembly";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -137,6 +139,14 @@ import {
   drawVignette,
   type PageGrade,
 } from "./studio-page-grade";
+import { materializePanelLayout } from "./studio-panel-layouts";
+import {
+  computeAlignDeltas,
+  computeDistributeDeltas,
+  normalizeMarqueeRect,
+  selectIdsByMarquee,
+  unionBounds,
+} from "./studio-selection";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   DEFAULT_WATERMARK,
@@ -145,6 +155,8 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
+import { StudioUploadPublish } from "./StudioUploadPublish";
 
 import type { StudioAsset } from "./studio-asset-library";
 import type { AutoAdjust } from "./studio-auto-adjust";
@@ -699,11 +711,6 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
     current = current.getParent();
   }
   return null;
-}
-
-// 두 사각형이 겹치는지(마퀴 다중선택 판정).
-function rectsIntersect(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 // 요소가 "들어가야 할" 패널(중심이 패널 안 + 패널보다 크게 넘치지 않음). 없으면 null.
@@ -2018,12 +2025,22 @@ interface PageState {
 }
 
 export function StudioPage() {
+  const [params] = useSearchParams();
+  if (params.get("mode") === "upload") {
+    return <StudioUploadPublish />;
+  }
+  return <StudioCuttoonEditor />;
+}
+
+function StudioCuttoonEditor() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
   const workId = params.get("id");
   const remixId = params.get("remix");
   const linkedTitleId = params.get("titleId");
+  const linkedSeriesId = params.get("seriesId");
+  const linkedChallengeId = params.get("challengeId");
   const studioAuthUserId = session?.user?.id ?? null;
   const loggedIn = Boolean(studioAuthUserId);
 
@@ -2348,6 +2365,7 @@ export function StudioPage() {
   const [tagsText, setTagsText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [publishContext, setPublishContext] = useState<PublishContext>({});
   const [workHydrated, setWorkHydrated] = useState(!workId);
   const sceneTemplates = sceneTemplatePacks ?? EMPTY_STUDIO_SCENE_TEMPLATE_PACKS;
   const studioSfx = sfxPacks ?? EMPTY_STUDIO_SFX_PACKS;
@@ -2948,6 +2966,57 @@ export function StudioPage() {
       alive = false;
     };
   }, [workId, remixId]);
+
+  // 시리즈·챌린지 딥링크로 들어온 경우 게시 맥락 배너를 채운다.
+  useEffect(() => {
+    if (!linkedSeriesId && !linkedChallengeId) {
+      setPublishContext({});
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    async function loadPublishContext() {
+      const next: PublishContext = {};
+      if (linkedSeriesId) {
+        try {
+          const { getSeries } = await import("@/src/infrastructure/creator-client");
+          const series = await getSeries(linkedSeriesId, controller.signal);
+          if (!alive) return;
+          const maxEpisode = series.episodeList.reduce(
+            (max, episode) => Math.max(max, episode.episodeNo ?? 0),
+            0
+          );
+          next.series = {
+            id: series.id,
+            title: series.title,
+            nextEpisodeNo: maxEpisode + 1,
+          };
+        } catch {
+          // 맥락 로드 실패 시 배너만 생략.
+        }
+      }
+      if (linkedChallengeId) {
+        try {
+          const { getChallenge } = await import("@/src/infrastructure/creator-client");
+          const challenge = await getChallenge(linkedChallengeId, controller.signal);
+          if (!alive) return;
+          next.challenge = {
+            id: challenge.id,
+            title: challenge.title,
+            theme: challenge.theme,
+          };
+        } catch {
+          // 맥락 로드 실패 시 배너만 생략.
+        }
+      }
+      if (alive) setPublishContext(next);
+    }
+    void loadPublishContext();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [linkedSeriesId, linkedChallengeId]);
 
   useEffect(() => {
     studioOptionalAssetsMountedRef.current = true;
@@ -3777,27 +3846,97 @@ export function StudioPage() {
   function startFromExample() {
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
 
-    const frames = createQuickSampleFrames();
-    const firstFrame = frames[0];
-    const sample: El[] = [...frames];
+    const assembled = assembleComipoPage({
+      layoutId: "layout_talk_2_bubbles",
+      sceneTemplateId: "confession",
+      dialogueScript: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터·말풍선·컷 템플릿을 바로 써 보세요.",
+    });
+    const sample: El[] = assembled
+      ? assembled.seeds.map((seed) => {
+          const id = uid();
+          if (seed.type === "frame") {
+            return {
+              id,
+              type: "frame" as const,
+              x: seed.x,
+              y: seed.y,
+              width: seed.width,
+              height: seed.height,
+              stroke: "stroke" in seed ? seed.stroke : undefined,
+              strokeWidth: "strokeWidth" in seed ? seed.strokeWidth : undefined,
+              bgColor: "bgColor" in seed ? seed.bgColor : undefined,
+            };
+          }
+          if (seed.type === "bubble") {
+            return {
+              id,
+              type: "bubble" as const,
+              variant: seed.variant,
+              text: seed.text,
+              x: seed.x,
+              y: seed.y,
+              width: seed.width,
+              height: seed.height,
+              fill: seed.fill,
+              textFill: seed.textFill,
+              rotation: seed.rotation,
+              tail: "tail" in seed ? seed.tail : undefined,
+              tailDirection: "tailDirection" in seed ? seed.tailDirection : undefined,
+              align: "align" in seed ? seed.align : undefined,
+            };
+          }
+          if (seed.type === "text") {
+            return {
+              id,
+              type: "text" as const,
+              text: seed.text,
+              x: seed.x,
+              y: seed.y,
+              width: seed.width,
+              fontSize: seed.fontSize,
+              fill: seed.fill,
+              rotation: seed.rotation,
+              font: seed.font,
+              stroke: seed.stroke,
+              strokeWidth: seed.strokeWidth,
+              align: seed.align,
+              fontStyle: seed.fontStyle,
+            };
+          }
+          if (seed.type === "focusLines") {
+            return {
+              id,
+              type: "focusLines" as const,
+              x: seed.x,
+              y: seed.y,
+              width: seed.width,
+              height: seed.height,
+              lineCount: seed.lineCount,
+              innerRadius: seed.innerRadius,
+              outerRadius: seed.outerRadius,
+              stroke: seed.stroke,
+              strokeWidth: seed.strokeWidth,
+              noise: seed.noise,
+              rotation: seed.rotation,
+            };
+          }
+          return {
+            id,
+            type: "speedLines" as const,
+            x: seed.x,
+            y: seed.y,
+            width: seed.width,
+            height: seed.height,
+            lineCount: seed.lineCount,
+            direction: seed.direction,
+            stroke: seed.stroke,
+            strokeWidth: seed.strokeWidth,
+            rotation: seed.rotation,
+          };
+        })
+      : [...createQuickSampleFrames()];
 
-    if (firstFrame) {
-      sample.push({
-        id: uid(),
-        type: "bubble",
-        variant: "speech",
-        text: "상단의 '3D 캐릭터' 버튼을 눌러 다양한 3D 모델을 추가하고 포즈를 취해보세요!",
-        x: firstFrame.x + 30,
-        y: firstFrame.y + 40,
-        width: 300,
-        height: 120,
-        fill: "#ffffff",
-        textFill: "#111111",
-        rotation: 0,
-      });
-    }
-
-    setCanvasH(QUICK_SAMPLE_CANVAS_H);
+    setCanvasH(assembled?.canvasH ?? QUICK_SAMPLE_CANVAS_H);
     setBg("#ffffff");
     setBgGrad(null);
     setWebtoonTheme("soft");
@@ -3897,87 +4036,39 @@ export function StudioPage() {
       const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
 
       if (mode === "distributeH" || mode === "distributeV") {
-        if (selectedEls.length < 3) return; // 3개 미만은 분배 NOP
-        if (mode === "distributeH") {
-          const sorted = [...boundsList].sort((a, b) => (a.b.x + a.b.w / 2) - (b.b.x + b.b.w / 2));
-          const leftEl = sorted[0]!;
-          const rightEl = sorted[sorted.length - 1]!;
-          const startX = leftEl.b.x + leftEl.b.w / 2;
-          const endX = rightEl.b.x + rightEl.b.w / 2;
-          const step = (endX - startX) / (sorted.length - 1);
-
-          const next = elements.map((el) => {
-            if (!marqueeIds.includes(el.id) || el.locked) return el;
-            const sortedIdx = sorted.findIndex((item) => item.el.id === el.id);
-            if (sortedIdx === 0 || sortedIdx === sorted.length - 1) return el; // 양 끝은 고정
-            const item = sorted[sortedIdx]!;
-            const targetCenterX = startX + sortedIdx * step;
-            const currentCenterX = item.b.x + item.b.w / 2;
-            const dx = targetCenterX - currentCenterX;
-
-            return el.type === "draw"
-              ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : 0)) } as El)
-              : ({ ...el, x: (el as { x: number }).x + dx } as El);
-          });
-          commit(next);
-        } else {
-          const sorted = [...boundsList].sort((a, b) => (a.b.y + a.b.h / 2) - (b.b.y + b.b.h / 2));
-          const topEl = sorted[0]!;
-          const bottomEl = sorted[sorted.length - 1]!;
-          const startY = topEl.b.y + topEl.b.h / 2;
-          const endY = bottomEl.b.y + bottomEl.b.h / 2;
-          const step = (endY - startY) / (sorted.length - 1);
-
-          const next = elements.map((el) => {
-            if (!marqueeIds.includes(el.id) || el.locked) return el;
-            const sortedIdx = sorted.findIndex((item) => item.el.id === el.id);
-            if (sortedIdx === 0 || sortedIdx === sorted.length - 1) return el; // 양 끝은 고정
-            const item = sorted[sortedIdx]!;
-            const targetCenterY = startY + sortedIdx * step;
-            const currentCenterY = item.b.y + item.b.h / 2;
-            const dy = targetCenterY - currentCenterY;
-
-            return el.type === "draw"
-              ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? 0 : dy)) } as El)
-              : ({ ...el, y: (el as { y: number }).y + dy } as El);
-          });
-          commit(next);
-        }
+        const bounds = boundsList.map(({ b }) => b);
+        const deltas = computeDistributeDeltas(bounds, mode);
+        if (!deltas) return;
+        const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
+        const next = elements.map((el) => {
+          if (!marqueeIds.includes(el.id) || el.locked) return el;
+          const delta = deltaById.get(el.id);
+          if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
+          return el.type === "draw"
+            ? ({
+                ...el,
+                points: el.points.map((v, i) => v + (i % 2 === 0 ? delta.dx : delta.dy)),
+              } as El)
+            : ({ ...el, x: (el as { x: number }).x + delta.dx, y: (el as { y: number }).y + delta.dy } as El);
+        });
+        commit(next);
         return;
       }
 
-      // Normal alignment (relative to selection bounding box)
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minY = Infinity;
-      let maxY = -Infinity;
-
-      boundsList.forEach(({ b }) => {
-        minX = Math.min(minX, b.x);
-        maxX = Math.max(maxX, b.x + b.w);
-        minY = Math.min(minY, b.y);
-        maxY = Math.max(maxY, b.y + b.h);
-      });
-
-      const totalW = maxX - minX;
-      const totalH = maxY - minY;
-
+      const bounds = boundsList.map(({ b }) => b);
+      const box = unionBounds(bounds);
+      const deltas = computeAlignDeltas(bounds, mode, box);
+      const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
       const next = elements.map((el) => {
         if (!marqueeIds.includes(el.id) || el.locked) return el;
-        const b = elBounds(el);
-        let dx = 0;
-        let dy = 0;
-        if (mode === "left") dx = minX - b.x;
-        else if (mode === "right") dx = maxX - b.w - b.x;
-        else if (mode === "hcenter") dx = minX + (totalW - b.w) / 2 - b.x;
-        else if (mode === "top") dy = minY - b.y;
-        else if (mode === "bottom") dy = maxY - b.h - b.y;
-        else if (mode === "vcenter") dy = minY + (totalH - b.h) / 2 - b.y;
-
-        if (dx === 0 && dy === 0) return el;
+        const delta = deltaById.get(el.id);
+        if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
         return el.type === "draw"
-          ? ({ ...el, points: el.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
-          : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El);
+          ? ({
+              ...el,
+              points: el.points.map((v, i) => v + (i % 2 === 0 ? delta.dx : delta.dy)),
+            } as El)
+          : ({ ...el, x: (el as { x: number }).x + delta.dx, y: (el as { y: number }).y + delta.dy } as El);
       });
       commit(next);
       return;
@@ -4546,32 +4637,37 @@ export function StudioPage() {
   function applyPanelLayout(layout: PanelLayoutPreset) {
     setMenu(null);
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
-    setCanvasH(layout.canvasH);
+    const { canvasH: nextH, seeds } = materializePanelLayout(layout);
+    setCanvasH(nextH);
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(null);
-    const frames: El[] = layout.frames.map((f) => ({
-      id: uid(),
-      type: "frame" as const,
-      x: f.x,
-      y: f.y,
-      width: f.width,
-      height: f.height,
-    }));
-    const bubbles: El[] = (layout.bubbles ?? []).map((b) => ({
-      id: uid(),
-      type: "bubble" as const,
-      variant: b.variant,
-      text: b.text,
-      x: b.x,
-      y: b.y,
-      width: b.width,
-      height: b.height,
-      fill: "#ffffff",
-      textFill: "#16100c",
-      rotation: 0,
-    }));
-    commit([...frames, ...bubbles]);
+    const nextEls: El[] = seeds.map((seed) => {
+      if (seed.type === "frame") {
+        return {
+          id: uid(),
+          type: "frame" as const,
+          x: seed.x,
+          y: seed.y,
+          width: seed.width,
+          height: seed.height,
+        };
+      }
+      return {
+        id: uid(),
+        type: "bubble" as const,
+        variant: seed.variant,
+        text: seed.text,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        fill: seed.fill,
+        textFill: seed.textFill,
+        rotation: seed.rotation,
+      };
+    });
+    commit(nextEls);
     setSelectedId(null);
   }
   function applyBgPreset(p: BgPreset) {
@@ -4673,12 +4769,7 @@ export function StudioPage() {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const s = marqueeStartRef.current;
-        scheduleMarqueeRect({
-          x: Math.min(s.x, pos.x),
-          y: Math.min(s.y, pos.y),
-          w: Math.abs(pos.x - s.x),
-          h: Math.abs(pos.y - s.y),
-        });
+        scheduleMarqueeRect(normalizeMarqueeRect(s.x, s.y, pos.x, pos.y));
       }
       return;
     }
@@ -4732,10 +4823,13 @@ export function StudioPage() {
         [targetX, targetY] = stabilizePoint(lastX, lastY, pos.x, pos.y, stabilizer);
       }
 
-      next = { 
-        ...current, 
+      const lastX = current.points[current.points.length - 2] ?? targetX;
+      const lastY = current.points[current.points.length - 1] ?? targetY;
+      if (!shouldAppendStrokePoint(lastX, lastY, targetX, targetY)) return;
+      next = {
+        ...current,
         points: [...current.points, targetX, targetY],
-        pressures: current.pressures ? [...current.pressures, pressure] : [pressure]
+        pressures: current.pressures ? [...current.pressures, pressure] : [pressure],
       };
     } else {
       const x0 = current.points[0] ?? pos.x;
@@ -4772,7 +4866,12 @@ export function StudioPage() {
       marqueeStartRef.current = null;
       clearMarqueePreview();
       if (rect && rect.w > 3 && rect.h > 3) {
-        const ids = elements.filter((el) => !el.hidden && rectsIntersect(rect, elBounds(el))).map((el) => el.id);
+        const ids = selectIdsByMarquee(
+          elements,
+          (el) => elBounds(el),
+          rect,
+          { include: (el) => !el.hidden }
+        );
         setMarqueeIds(ids);
         setSelectedId(null);
       }
@@ -5025,6 +5124,8 @@ export function StudioPage() {
         } as Record<string, unknown>,
         status,
         remixFromId: (!workId && remixId) ? remixId : undefined,
+        seriesId: linkedSeriesId ?? undefined,
+        challengeId: linkedChallengeId ?? undefined,
       };
       const { createWork, updateWork } = await import("@/src/infrastructure/creator-client");
       const work = workId ? await updateWork(workId, payload) : await createWork(payload);
@@ -5414,6 +5515,7 @@ export function StudioPage() {
           만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
         </div>
       )}
+      <StudioPublishContextBanner context={publishContext} />
 
       {/* 툴바 */}
       {/* 데스크톱: wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록).

@@ -37,8 +37,12 @@ const MobileHeaderNavigation = lazy(() =>
 
 function useActive() {
   const path = usePathname();
-  return (href: string, exact?: boolean) =>
-    exact ? path === href : path === href || path.startsWith(href + "/");
+  return (href: string, exact?: boolean) => {
+    if (href === "/create") {
+      return path === "/create" || path.startsWith("/create/") || path.startsWith("/studio");
+    }
+    return exact ? path === href : path === href || path.startsWith(href + "/");
+  };
 }
 
 function matchesMobileNavigationViewport() {

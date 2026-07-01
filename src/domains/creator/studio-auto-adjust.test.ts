@@ -7,6 +7,8 @@ import {
   DEFAULT_AUTO_ADJUST,
   applyAutoAdjust,
   autoAdjustKonvaFilter,
+  collectImageStats,
+  computeAutoAdjustCoeffs,
   isIdentityAutoAdjust,
   normalizeAutoAdjust,
   type AutoAdjust,
@@ -74,6 +76,17 @@ describe("DEFAULT_AUTO_ADJUST / isIdentityAutoAdjust / AUTO_MODES / AUTO_STRENGT
   it("모드가 none이 아니고 강도>0이면 항등이 아니다", () => {
     expect(isIdentityAutoAdjust({ mode: "contrast", strength: 1 })).toBe(false);
     expect(isIdentityAutoAdjust({ mode: "whiteBalance", strength: 100 })).toBe(false);
+  });
+});
+
+describe("collectImageStats / computeAutoAdjustCoeffs", () => {
+  it("collects histograms in one pass and contrast coeffs stretch low-contrast gradients", () => {
+    const img = makeImage(4, 1, grayGradient(40, 200, 4));
+    const stats = collectImageStats(img.data);
+    expect(stats.total).toBe(4);
+    expect(stats.sum[0]).toBeGreaterThan(0);
+    const coeffs = computeAutoAdjustCoeffs("contrast", stats);
+    expect(coeffs[0].scale).toBeGreaterThan(1);
   });
 });
 

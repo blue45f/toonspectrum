@@ -27,6 +27,17 @@ export const BRUSH_PRESETS: BrushPreset[] = [
 // 손떨림 보정 강도 범위(0=끔 ~ 10=최대).
 export const STABILIZER_MAX = 10;
 
+/** 라이브 드로잉 중 너무 촘촘한 포인트 추가를 건너뛴다(RAF 부하·메모리 절감). */
+export function shouldAppendStrokePoint(
+  lastX: number,
+  lastY: number,
+  nextX: number,
+  nextY: number,
+  minDist = 1.5
+): boolean {
+  return Math.hypot(nextX - lastX, nextY - lastY) >= minDist;
+}
+
 function clampStrength(strength: number): number {
   if (!Number.isFinite(strength)) return 0;
   return Math.min(STABILIZER_MAX, Math.max(0, strength));

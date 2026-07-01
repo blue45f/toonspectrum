@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
+import { buildStudioHref } from "./creator-studio-links";
 
 import { CountUp } from "@/components/count-up";
 import { RevealOnScroll } from "@/components/reveal-on-scroll";
@@ -201,8 +202,8 @@ export function CreateChallengesPage() {
             </ShimmerTitle>
           </h1>
           <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-            매주 새로운 주제로 함께 그리는 창작 이벤트. 스튜디오에서 작품을 만든 뒤 작품 상세의
-            ‘연재·챌린지 설정’에서 챌린지에 연결하면 참여 완료!
+            매주 새로운 주제로 함께 그리는 창작 이벤트. ‘스튜디오에서 참여하기’를 누르면 챌린지가
+            자동 연결된 상태로 작품을 만들고 바로 게시할 수 있어요.
           </p>
         </div>
       </header>
@@ -273,7 +274,7 @@ export function CreateChallengesPage() {
                 </h2>
                 <DdayChip endsAt={selected.endsAt} />
                 <Link
-                  href="/studio"
+                  href={buildStudioHref({ challengeId: selected.id })}
                   data-no-sfx
                   onClick={(event) => {
                     // 참여 시작은 작은 보상감 — 퍼시몬 파티클 "팡" + 'pop'.
