@@ -4532,7 +4532,6 @@ function StudioCuttoonEditor() {
     };
   }
   function commitMutatedSnapshot(
-    snapshot: StudioCanvasSnapshot,
     result: ReturnType<typeof mutateComipoSnapshot>,
     errorMessage: string
   ): boolean {
@@ -4585,7 +4584,7 @@ function StudioCuttoonEditor() {
           };
 
     const result = mutateComipoSnapshot(snapshot, action, uid);
-    if (!commitMutatedSnapshot(snapshot, result, "장면을 이 컷에 맞출 수 없습니다.")) return;
+    if (!commitMutatedSnapshot(result, "장면을 이 컷에 맞출 수 없습니다.")) return;
     setTool("select");
   }
   // 대사 스크립트 일괄 삽입 — mutateComipoSnapshot 단일 shipped path.
@@ -4600,7 +4599,6 @@ function StudioCuttoonEditor() {
     );
     if (
       !commitMutatedSnapshot(
-        snapshot,
         result,
         "대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요."
       )

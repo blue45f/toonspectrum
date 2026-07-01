@@ -404,7 +404,7 @@ function decorSeedToStudioElement(seed: DecorSeed, id: string): StudioDecorEleme
   throw new Error("Unsupported decor seed for studio element");
 }
 
-/** IncrementalInsertPlan 을 decor 배열에 적용(StudioPage commit 전 단계). */
+/** 증분 decor 패치를 decor 배열에 적용(mutateComipoSnapshot 내부·commit 전 단계). */
 export function applyIncrementalDecor(
   decor: readonly StudioDecorElement[],
   patch: IncrementalDecorPatch,
