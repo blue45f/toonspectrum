@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -4095,6 +4095,48 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
                   여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
                 </p>
+
+                <div className="mt-3 rounded-xl border border-line bg-accent-soft/30 p-3">
+                  <h4 className="flex items-center gap-1 text-xs font-bold text-accent">
+                    <Sparkles size={13} aria-hidden />
+                    무료 VRM 캐릭터 / 의상 / 악세사리 추천 사이트
+                  </h4>
+                  <p className="mt-1 text-[0.62rem] leading-normal text-fg-2">
+                    아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonSpectrum에 자유롭게 추가할 수 있습니다.
+                  </p>
+                  <div className="mt-2.5 space-y-2">
+                    <a
+                      href="https://hub.vroid.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg hover:bg-raised transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
+                          VRoid Hub <ExternalLink size={10} className="opacity-60" />
+                        </span>
+                        <span className="text-[0.62rem] text-fg-3 truncate">
+                          'Free' 태그가 달린 수많은 고품질 무료 3D 캐릭터 다운로드
+                        </span>
+                      </div>
+                    </a>
+                    <a
+                      href="https://booth.pm/ko/search/VRM?max_price=0"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg hover:bg-raised transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
+                          BOOTH (무료 VRM 아바타) <ExternalLink size={10} className="opacity-60" />
+                        </span>
+                        <span className="text-[0.62rem] text-fg-3 truncate">
+                          의상, 헤어, 악세사리 등 3D 소스 무료 배포 카탈로그
+                        </span>
+                      </div>
+                    </a>
+                  </div>
+                </div>
 
                 {libraryStatus === "error" && libraryError ? (
                   <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
