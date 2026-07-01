@@ -39,7 +39,7 @@ type VrmThumbnailRecord = {
 // 기본 번들 VRM 캐릭터.
 // A-C는 pixiv VRoidPreset 조건, old beta 샘플 4종은 pixiv CC0 조건을 따른다.
 // 모델별 출처 URL·라이선스 요약은 public/vrm/LICENSES.md 참고
-// (신규 8종: madjin/vrm-samples의 VRoid 공식 샘플 + UniVRM Alicia Solid 테스트 모델).
+// (신규 8종: madjin/vrm-samples의 VRoid 공식 샘플 + UniVRM Alicia Solid 테스트 모델, 2026-07 3종: VRoid Hub & BOOTH 무료 배포 모델).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -70,6 +70,9 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "eggplant", name: "에그플랜트 (가지)", url: "/vrm/Eggplant.vrm" },
   { id: "coolbanana", name: "쿨바나나", url: "/vrm/CoolBanana.vrm" },
   { id: "skull", name: "스컬 (해골)", url: "/vrm/Skull.vrm" },
+  { id: "nasera", name: "나세라", url: "/vrm/Nasera.vrm" },
+  { id: "katya", name: "카츄아", url: "/vrm/Katya.vrm" },
+  { id: "emma", name: "엠마", url: "/vrm/Emma.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

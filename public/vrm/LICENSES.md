@@ -24,6 +24,9 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Eggplant.vrm` | 에그플랜트 (가지) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Nasera.vrm` | 나세라 | <https://hub.vroid.com/en/characters/3923917519236577321/models/4937377628437742180> | 柏太刀카즈키 제작 — 아바타 이용 허용, 상업적 이용 불가, 출처 표기 필요 |
+| `Katya.vrm` | 카츄아 | <https://booth.pm/en/items/2552633> | らてのす의 숍 — 무료 배포 모델, 상업적 이용 가능 여부 개별 확인 필요 |
+| `Emma.vrm` | 엠마 | <https://booth.pm/en/items/6938344> | Neural4D-AnimeArt — 무료 배포 모델, 아바타 이용 허용 |
 
 
 
