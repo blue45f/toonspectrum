@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -4136,6 +4136,35 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       </div>
                     </a>
                   </div>
+                </div>
+
+                <div className="mt-3 rounded-xl border border-line bg-card/60 p-3">
+                  <h4 className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                    <Paintbrush size={13} className="text-accent" aria-hidden />
+                    나만의 캐릭터 만들기 (VRoid Studio)
+                  </h4>
+                  <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
+                    VRoid Studio는 코딩이나 모델링 지식 없이도 얼굴, 헤어, 의상 등을 마우스 클릭과 드래그로 자유롭게 디자인할 수 있는 무료 3D 아바타 제작 도구입니다.
+                  </p>
+                  
+                  <div className="mt-2.5 rounded-lg border border-line bg-panel p-2 text-[0.62rem] text-fg-3 space-y-1.5">
+                    <div className="font-bold text-fg">💡 툰스펙트럼 적용 가이드:</div>
+                    <ul className="list-decimal pl-3.5 space-y-1">
+                      <li>PC/Mac 버전 VRoid Studio를 다운로드하여 설치합니다.</li>
+                      <li>원하는 슬롯(얼굴, 체형, 헤어, 옷 등)의 프리셋을 골라 취향대로 커스텀합니다.</li>
+                      <li>우측 상단 [내보내기(Export)] 아이콘 ➜ <span className="font-bold text-fg">Export as VRM</span>을 클릭합니다.</li>
+                      <li>정보(이름, 라이선스 등)를 입력하고 내보낸 <span className="font-semibold text-accent">.vrm 파일</span>을 ToonSpectrum에 업로드해 보세요!</li>
+                    </ul>
+                  </div>
+
+                  <a
+                    href="https://vroid.com/studio"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2.5 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-raised px-2.5 py-1.5 text-[0.68rem] font-bold text-fg hover:bg-line transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    VRoid Studio 공식 다운로드 <ExternalLink size={10} className="opacity-70" />
+                  </a>
                 </div>
 
                 {libraryStatus === "error" && libraryError ? (
