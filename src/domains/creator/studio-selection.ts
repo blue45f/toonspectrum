@@ -25,6 +25,11 @@ export function rectsIntersect(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/** 점이 사각형 안에 있는지(경계 포함). */
+export function rectContainsPoint(rect: Rect, x: number, y: number): boolean {
+  return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+}
+
 /** 마퀴가 의미 있는 크기인지(우발 클릭 제외). */
 export function isMeaningfulMarquee(rect: Rect, minSize = MIN_MARQUEE): boolean {
   return rect.w > minSize && rect.h > minSize;

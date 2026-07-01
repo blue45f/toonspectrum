@@ -273,6 +273,155 @@ export function dialogueIncomingRefs(bubbles: readonly DialogueBubbleSeed[]): De
   return bubbles.map((seed) => ({ source: "dialogue" as const, seed }));
 }
 
+export interface IncrementalDecorPatch {
+  removedIds: readonly string[];
+  updates: ReadonlyArray<{ id: string; seed: DecorSeed }>;
+  addedSeeds: readonly DecorSeed[];
+}
+
+function patchDecorElement(el: StudioDecorElement, seed: DecorSeed): StudioDecorElement {
+  if (el.type === "bubble" && seed.type === "bubble") {
+    return {
+      ...el,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      text: seed.text,
+      variant: seed.variant,
+      fill: seed.fill,
+      textFill: seed.textFill,
+      rotation: seed.rotation,
+      tail: seed.tail,
+      tailDirection: seed.tailDirection,
+      align: seed.align,
+    };
+  }
+  if (el.type === "text" && seed.type === "text") {
+    return {
+      ...el,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      text: seed.text,
+      fontSize: seed.fontSize,
+      fill: seed.fill,
+      rotation: seed.rotation,
+    };
+  }
+  if (el.type === "focusLines" && seed.type === "focusLines") {
+    return {
+      ...el,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      rotation: seed.rotation,
+    };
+  }
+  if (el.type === "speedLines" && seed.type === "speedLines") {
+    return {
+      ...el,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      rotation: seed.rotation,
+    };
+  }
+  return el;
+}
+
+function decorSeedToStudioElement(seed: DecorSeed, id: string): StudioDecorElement {
+  if (seed.type === "bubble") {
+    return {
+      id,
+      type: "bubble",
+      variant: seed.variant,
+      text: seed.text,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      fill: seed.fill,
+      textFill: seed.textFill,
+      rotation: seed.rotation,
+      tail: seed.tail,
+      tailDirection: seed.tailDirection,
+      align: seed.align,
+    };
+  }
+  if (seed.type === "text") {
+    return {
+      id,
+      type: "text",
+      text: seed.text,
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      fontSize: seed.fontSize,
+      fill: seed.fill,
+      rotation: seed.rotation,
+      font: seed.font,
+      stroke: seed.stroke,
+      strokeWidth: seed.strokeWidth,
+      align: seed.align,
+      fontStyle: seed.fontStyle,
+    };
+  }
+  if (seed.type === "focusLines") {
+    return {
+      id,
+      type: "focusLines",
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      lineCount: seed.lineCount,
+      innerRadius: seed.innerRadius,
+      outerRadius: seed.outerRadius,
+      stroke: seed.stroke,
+      strokeWidth: seed.strokeWidth,
+      noise: seed.noise,
+      rotation: seed.rotation,
+    };
+  }
+  if (seed.type === "speedLines") {
+    return {
+      id,
+      type: "speedLines",
+      x: seed.x,
+      y: seed.y,
+      width: seed.width,
+      height: seed.height,
+      lineCount: seed.lineCount,
+      direction: seed.direction,
+      stroke: seed.stroke,
+      strokeWidth: seed.strokeWidth,
+      rotation: seed.rotation,
+    };
+  }
+  throw new Error("Unsupported decor seed for studio element");
+}
+
+/** IncrementalInsertPlan 을 decor 배열에 적용(StudioPage commit 전 단계). */
+export function applyIncrementalDecor(
+  decor: readonly StudioDecorElement[],
+  patch: IncrementalDecorPatch,
+  createId: () => string
+): StudioDecorElement[] {
+  const removed = new Set(patch.removedIds);
+  const byId = new Map(patch.updates.map((u) => [u.id, u.seed] as const));
+  const kept = decor
+    .filter((e) => !removed.has(e.id))
+    .map((e) => {
+      const seed = byId.get(e.id);
+      return seed ? patchDecorElement(e, seed) : e;
+    });
+  const added = patch.addedSeeds.map((seed) => decorSeedToStudioElement(seed, createId()));
+  return [...kept, ...added];
+}
+
 /** 프레임 내 최종 장식이 쌍별로 겹치지 않는지(증분 commit 후 불변식). */
 export function frameDecorHasNoPairwiseOverlap(
   frame: PanelLayoutFrame,

@@ -5,6 +5,7 @@ import {
   computeDistributeDeltas,
   isMeaningfulMarquee,
   normalizeMarqueeRect,
+  rectContainsPoint,
   rectsIntersect,
   selectIdsByMarquee,
   unionBounds,
@@ -13,6 +14,12 @@ import {
 describe("studio-selection", () => {
   it("normalizes marquee drag corners", () => {
     expect(normalizeMarqueeRect(100, 50, 10, 80)).toEqual({ x: 10, y: 50, w: 90, h: 30 });
+  });
+
+  it("rectContainsPoint detects viewport center inside panel frame", () => {
+    const frame = { x: 24, y: 24, w: 672, h: 560 };
+    expect(rectContainsPoint(frame, 360, 300)).toBe(true);
+    expect(rectContainsPoint(frame, 0, 0)).toBe(false);
   });
 
   it("detects rectangle intersection for marquee pick", () => {

@@ -111,17 +111,14 @@ import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
-  composeDialogueIntoFrames,
-  composeSceneIntoFrame,
-  type DecorSeed,
-} from "./studio-comipo-compose";
-import {
-  collectStudioDecorRefs,
-  dialogueIncomingRefs,
-  incrementalPlaceInFrame,
-  sceneIncomingRefs,
-  type IncrementalPlaceResult,
-} from "./studio-comipo-incremental";
+  applyIncrementalInsertPlan,
+  pickTargetPanelFrame,
+  planDialogueScriptInsert,
+  planSceneTemplateInsert,
+  planSceneTemplateInsertOffFrame,
+  type IncrementalInsertPlan,
+  type StudioCanvasSnapshot,
+} from "./studio-comipo-insert";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -176,6 +173,7 @@ import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
+import type { StudioDecorElement } from "./studio-comipo-incremental";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -4528,219 +4526,49 @@ function StudioCuttoonEditor() {
       el.type === "speedLines"
     );
   }
-  function patchDecorElFromSeed(el: El, seed: DecorSeed): El {
-    if (el.type === "bubble" && seed.type === "bubble") {
-      return {
-        ...el,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        text: seed.text,
-        variant: seed.variant as BubbleEl["variant"],
-        fill: seed.fill,
-        textFill: seed.textFill,
-        rotation: seed.rotation,
-        tail: seed.tail,
-        tailDirection: seed.tailDirection,
-        align: seed.align,
-      };
-    }
-    if (el.type === "text" && seed.type === "text") {
-      return {
-        ...el,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        text: seed.text,
-        fontSize: seed.fontSize,
-        fill: seed.fill,
-        rotation: seed.rotation,
-      };
-    }
-    if (el.type === "focusLines" && seed.type === "focusLines") {
-      return {
-        ...el,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        rotation: seed.rotation,
-      };
-    }
-    if (el.type === "speedLines" && seed.type === "speedLines") {
-      return {
-        ...el,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        rotation: seed.rotation,
-      };
-    }
-    return el;
+  function studioCanvasSnapshot(): StudioCanvasSnapshot {
+    const frames = elements
+      .filter((e): e is FrameEl => e.type === "frame" && !e.hidden)
+      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
+    return {
+      frames,
+      decor: elements.filter(isStudioDecorEl) as StudioDecorElement[],
+    };
   }
-  function decorSeedToEl(seed: DecorSeed): El {
-    const id = uid();
-    if (seed.type === "bubble") {
-      return {
-        id,
-        type: "bubble",
-        variant: seed.variant as BubbleEl["variant"],
-        text: seed.text,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        fill: seed.fill,
-        textFill: seed.textFill,
-        rotation: seed.rotation,
-        tail: seed.tail,
-        tailDirection: seed.tailDirection,
-        align: seed.align,
-      };
+  function commitDecorInsert(plan: IncrementalInsertPlan, errorMessage: string): boolean {
+    const snapshot = studioCanvasSnapshot();
+    const next = applyIncrementalInsertPlan(snapshot, plan, uid);
+    if (!next) {
+      setError(errorMessage);
+      return false;
     }
-    if (seed.type === "text") {
-      return {
-        id,
-        type: "text",
-        text: seed.text,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        fontSize: seed.fontSize,
-        fill: seed.fill,
-        rotation: seed.rotation,
-        font: seed.font,
-        stroke: seed.stroke,
-        strokeWidth: seed.strokeWidth,
-        align: seed.align,
-        fontStyle: seed.fontStyle,
-      };
-    }
-    if (seed.type === "focusLines") {
-      return {
-        id,
-        type: "focusLines",
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        lineCount: seed.lineCount,
-        innerRadius: seed.innerRadius,
-        outerRadius: seed.outerRadius,
-        stroke: seed.stroke,
-        strokeWidth: seed.strokeWidth,
-        noise: seed.noise ?? 0,
-        rotation: seed.rotation,
-      };
-    }
-    if (seed.type === "speedLines") {
-      return {
-        id,
-        type: "speedLines",
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        lineCount: seed.lineCount,
-        direction: seed.direction,
-        stroke: seed.stroke,
-        strokeWidth: seed.strokeWidth,
-        rotation: seed.rotation,
-      };
-    }
-    throw new Error("Unsupported decor seed type for canvas element");
+    const decorIds = new Set(elements.filter(isStudioDecorEl).map((e) => e.id));
+    const nonDecor = elements.filter((e) => !decorIds.has(e.id));
+    commit([...nonDecor, ...(next.decor as El[])]);
+    return true;
   }
-  function applyIncrementalPlacement(current: El[], result: IncrementalPlaceResult): El[] {
-    const removed = new Set(result.removedIds);
-    const byId = new Map(
-      result.refs.filter((r) => r.id).map((r) => [r.id!, r.seed] as const)
-    );
-    const kept = current
-      .filter((e) => !removed.has(e.id))
-      .map((e) => {
-        const seed = byId.get(e.id);
-        return seed ? patchDecorElFromSeed(e, seed) : e;
-      });
-    return [...kept, ...result.addedSeeds.map(decorSeedToEl)];
-  }
-  // 장면 템플릿 삽입 — 기존 프레임 장식 + 신규 장면을 한 배치로 충돌 해소.
+  // 장면 템플릿 삽입 — studio-comipo-insert shipped path.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
-    const panelFrames = elements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
+    const snapshot = studioCanvasSnapshot();
     const [cx, cy] = spawnCenter();
-    let target: { x: number; y: number; width: number; height: number } | null = null;
+    const target =
+      selected?.type === "frame"
+        ? selected
+        : pickTargetPanelFrame(snapshot.frames, cx, cy);
 
-    if (selected?.type === "frame") {
-      target = selected;
-    } else if (panelFrames.length > 0) {
-      const hit = panelFrames.find(
-        (f) => cx >= f.x && cx <= f.x + f.width && cy >= f.y && cy <= f.y + f.height
-      );
-      const pick = hit ?? [...panelFrames].sort((a, b) => a.y - b.y || a.x - b.x)[0]!;
-      target = pick;
-    }
+    const plan = target
+      ? planSceneTemplateInsert(snapshot, template.id, target)
+      : planSceneTemplateInsertOffFrame(template.id, Math.max(20, Math.round(cy - 240)));
 
-    if (target) {
-      const decorEls = elements.filter(isStudioDecorEl);
-      const existing = collectStudioDecorRefs(target, decorEls as Parameters<typeof collectStudioDecorRefs>[1]);
-      const incoming = sceneIncomingRefs(composeSceneIntoFrame(template.build(0, 0), target));
-      const result = incrementalPlaceInFrame(target, existing, incoming);
-      if (!result.composable) {
-        setError("장면을 이 컷에 맞출 수 없습니다.");
-        return;
-      }
-      commit(applyIncrementalPlacement(elements, result));
-    } else {
-      const seeds = template.build(0, Math.max(20, Math.round(cy - 240)));
-      const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
-      commit([...elements, ...newEls]);
-    }
+    if (!commitDecorInsert(plan, "장면을 이 컷에 맞출 수 없습니다.")) return;
     setTool("select");
   }
-  // 대사 스크립트 일괄 삽입 — 기존 프레임 장식을 포함해 컷별 충돌 없이 배치.
-  async function addDialogueBubbles() {
+  // 대사 스크립트 일괄 삽입 — studio-comipo-insert shipped path.
+  function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
-    const panelFrames = elements
-      .filter((e): e is FrameEl => e.type === "frame" && !e.hidden)
-      .sort((a, b) => a.y - b.y || a.x - b.x)
-      .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
-
-    if (panelFrames.length > 0) {
-      const raw = composeDialogueIntoFrames(dialogueScript, panelFrames, CANVAS_W);
-      const decorEls = elements.filter(isStudioDecorEl);
-      const merged: IncrementalPlaceResult = {
-        composable: true,
-        refs: [],
-        removedIds: [],
-        addedSeeds: [],
-      };
-      for (let i = 0; i < panelFrames.length; i++) {
-        const frame = panelFrames[i]!;
-        const forFrame = raw.filter((_, idx) => idx % panelFrames.length === i);
-        if (forFrame.length === 0) continue;
-        const existing = collectStudioDecorRefs(frame, decorEls as Parameters<typeof collectStudioDecorRefs>[1]);
-        const result = incrementalPlaceInFrame(frame, existing, dialogueIncomingRefs(forFrame));
-        if (!result.composable) {
-          setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
-          return;
-        }
-        merged.refs.push(...result.refs);
-        merged.removedIds.push(...result.removedIds);
-        merged.addedSeeds.push(...result.addedSeeds);
-      }
-      if (merged.addedSeeds.length === 0) return;
-      commit(applyIncrementalPlacement(elements, merged));
-    } else {
-      const seeds = (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
-        canvasWidth: CANVAS_W,
-        startY: 80,
-      });
-      if (seeds.length === 0) return;
-      const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
-      commit([...elements, ...newEls]);
-    }
+    const plan = planDialogueScriptInsert(studioCanvasSnapshot(), dialogueScript, CANVAS_W);
+    if (!commitDecorInsert(plan, "대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.")) return;
     setDialogueScript("");
     setMenu(null);
     setTool("select");
