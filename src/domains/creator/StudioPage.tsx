@@ -113,8 +113,15 @@ import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-ass
 import {
   composeDialogueIntoFrames,
   composeSceneIntoFrame,
-  placeDecorInFrame,
+  type DecorSeed,
 } from "./studio-comipo-compose";
+import {
+  collectStudioDecorRefs,
+  dialogueIncomingRefs,
+  incrementalPlaceInFrame,
+  sceneIncomingRefs,
+  type IncrementalPlaceResult,
+} from "./studio-comipo-incremental";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -180,7 +187,7 @@ import type { Light } from "./studio-light";
 import type { Outline } from "./studio-outline";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PhotoFilter } from "./studio-photo-filter";
-import type { SceneSeed, SceneTemplate } from "./studio-scene-templates";
+import type { SceneTemplate } from "./studio-scene-templates";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { Sketch } from "./studio-sketch";
@@ -4513,7 +4520,152 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
   }
-  // 장면 템플릿 삽입 — 선택/뷰포트 패널 프레임 안에 맞추거나, 프레임 없으면 보기 중앙에 배치.
+  function isStudioDecorEl(el: El): el is BubbleEl | TextEl | FocusLinesEl | SpeedLinesEl {
+    return (
+      el.type === "bubble" ||
+      el.type === "text" ||
+      el.type === "focusLines" ||
+      el.type === "speedLines"
+    );
+  }
+  function patchDecorElFromSeed(el: El, seed: DecorSeed): El {
+    if (el.type === "bubble" && seed.type === "bubble") {
+      return {
+        ...el,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        text: seed.text,
+        variant: seed.variant as BubbleEl["variant"],
+        fill: seed.fill,
+        textFill: seed.textFill,
+        rotation: seed.rotation,
+        tail: seed.tail,
+        tailDirection: seed.tailDirection,
+        align: seed.align,
+      };
+    }
+    if (el.type === "text" && seed.type === "text") {
+      return {
+        ...el,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        text: seed.text,
+        fontSize: seed.fontSize,
+        fill: seed.fill,
+        rotation: seed.rotation,
+      };
+    }
+    if (el.type === "focusLines" && seed.type === "focusLines") {
+      return {
+        ...el,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        rotation: seed.rotation,
+      };
+    }
+    if (el.type === "speedLines" && seed.type === "speedLines") {
+      return {
+        ...el,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        rotation: seed.rotation,
+      };
+    }
+    return el;
+  }
+  function decorSeedToEl(seed: DecorSeed): El {
+    const id = uid();
+    if (seed.type === "bubble") {
+      return {
+        id,
+        type: "bubble",
+        variant: seed.variant as BubbleEl["variant"],
+        text: seed.text,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        fill: seed.fill,
+        textFill: seed.textFill,
+        rotation: seed.rotation,
+        tail: seed.tail,
+        tailDirection: seed.tailDirection,
+        align: seed.align,
+      };
+    }
+    if (seed.type === "text") {
+      return {
+        id,
+        type: "text",
+        text: seed.text,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        fontSize: seed.fontSize,
+        fill: seed.fill,
+        rotation: seed.rotation,
+        font: seed.font,
+        stroke: seed.stroke,
+        strokeWidth: seed.strokeWidth,
+        align: seed.align,
+        fontStyle: seed.fontStyle,
+      };
+    }
+    if (seed.type === "focusLines") {
+      return {
+        id,
+        type: "focusLines",
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        lineCount: seed.lineCount,
+        innerRadius: seed.innerRadius,
+        outerRadius: seed.outerRadius,
+        stroke: seed.stroke,
+        strokeWidth: seed.strokeWidth,
+        noise: seed.noise ?? 0,
+        rotation: seed.rotation,
+      };
+    }
+    if (seed.type === "speedLines") {
+      return {
+        id,
+        type: "speedLines",
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        lineCount: seed.lineCount,
+        direction: seed.direction,
+        stroke: seed.stroke,
+        strokeWidth: seed.strokeWidth,
+        rotation: seed.rotation,
+      };
+    }
+    throw new Error("Unsupported decor seed type for canvas element");
+  }
+  function applyIncrementalPlacement(current: El[], result: IncrementalPlaceResult): El[] {
+    const removed = new Set(result.removedIds);
+    const byId = new Map(
+      result.refs.filter((r) => r.id).map((r) => [r.id!, r.seed] as const)
+    );
+    const kept = current
+      .filter((e) => !removed.has(e.id))
+      .map((e) => {
+        const seed = byId.get(e.id);
+        return seed ? patchDecorElFromSeed(e, seed) : e;
+      });
+    return [...kept, ...result.addedSeeds.map(decorSeedToEl)];
+  }
+  // 장면 템플릿 삽입 — 기존 프레임 장식 + 신규 장면을 한 배치로 충돌 해소.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
     const panelFrames = elements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
@@ -4530,28 +4682,24 @@ function StudioCuttoonEditor() {
       target = pick;
     }
 
-    let seeds: SceneSeed[];
     if (target) {
-      const placed = placeDecorInFrame(
-        target,
-        composeSceneIntoFrame(template.build(0, 0), target).map((seed) => ({
-          source: "scene" as const,
-          seed,
-        }))
-      );
-      if (!placed.composable) {
+      const decorEls = elements.filter(isStudioDecorEl);
+      const existing = collectStudioDecorRefs(target, decorEls as Parameters<typeof collectStudioDecorRefs>[1]);
+      const incoming = sceneIncomingRefs(composeSceneIntoFrame(template.build(0, 0), target));
+      const result = incrementalPlaceInFrame(target, existing, incoming);
+      if (!result.composable) {
         setError("장면을 이 컷에 맞출 수 없습니다.");
         return;
       }
-      seeds = placed.placed;
+      commit(applyIncrementalPlacement(elements, result));
     } else {
-      seeds = template.build(0, Math.max(20, Math.round(cy - 240)));
+      const seeds = template.build(0, Math.max(20, Math.round(cy - 240)));
+      const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
+      commit([...elements, ...newEls]);
     }
-    const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
-    commit([...elements, ...newEls]);
     setTool("select");
   }
-  // 대사 스크립트 일괄 삽입 — 패널 프레임이 있으면 컷별 배치, 없으면 세로 스택.
+  // 대사 스크립트 일괄 삽입 — 기존 프레임 장식을 포함해 컷별 충돌 없이 배치.
   async function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
     const panelFrames = elements
@@ -4559,33 +4707,40 @@ function StudioCuttoonEditor() {
       .sort((a, b) => a.y - b.y || a.x - b.x)
       .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-    let seeds: Awaited<ReturnType<typeof composeDialogueIntoFrames>>;
     if (panelFrames.length > 0) {
       const raw = composeDialogueIntoFrames(dialogueScript, panelFrames, CANVAS_W);
-      seeds = [];
+      const decorEls = elements.filter(isStudioDecorEl);
+      const merged: IncrementalPlaceResult = {
+        composable: true,
+        refs: [],
+        removedIds: [],
+        addedSeeds: [],
+      };
       for (let i = 0; i < panelFrames.length; i++) {
         const frame = panelFrames[i]!;
         const forFrame = raw.filter((_, idx) => idx % panelFrames.length === i);
         if (forFrame.length === 0) continue;
-        const placed = placeDecorInFrame(
-          frame,
-          forFrame.map((seed) => ({ source: "dialogue" as const, seed }))
-        );
-        if (!placed.composable) {
+        const existing = collectStudioDecorRefs(frame, decorEls as Parameters<typeof collectStudioDecorRefs>[1]);
+        const result = incrementalPlaceInFrame(frame, existing, dialogueIncomingRefs(forFrame));
+        if (!result.composable) {
           setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
           return;
         }
-        seeds.push(...(placed.placed as typeof forFrame));
+        merged.refs.push(...result.refs);
+        merged.removedIds.push(...result.removedIds);
+        merged.addedSeeds.push(...result.addedSeeds);
       }
+      if (merged.addedSeeds.length === 0) return;
+      commit(applyIncrementalPlacement(elements, merged));
     } else {
-      seeds = (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
+      const seeds = (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
         canvasWidth: CANVAS_W,
         startY: 80,
       });
+      if (seeds.length === 0) return;
+      const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
+      commit([...elements, ...newEls]);
     }
-    if (seeds.length === 0) return;
-    const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
-    commit([...elements, ...newEls]);
     setDialogueScript("");
     setMenu(null);
     setTool("select");
