@@ -15,6 +15,11 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `fem_vroid.vrm` | 미오 | <https://github.com/madjin/vrm-samples/blob/master/vroid/fem_vroid.vrm> | VRoid Studio 기본 프리셋 기반 샘플 — pixiv VRoid Studio 프리셋(VRoidPreset) 이용조건 준수 |
 | `masc_vroid.vrm` | 노아 | <https://github.com/madjin/vrm-samples/blob/master/vroid/masc_vroid.vrm> | VRoid Studio 기본 프리셋 기반 샘플 — 위와 동일 |
 | `AliciaSolid.vrm` | 아리시아 | <https://github.com/vrm-c/UniVRM/blob/master/Tests/Models/Alicia_vrm-0.51/AliciaSolid_vrm-0.51.vrm> | 니코니 솔리드(ニコニ立体ちゃん, Alicia Solid) 캐릭터 모델 — 니코니 솔리드 라이선스(<https://3d.nicovideo.jp/alicia/rule.html>) 적용. 재배포·2차 이용 시 해당 라이선스 고지가 필요 |
+| `Devil.vrm` | 데빌 (악마) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Polydancer.vrm` | 폴리댄서 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Rose.vrm` | 로즈 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `Robert.vrm` | 로버트 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+
 
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
 - Alicia Solid 원 배포처: <https://3d.nicovideo.jp/works/td14712> — UniVRM 저장소의 VRM 0.51 변환본을 사용.

@@ -61,6 +61,10 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "mio", name: "미오", url: "/vrm/fem_vroid.vrm" },
   { id: "noa", name: "노아", url: "/vrm/masc_vroid.vrm" },
   { id: "alicia", name: "아리시아", url: "/vrm/AliciaSolid.vrm" },
+  { id: "devil", name: "데빌 (악마)", url: "/vrm/Devil.vrm" },
+  { id: "polydancer", name: "폴리댄서", url: "/vrm/Polydancer.vrm" },
+  { id: "rose", name: "로즈", url: "/vrm/Rose.vrm" },
+  { id: "robert", name: "로버트", url: "/vrm/Robert.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,
