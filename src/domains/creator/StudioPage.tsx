@@ -110,7 +110,11 @@ import {
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
-import { composeDialogueIntoFrames, composeSceneIntoFrame } from "./studio-comipo-compose";
+import {
+  composeDialogueIntoFrames,
+  composeSceneIntoFrame,
+  placeDecorInFrame,
+} from "./studio-comipo-compose";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -4526,9 +4530,23 @@ function StudioCuttoonEditor() {
       target = pick;
     }
 
-    const seeds: SceneSeed[] = target
-      ? composeSceneIntoFrame(template.build(0, 0), target)
-      : template.build(0, Math.max(20, Math.round(cy - 240)));
+    let seeds: SceneSeed[];
+    if (target) {
+      const placed = placeDecorInFrame(
+        target,
+        composeSceneIntoFrame(template.build(0, 0), target).map((seed) => ({
+          source: "scene" as const,
+          seed,
+        }))
+      );
+      if (!placed.composable) {
+        setError("장면을 이 컷에 맞출 수 없습니다.");
+        return;
+      }
+      seeds = placed.placed;
+    } else {
+      seeds = template.build(0, Math.max(20, Math.round(cy - 240)));
+    }
     const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
     commit([...elements, ...newEls]);
     setTool("select");
@@ -4541,13 +4559,30 @@ function StudioCuttoonEditor() {
       .sort((a, b) => a.y - b.y || a.x - b.x)
       .map((f) => ({ x: f.x, y: f.y, width: f.width, height: f.height }));
 
-    const seeds =
-      panelFrames.length > 0
-        ? composeDialogueIntoFrames(dialogueScript, panelFrames, CANVAS_W)
-        : (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
-            canvasWidth: CANVAS_W,
-            startY: 80,
-          });
+    let seeds: Awaited<ReturnType<typeof composeDialogueIntoFrames>>;
+    if (panelFrames.length > 0) {
+      const raw = composeDialogueIntoFrames(dialogueScript, panelFrames, CANVAS_W);
+      seeds = [];
+      for (let i = 0; i < panelFrames.length; i++) {
+        const frame = panelFrames[i]!;
+        const forFrame = raw.filter((_, idx) => idx % panelFrames.length === i);
+        if (forFrame.length === 0) continue;
+        const placed = placeDecorInFrame(
+          frame,
+          forFrame.map((seed) => ({ source: "dialogue" as const, seed }))
+        );
+        if (!placed.composable) {
+          setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
+          return;
+        }
+        seeds.push(...(placed.placed as typeof forFrame));
+      }
+    } else {
+      seeds = (await import("./studio-dialogue")).dialogueToBubbles(dialogueScript, {
+        canvasWidth: CANVAS_W,
+        startY: 80,
+      });
+    }
     if (seeds.length === 0) return;
     const newEls = seeds.map((s): El => ({ ...s, id: uid() }));
     commit([...elements, ...newEls]);
