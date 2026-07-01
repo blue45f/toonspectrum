@@ -4,6 +4,7 @@
  */
 
 import { parseDialogueScript, type DialogueBubbleSeed } from "./studio-dialogue";
+import { estimateBubbleHeight } from "./studio-fit";
 
 import type { PanelLayoutFrame } from "./studio-panel-layouts";
 import type { SceneSeed } from "./studio-scene-templates";
@@ -12,6 +13,23 @@ const CANVAS_W = 720;
 const FRAME_PAD = 20;
 
 export type ComposeBounds = { x: number; y: number; w: number; h: number };
+export type DecorSeed = SceneSeed | DialogueBubbleSeed;
+export type DecorSource = "layout" | "scene" | "dialogue";
+
+export interface TaggedDecorSeed {
+  seed: DecorSeed;
+  source: DecorSource;
+}
+
+export interface PlaceDecorOptions {
+  gap?: number;
+  padding?: number;
+}
+
+export interface PlaceDecorResult {
+  placed: DecorSeed[];
+  composable: boolean;
+}
 
 /** 시드의 대략적 bbox (width/height 없는 타입은 최소 크기 추정). */
 export function seedBounds(seed: SceneSeed | DialogueBubbleSeed): ComposeBounds {
@@ -143,6 +161,8 @@ export function composeSceneIntoFrame(
   return scaled.map((seed) => translateSceneSeed(seed, dx, dy));
 }
 
+const DIALOGUE_FONT_SIZE = 22;
+
 /** 대사 라인을 프레임 순서대로 배치(한 줄 = 한 프레임, 초과 시 순환). */
 export function composeDialogueIntoFrames(
   script: string,
@@ -165,7 +185,7 @@ export function composeDialogueIntoFrames(
 
     if (line.kind === "narration") {
       const width = frame.width - innerMargin * 2;
-      const height = Math.max(72, Math.round(line.text.length * 0.55 + 36));
+      const height = estimateBubbleHeight(line.text, width, DIALOGUE_FONT_SIZE);
       out.push({
         type: "bubble",
         variant: "box",
@@ -182,7 +202,7 @@ export function composeDialogueIntoFrames(
       continue;
     }
 
-    const height = Math.max(80, Math.round(line.text.length * 0.42 + 40));
+    const height = estimateBubbleHeight(line.text, maxBubbleW, DIALOGUE_FONT_SIZE);
     const x =
       line.side === "left"
         ? frame.x + innerMargin
@@ -209,6 +229,121 @@ export function composeDialogueIntoFrames(
   return out;
 }
 
+/** 시드 중심이 프레임 안에 있는지. */
+export function seedCenterInFrame(seed: DecorSeed, frame: PanelLayoutFrame): boolean {
+  const b = seedBounds(seed);
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  return cx >= frame.x && cx <= frame.x + frame.width && cy >= frame.y && cy <= frame.y + frame.height;
+}
+
+function decorPriority(tag: TaggedDecorSeed): number {
+  if (tag.seed.type === "focusLines" || tag.seed.type === "speedLines") return 1;
+  if (tag.seed.type === "text") return 2;
+  if (tag.seed.type !== "bubble") return 2;
+  if (tag.source === "layout") return 3;
+  if (tag.source === "scene") return 4;
+  return 5;
+}
+
+function winningBubbleSource(sources: ReadonlySet<DecorSource>): DecorSource | null {
+  if (sources.has("dialogue")) return "dialogue";
+  if (sources.has("scene")) return "scene";
+  if (sources.has("layout")) return "layout";
+  return null;
+}
+
+function moveSeedY(seed: DecorSeed, y: number): DecorSeed {
+  return { ...seed, y };
+}
+
+/** 프레임 안 장식끼리 bbox가 겹치는지(쌍별 검사). */
+export function decorCollidesInFrame(
+  frame: PanelLayoutFrame,
+  seeds: readonly DecorSeed[]
+): boolean {
+  const inFrame = seeds.filter((s) => s.type !== "frame" && seedCenterInFrame(s, frame));
+  for (let i = 0; i < inFrame.length; i++) {
+    for (let j = i + 1; j < inFrame.length; j++) {
+      if (boundsOverlap(seedBounds(inFrame[i]!), seedBounds(inFrame[j]!))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 한 프레임에 들어갈 장식(레이아웃·장면·대사)을 충돌 없이 배치한다.
+ * 말풍선은 dialogue > scene > layout 우선순위로 placeholder를 대체하고,
+ * 남은 충돌은 낮은 우선순위 요소를 세로로 밀어 해소한다.
+ */
+export function placeDecorInFrame(
+  frame: PanelLayoutFrame,
+  tagged: readonly TaggedDecorSeed[],
+  options: PlaceDecorOptions = {}
+): PlaceDecorResult {
+  const gap = options.gap ?? 12;
+  const padding = options.padding ?? FRAME_PAD;
+
+  const bubbleSources = new Set(
+    tagged.filter((t) => t.seed.type === "bubble").map((t) => t.source)
+  );
+  const activeBubbleSource = winningBubbleSource(bubbleSources);
+
+  const working: TaggedDecorSeed[] = tagged
+    .filter((t) => t.seed.type !== "bubble" || t.source === activeBubbleSource)
+    .map((t) => ({ source: t.source, seed: { ...t.seed } }));
+
+  const maxIter = Math.max(1, working.length * 6);
+  for (let iter = 0; iter < maxIter; iter++) {
+    let hit: [number, number] | null = null;
+    for (let i = 0; i < working.length; i++) {
+      for (let j = i + 1; j < working.length; j++) {
+        if (boundsOverlap(seedBounds(working[i]!.seed), seedBounds(working[j]!.seed))) {
+          hit = [i, j];
+          break;
+        }
+      }
+      if (hit) break;
+    }
+    if (!hit) break;
+
+    const [ai, bi] = hit;
+    const moveIdx = decorPriority(working[ai]!) <= decorPriority(working[bi]!) ? ai : bi;
+    const stayIdx = moveIdx === ai ? bi : ai;
+    const move = working[moveIdx]!;
+    const stay = working[stayIdx]!;
+    const mb = seedBounds(move.seed);
+    const sb = seedBounds(stay.seed);
+
+    if (move.seed.type === "bubble") {
+      const newY = sb.y + sb.h + gap;
+      if (newY + mb.h > frame.y + frame.height - padding) {
+        return { placed: working.map((t) => t.seed), composable: false };
+      }
+      move.seed = moveSeedY(move.seed, newY);
+      continue;
+    }
+
+    if (move.seed.type === "text") {
+      const newY =
+        mb.y < sb.y
+          ? Math.max(frame.y + padding, sb.y - mb.h - gap)
+          : sb.y + sb.h + gap;
+      if (newY + mb.h > frame.y + frame.height - padding || newY < frame.y + padding) {
+        return { placed: working.map((t) => t.seed), composable: false };
+      }
+      move.seed = moveSeedY(move.seed, newY);
+      continue;
+    }
+
+    return { placed: working.map((t) => t.seed), composable: false };
+  }
+
+  const placed = working.map((t) => t.seed);
+  const composable = seedsFitInsideFrame(placed, frame, 4) && !decorCollidesInFrame(frame, placed);
+  return { placed, composable };
+}
+
 /** 말풍선/장식 시드가 지정 프레임 안에 완전히 들어가는지. */
 export function seedsFitInsideFrame(
   seeds: readonly (SceneSeed | DialogueBubbleSeed)[],
@@ -230,10 +365,10 @@ export function seedsFitInsideFrame(
   return true;
 }
 
-/** 조립 결과가 '배치 가능한 상태'인지 — 패널 프레임끼리 안 겹치고, 장식이 어떤 프레임 안에든 들어감. */
+/** 조립 결과가 '배치 가능한 상태'인지 — 프레임·장식 fit + 프레임 내 장식 쌍별 충돌 없음. */
 export function isComposableAssembly(
   frames: readonly PanelLayoutFrame[],
-  decorSeeds: readonly (SceneSeed | DialogueBubbleSeed)[],
+  decorSeeds: readonly DecorSeed[],
   canvasH: number,
   canvasWidth = CANVAS_W
 ): boolean {
@@ -243,6 +378,9 @@ export function isComposableAssembly(
     if (frame.x < 0 || frame.y < 0 || frame.x + frame.width > canvasWidth + 1 || frame.y + frame.height > canvasH + 1) {
       return false;
     }
+    const inFrame = decorSeeds.filter((s) => s.type !== "frame" && seedCenterInFrame(s, frame));
+    if (!seedsFitInsideFrame(inFrame, frame, 4)) return false;
+    if (decorCollidesInFrame(frame, inFrame)) return false;
   }
   for (const seed of decorSeeds) {
     if (seed.type === "frame") continue;

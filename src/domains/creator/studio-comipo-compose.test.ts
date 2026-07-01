@@ -4,11 +4,14 @@ import {
   boundsOverlap,
   composeDialogueIntoFrames,
   composeSceneIntoFrame,
+  decorCollidesInFrame,
   framesOverlap,
   isComposableAssembly,
+  placeDecorInFrame,
   seedBounds,
   seedsFitInsideFrame,
 } from "./studio-comipo-compose";
+import { estimateBubbleHeight } from "./studio-fit";
 import { PANEL_LAYOUTS } from "./studio-panel-layouts";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 
@@ -44,14 +47,49 @@ describe("studio-comipo-compose", () => {
     expect(isComposableAssembly(badFrames, [], 800)).toBe(false);
   });
 
-  it("isComposableAssembly accepts scene+dialogue fitted into talk layout", () => {
+  it("placeDecorInFrame resolves scene decor collisions in top frame", () => {
     const sceneDecor = composeSceneIntoFrame(confession.build(0, 0), talkLayout.frames[0]!);
+    const placed = placeDecorInFrame(
+      talkLayout.frames[0]!,
+      sceneDecor.map((seed) => ({ source: "scene" as const, seed }))
+    );
+    expect(placed.composable).toBe(true);
+    expect(decorCollidesInFrame(talkLayout.frames[0]!, placed.placed)).toBe(false);
+  });
+
+  it("composeDialogueIntoFrames sizes long lines with estimateBubbleHeight", () => {
+    const longLine =
+      "민수: 아주 길고 긴 대사를 적어 여러 줄로 늘어나게 만들면 높이가 커져야 한다 정말로 그래야 한다";
+    const [bubble] = composeDialogueIntoFrames(longLine, [talkLayout.frames[0]!]);
+    const expected = estimateBubbleHeight(longLine.replace(/^[^:]+:\s*/, ""), bubble!.width, 22);
+    expect(bubble!.height).toBeGreaterThanOrEqual(expected);
+    expect(seedsFitInsideFrame([bubble!], talkLayout.frames[0]!)).toBe(true);
+  });
+
+  it("isComposableAssembly accepts placed scene+dialogue per frame", () => {
+    const top = talkLayout.frames[0]!;
+    const bottom = talkLayout.frames[1]!;
+    const scenePlaced = placeDecorInFrame(
+      top,
+      composeSceneIntoFrame(confession.build(0, 0), top).map((seed) => ({ source: "scene" as const, seed }))
+    );
     const dialogue = composeDialogueIntoFrames(
       "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터를 써 보세요.",
       talkLayout.frames
     );
+    const topDialogue = placeDecorInFrame(top, [
+      ...scenePlaced.placed.map((seed) => ({ source: "scene" as const, seed })),
+      { source: "dialogue" as const, seed: dialogue[0]! },
+    ]);
+    const bottomDialogue = placeDecorInFrame(bottom, [
+      { source: "dialogue" as const, seed: dialogue[1]! },
+    ]);
     expect(
-      isComposableAssembly(talkLayout.frames, [...sceneDecor, ...dialogue], talkLayout.canvasH)
+      isComposableAssembly(
+        talkLayout.frames,
+        [...topDialogue.placed, ...bottomDialogue.placed],
+        talkLayout.canvasH
+      )
     ).toBe(true);
   });
 });

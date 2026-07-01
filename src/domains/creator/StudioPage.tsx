@@ -109,7 +109,7 @@ import {
 } from "./studio-brush";
 import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
-import { assembleComipoPage } from "./studio-comipo-assembly";
+import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import { composeDialogueIntoFrames, composeSceneIntoFrame } from "./studio-comipo-compose";
 import {
   type ExportFormat,
@@ -140,7 +140,6 @@ import {
   drawVignette,
   type PageGrade,
 } from "./studio-page-grade";
-import { materializePanelLayout } from "./studio-panel-layouts";
 import {
   computeAlignDeltas,
   computeDistributeDeltas,
@@ -3844,6 +3843,90 @@ function StudioCuttoonEditor() {
       titleInputRef.current?.focus({ preventScroll: true });
     });
   }
+  function comipoSeedsToEls(seeds: ComipoAssemblySeed[]): El[] {
+    return seeds.map((seed) => {
+      const id = uid();
+      if (seed.type === "frame") {
+        return {
+          id,
+          type: "frame" as const,
+          x: seed.x,
+          y: seed.y,
+          width: seed.width,
+          height: seed.height,
+          stroke: "stroke" in seed ? seed.stroke : undefined,
+          strokeWidth: "strokeWidth" in seed ? seed.strokeWidth : undefined,
+          bgColor: "bgColor" in seed ? seed.bgColor : undefined,
+        };
+      }
+      if (seed.type === "bubble") {
+        return {
+          id,
+          type: "bubble" as const,
+          variant: seed.variant,
+          text: seed.text,
+          x: seed.x,
+          y: seed.y,
+          width: seed.width,
+          height: seed.height,
+          fill: seed.fill,
+          textFill: seed.textFill,
+          rotation: seed.rotation,
+          tail: "tail" in seed ? seed.tail : undefined,
+          tailDirection: "tailDirection" in seed ? seed.tailDirection : undefined,
+          align: "align" in seed ? seed.align : undefined,
+        };
+      }
+      if (seed.type === "text") {
+        return {
+          id,
+          type: "text" as const,
+          text: seed.text,
+          x: seed.x,
+          y: seed.y,
+          width: seed.width,
+          fontSize: seed.fontSize,
+          fill: seed.fill,
+          rotation: seed.rotation,
+          font: seed.font,
+          stroke: seed.stroke,
+          strokeWidth: seed.strokeWidth,
+          align: seed.align,
+          fontStyle: seed.fontStyle,
+        };
+      }
+      if (seed.type === "focusLines") {
+        return {
+          id,
+          type: "focusLines" as const,
+          x: seed.x,
+          y: seed.y,
+          width: seed.width,
+          height: seed.height,
+          lineCount: seed.lineCount,
+          innerRadius: seed.innerRadius,
+          outerRadius: seed.outerRadius,
+          stroke: seed.stroke,
+          strokeWidth: seed.strokeWidth,
+          noise: seed.noise,
+          rotation: seed.rotation,
+        };
+      }
+      return {
+        id,
+        type: "speedLines" as const,
+        x: seed.x,
+        y: seed.y,
+        width: seed.width,
+        height: seed.height,
+        lineCount: seed.lineCount,
+        direction: seed.direction,
+        stroke: seed.stroke,
+        strokeWidth: seed.strokeWidth,
+        rotation: seed.rotation,
+      };
+    });
+  }
   function startFromExample() {
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
 
@@ -3852,92 +3935,25 @@ function StudioCuttoonEditor() {
       sceneTemplateId: "confession",
       dialogueScript: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터·말풍선·컷 템플릿을 바로 써 보세요.",
     });
-    const sample: El[] = assembled
-      ? assembled.seeds.map((seed) => {
-          const id = uid();
-          if (seed.type === "frame") {
-            return {
-              id,
-              type: "frame" as const,
-              x: seed.x,
-              y: seed.y,
-              width: seed.width,
-              height: seed.height,
-              stroke: "stroke" in seed ? seed.stroke : undefined,
-              strokeWidth: "strokeWidth" in seed ? seed.strokeWidth : undefined,
-              bgColor: "bgColor" in seed ? seed.bgColor : undefined,
-            };
-          }
-          if (seed.type === "bubble") {
-            return {
-              id,
-              type: "bubble" as const,
-              variant: seed.variant,
-              text: seed.text,
-              x: seed.x,
-              y: seed.y,
-              width: seed.width,
-              height: seed.height,
-              fill: seed.fill,
-              textFill: seed.textFill,
-              rotation: seed.rotation,
-              tail: "tail" in seed ? seed.tail : undefined,
-              tailDirection: "tailDirection" in seed ? seed.tailDirection : undefined,
-              align: "align" in seed ? seed.align : undefined,
-            };
-          }
-          if (seed.type === "text") {
-            return {
-              id,
-              type: "text" as const,
-              text: seed.text,
-              x: seed.x,
-              y: seed.y,
-              width: seed.width,
-              fontSize: seed.fontSize,
-              fill: seed.fill,
-              rotation: seed.rotation,
-              font: seed.font,
-              stroke: seed.stroke,
-              strokeWidth: seed.strokeWidth,
-              align: seed.align,
-              fontStyle: seed.fontStyle,
-            };
-          }
-          if (seed.type === "focusLines") {
-            return {
-              id,
-              type: "focusLines" as const,
-              x: seed.x,
-              y: seed.y,
-              width: seed.width,
-              height: seed.height,
-              lineCount: seed.lineCount,
-              innerRadius: seed.innerRadius,
-              outerRadius: seed.outerRadius,
-              stroke: seed.stroke,
-              strokeWidth: seed.strokeWidth,
-              noise: seed.noise,
-              rotation: seed.rotation,
-            };
-          }
-          return {
-            id,
-            type: "speedLines" as const,
-            x: seed.x,
-            y: seed.y,
-            width: seed.width,
-            height: seed.height,
-            lineCount: seed.lineCount,
-            direction: seed.direction,
-            stroke: seed.stroke,
-            strokeWidth: seed.strokeWidth,
-            rotation: seed.rotation,
-          };
-        })
-      : [...createQuickSampleFrames()];
+    if (!assembled) {
+      setCanvasH(QUICK_SAMPLE_CANVAS_H);
+      setBg("#ffffff");
+      setBgGrad(null);
+      setWebtoonTheme("soft");
+      setTool("select");
+      setMenu(null);
+      setSelectedId(null);
+      commit([...createQuickSampleFrames()]);
+      dismissQuickStart();
+      return;
+    }
+    if (!assembled.composable) {
+      setError("예시 페이지를 조립하지 못했습니다. 레이아웃을 다시 시도해 주세요.");
+      return;
+    }
+    const sample: El[] = comipoSeedsToEls(assembled.seeds);
 
-    setCanvasH(assembled?.canvasH ?? QUICK_SAMPLE_CANVAS_H);
+    setCanvasH(assembled.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
     setWebtoonTheme("soft");
@@ -4658,41 +4674,23 @@ function StudioCuttoonEditor() {
     commit(nextEls);
     setSelectedId(null);
   }
-  // 코미Po!식 정형 컷 레이아웃 — 패널 프레임(+말풍선 시드)을 한 번에 배치.
+  // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
   function applyPanelLayout(layout: PanelLayoutPreset) {
     setMenu(null);
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
-    const { canvasH: nextH, seeds } = materializePanelLayout(layout);
-    setCanvasH(nextH);
+    const assembled = assembleComipoPage({
+      layoutId: layout.id,
+      dialogueScript: dialogueScript.trim() || undefined,
+    });
+    if (!assembled?.composable) {
+      setError("컷 템플릿을 배치하지 못했습니다. 대사 길이를 줄이거나 레이아웃을 바꿔 보세요.");
+      return;
+    }
+    setCanvasH(assembled.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(null);
-    const nextEls: El[] = seeds.map((seed) => {
-      if (seed.type === "frame") {
-        return {
-          id: uid(),
-          type: "frame" as const,
-          x: seed.x,
-          y: seed.y,
-          width: seed.width,
-          height: seed.height,
-        };
-      }
-      return {
-        id: uid(),
-        type: "bubble" as const,
-        variant: seed.variant,
-        text: seed.text,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        fill: seed.fill,
-        textFill: seed.textFill,
-        rotation: seed.rotation,
-      };
-    });
-    commit(nextEls);
+    commit(comipoSeedsToEls(assembled.seeds));
     setSelectedId(null);
   }
   function applyBgPreset(p: BgPreset) {

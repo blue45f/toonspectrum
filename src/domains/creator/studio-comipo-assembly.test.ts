@@ -1,12 +1,38 @@
 import { describe, expect, it } from "vitest";
 
 import { assembleComipoPage } from "./studio-comipo-assembly";
-import { boundsOverlap, seedBounds, seedsFitInsideFrame } from "./studio-comipo-compose";
+import {
+  boundsOverlap,
+  seedBounds,
+  seedCenterInFrame,
+  seedsFitInsideFrame,
+} from "./studio-comipo-compose";
 import { PANEL_LAYOUTS } from "./studio-panel-layouts";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 
 describe("assembleComipoPage", () => {
   const talkLayout = PANEL_LAYOUTS.find((item) => item.id === "layout_talk_2_bubbles")!;
+
+  it("scene without dialogue composes into top frame with zero decor collisions", () => {
+    const result = assembleComipoPage({
+      layoutId: talkLayout.id,
+      sceneTemplateId: "confession",
+    });
+    expect(result).not.toBeNull();
+    expect(result!.composable).toBe(true);
+
+    const top = talkLayout.frames[0]!;
+    const decor = result!.seeds.filter((s) => s.type !== "frame");
+    const topDecor = decor.filter((s) => seedCenterInFrame(s, top));
+    expect(topDecor.length).toBeGreaterThan(0);
+
+    for (let i = 0; i < topDecor.length; i++) {
+      for (let j = i + 1; j < topDecor.length; j++) {
+        expect(boundsOverlap(seedBounds(topDecor[i]!), seedBounds(topDecor[j]!))).toBe(false);
+      }
+    }
+    expect(seedsFitInsideFrame(topDecor, top)).toBe(true);
+  });
 
   it("materializes frames and bubble seeds from a panel layout", () => {
     const result = assembleComipoPage({ layoutId: talkLayout.id });
