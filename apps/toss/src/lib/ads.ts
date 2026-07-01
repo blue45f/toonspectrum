@@ -3,9 +3,9 @@ import {
   showFullScreenAd,
   TossAds,
   type TossAdsAttachBannerOptions,
-} from '@apps-in-toss/web-framework';
-import { pauseAudioForAd, resumeAudioAfterAd } from '@toonspectrum/core/fx';
-import { useCallback, useEffect, useRef, useState } from 'react';
+} from "@apps-in-toss/web-framework";
+import { pauseAudioForAd, resumeAudioAfterAd } from "@toonspectrum/core/fx";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * 앱인토스 인앱 배너 광고 헬퍼.
@@ -16,14 +16,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * 슬롯 종류(일반 배너 / 피드형 배너 등)는 콘솔 광고 그룹(adGroupId)이 결정해요.
  */
 
-
 // WebView 배너 테스트 ID(공식 문서). 실제 광고 ID로 테스트하면 정책 위반이라 dev 전용.
-const TEST_BANNER_AD_GROUP_ID = 'ait-ad-test-banner-id';
-const TEST_FEED_AD_GROUP_ID = 'ait-ad-test-native-image-id';
+const TEST_BANNER_AD_GROUP_ID = "ait-ad-test-banner-id";
+// 공식 WebView 배너 가이드는 현재 리스트형 테스트 ID 하나만 제공한다.
+const TEST_FEED_AD_GROUP_ID = TEST_BANNER_AD_GROUP_ID;
 
 /** 배너 광고 배치 위치 라벨(슬롯 종류 X, 광고 타입 X) — 어느 콘솔 광고 그룹 ID를 쓸지 고르는 키. */
-export type AdFormat = 'banner' | 'feed';
-export type FullScreenAdFormat = 'interstitial' | 'rewarded';
+export type AdFormat = "banner" | "feed";
+export type FullScreenAdFormat = "interstitial" | "rewarded";
 
 /**
  * 노출할 배너 광고 그룹 ID.
@@ -31,10 +31,10 @@ export type FullScreenAdFormat = 'interstitial' | 'rewarded';
  * - 개발: 테스트 ID  · 운영인데 미설정: null → 미노출(빈 슬롯 방지)
  * - 서로 다른 형식의 그룹 ID를 폴백으로 공유하지 않음(콘솔 형식과 실제 슬롯 불일치 방지)
  */
-export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
+export function getBannerAdGroupId(format: AdFormat = "banner"): string | null {
   const banner = import.meta.env.VITE_TOSS_AD_GROUP_ID?.trim();
   const feed = import.meta.env.VITE_TOSS_FEED_AD_GROUP_ID?.trim();
-  if (format === 'feed') {
+  if (format === "feed") {
     if (feed) return feed;
     return import.meta.env.DEV ? TEST_FEED_AD_GROUP_ID : null;
   }
@@ -46,9 +46,11 @@ export function getBannerAdGroupId(format: AdFormat = 'banner'): string | null {
  * 전면 광고 그룹 ID. 운영 콘솔에서 발급받은 값만 사용하고, 미설정 시 광고를 요청하지 않아요.
  * 전면형은 배너와 달리 사용자의 진행을 가리므로 개발 환경에서도 임의 테스트 ID로 폴백하지 않아요.
  */
-export function getFullScreenAdGroupId(format: FullScreenAdFormat): string | null {
+export function getFullScreenAdGroupId(
+  format: FullScreenAdFormat,
+): string | null {
   const value =
-    format === 'rewarded'
+    format === "rewarded"
       ? import.meta.env.VITE_TOSS_REWARDED_AD_GROUP_ID
       : import.meta.env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
   return value?.trim() || null;
@@ -96,7 +98,11 @@ export function useTossBanner() {
   }, []);
 
   const attach = useCallback(
-    (adGroupId: string, element: HTMLElement, options?: TossAdsAttachBannerOptions) => {
+    (
+      adGroupId: string,
+      element: HTMLElement,
+      options?: TossAdsAttachBannerOptions,
+    ) => {
       if (!ready) return undefined;
       try {
         return TossAds.attachBanner(adGroupId, element, options);
@@ -122,7 +128,9 @@ function toError(error: unknown): Error {
 
 function isFullScreenAdSupported(): boolean {
   try {
-    return Boolean(loadFullScreenAd.isSupported() && showFullScreenAd.isSupported());
+    return Boolean(
+      loadFullScreenAd.isSupported() && showFullScreenAd.isSupported(),
+    );
   } catch {
     return false;
   }
@@ -170,7 +178,7 @@ export function useTossFullScreenAd(
       loadUnregisterRef.current = loadFullScreenAd({
         options: { adGroupId },
         onEvent: ({ type }) => {
-          if (type !== 'loaded') return;
+          if (type !== "loaded") return;
           unregisterLoad();
           setReady(true);
         },
@@ -213,10 +221,10 @@ export function useTossFullScreenAd(
       showUnregisterRef.current = showFullScreenAd({
         options: { adGroupId },
         onEvent: (event) => {
-          if (event.type === 'userEarnedReward') {
+          if (event.type === "userEarnedReward") {
             onRewardRef.current?.(event.data);
           }
-          if (event.type === 'dismissed' || event.type === 'failedToShow') {
+          if (event.type === "dismissed" || event.type === "failedToShow") {
             finishAndReload();
           }
         },

@@ -86,3 +86,20 @@ WEB_APP_BASE_URL=https://toonspectrum.example.com
 ## 6. Render 대안
 
 `render.yaml`은 장시간 상시구동 Nest API를 따로 배포하기 위한 보존된 Blueprint입니다. 이 경로를 쓰려면 `vercel.json`의 `/api/:path*` rewrite를 Render API URL로 바꾸거나 `VITE_API_BASE`/프록시 전략을 별도로 정해야 합니다. 현재 기본 배포와 자동 검증은 Vercel serverless 경로를 기준으로 합니다.
+
+## 앱인토스 로그인·공유 운영 설정
+
+토스 로그인 API는 mTLS가 필수입니다. Vercel에는 인증서 파일 경로 대신 PEM 본문을 시크릿으로
+등록합니다(`\\n` 리터럴 개행도 지원).
+
+```sh
+TOSS_MTLS_CERT='-----BEGIN CERTIFICATE-----\n...'
+TOSS_MTLS_KEY='-----BEGIN PRIVATE KEY-----\n...'
+TOSS_UNLINK_USERNAME=callback-user
+TOSS_UNLINK_PASSWORD=long-random-password
+```
+
+앱인토스 콘솔의 연결 끊기 콜백은
+`POST https://toonspectrum.vercel.app/api/auth/toss/unlink`로 등록하고 위 Basic Auth 값을 사용합니다.
+미니앱 공유는 `getTossShareLink`에 `https://toonspectrum.vercel.app/og-toss.png`를 전달하며,
+이 파일은 앱인토스 전용 1200×600 PNG입니다. 일반 웹 OG는 1200×630 `og-web.png`를 사용합니다.

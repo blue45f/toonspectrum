@@ -8,11 +8,17 @@
     <!-- iOS/안드로이드 standalone 설치 모드 — 홈 추가 시 풀스크린 앱셸로 실행 -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="툰스펙트럼" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <!-- viewport-fit=cover 가 있어야 노치/홈인디케이터 기기에서 env(safe-area-inset-*) 가 0이 아닌 실제 값으로 해석된다 (스튜디오 바텀시트·툴바·웹캠 프리뷰가 잘리지 않도록). -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta
       name="description"
       content="웹툰·웹소설 통합 인덱스. 플랫폼을 가로질러 무엇을, 어디서, 왜 봐야 하는지 찾습니다."
@@ -22,7 +28,9 @@
     <meta name="theme-color" content="#1a1410" />
     <script>
       try {
-        var s = localStorage.getItem("toonspectrum-theme") || localStorage.getItem("webdex-theme");
+        var s =
+          localStorage.getItem("toonspectrum-theme") ||
+          localStorage.getItem("webdex-theme");
         if (s) {
           var t = JSON.parse(s).state.theme;
           if (t) document.documentElement.setAttribute("data-theme", t);
@@ -39,10 +47,17 @@
       content="네이버·카카오·리디·레진 등 국내 웹툰·웹소설을 가로질러 — 무엇을, 어디서, 왜 봐야 하는지 한 곳에서. 통합 랭킹·연재 캘린더·가격비교·작가별 보기."
     />
     <meta property="og:url" content="https://toonspectrum.vercel.app/" />
-    <meta property="og:image" content="https://toonspectrum.vercel.app/og.png" />
+    <meta
+      property="og:image"
+      content="https://toonspectrum.vercel.app/og-web.png"
+    />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="툰스펙트럼 — 웹툰·웹소설 통합 인덱스" />
+    <meta
+      property="og:image:alt"
+      content="툰스펙트럼 — 웹툰·웹소설 통합 인덱스"
+    />
     <meta property="og:locale" content="ko_KR" />
 
     <!-- Twitter Card -->
@@ -52,7 +67,10 @@
       name="twitter:description"
       content="네이버·카카오·리디·레진 등 국내 웹툰·웹소설을 가로질러 한 곳에서. 통합 랭킹·연재 캘린더·가격비교·작가별 보기."
     />
-    <meta name="twitter:image" content="https://toonspectrum.vercel.app/og.png" />
+    <meta
+      name="twitter:image"
+      content="https://toonspectrum.vercel.app/og-web.png"
+    />
 
     <!-- 구조화 데이터(schema.org) — 사이트링크 검색창·지식그래프 신호 -->
     <script type="application/ld+json">
@@ -81,7 +99,7 @@
             "@id": "https://toonspectrum.vercel.app/#org",
             "name": "툰스펙트럼",
             "url": "https://toonspectrum.vercel.app/",
-            "logo": "https://toonspectrum.vercel.app/og.png"
+            "logo": "https://toonspectrum.vercel.app/og-web.png"
           }
         ]
       }
@@ -104,17 +122,21 @@
   <body>
     <div id="root"></div>
     <script>
-      (function() {
-        if (typeof window === 'undefined') return;
-        var isSupported = typeof Promise !== 'undefined' && typeof fetch !== 'undefined' && typeof Symbol !== 'undefined';
+      (function () {
+        if (typeof window === "undefined") return;
+        var isSupported =
+          typeof Promise !== "undefined" &&
+          typeof fetch !== "undefined" &&
+          typeof Symbol !== "undefined";
         if (!isSupported) {
-          var root = document.getElementById('root');
+          var root = document.getElementById("root");
           if (root) {
-            root.innerHTML = '<div style="padding:40px 20px;text-align:center;font-family:sans-serif;background:#1a1410;color:#fff;min-height:100vh;">' +
+            root.innerHTML =
+              '<div style="padding:40px 20px;text-align:center;font-family:sans-serif;background:#1a1410;color:#fff;min-height:100vh;">' +
               '<h2 style="font-size:24px;margin-bottom:12px;color:#f59e0b;">브라우저 업데이트가 필요합니다</h2>' +
               '<p style="font-size:14px;color:#ccc;max-width:480px;margin:0 auto 24px;">현재 사용 중인 브라우저는 최신 웹 표준을 지원하지 않아 웹사이트를 표시할 수 없습니다.<br/>Chrome, Edge, Safari 또는 Firefox 최신 버전으로 업데이트해 주세요.</p>' +
               '<a href="https://www.google.com/chrome/" target="_blank" style="display:inline-block;padding:12px 24px;background:#f59e0b;color:#000;font-weight:bold;text-decoration:none;border-radius:12px;">Chrome 다운로드</a>' +
-              '</div>';
+              "</div>";
           }
         }
       })();

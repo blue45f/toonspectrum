@@ -3,8 +3,22 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
+declare global {
+  var __toonspectrumTossShareLink:
+    | undefined
+    | ((path: string) => Promise<string | null>);
+}
+
 // 작품 공유 버튼 — 모바일은 OS 공유 시트(navigator.share, 카카오/인스타 등), 데스크톱은 링크 복사 + X/페북.
-export function ShareButton({ title, slug, className }: { title: string; slug: string; className?: string }) {
+export function ShareButton({
+  title,
+  slug,
+  className,
+}: {
+  title: string;
+  slug: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -18,16 +32,27 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
   async function onShare() {
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    const tossUrl =
+      typeof globalThis.__toonspectrumTossShareLink === "function"
+        ? await globalThis.__toonspectrumTossShareLink(
+            `/title/${encodeURIComponent(slug)}`,
+          )
+        : null;
+    const resolvedUrl = tossUrl || url;
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function"
+    ) {
       try {
-        await navigator.share({ title: shareText, url });
+        await navigator.share({ title: shareText, url: resolvedUrl });
         return;
       } catch {
         /* 사용자 취소 — 메뉴로 폴백 */
@@ -48,7 +73,8 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
 
   const x = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
   const fb = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-  const itemCls = "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg";
+  const itemCls =
+    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
   return (
     <div ref={ref} className={cn("relative", className)}>
@@ -63,13 +89,27 @@ export function ShareButton({ title, slug, className }: { title: string; slug: s
       {open && (
         <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-line-strong bg-panel p-1 shadow-2xl shadow-[oklch(0.1_0.02_70/0.42)]">
           <button type="button" onClick={copyLink} className={itemCls}>
-            {copied ? <Check size={15} className="text-good" /> : <Link2 size={15} />}
+            {copied ? (
+              <Check size={15} className="text-good" />
+            ) : (
+              <Link2 size={15} />
+            )}
             {copied ? "링크 복사됨" : "링크 복사"}
           </button>
-          <a href={x} target="_blank" rel="noopener noreferrer" className={itemCls}>
+          <a
+            href={x}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={itemCls}
+          >
             X (트위터)
           </a>
-          <a href={fb} target="_blank" rel="noopener noreferrer" className={itemCls}>
+          <a
+            href={fb}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={itemCls}
+          >
             페이스북
           </a>
         </div>

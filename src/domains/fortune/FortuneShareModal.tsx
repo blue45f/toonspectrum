@@ -6,7 +6,6 @@ import { FortuneShareCard } from "./FortuneShareCard";
 
 import type { FortuneResult, FortuneTab } from "./FortunePage";
 
-
 interface ShareCharacter {
   id: string;
   name: string;
@@ -30,15 +29,27 @@ const TAB_LABEL: Record<FortuneTab, string> = {
   prescription: "독서 처방",
 };
 
-export function FortuneShareModal({ result, character, tab, onClose }: FortuneShareModalProps) {
+export function FortuneShareModal({
+  result,
+  character,
+  tab,
+  onClose,
+}: FortuneShareModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dateLabel = new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+  const dateLabel = new Date().toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
   const fileName = `toonspectrum-fortune-${character.id}-${tab}.png`;
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/fortune` : "https://toonspectrum.vercel.app/fortune";
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/fortune`
+      : "https://toonspectrum.vercel.app/fortune";
 
   // Esc로 닫기 + 진입 시 포커스
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -55,7 +66,11 @@ export function FortuneShareModal({ result, character, tab, onClose }: FortuneSh
     if (!cardRef.current) return null;
     // skipFonts: 크로스도메인 폰트(Google/Pretendard CDN)는 CORS로 cssRules를 못 읽어
     // 임베딩이 실패하며 콘솔 에러만 남긴다. 어차피 시스템 폰트로 렌더되므로 건너뛴다.
-    return toPng(cardRef.current, { pixelRatio: 3, cacheBust: true, skipFonts: true });
+    return toPng(cardRef.current, {
+      pixelRatio: 3,
+      cacheBust: true,
+      skipFonts: true,
+    });
   }
 
   async function handleSave() {
@@ -81,16 +96,23 @@ export function FortuneShareModal({ result, character, tab, onClose }: FortuneSh
     setError(null);
     try {
       const dataUrl = await renderPng();
-      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      const tossShareUrl =
+        typeof globalThis.__toonspectrumTossShareLink === "function"
+          ? await globalThis.__toonspectrumTossShareLink("/fortune")
+          : null;
+      const nav = navigator as Navigator & {
+        canShare?: (d: ShareData) => boolean;
+      };
       if (dataUrl && typeof nav.share === "function") {
         const blob = await (await fetch(dataUrl)).blob();
         const file = new File([blob], fileName, { type: "image/png" });
         const data: ShareData & { files?: File[] } = {
           title: "ToonSpectrum 캐릭터 운세",
           text: `${character.name}가 본 나의 ${TAB_LABEL[tab]} 🔮`,
-          url: shareUrl,
+          url: tossShareUrl || shareUrl,
         };
-        if (nav.canShare && nav.canShare({ files: [file] })) data.files = [file];
+        if (nav.canShare && nav.canShare({ files: [file] }))
+          data.files = [file];
         await nav.share(data);
       } else {
         await copyLink();
@@ -146,7 +168,13 @@ export function FortuneShareModal({ result, character, tab, onClose }: FortuneSh
 
         {/* 카드 미리보기 (이 노드를 그대로 PNG로 캡처) */}
         <div className="flex justify-center overflow-x-auto">
-          <FortuneShareCard ref={cardRef} result={result} character={character} tab={tab} dateLabel={dateLabel} />
+          <FortuneShareCard
+            ref={cardRef}
+            result={result}
+            character={character}
+            tab={tab}
+            dateLabel={dateLabel}
+          />
         </div>
 
         {error && <p className="text-center text-xs text-bad">{error}</p>}
@@ -176,11 +204,19 @@ export function FortuneShareModal({ result, character, tab, onClose }: FortuneSh
             disabled={busy}
             className="flex flex-col items-center gap-1 rounded-xl border border-line bg-card py-2.5 text-[11px] font-bold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
           >
-            {copied ? <Check className="h-4 w-4 text-good" /> : <Link2 className="h-4 w-4" />}
+            {copied ? (
+              <Check className="h-4 w-4 text-good" />
+            ) : (
+              <Link2 className="h-4 w-4" />
+            )}
             {copied ? "복사됨" : "링크 복사"}
           </button>
         </div>
-        {busy && <p className="text-center text-[11px] text-fg-3">이미지를 만드는 중…</p>}
+        {busy && (
+          <p className="text-center text-[11px] text-fg-3">
+            이미지를 만드는 중…
+          </p>
+        )}
       </div>
     </div>
   );

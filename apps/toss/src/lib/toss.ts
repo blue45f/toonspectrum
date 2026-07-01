@@ -9,25 +9,28 @@ import {
   getAnonymousKey,
   getOperationalEnvironment,
   getSchemeUri,
+  getTossShareLink,
   openURL,
   share,
   type HapticFeedbackType,
-} from '@apps-in-toss/web-framework';
+} from "@apps-in-toss/web-framework";
 
 export type { HapticFeedbackType };
 
-export type TossEnv = 'toss' | 'sandbox' | 'web';
+export type TossEnv = "toss" | "sandbox" | "web";
 
 /** 'toss'(실기기/앱) | 'sandbox'(샌드박스) | 'web'(브릿지 없음). */
 export function getTossEnv(): TossEnv {
   try {
     return getOperationalEnvironment();
   } catch {
-    return 'web';
+    return "web";
   }
 }
 
-export const isInToss = (): boolean => getTossEnv() !== 'web';
+export const isInToss = (): boolean => getTossEnv() !== "web";
+
+const TOSS_OG_IMAGE_URL = "https://toonspectrum.vercel.app/og-toss.png";
 
 /**
  * 비게임 미니앱 사용자 식별키(hash). 서버/동의 없이 미니앱 내 고유 사용자 식별.
@@ -36,7 +39,7 @@ export const isInToss = (): boolean => getTossEnv() !== 'web';
 export async function getStableUserKey(): Promise<string | null> {
   try {
     const result = await getAnonymousKey();
-    if (result && typeof result === 'object' && result.type === 'HASH') {
+    if (result && typeof result === "object" && result.type === "HASH") {
       return result.hash;
     }
     return null;
@@ -51,7 +54,7 @@ export async function getStableUserKey(): Promise<string | null> {
  */
 export async function tossAppLogin(): Promise<{
   authorizationCode: string;
-  referrer: 'DEFAULT' | 'SANDBOX';
+  referrer: "DEFAULT" | "SANDBOX";
 } | null> {
   const result = await appLogin();
   return result ?? null;
@@ -87,8 +90,8 @@ export function openExternalUrl(url: string): void {
     }
   }
   try {
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank', 'noopener,noreferrer');
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   } catch {
     // 차단/미지원 환경은 조용히 무시
@@ -104,26 +107,68 @@ export function getMiniAppSchemeUri(): string | null {
   }
 }
 
+/** 앱 시작 시 전달된 intoss 딥링크 중 앱이 지원하는 내부 경로만 반환한다. */
+export function resolveTossEntryRoute(): string | null {
+  const scheme = getMiniAppSchemeUri();
+  if (!scheme) return null;
+  try {
+    const path = new URL(scheme).pathname;
+    if (/^\/title\/[a-zA-Z0-9_-]+$/.test(path)) return path;
+    if (
+      path === "/" ||
+      path === "/ranking" ||
+      path === "/recommend" ||
+      path === "/explore" ||
+      path === "/community" ||
+      path === "/library" ||
+      path === "/fortune"
+    ) {
+      return path;
+    }
+  } catch {
+    // malformed/unsupported scheme
+  }
+  return null;
+}
+
+/** 공식 앱인토스 공유 링크 + 1200×600 OG 이미지를 생성한다. */
+export async function buildTossShareLink(path = "/"): Promise<string | null> {
+  if (!isInToss()) return null;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  try {
+    const link = await getTossShareLink(
+      `intoss://toonspectrum${normalizedPath === "/" ? "" : normalizedPath}`,
+      TOSS_OG_IMAGE_URL,
+    );
+    return typeof link === "string" && link.length > 0 ? link : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 메시지 공유. 토스 네이티브 공유 → navigator.share → 클립보드 순으로 폴백.
  * @returns 공유/복사 성공 여부
  */
 export async function shareMessage(
   message: string,
-): Promise<'toss' | 'web-share' | 'clipboard' | null> {
+): Promise<"toss" | "web-share" | "clipboard" | null> {
   if (isInToss()) {
     try {
       await share({ message });
-      return 'toss';
+      return "toss";
     } catch {
       // fall through to web fallbacks
     }
   }
 
   try {
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function"
+    ) {
       await navigator.share({ text: message });
-      return 'web-share';
+      return "web-share";
     }
   } catch {
     return null; // 사용자가 공유 시트를 닫은 경우 등
@@ -131,7 +176,7 @@ export async function shareMessage(
 
   try {
     await navigator.clipboard.writeText(message);
-    return 'clipboard';
+    return "clipboard";
   } catch {
     return null;
   }
