@@ -1,6 +1,7 @@
 /**
- * Studio shipped insert paths — addSceneTemplate / addDialogueBubbles 가 호출하는
- * 순수 계획·commit 함수. assembleComipoPage 와 동일한 scene/dialogue 태깅을 쓴다.
+ * Studio shipped insert — addSceneTemplate / addDialogueBubbles 가 호출하는
+ * 단일 원자 API mutateComipoSnapshot. assembleComipoPage 와 동일한 per-frame
+ * 태깅 + placeDecorInFrame 을 on/off-frame 모두에 적용한다.
  */
 
 import { CANVAS_W } from "./studio-assets";
@@ -15,7 +16,6 @@ import {
   type DecorRef,
   type StudioDecorElement,
 } from "./studio-comipo-incremental";
-import { dialogueToBubbles } from "./studio-dialogue";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 import { rectContainsPoint, type Rect } from "./studio-selection";
 
@@ -26,15 +26,25 @@ export interface StudioCanvasSnapshot {
   decor: readonly StudioDecorElement[];
 }
 
-export interface IncrementalInsertPlan {
-  composable: boolean;
-  removedIds: readonly string[];
-  updates: ReadonlyArray<{ id: string; seed: DecorRef["seed"] }>;
-  addedSeeds: readonly DecorRef["seed"][];
-}
+export type ComipoInsertAction =
+  | {
+      kind: "scene";
+      templateId: string;
+      /** 지정 없으면 snapshot.frames 또는 가상 컷. */
+      targetFrame?: PanelLayoutFrame;
+      originY?: number;
+    }
+  | {
+      kind: "dialogue";
+      script: string;
+      startY?: number;
+    };
+
+export type MutateComipoResult = { ok: false } | { ok: true; snapshot: StudioCanvasSnapshot };
 
 const OFF_FRAME_HEIGHT = 480;
 const OFF_FRAME_MARGIN = 24;
+const OFF_DIALOGUE_FRAME_HEIGHT = 1200;
 
 function findSceneTemplate(id: string) {
   return SCENE_TEMPLATES.find((t) => t.id === id) ?? null;
@@ -56,6 +66,24 @@ export function pickTargetPanelFrame(
   return [...frames].sort((a, b) => a.y - b.y || a.x - b.x)[0] ?? null;
 }
 
+function virtualInsertFrame(originY: number, canvasWidth = CANVAS_W): PanelLayoutFrame {
+  return {
+    x: OFF_FRAME_MARGIN,
+    y: Math.max(OFF_FRAME_MARGIN, Math.round(originY)),
+    width: canvasWidth - OFF_FRAME_MARGIN * 2,
+    height: OFF_FRAME_HEIGHT,
+  };
+}
+
+function virtualDialogueFrame(startY: number, canvasWidth = CANVAS_W): PanelLayoutFrame {
+  return {
+    x: OFF_FRAME_MARGIN,
+    y: Math.max(OFF_FRAME_MARGIN, Math.round(startY)),
+    width: canvasWidth - OFF_FRAME_MARGIN * 2,
+    height: OFF_DIALOGUE_FRAME_HEIGHT,
+  };
+}
+
 function sceneIncomingForFrame(
   templateId: string,
   frame: PanelLayoutFrame,
@@ -70,145 +98,157 @@ function sceneIncomingForFrame(
   return sceneIncomingRefs(composeSceneIntoFrame(sceneForCompose, frame));
 }
 
-function planFromIncremental(
+function incrementalPatchFromPlace(
   frame: PanelLayoutFrame,
   existing: readonly DecorRef[],
   incoming: readonly DecorRef[]
-): IncrementalInsertPlan {
+): ReturnType<typeof incrementalPlaceInFrame> | null {
   const result = incrementalPlaceInFrame(frame, existing, incoming);
-  if (!result.composable) {
-    return { composable: false, removedIds: [], updates: [], addedSeeds: [] };
-  }
+  return result.composable ? result : null;
+}
+
+function decorPatchFromResult(result: NonNullable<ReturnType<typeof incrementalPatchFromPlace>>) {
   return {
-    composable: true,
     removedIds: result.removedIds,
-    updates: result.refs
-      .filter((r) => r.id)
-      .map((r) => ({ id: r.id!, seed: r.seed })),
+    updates: result.refs.filter((r) => r.id).map((r) => ({ id: r.id!, seed: r.seed })),
     addedSeeds: result.addedSeeds,
   };
 }
 
-/** addSceneTemplate shipped path — target 프레임에 기존 장식 포함 배치. */
-export function planSceneTemplateInsert(
-  snapshot: StudioCanvasSnapshot,
-  templateId: string,
-  targetFrame: PanelLayoutFrame,
-  options?: { dialogueScript?: string }
-): IncrementalInsertPlan {
-  const hasDialogue = Boolean(options?.dialogueScript?.trim());
-  const existing = collectStudioDecorRefs(targetFrame, snapshot.decor);
-  const incoming = sceneIncomingForFrame(templateId, targetFrame, hasDialogue);
-  return planFromIncremental(targetFrame, existing, incoming);
-}
-
-/** 프레임 없을 때 가상 컷 안에 배치(addSceneTemplate else branch). */
-export function planSceneTemplateInsertOffFrame(
-  templateId: string,
-  originY: number,
-  canvasWidth = CANVAS_W
-): IncrementalInsertPlan {
-  const virtualFrame: PanelLayoutFrame = {
-    x: OFF_FRAME_MARGIN,
-    y: Math.max(OFF_FRAME_MARGIN, Math.round(originY)),
-    width: canvasWidth - OFF_FRAME_MARGIN * 2,
-    height: OFF_FRAME_HEIGHT,
-  };
-  const incoming = sceneIncomingForFrame(templateId, virtualFrame, false);
-  return planFromIncremental(virtualFrame, [], incoming);
-}
-
-/** addDialogueBubbles shipped path — 패널 프레임별 기존 장식 + 대사. */
-export function planDialogueScriptInsert(
-  snapshot: StudioCanvasSnapshot,
-  script: string,
-  canvasWidth = CANVAS_W
-): IncrementalInsertPlan {
-  const frames = [...snapshot.frames].sort((a, b) => a.y - b.y || a.x - b.x);
-  if (frames.length === 0) {
-    return planDialogueScriptInsertOffFrame(script, canvasWidth);
-  }
-
-  const raw = composeDialogueIntoFrames(script, frames, canvasWidth);
-  const merged: IncrementalInsertPlan = {
-    composable: true,
-    removedIds: [],
-    updates: [],
-    addedSeeds: [],
-  };
-
-  for (let i = 0; i < frames.length; i++) {
-    const frame = frames[i]!;
-    const forFrame = raw.filter((_, idx) => idx % frames.length === i);
-    if (forFrame.length === 0) continue;
-    const existing = collectStudioDecorRefs(frame, snapshot.decor);
-    const partial = planFromIncremental(frame, existing, dialogueIncomingRefs(forFrame));
-    if (!partial.composable) {
-      return { composable: false, removedIds: [], updates: [], addedSeeds: [] };
-    }
-    merged.removedIds = [...merged.removedIds, ...partial.removedIds];
-    merged.updates = [...merged.updates, ...partial.updates];
-    merged.addedSeeds = [...merged.addedSeeds, ...partial.addedSeeds];
-  }
-
-  if (merged.addedSeeds.length === 0) {
-    return { composable: false, removedIds: [], updates: [], addedSeeds: [] };
-  }
-  return merged;
-}
-
-/** 패널 없을 때 세로 스택 대사(addDialogueBubbles else branch) — 쌍별 겹침 검사. */
-export function planDialogueScriptInsertOffFrame(
-  script: string,
-  canvasWidth = CANVAS_W,
-  startY = 80
-): IncrementalInsertPlan {
-  const bubbles = dialogueToBubbles(script, { canvasWidth, startY });
-  if (bubbles.length === 0) {
-    return { composable: false, removedIds: [], updates: [], addedSeeds: [] };
-  }
-  for (let i = 0; i < bubbles.length; i++) {
-    for (let j = i + 1; j < bubbles.length; j++) {
-      const a = bubbles[i]!;
-      const b = bubbles[j]!;
-      const overlap =
-        a.x < b.x + b.width &&
-        a.x + a.width > b.x &&
-        a.y < b.y + b.height &&
-        a.y + a.height > b.y;
-      if (overlap) {
-        return { composable: false, removedIds: [], updates: [], addedSeeds: [] };
-      }
-    }
-  }
-  return {
-    composable: true,
-    removedIds: [],
-    updates: [],
-    addedSeeds: bubbles,
-  };
-}
-
-/** composable 일 때만 decor 갱신; 거짓이면 null(commit 차단). */
-export function applyIncrementalInsertPlan(
-  snapshot: StudioCanvasSnapshot,
-  plan: IncrementalInsertPlan,
-  createId: () => string
-): StudioCanvasSnapshot | null {
-  if (!plan.composable) return null;
-  const nextDecor = applyIncrementalDecor(snapshot.decor, plan, createId);
-  if (!postInsertFramesComposable(snapshot.frames, nextDecor)) return null;
-  return { frames: snapshot.frames, decor: nextDecor };
-}
-
-/** commit 후 모든 패널 프레임 decor 쌍별 겹침 없음. */
-export function postInsertFramesComposable(
+/** 모든 등록 프레임 + 가상 검사 프레임에서 decor 쌍별 겹침 없음. */
+function assertSnapshotComposable(
   frames: readonly PanelLayoutFrame[],
-  decor: readonly StudioDecorElement[]
+  decor: readonly StudioDecorElement[],
+  virtualChecks: readonly PanelLayoutFrame[] = []
 ): boolean {
   for (const frame of frames) {
     const seeds = collectStudioDecorRefs(frame, decor).map((r) => r.seed);
     if (!frameDecorHasNoPairwiseOverlap(frame, seeds)) return false;
   }
+  for (const frame of virtualChecks) {
+    const seeds = collectStudioDecorRefs(frame, decor).map((r) => r.seed);
+    if (!frameDecorHasNoPairwiseOverlap(frame, seeds)) return false;
+  }
   return true;
+}
+
+function mutateScene(
+  snapshot: StudioCanvasSnapshot,
+  templateId: string,
+  createId: () => string,
+  canvasWidth: number,
+  targetFrame?: PanelLayoutFrame,
+  originY = 80
+): MutateComipoResult {
+  const scene = findSceneTemplate(templateId);
+  if (!scene) return { ok: false };
+
+  let frames = snapshot.frames;
+  let decor = snapshot.decor;
+  let checkVirtual: PanelLayoutFrame | null = null;
+
+  let frame = targetFrame ?? null;
+  if (!frame && frames.length > 0) {
+    frame = [...frames].sort((a, b) => a.y - b.y || a.x - b.x)[0]!;
+  }
+
+  if (!frame) {
+    const raw = scene.build(0, Math.max(OFF_FRAME_MARGIN, Math.round(originY)));
+    const frameSeed = raw.find((s) => s.type === "frame");
+    frame = frameSeed
+      ? {
+          x: frameSeed.x,
+          y: frameSeed.y,
+          width: frameSeed.width,
+          height: frameSeed.height,
+        }
+      : virtualInsertFrame(originY, canvasWidth);
+    checkVirtual = frame;
+    if (frameSeed && frames.length === 0) {
+      frames = [frame];
+    }
+  }
+
+  const existing = collectStudioDecorRefs(frame, decor);
+  const incoming = sceneIncomingForFrame(templateId, frame, false);
+  const placed = incrementalPatchFromPlace(frame, existing, incoming);
+  if (!placed) return { ok: false };
+
+  decor = applyIncrementalDecor(decor, decorPatchFromResult(placed), createId);
+  const virtualChecks = checkVirtual && frames.length === 0 ? [checkVirtual] : [];
+  if (!assertSnapshotComposable(frames, decor, virtualChecks)) return { ok: false };
+
+  return { ok: true, snapshot: { frames, decor } };
+}
+
+function mutateDialogue(
+  snapshot: StudioCanvasSnapshot,
+  script: string,
+  createId: () => string,
+  canvasWidth: number,
+  startY = 80
+): MutateComipoResult {
+  const trimmed = script.trim();
+  if (!trimmed) return { ok: false };
+
+  let frames = [...snapshot.frames].sort((a, b) => a.y - b.y || a.x - b.x);
+  let decor = snapshot.decor;
+  let checkVirtual: PanelLayoutFrame | null = null;
+
+  if (frames.length === 0) {
+    const virtual = virtualDialogueFrame(startY, canvasWidth);
+    checkVirtual = virtual;
+    frames = [virtual];
+  }
+
+  const raw = composeDialogueIntoFrames(trimmed, frames, canvasWidth);
+  if (raw.length === 0) return { ok: false };
+
+  for (let i = 0; i < frames.length; i++) {
+    const frame = frames[i]!;
+    const forFrame = raw.filter((_, idx) => idx % frames.length === i);
+    if (forFrame.length === 0) continue;
+    const existing = collectStudioDecorRefs(frame, decor);
+    const placed = incrementalPatchFromPlace(frame, existing, dialogueIncomingRefs(forFrame));
+    if (!placed) return { ok: false };
+    decor = applyIncrementalDecor(decor, decorPatchFromResult(placed), createId);
+  }
+
+  const panelFrames = snapshot.frames;
+  const virtualChecks = checkVirtual && panelFrames.length === 0 ? [checkVirtual] : [];
+  if (!assertSnapshotComposable(panelFrames, decor, virtualChecks)) return { ok: false };
+
+  return { ok: true, snapshot: { frames: panelFrames, decor } };
+}
+
+/**
+ * addSceneTemplate / addDialogueBubbles 의 단일 shipped 진입점.
+ * ok: false 이면 StudioPage 는 commit 하지 않는다.
+ */
+export function mutateComipoSnapshot(
+  snapshot: StudioCanvasSnapshot,
+  action: ComipoInsertAction,
+  createId: () => string,
+  canvasWidth = CANVAS_W
+): MutateComipoResult {
+  if (action.kind === "scene") {
+    return mutateScene(
+      snapshot,
+      action.templateId,
+      createId,
+      canvasWidth,
+      action.targetFrame,
+      action.originY
+    );
+  }
+  return mutateDialogue(snapshot, action.script, createId, canvasWidth, action.startY);
+}
+
+/** 삽입 후 스냅샷이 프레임·가상 프레임 모두에서 쌍별 겹침 없는지(테스트·디버그). */
+export function postInsertFramesComposable(
+  frames: readonly PanelLayoutFrame[],
+  decor: readonly StudioDecorElement[],
+  virtualChecks: readonly PanelLayoutFrame[] = []
+): boolean {
+  return assertSnapshotComposable(frames, decor, virtualChecks);
 }

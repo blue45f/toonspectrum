@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { assembleComipoPage } from "./studio-comipo-assembly";
-import { frameDecorHasNoPairwiseOverlap } from "./studio-comipo-incremental";
 import {
-  applyIncrementalInsertPlan,
-  planDialogueScriptInsert,
-  planDialogueScriptInsertOffFrame,
-  planSceneTemplateInsert,
-  planSceneTemplateInsertOffFrame,
+  collectStudioDecorRefs,
+  frameDecorHasNoPairwiseOverlap,
+} from "./studio-comipo-incremental";
+import {
+  mutateComipoSnapshot,
   postInsertFramesComposable,
   type StudioCanvasSnapshot,
 } from "./studio-comipo-insert";
@@ -49,10 +48,10 @@ function assemblyToSnapshot(layoutId: string): StudioCanvasSnapshot {
   return { frames, decor };
 }
 
-describe("studio-comipo-insert shipped paths", () => {
+describe("mutateComipoSnapshot shipped path", () => {
   const talkLayout = PANEL_LAYOUTS.find((l) => l.id === "layout_talk_2_bubbles")!;
 
-  it("planSceneTemplateInsert: populated panel + confession drops layout placeholder, post-state no overlap", () => {
+  it("scene: populated panel + confession drops layout placeholder, post-state no overlap", () => {
     const snapshot = assemblyToSnapshot(talkLayout.id);
     const layoutBubble = snapshot.decor.find(
       (d): d is Extract<typeof d, { type: "bubble" }> =>
@@ -60,56 +59,49 @@ describe("studio-comipo-insert shipped paths", () => {
     )!;
     const top = talkLayout.frames[0]!;
 
-    const plan = planSceneTemplateInsert(snapshot, "confession", top);
-    expect(plan.composable).toBe(true);
-    expect(plan.removedIds).toContain(layoutBubble.id);
+    const result = mutateComipoSnapshot(
+      snapshot,
+      { kind: "scene", templateId: "confession", targetFrame: top },
+      nextId
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
 
-    const next = applyIncrementalInsertPlan(snapshot, plan, nextId);
-    expect(next).not.toBeNull();
-    expect(postInsertFramesComposable(next!.frames, next!.decor)).toBe(true);
+    expect(postInsertFramesComposable(result.snapshot.frames, result.snapshot.decor)).toBe(true);
+    expect(result.snapshot.decor.some((d) => d.id === layoutBubble.id)).toBe(false);
 
-    const topSeeds = next!.decor
-      .filter((d) => d.type === "bubble" || d.type === "text")
-      .map((d) => ({
-        type: d.type,
-        x: d.x,
-        y: d.y,
-        width: d.width,
-        height: "height" in d ? d.height : d.fontSize * 1.4,
-      }));
-    expect(frameDecorHasNoPairwiseOverlap(top, topSeeds as never)).toBe(true);
-    expect(next!.decor.some((d) => d.id === layoutBubble.id)).toBe(false);
+    const topSeeds = collectStudioDecorRefs(top, result.snapshot.decor).map((r) => r.seed);
+    expect(frameDecorHasNoPairwiseOverlap(top, topSeeds)).toBe(true);
   });
 
-  it("planDialogueScriptInsert: scene-populated canvas stays composable with no frame overlap", () => {
+  it("dialogue: scene-populated canvas stays composable with no frame overlap", () => {
     let snapshot = assemblyToSnapshot(talkLayout.id);
     const top = talkLayout.frames[0]!;
-    const scenePlan = planSceneTemplateInsert(snapshot, "confession", top);
-    snapshot = applyIncrementalInsertPlan(snapshot, scenePlan, nextId)!;
 
-    const dialoguePlan = planDialogueScriptInsert(
+    const scene = mutateComipoSnapshot(
       snapshot,
-      "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터를 써 보세요."
+      { kind: "scene", templateId: "confession", targetFrame: top },
+      nextId
     );
-    expect(dialoguePlan.composable).toBe(true);
+    expect(scene.ok).toBe(true);
+    if (!scene.ok) return;
+    snapshot = scene.snapshot;
 
-    const next = applyIncrementalInsertPlan(snapshot, dialoguePlan, nextId);
-    expect(next).not.toBeNull();
-    expect(postInsertFramesComposable(next!.frames, next!.decor)).toBe(true);
+    const dialogue = mutateComipoSnapshot(
+      snapshot,
+      {
+        kind: "dialogue",
+        script: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터를 써 보세요.",
+      },
+      nextId
+    );
+    expect(dialogue.ok).toBe(true);
+    if (!dialogue.ok) return;
+
+    expect(postInsertFramesComposable(dialogue.snapshot.frames, dialogue.snapshot.decor)).toBe(true);
   });
 
-  it("applyIncrementalInsertPlan returns null when plan.composable is false", () => {
-    const snapshot = assemblyToSnapshot(talkLayout.id);
-    expect(
-      applyIncrementalInsertPlan(
-        snapshot,
-        { composable: false, removedIds: [], updates: [], addedSeeds: [] },
-        nextId
-      )
-    ).toBeNull();
-  });
-
-  it("planSceneTemplateInsert guard blocks overcrowded populated frame", () => {
+  it("returns ok:false when plan would be non-composable (overcrowded frame)", () => {
     const top = talkLayout.frames[0]!;
     const snapshot: StudioCanvasSnapshot = {
       frames: [top],
@@ -131,21 +123,85 @@ describe("studio-comipo-insert shipped paths", () => {
         },
       ],
     };
-    const plan = planSceneTemplateInsert(snapshot, "confession", top);
-    expect(plan.composable).toBe(false);
-    expect(applyIncrementalInsertPlan(snapshot, plan, nextId)).toBeNull();
+    const result = mutateComipoSnapshot(
+      snapshot,
+      { kind: "scene", templateId: "confession", targetFrame: top },
+      nextId
+    );
+    expect(result.ok).toBe(false);
   });
 
-  it("planSceneTemplateInsertOffFrame guards virtual frame placement", () => {
-    const plan = planSceneTemplateInsertOffFrame("confession", 80);
-    expect(plan.composable).toBe(true);
-    expect(plan.addedSeeds.length).toBeGreaterThan(0);
+  it("off-frame scene: guards against pre-existing decor overlap in virtual frame", () => {
+    const originY = 80;
+    const virtualFrame = {
+      x: 24,
+      y: originY,
+      width: 720 - 48,
+      height: 480,
+    };
+    const snapshot: StudioCanvasSnapshot = {
+      frames: [],
+      decor: [
+        {
+          id: "blocker",
+          type: "bubble",
+          variant: "speech",
+          text: "이미 차지",
+          x: virtualFrame.x + 40,
+          y: virtualFrame.y + 40,
+          width: 400,
+          height: 400,
+          fill: "#fff",
+          textFill: "#000",
+          rotation: 0,
+        },
+      ],
+    };
+    const result = mutateComipoSnapshot(
+      snapshot,
+      { kind: "scene", templateId: "action-impact", originY },
+      nextId
+    );
+    expect(result.ok).toBe(false);
   });
 
-  it("planDialogueScriptInsertOffFrame rejects overlapping vertical stack", () => {
+  it("off-frame scene without panels: confession adds virtual frame seed composably", () => {
+    const result = mutateComipoSnapshot(
+      { frames: [], decor: [] },
+      { kind: "scene", templateId: "confession", originY: 80 },
+      nextId
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.frames.length).toBe(1);
+    expect(result.snapshot.decor.length).toBeGreaterThan(0);
+    expect(postInsertFramesComposable(result.snapshot.frames, result.snapshot.decor)).toBe(true);
+  });
+
+  it("off-frame dialogue: empty canvas places bubbles without persisting virtual frame", () => {
+    const result = mutateComipoSnapshot(
+      { frames: [], decor: [] },
+      { kind: "dialogue", script: "민수: 안녕\n지영: 반가워", startY: 80 },
+      nextId
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.frames).toHaveLength(0);
+    expect(result.snapshot.decor.length).toBeGreaterThan(0);
+    const virtual = { x: 24, y: 80, width: 720 - 48, height: 1200 };
+    const seeds = collectStudioDecorRefs(virtual, result.snapshot.decor).map((r) => r.seed);
+    expect(frameDecorHasNoPairwiseOverlap(virtual, seeds)).toBe(true);
+  });
+
+  it("returns ok:false for empty dialogue script", () => {
+    const snapshot = assemblyToSnapshot(talkLayout.id);
+    expect(
+      mutateComipoSnapshot(snapshot, { kind: "dialogue", script: "   " }, nextId).ok
+    ).toBe(false);
+  });
+
+  it("materializePanelLayout seeds remain valid inputs for assembly guard", () => {
     const { seeds } = materializePanelLayout(talkLayout);
-    const good = planDialogueScriptInsertOffFrame("민수: 안녕\n지영: 반가워");
-    expect(good.composable).toBe(true);
     expect(seeds.length).toBeGreaterThan(0);
   });
 });

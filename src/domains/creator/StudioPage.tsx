@@ -111,12 +111,8 @@ import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
-  applyIncrementalInsertPlan,
+  mutateComipoSnapshot,
   pickTargetPanelFrame,
-  planDialogueScriptInsert,
-  planSceneTemplateInsert,
-  planSceneTemplateInsertOffFrame,
-  type IncrementalInsertPlan,
   type StudioCanvasSnapshot,
 } from "./studio-comipo-insert";
 import {
@@ -4535,40 +4531,82 @@ function StudioCuttoonEditor() {
       decor: elements.filter(isStudioDecorEl) as StudioDecorElement[],
     };
   }
-  function commitDecorInsert(plan: IncrementalInsertPlan, errorMessage: string): boolean {
-    const snapshot = studioCanvasSnapshot();
-    const next = applyIncrementalInsertPlan(snapshot, plan, uid);
-    if (!next) {
+  function commitMutatedSnapshot(
+    snapshot: StudioCanvasSnapshot,
+    result: ReturnType<typeof mutateComipoSnapshot>,
+    errorMessage: string
+  ): boolean {
+    if (!result.ok) {
       setError(errorMessage);
       return false;
     }
     const decorIds = new Set(elements.filter(isStudioDecorEl).map((e) => e.id));
-    const nonDecor = elements.filter((e) => !decorIds.has(e.id));
-    commit([...nonDecor, ...(next.decor as El[])]);
+    const kept = elements.filter((e) => !decorIds.has(e.id));
+    const existingFrameKeys = new Set(
+      elements
+        .filter((e): e is FrameEl => e.type === "frame")
+        .map((f) => `${f.x},${f.y},${f.width},${f.height}`)
+    );
+    const addedFrames: FrameEl[] = result.snapshot.frames
+      .filter((f) => !existingFrameKeys.has(`${f.x},${f.y},${f.width},${f.height}`))
+      .map((f) => ({
+        id: uid(),
+        type: "frame" as const,
+        x: f.x,
+        y: f.y,
+        width: f.width,
+        height: f.height,
+      }));
+    commit([...kept, ...addedFrames, ...(result.snapshot.decor as El[])]);
     return true;
   }
-  // 장면 템플릿 삽입 — studio-comipo-insert shipped path.
+  // 장면 템플릿 삽입 — mutateComipoSnapshot 단일 shipped path.
   function addSceneTemplate(template: SceneTemplate) {
     setMenu(null);
     const snapshot = studioCanvasSnapshot();
     const [cx, cy] = spawnCenter();
     const target =
       selected?.type === "frame"
-        ? selected
+        ? {
+            x: selected.x,
+            y: selected.y,
+            width: selected.width,
+            height: selected.height,
+          }
         : pickTargetPanelFrame(snapshot.frames, cx, cy);
 
-    const plan = target
-      ? planSceneTemplateInsert(snapshot, template.id, target)
-      : planSceneTemplateInsertOffFrame(template.id, Math.max(20, Math.round(cy - 240)));
+    const action =
+      target && snapshot.frames.length > 0
+        ? { kind: "scene" as const, templateId: template.id, targetFrame: target }
+        : {
+            kind: "scene" as const,
+            templateId: template.id,
+            originY: Math.max(20, Math.round(cy - 240)),
+          };
 
-    if (!commitDecorInsert(plan, "장면을 이 컷에 맞출 수 없습니다.")) return;
+    const result = mutateComipoSnapshot(snapshot, action, uid);
+    if (!commitMutatedSnapshot(snapshot, result, "장면을 이 컷에 맞출 수 없습니다.")) return;
     setTool("select");
   }
-  // 대사 스크립트 일괄 삽입 — studio-comipo-insert shipped path.
+  // 대사 스크립트 일괄 삽입 — mutateComipoSnapshot 단일 shipped path.
   function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
-    const plan = planDialogueScriptInsert(studioCanvasSnapshot(), dialogueScript, CANVAS_W);
-    if (!commitDecorInsert(plan, "대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.")) return;
+    const snapshot = studioCanvasSnapshot();
+    const result = mutateComipoSnapshot(
+      snapshot,
+      { kind: "dialogue", script: dialogueScript },
+      uid,
+      CANVAS_W
+    );
+    if (
+      !commitMutatedSnapshot(
+        snapshot,
+        result,
+        "대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요."
+      )
+    ) {
+      return;
+    }
     setDialogueScript("");
     setMenu(null);
     setTool("select");
