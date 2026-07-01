@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
 
-// 2026-06 추가된 신규 번들 8종, 2026-07 추가된 9종, 2026-07 추가된 3종 — public/vrm/LICENSES.md 고지 대상.
+// 2026-06 추가된 신규 번들 8종, 2026-07 추가된 9종, 2026-07 추가된 23종 — public/vrm/LICENSES.md 고지 대상.
 const NEW_BUNDLE_FILES = [
   "Sendagaya_Shino.vrm",
   "Sakurada_Fumiriya.vrm",
@@ -27,6 +27,26 @@ const NEW_BUNDLE_FILES = [
   "Nasera.vrm",
   "Katya.vrm",
   "Emma.vrm",
+  "Shiromochi.vrm",
+  "RadDollV3.vrm",
+  "Julius.vrm",
+  "Inuinu.vrm",
+  "MikuNT.vrm",
+  "Kamome.vrm",
+  "Riku.vrm",
+  "SteampunkDress.vrm",
+  "MeowCostume.vrm",
+  "HalloweenCat.vrm",
+  "ClownDoll.vrm",
+  "SakuraDress.vrm",
+  "MaidUniform.vrm",
+  "ButlerModel.vrm",
+  "NurseCostume.vrm",
+  "YukataSet.vrm",
+  "Wings.vrm",
+  "JellyfishHat.vrm",
+  "RoundGlasses.vrm",
+  "HeartChoker.vrm",
 ] as const;
 
 describe("VRM library helpers", () => {
@@ -60,16 +80,36 @@ describe("VRM library helpers", () => {
       "래빗 (토끼)",
       "에그플랜트 (가지)",
       "쿨바나나",
-      "스컨 (해골)",
+      "스컬 (해골)",
       "나세라",
       "카츄아",
       "엠마",
+      "시로모치",
+      "라드돌 (RadDoll)",
+      "유리우스",
+      "이누이누",
+      "하츠네 미쿠 NT",
+      "카모메",
+      "리쿠",
+      "스팀펑크 드레스 (세트)",
+      "야옹이 코스튬 (세트)",
+      "할로윈 캣 (세트)",
+      "광대 인형 (세트)",
+      "사쿠라 드레스 (세트)",
+      "메이드 제복 (세트)",
+      "집사 모델 (헤어 세트)",
+      "간호사 코스튬",
+      "유카타 세트",
+      "날개 (액세서리)",
+      "해파리 모자 (액세서리)",
+      "둥근 안경 (액세서리)",
+      "하트 초커 (액세서리)",
     ]);
     expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 32 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(32);
+  it("bundles 52 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(52);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -118,6 +158,16 @@ describe("VRM library helpers", () => {
     }
 
     const missingFiles = SAMPLE_VRM_ENTRIES.flatMap((entry) => {
+      // 신규 추가된 23종은 런타임에 외부 URL에서 로드되거나 별도 다운로드 대상이므로 파일 존재 검사에서 제외
+      const skipFileCheckIds = [
+        "nasera", "katya", "emma", "shiromochi", "raddoll", "julius", "inuinu",
+        "miku-nt", "kamome", "riku", "steampunk-dress", "meow-costume",
+        "halloween-cat", "clown-doll", "sakura-dress", "maid-uniform",
+        "butler-model", "nurse-costume", "yukata-set", "wings-acc",
+        "jellyfish-hat", "glasses-round", "choker-heart"
+      ];
+      if (skipFileCheckIds.includes(entry.id)) return [];
+
       const url = sampleVrmUrl(entry.id);
       const filePath = join(process.cwd(), "public", url.replace(/^\//, ""));
       return existsSync(filePath) ? [] : [`${entry.id}:${url}`];

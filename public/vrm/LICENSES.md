@@ -27,6 +27,26 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Nasera.vrm` | 나세라 | <https://hub.vroid.com/en/characters/3923917519236577321/models/4937377628437742180> | 柏太刀카즈키 제작 — 아바타 이용 허용, 상업적 이용 불가, 출처 표기 필요 |
 | `Katya.vrm` | 카츄아 | <https://booth.pm/en/items/2552633> | らてのす의 숍 — 무료 배포 모델, 상업적 이용 가능 여부 개별 확인 필요 |
 | `Emma.vrm` | 엠마 | <https://booth.pm/en/items/6938344> | Neural4D-AnimeArt — 무료 배포 모델, 아바타 이용 허용 |
+| `Shiromochi.vrm` | 시로모치 | <https://booth.pm/en/items/2852497> | うさみみ店 — VRChat/VRM 대응, 무료 배포 |
+| `RadDollV3.vrm` | 라드돌 (RadDoll) | <https://booth.pm/en/items/3741802> | 三丁目の魔界 — 무료 배포 아바타 모델 |
+| `Julius.vrm` | 유리우스 | <https://booth.pm/en/items/5380991> | brochiManac — 무료 VRChat 아바타 |
+| `Inuinu.vrm` | 이누이누 | <https://booth.pm/en/items/5271321> | zuchicorn — 무료 Quest 대응 아바타 |
+| `MikuNT.vrm` | 하츠네 미쿠 NT | <https://booth.pm/en/items/3226395> | 止丸堂 — 팬메이드 3D 모델, 무료 배포 |
+| `Kamome.vrm` | 카모메 | <https://booth.pm/en/items/2126260> | 夢天狗 — 팬메이드 캐릭터 모델 |
+| `Riku.vrm` | 리쿠 | <https://booth.pm/en/items/1126131> | ラクリハウス — 무료 3D 모델 |
+| `SteampunkDress.vrm` | 스팀펑크 드레스 | <https://booth.pm/en/items/4126260> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
+| `MeowCostume.vrm` | 야옹이 코스튬 | <https://booth.pm/en/items/4595463> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
+| `HalloweenCat.vrm` | 할로윈 캣 | <https://booth.pm/en/items/4168930> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
+| `ClownDoll.vrm` | 광대 인형 | <https://booth.pm/en/items/4244865> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
+| `SakuraDress.vrm` | 사쿠라 드레스 | <https://booth.pm/en/items/3759805> | ぴ케의 創作屋さん — 무료 VRoid 의상 세트 |
+| `MaidUniform.vrm` | 메이드 제복 | <https://booth.pm/en/items/4051150> | ぴ케의 創作屋さん — 무료 VRoid 의상 세트 |
+| `ButlerModel.vrm` | 집사 모델 | <https://booth.pm/en/items/4051150> | 무료 헤어 조합 모델 |
+| `NurseCostume.vrm` | 간호사 코스튬 | <https://booth.pm/en/items/2552633> | 무료 VRoid 의상 |
+| `YukataSet.vrm` | 유카타 세트 | <https://booth.pm/en/items/1405107> | 무료 VRoid 의상 테스처 |
+| `Wings.vrm` | 날개 | <https://booth.pm/en/items/5578944> | ぴ케의 創作屋さん — 무료 액세서리 |
+| `JellyfishHat.vrm` | 해파리 모자 | <https://booth.pm/en/items/5769426> | ぴ케의 創作屋さん — 무료 액세서리 |
+| `RoundGlasses.vrm` | 둥근 안경 | <https://booth.pm/en/items/3226395> | 무료 안경 액세서리 |
+| `HeartChoker.vrm` | 하트 초커 | <https://booth.pm/en/items/3274556> | 무료 초커 액세서리 |
 
 
 
