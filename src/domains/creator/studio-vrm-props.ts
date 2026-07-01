@@ -411,6 +411,126 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       }
       break;
     }
+    case "umbrella": {
+      const canopy = mesh(new three.CylinderGeometry(0.3, 0.02, 0.15, 12, 1, false), mat(0.4, 0.1));
+      canopy.position.set(0, 0.35, 0);
+      group.add(canopy);
+      const shaft = mesh(new three.CylinderGeometry(0.008, 0.008, 0.7, 8), mat(0.3, 0.8, "#64748b"));
+      group.add(shaft);
+      const handle = mesh(new three.TorusGeometry(0.03, 0.008, 8, 12, Math.PI), mat(0.4, 0.8, "#1e293b"));
+      handle.position.set(-0.03, -0.35, 0);
+      handle.rotation.set(0, 0, Math.PI);
+      group.add(handle);
+      break;
+    }
+    case "flute": {
+      const body = mesh(new three.CylinderGeometry(0.008, 0.008, 0.5, 10), mat(0.2, 0.9, "#d1d5db"));
+      group.add(body);
+      for (let i = 0; i < 6; i++) {
+        const key = mesh(new three.CylinderGeometry(0.003, 0.003, 0.004, 6), mat(0.3, 0.8, "#9ca3af"));
+        key.position.set(0, -0.15 + i * 0.06, 0.008);
+        key.rotation.set(Math.PI / 2, 0, 0);
+        group.add(key);
+      }
+      break;
+    }
+    case "wand": {
+      const stick = mesh(new three.CylinderGeometry(0.006, 0.004, 0.3, 8), mat(0.6, 0.1, "#8a5cf6"));
+      group.add(stick);
+      const starGroup = new three.Group();
+      starGroup.position.set(0, 0.16, 0);
+      starGroup.add(mesh(new three.SphereGeometry(0.02, 10, 10), mat(0.1, 0.9, hex)));
+      for (let i = 0; i < 5; i++) {
+        const pt = mesh(new three.ConeGeometry(0.012, 0.035, 4), mat(0.2, 0.8, "#fbbf24"));
+        const angle = (i * Math.PI * 2) / 5;
+        pt.position.set(Math.sin(angle) * 0.025, Math.cos(angle) * 0.025, 0);
+        pt.rotation.set(0, 0, -angle);
+        starGroup.add(pt);
+      }
+      group.add(starGroup);
+      break;
+    }
+    case "headphones": {
+      const band = mesh(new three.TorusGeometry(0.095, 0.008, 8, 24, Math.PI), mat(0.6, 0.1));
+      band.position.set(0, 0.02, 0);
+      group.add(band);
+      for (const side of [-1, 1] as const) {
+        const cup = mesh(new three.CylinderGeometry(0.035, 0.035, 0.02, 16), mat(0.5, 0.2, "#111827"));
+        cup.position.set(side * 0.095, 0.01, 0);
+        cup.rotation.set(0, 0, Math.PI / 2);
+        group.add(cup);
+        const logo = mesh(new three.SphereGeometry(0.012, 8, 8), mat(0.2, 0.9, hex));
+        logo.position.set(side * 0.106, 0.01, 0);
+        group.add(logo);
+      }
+      break;
+    }
+    case "headband": {
+      const band = mesh(new three.TorusGeometry(0.09, 0.007, 8, 24, Math.PI), mat(0.5, 0.1));
+      band.position.set(0, 0.02, 0);
+      group.add(band);
+      break;
+    }
+    case "flowerCrown": {
+      const ring = mesh(new three.TorusGeometry(0.09, 0.006, 8, 24), mat(0.7, 0.05, "#15803d"));
+      group.add(ring);
+      for (let i = 0; i < 8; i++) {
+        const flower = mesh(new three.SphereGeometry(0.018, 8, 8), mat(0.5, 0.1));
+        const angle = (i * Math.PI * 2) / 8;
+        flower.position.set(Math.cos(angle) * 0.09, 0.005, Math.sin(angle) * 0.09);
+        group.add(flower);
+      }
+      break;
+    }
+    case "scarf": {
+      const neckRing = mesh(new three.TorusGeometry(0.095, 0.022, 10, 16), mat(0.8, 0));
+      neckRing.rotation.set(Math.PI / 2, 0, 0);
+      group.add(neckRing);
+      const hanging = mesh(new three.BoxGeometry(0.04, 0.28, 0.015), mat(0.8, 0));
+      hanging.position.set(0.05, -0.14, 0.07);
+      hanging.rotation.set(0.1, -0.05, -0.1);
+      group.add(hanging);
+      break;
+    }
+    case "holster": {
+      group.add(mesh(new three.BoxGeometry(0.07, 0.14, 0.04), mat(0.75, 0.1, "#543825")));
+      const grip = mesh(new three.CylinderGeometry(0.01, 0.012, 0.08, 8), mat(0.6, 0.2, "#2b2b2b"));
+      grip.position.set(0.02, 0.07, 0.03);
+      grip.rotation.set(0.3, 0, 0.6);
+      group.add(grip);
+      break;
+    }
+    case "belt": {
+      const loop = mesh(new three.TorusGeometry(0.14, 0.01, 8, 24), mat(0.7, 0.2, "#1e293b"));
+      loop.rotation.set(Math.PI / 2, 0, 0);
+      group.add(loop);
+      const buckle = mesh(new three.BoxGeometry(0.035, 0.028, 0.022), mat(0.2, 0.9, "#fbbf24"));
+      buckle.position.set(0, 0, 0.14);
+      group.add(buckle);
+      break;
+    }
+    case "backwing": {
+      for (const side of [-1, 1] as const) {
+        const wing = mesh(new three.SphereGeometry(0.1, 10, 8, 0, Math.PI), mat(0.3, 0.5));
+        wing.position.set(side * 0.09, 0, 0);
+        wing.rotation.set(0, side > 0 ? 0 : Math.PI, 0);
+        group.add(wing);
+      }
+      break;
+    }
+    case "gloves": {
+      group.add(mesh(new three.SphereGeometry(0.045, 12, 12), mat(0.8, 0)));
+      break;
+    }
+    case "choker": {
+      const neckLoop = mesh(new three.TorusGeometry(0.065, 0.007, 8, 20), mat(0.6, 0.1, "#111827"));
+      neckLoop.rotation.set(Math.PI / 2, 0, 0);
+      group.add(neckLoop);
+      const pendant = mesh(new three.SphereGeometry(0.009, 8, 8), mat(0.1, 0.9, hex));
+      pendant.position.set(0, 0, 0.065);
+      group.add(pendant);
+      break;
+    }
     default:
       group.add(mesh(new three.BoxGeometry(0.05, 0.05, 0.05), mat()));
   }
