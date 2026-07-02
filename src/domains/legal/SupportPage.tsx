@@ -23,7 +23,7 @@ import { useDocumentTitle } from "@/src/hooks/use-document-title";
 // 전화·이메일로 문의 남기는 수단은 제거하고 모든 문의를 이 게시판으로 통합한다.
 
 const inputClass =
-  "mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50";
+  "mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40";
 
 const SIMPLE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -39,7 +39,7 @@ function StatusBadge({ status }: { status: InquiryStatus }) {
   const label = INQUIRY_STATUS_LABELS[status] ?? status;
   return (
     <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.66rem] font-semibold leading-none ${statusTone[status] ?? statusTone.closed}`}
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.72rem] font-semibold leading-none ${statusTone[status] ?? statusTone.closed}`}
     >
       {label}
     </span>
@@ -64,7 +64,7 @@ function InquiryCard({ inquiry }: { inquiry: Inquiry }) {
   return (
     <article className="rounded-2xl border border-line bg-card/60 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center rounded-md border border-line bg-raised/50 px-2 py-0.5 text-[0.66rem] font-semibold text-fg-2">
+        <span className="inline-flex items-center rounded-md border border-line bg-raised/50 px-2 py-0.5 text-[0.72rem] font-semibold text-fg-2">
           {INQUIRY_CATEGORY_LABELS[inquiry.category] ?? inquiry.category}
         </span>
         <StatusBadge status={inquiry.status} />

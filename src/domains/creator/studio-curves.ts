@@ -2,6 +2,8 @@
  * Studio Tone Curve Engine
  * 포토샵 "곡선(Curves)" 보정 — 입력 0..255 → 출력 0..255 제어점을 구간 선형보간해
  * 256칸 LUT로 미리 구워 r/g/b 채널에 한 번에 적용한다(알파 보존).
+ * 마스터(RGB) 곡선 위에 r/g/b 개별 채널 곡선을 얹는 채널 편집도 지원한다
+ * (하위호환: 기존 저장본의 curve(CurvePoint[])는 그대로 마스터, 채널 곡선은 별도 필드).
  * 곡선 에디터용 헬퍼(점 추가/이동/삭제, flat↔점 변환)와 프리셋, Konva 필터까지 한 모듈에 모았다.
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  * 전부 순수·결정적(랜덤 없음).
@@ -148,6 +150,96 @@ export function applyCurve(img: StudioImageDataLike, points: CurvePoint[]): void
     data[i] = lut[data[i]!]!;
     data[i + 1] = lut[data[i + 1]!]!;
     data[i + 2] = lut[data[i + 2]!]!;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 채널별(R/G/B) 곡선 — 포토샵 커브의 채널 드롭다운처럼 마스터(RGB) 위에
+// 개별 채널 곡선을 얹는다. 하위호환: 기존 저장본의 curve(CurvePoint[])는 그대로
+// 마스터 곡선이고, 채널 곡선은 별도 필드(curveCh)로만 추가된다(없으면 항등).
+// ---------------------------------------------------------------------------
+
+/** 보정 채널 — master=R·G·B 세 채널 동일 적용, r/g/b=개별 채널. */
+export type ToneChannel = "master" | "r" | "g" | "b";
+
+/** r/g/b 개별 채널 키(마스터 제외). */
+export type RgbChannelKey = "r" | "g" | "b";
+
+/** 채널 선택 세그먼트 정의 — 커브/레벨 패널이 공유한다(표시 순서·라벨·툴팁). */
+export const TONE_CHANNELS: { id: ToneChannel; label: string; tip: string }[] = [
+  { id: "master", label: "RGB", tip: "R·G·B 세 채널에 똑같이 적용되는 마스터 조정입니다." },
+  { id: "r", label: "R", tip: "빨강 채널만 조정합니다." },
+  { id: "g", label: "G", tip: "초록 채널만 조정합니다." },
+  { id: "b", label: "B", tip: "파랑 채널만 조정합니다." },
+];
+
+/** r/g/b 개별 채널 곡선 묶음 — 누락 채널은 항등(마스터 곡선은 기존 curve 필드). */
+export type CurveRgbChannels = { r?: CurvePoint[]; g?: CurvePoint[]; b?: CurvePoint[] };
+
+/** 채널 곡선 묶음 안전장치 — 각 채널을 normalizeCurve로 정리(누락/무효 채널은 항등). */
+export function normalizeCurveChannels(
+  channels?: CurveRgbChannels | null
+): Record<RgbChannelKey, CurvePoint[]> {
+  const src = channels && typeof channels === "object" ? channels : undefined;
+  return {
+    r: normalizeCurve(src?.r),
+    g: normalizeCurve(src?.g),
+    b: normalizeCurve(src?.b),
+  };
+}
+
+/** r/g/b 채널 곡선이 전부 항등(픽셀 불변)인지. */
+export function isIdentityCurveChannels(channels?: CurveRgbChannels | null): boolean {
+  const ch = normalizeCurveChannels(channels);
+  return isIdentityCurve(ch.r) && isIdentityCurve(ch.g) && isIdentityCurve(ch.b);
+}
+
+/**
+ * LUT 합성 순수함수 — first 적용 후 second를 적용하는 것과 같은 단일 256칸 LUT.
+ *   out[i] = second[first[i]]
+ * 입력은 변형하지 않는다. 커브·레벨의 채널 합성이 함께 재사용한다.
+ */
+export function composeLuts(first: Uint8ClampedArray, second: Uint8ClampedArray): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i++) {
+    out[i] = second[first[i]!]!;
+  }
+  return out;
+}
+
+/**
+ * 채널별 최종 LUT — 각 채널에 "채널 곡선 → 마스터 곡선" 순으로 합성한다
+ * (개별 채널 곡선을 먼저 통과시키고 마스터(RGB) 곡선을 그 위에 얹는다:
+ *  final[i] = master[channel[i]]).
+ * 채널 곡선이 항등이면 그 채널은 마스터 LUT를 그대로 공유한다(추가 비용 없음).
+ */
+export function buildCurveChannelLuts(
+  master: CurvePoint[],
+  channels?: CurveRgbChannels | null
+): Record<RgbChannelKey, Uint8ClampedArray> {
+  const masterLut = buildCurveLut(master);
+  const ch = normalizeCurveChannels(channels);
+  const lutFor = (points: CurvePoint[]): Uint8ClampedArray =>
+    isIdentityCurve(points) ? masterLut : composeLuts(buildCurveLut(points), masterLut);
+  return { r: lutFor(ch.r), g: lutFor(ch.g), b: lutFor(ch.b) };
+}
+
+/**
+ * 마스터+채널 곡선 제자리 적용 — 전부 항등이면 no-op. 채널별 LUT를 한 번만 구워
+ * r/g/b 각각에 매핑하고 알파(+3)는 보존한다.
+ */
+export function applyCurveChannels(
+  img: StudioImageDataLike,
+  master: CurvePoint[],
+  channels?: CurveRgbChannels | null
+): void {
+  if (isIdentityCurve(master) && isIdentityCurveChannels(channels)) return;
+  const luts = buildCurveChannelLuts(master, channels);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = luts.r[data[i]!]!;
+    data[i + 1] = luts.g[data[i + 1]!]!;
+    data[i + 2] = luts.b[data[i + 2]!]!;
   }
 }
 
@@ -350,13 +442,27 @@ export function flatToCurve(flat: number[]): CurvePoint[] {
 }
 
 // ---------------------------------------------------------------------------
-// Konva 등록용 — StudioPage가 node.attrs.curvePoints(flat number[])로 부착.
+// Konva 등록용 — StudioPage가 node.attrs.curvePoints(마스터)와
+// curvePointsR/G/B(채널)를 flat number[]로 부착.
 // attrs는 외부 입력이므로 flatToCurve로 안전 변환, 항등/무효면 no-op(throw 금지).
 // ---------------------------------------------------------------------------
 
+/** attrs 평탄 배열 → 곡선. 배열이 아니거나 유효 숫자가 2개 미만이면 null(=곡선 없음). */
+function attrFlatCurve(value: unknown): CurvePoint[] | null {
+  if (!Array.isArray(value)) return null;
+  // 숫자만 추려 안전하게 변환(무효 원소가 섞여도 throw 없이 무시).
+  const numeric: number[] = [];
+  for (const v of value) {
+    if (typeof v === "number" && Number.isFinite(v)) numeric.push(v);
+  }
+  if (numeric.length < 2) return null;
+  return flatToCurve(numeric);
+}
+
 /**
- * Konva 필터 함수 — node(`this`).attrs.curvePoints(평탄 number[])를
- * flatToCurve → applyCurve. attrs 누락·curvePoints 무효·항등이면 no-op.
+ * Konva 필터 함수 — node(`this`).attrs.curvePoints(마스터, 평탄 number[])와
+ * curvePointsR/G/B(채널, 평탄 number[])를 읽어 채널 합성 LUT로 적용한다.
+ * attrs 누락·전부 무효·전부 항등이면 no-op.
  */
 export function curveKonvaFilter(
   this: { attrs?: Record<string, unknown> },
@@ -364,15 +470,14 @@ export function curveKonvaFilter(
 ): void {
   const attrs = this.attrs;
   if (!attrs) return;
-  const flat = attrs.curvePoints;
-  if (!Array.isArray(flat)) return;
-  // 숫자만 추려 안전하게 변환(무효 원소가 섞여도 throw 없이 무시).
-  const numeric: number[] = [];
-  for (const v of flat) {
-    if (typeof v === "number" && Number.isFinite(v)) numeric.push(v);
-  }
-  if (numeric.length < 2) return;
-  const points = flatToCurve(numeric);
-  if (isIdentityCurve(points)) return;
-  applyCurve(imageData, points);
+  const master = attrFlatCurve(attrs.curvePoints) ?? defaultCurveCopy();
+  const channels: CurveRgbChannels = {};
+  const r = attrFlatCurve(attrs.curvePointsR);
+  if (r) channels.r = r;
+  const g = attrFlatCurve(attrs.curvePointsG);
+  if (g) channels.g = g;
+  const b = attrFlatCurve(attrs.curvePointsB);
+  if (b) channels.b = b;
+  if (isIdentityCurve(master) && isIdentityCurveChannels(channels)) return;
+  applyCurveChannels(imageData, master, channels);
 }

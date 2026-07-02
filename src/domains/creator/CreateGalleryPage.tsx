@@ -513,10 +513,11 @@ export function CreateGalleryPage() {
                   <button
                     type="button"
                     onClick={() => setParam("tag", null)}
+                    aria-label={`#${tag} 태그 필터 해제`}
                     className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-accent-soft active:scale-[0.96]"
                   >
                     #{tag}
-                    <X size={14} />
+                    <X size={14} aria-hidden />
                   </button>
                 )}
               </div>

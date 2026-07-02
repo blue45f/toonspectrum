@@ -319,9 +319,9 @@ export function CalendarPage() {
                     )}
                     <span className={cn("font-display text-sm font-bold", isToday && !on && "text-accent")}>
                       {day}
-                      {isToday && <span className="ml-1 text-[0.55rem] align-top">●</span>}
+                      {isToday && <span aria-hidden="true" className="ml-1 text-[0.55rem] align-top">●</span>}
                     </span>
-                    <span className="numeral text-[0.66rem] text-fg-3">{items.length}</span>
+                    <span className="numeral text-[0.72rem] text-fg-3">{items.length}</span>
                   </button>
                 );
               })}
@@ -361,7 +361,7 @@ export function CalendarPage() {
                   >
                     <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
                       {day}
-                      {isToday && <span className="ml-1.5 text-[0.6rem] font-medium">오늘</span>}
+                      {isToday && <span className="ml-1.5 text-[0.72rem] font-medium">오늘</span>}
                     </span>
                     <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </header>

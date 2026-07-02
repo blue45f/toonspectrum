@@ -66,7 +66,7 @@ export function TagsPage() {
             >
               <span className="opacity-50">#</span>
               {tag}
-              <span className="ml-0.5 text-[0.6em] text-fg-3">{count.toLocaleString("ko-KR")}</span>
+              <span className="ml-0.5 text-[0.72rem] text-fg-3">{count.toLocaleString("ko-KR")}</span>
             </Link>
           ))}
         </div>

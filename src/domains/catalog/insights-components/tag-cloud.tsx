@@ -39,7 +39,7 @@ export function TagCloud({
           >
             <span className={cn(strong ? "text-accent/60" : "text-fg-3")}>#</span>
             {tag}
-            <span className="numeral ml-0.5 text-[0.62em] text-fg-3">{count}</span>
+            <span className="numeral ml-0.5 text-[0.72rem] text-fg-3">{count}</span>
           </span>
         );
       })}

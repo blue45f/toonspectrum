@@ -223,6 +223,7 @@ export function SettingsPage() {
             onClick={toggleRemember}
             role="switch"
             aria-checked={hydrated && remember}
+            aria-label="필터 기억"
             className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
               hydrated && remember ? "bg-accent" : "bg-line-strong"
             }`}

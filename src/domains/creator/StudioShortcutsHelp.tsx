@@ -108,7 +108,7 @@ export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose:
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[0.6rem] leading-relaxed text-fg-4">Windows·Linux에서는 ⌘ 대신 Ctrl을 사용하세요. 입력창에 포커스가 있을 땐 단축키가 비활성화됩니다.</p>
+        <p className="mt-3 text-[0.6rem] leading-relaxed text-fg-3">Windows·Linux에서는 ⌘ 대신 Ctrl을 사용하세요. 입력창에 포커스가 있을 땐 단축키가 비활성화됩니다.</p>
       </div>
     </div>
   );

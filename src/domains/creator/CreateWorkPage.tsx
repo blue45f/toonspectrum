@@ -136,7 +136,7 @@ function WorkCommunityPanel({
             <select
               value={seriesId}
               onChange={(event) => setSeriesId(event.target.value)}
-              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
+              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg focus:border-accent/50"
             >
               <option value="">시리즈에 연결하지 않음</option>
               {mySeries.map((series) => (
@@ -160,7 +160,7 @@ function WorkCommunityPanel({
             <select
               value={challengeId}
               onChange={(event) => setChallengeId(event.target.value)}
-              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
+              className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg focus:border-accent/50"
             >
               <option value="">챌린지에 참여하지 않음</option>
               {/* 이미 연결된(종료됐을 수도 있는) 챌린지는 유지 옵션으로 노출 */}
@@ -251,8 +251,9 @@ function WorkComments({ workId }: { workId: string }) {
             value={draft}
             onChange={(event) => setDraft(event.target.value.slice(0, MAX_COMMENT_LENGTH))}
             placeholder="응원의 한마디를 남겨 보세요."
+            aria-label="댓글 입력"
             rows={3}
-            className="w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50"
+            className="w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-fg transition-colors placeholder:text-fg-3 focus:border-accent/50"
           />
           <div className="flex items-center justify-between gap-2">
             <span className="numeral text-[0.7rem] text-fg-3">
@@ -420,6 +421,7 @@ function WorkInspector({ doc }: { doc: unknown }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between font-bold text-sm text-fg"
       >
         <span className="flex items-center gap-1.5">
@@ -799,7 +801,7 @@ export function CreateWorkPage() {
                   <h3 className="line-clamp-1 text-xs font-semibold leading-tight text-fg group-hover:text-accent">
                     {child.title}
                   </h3>
-                  <p className="truncate text-[0.65rem] text-fg-3">by {child.author.name}</p>
+                  <p className="truncate text-[0.72rem] text-fg-3">by {child.author.name}</p>
                 </div>
               </Link>
             ))}
@@ -817,7 +819,7 @@ export function CreateWorkPage() {
             >
               <ChevronLeft size={15} className="shrink-0" />
               <span className="min-w-0">
-                <span className="block text-[0.66rem] text-fg-3">이전화</span>
+                <span className="block text-[0.72rem] text-fg-3">이전화</span>
                 <span className="block truncate text-xs font-medium">
                   {work.prevEpisode.episodeNo != null && (
                     <span className="numeral">{work.prevEpisode.episodeNo}화 </span>
@@ -846,7 +848,7 @@ export function CreateWorkPage() {
               className="group flex min-w-0 items-center justify-end gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-right text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <span className="min-w-0">
-                <span className="block text-[0.66rem] text-fg-3">다음화</span>
+                <span className="block text-[0.72rem] text-fg-3">다음화</span>
                 <span className="block truncate text-xs font-medium">
                   {work.nextEpisode.episodeNo != null && (
                     <span className="numeral">{work.nextEpisode.episodeNo}화 </span>

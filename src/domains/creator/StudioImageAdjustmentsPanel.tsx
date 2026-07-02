@@ -1,9 +1,14 @@
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-import { normalizeCurve, type CurvePoint } from "./studio-curves";
+import { isIdentityCurveChannels, normalizeCurve, type CurvePoint, type CurveRgbChannels } from "./studio-curves";
 import { type LayerStylePatch } from "./studio-layer-styles";
-import { normalizeLevels, type LevelsParams } from "./studio-levels";
+import {
+  isIdentityLevelsChannels,
+  normalizeLevels,
+  type LevelsParams,
+  type LevelsRgbChannels,
+} from "./studio-levels";
 import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-looks";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
@@ -525,6 +530,9 @@ export function StudioImageAdjustmentsPanel({
   onSetFilterClipboard,
   onPatch,
 }: StudioImageAdjustmentsPanelProps) {
+  // 채널(r/g/b) 곡선·레벨 필드(curveCh/levelsCh) — ImageEl 타입 선언에는 아직 없어
+  // ImageFilterFields로 읽는다(런타임은 같은 요소 객체라 patchEl 스프레드로 그대로 왕복된다).
+  const filterFields: ImageFilterFields = selected;
   return (
     <>
       <AdjustmentSection title="룩 프리셋" defaultOpen>
@@ -555,6 +563,7 @@ export function StudioImageAdjustmentsPanel({
             outBlack: selected.levelsOutBlack,
             outWhite: selected.levelsOutWhite,
           })}
+          channels={filterFields.levelsCh}
           onPatch={(patch) =>
             onPatch({
               ...(patch.blackPoint !== undefined ? { levelsBlack: patch.blackPoint } : {}),
@@ -564,6 +573,13 @@ export function StudioImageAdjustmentsPanel({
               ...(patch.outWhite !== undefined ? { levelsOutWhite: patch.outWhite } : {}),
             } as Partial<El>)
           }
+          onChannelsChange={(ch: LevelsRgbChannels) => {
+            // 전 채널이 항등이면 필드 자체를 비워 저장본을 깨끗하게 유지한다(없음=항등 하위호환).
+            const patch: Partial<ImageFilterFields> = {
+              levelsCh: isIdentityLevelsChannels(ch) ? undefined : ch,
+            };
+            onPatch(patch as Partial<El>);
+          }}
           onApplyPreset={(p: LevelsParams) =>
             onPatch({
               levelsBlack: p.blackPoint,
@@ -573,15 +589,17 @@ export function StudioImageAdjustmentsPanel({
               levelsOutWhite: p.outWhite,
             } as Partial<El>)
           }
-          onReset={() =>
-            onPatch({
+          onReset={() => {
+            const patch: Partial<ImageFilterFields> = {
               levelsBlack: undefined,
               levelsWhite: undefined,
               levelsGamma: undefined,
               levelsOutBlack: undefined,
               levelsOutWhite: undefined,
-            } as Partial<El>)
-          }
+              levelsCh: undefined,
+            };
+            onPatch(patch as Partial<El>);
+          }}
         />
       </AdjustmentSection>
 
@@ -592,11 +610,25 @@ export function StudioImageAdjustmentsPanel({
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="톤 커브" defaultOpen={hasAdjustmentValue(selected.curve)}>
+      <AdjustmentSection
+        title="톤 커브"
+        defaultOpen={hasAdjustmentValue(selected.curve) || hasAdjustmentValue(filterFields.curveCh)}
+      >
         <StudioCurvePanel
           points={normalizeCurve(selected.curve)}
+          channels={filterFields.curveCh}
           onChange={(pts: CurvePoint[]) => onPatch({ curve: pts } as Partial<El>)}
-          onReset={() => onPatch({ curve: undefined } as Partial<El>)}
+          onChannelsChange={(ch: CurveRgbChannels) => {
+            // 전 채널이 항등이면 필드 자체를 비워 저장본을 깨끗하게 유지한다(없음=항등 하위호환).
+            const patch: Partial<ImageFilterFields> = {
+              curveCh: isIdentityCurveChannels(ch) ? undefined : ch,
+            };
+            onPatch(patch as Partial<El>);
+          }}
+          onReset={() => {
+            const patch: Partial<ImageFilterFields> = { curve: undefined, curveCh: undefined };
+            onPatch(patch as Partial<El>);
+          }}
         />
       </AdjustmentSection>
 

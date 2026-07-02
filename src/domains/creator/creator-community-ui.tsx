@@ -31,7 +31,9 @@ export function AuthorAvatar({
   size?: "xs" | "sm" | "md";
   className?: string;
 }) {
-  const sizes = { xs: "size-4 text-[0.55rem]", sm: "size-6 text-[0.7rem]", md: "size-9 text-sm" };
+  // 이니셜은 장식(aria-hidden)이고 인접 닉네임 텍스트가 항상 함께 표기된다.
+  const sizes = { xs: "size-4 text-[0.55rem]", sm: "size-6 text-[0.7rem]", md: "size-9 text-sm" }; // a11y-exempt: 장식 이니셜
+
   return (
     <span
       aria-hidden
@@ -71,19 +73,19 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[oklch(0.14_0.01_70/0.55)] to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         />
-        <span className="absolute left-2 top-2 inline-flex items-center rounded-full border border-line/60 bg-[oklch(0.16_0.01_70/0.7)] px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 backdrop-blur-md">
+        <span className="absolute left-2 top-2 inline-flex items-center rounded-full border border-line/60 bg-[oklch(0.16_0.01_70/0.7)] px-2 py-0.5 text-[0.72rem] font-medium text-fg-2 backdrop-blur-md">
           {FORMAT_LABEL[work.format]}
         </span>
         {/* 시리즈 회차 배지 */}
         {work.seriesId && (
-          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.75)] px-2 py-0.5 text-[0.66rem] font-medium text-cool backdrop-blur-md">
+          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.75)] px-2 py-0.5 text-[0.72rem] font-medium text-cool backdrop-blur-md">
             <Layers size={10} />
             {work.episodeNo != null ? `${work.episodeNo}화` : "시리즈"}
           </span>
         )}
         {/* 챌린지 참여 배지 */}
         {work.challengeId && (
-          <span className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-full border border-accent/45 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.66rem] font-medium text-accent backdrop-blur-md">
+          <span className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-full border border-accent/45 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.72rem] font-medium text-accent backdrop-blur-md">
             <Trophy size={10} className="shrink-0" />
             <span className="truncate">{work.challengeTitle ?? "챌린지"}</span>
           </span>
@@ -161,7 +163,7 @@ export function SeriesCard({ series }: { series: SeriesSummary }) {
         <div className="flex items-center gap-2">
           <span
             className={cn(
-              "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.66rem] font-medium leading-none",
+              "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.72rem] font-medium leading-none",
               series.status === "completed"
                 ? "border-line bg-raised text-fg-2"
                 : "border-[color:oklch(0.8_0.15_150/0.3)] bg-[oklch(0.8_0.15_150/0.12)] text-good"
@@ -239,21 +241,24 @@ export function SeriesForm({
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value.slice(0, 80))}
+          aria-label="시리즈 제목"
           placeholder="시리즈 제목 (예: 야자 끝나고 옥상에서)"
-          className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/50"
+          className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value.slice(0, 2000))}
+          aria-label="시리즈 소개"
           placeholder="어떤 이야기인지 소개해 주세요."
           rows={3}
-          className="w-full resize-y rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/50"
+          className="w-full resize-y rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <input
           value={tagsText}
           onChange={(event) => setTagsText(event.target.value.slice(0, 200))}
+          aria-label="시리즈 태그 (쉼표로 구분)"
           placeholder="태그 (쉼표로 구분, 최대 8개)"
-          className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/50"
+          className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="연재 상태">
           {(["ongoing", "completed"] as const).map((value) => (

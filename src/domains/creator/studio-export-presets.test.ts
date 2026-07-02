@@ -1,16 +1,25 @@
 import { describe, it, expect } from "vitest";
 
+import { MAX_CANVAS_DIM } from "./studio-export";
 import {
   EXPORT_PRESETS,
+  exportPresetSlices,
   findExportPreset,
+  planPresetSliceExport,
+  planSliceDrawOps,
   planStripSlices,
+  presetExportResultMessage,
+  presetSliceFileName,
   recommendScale,
+  resolvePresetFormat,
   validateExport,
   type ExportPreset,
+  type PresetPageLayout,
 } from "./studio-export-presets";
 
 const naver = findExportPreset("naver-challenge") as ExportPreset;
 const canvas = findExportPreset("webtoon-canvas") as ExportPreset;
+const lezhin = findExportPreset("lezhin") as ExportPreset;
 const original = findExportPreset("original") as ExportPreset;
 
 describe("EXPORT_PRESETS 데이터", () => {
@@ -139,5 +148,325 @@ describe("validateExport", () => {
   it("용량 정보가 없으면 filesize 경고는 건너뛴다", () => {
     const r = validateExport({ width: 690, height: 1000, format: "jpg" }, naver);
     expect(r.warnings.map((w) => w.code)).not.toContain("filesize");
+  });
+});
+
+describe("resolvePresetFormat", () => {
+  it("허용 포맷이면 그대로 둔다", () => {
+    expect(resolvePresetFormat(naver, "jpg")).toBe("jpg");
+    expect(resolvePresetFormat(canvas, "png")).toBe("png");
+  });
+
+  it("허용하지 않는 포맷은 권장 포맷으로 강제한다(네이버 PNG→JPG)", () => {
+    expect(resolvePresetFormat(naver, "png")).toBe("jpg");
+    expect(resolvePresetFormat(canvas, "webp")).toBe("jpg");
+  });
+});
+
+describe("planPresetSliceExport", () => {
+  it("한 페이지를 규격 폭으로 리샘플해 규격 높이 단위로 자른다(네이버 720×2560)", () => {
+    const plan = planPresetSliceExport([{ width: 720, height: 2560 }], naver, "png");
+    expect(plan).not.toBeNull();
+    // 690/720 리샘플: round(2560×690/720)=2453 → 1280 + 1173 두 장.
+    expect(plan?.targetWidth).toBe(690);
+    expect(plan?.totalHeight).toBe(2453);
+    expect(plan?.sliceHeight).toBe(1280);
+    expect(plan?.format).toBe("jpg"); // 네이버는 JPG 전용 — 포맷 강제
+    expect(plan?.slices).toEqual([
+      { index: 0, y: 0, height: 1280 },
+      { index: 1, y: 1280, height: 1173 },
+    ]);
+    expect(plan?.pages).toEqual([{ y: 0, height: 2453, sourceWidth: 720, sourceHeight: 2560 }]);
+  });
+
+  it("여러 페이지는 간격 0으로 이어 붙인다", () => {
+    const plan = planPresetSliceExport(
+      [
+        { width: 720, height: 1280 },
+        { width: 720, height: 1280 },
+      ],
+      naver,
+      "jpg"
+    );
+    // 페이지당 round(1280×690/720)=1227 → 총 2454.
+    expect(plan?.pages.map((p) => p.y)).toEqual([0, 1227]);
+    expect(plan?.totalHeight).toBe(2454);
+    expect(plan?.slices.map((s) => s.height)).toEqual([1280, 1174]);
+  });
+
+  it("원본 유지(width 0)는 첫 페이지 폭을 쓰고 캔버스 한계로만 자른다", () => {
+    const plan = planPresetSliceExport([{ width: 1440, height: 2000 }], original, "png");
+    expect(plan?.targetWidth).toBe(1440);
+    expect(plan?.sliceHeight).toBe(MAX_CANVAS_DIM);
+    expect(plan?.slices).toEqual([{ index: 0, y: 0, height: 2000 }]);
+    expect(plan?.format).toBe("png");
+  });
+
+  it("최대 높이가 없는 프리셋(레진)도 캔버스 한계로 자른다", () => {
+    const plan = planPresetSliceExport([{ width: 1440, height: 40000 }], lezhin, "jpg");
+    expect(plan?.sliceHeight).toBe(MAX_CANVAS_DIM);
+    expect(plan?.slices.length).toBe(Math.ceil(40000 / MAX_CANVAS_DIM));
+  });
+
+  it("규격 최대 높이가 캔버스 한계보다 크면 한계로 클램프한다", () => {
+    const plan = planPresetSliceExport([{ width: 720, height: 10000 }], naver, "jpg", 1000);
+    expect(plan?.sliceHeight).toBe(1000);
+  });
+
+  it("유효한 페이지가 없으면 null", () => {
+    expect(planPresetSliceExport([], naver, "jpg")).toBeNull();
+    expect(planPresetSliceExport([{ width: 0, height: 100 }], naver, "jpg")).toBeNull();
+    expect(planPresetSliceExport([{ width: 100, height: -1 }], naver, "jpg")).toBeNull();
+  });
+});
+
+describe("planSliceDrawOps", () => {
+  // 페이지1은 원본이 2배 해상도(ratio 2), 페이지2는 1:1.
+  const layout: PresetPageLayout[] = [
+    { y: 0, height: 100, sourceWidth: 100, sourceHeight: 200 },
+    { y: 100, height: 100, sourceWidth: 100, sourceHeight: 100 },
+  ];
+
+  it("슬라이스가 두 페이지에 걸치면 각 페이지 조각을 좌표 환산해 그린다", () => {
+    const ops = planSliceDrawOps({ index: 0, y: 50, height: 100 }, layout);
+    expect(ops).toEqual([
+      { pageIndex: 0, srcY: 100, srcHeight: 100, destY: 0, destHeight: 50 },
+      { pageIndex: 1, srcY: 0, srcHeight: 50, destY: 50, destHeight: 50 },
+    ]);
+  });
+
+  it("겹치지 않는 페이지는 제외한다", () => {
+    const ops = planSliceDrawOps({ index: 1, y: 150, height: 50 }, layout);
+    expect(ops).toEqual([{ pageIndex: 1, srcY: 50, srcHeight: 50, destY: 0, destHeight: 50 }]);
+  });
+
+  it("슬라이스가 페이지 안에 완전히 들어가면 조각 하나", () => {
+    const ops = planSliceDrawOps({ index: 0, y: 10, height: 20 }, layout);
+    expect(ops).toEqual([{ pageIndex: 0, srcY: 20, srcHeight: 40, destY: 0, destHeight: 20 }]);
+  });
+});
+
+describe("presetSliceFileName", () => {
+  it("여러 장이면 -NofM 접미사", () => {
+    expect(presetSliceFileName("내 만화", "naver-challenge", "jpg", { index: 0, total: 3 })).toBe(
+      "내 만화-naver-challenge-1of3.jpg"
+    );
+    expect(presetSliceFileName("내 만화", "naver-challenge", "jpg", { index: 2, total: 3 })).toBe(
+      "내 만화-naver-challenge-3of3.jpg"
+    );
+  });
+
+  it("한 장이면 접미사 없음", () => {
+    expect(presetSliceFileName("내 만화", "kakaopage", "png", { index: 0, total: 1 })).toBe("내 만화-kakaopage.png");
+  });
+
+  it("빈 제목은 기본 파일명으로", () => {
+    expect(presetSliceFileName("  ", "webtoon-canvas", "png", { index: 0, total: 1 })).toBe(
+      "toonspectrum-webtoon-webtoon-canvas.png"
+    );
+  });
+});
+
+describe("presetExportResultMessage", () => {
+  it("성공 안내(폭·포맷·장수)", () => {
+    const msg = presetExportResultMessage({ files: 2, oversized: 0, format: "jpg", targetWidth: 690 }, naver);
+    expect(msg).toBe("폭 690px JPG 2장으로 저장했어요.");
+  });
+
+  it("용량 초과가 있으면 제한값과 함께 경고를 덧붙인다", () => {
+    const msg = presetExportResultMessage({ files: 3, oversized: 1, format: "jpg", targetWidth: 690 }, naver);
+    expect(msg).toContain("3장으로 저장했어요");
+    expect(msg).toContain("1장은 5MB 제한을 넘어요");
+  });
+
+  it("용량 제한이 없는 프리셋은 초과 카운트가 있어도 경고를 만들지 않는다", () => {
+    const msg = presetExportResultMessage({ files: 1, oversized: 1, format: "png", targetWidth: 800 }, canvas);
+    expect(msg).toBe("폭 800px PNG 1장으로 저장했어요.");
+  });
+});
+
+// ── exportPresetSlices — 브라우저 캔버스 없이 가짜 캔버스로 실행 흐름 검증 ──
+
+class FakeContext2D {
+  fillStyle: unknown = "";
+  imageSmoothingEnabled = false;
+  imageSmoothingQuality = "low";
+  globalAlpha = 1;
+  font = "";
+  textAlign = "";
+  textBaseline = "";
+  lineJoin = "";
+  lineWidth = 0;
+  strokeStyle: unknown = "";
+  fillRects: number[][] = [];
+  drawImages: { srcY: number; srcHeight: number; destY: number; destHeight: number; destWidth: number }[] = [];
+  strokeTexts: string[] = [];
+  fillTexts: string[] = [];
+
+  fillRect(x: number, y: number, w: number, h: number): void {
+    this.fillRects.push([x, y, w, h]);
+  }
+
+  drawImage(
+    _image: unknown,
+    _sx: number,
+    sy: number,
+    _sw: number,
+    sh: number,
+    _dx: number,
+    dy: number,
+    dw: number,
+    dh: number
+  ): void {
+    this.drawImages.push({ srcY: sy, srcHeight: sh, destY: dy, destHeight: dh, destWidth: dw });
+  }
+
+  save(): void {}
+  restore(): void {}
+
+  strokeText(text: string): void {
+    this.strokeTexts.push(text);
+  }
+
+  fillText(text: string): void {
+    this.fillTexts.push(text);
+  }
+}
+
+class FakeCanvas {
+  ctx = new FakeContext2D();
+
+  constructor(
+    public width: number,
+    public height: number,
+    private blobBytes = 8
+  ) {}
+
+  getContext(_type: string): FakeContext2D {
+    return this.ctx;
+  }
+
+  toBlob(callback: (blob: Blob | null) => void): void {
+    callback(new Blob([new Uint8Array(this.blobBytes)]));
+  }
+}
+
+const asCanvas = (fake: FakeCanvas) => fake as unknown as HTMLCanvasElement;
+
+describe("exportPresetSlices", () => {
+  it("두 페이지를 규격 폭으로 리샘플·분할 저장한다(포맷 강제·파일명·좌표·진행)", async () => {
+    const pages = [new FakeCanvas(720, 1280), new FakeCanvas(720, 1280)];
+    const created: FakeCanvas[] = [];
+    const downloads: { name: string; size: number }[] = [];
+    const progress: number[][] = [];
+
+    const result = await exportPresetSlices({
+      pages: pages.map(asCanvas),
+      preset: naver,
+      format: "png", // 네이버는 JPG 전용 → 강제 전환돼야 한다
+      title: "내 만화",
+      delayMs: 0,
+      createCanvas: (w, h) => {
+        const fake = new FakeCanvas(w, h);
+        created.push(fake);
+        return asCanvas(fake);
+      },
+      download: (blob, name) => downloads.push({ name, size: blob.size }),
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+
+    expect(result).toEqual({ files: 2, oversized: 0, format: "jpg", targetWidth: 690 });
+    expect(created.map((c) => [c.width, c.height])).toEqual([
+      [690, 1280],
+      [690, 1174],
+    ]);
+    expect(downloads.map((d) => d.name)).toEqual([
+      "내 만화-naver-challenge-1of2.jpg",
+      "내 만화-naver-challenge-2of2.jpg",
+    ]);
+    expect(progress).toEqual([
+      [1, 2],
+      [2, 2],
+    ]);
+    // 첫 슬라이스: 흰 배경을 먼저 깔고, 페이지1 전체 + 페이지2 상단(경계 걸침)을 그린다.
+    expect(created[0].ctx.fillRects[0]).toEqual([0, 0, 690, 1280]);
+    expect(created[0].ctx.imageSmoothingQuality).toBe("high");
+    expect(created[0].ctx.drawImages).toHaveLength(2);
+    expect(created[0].ctx.drawImages[0]).toMatchObject({ destY: 0, destHeight: 1227, destWidth: 690 });
+    expect(created[0].ctx.drawImages[1]).toMatchObject({ destY: 1227, destHeight: 53 });
+    // 둘째 슬라이스: 페이지2의 나머지.
+    expect(created[1].ctx.drawImages).toHaveLength(1);
+    expect(created[1].ctx.drawImages[0]).toMatchObject({ destY: 0, destHeight: 1174 });
+    // 워터마크 미지정 → 텍스트 그리기 없음.
+    expect(created[0].ctx.strokeTexts).toEqual([]);
+  });
+
+  it("워터마크가 켜져 있으면 슬라이스마다 서명을 찍는다", async () => {
+    const created: FakeCanvas[] = [];
+    await exportPresetSlices({
+      pages: [asCanvas(new FakeCanvas(720, 2560))],
+      preset: naver,
+      format: "jpg",
+      title: "",
+      watermark: { enabled: true, text: "© 툰스펙트럼", position: "br", opacity: 0.5, size: 0.028 },
+      delayMs: 0,
+      createCanvas: (w, h) => {
+        const fake = new FakeCanvas(w, h);
+        created.push(fake);
+        return asCanvas(fake);
+      },
+      download: () => {},
+    });
+    expect(created).toHaveLength(2);
+    for (const slice of created) {
+      expect(slice.ctx.strokeTexts).toEqual(["© 툰스펙트럼"]);
+      expect(slice.ctx.fillTexts).toEqual(["© 툰스펙트럼"]);
+    }
+  });
+
+  it("꺼진 워터마크·빈 텍스트는 그리지 않는다", async () => {
+    const created: FakeCanvas[] = [];
+    await exportPresetSlices({
+      pages: [asCanvas(new FakeCanvas(690, 1000))],
+      preset: naver,
+      format: "jpg",
+      title: "x",
+      watermark: { enabled: false, text: "© x", position: "br", opacity: 0.5, size: 0.028 },
+      delayMs: 0,
+      createCanvas: (w, h) => {
+        const fake = new FakeCanvas(w, h);
+        created.push(fake);
+        return asCanvas(fake);
+      },
+      download: () => {},
+    });
+    expect(created[0].ctx.strokeTexts).toEqual([]);
+  });
+
+  it("프리셋 용량 제한을 넘는 파일 수를 세어 돌려준다", async () => {
+    const result = await exportPresetSlices({
+      pages: [asCanvas(new FakeCanvas(690, 1000))],
+      preset: naver,
+      format: "jpg",
+      title: "big",
+      delayMs: 0,
+      createCanvas: (w, h) => asCanvas(new FakeCanvas(w, h, 6 * 1024 * 1024)),
+      download: () => {},
+    });
+    expect(result.files).toBe(1);
+    expect(result.oversized).toBe(1);
+  });
+
+  it("유효한 페이지가 없으면 한글 메시지로 던진다", async () => {
+    await expect(
+      exportPresetSlices({
+        pages: [],
+        preset: naver,
+        format: "jpg",
+        title: "x",
+        delayMs: 0,
+        download: () => {},
+      })
+    ).rejects.toThrow("내보낼 페이지가 없어요");
   });
 });

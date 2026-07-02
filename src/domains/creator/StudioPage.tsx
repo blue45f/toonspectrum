@@ -119,8 +119,19 @@ import {
   type StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
 import {
+  applyDialogueTextEdit,
+  applyReplacePlanToPages,
+  type DialogueReplacePlan,
+} from "./studio-dialogue-batch";
+import {
   type ExportFormat,
 } from "./studio-export";
+import {
+  estimateTextGradientBBox,
+  konvaGradientProps,
+  legacyTextGradientToSpec,
+  type StudioGradientSpec,
+} from "./studio-gradient-engine";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
@@ -148,6 +159,20 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import {
+  PAGE_NAME_MAX,
+  PAGE_NOTE_MAX,
+  autoPageName,
+  buildClipboardPayload,
+  collectCopyElements,
+  pageDisplayName,
+  parseClipboardPayload,
+  planClipboardPaste,
+  readClipboardFallback,
+  serializeClipboardPayload,
+  withPageMeta,
+  writeClipboardFallback,
+} from "./studio-page-meta";
+import {
   appendPageState,
   applyBackgroundToAllPages,
   applyGradeToAllPages,
@@ -166,6 +191,25 @@ import {
   selectIdsByMarquee,
   unionBounds,
 } from "./studio-selection";
+import {
+  EMPTY_SMART_GUIDE_OVERLAY,
+  SMART_GUIDE_EPSILON,
+  SMART_SNAP_THRESHOLD,
+  buildSmartGuideOverlay,
+  computeSmartSnap,
+  smartGuideOverlaysEqual,
+  type GuideBox,
+  type SmartGuideOverlay,
+} from "./studio-smart-guides";
+import {
+  effectiveCornerRadius,
+  lineArrowHeadGeoms,
+  normalizeShapeParams,
+  normalizeStrokeStyle,
+  strokeDashArray,
+  type ShapeParams,
+  type StrokeStyle,
+} from "./studio-stroke-shapes";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   DEFAULT_WATERMARK,
@@ -174,6 +218,7 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
@@ -236,6 +281,9 @@ const StudioPageGradePanel = lazy(() =>
 const StudioBubbleStylePresetPanel = lazy(() =>
   import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel }))
 );
+const StudioDialogueBatchPanel = lazy(() =>
+  import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel }))
+);
 const StudioShortcutsHelp = lazy(() =>
   import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp }))
 );
@@ -245,11 +293,17 @@ const StudioStickerGrid = lazy(() =>
 const StudioTextEffectPanel = lazy(() =>
   import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel }))
 );
+const StudioGradientEnginePanel = lazy(() =>
+  import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel }))
+);
 const StudioTextPathPanel = lazy(() =>
   import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel }))
 );
 const StudioTonePanel = lazy(() =>
   import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel }))
+);
+const StudioStrokeShapePanel = lazy(() =>
+  import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel }))
 );
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -505,6 +559,7 @@ interface TextEl {
   gradientColorStart?: string;
   gradientColorEnd?: string;
   gradientDirection?: "vertical" | "horizontal";
+  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션(엔진) — 있으면 위 2색 레거시 필드보다 우선.
   textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
 }
 interface BubbleEl {
@@ -572,8 +627,13 @@ interface DrawEl {
   strokeWidth: number;
   opacity?: number;
   fill?: string;
+  gradient?: StudioGradientSpec; // 도형 채우기 그라데이션(멀티스톱) — 미설정이면 fill 단색.
   brush?: string;
   pressures?: number[];
+  // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
+  strokeStyle?: StrokeStyle;
+  // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
+  shapeParams?: ShapeParams;
   symmetry?: {
     type: "none" | "vertical" | "horizontal" | "radial";
     centerX: number;
@@ -1058,6 +1118,10 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
   const opacity = el.opacity ?? 1;
   const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
   const strokeWidth = Math.max(1, el.strokeWidth);
+  // 스트로크 스타일(점선/선 끝) + 도형 파라미터 — 미설정 요소는 기본값으로 정규화된다.
+  const strokeStyle = normalizeStrokeStyle(el.strokeStyle);
+  const shapeParams = normalizeShapeParams(el.shapeParams);
+  const shapeDash = strokeDashArray(strokeStyle.dash, strokeWidth);
 
   const symmetricVariations = getSymmetricPoints(el.points, el.symmetry);
 
@@ -1074,10 +1138,12 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               width={Math.max(0.1, box.width)}
               height={Math.max(0.1, box.height)}
               fill={el.fill}
+              {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: Math.max(0.1, box.width), height: Math.max(0.1, box.height) })}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
-              cornerRadius={3}
+              dash={shapeDash}
+              cornerRadius={effectiveCornerRadius(box.width, box.height, shapeParams.cornerRadius)}
               lineJoin="round"
               globalCompositeOperation={composite}
               listening={false}
@@ -1095,9 +1161,11 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               radiusX={Math.max(0.1, box.width / 2)}
               radiusY={Math.max(0.1, box.height / 2)}
               fill={el.fill}
+              {...konvaGradientProps(el.gradient, { x: -box.width / 2, y: -box.height / 2, width: Math.max(0.1, box.width), height: Math.max(0.1, box.height) })}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
+              dash={shapeDash}
               globalCompositeOperation={composite}
               listening={false}
             />
@@ -1111,13 +1179,16 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               key={index}
               x={box.x + box.width / 2}
               y={box.y + box.height / 2}
-              numPoints={5}
-              innerRadius={Math.max(0.1, Math.min(box.width, box.height) / 4)}
+              numPoints={shapeParams.starPoints}
+              innerRadius={Math.max(0.1, (Math.min(box.width, box.height) / 2) * shapeParams.starInnerRatio)}
               outerRadius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
+              {...konvaGradientProps(el.gradient, { x: -Math.min(box.width, box.height) / 2, y: -Math.min(box.width, box.height) / 2, width: Math.max(0.1, Math.min(box.width, box.height)), height: Math.max(0.1, Math.min(box.width, box.height)) })}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
+              dash={shapeDash}
+              lineJoin="round"
               globalCompositeOperation={composite}
               listening={false}
             />
@@ -1135,6 +1206,8 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
+              dash={shapeDash}
+              lineCap={strokeStyle.lineCap}
               globalCompositeOperation={composite}
               listening={false}
             />
@@ -1154,6 +1227,8 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
+              dash={shapeDash}
+              lineJoin="round"
               globalCompositeOperation={composite}
               listening={false}
             />
@@ -1167,12 +1242,14 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               key={index}
               x={box.x + box.width / 2}
               y={box.y + box.height / 2}
-              sides={6}
+              sides={shapeParams.polygonSides}
               radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
+              dash={shapeDash}
+              lineJoin="round"
               globalCompositeOperation={composite}
               listening={false}
             />
@@ -1375,19 +1452,44 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           );
         }
 
+        // 직선("line") — 점선/선 끝 스타일 + 시작/끝 화살촉(삼각형·점)을 함께 그린다.
+        const lineHeads = lineArrowHeadGeoms(points, strokeStyle, strokeWidth);
         return (
-          <Line
-            key={index}
-            points={points}
-            stroke={stroke}
-            strokeWidth={strokeWidth}
-            opacity={opacity}
-            lineCap="round"
-            lineJoin="round"
-            tension={0.4}
-            globalCompositeOperation={composite}
-            listening={false}
-          />
+          <Group key={index} opacity={opacity} listening={false}>
+            <Line
+              points={points}
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+              dash={shapeDash}
+              lineCap={strokeStyle.lineCap}
+              lineJoin="round"
+              globalCompositeOperation={composite}
+              listening={false}
+            />
+            {lineHeads.map((head, headIndex) =>
+              head.kind === "dot" ? (
+                <KCircle
+                  key={headIndex}
+                  x={head.cx}
+                  y={head.cy}
+                  radius={head.r}
+                  fill={stroke}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              ) : (
+                <Line
+                  key={headIndex}
+                  points={head.points}
+                  closed
+                  fill={stroke}
+                  lineJoin="round"
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              )
+            )}
+          </Group>
         );
       })}
     </>
@@ -2041,6 +2143,8 @@ interface PageState {
   canvasH: number;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
+  name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
+  note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.
 }
 
 export function StudioPage() {
@@ -2154,6 +2258,8 @@ function StudioCuttoonEditor() {
   };
   // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
   const [dialogueScript, setDialogueScript] = useState("");
+  // 배치된 대사 일괄 편집 패널(코미포식) — 목록 인라인 수정·찾아바꾸기·클릭 선택.
+  const [dialogueBatchOpen, setDialogueBatchOpen] = useState(false);
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -2811,6 +2917,12 @@ function StudioCuttoonEditor() {
         ? prev
         : { x, y }
     );
+  };
+  // 요소 간 스마트 가이드 오버레이(정렬 선분 + 균등 간격 배지) — 값이 같으면 참조를 유지해
+  // 드래그 매 프레임 리렌더를 억제한다(applyGuides와 같은 패턴).
+  const [smartGuides, setSmartGuides] = useState<SmartGuideOverlay>(EMPTY_SMART_GUIDE_OVERLAY);
+  const applySmartGuides = (next: SmartGuideOverlay) => {
+    setSmartGuides((prev) => (smartGuideOverlaysEqual(prev, next) ? prev : next));
   };
   const scheduleDraft = (next: DrawEl | null) => {
     pendingDraftRef.current = next;
@@ -3786,6 +3898,11 @@ function StudioCuttoonEditor() {
     const nextPages = reorderPages(pages, from, last);
     commitPages(nextPages);
   }
+  // 페이지 스트립 드래그 재배열(PPT식) — 슬롯 계산·상태는 useStudioPageDnd, 실제 재배치는 reorderPages 재사용.
+  // 키보드/터치 대체 수단은 위의 이동 버튼(movePage*)이 그대로 유지된다(a11y).
+  const pageDnd = useStudioPageDnd(pages.length, (from, to) => {
+    commitPages(reorderPages(pages, from, to));
+  });
   function addRenderedImage(src: string, width: number, height: number) {
     setError(null);
     addEl(
@@ -4226,6 +4343,9 @@ function StudioCuttoonEditor() {
       } else if (mod && (e.key === "d" || e.key === "D")) {
         e.preventDefault();
         duplicateSelected();
+      } else if (mod && (e.key === "c" || e.key === "C") && !e.shiftKey && !e.altKey) {
+        // 요소 복사(⌘C): 선택이 있을 때만 가로챈다 — 없으면 브라우저 기본 복사 유지.
+        if (copySelectedElements()) e.preventDefault();
       } else if (mod && e.key === "]") {
         e.preventDefault();
         reorder("front");
@@ -4276,6 +4396,27 @@ function StudioCuttoonEditor() {
     return () => globalThis.removeEventListener("keydown", onKey);
   }, []);
 
+  // ── 페이지 메타(이름·콘티 메모) + 요소 클립보드(⌘C/⌘V) ──────────────────────
+  // 메타 편집 중인 페이지 id(스트립 인라인 편집). 커밋은 blur/Enter에서 1회 —
+  // withPageMeta가 실질 무변화 시 원본 참조를 돌려줘 undo 히스토리 오염을 막는다.
+  const [metaEditPageId, setMetaEditPageId] = useState<string | null>(null);
+  function commitPageMeta(pageId: string, patch: { name?: string | null; note?: string | null }) {
+    const next = withPageMeta(pages, pageId, patch);
+    if (next !== pages) commitPages(next);
+  }
+  // 연속 붙여넣기 캐스케이드(PPT식 계단 배치) 카운터 — 페이로드·대상 페이지 조합별로 초기화.
+  const pasteSeqRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
+  // 선택 요소 복사(⌘C): 시스템 클립보드는 best-effort, localStorage 폴백은 항상 기록해 ⌘V를 보장.
+  function copySelectedElements(): boolean {
+    const members = collectCopyElements(elements, selectedId, marqueeIds);
+    if (members.length === 0) return false;
+    const payload = buildClipboardPayload(members, { canvasW: CANVAS_W, canvasH, pageId: activePage.id });
+    writeClipboardFallback(globalThis.localStorage, payload);
+    void navigator.clipboard?.writeText(serializeClipboardPayload(payload)).catch(() => {});
+    pasteSeqRef.current = { key: "", count: 0 };
+    return true;
+  }
+
   // 클립보드 이미지 붙여넣기(⌘V): 스크린샷·외부 그림을 바로 캔버스에 추가.
   // shortcutRef와 같은 방식으로 최신 상태/함수를 ref로 흘린다.
   const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});
@@ -4284,6 +4425,33 @@ function StudioCuttoonEditor() {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing || editing) return;
+      // 스튜디오 요소 붙여넣기: 복사 페이로드(텍스트) 우선. 이미지가 없을 때만 localStorage 폴백
+      // (시스템 클립보드 기록이 차단된 환경) — 외부에서 복사한 이미지 붙여넣기는 그대로 존중한다.
+      const elementPayload =
+        parseClipboardPayload(e.clipboardData?.getData("text/plain")) ??
+        (Array.from(e.clipboardData?.items ?? []).some((it) => it.type.startsWith("image/"))
+          ? null
+          : readClipboardFallback(globalThis.localStorage));
+      if (elementPayload) {
+        const samePage = elementPayload.source.pageId === activePage.id;
+        const seqKey = `${elementPayload.copiedAt}:${activePage.id}`;
+        if (pasteSeqRef.current.key !== seqKey) pasteSeqRef.current = { key: seqKey, count: 0 };
+        pasteSeqRef.current.count += 1;
+        const plan = planClipboardPaste(
+          elementPayload,
+          { canvasW: CANVAS_W, canvasH, pageId: activePage.id },
+          uid,
+          samePage ? { offsetSteps: pasteSeqRef.current.count } : undefined
+        );
+        if (plan) {
+          e.preventDefault();
+          commit([...elements, ...(plan.els as unknown as El[])]);
+          setMarqueeIds(plan.ids.length > 1 ? plan.ids : []);
+          setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
+          setTool("select");
+          return;
+        }
+      }
       const items = e.clipboardData?.items;
       if (!items) return;
       for (let i = 0; i < items.length; i++) {
@@ -4622,6 +4790,23 @@ function StudioCuttoonEditor() {
     setDialogueScript("");
     setMenu(null);
     setTool("select");
+  }
+
+  // 배치된 대사 일괄 편집 — 순수 헬퍼가 무변경이면 입력 배열을 그대로 돌려주므로 참조 비교로 빈 커밋을 막는다.
+  function patchDialogueText(pageId: string, elId: string, text: string) {
+    const next = applyDialogueTextEdit(pages, pageId, elId, text);
+    if (next !== pages) commitPages(next as PageState[]);
+  }
+  // 찾아바꾸기 일괄 적용 — 여러 페이지를 한 번에 바꿔도 히스토리 1개(실행취소 1회).
+  function applyDialogueReplacePlan(plan: DialogueReplacePlan) {
+    const next = applyReplacePlanToPages(pages, plan);
+    if (next !== pages) commitPages(next as PageState[]);
+  }
+  // 목록 클릭 → 캔버스 선택(다른 페이지면 전환). 마퀴 해제는 기존 selectedId 이펙트가 처리한다.
+  function selectDialogueElement(pageId: string, elId: string) {
+    if (pageId !== activePage.id) setCurrentPageId(pageId);
+    setTool("select");
+    setSelectedId(elId);
   }
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
@@ -5029,6 +5214,7 @@ function StudioCuttoonEditor() {
 
     if (!snapEnabled) {
       applyGuides([], []);
+      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
       return;
     }
 
@@ -5100,12 +5286,51 @@ function StudioCuttoonEditor() {
           gy = line;
         }
       }
+    // ── 요소 간 스마트 가이드(PPT급): 엣지/센터 정렬 + 균등 간격 스냅 ──
+    // 다른 요소들의 bbox를 O(n)으로 모아(숨김·함께 끌리는 다중선택군 제외) 후보를 구하고,
+    // 축별로 캔버스/그리드 라인 스냅과 요소 스냅 중 더 가까운 쪽을 채택한다(동률이면 요소 우선).
+    let smartOthers: GuideBox[] | null = null;
+    if (draggedId) {
+      const groupDragging = marqueeIds.length > 1 && marqueeIds.includes(draggedId);
+      smartOthers = [];
+      for (const el of elements) {
+        if (el.id === draggedId || isEffectivelyHidden(el, groups)) continue;
+        if (groupDragging && marqueeIds.includes(el.id)) continue;
+        const otherNode = nodeRefs.current[el.id];
+        if (otherNode) {
+          const r = otherNode.getClientRect({ relativeTo: layer });
+          smartOthers.push({ id: el.id, x: r.x, y: r.y, width: r.width, height: r.height });
+        } else {
+          const r = elBounds(el);
+          smartOthers.push({ id: el.id, x: r.x, y: r.y, width: r.w, height: r.h });
+        }
+      }
+      const movingBox: GuideBox = { id: draggedId, x: box.x, y: box.y, width: box.width, height: box.height };
+      const smart = computeSmartSnap(movingBox, smartOthers, { threshold: SMART_SNAP_THRESHOLD / effScale });
+      if (smart.x && smart.x.dist <= bestX) {
+        dx = smart.x.delta;
+        gx = null;
+      }
+      if (smart.y && smart.y.dist <= bestY) {
+        dy = smart.y.delta;
+        gy = null;
+      }
+    }
     if (dx !== 0) node.x(node.x() + dx);
     if (dy !== 0) node.y(node.y() + dy);
+    // 스냅 확정 위치 기준으로 요소 정렬 선분·균등 간격 배지를 그린다(그리드/캔버스 스냅
+    // 결과가 우연히 요소와 정렬된 경우도 함께 드러난다 — PPT 동작).
+    if (smartOthers && draggedId) {
+      const movedBox: GuideBox = { id: draggedId, x: box.x + dx, y: box.y + dy, width: box.width, height: box.height };
+      applySmartGuides(buildSmartGuideOverlay(movedBox, smartOthers, { epsilon: SMART_GUIDE_EPSILON / effScale }));
+    } else {
+      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+    }
     applyGuides(gx != null ? [gx] : [], gy != null ? [gy] : []);
   }
   function onStageDragEnd() {
     applyGuides([], []);
+    applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
     // 그룹 이동 확정: 끈 노드의 총 이동량(delta)을 선택된 좌표형 요소 모두에 한 번에 커밋.
     const g = groupDragRef.current;
     groupDragRef.current = null;
@@ -5438,6 +5663,43 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // 플랫폼 규격 슬라이스 내보내기용 페이지 캡처 — handleDownload/handleDownloadAll과 같은
+  // 캡처 경로(stage.toCanvas + 색보정 합성)를 재사용한다. 리샘플·분할·저장은 내보내기 패널
+  // (exportPresetSlices)이 수행하고, 워터마크도 슬라이스 단위로 그쪽에서 찍는다(중복 방지).
+  async function handleCapturePagesForPreset(scope: "current" | "all"): Promise<HTMLCanvasElement[]> {
+    setSelectedId(null);
+    setIsExporting(true);
+    await new Promise((r) => setTimeout(r, 60));
+    const captured: HTMLCanvasElement[] = [];
+    try {
+      if (scope === "current" || pages.length <= 1) {
+        const stage = stageRef.current;
+        if (stage) {
+          const raw = stage.toCanvas({ pixelRatio: exportScale / effScale });
+          captured.push(bakeGradeIntoCanvas(raw, pageGrade));
+        }
+      } else {
+        const originalPageId = currentPageId;
+        try {
+          for (const page of pages) {
+            setCurrentPageId(page.id);
+            // React 렌더링 및 캔버스 업데이트 대기(기존 handleDownloadAll과 동일 리듬)
+            await new Promise((resolve) => setTimeout(resolve, 180));
+            const stage = stageRef.current;
+            if (!stage) continue;
+            const raw = stage.toCanvas({ pixelRatio: exportScale / effScale });
+            captured.push(bakeGradeIntoCanvas(raw, normalizePageGrade(page.grade)));
+          }
+        } finally {
+          setCurrentPageId(originalPageId);
+        }
+      }
+    } finally {
+      setIsExporting(false);
+    }
+    return captured;
+  }
+
   // 스튜디오 프로젝트 내보내기 (.json)
   function handleExportProject() {
     const projectData = {
@@ -5557,6 +5819,9 @@ function StudioCuttoonEditor() {
                   exportPresetId={exportPresetId}
                   watermark={watermark}
                   isExporting={isExporting}
+                  exportTitle={title}
+                  pageCount={pages.length}
+                  capturePagesForPreset={handleCapturePagesForPreset}
                   setExportScale={setExportScale}
                   setExportFormat={setExportFormat}
                   setExportTransparent={setExportTransparent}
@@ -6064,6 +6329,16 @@ function StudioCuttoonEditor() {
                 >
                   말풍선으로 한 번에 넣기
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu(null);
+                    setDialogueBatchOpen(true);
+                  }}
+                  className="mt-1.5 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
+                >
+                  배치된 대사 일괄 편집…
+                </button>
               </div>
             </div>
           )}
@@ -6358,7 +6633,7 @@ function StudioCuttoonEditor() {
                         aria-label={`색상 ${swatch}`}
                         className={cn(
                           "size-5 rounded transition-transform hover:scale-110 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : "border border-line/60"
+                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : "border border-line/60"
                         )}
                         style={{ background: swatch }}
                       />
@@ -6673,13 +6948,14 @@ function StudioCuttoonEditor() {
           <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[56vh] lg:max-h-[calc(100dvh-24rem)] pr-1">
             {pages.map((p, idx) => {
               const isActive = p.id === currentPageId;
+              const dropIndicator = pageDnd.indicatorFor(idx);
               return (
                 <div
                   key={p.id}
                   data-testid="studio-page-item"
                   role="button"
                   tabIndex={0}
-                  aria-label={`${idx + 1}페이지 선택`}
+                  aria-label={`${pageDisplayName(p, idx)} 선택`}
                   aria-pressed={isActive}
                   onClick={() => setCurrentPageId(p.id)}
                   onKeyDown={(e) => {
@@ -6689,14 +6965,42 @@ function StudioCuttoonEditor() {
                       setCurrentPageId(p.id);
                     }
                   }}
+                  {...pageDnd.itemProps(idx)}
+                  title="드래그하여 순서 변경"
                   className={cn(
-                    "flex w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
-                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card"
+                    "relative flex w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
+                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
+                    pageDnd.dragIndex === idx && "opacity-50"
                   )}
                 >
+                  {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
+                  {dropIndicator && (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "pointer-events-none absolute inset-x-1 z-10 h-[3px] rounded-full bg-accent",
+                        dropIndicator === "before" ? "top-0" : "bottom-0"
+                      )}
+                    />
+                  )}
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-[10px] font-bold text-fg-2">{idx + 1}페이지</span>
+                    <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
+                      {pageDisplayName(p, idx)}
+                    </span>
                     <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMetaEditPageId((v) => (v === p.id ? null : p.id));
+                        }}
+                        className={cn("rounded p-0.5 hover:bg-raised", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
+                        title="이름·콘티 메모 편집"
+                        aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
+                        aria-expanded={metaEditPageId === p.id}
+                      >
+                        <Pencil size={10} />
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -6747,31 +7051,58 @@ function StudioCuttoonEditor() {
                       </button>
                     </div>
                   </div>
-                  {/* 미니 미리보기 박스 */}
-                  <div
-                    style={{
-                      height: "48px",
-                      background: p.bgGrad ? `linear-gradient(${p.bgGrad[0]}, ${p.bgGrad[1]})` : p.bg,
-                    }}
-                    className="relative rounded border border-line/60 overflow-hidden"
-                  >
-                    {/* Render panels in thumbnail */}
-                    {p.elements.filter(el => el.type === "frame").map((el) => {
-                      const bounds = elBounds(el);
-                      return (
-                        <div
-                          key={`thumb-frame-${el.id}`}
-                          className="absolute border border-red-500/30 bg-red-500/5 pointer-events-none"
-                          style={{
-                            left: `${(bounds.x / CANVAS_W) * 100}%`,
-                            top: `${(bounds.y / p.canvasH) * 100}%`,
-                            width: `${(bounds.w / CANVAS_W) * 100}%`,
-                            height: `${(bounds.h / p.canvasH) * 100}%`,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
+                  {/* 실내용 미니 썸네일 — 요소들을 경량 SVG 프록시로 축소 렌더(StudioPageThumbnails) */}
+                  <StudioPageThumbnail page={p} />
+                  {metaEditPageId === p.id ? (
+                    <div className="flex flex-col gap-1 pt-1">
+                      <input
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- 연필 버튼 클릭으로만 열리는 인라인 편집 — 열릴 때 이름란 포커스가 올바른 패턴(기존 텍스트 편집 모달과 동일)
+                        autoFocus
+                        type="text"
+                        defaultValue={p.name ?? ""}
+                        placeholder={autoPageName(idx)}
+                        maxLength={PAGE_NAME_MAX}
+                        aria-label="페이지 이름"
+                        className="w-full rounded border border-line bg-card px-1.5 py-1 text-[10px] font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") {
+                            commitPageMeta(p.id, { name: e.currentTarget.value });
+                            setMetaEditPageId(null);
+                          } else if (e.key === "Escape") {
+                            setMetaEditPageId(null);
+                          }
+                        }}
+                        onBlur={(e) => commitPageMeta(p.id, { name: e.target.value })}
+                      />
+                      <textarea
+                        rows={2}
+                        defaultValue={p.note ?? ""}
+                        placeholder="콘티 메모 (장면·대사 아이디어)"
+                        maxLength={PAGE_NOTE_MAX}
+                        aria-label="콘티 메모"
+                        className="w-full resize-none rounded border border-line bg-card px-1.5 py-1 text-[9px] leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => commitPageMeta(p.id, { note: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMetaEditPageId(null);
+                        }}
+                        className="self-end rounded bg-accent px-2 py-0.5 text-[9px] font-semibold text-on-accent hover:bg-accent-hover"
+                      >
+                        완료
+                      </button>
+                    </div>
+                  ) : p.note ? (
+                    <p className="line-clamp-2 whitespace-pre-wrap text-[9px] leading-tight text-fg-3" title={p.note}>
+                      {p.note}
+                    </p>
+                  ) : null}
                   <div className="flex items-center justify-end gap-1.5 pt-1">
                     <button
                       type="button"
@@ -7214,7 +7545,14 @@ function StudioCuttoonEditor() {
                       y={el.y}
                       data={buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize)}
                       fontSize={el.fontSize}
-                      fill={el.fillType === "gradient" ? (el.gradientColorStart ?? "#ff3b30") : el.fill}
+                      fill={el.fillType === "gradient" ? undefined : el.fill}
+                      {...(el.fillType === "gradient"
+                        ? konvaGradientProps(
+                            el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
+                            // 곡선 텍스트 로컬 bbox 근사 — baseline(fontSize×1.4) 중심으로 위아래 글자 폭 커버.
+                            { x: 0, y: 0, width: Math.max(1, el.width), height: el.fontSize * 2.8 }
+                          )
+                        : {})}
                       stroke={el.stroke}
                       strokeWidth={el.strokeWidth ?? 0}
                       fillAfterStrokeEnabled
@@ -7253,9 +7591,17 @@ function StudioCuttoonEditor() {
                       width={el.width}
                       fontSize={el.fontSize}
                       fill={el.fillType === "gradient" ? undefined : el.fill}
-                      fillLinearGradientStartPoint={el.fillType === "gradient" ? { x: 0, y: 0 } : undefined}
-                      fillLinearGradientEndPoint={el.fillType === "gradient" ? (el.gradientDirection === "horizontal" ? { x: el.width, y: 0 } : { x: 0, y: el.fontSize * 1.3 }) : undefined}
-                      fillLinearGradientColorStops={el.fillType === "gradient" ? [0, el.gradientColorStart ?? "#ff3b30", 1, el.gradientColorEnd ?? "#ffcc00"] : undefined}
+                      {...(el.fillType === "gradient"
+                        ? konvaGradientProps(
+                            el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
+                            estimateTextGradientBBox({
+                              width: el.width,
+                              text: el.vertical ? formatVerticalText(el.text) : el.text,
+                              fontSize: el.fontSize,
+                              lineHeight: el.lineHeight ?? 1,
+                            })
+                          )
+                        : {})}
                       stroke={el.stroke}
                       strokeWidth={el.strokeWidth ?? 0}
                       fillAfterStrokeEnabled
@@ -7853,6 +8199,62 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
             
+            {/* 요소 간 스마트 가이드: 정렬 선분(로즈) + 균등 간격 배지(보라) */}
+            {!isExporting && (smartGuides.segments.length > 0 || smartGuides.spacings.length > 0) && (
+              <Layer listening={false}>
+                {smartGuides.segments.map((seg, i) => (
+                  <Line
+                    key={`sgseg-${i}`}
+                    points={seg.axis === "v" ? [seg.pos, seg.from, seg.pos, seg.to] : [seg.from, seg.pos, seg.to, seg.pos]}
+                    stroke="#f43f5e"
+                    strokeWidth={1 / effScale}
+                    dash={seg.kind === "center" ? [7 / effScale, 3 / effScale] : undefined}
+                  />
+                ))}
+                {smartGuides.spacings.map((sp, i) => (
+                  <Group key={`sgsp-${i}`}>
+                    {sp.spans.map((span, j) => (
+                      <Group key={`sgsp-${i}-${j}`}>
+                        <Line
+                          points={sp.axis === "x" ? [span.from, sp.at, span.to, sp.at] : [sp.at, span.from, sp.at, span.to]}
+                          stroke="#8b5cf6"
+                          strokeWidth={1.5 / effScale}
+                        />
+                        <Line
+                          points={
+                            sp.axis === "x"
+                              ? [span.from, sp.at - 5 / effScale, span.from, sp.at + 5 / effScale]
+                              : [sp.at - 5 / effScale, span.from, sp.at + 5 / effScale, span.from]
+                          }
+                          stroke="#8b5cf6"
+                          strokeWidth={1.5 / effScale}
+                        />
+                        <Line
+                          points={
+                            sp.axis === "x"
+                              ? [span.to, sp.at - 5 / effScale, span.to, sp.at + 5 / effScale]
+                              : [sp.at - 5 / effScale, span.to, sp.at + 5 / effScale, span.to]
+                          }
+                          stroke="#8b5cf6"
+                          strokeWidth={1.5 / effScale}
+                        />
+                        <KText
+                          x={sp.axis === "x" ? (span.from + span.to) / 2 - 24 / effScale : sp.at + 6 / effScale}
+                          y={sp.axis === "x" ? sp.at + 6 / effScale : (span.from + span.to) / 2 - 6 / effScale}
+                          width={48 / effScale}
+                          align={sp.axis === "x" ? "center" : "left"}
+                          text={`${Math.round(sp.gap)}`}
+                          fontSize={12 / effScale}
+                          fontStyle="bold"
+                          fill="#8b5cf6"
+                        />
+                      </Group>
+                    ))}
+                  </Group>
+                ))}
+              </Layer>
+            )}
+
             {/* 작가 수동 가이드선 */}
             {!isExporting && userGuides.length > 0 && (
               <Layer>
@@ -8087,6 +8489,19 @@ function StudioCuttoonEditor() {
           {shortcutsOpen && (
             <Suspense fallback={null}>
               <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+            </Suspense>
+          )}
+          {dialogueBatchOpen && (
+            <Suspense fallback={null}>
+              <StudioDialogueBatchPanel
+                pages={pages}
+                currentPageId={activePage.id}
+                selectedId={selectedId}
+                onClose={() => setDialogueBatchOpen(false)}
+                onSelectElement={selectDialogueElement}
+                onPatchText={patchDialogueText}
+                onApplyReplace={applyDialogueReplacePlan}
+              />
             </Suspense>
           )}
 
@@ -8556,6 +8971,34 @@ function StudioCuttoonEditor() {
                           className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                         />
                       </div>
+                      <StudioGradientEnginePanel
+                        value={selected.gradient ?? null}
+                        onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
+                        title="그라데이션 채우기"
+                      />
+                    </div>
+                  )}
+
+                  {/* 선 스타일(점선/선 끝/화살촉) + 도형 파라미터(별/다각형/모서리) — 도형·선 전용 */}
+                  {selected.kind && selected.kind !== "freehand" && (
+                    <div className="mt-2.5 border-t border-line/40 pt-2.5">
+                      <Suspense fallback={<StudioPanelLoading label="선 스타일 패널을 여는 중..." />}>
+                        <StudioStrokeShapePanel
+                          kind={selected.kind}
+                          strokeStyle={normalizeStrokeStyle(selected.strokeStyle)}
+                          shapeParams={normalizeShapeParams(selected.shapeParams)}
+                          onPatchStrokeStyle={(patch) =>
+                            patchEl(selected.id, {
+                              strokeStyle: { ...normalizeStrokeStyle(selected.strokeStyle), ...patch },
+                            } as Partial<El>)
+                          }
+                          onPatchShapeParams={(patch) =>
+                            patchEl(selected.id, {
+                              shapeParams: { ...normalizeShapeParams(selected.shapeParams), ...patch },
+                            } as Partial<El>)
+                          }
+                        />
+                      </Suspense>
                     </div>
                   )}
                 </div>
@@ -8600,49 +9043,14 @@ function StudioCuttoonEditor() {
 
                   {(selected.fillType ?? "solid") === "gradient" && (
                     <div className="space-y-2 pt-1">
-                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                        시작 색상
-                        <input
-                          type="color"
-                          value={selected.gradientColorStart || "#ff3b30"}
-                          onChange={(e) => patchEl(selected.id, { gradientColorStart: e.target.value } as Partial<El>)}
-                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                        />
-                      </label>
+                      <StudioGradientEnginePanel
+                        value={selected.gradient ?? legacyTextGradientToSpec(selected.gradientColorStart, selected.gradientColorEnd, selected.gradientDirection)}
+                        onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
+                        allowClear={false}
+                        title="그라데이션 편집"
+                      />
                       
-                      <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                        종료 색상
-                        <input
-                          type="color"
-                          value={selected.gradientColorEnd || "#ffcc00"}
-                          onChange={(e) => patchEl(selected.id, { gradientColorEnd: e.target.value } as Partial<El>)}
-                          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                        />
-                      </label>
-
-                      <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                        <span>그라데이션 방향</span>
-                        <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line w-28">
-                          {[
-                            { label: "가로", v: "horizontal" },
-                            { label: "세로", v: "vertical" }
-                          ].map((dir) => (
-                            <button
-                              key={dir.v}
-                              type="button"
-                              onClick={() => patchEl(selected.id, { gradientDirection: dir.v as "horizontal" | "vertical" } as Partial<El>)}
-                              className={cn(
-                                "flex-1 rounded py-0.5 text-[0.6rem] font-semibold transition-colors",
-                                (selected.gradientDirection ?? "vertical") === dir.v
-                                  ? "bg-accent text-on-accent"
-                                  : "text-fg-2 hover:bg-raised"
-                              )}
-                            >
-                              {dir.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                      {/* 시작/종료/방향 레거시 컨트롤은 멀티스톱 엔진 패널로 대체 */}
                     </div>
                   )}
                 </div>
@@ -9443,7 +9851,7 @@ function StudioCuttoonEditor() {
                         type="number"
                         value={Math.round(selected.x)}
                         onChange={(e) => patchEl(selected.id, { x: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
                       />
                     </label>
                     <label className="flex flex-col gap-0.5">
@@ -9452,7 +9860,7 @@ function StudioCuttoonEditor() {
                         type="number"
                         value={Math.round(selected.y)}
                         onChange={(e) => patchEl(selected.id, { y: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
                       />
                     </label>
                     {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame" || selected.type === "text") && (
@@ -9462,7 +9870,7 @@ function StudioCuttoonEditor() {
                           type="number"
                           value={Math.round(selected.width)}
                           onChange={(e) => patchEl(selected.id, { width: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
                         />
                       </label>
                     )}
@@ -9473,7 +9881,7 @@ function StudioCuttoonEditor() {
                           type="number"
                           value={Math.round(selected.height)}
                           onChange={(e) => patchEl(selected.id, { height: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-background/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
                         />
                       </label>
                     )}
@@ -9493,7 +9901,7 @@ function StudioCuttoonEditor() {
                             type="number"
                             value={Math.round(selected.rotation ?? 0)}
                             onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
-                            className="w-14 rounded border border-line bg-background/50 px-1 py-0.5 text-center text-xs text-fg focus:border-accent focus:outline-none"
+                            className="w-14 rounded border border-line bg-canvas/50 px-1 py-0.5 text-center text-xs text-fg focus:border-accent focus:outline-none"
                           />
                         </div>
                       </label>
@@ -10064,7 +10472,7 @@ function StudioCuttoonEditor() {
                         onClick={() => setColor(swatch)}
                         className={cn(
                           "size-5 rounded border transition-transform hover:scale-110",
-                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-background" : "border-line/60"
+                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : "border-line/60"
                         )}
                         style={{ background: swatch }}
                         title={swatch}
@@ -10359,7 +10767,7 @@ function StudioCuttoonEditor() {
           {/* 미니맵 / 네비게이터 */}
           <div className="rounded-2xl border border-line bg-panel/40 p-3">
             <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">미니맵 / 네비게이터</p>
-            <div className="flex justify-center bg-background/30 rounded-xl p-2 border border-line/50">
+            <div className="flex justify-center bg-canvas/30 rounded-xl p-2 border border-line/50">
               <div
                 role="button"
                 tabIndex={0}

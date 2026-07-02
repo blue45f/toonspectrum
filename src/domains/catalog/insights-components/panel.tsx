@@ -31,7 +31,7 @@ export function Panel({
     >
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="eyebrow mb-1.5 text-[0.62rem] text-accent">{eyebrow}</p>
+          <p className="eyebrow mb-1.5 text-accent">{eyebrow}</p>
           <h3 className="text-pretty text-base font-bold leading-tight tracking-tight text-fg sm:text-lg">
             {title}
           </h3>
@@ -41,7 +41,7 @@ export function Panel({
       <div className="min-w-0 flex-1">{children}</div>
       {insight != null && (
         <p className="mt-4 border-t border-line pt-3 text-[0.8rem] leading-relaxed text-fg-3">
-          <span className="eyebrow mr-1.5 text-[0.58rem] text-fg-2">인사이트</span>
+          <span className="eyebrow mr-1.5 text-fg-2">인사이트</span>
           {insight}
         </p>
       )}

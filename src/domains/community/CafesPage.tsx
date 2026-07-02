@@ -265,7 +265,7 @@ export function CafesPage() {
                       onChange={(event) => setName(event.target.value.slice(0, CAFE_NAME_MAX))}
                       maxLength={CAFE_NAME_MAX}
                       placeholder="예: 로판 정주행 모임"
-                      className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50"
+                      className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                   </div>
                   <div>
@@ -276,7 +276,7 @@ export function CafesPage() {
                       id="cafe-genre"
                       value={composeGenre}
                       onChange={(event) => setComposeGenre(event.target.value)}
-                      className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50"
+                      className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40"
                     >
                       <option value="">자유(장르 무관)</option>
                       {GENRES.map((item) => (
@@ -297,7 +297,7 @@ export function CafesPage() {
                       maxLength={CAFE_DESCRIPTION_MAX}
                       rows={3}
                       placeholder="어떤 독자를 위한 카페인가요?"
-                      className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50"
+                      className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                     <p className="mt-1 text-right text-[0.68rem] text-fg-3">
                       {description.length}/{CAFE_DESCRIPTION_MAX}

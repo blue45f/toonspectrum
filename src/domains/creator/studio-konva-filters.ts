@@ -21,7 +21,7 @@ import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-b
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
 import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "./studio-clarity";
 import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "./studio-color-balance";
-import { curveKonvaFilter, normalizeCurve, isIdentityCurve, curveToFlat } from "./studio-curves";
+import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "./studio-curves";
 import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
 import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
@@ -29,7 +29,7 @@ import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
 import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
 import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "./studio-grain";
 import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "./studio-halftone";
-import { levelsKonvaFilter, normalizeLevels, isIdentityLevels } from "./studio-levels";
+import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "./studio-levels";
 import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
 import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "./studio-photo-filter";
@@ -111,9 +111,10 @@ function hasActiveVibrance(el: ImageFilterFields): boolean {
   return !!el.vibrance && !isIdentityVibrance(normalizeVibrance(el.vibrance));
 }
 
-// 톤 커브가 항등(보정 없음)이 아니면 활성.
+// 톤 커브가 항등(보정 없음)이 아니면 활성 — 마스터(curve) 또는 r/g/b 채널(curveCh) 중 하나라도.
 function hasActiveCurve(el: ImageFilterFields): boolean {
-  return !!el.curve && !isIdentityCurve(normalizeCurve(el.curve));
+  if (el.curve && !isIdentityCurve(normalizeCurve(el.curve))) return true;
+  return !!el.curveCh && !isIdentityCurveChannels(el.curveCh);
 }
 // 컬러 밸런스가 항등이 아니면 활성.
 function hasActiveColorBalance(el: ImageFilterFields): boolean {
@@ -134,9 +135,10 @@ function levelsParamsOf(el: ImageFilterFields) {
     outWhite: el.levelsOutWhite,
   });
 }
-// 레벨 보정이 항등(보정 없음)이 아니면 활성.
+// 레벨 보정이 항등(보정 없음)이 아니면 활성 — 마스터(levels*) 또는 r/g/b 채널(levelsCh) 중 하나라도.
 function hasActiveLevels(el: ImageFilterFields): boolean {
-  return !isIdentityLevels(levelsParamsOf(el));
+  if (!isIdentityLevels(levelsParamsOf(el))) return true;
+  return !!el.levelsCh && !isIdentityLevelsChannels(el.levelsCh);
 }
 
 // Konva 필터 함수가 호출될 때의 `this` — node.attrs에서 보정 파라미터를 읽는다.
@@ -508,10 +510,24 @@ export function buildImageFilters(
     attrs.levelsGamma = lv.gamma;
     attrs.levelsOutBlack = lv.outBlack;
     attrs.levelsOutWhite = lv.outWhite;
+    // r/g/b 개별 채널 레벨 — 항등이 아닌 채널만 평탄 5칸으로 부착(studio-levels).
+    if (el.levelsCh) {
+      const lch = normalizeLevelsChannels(el.levelsCh);
+      if (!isIdentityLevels(lch.r)) attrs.levelsR = levelsToFlat(lch.r);
+      if (!isIdentityLevels(lch.g)) attrs.levelsG = levelsToFlat(lch.g);
+      if (!isIdentityLevels(lch.b)) attrs.levelsB = levelsToFlat(lch.b);
+    }
   }
   if (hasActiveCurve(el)) {
     filters.push(F.Curve!);
     attrs.curvePoints = curveToFlat(normalizeCurve(el.curve));
+    // r/g/b 개별 채널 곡선 — 항등이 아닌 채널만 평탄 배열로 부착(studio-curves).
+    if (el.curveCh) {
+      const cch = normalizeCurveChannels(el.curveCh);
+      if (!isIdentityCurve(cch.r)) attrs.curvePointsR = curveToFlat(cch.r);
+      if (!isIdentityCurve(cch.g)) attrs.curvePointsG = curveToFlat(cch.g);
+      if (!isIdentityCurve(cch.b)) attrs.curvePointsB = curveToFlat(cch.b);
+    }
   }
   if (hasActiveColorBalance(el)) {
     filters.push(F.ColorBalance!);
@@ -713,5 +729,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.light ?? null,
     el.sketch ?? null,
     el.detail ?? null,
+    el.levelsCh ?? null,
+    el.curveCh ?? null,
   ]);
 }

@@ -123,7 +123,7 @@ export function CommunityPostPage() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.65rem] font-semibold text-accent">
+              <span className="rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 text-[0.72rem] font-semibold text-accent">
                 {KIND_LABEL[post.kind]}
               </span>
               <span className="text-[0.68rem] text-fg-3">

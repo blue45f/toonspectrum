@@ -263,11 +263,43 @@ a {
   animation: fadeUp 0.45s var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
+/* ── More 시트 모션 — 백드롭 페이드 + 아이템 스태거(시트 본체는 전역 sheet-rise). ── */
+@keyframes more-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.more-backdrop {
+  animation: more-backdrop-in 240ms ease-out both;
+}
+
+@keyframes more-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.more-item {
+  animation: more-item-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--more-stagger, 0ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rise {
     animation: none;
   }
   .pressable {
     transition: none;
+  }
+  .more-backdrop,
+  .more-item {
+    animation: none;
   }
 }

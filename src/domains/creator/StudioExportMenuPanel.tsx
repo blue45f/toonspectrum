@@ -1,4 +1,5 @@
-import { Copy } from "lucide-react";
+import { Copy, Scissors } from "lucide-react";
+import { useState } from "react";
 
 import {
   EXPORT_FORMATS,
@@ -8,12 +9,26 @@ import {
   exportQuality,
   type ExportFormat,
 } from "./studio-export";
-import { EXPORT_PRESETS, planStripSlices, recommendScale, validateExport } from "./studio-export-presets";
+import {
+  EXPORT_PRESETS,
+  exportPresetSlices,
+  planStripSlices,
+  presetExportResultMessage,
+  recommendScale,
+  validateExport,
+  type PresetExportScope,
+} from "./studio-export-presets";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 
 import type { Dispatch, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";
+
+/** 규격 내보내기 진행/결과 안내 — tone에 따라 색을 달리해 표시한다. */
+interface PresetExportStatus {
+  tone: "info" | "good" | "warn";
+  text: string;
+}
 
 export interface StudioExportMenuPanelProps {
   canvasWidth: number;
@@ -24,12 +39,22 @@ export interface StudioExportMenuPanelProps {
   exportPresetId: string | null;
   watermark: WatermarkSettings;
   isExporting: boolean;
+  /** 규격 슬라이스 파일명에 쓸 작품 제목(비어 있으면 기본 파일명). */
+  exportTitle: string;
+  /** 전체 페이지 수 — 2 이상이면 "전체 페이지" 규격 내보내기 버튼을 보여준다. */
+  pageCount: number;
   setExportScale: Dispatch<SetStateAction<number>>;
   setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
   setExportTransparent: Dispatch<SetStateAction<boolean>>;
   setExportPresetId: Dispatch<SetStateAction<string | null>>;
   setWatermark: (next: WatermarkSettings) => void;
   onCopyToClipboard: () => void;
+  /**
+   * 규격 슬라이스용 페이지 캡처 — 현재 페이지("current") 또는 전체 페이지("all")를
+   * 내보내기 배율·색보정 합성으로 캡처해 페이지 순서대로 반환한다. 워터마크는 여기서
+   * 찍지 않는다(슬라이스 단계에서 장마다 합성 — 절단면에서 잘리지 않게).
+   */
+  capturePagesForPreset: (scope: PresetExportScope) => Promise<HTMLCanvasElement[]>;
 }
 
 export function StudioExportMenuPanel({
@@ -41,13 +66,19 @@ export function StudioExportMenuPanel({
   exportPresetId,
   watermark,
   isExporting,
+  exportTitle,
+  pageCount,
   setExportScale,
   setExportFormat,
   setExportTransparent,
   setExportPresetId,
   setWatermark,
   onCopyToClipboard,
+  capturePagesForPreset,
 }: StudioExportMenuPanelProps) {
+  // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
+  const [presetBusy, setPresetBusy] = useState(false);
+  const [presetStatus, setPresetStatus] = useState<PresetExportStatus | null>(null);
   const selectedPreset = exportPresetId ? EXPORT_PRESETS.find((preset) => preset.id === exportPresetId) : null;
   const outW = Math.round(canvasWidth * exportScale);
   const outH = Math.round(canvasHeight * exportScale);
@@ -57,6 +88,35 @@ export function StudioExportMenuPanel({
   const maxH = selectedPreset?.maxImageHeight;
   const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
   const quality = exportQuality(exportFormat);
+
+  // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
+  async function runPresetSliceExport(scope: PresetExportScope) {
+    if (!selectedPreset || presetBusy) return;
+    setPresetBusy(true);
+    setPresetStatus({ tone: "info", text: scope === "all" ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
+    try {
+      const pages = await capturePagesForPreset(scope);
+      const result = await exportPresetSlices({
+        pages,
+        preset: selectedPreset,
+        format: exportFormat,
+        title: exportTitle,
+        watermark,
+        onProgress: (done, total) => setPresetStatus({ tone: "info", text: `${done}/${total}장 저장 중…` }),
+      });
+      setPresetStatus({
+        tone: result.oversized > 0 ? "warn" : "good",
+        text: presetExportResultMessage(result, selectedPreset),
+      });
+    } catch (err) {
+      setPresetStatus({
+        tone: "warn",
+        text: err instanceof Error ? err.message : "규격 내보내기에 실패했어요.",
+      });
+    } finally {
+      setPresetBusy(false);
+    }
+  }
 
   return (
     <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
@@ -69,6 +129,7 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => {
                 setExportPresetId(preset.id);
+                setPresetStatus(null);
                 if (!preset.allowedFormats.includes(exportFormat)) setExportFormat(preset.recommendedFormat);
                 if (preset.width > 0) setExportScale(recommendScale(canvasWidth, preset));
               }}
@@ -235,6 +296,43 @@ export function StudioExportMenuPanel({
               {selectedPreset.label} 규격에 맞아요.
             </p>
           )}
+
+          {/* 규격 실행 — 규격 폭 리샘플 + 규격 높이 자동 분할을 실제 파일 저장으로. */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => void runPresetSliceExport("current")}
+              disabled={presetBusy || isExporting}
+              className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+              title={`현재 페이지를 ${selectedPreset.label} 규격(폭 리샘플·세로 분할)으로 저장`}
+            >
+              <Scissors size={12} /> 규격으로 저장
+            </button>
+            {pageCount > 1 && (
+              <button
+                type="button"
+                onClick={() => void runPresetSliceExport("all")}
+                disabled={presetBusy || isExporting}
+                className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+                title={`${pageCount}페이지를 이어 붙여 ${selectedPreset.label} 규격으로 나눠 저장`}
+              >
+                <Scissors size={12} /> 전체 {pageCount}페이지
+              </button>
+            )}
+          </div>
+          <p
+            aria-live="polite"
+            className={cx(
+              presetStatus
+                ? "rounded-md border px-2 py-1 text-[10px] leading-snug"
+                : "sr-only",
+              presetStatus?.tone === "info" && "border-line bg-card text-fg-3",
+              presetStatus?.tone === "good" && "border-good/40 bg-good/10 text-good",
+              presetStatus?.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+            )}
+          >
+            {presetStatus?.text}
+          </p>
         </div>
       )}
     </div>

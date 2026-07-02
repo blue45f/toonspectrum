@@ -3,13 +3,14 @@ import type { BlurFx } from "./studio-blur";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { ColorBalance } from "./studio-color-balance";
-import type { CurvePoint } from "./studio-curves";
+import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
+import type { LevelsRgbChannels } from "./studio-levels";
 import type { Light } from "./studio-light";
 import type { Outline } from "./studio-outline";
 import type { PhotoFilter } from "./studio-photo-filter";
@@ -45,7 +46,9 @@ export type ImageFilterFields = {
   levelsGamma?: number;
   levelsOutBlack?: number;
   levelsOutWhite?: number;
+  levelsCh?: LevelsRgbChannels; // r/g/b 개별 채널 레벨(마스터는 levels* 스칼라)
   curve?: CurvePoint[];
+  curveCh?: CurveRgbChannels; // r/g/b 개별 채널 곡선(마스터는 curve)
   colorBalance?: ColorBalance;
   channelMixer?: ChannelMixer;
   selectiveHsl?: SelectiveHsl;
@@ -93,7 +96,9 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     el.grayscale ||
     el.sepia ||
     isNonDefaultLevelFields(el) ||
+    hasObjectFilter(el.levelsCh) ||
     hasObjectFilter(el.curve) ||
+    hasObjectFilter(el.curveCh) ||
     hasObjectFilter(el.colorBalance) ||
     hasObjectFilter(el.channelMixer) ||
     hasObjectFilter(el.selectiveHsl) ||
@@ -177,5 +182,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.light ?? null,
     el.sketch ?? null,
     el.detail ?? null,
+    el.levelsCh ?? null,
+    el.curveCh ?? null,
   ]);
 }

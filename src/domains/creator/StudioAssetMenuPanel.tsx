@@ -183,7 +183,7 @@ export function StudioAssetMenuPanel({
             }}
             placeholder="예: 비 오는 골목 배경, 마법 소품, 놀란 표정 캐릭터"
             rows={2}
-            className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
+            className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent"
           />
           <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1.5">
             <input
@@ -191,7 +191,7 @@ export function StudioAssetMenuPanel({
               value={assetPromptName}
               onChange={(event) => setAssetPromptName(event.target.value.slice(0, 60))}
               placeholder="이름"
-              className="min-w-0 rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent"
+              className="min-w-0 rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent"
             />
             <button
               type="button"
@@ -229,19 +229,19 @@ export function StudioAssetMenuPanel({
 
       <div className="mb-2 flex items-center gap-1.5">
         <div className="relative flex-1">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
           <input
             type="text"
             placeholder="에셋 검색..."
             value={assetSearchQuery}
             onChange={(event) => setAssetSearchQuery(event.target.value)}
-            className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none transition-colors focus:border-accent"
+            className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none transition-colors focus:border-accent"
           />
           {assetSearchQuery && (
             <button
               type="button"
               onClick={() => setAssetSearchQuery("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 transition-colors hover:text-fg-2"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-3 transition-colors hover:text-fg-2"
               aria-label="에셋 검색어 지우기"
             >
               <X size={10} />
@@ -329,7 +329,7 @@ function LocalAssetGrid({
     return (
       <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
         <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
-        <p className="mt-1 text-[0.6rem] leading-normal text-fg-4">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
+        <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
       </div>
     );
   }
@@ -510,7 +510,7 @@ function SharedAssetGrid({
     return (
       <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
         <p className="text-xs text-fg-3">아직 공유된 에셋이 없어요.</p>
-        <p className="mt-1 text-[0.6rem] leading-normal text-fg-4">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
+        <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
       </div>
     );
   }
@@ -541,7 +541,7 @@ function SharedAssetGrid({
           <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
             {asset.name}
           </span>
-          <span className="block w-full truncate text-center text-[0.55rem] text-fg-4">{asset.author.name}</span>
+          <span className="block w-full truncate text-center text-[0.55rem] text-fg-3">{asset.author.name}</span>
           {asset.isOwner && (
             <button
               type="button"
@@ -562,7 +562,7 @@ function EmptySearchResult() {
   return (
     <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
       <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-      <p className="mt-1 text-[0.6rem] leading-normal text-fg-4">다른 검색어로 찾아보세요.</p>
+      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">다른 검색어로 찾아보세요.</p>
     </div>
   );
 }

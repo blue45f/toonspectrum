@@ -248,7 +248,7 @@ export function InsightsPage() {
             aside={
               <div className="text-right">
                 <div className="numeral text-2xl text-accent tabular-nums">{weightedAvg.toFixed(2)}</div>
-                <div className="text-[0.62rem] text-fg-3">가중 평균</div>
+                <div className="text-[0.72rem] text-fg-3">가중 평균</div>
               </div>
             }
             insight={
@@ -277,7 +277,7 @@ export function InsightsPage() {
               center={
                 <>
                   <span className="numeral text-2xl text-fg tabular-nums">{pricingTotal}</span>
-                  <span className="text-[0.62rem] text-fg-3">연재 채널</span>
+                  <span className="text-[0.72rem] text-fg-3">연재 채널</span>
                 </>
               }
             />

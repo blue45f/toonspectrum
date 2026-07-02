@@ -1,14 +1,19 @@
 /**
- * Studio Export Presets — 플랫폼별 내보내기 규격 프리셋 · 검증 · 스트립 슬라이스 계획.
+ * Studio Export Presets — 플랫폼별 내보내기 규격 프리셋 · 검증 · 스트립 슬라이스 계획·실행.
  *
  * 기존 내보내기는 배율(1/2/3)·포맷(png/jpg/webp)·투명배경만 있고, "네이버 도전만화는
  * 폭 690·JPG만·5MB" 같은 연재 규격을 알려주거나 검증하지 못했다. 이 모듈이 그 공백을
  * 메운다 — 대표 플랫폼 규격 데이터 + 현재 출력이 규격에 맞는지 한글 경고 + 긴 세로
- * 스트립을 규격 높이로 자르는 슬라이스 계획을 순수 함수로 제공한다.
+ * 스트립을 규격 높이로 자르는 슬라이스 계획 + 그 계획을 실제 파일 저장으로 옮기는 실행부.
  *
- * 전부 순수·결정적(랜덤·부작용 없음). DOM/Konva/React 의존 없음 — 내보내기 UI와
- * 단위 테스트가 같은 규격을 공유한다. 사용자 노출 문자열은 한글.
+ * 계획·검증(플랜·좌표·파일명·안내문)은 전부 순수·결정적(랜덤·부작용 없음)이라 node
+ * 단위 테스트가 가능하다. 브라우저 캔버스·다운로드를 만지는 건 exportPresetSlices 실행부
+ * 하나뿐이며, 저장 경로(canvasToBlob/downloadBlob)는 studio-export를 재사용한다.
+ * 사용자 노출 문자열은 한글.
  */
+
+import { MAX_CANVAS_DIM, canvasToBlob, downloadBlob, exportMimeType, exportQuality } from "./studio-export";
+import { shouldDrawWatermark, watermarkPlacement, type WatermarkSettings } from "./studio-watermark";
 
 export type ExportFormat = "png" | "jpg" | "webp";
 
@@ -195,4 +200,242 @@ export function validateExport(
     });
   }
   return { ok: warnings.length === 0, warnings };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 규격 슬라이스 내보내기 실행 — 위 규격 데이터를 "안내"에서 "실행"으로 옮긴다.
+// 페이지 캡처(색보정 합성)는 StudioPage의 기존 내보내기 경로가 담당하고, 여기서는
+// 캡처된 캔버스들을 규격 폭으로 리샘플해 이어 붙인 "가상 스트립"을 규격 높이 단위로
+// 잘라 여러 장으로 순차 저장한다(zip·추가 의존성 없음). 전체 스트립을 한 장의 중간
+// 캔버스로 합치지 않고 페이지→슬라이스로 직접 그려 브라우저 캔버스 한계를 피한다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 규격 내보내기 범위 — 현재 페이지 1장 또는 전체 페이지 세로 연결. */
+export type PresetExportScope = "current" | "all";
+
+/** 가상 스트립(규격 폭 기준) 안에서 페이지 하나가 차지하는 세로 구간. */
+export interface PresetPageLayout {
+  /** 스트립 안 시작 y(타깃 px). */
+  y: number;
+  /** 규격 폭으로 리샘플된 페이지 높이(px). */
+  height: number;
+  /** 캡처 원본 폭(px) — drawImage 소스 좌표 환산용. */
+  sourceWidth: number;
+  /** 캡처 원본 높이(px). */
+  sourceHeight: number;
+}
+
+export interface PresetSlicePlan {
+  /** 최종 출력 폭(px) — 프리셋 권장 폭, 원본 유지(0)면 첫 페이지 캡처 폭. */
+  targetWidth: number;
+  /** 리샘플 후 전체 스트립 높이(px). */
+  totalHeight: number;
+  /** 슬라이스 1장 기준 높이(px) — 프리셋 최대 높이, 없으면 브라우저 캔버스 한계. */
+  sliceHeight: number;
+  /** 프리셋 허용 포맷으로 강제된 최종 포맷. */
+  format: ExportFormat;
+  slices: StripSlice[];
+  pages: PresetPageLayout[];
+}
+
+/** 프리셋이 허용하지 않는 포맷이면 권장 포맷으로 바꾼다(네이버=JPG 전용 등). */
+export function resolvePresetFormat(preset: ExportPreset, format: ExportFormat): ExportFormat {
+  return preset.allowedFormats.includes(format) ? format : preset.recommendedFormat;
+}
+
+/**
+ * 캡처된 페이지 크기 목록 → 규격 슬라이스 실행 계획(순수).
+ * - 페이지마다 규격 폭 리샘플 후 높이를 구해 간격 0으로 이어 붙인다(연재 업로드는
+ *   슬라이스가 뷰어에서 다시 이어 보이므로 페이지 사이 여백을 넣지 않는다).
+ * - 프리셋에 최대 높이가 없어도 브라우저 캔버스 한계(maxCanvasDim)로는 자른다 —
+ *   한계를 넘는 캔버스는 조용히 빈 이미지가 되기 때문(studio-export의 MAX_CANVAS_DIM).
+ * - 유효한(양수 크기) 페이지가 하나도 없으면 null.
+ */
+export function planPresetSliceExport(
+  pageSizes: { width: number; height: number }[],
+  preset: ExportPreset,
+  format: ExportFormat,
+  maxCanvasDim = MAX_CANVAS_DIM
+): PresetSlicePlan | null {
+  const valid = pageSizes.filter((size) => size.width > 0 && size.height > 0);
+  if (valid.length === 0 || maxCanvasDim <= 0) return null;
+  const targetWidth = preset.width > 0 ? preset.width : Math.max(1, Math.round(valid[0].width));
+  const pages: PresetPageLayout[] = [];
+  let y = 0;
+  for (const size of valid) {
+    const height = Math.max(1, Math.round((size.height * targetWidth) / size.width));
+    pages.push({ y, height, sourceWidth: size.width, sourceHeight: size.height });
+    y += height;
+  }
+  const sliceHeight = Math.min(preset.maxImageHeight ?? maxCanvasDim, maxCanvasDim);
+  return {
+    targetWidth,
+    totalHeight: y,
+    sliceHeight,
+    format: resolvePresetFormat(preset, format),
+    slices: planStripSlices(y, sliceHeight),
+    pages,
+  };
+}
+
+/** 슬라이스 캔버스에 그릴 페이지 조각 — 원본(src)·슬라이스(dest) 좌표 쌍. */
+export interface SliceDrawOp {
+  pageIndex: number;
+  /** 원본 페이지 캔버스 안 시작 y(px). */
+  srcY: number;
+  /** 원본에서 가져올 높이(px). */
+  srcHeight: number;
+  /** 슬라이스 캔버스 안 시작 y(px). */
+  destY: number;
+  /** 슬라이스에 그릴 높이(px). */
+  destHeight: number;
+}
+
+/**
+ * 슬라이스 하나와 겹치는 페이지 구간들을 그리기 좌표로 변환(순수).
+ * 원본 좌표는 리샘플 비율(sourceHeight/height)로 환산하며 소수를 허용한다
+ * (drawImage가 서브픽셀 보간). 겹치지 않는 페이지는 결과에서 빠진다.
+ */
+export function planSliceDrawOps(slice: StripSlice, pages: PresetPageLayout[]): SliceDrawOp[] {
+  const ops: SliceDrawOp[] = [];
+  const sliceTop = slice.y;
+  const sliceBottom = slice.y + slice.height;
+  pages.forEach((page, pageIndex) => {
+    const top = Math.max(sliceTop, page.y);
+    const bottom = Math.min(sliceBottom, page.y + page.height);
+    if (bottom <= top) return;
+    const ratio = page.sourceHeight / page.height;
+    ops.push({
+      pageIndex,
+      srcY: (top - page.y) * ratio,
+      srcHeight: (bottom - top) * ratio,
+      destY: top - sliceTop,
+      destHeight: bottom - top,
+    });
+  });
+  return ops;
+}
+
+/** 규격 슬라이스 파일명 — `<제목>-<프리셋id>.<확장자>`, 여러 장이면 `-1of3` 접미사. */
+export function presetSliceFileName(
+  title: string,
+  presetId: string,
+  format: ExportFormat,
+  part: { index: number; total: number }
+): string {
+  const suffix = part.total > 1 ? `-${part.index + 1}of${part.total}` : "";
+  return `${title.trim() || "toonspectrum-webtoon"}-${presetId}${suffix}.${format}`;
+}
+
+export interface PresetExportResult {
+  /** 저장한 파일 수. */
+  files: number;
+  /** 프리셋 용량 제한을 넘은 파일 수(저장은 됨 — 업로드 전 확인 필요). */
+  oversized: number;
+  /** 실제 저장에 쓴 포맷(프리셋 허용 포맷으로 강제된 값). */
+  format: ExportFormat;
+  /** 실제 저장 폭(px). */
+  targetWidth: number;
+}
+
+/** 실행 결과를 한 줄 한글 안내로 — 용량 초과 파일이 있으면 경고를 덧붙인다. */
+export function presetExportResultMessage(result: PresetExportResult, preset: ExportPreset): string {
+  const base = `폭 ${result.targetWidth.toLocaleString()}px ${result.format.toUpperCase()} ${result.files}장으로 저장했어요.`;
+  if (result.oversized > 0 && preset.maxFileBytes !== undefined) {
+    return `${base} ${result.oversized}장은 ${Math.round(preset.maxFileBytes / MB)}MB 제한을 넘어요 — 업로드 전에 용량을 줄여주세요.`;
+  }
+  return base;
+}
+
+export interface PresetSliceExportOptions {
+  /** 캡처된 페이지 캔버스(색보정 합성 완료, 페이지 순서). */
+  pages: HTMLCanvasElement[];
+  preset: ExportPreset;
+  /** 사용자가 고른 포맷 — 프리셋이 허용하지 않으면 권장 포맷으로 강제된다. */
+  format: ExportFormat;
+  /** 파일명에 쓸 작품 제목(비어 있으면 기본 파일명). */
+  title: string;
+  /** 있으면 슬라이스마다 서명 — 파일 단위 귀속이 유지되고 절단면에서 잘리지 않는다. */
+  watermark?: WatermarkSettings;
+  onProgress?: (done: number, total: number) => void;
+  /** 파일 사이 대기(ms) — 연속 다운로드 차단 회피. 기본 250, 테스트에선 0. */
+  delayMs?: number;
+  /** 테스트 주입용 — 기본은 document.createElement("canvas"). */
+  createCanvas?: (width: number, height: number) => HTMLCanvasElement;
+  /** 테스트 주입용 — 기본은 downloadBlob(실제 파일 저장). */
+  download?: (blob: Blob, filename: string) => void;
+}
+
+/** 기본 슬라이스 캔버스 팩토리 — 브라우저 전용(호출 시점에만 document 접근). */
+function createSliceCanvas(width: number, height: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+/** StudioPage 내보내기 경로와 같은 규칙의 워터마크 합성(어두운 외곽선 + 흰 채움). */
+function drawWatermarkOnSlice(canvas: HTMLCanvasElement, settings: WatermarkSettings): void {
+  if (!shouldDrawWatermark(settings)) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const placement = watermarkPlacement(canvas.width, canvas.height, settings);
+  const text = settings.text.trim();
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, Math.max(0, settings.opacity));
+  ctx.font = `700 ${placement.fontPx}px "Pretendard", system-ui, sans-serif`;
+  ctx.textAlign = placement.textAlign;
+  ctx.textBaseline = placement.textBaseline;
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(1.5, placement.fontPx * 0.09);
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.strokeText(text, placement.x, placement.y);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, placement.x, placement.y);
+  ctx.restore();
+}
+
+/**
+ * 규격 슬라이스 내보내기 실행 — 캡처된 페이지들을 규격 폭으로 리샘플해 이어 붙인 뒤
+ * 규격 높이 단위 이미지 여러 장으로 순차 다운로드한다. 플랫폼 업로드용이라 배경은
+ * 흰색 불투명(네이버 등 JPG 전용 + 뷰어 배경 일치). 저장한 파일 수·용량 초과 수를
+ * 담은 결과를 돌려주며, 페이지가 없거나 캔버스 생성이 막히면 한글 메시지로 throw.
+ */
+export async function exportPresetSlices(options: PresetSliceExportOptions): Promise<PresetExportResult> {
+  const { pages, preset, title, watermark, onProgress } = options;
+  const plan = planPresetSliceExport(
+    pages.map((canvas) => ({ width: canvas.width, height: canvas.height })),
+    preset,
+    options.format
+  );
+  if (!plan || plan.slices.length === 0) throw new Error("내보낼 페이지가 없어요.");
+  const createCanvas = options.createCanvas ?? createSliceCanvas;
+  const download = options.download ?? downloadBlob;
+  const delayMs = options.delayMs ?? 250;
+  const mime = exportMimeType(plan.format);
+  const quality = exportQuality(plan.format);
+  let oversized = 0;
+  for (const slice of plan.slices) {
+    const canvas = createCanvas(plan.targetWidth, slice.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("슬라이스 캔버스를 만들지 못했어요. 다시 시도해주세요.");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, plan.targetWidth, slice.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    for (const op of planSliceDrawOps(slice, plan.pages)) {
+      const page = pages[op.pageIndex];
+      ctx.drawImage(page, 0, op.srcY, page.width, op.srcHeight, 0, op.destY, plan.targetWidth, op.destHeight);
+    }
+    if (watermark) drawWatermarkOnSlice(canvas, watermark);
+    const blob = await canvasToBlob(canvas, mime, quality);
+    if (preset.maxFileBytes !== undefined && blob.size > preset.maxFileBytes) oversized += 1;
+    download(blob, presetSliceFileName(title, preset.id, plan.format, { index: slice.index, total: plan.slices.length }));
+    onProgress?.(slice.index + 1, plan.slices.length);
+    // 연속 다운로드가 브라우저에서 차단되지 않게 한 박자 쉼(마지막 장 제외).
+    if (delayMs > 0 && slice.index < plan.slices.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return { files: plan.slices.length, oversized, format: plan.format, targetWidth: plan.targetWidth };
 }

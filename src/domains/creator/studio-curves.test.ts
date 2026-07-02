@@ -3,17 +3,24 @@ import { describe, expect, it } from "vitest";
 import {
   CURVE_PRESETS,
   DEFAULT_CURVE,
+  TONE_CHANNELS,
   addCurvePoint,
   applyCurve,
+  applyCurveChannels,
+  buildCurveChannelLuts,
   buildCurveLut,
+  composeLuts,
   curveKonvaFilter,
   curveToFlat,
   flatToCurve,
   isIdentityCurve,
+  isIdentityCurveChannels,
   moveCurvePoint,
   normalizeCurve,
+  normalizeCurveChannels,
   removeCurvePoint,
   type CurvePoint,
+  type CurveRgbChannels,
 } from "./studio-curves";
 import { type StudioImageDataLike } from "./studio-filters";
 
@@ -430,6 +437,52 @@ describe("curveKonvaFilter", () => {
   });
 });
 
-// 미사용 import 방지용 타입 참조.
-const _typecheck: CurvePoint = DEFAULT_CURVE[0]!;
-void _typecheck;
+describe("채널 커브(R/G/B)", () => {
+  it("TONE_CHANNELS는 master+r/g/b 4종을 순서대로 노출한다", () => {
+    expect(TONE_CHANNELS.map((c) => c.id)).toEqual(["master", "r", "g", "b"]);
+    for (const ch of TONE_CHANNELS) {
+      expect(ch.label.length).toBeGreaterThan(0);
+      expect(ch.tip.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("normalizeCurveChannels는 누락/무효 채널을 항등으로 채운다", () => {
+    const ch = normalizeCurveChannels({ r: [{ x: 0, y: 40 }, { x: 255, y: 255 }] });
+    expect(ch.r[0]).toEqual({ x: 0, y: 40 });
+    expect(isIdentityCurve(ch.g)).toBe(true);
+    expect(isIdentityCurve(ch.b)).toBe(true);
+    expect(normalizeCurveChannels(null).r).toEqual(DEFAULT_CURVE);
+  });
+
+  it("isIdentityCurveChannels는 세 채널 모두 항등일 때만 참", () => {
+    expect(isIdentityCurveChannels(null)).toBe(true);
+    expect(isIdentityCurveChannels({})).toBe(true);
+    const bent: CurveRgbChannels = { b: [{ x: 0, y: 30 }, { x: 255, y: 255 }] };
+    expect(isIdentityCurveChannels(bent)).toBe(false);
+  });
+
+  it("composeLuts는 두 LUT의 순차 적용과 같다", () => {
+    const bright = buildCurveLut([{ x: 0, y: 40 }, { x: 255, y: 255 }]);
+    const identity = buildCurveLut(DEFAULT_CURVE);
+    const composed = composeLuts(identity, bright);
+    expect(composed[0]).toBe(bright[0]!);
+    expect(composed[128]).toBe(bright[128]!);
+    expect(composed).toHaveLength(256);
+  });
+
+  it("buildCurveChannelLuts — 채널 없는 축은 마스터 LUT와 동일, 있는 축은 합성으로 달라진다", () => {
+    const master: CurvePoint[] = [{ x: 0, y: 0 }, { x: 255, y: 200 }];
+    const channels: CurveRgbChannels = { r: [{ x: 0, y: 50 }, { x: 255, y: 255 }] };
+    const luts = buildCurveChannelLuts(master, channels);
+    const masterLut = buildCurveLut(normalizeCurve(master));
+    expect(luts.g[128]).toBe(masterLut[128]!);
+    expect(luts.b[200]).toBe(masterLut[200]!);
+    expect(luts.r[128]).not.toBe(masterLut[128]!);
+  });
+
+  it("applyCurveChannels는 픽셀에 채널별 LUT를 적용한다(알파 보존)", () => {
+    const img = makeImage(1, 1, [[100, 100, 100, 255]]);
+    applyCurveChannels(img, DEFAULT_CURVE, { r: [{ x: 0, y: 255 }, { x: 255, y: 255 }] });
+    expect(pixelAt(img, 0)).toEqual([255, 100, 100, 255]);
+  });
+});

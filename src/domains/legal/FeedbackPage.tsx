@@ -196,18 +196,18 @@ export function FeedbackPage() {
               <form onSubmit={onSubmit} className="space-y-3">
                 <div>
                   <label htmlFor="feedback-category" className="mb-1 block text-xs text-fg-3">분류</label>
-                  <select id="feedback-category" {...register("category")} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50">
+                  <select id="feedback-category" {...register("category")} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40">
                     <option value="question">질문 (Q&amp;A)</option>
                     <option value="idea">의견·제안</option>
                     <option value="bug">버그신고</option>
                   </select>
                 </div>
                 <div>
-                  <input {...register("title")} placeholder="제목" maxLength={100} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" />
+                  <input {...register("title")} aria-label="제목" placeholder="제목" maxLength={100} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40" />
                   {errors.title && <p className="mt-1 text-[0.7rem] text-bad">{errors.title.message}</p>}
                 </div>
                 <div>
-                  <textarea {...register("text")} rows={5} maxLength={2000} placeholder="내용을 자세히 적어주세요." className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50" />
+                  <textarea {...register("text")} aria-label="내용" rows={5} maxLength={2000} placeholder="내용을 자세히 적어주세요." className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40" />
                   {errors.text && <p className="mt-1 text-[0.7rem] text-bad">{errors.text.message}</p>}
                 </div>
                 <div>
@@ -219,7 +219,8 @@ export function FeedbackPage() {
                           key={t}
                           type="button"
                           onClick={() => setComposeTags((p) => p.filter((x) => x !== t))}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-accent/50 bg-accent-soft/50 px-2 py-0.5 text-[0.68rem] text-accent"
+                          aria-label={`${t} 태그 제거`}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-accent/50 bg-accent-soft/50 px-2 py-1 text-[0.72rem] text-accent"
                         >
                           #{t} ✕
                         </button>
@@ -240,7 +241,7 @@ export function FeedbackPage() {
                     placeholder="예: UI, 모바일 (Enter/쉼표로 추가)"
                     maxLength={20}
                     disabled={composeTags.length >= 5}
-                    className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
+                    className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
                   />
                 </div>
                 <Button type="submit" disabled={isSubmitting} className="w-full justify-center gap-1.5">
@@ -298,11 +299,11 @@ function PostCard({ post, expanded, onToggle, userId, onTagClick }: { post: Feed
     <li className="rounded-xl border border-line bg-card/60 p-3.5">
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-center gap-2">
-          <span className={cn("rounded-full border px-2 py-0.5 text-[0.66rem] font-medium", CATEGORY_TONE[post.category])}>
+          <span className={cn("rounded-full border px-2 py-0.5 text-[0.72rem] font-medium", CATEGORY_TONE[post.category])}>
             {CATEGORY_LABEL[post.category]}
           </span>
           <span className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.66rem] font-medium",
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-medium",
             post.status === "answered" ? "bg-good/15 text-good" : "bg-warn/15 text-warn"
           )}>
             {post.status === "answered" ? <CheckCircle2 size={11} /> : <Clock size={11} />}
@@ -325,7 +326,7 @@ function PostCard({ post, expanded, onToggle, userId, onTagClick }: { post: Feed
               key={t}
               type="button"
               onClick={() => onTagClick(t)}
-              className="rounded-full border border-line bg-raised/40 px-2 py-0.5 text-[0.66rem] text-fg-3 transition-colors hover:border-accent/50 hover:text-accent"
+              className="rounded-full border border-line bg-raised/40 px-2 py-1 text-[0.72rem] text-fg-3 transition-colors hover:border-accent/50 hover:text-accent"
             >
               #{t}
             </button>
@@ -386,9 +387,10 @@ function PostThread({ postId, userId }: { postId: string; userId: string | null 
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
+            aria-label="답변 남기기"
             placeholder="답변 남기기"
             maxLength={1500}
-            className="flex-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/50"
+            className="flex-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40"
           />
           <button type="button" onClick={send} disabled={sending || !text.trim()} className={buttonClass({ size: "sm", variant: "solid" })}>
             등록
@@ -405,7 +407,7 @@ function ReplyNode({ reply, depth }: { reply: FeedbackReply; depth: number }) {
   return (
     <li style={{ marginLeft: depth * 14 }}>
       <div className={cn("rounded-lg border px-2.5 py-1.5", reply.isOfficial ? "border-accent/40 bg-accent-soft/30" : "border-line bg-panel/40")}>
-        <div className="flex items-center gap-1.5 text-[0.66rem] text-fg-3">
+        <div className="flex items-center gap-1.5 text-[0.72rem] text-fg-3">
           <span className="font-medium text-fg-2">{reply.author.name}</span>
           {reply.isOfficial && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-accent/15 px-1.5 text-accent">

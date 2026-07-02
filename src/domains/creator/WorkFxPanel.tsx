@@ -148,7 +148,7 @@ export function WorkFxPanel({
           {cutCount > 0 && (
             <div className="rounded-lg border border-line bg-panel/40 px-2.5 py-2">
               <p className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">컷별 효과 (선택)</p>
-              <p className="mb-2 text-[0.62rem] leading-snug text-fg-4">
+              <p className="mb-2 text-[0.62rem] leading-snug text-fg-3">
                 특정 컷만 다르게 연출해요. 등장 효과는 비워두면 작품 기본을 따르고, 강조는 그 컷이 보일 때 한 번 재생돼요.
               </p>
               <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">

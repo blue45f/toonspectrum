@@ -2,9 +2,13 @@
  * Studio Levels / Tone Engine
  * 포토샵 "레벨(Levels)" 보정 — 입력 검정·흰점, 중간톤 감마, 출력 하한·상한을
  * 256칸 LUT로 미리 구워 r/g/b 채널에 한 번에 적용한다(알파 보존).
+ * 마스터(RGB) 레벨 위에 r/g/b 개별 채널 레벨을 얹는 채널 편집도 지원한다
+ * (하위호환: 기존 저장본의 levels* 스칼라는 그대로 마스터, 채널 레벨은 별도 필드).
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  * 전부 순수·결정적(랜덤 없음).
  */
+
+import { composeLuts, type RgbChannelKey } from "./studio-curves";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
@@ -119,6 +123,94 @@ export function applyLevels(img: StudioImageDataLike, p: LevelsParams): void {
 }
 
 // ---------------------------------------------------------------------------
+// 채널별(R/G/B) 레벨 — 포토샵 레벨의 채널 드롭다운처럼 마스터(RGB) 위에
+// 개별 채널 레벨을 얹는다. 하위호환: 기존 저장본의 levels* 스칼라는 그대로
+// 마스터이고, 채널 레벨은 별도 필드(levelsCh)로만 추가된다(없으면 항등).
+// ---------------------------------------------------------------------------
+
+/** r/g/b 개별 채널 레벨 묶음 — 누락 채널은 항등(마스터는 기존 levels* 필드). */
+export type LevelsRgbChannels = {
+  r?: Partial<LevelsParams>;
+  g?: Partial<LevelsParams>;
+  b?: Partial<LevelsParams>;
+};
+
+/** 채널 레벨 묶음 안전장치 — 각 채널을 normalizeLevels로 정리(누락/무효 채널은 항등). */
+export function normalizeLevelsChannels(
+  channels?: LevelsRgbChannels | null
+): Record<RgbChannelKey, LevelsParams> {
+  const src = channels && typeof channels === "object" ? channels : undefined;
+  return {
+    r: normalizeLevels(src?.r),
+    g: normalizeLevels(src?.g),
+    b: normalizeLevels(src?.b),
+  };
+}
+
+/** r/g/b 채널 레벨이 전부 항등(픽셀 불변)인지. */
+export function isIdentityLevelsChannels(channels?: LevelsRgbChannels | null): boolean {
+  const ch = normalizeLevelsChannels(channels);
+  return isIdentityLevels(ch.r) && isIdentityLevels(ch.g) && isIdentityLevels(ch.b);
+}
+
+/** LevelsParams → [blackPoint, whitePoint, gamma, outBlack, outWhite] 평탄 5칸(Konva attrs 직렬화용). */
+export function levelsToFlat(p?: Partial<LevelsParams> | null): number[] {
+  const n = normalizeLevels(p);
+  return [n.blackPoint, n.whitePoint, n.gamma, n.outBlack, n.outWhite];
+}
+
+/** 평탄 5칸 → LevelsParams(normalizeLevels 통과). 배열 아님/길이 부족/무효 값은 항등 쪽으로. */
+export function flatToLevels(flat: unknown): LevelsParams {
+  if (!Array.isArray(flat)) return { ...DEFAULT_LEVELS };
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  return normalizeLevels({
+    blackPoint: num(flat[0]),
+    whitePoint: num(flat[1]),
+    gamma: num(flat[2]),
+    outBlack: num(flat[3]),
+    outWhite: num(flat[4]),
+  });
+}
+
+/**
+ * 채널별 최종 LUT — 각 채널에 "채널 레벨 → 마스터 레벨" 순으로 composeLuts 합성
+ * (커브와 동일 규칙: final[i] = master[channel[i]]).
+ * 채널 레벨이 항등이면 그 채널은 마스터 LUT를 그대로 공유한다(추가 비용 없음).
+ */
+export function buildChannelLevelsLuts(
+  master?: Partial<LevelsParams> | null,
+  channels?: LevelsRgbChannels | null
+): Record<RgbChannelKey, Uint8ClampedArray> {
+  const m = normalizeLevels(master);
+  const masterLut = buildLevelsLut(m);
+  const ch = normalizeLevelsChannels(channels);
+  const lutFor = (p: LevelsParams): Uint8ClampedArray =>
+    isIdentityLevels(p) ? masterLut : composeLuts(buildLevelsLut(p), masterLut);
+  return { r: lutFor(ch.r), g: lutFor(ch.g), b: lutFor(ch.b) };
+}
+
+/**
+ * 마스터+채널 레벨 제자리 적용 — 전부 항등이면 no-op. 채널별 LUT를 한 번만 구워
+ * r/g/b 각각에 매핑하고 알파(+3)는 보존한다.
+ */
+export function applyLevelsChannels(
+  img: StudioImageDataLike,
+  master?: Partial<LevelsParams> | null,
+  channels?: LevelsRgbChannels | null
+): void {
+  const m = normalizeLevels(master);
+  if (isIdentityLevels(m) && isIdentityLevelsChannels(channels)) return;
+  const luts = buildChannelLevelsLuts(m, channels);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = luts.r[data[i]!]!;
+    data[i + 1] = luts.g[data[i + 1]!]!;
+    data[i + 2] = luts.b[data[i + 2]!]!;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 웹툰 색보정 프리셋 — 첫 항목은 항등, 나머지는 자주 쓰는 톤 조합.
 // 모든 params는 normalizeLevels를 통과(범위 안, whitePoint>blackPoint).
 // ---------------------------------------------------------------------------
@@ -198,8 +290,9 @@ function attrNumber(value: unknown): number | undefined {
 }
 
 /**
- * Konva 필터 함수 — node(`this`).attrs에서 5개 레벨 값을 읽어
- * normalizeLevels로 안전 변환 후 applyLevels. 항등이거나 attrs가 비면 no-op.
+ * Konva 필터 함수 — node(`this`).attrs에서 마스터 5개 레벨 값과
+ * 채널 레벨(levelsR/levelsG/levelsB — 평탄 5칸)을 읽어 채널 합성 LUT로 적용한다.
+ * 전부 항등이거나 attrs가 비면 no-op.
  */
 export function levelsKonvaFilter(this: { attrs?: Record<string, unknown> }, imageData: StudioImageDataLike): void {
   const attrs = this.attrs;
@@ -211,6 +304,10 @@ export function levelsKonvaFilter(this: { attrs?: Record<string, unknown> }, ima
     outBlack: attrNumber(attrs.levelsOutBlack),
     outWhite: attrNumber(attrs.levelsOutWhite),
   });
-  if (isIdentityLevels(params)) return;
-  applyLevels(imageData, params);
+  const channels: LevelsRgbChannels = {};
+  if (Array.isArray(attrs.levelsR)) channels.r = flatToLevels(attrs.levelsR);
+  if (Array.isArray(attrs.levelsG)) channels.g = flatToLevels(attrs.levelsG);
+  if (Array.isArray(attrs.levelsB)) channels.b = flatToLevels(attrs.levelsB);
+  if (isIdentityLevels(params) && isIdentityLevelsChannels(channels)) return;
+  applyLevelsChannels(imageData, params, channels);
 }

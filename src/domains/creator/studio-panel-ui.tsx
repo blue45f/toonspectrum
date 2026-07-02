@@ -12,11 +12,11 @@ import { cn } from "@/lib/utils";
 // 데스크톱(fine pointer)은 기존 컴팩트 사이즈 유지 — 정밀 조작·공간 효율.
 export const PANEL_LABEL_ROW =
   "flex items-center justify-between gap-2 text-xs pointer-coarse:text-[0.8125rem] text-fg-2";
-export const PANEL_RANGE_CLASS = "w-24 pointer-coarse:w-32 pointer-coarse:h-5 accent-accent cursor-pointer";
+export const PANEL_RANGE_CLASS = "w-24 pointer-coarse:w-32 pointer-coarse:h-6 accent-accent cursor-pointer";
 export const PANEL_READOUT_CLASS =
-  "w-8 pointer-coarse:w-9 text-right text-[10px] pointer-coarse:text-[11px] tabular-nums text-fg-3";
+  "w-8 pointer-coarse:w-9 text-right text-[0.72rem] pointer-coarse:text-[0.75rem] tabular-nums text-fg-3";
 export const PANEL_CHIP_CLASS =
-  "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.7rem]";
+  "min-h-6 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
 
 // 프리셋/종류 선택 칩. active 면 강조 테두리(현재 선택)로 표시한다.
 export function StudioPanelChip({
@@ -44,7 +44,7 @@ export function StudioPanelChip({
 
 // 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
 export const PANEL_SWATCH_CHIP_CLASS =
-  "flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.7rem]";
+  "flex min-h-6 items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
 
 // 색 스와치 + 라벨을 한 칩에 담는 프리셋 칩. swatch 는 color 로 칠하고, active 면 강조 테두리로 표시한다.
 export function StudioSwatchChip({

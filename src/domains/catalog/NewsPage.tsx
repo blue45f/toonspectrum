@@ -132,7 +132,7 @@ export function NewsPage() {
               );
             })}
           </div>
-          <div className="flex max-w-xs items-center gap-2 rounded-xl border border-line bg-canvas px-3.5">
+          <div className="flex max-w-xs items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 transition-colors focus-within:border-accent/60">
             <Search size={15} className="text-fg-3" />
             <input
               value={q}

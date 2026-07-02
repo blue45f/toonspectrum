@@ -114,6 +114,21 @@ const GROUPS: Group[] = [
   },
 ];
 
+// 아이템 스태거 — 그룹 누적 시작 인덱스(모듈 상수: GROUPS 정적). 지연은 22개까지만 누적해
+// 아래 그룹이 굼뜨지 않게 한다(그 뒤 항목은 마지막 지연으로 함께 등장).
+const GROUP_START_INDEX: number[] = [];
+{
+  let offset = 0;
+  for (const group of GROUPS) {
+    GROUP_START_INDEX.push(offset);
+    offset += group.items.length;
+  }
+}
+const STAGGER_STEP_MS = 14;
+const STAGGER_MAX_INDEX = 22;
+const staggerDelay = (groupIdx: number, itemIdx: number): string =>
+  `${Math.min(GROUP_START_INDEX[groupIdx] + itemIdx, STAGGER_MAX_INDEX) * STAGGER_STEP_MS}ms`;
+
 /** 시트 안 포커스 가능한 요소 목록(포커스 트랩용). */
 function focusable(root: HTMLElement | null): HTMLElement[] {
   if (!root) return [];
@@ -217,14 +232,15 @@ export function MoreMenu({
     <div
       role="presentation"
       onClick={onClose}
+      className="more-backdrop"
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 80,
-        // warm-ink 스크림(순수 검정 금지 — DESIGN.md). 깊은 잉크 톤에 투과.
+        // warm-ink 스크림(순수 검정 금지 — DESIGN.md). 깊은 잉크 톤에 투과 + 백드롭 블러 강화.
         background: "oklch(0.1 0.012 70 / 0.62)",
-        backdropFilter: "blur(3px)",
-        WebkitBackdropFilter: "blur(3px)",
+        backdropFilter: "blur(7px)",
+        WebkitBackdropFilter: "blur(7px)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
@@ -344,7 +360,7 @@ export function MoreMenu({
             </div>
           </div>
 
-          {GROUPS.map((group) => (
+          {GROUPS.map((group, groupIdx) => (
             <section key={group.title} style={{ marginTop: 14 }}>
               <h3
                 style={{
@@ -365,15 +381,16 @@ export function MoreMenu({
                   gap: 8,
                 }}
               >
-                {group.items.map((it) => {
+                {group.items.map((it, itemIdx) => {
                   const Icon = it.Icon;
                   return (
                     <button
                       key={it.to}
                       type="button"
-                      className="pressable"
+                      className="pressable more-item"
                       onClick={() => go(it.to)}
                       style={{
+                        ["--more-stagger" as string]: staggerDelay(groupIdx, itemIdx),
                         display: "flex",
                         alignItems: "center",
                         gap: 10,

@@ -106,7 +106,7 @@ export function HomeDeferredSections({
             <div key={original.id} className="rounded-2xl border border-line bg-card p-5 surface-hl">
               <div className="mb-4 flex items-center gap-2 text-fg-3">
                 <Layers size={14} />
-                <span className="eyebrow text-[0.62rem]">{original.title} 유니버스</span>
+                <span className="eyebrow">{original.title} 유니버스</span>
               </div>
               <AdaptationGraph original={original} adaptations={adaptations} />
             </div>

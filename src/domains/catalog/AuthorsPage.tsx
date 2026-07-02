@@ -60,7 +60,7 @@ export function AuthorsPage() {
           )}
         </p>
         {!loading && !error && authors.length > 0 && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 max-w-xs">
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 max-w-xs transition-colors focus-within:border-accent/60">
             <Search size={15} className="text-fg-3" />
             <input
               value={q}
@@ -111,7 +111,7 @@ export function AuthorsPage() {
                   {a.topGenres.slice(0, 3).map((g) => (
                     <span
                       key={g}
-                      className="rounded-full border px-1.5 py-0.5 text-[0.62rem] font-medium leading-none"
+                      className="rounded-full border px-1.5 py-0.5 text-[0.72rem] font-medium leading-none"
                       style={{ color: genreTextColor(g, 0.85), backgroundColor: genreTint(g, 0.12), borderColor: genreBorder(g, 0.3) }}
                     >
                       {g}
