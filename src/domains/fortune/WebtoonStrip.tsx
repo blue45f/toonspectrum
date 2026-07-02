@@ -6,6 +6,7 @@ import { CHAR_HUE } from "./fortune-theme";
 import type { FortuneCharacterInfo, FortunePanel, FortunePanelLine, PlaybackStep } from "./fortune-types";
 
 import { cn } from "@/lib/utils";
+import { resolveAssetUrl } from "@/src/catalog-static";
 
 // 캐릭터별 무드 색상환(hue)은 fortune-theme 단일 출처. 나레이션 기본은 따뜻한 잉크.
 const NARRATION_HUE = 70;
@@ -310,7 +311,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
                           transition={isSpeaking ? { duration: 0.6, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
                         >
                           {character?.avatarUrl ? (
-                            <img src={character.avatarUrl} alt={line.speaker} className="h-full w-full object-cover" />
+                            <img src={resolveAssetUrl(character.avatarUrl)} alt={line.speaker} className="h-full w-full object-cover" />
                           ) : (
                             <span
                               className="flex h-full w-full items-center justify-center font-display text-xl font-black"

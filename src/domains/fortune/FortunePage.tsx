@@ -36,7 +36,9 @@ import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/lib/types";
 
 import { TitleCard } from "@/components/title-card";
+// 토스 WebView(교차 출처)에서 root-relative /images/.. 경로를 배포 오리진으로 절대화한다. 웹은 무변경.
 import { cn } from "@/lib/utils";
+import { resolveAssetUrl } from "@/src/catalog-static";
 
 interface Character {
   id: string;
@@ -512,7 +514,7 @@ export function FortunePage() {
                     >
                       <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-line/50">
                         {h.characterAvatar ? (
-                          <img src={h.characterAvatar} alt="" className="h-full w-full object-cover" />
+                          <img src={resolveAssetUrl(h.characterAvatar)} alt="" className="h-full w-full object-cover" />
                         ) : null}
                       </div>
                       <div className="min-w-0">
@@ -568,9 +570,9 @@ export function FortunePage() {
                 {/* 캐릭터 아바타 이미지 (없을 경우 텍스트 fallback) */}
                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-gradient-to-br from-accent-soft to-panel/80 flex items-center justify-center border border-line/40">
                   {char.avatarUrl ? (
-                    <img 
-                      src={char.avatarUrl} 
-                      alt={char.name} 
+                    <img
+                      src={resolveAssetUrl(char.avatarUrl)}
+                      alt={char.name}
                       className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
@@ -608,9 +610,9 @@ export function FortunePage() {
             <div className="rounded-2xl border border-line bg-panel/35 p-5 flex flex-col items-center text-center">
               <div className="relative aspect-square w-24 overflow-hidden rounded-full bg-gradient-to-br from-accent/20 to-panel border-2 flex items-center justify-center shadow-lg" style={{ borderColor: "var(--char-accent)" }}>
                 {selectedChar.avatarUrl ? (
-                  <img 
-                    src={selectedChar.avatarUrl} 
-                    alt={selectedChar.name} 
+                  <img
+                    src={resolveAssetUrl(selectedChar.avatarUrl)}
+                    alt={selectedChar.name}
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 ) : (
@@ -1666,7 +1668,7 @@ export function FortunePage() {
                               ease: "easeInOut"
                             }}
                             className="w-24 aspect-[2/3] rounded-xl border border-amber-500/20 bg-cover bg-center shadow-md"
-                            style={{ backgroundImage: "url('/images/tarot/tarot-back.jpg')" }}
+                            style={{ backgroundImage: `url('${resolveAssetUrl("/images/tarot/tarot-back.jpg")}')` }}
                           />
                         ))}
                       </div>
@@ -1686,7 +1688,7 @@ export function FortunePage() {
                             whileHover={{ y: -10, scale: 1.03 }}
                             onClick={() => handleSelectTarotCard(idx)}
                             className="w-28 cursor-pointer aspect-[2/3] rounded-xl border border-amber-500/20 bg-cover bg-center flex items-center justify-center relative overflow-hidden shadow-lg transition-all hover:border-amber-400 focus:outline-none"
-                            style={{ backgroundImage: "url('/images/tarot/tarot-back.jpg')" }}
+                            style={{ backgroundImage: `url('${resolveAssetUrl("/images/tarot/tarot-back.jpg")}')` }}
                           >
                             {/* 카드 뒷면에 호버 시 미세한 골드 이펙트 오버레이 */}
                             <div className="absolute inset-0 bg-black/10 hover:bg-transparent transition-colors" />

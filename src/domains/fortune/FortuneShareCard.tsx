@@ -5,6 +5,9 @@ import { getTarotVisual, tarotAccent } from "./tarot-visuals";
 
 import type { FortuneResult, FortuneTab } from "./FortunePage";
 
+import { resolveAssetUrl } from "@/src/catalog-static";
+
+
 
 // 공유/저장용 포스터 카드 — html-to-image로 PNG 캡처되는 고정폭 세로 카드.
 // 운세 타입별 핵심 결과 + 하이라이트 대사 + 추천작 + 브랜딩을 한 장에 담는다.
@@ -106,7 +109,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
               }}
             >
               {character.avatarUrl ? (
-                <img src={character.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={resolveAssetUrl(character.avatarUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : null}
             </div>
             <div>

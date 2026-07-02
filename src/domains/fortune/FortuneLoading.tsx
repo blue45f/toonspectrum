@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 
 import type { FortuneTab } from "./FortunePage";
 
+import { resolveAssetUrl } from "@/src/catalog-static";
+
 // 탭별 결과 형태에 맞춘 스켈레톤 로딩 — DESIGN.md "스켈레톤 로딩, 스피너 금지" 준수.
 // 캐릭터 아바타 글로우 + 단계별 카피로 'AI가 점치는 중' 의식을 연출한다.
 
@@ -99,7 +101,7 @@ export function FortuneLoading({
           transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            <img src={resolveAssetUrl(avatarUrl)} alt="" className="h-full w-full object-cover" />
           ) : (
             <span className="skeleton block h-full w-full" />
           )}
