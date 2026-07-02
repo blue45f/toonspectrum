@@ -9836,6 +9836,10 @@ function StudioCuttoonEditor() {
                     <option value="soft-light">소프트 라이트 (Soft Light)</option>
                     <option value="difference">차이 (Difference)</option>
                     <option value="exclusion">제외 (Exclusion)</option>
+                    <option value="hue">색조 (Hue)</option>
+                    <option value="saturation">채도 (Saturation)</option>
+                    <option value="color">색상 (Color)</option>
+                    <option value="luminosity">광도 (Luminosity)</option>
                   </select>
                 </label>
               )}
