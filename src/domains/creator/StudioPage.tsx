@@ -74,6 +74,7 @@ import {
   Layers,
   Palette,
   Hand,
+  History as HistoryIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
@@ -107,7 +108,7 @@ import {
   stabilizePoint,
   STABILIZER_MAX,
 } from "./studio-brush";
-import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
+import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
@@ -118,6 +119,24 @@ import {
   type StudioPageInsertState,
   type StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
+import {
+  applyCropAspect,
+  beginCropDrag,
+  cropAspectRatio,
+  cropHandlePoints,
+  cropHitTolerance,
+  cropRectLocalPx,
+  cropShadeRects,
+  cropThirdsLines,
+  hitTestCropHandle,
+  initialCropRect,
+  isCropRectNoop,
+  planCropApply,
+  updateCropDrag,
+  type CropAspectId,
+  type CropDragSession,
+  type CropRect,
+} from "./studio-crop";
 import {
   applyDialogueTextEdit,
   applyReplacePlanToPages,
@@ -185,6 +204,12 @@ import {
   reorderPages,
 } from "./studio-pages";
 import {
+  konvaPatternProps,
+  loadPatternTileImage,
+  patternDataUrl,
+  type StudioPatternSpec,
+} from "./studio-pattern-fill";
+import {
   computeAlignDeltas,
   computeDistributeDeltas,
   normalizeMarqueeRect,
@@ -215,6 +240,7 @@ import {
   type SelectionFrame,
   type SelectionToolKind,
 } from "./studio-selection-tools";
+import { normalizeSkewPatch, toKonvaSkewAttrs } from "./studio-skew";
 import {
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
@@ -244,6 +270,7 @@ import {
 } from "./studio-watermark";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
+import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
 import type { StudioAsset } from "./studio-asset-library";
@@ -308,6 +335,9 @@ const StudioBubbleStylePresetPanel = lazy(() =>
 const StudioDialogueBatchPanel = lazy(() =>
   import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel }))
 );
+const StudioHistoryPanel = lazy(() =>
+  import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel }))
+);
 const StudioShortcutsHelp = lazy(() =>
   import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp }))
 );
@@ -320,6 +350,9 @@ const StudioTextEffectPanel = lazy(() =>
 const StudioGradientEnginePanel = lazy(() =>
   import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel }))
 );
+const StudioPatternFillPanel = lazy(() =>
+  import("./StudioPatternFillPanel").then((mod) => ({ default: mod.StudioPatternFillPanel }))
+);
 const StudioTextPathPanel = lazy(() =>
   import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel }))
 );
@@ -331,6 +364,9 @@ const StudioStrokeShapePanel = lazy(() =>
 );
 const StudioSelectionToolsPanel = lazy(() =>
   import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel }))
+);
+const StudioCropPanel = lazy(() =>
+  import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel }))
 );
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -558,6 +594,9 @@ export interface ImageEl {
   light?: Light;
   sketch?: Sketch;
   detail?: Detail;
+  // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
+  skewX?: number;
+  skewY?: number;
 }
 interface TextEl {
   id: string;
@@ -588,6 +627,8 @@ interface TextEl {
   gradientDirection?: "vertical" | "horizontal";
   gradient?: StudioGradientSpec; // 멀티스톱 그라데이션(엔진) — 있으면 위 2색 레거시 필드보다 우선.
   textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
+  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
+  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
 }
 interface BubbleEl {
   id: string;
@@ -603,6 +644,7 @@ interface BubbleEl {
   rotation: number;
   tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
   tailDirection?: "bottom" | "top" | "left" | "right"; // 말풍선 꼬리 방향(상하좌우).
+  extraTails?: BubbleTailSpec[]; // 추가 꼬리(두 화자 동시 대사) — 주 꼬리 외 최대 2개. studio-bubble-path 정규화 규약.
   font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
   fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
   lineHeight?: number; // 행간(배수, 미설정 시 1.1)
@@ -643,6 +685,8 @@ interface StickerEl {
   y: number;
   fontSize: number;
   rotation: number;
+  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
+  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
 }
 interface DrawEl {
   id: string;
@@ -655,6 +699,8 @@ interface DrawEl {
   opacity?: number;
   fill?: string;
   gradient?: StudioGradientSpec; // 도형 채우기 그라데이션(멀티스톱) — 미설정이면 fill 단색.
+  // 도형 채우기 패턴 — 우선순위: 패턴 > 그라데이션 > fill 단색. 타일 로드 전엔 아래 채우기가 폴백.
+  pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
   // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
@@ -1139,8 +1185,37 @@ function getSymmetricPoints(
   return result;
 }
 
+// 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
+// UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
+// 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다.
+// 로드 전/실패 시 null → konvaPatternProps가 no-op이 되어 fill/그라데이션 폴백 유지.
+function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageElement | null {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const tileSrc = pattern ? patternDataUrl(pattern) : null;
+  useEffect(() => {
+    if (!tileSrc) {
+      setImage(null);
+      return;
+    }
+    let active = true;
+    loadPatternTileImage(tileSrc, () => new globalThis.Image())
+      .then((img) => {
+        if (active) setImage(img);
+      })
+      .catch(() => {
+        if (active) setImage(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [tileSrc]);
+  return image;
+}
+
 function StudioDrawNode({ el }: { el: DrawEl }) {
   const kind = el.kind ?? "freehand";
+  // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
+  const patternImage = usePatternFillImage(el.pattern);
   const composite = el.mode === "eraser" ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
   const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
@@ -1166,6 +1241,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               height={Math.max(0.1, box.height)}
               fill={el.fill}
               {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: Math.max(0.1, box.width), height: Math.max(0.1, box.height) })}
+              {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
@@ -1189,6 +1265,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               radiusY={Math.max(0.1, box.height / 2)}
               fill={el.fill}
               {...konvaGradientProps(el.gradient, { x: -box.width / 2, y: -box.height / 2, width: Math.max(0.1, box.width), height: Math.max(0.1, box.height) })}
+              {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
@@ -1211,6 +1288,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               outerRadius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
               {...konvaGradientProps(el.gradient, { x: -Math.min(box.width, box.height) / 2, y: -Math.min(box.width, box.height) / 2, width: Math.max(0.1, Math.min(box.width, box.height)), height: Math.max(0.1, Math.min(box.width, box.height)) })}
+              {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
@@ -1251,6 +1329,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               sides={3}
               radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
+              {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
@@ -1272,6 +1351,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               sides={shapeParams.polygonSides}
               radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
               fill={el.fill}
+              {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
               strokeWidth={strokeWidth}
               opacity={opacity}
@@ -1827,6 +1907,48 @@ function StudioSelectionAntsOverlay({
   );
 }
 
+// 크롭 오버레이 — 크롭 모드 중 이미지 위에 크롭 rect(바깥 어둡게 마스킹 + 3분할선 + 8핸들)를
+// 그린다. 기하는 studio-crop 순수 헬퍼가 계산하고 여기서는 Konva 노드로 그리기만 한다.
+// listening=false — 포인터는 Stage 핸들러(onStageDown/Move/Up)가 히트테스트로 처리한다.
+function StudioCropOverlay({ rect, frame, scale }: { rect: CropRect; frame: SelectionFrame; scale: number }) {
+  const size = { width: frame.width, height: frame.height };
+  const border = cropRectLocalPx(rect, size);
+  const handleSide = 9 / scale; // 화면 9px 사각 핸들
+  return (
+    <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
+      {cropShadeRects(rect, size).map((s, i) => (
+        <Rect key={`crop-shade-${i}`} x={s.x} y={s.y} width={s.w} height={s.h} fill="rgba(9, 9, 11, 0.55)" />
+      ))}
+      {cropThirdsLines(rect, size).map((pts, i) => (
+        <Line key={`crop-third-${i}`} points={pts} stroke="rgba(255, 255, 255, 0.4)" strokeWidth={1 / scale} />
+      ))}
+      {/* 이중 테두리 — 어두운 밑줄 + 흰 실선이라 어떤 배경에서도 보인다. */}
+      <Rect
+        x={border.x}
+        y={border.y}
+        width={border.w}
+        height={border.h}
+        stroke="rgba(24, 24, 27, 0.6)"
+        strokeWidth={3 / scale}
+      />
+      <Rect x={border.x} y={border.y} width={border.w} height={border.h} stroke="#ffffff" strokeWidth={1.5 / scale} />
+      {cropHandlePoints(rect, size).map((hd) => (
+        <Rect
+          key={`crop-handle-${hd.id}`}
+          x={hd.x - handleSide / 2}
+          y={hd.y - handleSide / 2}
+          width={handleSide}
+          height={handleSide}
+          fill="#ffffff"
+          stroke="#18181b"
+          strokeWidth={1 / scale}
+          cornerRadius={2 / scale}
+        />
+      ))}
+    </Group>
+  );
+}
+
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
 function UrlImage({
   el,
@@ -1950,6 +2072,7 @@ function UrlImage({
       shadowOffsetY={el.shadowOffsetY ?? 0}
       shadowOpacity={el.shadowOpacity ?? 1}
       cornerRadius={el.cornerRadius ?? 0}
+      {...toKonvaSkewAttrs(el)}
       {...resizableNodeProps<Partial<ImageEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
     />
   );
@@ -2395,6 +2518,8 @@ function StudioCuttoonEditor() {
   const [dialogueScript, setDialogueScript] = useState("");
   // 배치된 대사 일괄 편집 패널(코미포식) — 목록 인라인 수정·찾아바꾸기·클릭 선택.
   const [dialogueBatchOpen, setDialogueBatchOpen] = useState(false);
+  // 작업 내역(히스토리) 패널 — 단계 목록 클릭으로 특정 시점 점프(포토샵 히스토리식).
+  const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -3145,6 +3270,53 @@ function StudioCuttoonEditor() {
     setPixelSel(null);
     setPixelBusy(false);
   }, [selectedId]);
+  // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
+  // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [cropAspect, setCropAspect] = useState<CropAspectId>("free");
+  const [cropBusy, setCropBusy] = useState(false);
+  // 진행 중 크롭 드래그 — ref 가 원본(포인터마다 갱신), rect 상태 반영은 RAF 로 합친다
+  // (픽셀 선택 미리보기와 동일 패턴). frame 은 드래그 시작 시점 스냅샷.
+  const cropDragRef = useRef<{ elId: string; frame: SelectionFrame; session: CropDragSession } | null>(null);
+  const cropRafRef = useRef<number | null>(null);
+  const pendingCropRectRef = useRef<CropRect | null>(null);
+  const scheduleCropRect = (next: CropRect) => {
+    pendingCropRectRef.current = next;
+    if (cropRafRef.current !== null) return;
+    cropRafRef.current = globalThis.requestAnimationFrame(() => {
+      cropRafRef.current = null;
+      if (pendingCropRectRef.current) setCropRect(pendingCropRectRef.current);
+    });
+  };
+  // 드래그 종료 시 RAF 대기분을 즉시 반영 — 마지막 이동이 유실되지 않는다.
+  const flushCropRect = () => {
+    if (cropRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(cropRafRef.current);
+      cropRafRef.current = null;
+    }
+    if (pendingCropRectRef.current) {
+      setCropRect(pendingCropRectRef.current);
+      pendingCropRectRef.current = null;
+    }
+  };
+  useEffect(
+    () => () => {
+      if (cropRafRef.current !== null) globalThis.cancelAnimationFrame(cropRafRef.current);
+    },
+    []
+  );
+  // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
+  useEffect(() => {
+    void selectedId; // "바뀌면 초기화"를 위해 의존성으로 구독.
+    cropDragRef.current = null;
+    pendingCropRectRef.current = null;
+    if (cropRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(cropRafRef.current);
+      cropRafRef.current = null;
+    }
+    setCropRect(null);
+    setCropBusy(false);
+  }, [selectedId]);
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
@@ -3214,6 +3386,9 @@ function StudioCuttoonEditor() {
       ? { x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: selected.rotation }
       : null;
   const pixelOverlaySel = pixelSel && (pixelSel.subpaths.length > 0 || pixelSel.invert) ? pixelSel : null;
+  // 크롭 모드 무장(이미지 요소 선택 + 크롭 rect 존재) — 무장 중엔 스테이지 드래그를 크롭 rect
+  // 조작으로 가로채고, 요소 드래그/클릭 선택 전환을 함께 잠근다(픽셀 선택 도구와 동일 정책).
+  const cropArmed = cropRect !== null && selected?.type === "image";
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -4514,6 +4689,8 @@ function StudioCuttoonEditor() {
   }
   const undo = () => setPagesHi((i) => Math.max(0, i - 1));
   const redo = () => setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
+  // 히스토리 목록 점프 — undo/redo 와 동일하게 pagesHi 인덱스만 이동(스냅샷 배열은 그대로 유지).
+  const jumpToHistoryIndex = (index: number) => setPagesHi(Math.max(0, Math.min(pagesHistory.length - 1, index)));
 
   // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
@@ -4571,6 +4748,9 @@ function StudioCuttoonEditor() {
           // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
           menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
           setMenu(null);
+        } else if (cropRect) {
+          // 크롭 모드를 먼저 종료(영역 폐기) — 다음 Esc 가 픽셀 선택/요소 선택을 해제한다.
+          setCropRect(null);
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
@@ -5214,10 +5394,90 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 이미지 크롭 적용 — 원본 자연 해상도로 잘라 data URL 교체(파괴적, 히스토리 1건) ──
+  // 크롭 후에도 화면상 위치가 유지되도록 src 와 요소 프레임(x/y/width/height)을 한 번의
+  // patchEl 로 함께 갱신한다(⌘Z 1회로 원복). 반전(flipX/flipY)·회전 보정은 planCropApply 가 담당.
+  async function applyCropToSelectedImage() {
+    if (cropBusy || !cropRect) return;
+    if (selected?.type !== "image") return;
+    if (isCropRectNoop(cropRect)) {
+      setCropRect(null); // 전체 영역 = 자를 것 없음 → 모드만 종료.
+      return;
+    }
+    const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷.
+    const rect = cropRect;
+    setCropBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const plan = planCropApply({
+        rect,
+        natural: { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height },
+        frame: { x: target.x, y: target.y, width: target.width, height: target.height, rotation: target.rotation },
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!plan) throw new Error("크롭 영역을 계산하지 못했습니다.");
+      const out = createPixelEditCanvas(plan.source.sw, plan.source.sh);
+      if (!out) throw new Error("크롭 캔버스를 만들지 못했습니다.");
+      out.ctx.drawImage(
+        img,
+        plan.source.sx,
+        plan.source.sy,
+        plan.source.sw,
+        plan.source.sh,
+        0,
+        0,
+        plan.source.sw,
+        plan.source.sh
+      );
+      // PNG: 투명 배경(누끼·스티커) 알파를 보존하는 무손실 포맷.
+      const src = out.canvas.toDataURL("image/png");
+      patchEl(target.id, {
+        src,
+        x: plan.el.x,
+        y: plan.el.y,
+        width: plan.el.width,
+        height: plan.el.height,
+      } as Partial<El>);
+      setCropRect(null);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply image crop:", err);
+      setError(err instanceof Error ? err.message : "이미지 크롭에 실패했습니다.");
+    } finally {
+      setCropBusy(false);
+    }
+  }
+
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle") {
       return;
+    }
+    // 크롭 모드 무장 중: 스테이지 드래그를 크롭 rect 조작(핸들 리사이즈/이동)으로 가로챈다.
+    // 아래 픽셀 선택보다 먼저 검사한다 — 크롭 진입 시 픽셀 도구를 끄지만, 혹시 겹치면 크롭 우선.
+    // 트랜스포머 앵커·Space 팬은 픽셀 선택과 동일하게 예외(크롭 rect 는 정규화라 리사이즈를 따라간다).
+    if (
+      cropRect &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      const handle = hitTestCropHandle(p, cropRect, cropHitTolerance(frame, 14 / effScale));
+      if (handle) {
+        cropDragRef.current = { elId: selected.id, frame, session: beginCropDrag(cropRect, handle, p) };
+      }
+      return; // 핸들 밖이어도 크롭 모드 중엔 마퀴·드로잉 등 다른 스테이지 제스처를 막는다.
     }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
@@ -5301,6 +5561,19 @@ function StudioCuttoonEditor() {
     }
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // 크롭 드래그 중이면 rect 를 갱신한다(시작 시점 스냅샷 기준 — 증분 오차 없음, RAF 합침).
+    if (cropDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = cropDragRef.current;
+        const next = updateCropDrag(session.session, canvasPointToNormalized(pos.x, pos.y, session.frame), {
+          ratio: cropAspectRatio(cropAspect),
+          frameAspect: session.frame.height > 0 ? session.frame.width / session.frame.height : 1,
+        });
+        scheduleCropRect(next);
+      }
+      return;
+    }
     // 픽셀 선택 드래그 중이면 궤적/박스를 갱신한다(시작 시점 프레임 스냅샷 기준 좌표 변환).
     // 올가미는 최소 간격 미만이면 같은 상태를 돌려주므로 그때는 RAF 예약도 건너뛴다.
     if (pixelDragRef.current) {
@@ -5411,6 +5684,12 @@ function StudioCuttoonEditor() {
     scheduleDraft(next);
   }
   function onStageUp() {
+    // 크롭 드래그 종료 — 마지막 RAF 대기분을 반영하고 세션만 닫는다(rect 는 적용 전까지 유지).
+    if (cropDragRef.current) {
+      cropDragRef.current = null;
+      flushCropRect();
+      return;
+    }
     // 픽셀 선택 드래그 종료: 의미 있는 면적이면 서브패스로 결합(찰나 클릭은 변화 없음 = null).
     if (pixelDragRef.current) {
       const session = pixelDragRef.current;
@@ -7057,6 +7336,16 @@ function StudioCuttoonEditor() {
         <button type="button" onClick={redo} disabled={hi >= history.length - 1} className={cn(toolBtn(false), "disabled:opacity-40")} title="다시실행">
           <Redo2 size={14} />
         </button>
+        <button
+          type="button"
+          onClick={() => setHistoryPanelOpen((v) => !v)}
+          aria-pressed={historyPanelOpen}
+          aria-label="작업 내역 (히스토리)"
+          className={toolBtn(historyPanelOpen)}
+          title="작업 내역 (히스토리)"
+        >
+          <HistoryIcon size={14} />
+        </button>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
         {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
         <div className="hidden items-center gap-1 lg:flex">
@@ -7732,12 +8021,14 @@ function StudioCuttoonEditor() {
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
-                // 픽셀 선택 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 선택 그리기로 간다.
-                const draggable = !opts.asMask && tool === "select" && !locked && !pixelToolArmed;
+                // 픽셀 선택/크롭 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
+                const draggable = !opts.asMask && tool === "select" && !locked && !pixelToolArmed && !cropArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
-                const onSelect = opts.asMask ? () => {} : () => tool === "select" && !pixelToolArmed && setSelectedId(el.id);
+                const onSelect = opts.asMask
+                  ? () => {}
+                  : () => tool === "select" && !pixelToolArmed && !cropArmed && setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -7854,6 +8145,7 @@ function StudioCuttoonEditor() {
                       shadowOffsetY={el.shadowOffsetY}
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
+                      {...toKonvaSkewAttrs(el)}
                       {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target;
@@ -7904,6 +8196,7 @@ function StudioCuttoonEditor() {
                       shadowOffsetY={el.shadowOffsetY}
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
+                      {...toKonvaSkewAttrs(el)}
                       {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target as Konva.Text;
@@ -7927,6 +8220,7 @@ function StudioCuttoonEditor() {
                       fontSize={el.fontSize}
                       rotation={el.rotation}
                       opacity={el.opacity ?? 1}
+                      {...toKonvaSkewAttrs(el)}
                       {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
                       onTransformEnd={(e) => {
                         const node = e.target as Konva.Text;
@@ -8009,7 +8303,15 @@ function StudioCuttoonEditor() {
                       side: "center",
                     }
                   : null;
-                const speechPathData = bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
+                // 추가 꼬리(두 화자 동시 대사)가 있으면 다중 꼬리 워커로 — 없으면 기존 단일 경로 바이트 동일 유지.
+                const bubbleExtraTails = normalizeExtraTails(el.extraTails);
+                const speechPathData =
+                  bubbleExtraTails.length > 0
+                    ? bubblePathDataMulti(el.width, el.height, bRadius, [
+                        ...(bubbleTailSpec ? [bubbleTailSpec] : []),
+                        ...bubbleExtraTails,
+                      ])
+                    : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
                 // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히).
                 const bubbleLineHeight =
                   el.lineHeight ?? (el.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
@@ -8472,6 +8774,12 @@ function StudioCuttoonEditor() {
                 />
               </Layer>
             )}
+            {/* 크롭 오버레이 — 크롭 모드 중 크롭 rect(바깥 어둡게 + 3분할선 + 8핸들). */}
+            {!isExporting && cropRect && pixelOverlayFrame && (
+              <Layer listening={false}>
+                <StudioCropOverlay rect={cropRect} frame={pixelOverlayFrame} scale={effScale} />
+              </Layer>
+            )}
             {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
               <Layer listening={false}>
                 {guides.x.map((gx) => (
@@ -8785,6 +9093,16 @@ function StudioCuttoonEditor() {
           {shortcutsOpen && (
             <Suspense fallback={null}>
               <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+            </Suspense>
+          )}
+          {historyPanelOpen && (
+            <Suspense fallback={null}>
+              <StudioHistoryPanel
+                history={pagesHistory}
+                currentIndex={pagesHi}
+                onJumpTo={jumpToHistoryIndex}
+                onClose={() => setHistoryPanelOpen(false)}
+              />
             </Suspense>
           )}
           {dialogueBatchOpen && (
@@ -9254,8 +9572,13 @@ function StudioCuttoonEditor() {
                     </span>
                   </label>
 
-                  {/* 도형 타입(rect, ellipse, star)일 경우 채우기 색상 조절 */}
-                  {(selected.kind === "rect" || selected.kind === "ellipse" || selected.kind === "star") && (
+                  {/* 채우기 가능 도형(rect/ellipse/star/triangle/polygon) 색상·그라데이션·패턴 조절.
+                      우선순위: 패턴 > 그라데이션 > 단색. 그라데이션 렌더는 rect/ellipse/star만 지원해 그 3종에만 노출. */}
+                  {(selected.kind === "rect" ||
+                    selected.kind === "ellipse" ||
+                    selected.kind === "star" ||
+                    selected.kind === "triangle" ||
+                    selected.kind === "polygon") && (
                     <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
                       <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기</p>
                       <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -9267,11 +9590,19 @@ function StudioCuttoonEditor() {
                           className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                         />
                       </div>
-                      <StudioGradientEnginePanel
-                        value={selected.gradient ?? null}
-                        onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
-                        title="그라데이션 채우기"
-                      />
+                      {(selected.kind === "rect" || selected.kind === "ellipse" || selected.kind === "star") && (
+                        <StudioGradientEnginePanel
+                          value={selected.gradient ?? null}
+                          onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
+                          title="그라데이션 채우기"
+                        />
+                      )}
+                      <div className="border-t border-line/40 pt-2.5">
+                        <StudioPatternFillPanel
+                          value={selected.pattern ?? null}
+                          onChange={(spec) => patchEl(selected.id, { pattern: spec ?? undefined } as Partial<El>)}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -9632,6 +9963,72 @@ function StudioCuttoonEditor() {
                       <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.tailHeight ?? 30}px</span>
                     </span>
                   </label>
+
+                  {/* 추가 꼬리 — 두 화자 동시 대사(합창) 말풍선. 주 꼬리 외 최대 2개. */}
+                  <div className="mt-2 border-t border-line/40 pt-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[0.72rem] font-semibold text-fg-2">추가 꼬리 (동시 대사)</p>
+                      <button
+                        type="button"
+                        disabled={normalizeExtraTails(selected.extraTails).length >= BUBBLE_MAX_TAILS - 1}
+                        onClick={() =>
+                          patchEl(selected.id, {
+                            extraTails: [
+                              ...normalizeExtraTails(selected.extraTails),
+                              { direction: "bottom", ratio: 0.75, length: 26, base: 18, side: "center" },
+                            ],
+                          } as Partial<El>)
+                        }
+                        className="rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] font-medium text-fg-2 hover:bg-raised disabled:opacity-40"
+                      >
+                        + 꼬리 추가
+                      </button>
+                    </div>
+                    {normalizeExtraTails(selected.extraTails).map((extraTail, extraIdx) => (
+                      <div key={extraIdx} className="mt-1.5 flex items-center gap-1.5">
+                        <select
+                          value={extraTail.direction}
+                          aria-label={`추가 꼬리 ${extraIdx + 1} 방향`}
+                          onChange={(e) => {
+                            const next = normalizeExtraTails(selected.extraTails);
+                            next[extraIdx] = { ...next[extraIdx], direction: e.target.value as BubbleTailSpec["direction"] };
+                            patchEl(selected.id, { extraTails: next } as Partial<El>);
+                          }}
+                          className="rounded border border-line bg-card px-1.5 py-1 text-[0.72rem] text-fg cursor-pointer"
+                        >
+                          <option value="bottom">아래</option>
+                          <option value="top">위</option>
+                          <option value="left">왼쪽</option>
+                          <option value="right">오른쪽</option>
+                        </select>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={0.9}
+                          step={0.05}
+                          value={extraTail.ratio}
+                          aria-label={`추가 꼬리 ${extraIdx + 1} 위치`}
+                          onChange={(e) => {
+                            const next = normalizeExtraTails(selected.extraTails);
+                            next[extraIdx] = { ...next[extraIdx], ratio: Number(e.target.value) };
+                            patchEl(selected.id, { extraTails: next } as Partial<El>);
+                          }}
+                          className="h-2 flex-1 accent-accent cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`추가 꼬리 ${extraIdx + 1} 제거`}
+                          onClick={() => {
+                            const next = normalizeExtraTails(selected.extraTails).filter((_, i) => i !== extraIdx);
+                            patchEl(selected.id, { extraTails: next.length ? next : undefined } as Partial<El>);
+                          }}
+                          className="rounded p-1 text-fg-3 hover:bg-raised hover:text-bad"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {(selected.type === "text" || selected.type === "bubble") && (
@@ -10210,6 +10607,17 @@ function StudioCuttoonEditor() {
                 </div>
               )}
 
+              {/* 기울이기(Skew) — 이미지/텍스트/스티커 자유 변형. 도 단위 저장, Konva 렌더 시 tangent 변환(studio-skew). */}
+              {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
+                <div className="mt-3 border-t border-line/50 pt-3">
+                  <StudioSkewPanel
+                    value={{ skewX: selected.skewX, skewY: selected.skewY }}
+                    onPatch={(patch) => patchEl(selected.id, normalizeSkewPatch(patch) as Partial<El>)}
+                    onReset={() => patchEl(selected.id, { skewX: undefined, skewY: undefined } as Partial<El>)}
+                  />
+                </div>
+              )}
+
               {/* 집중선 및 속도선 선 효과 설정 */}
               {selected.type === "focusLines" && (
                 <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
@@ -10596,6 +11004,33 @@ function StudioCuttoonEditor() {
                     onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
                     onClearSelection={() => setPixelSel(null)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
+                  />
+                  {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
+                  <StudioCropPanel
+                    active={!!cropRect}
+                    aspect={cropAspect}
+                    busy={cropBusy}
+                    canApply={!!cropRect && !isCropRectNoop(cropRect)}
+                    onToggle={() => {
+                      if (cropRect) {
+                        setCropRect(null);
+                        return;
+                      }
+                      // 크롭 진입 — 스테이지 제스처가 겹치지 않게 픽셀 선택 도구를 함께 끈다.
+                      setPixelTool(null);
+                      setPixelSel(null);
+                      setCropRect(initialCropRect());
+                    }}
+                    onAspectChange={(id) => {
+                      setCropAspect(id);
+                      const ratio = cropAspectRatio(id);
+                      if (ratio !== null && selected.height > 0) {
+                        setCropRect((r) => (r ? applyCropAspect(r, ratio, selected.width / selected.height) : r));
+                      }
+                    }}
+                    onReset={() => setCropRect(initialCropRect())}
+                    onApply={() => void applyCropToSelectedImage()}
+                    onCancel={() => setCropRect(null)}
                   />
                 </>
               )}

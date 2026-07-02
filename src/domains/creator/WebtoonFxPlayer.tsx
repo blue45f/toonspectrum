@@ -3,19 +3,31 @@
  * - 스크롤 리빌: 페이지가 화면에 들어오면 페이드업·줌 등으로 등장(IntersectionObserver).
  * - 분위기 오버레이: 비·눈·벚꽃 등 파티클을 화면 위에 sticky 캔버스로 깐다.
  * - BGM: 무드 자동생성(Web Audio) 또는 커스텀 URL을 사용자 제스처 후 재생.
- * 접근성: prefers-reduced-motion이면 리빌·파티클을 끄고 정적으로 보여준다.
+ * - 컷 오디오 연출: 컷 진입 시 SE 스팅어 1회 재생 + BGM 무드 전환(소리 꺼짐이면 무시,
+ *   빠른 스크롤 연타는 쿨다운으로 억제).
+ * 접근성: prefers-reduced-motion이면 리빌·파티클을 끄고 정적으로 보여준다(소리는 별개 토글).
  */
 import { Music, Pause, Play, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
-import { createBgmPlayer, findBgmMood, type BgmPlayer } from "./studio-bgm";
 import {
+  createBgmPlayer,
+  createDynamicBgmPlayer,
+  createSfxStingerPlayer,
+  findBgmMood,
+  type BgmPlayer,
+  type SfxStingerPlayer,
+} from "./studio-bgm";
+import {
+  CUT_BGM_SILENCE,
   REVEAL_SHOWN_STYLE,
   buildAmbientParticles,
   cutFx,
   emphasisAnimation,
   findAmbientPreset,
+  findSfxStingerPreset,
   hasAnyFx,
+  hasCutAudioFx,
   revealHiddenStyle,
   stepAmbientParticle,
   type AmbientParticle,
@@ -25,6 +37,19 @@ import {
 
 import { CoverImage } from "@/components/cover-image";
 import { cn } from "@/lib/utils";
+
+// 컷 진입 오디오 디렉터 — FxControlBar(플레이어 소유)가 채워 넣고, RevealPage의
+// IntersectionObserver가 컷 진입 시점에 호출한다. 상태를 ref로 건네 컷 수만큼 있는
+// 옵저버 effect를 소리 토글 때마다 재구독시키지 않는다. SE 연타 방지 쿨다운은
+// playStinger 내부(디렉터 소유)에서 적용된다.
+interface CutAudioDirector {
+  soundOn: boolean;
+  playStinger(presetId: string): void;
+  shiftBgm(mood: string): void;
+}
+
+// SE 연타 방지 쿨다운(ms) — 빠른 스크롤로 여러 컷이 연달아 들어와도 스팅어가 겹치지 않게.
+const SFX_COOLDOWN_MS = 380;
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -39,27 +64,40 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// 한 페이지(컷) 이미지를 감싸 스크롤 등장 효과 + 컷 강조 애니메이션을 적용한다.
-// 바깥 div가 리빌(opacity/transform transition), 안쪽 div가 강조(Web Animations)를 맡아 서로 안 부딪힌다.
+// 한 페이지(컷) 이미지를 감싸 스크롤 등장 효과 + 컷 강조 애니메이션 + 컷 진입 오디오
+// 트리거를 적용한다. 바깥 div가 리빌(opacity/transform transition), 안쪽 div가
+// 강조(Web Animations)를 맡아 서로 안 부딪힌다. 오디오 연출(SE·BGM 전환)은 모션이
+// 아니므로 prefers-reduced-motion과 무관하게 관찰한다(소리 여부는 디렉터가 판단).
 function RevealPage({
   src,
   alt,
   reveal,
   emphasis,
+  hasAudioFx,
   motionAllowed,
+  onEnter,
 }: {
   src: string;
   alt: string;
   reveal: string;
   emphasis: string;
+  hasAudioFx: boolean;
   motionAllowed: boolean;
+  onEnter: () => void;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const revealActive = motionAllowed && reveal !== "none";
   const emphasisActive = motionAllowed && emphasis !== "none";
-  const observe = revealActive || emphasisActive;
+  const observe = revealActive || emphasisActive || hasAudioFx;
   const [shown, setShown] = useState(!revealActive);
+  // 컷 진입 1회 판정 — effect 재구독(옵저버 재생성)이 있어도 오디오가 중복 발화하지 않게.
+  const enteredRef = useRef(false);
+  // 최신 onEnter 유지(latest-ref) — 콜백 정체가 바뀌어도 옵저버를 재구독하지 않는다.
+  const onEnterRef = useRef(onEnter);
+  useEffect(() => {
+    onEnterRef.current = onEnter;
+  });
 
   useEffect(() => {
     if (!observe) {
@@ -80,6 +118,10 @@ function RevealPage({
             const anim = emphasisAnimation(emphasis);
             if (anim) innerRef.current.animate(anim.keyframes, anim.options);
           }
+          if (hasAudioFx && !enteredRef.current) {
+            enteredRef.current = true;
+            onEnterRef.current();
+          }
           io.disconnect();
         }
       },
@@ -87,7 +129,7 @@ function RevealPage({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [observe, emphasisActive, emphasis]);
+  }, [observe, emphasisActive, emphasis, hasAudioFx]);
 
   const style = revealActive && !shown ? revealHiddenStyle(reveal) : REVEAL_SHOWN_STYLE;
   return (
@@ -208,11 +250,22 @@ function AmbientCanvas({ preset }: { preset: AmbientPreset }) {
   );
 }
 
-// 화면 하단 고정 효과툰 컨트롤 — 자동 재생(스스로 스크롤) + 배경음악.
-// 자동재생 정책상 BGM은 사용자가 재생을 눌러야 소리가 난다.
-function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
+// 화면 하단 고정 효과툰 컨트롤 — 자동 재생(스스로 스크롤) + 소리(배경음악·컷 효과음).
+// 자동재생 정책상 소리는 사용자가 켜야 난다. 컷 진입 SE/BGM 전환도 이 토글(음소거)을 존중한다.
+function FxControlBar({
+  fx,
+  hasSound,
+  directorRef,
+}: {
+  fx: WorkFxSettings;
+  hasSound: boolean;
+  directorRef: RefObject<CutAudioDirector | null>;
+}) {
   const playerRef = useRef<BgmPlayer | null>(null);
-  const [bgmOn, setBgmOn] = useState(false);
+  // SE 폴백 플레이어 — BGM 플레이어가 Web Audio 그래프를 안 가질 때(커스텀 URL)만 lazy 생성.
+  const stingerRef = useRef<SfxStingerPlayer | null>(null);
+  const sfxLastAtRef = useRef(0); // 마지막 스팅어 발화 시각(ms) — 연타 방지 쿨다운
+  const [soundOn, setSoundOn] = useState(false);
   const [volume, setVolume] = useState(fx.bgmVolume);
   const [autoPlay, setAutoPlay] = useState(false);
   const rafRef = useRef(0);
@@ -223,24 +276,59 @@ function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
     return () => {
       playerRef.current?.dispose();
       playerRef.current = null;
+      stingerRef.current?.dispose();
+      stingerRef.current = null;
+      directorRef.current = null;
     };
-  }, []);
+  }, [directorRef]);
 
-  const startBgm = () => {
-    if (!playerRef.current && hasBgm) {
-      playerRef.current = createBgmPlayer({
-        mood: fx.bgmUrl ? null : findBgmMood(fx.bgmMood),
-        url: fx.bgmUrl || undefined,
-        volume,
-      });
+  const startSound = () => {
+    if (!playerRef.current && hasSound) {
+      // 커스텀 URL이 있으면 그대로 루프 재생, 아니면 무드 전환·SE(컨텍스트 재사용)까지
+      // 지원하는 동적 신스 플레이어 — 기본 무드가 없어도(컷 전환 전용) 침묵으로 대기한다.
+      playerRef.current = fx.bgmUrl
+        ? createBgmPlayer({ url: fx.bgmUrl, volume })
+        : createDynamicBgmPlayer({ mood: findBgmMood(fx.bgmMood) ?? null, volume });
     }
     playerRef.current?.play();
-    setBgmOn(true);
+    setSoundOn(true);
   };
-  const stopBgm = () => {
+  const stopSound = () => {
     playerRef.current?.pause();
-    setBgmOn(false);
+    setSoundOn(false);
   };
+
+  // 컷 진입 오디오 디렉터 등록 — 매 렌더 최신 소리 상태·볼륨으로 갱신한다(값 대입만이라 저렴).
+  useEffect(() => {
+    directorRef.current = {
+      soundOn,
+      playStinger(presetId: string) {
+        const preset = findSfxStingerPreset(presetId);
+        if (!preset) return;
+        // 연타 방지 쿨다운 — 빠른 스크롤로 여러 컷이 연달아 들어와도 스팅어가 겹치지 않게.
+        const now = Date.now();
+        if (now - sfxLastAtRef.current < SFX_COOLDOWN_MS) return;
+        sfxLastAtRef.current = now;
+        const player = playerRef.current;
+        if (player?.playStinger) {
+          player.playStinger(preset, volume); // BGM 컨텍스트 재사용
+          return;
+        }
+        stingerRef.current ??= createSfxStingerPlayer({ volume });
+        stingerRef.current.play(preset);
+      },
+      shiftBgm(mood: string) {
+        const player = playerRef.current;
+        if (!player?.setMood) return; // 커스텀 URL BGM 등 무드 전환 미지원 — 조용히 무시
+        if (mood === CUT_BGM_SILENCE) {
+          player.setMood(null);
+          return;
+        }
+        const next = findBgmMood(mood);
+        if (next) player.setMood(next); // 모르는 무드 id는 무시(침묵으로 오해하지 않게)
+      },
+    };
+  });
 
   // 자동 스크롤 루프 — 일정 속도로 아래로 흘러가며 효과·BGM과 함께 감상.
   useEffect(() => {
@@ -273,10 +361,10 @@ function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
   const toggleAutoPlay = () => {
     const next = !autoPlay;
     setAutoPlay(next);
-    if (next && hasBgm && !bgmOn) startBgm(); // 재생 시작 시 BGM도 함께
+    if (next && hasSound && !soundOn) startSound(); // 재생 시작 시 소리도 함께
   };
 
-  const moodLabel = fx.bgmUrl ? "내 음악" : (findBgmMood(fx.bgmMood)?.label ?? "BGM");
+  const moodLabel = fx.bgmUrl ? "내 음악" : (findBgmMood(fx.bgmMood)?.label ?? "효과음");
 
   return (
     <div className="pointer-events-auto fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 py-2 shadow-xl backdrop-blur">
@@ -293,23 +381,23 @@ function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
         {autoPlay ? <Pause size={13} /> : <Play size={13} />}
         자동 재생
       </button>
-      {hasBgm && (
+      {hasSound && (
         <>
           <span className="h-4 w-px bg-line" />
           <button
             type="button"
-            onClick={() => (bgmOn ? stopBgm() : startBgm())}
-            aria-pressed={bgmOn}
+            onClick={() => (soundOn ? stopSound() : startSound())}
+            aria-pressed={soundOn}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
-              bgmOn ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
+              soundOn ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
             )}
-            title={bgmOn ? "배경음악 멈춤" : "배경음악 재생"}
+            title={soundOn ? "소리 끄기 (배경음악·컷 효과음)" : "소리 켜기 (배경음악·컷 효과음)"}
           >
             <Music size={13} />
             {moodLabel}
           </button>
-          <label className="flex items-center gap-1.5 text-fg-3" title="배경음악 음량">
+          <label className="flex items-center gap-1.5 text-fg-3" title="소리 음량">
             <Volume2 size={13} />
             <input
               type="range"
@@ -321,9 +409,10 @@ function FxControlBar({ fx, hasBgm }: { fx: WorkFxSettings; hasBgm: boolean }) {
                 const v = Number(e.target.value);
                 setVolume(v);
                 playerRef.current?.setVolume(v);
+                stingerRef.current?.setVolume(v);
               }}
               className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
-              aria-label="배경음악 음량"
+              aria-label="소리 음량"
             />
           </label>
         </>
@@ -344,7 +433,19 @@ export function WebtoonFxPlayer({
   const reduced = usePrefersReducedMotion();
   const ambientPreset = reduced ? undefined : findAmbientPreset(fx.ambient);
   const ambientOn = ambientPreset && ambientPreset.id !== "none";
-  const hasBgm = fx.bgmMood !== "" || fx.bgmUrl !== "";
+  // 소리 = 작품 BGM(무드/URL) 또는 컷 오디오 연출(SE·BGM 전환) — 하나라도 있으면 토글 노출.
+  const hasSound = fx.bgmMood !== "" || fx.bgmUrl !== "" || hasCutAudioFx(fx);
+  const directorRef = useRef<CutAudioDirector | null>(null);
+
+  // 컷 진입(IntersectionObserver 발화) — SE 스팅어 재생 + BGM 무드 전환.
+  // 소리가 꺼져 있으면(음소거) 아무것도 하지 않는다. 연타 방지는 디렉터가 맡는다.
+  const handleCutEnter = (index: number) => {
+    const director = directorRef.current;
+    if (!director || !director.soundOn) return;
+    const cut = cutFx(fx, index);
+    if (cut.bgmShift) director.shiftBgm(cut.bgmShift.mood); // 같은 무드 중복 전환은 플레이어가 무시
+    if (cut.sfx) director.playStinger(cut.sfx.preset); // 쿨다운은 디렉터 내부에서 적용
+  };
 
   return (
     <>
@@ -353,7 +454,7 @@ export function WebtoonFxPlayer({
           <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
         ) : (
           pages.map((page, index) => {
-            const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조
+            const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조 + 오디오 연출
             return (
               <RevealPage
                 key={`${page}-${index}`}
@@ -361,14 +462,18 @@ export function WebtoonFxPlayer({
                 alt={`${title} ${index + 1}컷`}
                 reveal={cut.reveal}
                 emphasis={cut.emphasis}
+                hasAudioFx={cut.sfx != null || cut.bgmShift != null}
                 motionAllowed={!reduced}
+                onEnter={() => handleCutEnter(index)}
               />
             );
           })
         )}
         {ambientOn && <AmbientCanvas preset={ambientPreset} />}
       </div>
-      {(hasAnyFx(fx) || pages.length >= 2) && <FxControlBar fx={fx} hasBgm={hasBgm} />}
+      {(hasAnyFx(fx) || pages.length >= 2) && (
+        <FxControlBar fx={fx} hasSound={hasSound} directorRef={directorRef} />
+      )}
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { bubblePathData, type BubbleTailSpec } from "./studio-bubble-path";
+import { bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
 
 const tail = (over: Partial<BubbleTailSpec> = {}): BubbleTailSpec => ({
   direction: "bottom",
@@ -58,5 +58,83 @@ describe("bubblePathData", () => {
     const center = bubblePathData(200, 120, 18, tail({ side: "center" }));
     const leaned = bubblePathData(200, 120, 18, tail({ side: "right" }));
     expect(center).not.toBe(leaned);
+  });
+});
+
+describe("다중 꼬리(bubblePathDataMulti)", () => {
+  const TAIL = (over: Partial<import("./studio-bubble-path").BubbleTailSpec> = {}) => ({
+    direction: "bottom" as const,
+    ratio: 0.5,
+    length: 24,
+    base: 18,
+    side: "center" as const,
+    ...over,
+  });
+
+  it("꼬리 0개면 단일 꼬리 없음 경로와 동일하다", () => {
+    expect(bubblePathDataMulti(200, 100, 12, [])).toBe(bubblePathData(200, 100, 12, null));
+  });
+
+  it("단일 path(M 1회)로 꼬리 수만큼 Q쌍이 들어간다", () => {
+    const d = bubblePathDataMulti(240, 120, 12, [
+      TAIL({ direction: "bottom", ratio: 0.25 }),
+      TAIL({ direction: "bottom", ratio: 0.75 }),
+      TAIL({ direction: "top", ratio: 0.5 }),
+    ]);
+    expect(d.match(/M /g)).toHaveLength(1);
+    expect(d.match(/Q /g)).toHaveLength(6); // 꼬리당 2개
+    expect(d.endsWith("Z")).toBe(true);
+  });
+
+  it("같은 변의 겹치는 꼬리는 진행 방향으로 밀려 겹치지 않는다", () => {
+    const d = bubblePathDataMulti(240, 120, 12, [
+      TAIL({ ratio: 0.5 }),
+      TAIL({ ratio: 0.5 }),
+    ]);
+    // 아랫변 홈 좌표 추출: "H x Q..." 패턴의 H 값들(아랫변은 x 감소 순회)
+    const hs = [...d.matchAll(/H (-?[\d.]+)/g)].map((m) => Number(m[1]));
+    expect(hs.length).toBeGreaterThanOrEqual(3);
+    // 결과 path에 NaN이 없어야 한다
+    expect(d.includes("NaN")).toBe(false);
+  });
+
+  it("최대 개수를 넘는 꼬리는 잘린다", () => {
+    const d = bubblePathDataMulti(300, 150, 10, [
+      TAIL({ ratio: 0.2 }),
+      TAIL({ ratio: 0.4 }),
+      TAIL({ ratio: 0.6 }),
+      TAIL({ ratio: 0.8 }),
+    ]);
+    expect(d.match(/Q /g)!.length).toBeLessThanOrEqual(6);
+  });
+
+  it("네 변 모두에 꼬리를 붙일 수 있고 좌표가 유한하다", () => {
+    const d = bubblePathDataMulti(200, 200, 14, [
+      TAIL({ direction: "top" }),
+      TAIL({ direction: "left" }),
+      TAIL({ direction: "right" }),
+    ]);
+    expect(d.includes("NaN")).toBe(false);
+    expect(d.match(/Q /g)).toHaveLength(6);
+  });
+});
+
+describe("normalizeExtraTails", () => {
+  it("쓰레기 입력은 빈 배열", () => {
+    expect(normalizeExtraTails(null)).toEqual([]);
+    expect(normalizeExtraTails("junk")).toEqual([]);
+    expect(normalizeExtraTails([{ direction: "diagonal" }])).toEqual([]);
+  });
+
+  it("유효 항목은 클램프되어 최대 2개까지 수용된다", () => {
+    const out = normalizeExtraTails([
+      { direction: "top", ratio: 9, length: 9999, base: 1, side: "left" },
+      { direction: "left", ratio: -1, length: 0.1, base: 999, side: "weird" },
+      { direction: "right", ratio: 0.5, length: 20, base: 16, side: "center" },
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ direction: "top", ratio: 1, length: 200, base: 4, side: "left" });
+    expect(out[1].side).toBe("center");
+    expect(out[1].direction).toBe("left");
   });
 });

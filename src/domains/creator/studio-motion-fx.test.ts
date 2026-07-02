@@ -1,18 +1,24 @@
 import { describe, it, expect } from "vitest";
 
+import { planMotionExport } from "./studio-motion-export";
 import {
   AMBIENT_PRESETS,
+  CUT_BGM_SILENCE,
   DEFAULT_WORK_FX,
   EMPHASIS_PRESETS,
   REVEAL_PRESETS,
+  SFX_STINGER_PRESETS,
   buildAmbientParticles,
   cutFx,
   emphasisAnimation,
   findAmbientPreset,
+  findSfxStingerPreset,
   hasAnyFx,
+  hasCutAudioFx,
   readWorkFx,
   revealHiddenStyle,
   stepAmbientParticle,
+  type WorkFxSettings,
 } from "./studio-motion-fx";
 
 describe("프리셋 데이터", () => {
@@ -96,6 +102,141 @@ describe("컷별 효과(cuts)", () => {
   it("cutFx: 범위 밖 인덱스는 작품 기본 + 강조 없음", () => {
     const fx = { ...DEFAULT_WORK_FX, reveal: "fade", cuts: [] };
     expect(cutFx(fx, 5)).toEqual({ reveal: "fade", emphasis: "none" });
+  });
+});
+
+describe("SE 스팅어 프리셋", () => {
+  it("8종이고 id가 유일하며 라벨이 기획(두근/쿵/휙/반짝/긴장/타격/또르르/빰)을 덮는다", () => {
+    expect(SFX_STINGER_PRESETS).toHaveLength(8);
+    const ids = SFX_STINGER_PRESETS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(SFX_STINGER_PRESETS.map((p) => p.label)).toEqual([
+      "두근",
+      "쿵",
+      "휙",
+      "반짝",
+      "긴장",
+      "타격",
+      "또르르",
+      "빰",
+    ]);
+  });
+
+  it("노트 파라미터가 Web Audio로 재생 가능한 범위다(양수 주파수·0..1 게인·어택<길이)", () => {
+    for (const p of SFX_STINGER_PRESETS) {
+      expect(p.duration).toBeGreaterThan(0);
+      expect(p.notes.length).toBeGreaterThan(0);
+      for (const n of p.notes) {
+        expect(n.at).toBeGreaterThanOrEqual(0);
+        expect(n.duration).toBeGreaterThan(0);
+        expect(n.at + n.duration).toBeLessThanOrEqual(p.duration + 1e-9); // 총 길이가 노트를 덮는다
+        expect(n.freq).toBeGreaterThan(0);
+        if (n.freqEnd != null) expect(n.freqEnd).toBeGreaterThan(0); // 지수 램프는 0을 못 지난다
+        expect(n.gain).toBeGreaterThan(0);
+        expect(n.gain).toBeLessThanOrEqual(1);
+        expect(n.attack).toBeGreaterThan(0);
+        expect(n.attack).toBeLessThan(n.duration);
+      }
+    }
+  });
+
+  it("findSfxStingerPreset", () => {
+    expect(findSfxStingerPreset("thud")?.label).toBe("쿵");
+    expect(findSfxStingerPreset("nope")).toBeUndefined();
+  });
+});
+
+describe("컷 오디오 필드(sfx·bgmShift) 정규화", () => {
+  it("유효한 sfx·bgmShift를 읽는다", () => {
+    const fx = readWorkFx({
+      fx: { cuts: [{ reveal: "", emphasis: "none", sfx: { preset: "thud" }, bgmShift: { mood: "tense" } }] },
+    });
+    expect(fx.cuts[0].sfx).toEqual({ preset: "thud" });
+    expect(fx.cuts[0].bgmShift).toEqual({ mood: "tense" });
+  });
+
+  it('bgmShift는 "silence"(음악 멈춤)도 허용한다', () => {
+    const fx = readWorkFx({ fx: { cuts: [{ bgmShift: { mood: CUT_BGM_SILENCE } }] } });
+    expect(fx.cuts[0].bgmShift).toEqual({ mood: "silence" });
+  });
+
+  it("잘못된 값은 키 자체를 만들지 않는다", () => {
+    const fx = readWorkFx({
+      fx: {
+        cuts: [
+          { sfx: { preset: "unknown" }, bgmShift: { mood: "" } }, // 모르는 프리셋 · 빈 무드
+          { sfx: "thud", bgmShift: 42 }, // 객체 아님
+          { sfx: {}, bgmShift: {} }, // 필드 누락
+        ],
+      },
+    });
+    for (const c of fx.cuts) {
+      expect("sfx" in c).toBe(false);
+      expect("bgmShift" in c).toBe(false);
+    }
+  });
+
+  it("구버전 doc(필드 없음)은 새 키가 생기지 않는다(직렬화 하위호환)", () => {
+    const fx = readWorkFx({ fx: { cuts: [{ reveal: "fade-up", emphasis: "shake" }] } });
+    expect(fx.cuts[0]).toEqual({ reveal: "fade-up", emphasis: "shake" });
+    expect(Object.keys(fx.cuts[0])).toEqual(["reveal", "emphasis"]);
+  });
+
+  it("cutFx는 sfx·bgmShift를 실효 효과에 실어 나른다(범위 밖·미지정은 undefined)", () => {
+    const fx: WorkFxSettings = {
+      ...DEFAULT_WORK_FX,
+      reveal: "fade",
+      cuts: [{ reveal: "", emphasis: "none", sfx: { preset: "hit" }, bgmShift: { mood: "epic" } }],
+    };
+    expect(cutFx(fx, 0)).toEqual({
+      reveal: "fade",
+      emphasis: "none",
+      sfx: { preset: "hit" },
+      bgmShift: { mood: "epic" },
+    });
+    expect(cutFx(fx, 3).sfx).toBeUndefined();
+    expect(cutFx(fx, 3).bgmShift).toBeUndefined();
+  });
+
+  it("hasAnyFx/hasCutAudioFx — 컷 오디오만 있어도 효과로 친다", () => {
+    const onlySfx: WorkFxSettings = {
+      ...DEFAULT_WORK_FX,
+      cuts: [{ reveal: "", emphasis: "none", sfx: { preset: "thud" } }],
+    };
+    const onlyShift: WorkFxSettings = {
+      ...DEFAULT_WORK_FX,
+      cuts: [{ reveal: "", emphasis: "none", bgmShift: { mood: "calm" } }],
+    };
+    expect(hasAnyFx(onlySfx)).toBe(true);
+    expect(hasAnyFx(onlyShift)).toBe(true);
+    expect(hasCutAudioFx(onlySfx)).toBe(true);
+    expect(hasCutAudioFx(onlyShift)).toBe(true);
+    expect(hasCutAudioFx(DEFAULT_WORK_FX)).toBe(false);
+    expect(hasCutAudioFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "zoom-in", emphasis: "shake" }] })).toBe(false);
+  });
+});
+
+// studio-motion-export는 수정 없이 새 컷 오디오 필드를 "모른 채" 동작해야 한다(무시 보장).
+describe("모션툰 영상 내보내기 하위호환", () => {
+  it("planMotionExport는 sfx·bgmShift가 있어도 플랜이 동일하다(필드 무시)", () => {
+    const opts = { fps: 10, revealSec: 0.5, holdSec: 1, tailSec: 0.5, width: 72, height: 128 };
+    const base: WorkFxSettings = {
+      ...DEFAULT_WORK_FX,
+      reveal: "fade-up",
+      bgmMood: "calm",
+      cuts: [
+        { reveal: "", emphasis: "shake" },
+        { reveal: "slide-in", emphasis: "none" },
+      ],
+    };
+    const withAudio: WorkFxSettings = {
+      ...base,
+      cuts: [
+        { reveal: "", emphasis: "shake", sfx: { preset: "thud" }, bgmShift: { mood: "tense" } },
+        { reveal: "slide-in", emphasis: "none", sfx: { preset: "sparkle" }, bgmShift: { mood: CUT_BGM_SILENCE } },
+      ],
+    };
+    expect(planMotionExport(2, withAudio, opts)).toEqual(planMotionExport(2, base, opts));
   });
 });
 
