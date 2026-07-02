@@ -101,26 +101,26 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
     }
   } catch {}
 
-  // Ensure pages sidebar/panel is visible (click open toggle if present)
-  try {
-    const openers = page.locator('button[title*="페이지 목록 펼치기"], button:has-text("페이지")').first();
-    if (await openers.isVisible({ timeout: 800 })) {
-      await openers.click({ timeout: 600 });
-      await page.waitForTimeout(300);
-      log(`run${run}: opened pages panel`);
-    }
-  } catch {}
-
   // Stable shipped observables + reliable card count for delta (page cards)
   const pageCards = page.locator('[data-testid="studio-page-item"]');
   const shell = page.locator('[data-studio-logical-w]');
 
-  // Find the exact add page button next to the "페이지 목록" header (prefer testid)
-  let addBtn = page.locator('[data-testid="studio-add-page"]');
-  if (!(await addBtn.isVisible({ timeout: 1200 }).catch(() => false))) {
-    addBtn = page.locator('div:has-text("페이지 목록")').locator('button:has-text("추가")').first();
-    log(`run${run}: using header-specific fallback for add button`);
+  // 페이지 사이드바는 leftPanelOpen 기본 true 라 보통 열려 있다. add 버튼(testid)이 안 보일 때만
+  // 명시적 "페이지 목록 펼치기" 버튼으로 연다. (기존 `button:has-text("페이지")` 토글은 접기/닫기
+  // 버튼까지 매칭해 열린 패널을 되레 닫아 run2 가 fallback 을 타던 취약성이 있어 쓰지 않는다.)
+  const addBtn = page.locator('[data-testid="studio-add-page"]');
+  if (!(await addBtn.isVisible({ timeout: 1000 }).catch(() => false))) {
+    try {
+      const expand = page.locator('button[title="페이지 목록 펼치기"]').first();
+      if (await expand.isVisible({ timeout: 800 }).catch(() => false)) {
+        await expand.click({ timeout: 600 });
+        await page.waitForTimeout(300);
+        log(`run${run}: expanded pages panel`);
+      }
+    } catch {}
   }
+  // 항상 안정적인 testid 로 페이지 추가한다(모호한 텍스트 fallback 제거 — "패널 추가" 등 오클릭 방지).
+  await addBtn.waitFor({ state: "visible", timeout: 4000 });
 
   const beforeCount = await pageCards.count().catch(() => 0);
   log(`run${run}: beforeCount=${beforeCount}`);
