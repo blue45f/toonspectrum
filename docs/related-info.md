@@ -48,3 +48,15 @@ NAVER_CLIENT_ID=xxx NAVER_CLIENT_SECRET=yyy YOUTUBE_API_KEY=zzz pnpm related:upd
 ```
 
 크롤러는 시작 시 소스별 모드(공식 API / 스크래핑)를 로그로 표시한다.
+
+## 커버리지 랭킹(알려진 특성)
+
+크롤 대상은 인기 상위 N개를 `popScore = views + likes*5 + bookmarks*4 + ratingCount*3`(scripts/crawl-related-info.mjs)
+로 고른다. 단 원시 `views` 는 플랫폼·연식에 따라 스케일 차가 크다(예: 오래된 네이버 데일리 웹툰은
+수십억, 카카오/최신작은 수백만) → **조회수 상위 = 오래된 고조회 네이버작에 치우친다.** 그래서
+글로벌 히트라도 플랫폼 집계 조회수가 낮은 작품(예: '나 혼자만 레벨업' 카카오 엔트리)은 top-N 밖에
+있을 수 있다. 이런 유명작은 `CURATED_DB`(수동 큐레이션 백업) 또는 나무위키 폴백으로 처리된다.
+
+커버리지를 넓힐 때(공식 API 키 설정 후 `--limit` 상향), 필요하면 랭킹 신호를 조정할 수 있다
+(예: 조회수 로그 스케일링, rating/bookmark 비중↑, 플랫폼 내 순위 블렌딩). 정답은 "실제로 상세를
+많이 보는 작품"인데 이는 실사용 로그가 있어야 검증되므로, 지금은 조회수 기준을 기본으로 둔다.
