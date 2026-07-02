@@ -4310,7 +4310,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
       role="dialog"
       style={{
         // 노치/홈인디케이터 안전영역을 모달 바깥 패딩에 반영해 하단(웹캠/푸터)이 잘리지 않게 한다.
@@ -4599,7 +4599,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <Sparkles size={13} aria-hidden />
                     무료 VRM 캐릭터 / 의상 / 악세사리 추천 사이트
                   </h4>
-                  <p className="mt-1 text-[0.62rem] leading-normal text-fg-2">
+                  <p className="mt-1 text-[0.68rem] leading-normal text-fg-2">
                     아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonSpectrum에 자유롭게 추가할 수 있습니다.
                   </p>
                   <div className="mt-2.5 space-y-2">
@@ -4613,7 +4613,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
                           VRoid Hub <ExternalLink size={10} className="opacity-60" />
                         </span>
-                        <span className="text-[0.62rem] text-fg-3 truncate">
+                        <span className="text-[0.68rem] text-fg-3 truncate">
                           'Free' 태그가 달린 수많은 고품질 무료 3D 캐릭터 다운로드
                         </span>
                       </div>
@@ -4628,7 +4628,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
                           BOOTH (무료 VRM 아바타) <ExternalLink size={10} className="opacity-60" />
                         </span>
-                        <span className="text-[0.62rem] text-fg-3 truncate">
+                        <span className="text-[0.68rem] text-fg-3 truncate">
                           의상, 헤어, 악세사리 등 3D 소스 무료 배포 카탈로그
                         </span>
                       </div>
@@ -4641,11 +4641,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <Paintbrush size={13} className="text-accent" aria-hidden />
                     나만의 캐릭터 만들기 (VRoid Studio)
                   </h4>
-                  <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
+                  <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
                     VRoid Studio는 코딩이나 모델링 지식 없이도 얼굴, 헤어, 의상 등을 마우스 클릭과 드래그로 자유롭게 디자인할 수 있는 무료 3D 아바타 제작 도구입니다.
                   </p>
                   
-                  <div className="mt-2.5 rounded-lg border border-line bg-panel p-2 text-[0.62rem] text-fg-3 space-y-1.5">
+                  <div className="mt-2.5 rounded-lg border border-line bg-panel p-2 text-[0.68rem] text-fg-3 space-y-1.5">
                     <div className="font-bold text-fg">💡 툰스펙트럼 적용 가이드:</div>
                     <ul className="list-decimal pl-3.5 space-y-1">
                       <li>PC/Mac 버전 VRoid Studio를 다운로드하여 설치합니다.</li>
@@ -4712,7 +4712,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
-                            <span className={cx("mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold", isActive ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>
+                            <span className={cx("mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.68rem] font-bold", isActive ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>
                               {entry.source === "sample" ? "번들" : "업로드"}
                             </span>
                           </span>
@@ -4797,7 +4797,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <Sliders size={14} className="text-accent" aria-hidden />
                   표정 세부 조절 (Blendshape Mix)
                 </h3>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   각 표정 슬라이더를 조절하여 여러 표정을 믹스해 보세요.
                 </p>
 
@@ -5026,7 +5026,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         type="button"
                         onClick={handleExportPoses}
                         disabled={savedPoses.length === 0}
-                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40"
+                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40"
                         title="JSON 파일로 백업 내보내기"
                       >
                         내보내기
@@ -5034,7 +5034,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       <button
                         type="button"
                         onClick={handleImportPoses}
-                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised hover:text-fg"
+                        className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg"
                         title="JSON 포즈 파일 가져오기"
                       >
                         가져오기
@@ -5099,7 +5099,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     포즈 서버에 공유
                   </button>
                 </div>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   다른 웹툰 작가들이 공유한 포즈를 내 캐릭터에 즉시 입히고, 나만의 멋진 포즈를 서버에 올려 공유하세요!
                 </p>
 
@@ -5135,11 +5135,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               <span className="block text-[0.7rem] font-bold truncate pr-4 text-fg" title={asset.name.replace("[3D_POSE] ", "")}>
                                 {asset.name.replace("[3D_POSE] ", "")}
                               </span>
-                              <span className="block text-[0.55rem] text-fg-3 truncate">
+                              <span className="block text-[0.68rem] text-fg-3 truncate">
                                 작성자: {asset.author?.name || "익명"}
                               </span>
                             </div>
-                            <span className="mt-1 block text-[0.55rem] text-fg-3 font-semibold">
+                            <span className="mt-1 block text-[0.68rem] text-fg-3 font-semibold">
                               다운로드 {asset.downloads}회
                             </span>
                           </button>
@@ -5165,9 +5165,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Shirt size={14} className="text-accent" aria-hidden />
                   3D 의상 실장착
-                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.55rem] font-bold text-accent">NEW</span>
+                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.68rem] font-bold text-accent">NEW</span>
                 </h3>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   색만 바뀌는 게 아니라 실제 3D 옷·신발이 장착됩니다. 포즈를 바꿔도 몸을 따라 움직이고, 어떤 모델이든 체형에 맞게 자동 핏돼요.
                 </p>
 
@@ -5206,7 +5206,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <button
                               type="button"
                               onClick={() => equipWardrobeItem(slot, null)}
-                              className="rounded-md px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-bad"
+                              className="rounded-md px-1.5 py-0.5 text-[0.68rem] font-semibold text-fg-3 hover:bg-raised hover:text-bad"
                             >
                               해제
                             </button>
@@ -5235,7 +5235,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         </div>
                         {equip ? (
                           <div className="mt-1.5 flex items-center gap-2.5">
-                            <label className="flex items-center gap-1 text-[0.62rem] font-semibold text-fg-2">
+                            <label className="flex items-center gap-1 text-[0.68rem] font-semibold text-fg-2">
                               색
                               <input
                                 type="color"
@@ -5245,7 +5245,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 aria-label={`${WARDROBE_SLOT_LABELS[slot]} 색상`}
                               />
                             </label>
-                            <label className="flex flex-1 items-center gap-1.5 text-[0.62rem] font-semibold text-fg-2">
+                            <label className="flex flex-1 items-center gap-1.5 text-[0.68rem] font-semibold text-fg-2">
                               품
                               <input
                                 type="range"
@@ -5267,7 +5267,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
 
                 <div className="mt-2.5 flex items-center justify-between gap-2">
-                  <label className="flex cursor-pointer items-center gap-1.5 text-[0.62rem] font-medium text-fg-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 text-[0.68rem] font-medium text-fg-2">
                     <input
                       type="checkbox"
                       checked={wardrobeAutoHide}
@@ -5292,7 +5292,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <Sliders size={14} className="text-accent" aria-hidden />
                   의상 및 신체 색상 변경
                 </h3>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   캐릭터의 부위별 색상을 자유롭게 변경해 보세요.
                 </p>
 
@@ -5429,7 +5429,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <span className="text-[0.7rem] font-bold text-fg-2">{label}</span>
                             <button
                               type="button"
-                              className="text-[0.62rem] text-accent hover:underline animate-fade-in"
+                              className="text-[0.68rem] text-accent hover:underline animate-fade-in"
                               disabled={!vrm}
                               onClick={() => {
                                 if (isFinger) {
@@ -5709,7 +5709,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   {/* 전체 상태 저장 · 불러오기 */}
                   <div className="space-y-2 border-t border-line/45 pt-3">
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">전체 상태 저장 · 불러오기</p>
-                    <p className="text-[0.62rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
+                    <p className="text-[0.68rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
                     <div className="flex gap-1.5">
                       <input value={fullStateName} onChange={e=>setFullStateName(e.target.value)} placeholder="상태 이름" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" />
                       <button type="button" onClick={handleSaveFullLocal} className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft">저장</button>
@@ -5735,7 +5735,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   생동감 연출 (대기 모션)
                 </h3>
-                <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
                   캐릭터가 정지해 있지 않고 자연스럽게 숨을 쉬고 눈을 깜빡이도록 설정하여 씬을 생생하게 연출합니다.
                 </p>
                 <div className="flex items-center justify-between text-xs text-fg-2 bg-card/40 border border-line/60 rounded-lg p-2.5">
@@ -5750,7 +5750,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   />
                 </div>
                 {webcamActive && (
-                  <p className="mt-1.5 text-[0.55rem] text-accent font-semibold leading-relaxed">
+                  <p className="mt-1.5 text-[0.68rem] text-accent font-semibold leading-relaxed">
                     ℹ️ 웹캠 실시간 페이스 트래킹이 활성화되어 대기 모션이 자동으로 일시 중지되었습니다.
                   </p>
                 )}
@@ -5762,7 +5762,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   소품 부착 (손·머리·몸)
                 </h3>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   캐릭터의 손·머리·몸 관절에 소품을 부착합니다. 포즈를 바꿔도 관절을 따라 움직여요.
                 </p>
                 {(["hand", "head", "body"] as PropCategory[]).map((cat) => (
@@ -5778,7 +5778,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           className="flex flex-col items-center gap-0.5 rounded-lg border border-line bg-card px-1 py-1.5 text-center text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40 transition-colors"
                           onClick={() => addVrmProp(def.id)}
                         >
-                          <span className="text-[0.55rem] font-semibold leading-tight">{def.label}</span>
+                          <span className="text-[0.68rem] font-semibold leading-tight">{def.label}</span>
                         </button>
                       ))}
                     </div>
@@ -5786,7 +5786,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 ))}
 
                 {vrmPropItems.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     부착된 소품이 없습니다. 위에서 소품을 눌러 추가하세요.
                   </p>
                 ) : (
@@ -5795,7 +5795,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       <p className="text-[0.65rem] font-bold text-fg-2">부착된 소품 ({vrmPropItems.length})</p>
                       <button
                         type="button"
-                        className="text-[0.62rem] text-fg-3 hover:underline"
+                        className="text-[0.68rem] text-fg-3 hover:underline"
                         onClick={() => {
                           setVrmPropItems([]);
                           setSelectedVrmPropUid(null);
@@ -5816,7 +5816,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               onClick={() => setSelectedVrmPropUid(isOpen ? null : item.uid)}
                             >
                               {def?.label ?? item.propId}
-                              <span className="ml-1 text-[0.58rem] font-normal text-fg-3">
+                              <span className="ml-1 text-[0.64rem] font-normal text-fg-3">
                                 · {PROP_BONE_LABELS[item.bone]}
                               </span>
                             </button>
@@ -5832,7 +5832,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           {isOpen && (
                             <div className="space-y-2.5 border-t border-line/40 px-2.5 py-2.5">
                               <div>
-                                <label htmlFor={`vrm-prop-bone-${item.uid}`} className="mb-1 block text-[0.62rem] font-semibold text-fg-2">부착 부위</label>
+                                <label htmlFor={`vrm-prop-bone-${item.uid}`} className="mb-1 block text-[0.68rem] font-semibold text-fg-2">부착 부위</label>
                                 <select
                                   id={`vrm-prop-bone-${item.uid}`}
                                   className="w-full rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] text-fg"
@@ -5845,10 +5845,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 </select>
                               </div>
                               <div>
-                                <p className="mb-1 text-[0.6rem] font-semibold text-fg-3">위치 (X / Y / Z)</p>
+                                <p className="mb-1 text-[0.66rem] font-semibold text-fg-3">위치 (X / Y / Z)</p>
                                 <div className="grid grid-cols-3 gap-2">
                                   {([0, 1, 2] as const).map((axis) => (
-                                    <label key={axis} className="block text-[0.55rem] text-fg-3">
+                                    <label key={axis} className="block text-[0.68rem] text-fg-3">
                                       {"XYZ"[axis]}: {item.position[axis].toFixed(2)}
                                       <input
                                         type="range" min="-0.5" max="0.5" step="0.01"
@@ -5865,10 +5865,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 </div>
                               </div>
                               <div>
-                                <p className="mb-1 text-[0.6rem] font-semibold text-fg-3">회전 (도)</p>
+                                <p className="mb-1 text-[0.66rem] font-semibold text-fg-3">회전 (도)</p>
                                 <div className="grid grid-cols-3 gap-2">
                                   {([0, 1, 2] as const).map((axis) => (
-                                    <label key={axis} className="block text-[0.55rem] text-fg-3">
+                                    <label key={axis} className="block text-[0.68rem] text-fg-3">
                                       {"XYZ"[axis]}: {Math.round(item.rotationDeg[axis])}°
                                       <input
                                         type="range" min="-180" max="180"
@@ -5885,7 +5885,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                <label className="flex-1 text-[0.6rem] text-fg-3">
+                                <label className="flex-1 text-[0.66rem] text-fg-3">
                                   크기 {item.scale.toFixed(1)}x
                                   <input
                                     type="range" min="0.2" max="4" step="0.1"
@@ -5895,7 +5895,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   />
                                 </label>
                                 {item.color !== null && (
-                                  <label className="flex flex-col items-center gap-0.5 text-[0.55rem] text-fg-3">
+                                  <label className="flex flex-col items-center gap-0.5 text-[0.68rem] text-fg-3">
                                     색상
                                     <input
                                       type="color"
@@ -5922,12 +5922,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   의상 분리 · 부분 채색
                 </h3>
                 {costumeMeshes.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     {vrm ? "이 모델은 의상 분리 정보가 없어요." : "모델을 먼저 불러오세요."}
                   </p>
                 ) : (
                   <>
-                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                    <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
                       탐지된 의상 메시를 슬롯별로 표시/숨김 토글하거나 색을 바꿉니다. 피부·얼굴·머리는 보호됩니다.
                     </p>
                     {(Object.keys(COSTUME_SLOT_LABELS) as CostumeSlot[]).map((slot) => {
@@ -5961,19 +5961,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                     <button
                                       type="button"
                                       className={cx(
-                                        "rounded px-1.5 py-0.5 text-[0.58rem] font-semibold transition-colors",
+                                        "rounded px-1.5 py-0.5 text-[0.64rem] font-semibold transition-colors",
                                         hidden ? "bg-card text-fg-3 line-through" : "bg-accent-soft text-accent"
                                       )}
                                       onClick={() => toggleCostumeMesh(entry.key)}
                                     >
                                       {hidden ? "숨김" : "표시"}
                                     </button>
-                                    <span className="flex-1 truncate text-[0.62rem] text-fg-2" title={entry.label}>
+                                    <span className="flex-1 truncate text-[0.68rem] text-fg-2" title={entry.label}>
                                       {entry.label}
                                     </span>
                                     <button
                                       type="button"
-                                      className="text-[0.58rem] text-fg-3 hover:underline"
+                                      className="text-[0.64rem] text-fg-3 hover:underline"
                                       onClick={() => setSelectedCostumeKey(isOpen ? null : entry.key)}
                                     >
                                       색상
@@ -5989,7 +5989,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                       />
                                       <button
                                         type="button"
-                                        className="rounded border border-line bg-card px-2 py-0.5 text-[0.58rem] text-fg-2 hover:bg-raised"
+                                        className="rounded border border-line bg-card px-2 py-0.5 text-[0.64rem] text-fg-2 hover:bg-raised"
                                         onClick={() => recolorCostumeMesh(entry.key, null)}
                                       >
                                         원래 색
@@ -6021,16 +6021,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   흔들림 물리 (머리카락·치마)
                 </h3>
                 {springJointCount === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     {vrm ? "이 모델에는 흔들림 뼈 정보가 없어요." : "모델을 먼저 불러오세요."}
                   </p>
                 ) : (
                   <>
-                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                    <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
                       흔들림 뼈 {springJointCount}개. 강도·중력·바람을 조절하면 정착된 정지 컷에 반영됩니다.
                     </p>
                     <div className="space-y-2.5">
-                      <label className="block text-[0.62rem] text-fg-2">
+                      <label className="block text-[0.68rem] text-fg-2">
                         <span className="flex justify-between"><span>흔들림 강도(탄성)</span><span>{vrmPhysics.stiffnessScale.toFixed(2)}</span></span>
                         <input
                           type="range" min="0" max="2" step="0.05"
@@ -6040,7 +6040,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           onChange={(e) => updatePhysics({ stiffnessScale: Number(e.target.value) })}
                         />
                       </label>
-                      <label className="block text-[0.62rem] text-fg-2">
+                      <label className="block text-[0.68rem] text-fg-2">
                         <span className="flex justify-between"><span>중력</span><span>{vrmPhysics.gravityScale.toFixed(2)}</span></span>
                         <input
                           type="range" min="0" max="2" step="0.05"
@@ -6050,7 +6050,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           onChange={(e) => updatePhysics({ gravityScale: Number(e.target.value) })}
                         />
                       </label>
-                      <label className="block text-[0.62rem] text-fg-2">
+                      <label className="block text-[0.68rem] text-fg-2">
                         <span className="flex justify-between"><span>바람 방향</span><span>{Math.round(vrmPhysics.windDirectionDeg)}°</span></span>
                         <input
                           type="range" min="-180" max="180"
@@ -6060,7 +6060,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           onChange={(e) => updatePhysics({ windDirectionDeg: Number(e.target.value) })}
                         />
                       </label>
-                      <label className="block text-[0.62rem] text-fg-2">
+                      <label className="block text-[0.68rem] text-fg-2">
                         <span className="flex justify-between"><span>바람 세기</span><span>{vrmPhysics.windStrength.toFixed(2)}</span></span>
                         <input
                           type="range" min="0" max="2" step="0.05"
@@ -6111,12 +6111,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   웹캠 실시간 페이스 트래킹
                 </h3>
                 {!vrm ? (
-                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.62rem] text-fg-3">
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     모델을 먼저 불러오세요.
                   </p>
                 ) : (
                   <>
-                    <p className="mb-2.5 text-[0.62rem] leading-relaxed text-fg-3">
+                    <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
                       내 행동이나 표정을 실시간으로 따라하게 만듭니다. 포즈 캡처를 클릭하면 현재 표정과 머리 각도가 저장됩니다.
                     </p>
 
@@ -6132,7 +6132,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             trackingOptions.mirrorMode ? "scale-x-[-1]" : ""
                           )}
                         />
-                        <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+                        <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[0.66rem] font-bold text-white">
                           <span
                             className={cx(
                               "size-1.5 rounded-full",
@@ -6143,7 +6143,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         </div>
                         {faceLostLong && (
                           <div
-                            className="absolute inset-x-2 bottom-2 rounded bg-black/70 px-2 py-1 text-center text-[0.6rem] font-semibold text-amber-300"
+                            className="absolute inset-x-2 bottom-2 rounded bg-black/70 px-2 py-1 text-center text-[0.66rem] font-semibold text-amber-300"
                             role="status"
                           >
                             얼굴이 보이지 않아요 — 카메라 정면에 위치해 주세요
@@ -6200,7 +6200,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               <p className="text-[0.65rem] opacity-90 text-left mb-1.5">
                                 브라우저 UI에서는 허용한 것처럼 보이지만, 여전히 즉시 차단됩니다. (두 단계 권한 모두 확인 필요)
                               </p>
-                              <ol className="list-decimal pl-4 text-[0.62rem] space-y-0.5 opacity-95">
+                              <ol className="list-decimal pl-4 text-[0.68rem] space-y-0.5 opacity-95">
                                 <li>이 사이트 <strong>정확한 주소</strong>(https://toonspectrum.vercel.app) 에서 브라우저 '자물쇠' → 카메라 '허용' (localhost와 별개)</li>
                                 <li><strong>macOS 시스템:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 브라우저 앱 스위치 <strong>켜기</strong></li>
                                 <li>설정 바꾼 후 브라우저 완전 종료 → 재시작 → 이 페이지 F5</li>
@@ -6339,7 +6339,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
                         {webcamActive && (
                           <div className="mt-2.5 space-y-2.5 rounded-lg border border-line/60 bg-card/20 p-2">
-                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
                               <span>거울 모드 (좌우 반전)</span>
                               <input
                                 type="checkbox"
@@ -6350,7 +6350,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 }
                               />
                             </div>
-                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
                               <span>시선 고정 (정면 바라보기)</span>
                               <input
                                 type="checkbox"
@@ -6361,7 +6361,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 }
                               />
                             </div>
-                            <div className="flex items-center justify-between text-[0.62rem] text-fg-2">
+                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
                               <span>손가락 추적 (재시작 시 적용)</span>
                               <input
                                 type="checkbox"
@@ -6372,7 +6372,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 }
                               />
                             </div>
-                            <div className="block text-[0.62rem] text-fg-2">
+                            <div className="block text-[0.68rem] text-fg-2">
                               <label htmlFor="tracking-sensitivity" className="flex justify-between mb-1">
                                 <span>트래킹 감도</span>
                                 <span>{trackingOptions.sensitivity.toFixed(1)}x</span>
@@ -6390,7 +6390,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 }
                               />
                             </div>
-                            <div className="block text-[0.62rem] text-fg-2 mt-2">
+                            <div className="block text-[0.68rem] text-fg-2 mt-2">
                               <label htmlFor="tracking-smoothing" className="flex justify-between mb-1">
                                 <span>트래킹 부드러움</span>
                                 <span>{Math.round((1 - trackingOptions.smoothing) * 100)}%</span>
@@ -6408,13 +6408,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 }
                               />
                             </div>
-                            <div className="space-y-1.5 border-t border-line/60 pt-2.5 text-[0.62rem] text-fg-2">
+                            <div className="space-y-1.5 border-t border-line/60 pt-2.5 text-[0.68rem] text-fg-2">
                               <div className="flex items-center justify-between">
                                 <span>정면 캘리브레이션{calibrated && !calibrating ? " · 적용됨" : ""}</span>
                                 {calibrated && !calibrating && (
                                   <button
                                     type="button"
-                                    className="rounded border border-line px-2 py-0.5 text-[0.6rem] text-fg-3 hover:bg-raised hover:text-fg"
+                                    className="rounded border border-line px-2 py-0.5 text-[0.66rem] text-fg-3 hover:bg-raised hover:text-fg"
                                     onClick={handleClearCalibration}
                                   >
                                     초기화
@@ -6437,7 +6437,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   {calibrated ? "다시 캘리브레이션" : "정면 캘리브레이션"}
                                 </button>
                               )}
-                              <p className="text-[0.58rem] leading-relaxed text-fg-3">
+                              <p className="text-[0.64rem] leading-relaxed text-fg-3">
                                 정면·무표정 기준으로 머리 각도와 시선, 눈 크기를 보정합니다. 비스듬히 앉아도 정면 응시가 유지됩니다.
                               </p>
                             </div>
@@ -6454,7 +6454,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   3D 소품 · 동물 배치
                 </h3>
-                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   캐릭터 주변에 귀여운 동물이나 소품을 추가해 보세요. 여러 개를 동시에 배치할 수 있습니다.
                 </p>
                 {(["animal", "item", "effect"] as const).map((cat) => {
@@ -6493,7 +6493,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               }}
                             >
                               <span className="text-base leading-none">{prop.emoji}</span>
-                              <span className="text-[0.55rem] font-semibold leading-tight">{prop.label}</span>
+                              <span className="text-[0.68rem] font-semibold leading-tight">{prop.label}</span>
                               {isActive && (
                                 <span 
                                   className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent"
@@ -6550,7 +6550,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         </span>
                         <button
                           type="button"
-                          className="text-[0.62rem] text-fg-3 hover:underline"
+                          className="text-[0.68rem] text-fg-3 hover:underline"
                           onClick={() => setSelectedPropId(null)}
                         >
                           설정 닫기
@@ -6590,9 +6590,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       {config.bone !== "none" && (
                         <div className="space-y-2.5">
                           <div className="border-t border-line/40 pt-2.5">
-                            <p className="text-[0.62rem] font-semibold text-fg-3 mb-1.5">위치 미세조정 (X / Y / Z)</p>
+                            <p className="text-[0.68rem] font-semibold text-fg-3 mb-1.5">위치 미세조정 (X / Y / Z)</p>
                             <div className="grid grid-cols-3 gap-2">
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 X: {(config.offsetX || 0).toFixed(2)}
                                 <input
                                   type="range"
@@ -6604,7 +6604,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   onChange={(e) => handleConfigChange({ offsetX: Number(e.target.value) })}
                                 />
                               </label>
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 Y: {(config.offsetY || 0).toFixed(2)}
                                 <input
                                   type="range"
@@ -6616,7 +6616,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   onChange={(e) => handleConfigChange({ offsetY: Number(e.target.value) })}
                                 />
                               </label>
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 Z: {(config.offsetZ || 0).toFixed(2)}
                                 <input
                                   type="range"
@@ -6632,9 +6632,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           </div>
 
                           <div className="border-t border-line/40 pt-2.5">
-                            <p className="text-[0.62rem] font-semibold text-fg-3 mb-1.5">회전 조정 (앞/뒤, 뒤틀기, 안/밖)</p>
+                            <p className="text-[0.68rem] font-semibold text-fg-3 mb-1.5">회전 조정 (앞/뒤, 뒤틀기, 안/밖)</p>
                             <div className="grid grid-cols-3 gap-2">
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 앞/뒤: {Math.round(config.rotX)}°
                                 <input
                                   type="range"
@@ -6645,7 +6645,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   onChange={(e) => handleConfigChange({ rotX: Number(e.target.value) })}
                                 />
                               </label>
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 뒤틀기: {Math.round(config.rotY)}°
                                 <input
                                   type="range"
@@ -6656,7 +6656,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   onChange={(e) => handleConfigChange({ rotY: Number(e.target.value) })}
                                 />
                               </label>
-                              <label className="block text-[0.55rem] text-fg-3">
+                              <label className="block text-[0.68rem] text-fg-3">
                                 안/밖: {Math.round(config.rotZ)}°
                                 <input
                                   type="range"
