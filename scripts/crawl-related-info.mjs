@@ -36,6 +36,15 @@ const REFRESH = args.includes("--refresh");
 const ONLY_ID = argVal("--id", null);
 const DELAY_MS = Number(argVal("--delay", "700")); // 소스 간·작품 간 예의상 간격
 
+// 공식 API 키(선택) — 설정돼 있으면 각 사 ToS 를 준수하는 "공식 검색 API" 를 우선 사용하고,
+// 없으면 HTML 스크래핑으로 폴백한다. 상업 서비스는 공식 API 사용을 권장(스크래핑은 각 사 약관 위반 소지).
+//   NAVER_CLIENT_ID / NAVER_CLIENT_SECRET — https://developers.naver.com 검색 API(무료, 뉴스/블로그)
+//   YOUTUBE_API_KEY                       — https://console.cloud.google.com YouTube Data API v3(일 1만 쿼터 무료, 스로틀 없음)
+const NAVER_ID = process.env.NAVER_CLIENT_ID || "";
+const NAVER_SECRET = process.env.NAVER_CLIENT_SECRET || "";
+const YT_API_KEY = process.env.YOUTUBE_API_KEY || "";
+const hasNaverApi = Boolean(NAVER_ID && NAVER_SECRET);
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchHtml(url, { referer } = {}) {
@@ -121,7 +130,27 @@ async function fetchYoutubeHtml(query) {
   }
 }
 
+// YouTube Data API v3(키 있으면) — ToS 준수 + 스로틀 없음. 없으면 검색 HTML 스크래핑 폴백.
+async function youtubeApi(query, max) {
+  try {
+    const r = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${max}` +
+        `&relevanceLanguage=ko&regionCode=KR&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`
+    );
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.items || [])
+      .filter((it) => it.id?.videoId)
+      .slice(0, max)
+      .map((it) => ({ id: it.id.videoId, title: decodeEntities(it.snippet?.title || ""), views: undefined }))
+      .filter((v) => v.title);
+  } catch {
+    return [];
+  }
+}
+
 async function crawlYoutube(query, max = 3) {
+  if (YT_API_KEY) return youtubeApi(query, max);
   const html = await fetchYoutubeHtml(query);
   if (!html) return [];
   const out = [];
@@ -179,8 +208,30 @@ async function naverResultUrls(where, query, pattern, max) {
   return urls;
 }
 
-// ── 네이버 뉴스: 실제 기사(n.news.naver.com) 링크 + 각 기사 og:title(정확) ──
+// 네이버 검색 오픈 API(뉴스/블로그) — ToS 준수. items[].title 은 <b> 태그·HTML 엔티티 포함이라 정제.
+async function naverSearchApi(kind, query, display) {
+  try {
+    const r = await fetch(
+      `https://openapi.naver.com/v1/search/${kind}.json?query=${encodeURIComponent(query)}&display=${display}&sort=sim`,
+      { headers: { "X-Naver-Client-Id": NAVER_ID, "X-Naver-Client-Secret": NAVER_SECRET } }
+    );
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j.items) ? j.items : [];
+  } catch {
+    return [];
+  }
+}
+
+// ── 네이버 뉴스: 공식 API 우선(키 있으면), 없으면 실제 기사 링크 + og:title 스크래핑 ──
 async function crawlNaverNews(query, max = 2) {
+  if (hasNaverApi) {
+    const items = await naverSearchApi("news", query, max);
+    return items.slice(0, max).map((it, i) => ({
+      url: it.link || it.originallink,
+      title: decodeEntities(it.title) || `${query} 관련 뉴스 ${i + 1}`,
+    })).filter((it) => it.url);
+  }
   const urls = await naverResultUrls("news", query, /https?:\/\/n\.news\.naver\.com\/[^\s"'<>\\]+/g, max);
   const titles = await Promise.all(urls.map((u) => fetchOgTitle(u)));
   return urls.map((url, i) => ({
@@ -189,8 +240,15 @@ async function crawlNaverNews(query, max = 2) {
   }));
 }
 
-// ── 네이버 블로그: 실제 포스트 링크 + 각 포스트 og:title(모바일 페이지에서 정확) ──
+// ── 네이버 블로그: 공식 API 우선(키 있으면), 없으면 실제 포스트 링크 + og:title 스크래핑 ──
 async function crawlNaverBlog(query, max = 1) {
+  if (hasNaverApi) {
+    const items = await naverSearchApi("blog", query, max);
+    return items.slice(0, max).map((it) => ({
+      url: it.link,
+      title: decodeEntities(it.title) || `${query} 후기·리뷰 블로그`,
+    })).filter((it) => it.url);
+  }
   const urls = await naverResultUrls("blog", query, /https?:\/\/blog\.naver\.com\/[A-Za-z0-9_-]+\/\d{6,}/g, max);
   // 데스크톱 blog.naver.com 은 iframe 이라 og:title 이 빈약 → m.blog 로 실제 제목을 읽는다.
   const titles = await Promise.all(urls.map((u) => fetchOgTitle(u.replace("blog.naver.com", "m.blog.naver.com"))));
@@ -284,6 +342,16 @@ function persist(data) {
 }
 
 async function main() {
+  // 소스별 모드 표시(투명성): 공식 API(ToS 준수) vs HTML 스크래핑 폴백.
+  console.log(
+    `소스 모드 — 유튜브: ${YT_API_KEY ? "공식 API" : "스크래핑(스로틀 있음)"} · ` +
+      `네이버 뉴스/블로그: ${hasNaverApi ? "공식 API" : "스크래핑"} · 나무위키: 문서 존재확인`
+  );
+  if (!YT_API_KEY || !hasNaverApi) {
+    console.log(
+      "  ↳ 공식 API 키를 설정하면 ToS 준수+품질↑+유튜브 스로틀 해소: NAVER_CLIENT_ID/NAVER_CLIENT_SECRET, YOUTUBE_API_KEY"
+    );
+  }
   if (!existsSync(CATALOG)) {
     console.error(`catalog not found: ${CATALOG} — run 'pnpm catalog:gen' first`);
     process.exit(1);

@@ -51,6 +51,10 @@ jobs:
       - name: Crawl related info (additive)
         env:
           TZ: Asia/Seoul
+          # 공식 API 키(선택). Secrets 에 설정하면 ToS 준수 API 로 수집(스크래핑 폴백 대신).
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: node scripts/crawl-related-info.mjs --limit "${{ github.event.inputs.limit || '300' }}"
 
       - name: Commit & push (변경 있을 때만)
