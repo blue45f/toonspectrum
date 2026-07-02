@@ -6035,14 +6035,14 @@ function StudioCuttoonEditor() {
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   const mobileBarBtn = (active: boolean) =>
     cn(
-      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.62rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
     );
 
   // 모바일 하단 '드로잉 도구' 버튼 — 한 손 조작용 큰 터치 타깃(>=44px). 활성 도구는 감귤색으로 또렷하게.
   const mobileDrawToolBtn = (active: boolean) =>
     cn(
-      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.66rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
       active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
 
@@ -6452,7 +6452,7 @@ function StudioCuttoonEditor() {
             <div className="fixed inset-x-2 top-[4.5rem] z-30 grid max-h-[calc(100dvh-9.5rem)] w-auto gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-80 lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:shadow-lg">
               {TEMPLATE_GROUPS.map((group) => (
                 <div key={group.group} className="grid gap-1">
-                  <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
+                  <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
                   {group.templates.map((t) => (
                     <button
                       key={t.id}
@@ -6468,7 +6468,7 @@ function StudioCuttoonEditor() {
               ))}
               {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
               <div className="grid gap-1 border-t border-line pt-1.5">
-                <p className="px-1 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
+                <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
                 {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
                   <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
                 )}
@@ -6581,7 +6581,7 @@ function StudioCuttoonEditor() {
                       onClick={() => setBgSceneGenreFilter(genre)}
                       aria-pressed={bgSceneGenreFilter === genre}
                       className={cn(
-                        "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                        "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
                         bgSceneGenreFilter === genre ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                       )}
                     >
@@ -6602,12 +6602,12 @@ function StudioCuttoonEditor() {
                 {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
                   <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                     <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                    <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                   </div>
                 )}
                 {bgSceneSectionsFiltered.map((group) => (
                   <div key={group.genre}>
-                    <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
+                    <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
                     <div className="grid grid-cols-3 gap-1.5">
                       {group.scenes.map((bg) => (
                         <button
@@ -6620,7 +6620,7 @@ function StudioCuttoonEditor() {
                           <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
                             <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                           </div>
-                          <span className="block text-center text-[0.6rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                          <span className="block text-center text-[0.66rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
                         </button>
                       ))}
                     </div>
@@ -6705,7 +6705,7 @@ function StudioCuttoonEditor() {
                       onClick={() => setEmeresCategoryFilter(category)}
                       aria-pressed={emeresCategoryFilter === category}
                       className={cn(
-                        "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                        "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
                         emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                       )}
                     >
@@ -6724,12 +6724,12 @@ function StudioCuttoonEditor() {
                 {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
                   <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                     <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                    <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                   </div>
                 )}
                 {emeresSectionsFiltered.map((section) => (
                   <div key={section.category}>
-                    <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
+                    <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {section.templates.map((t) => (
                         <button
@@ -6742,7 +6742,7 @@ function StudioCuttoonEditor() {
                           <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
                             <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
                           </div>
-                          <span className="mt-1 block truncate text-center text-[0.6rem] font-medium text-fg-2">{t.label}</span>
+                          <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
                         </button>
                       ))}
                     </div>
@@ -6774,7 +6774,7 @@ function StudioCuttoonEditor() {
                   if (items.length === 0) return null;
                   return (
                     <div key={cat.id}>
-                      <p className="mb-1 px-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
+                      <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
                       <div className="grid gap-1">
                         {items.map((t) => (
                           <button
@@ -6784,7 +6784,7 @@ function StudioCuttoonEditor() {
                             className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
                           >
                             <span className="block text-xs font-semibold text-fg">{t.label}</span>
-                            <span className="block text-[0.62rem] text-fg-3">{t.description}</span>
+                            <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
                           </button>
                         ))}
                       </div>
@@ -6829,7 +6829,7 @@ function StudioCuttoonEditor() {
                         title="이 클립을 캔버스에 넣기"
                       >
                         {c.name}
-                        <span className="ml-1 text-[0.6rem] text-fg-3">{(c.els as unknown[]).length}개</span>
+                        <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
                       </button>
                       <button
                         type="button"
@@ -6870,7 +6870,7 @@ function StudioCuttoonEditor() {
               </div>
               <div className="mt-2 border-t border-line pt-2">
                 <p className="mb-1 text-[0.66rem] font-medium text-fg-3">대사 한 번에</p>
-                <p className="mb-1.5 text-[0.6rem] leading-snug text-fg-3">
+                <p className="mb-1.5 text-[0.66rem] leading-snug text-fg-3">
                   한 줄에 한 대사. <span className="text-fg-3">이름: 대사</span>로 화자 지정(좌/우 자동), <span className="text-fg-3">(지문)</span>은 나레이션.
                 </p>
                 <textarea
@@ -6938,7 +6938,7 @@ function StudioCuttoonEditor() {
                     onClick={() => setFxPickerSection(section.id)}
                     aria-pressed={fxPickerSection === section.id}
                     className={cn(
-                      "rounded-full border px-2 py-0.5 text-[0.6rem] font-medium transition-colors",
+                      "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
                       fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                     )}
                   >
@@ -7046,7 +7046,7 @@ function StudioCuttoonEditor() {
               {!fxPickerHasResults && fxQuery !== "" && (
                 <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                   <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                  <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                  <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                 </div>
               )}
             </div>
@@ -7449,7 +7449,7 @@ function StudioCuttoonEditor() {
             title="페이지 목록 펼치기"
           >
             <ChevronRight size={14} />
-            <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">페이지</span>
+            <span className="text-[0.68rem] font-semibold [writing-mode:vertical-rl]">페이지</span>
           </button>
         )}
         <div
@@ -7860,7 +7860,7 @@ function StudioCuttoonEditor() {
                     <button
                       type="button"
                       onClick={() => alignSelected("distributeH")}
-                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.6rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
                       title="가로 간격 동일하게 정렬"
                     >
                       가로 분배
@@ -7868,7 +7868,7 @@ function StudioCuttoonEditor() {
                     <button
                       type="button"
                       onClick={() => alignSelected("distributeV")}
-                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.6rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
+                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
                       title="세로 간격 동일하게 정렬"
                     >
                       세로 분배
@@ -9207,7 +9207,7 @@ function StudioCuttoonEditor() {
             title="속성 패널 펼치기"
           >
             <ChevronLeft size={14} />
-            <span className="text-[0.62rem] font-semibold [writing-mode:vertical-rl]">속성</span>
+            <span className="text-[0.68rem] font-semibold [writing-mode:vertical-rl]">속성</span>
           </button>
         )}
         <aside
@@ -9244,7 +9244,7 @@ function StudioCuttoonEditor() {
             <button
               type="button"
               onClick={() => setRightPanelOpen(false)}
-              className="inline-flex items-center gap-0.5 rounded text-[0.62rem] text-fg-3 transition-colors hover:text-fg"
+              className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
               title="속성 패널 접기"
             >
               접기 <ChevronRight size={13} />
@@ -9271,7 +9271,7 @@ function StudioCuttoonEditor() {
             </div>
             {/* 그라디언트 배경 프리셋 — 세로 그라데이션으로 페이지 배경을 칠한다(웹툰 시간대·무드). */}
             <div className="mt-2">
-              <p className="mb-1 text-[0.62rem] font-medium text-fg-3">그라디언트 배경</p>
+              <p className="mb-1 text-[0.68rem] font-medium text-fg-3">그라디언트 배경</p>
               <div className="flex flex-wrap gap-1.5">
                 {GRADIENT_PRESETS.map((g) => {
                   const [c0, c1] = gradientToBgGrad(g);
@@ -9372,7 +9372,7 @@ function StudioCuttoonEditor() {
                 />
               </label>
               {showWebtoonGuides && (
-                <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.62rem] leading-snug text-fg-3">
+                <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.68rem] leading-snug text-fg-3">
                   {webtoonGuides
                     ? (() => {
                         const len = webtoonGuides.episodeLengthLabel(canvasH);
@@ -9400,7 +9400,7 @@ function StudioCuttoonEditor() {
                         { id: uid(), type: "v", pos: 400 },
                       ]);
                     }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
+                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
                   >
                     + 세로 가이드
                   </button>
@@ -9412,7 +9412,7 @@ function StudioCuttoonEditor() {
                         { id: uid(), type: "h", pos: canvasH / 2 },
                       ]);
                     }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
+                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
                   >
                     + 가로 가이드
                   </button>
@@ -9471,7 +9471,7 @@ function StudioCuttoonEditor() {
                     type="button"
                     onClick={() => setWebtoonTheme(style)}
                     className={cn(
-                      "rounded py-1 text-[0.6rem] font-semibold transition-colors",
+                      "rounded py-1 text-[0.66rem] font-semibold transition-colors",
                       webtoonTheme === style
                         ? "bg-accent text-on-accent"
                         : "text-fg-2 hover:bg-raised"
@@ -9492,7 +9492,7 @@ function StudioCuttoonEditor() {
                   <button
                     type="button"
                     onClick={() => setPageGradePanelOpen(false)}
-                    className="inline-flex items-center gap-0.5 rounded text-[0.62rem] text-fg-3 transition-colors hover:text-fg"
+                    className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
                     title="색보정 패널 접기"
                   >
                     접기 <ChevronUp size={13} />
@@ -9657,7 +9657,7 @@ function StudioCuttoonEditor() {
                         type="button"
                         onClick={() => patchEl(selected.id, { fillType: mode.v as "solid" | "gradient" } as Partial<El>)}
                         className={cn(
-                          "flex-1 rounded py-1 text-[0.62rem] font-semibold transition-colors",
+                          "flex-1 rounded py-1 text-[0.68rem] font-semibold transition-colors",
                           (selected.fillType ?? "solid") === mode.v
                             ? "bg-accent text-on-accent"
                             : "text-fg-2 hover:bg-raised"
@@ -9889,7 +9889,7 @@ function StudioCuttoonEditor() {
                             type="button"
                             onClick={() => patchEl(selected.id, { tail: t.v } as Partial<El>)}
                             className={cn(
-                              "rounded px-2 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
+                              "rounded px-2 py-0.5 text-[0.68rem] font-medium transition-colors cursor-pointer",
                               (selected.tail ?? "left") === t.v
                                 ? "bg-accent text-on-accent shadow-sm font-semibold"
                                 : "text-fg-2 hover:bg-raised"
@@ -9916,7 +9916,7 @@ function StudioCuttoonEditor() {
                               type="button"
                               onClick={() => patchEl(selected.id, { tailDirection: td.v as "top" | "bottom" | "left" | "right" } as Partial<El>)}
                               className={cn(
-                                "rounded px-1.5 py-0.5 text-[0.62rem] font-medium transition-colors cursor-pointer",
+                                "rounded px-1.5 py-0.5 text-[0.68rem] font-medium transition-colors cursor-pointer",
                                 (selected.tailDirection ?? "bottom") === td.v
                                   ? "bg-accent text-on-accent shadow-sm font-semibold"
                                   : "text-fg-2 hover:bg-raised"
@@ -10543,7 +10543,7 @@ function StudioCuttoonEditor() {
                   <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">위치 및 크기</p>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex flex-col gap-0.5">
-                      <span className="text-[0.6rem] text-fg-3">가로 위치 (X)</span>
+                      <span className="text-[0.66rem] text-fg-3">가로 위치 (X)</span>
                       <input
                         type="number"
                         value={Math.round(selected.x)}
@@ -10552,7 +10552,7 @@ function StudioCuttoonEditor() {
                       />
                     </label>
                     <label className="flex flex-col gap-0.5">
-                      <span className="text-[0.6rem] text-fg-3">세로 위치 (Y)</span>
+                      <span className="text-[0.66rem] text-fg-3">세로 위치 (Y)</span>
                       <input
                         type="number"
                         value={Math.round(selected.y)}
@@ -10562,7 +10562,7 @@ function StudioCuttoonEditor() {
                     </label>
                     {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame" || selected.type === "text") && (
                       <label className="flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-fg-3">너비 (Width)</span>
+                        <span className="text-[0.66rem] text-fg-3">너비 (Width)</span>
                         <input
                           type="number"
                           value={Math.round(selected.width)}
@@ -10573,7 +10573,7 @@ function StudioCuttoonEditor() {
                     )}
                     {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame") && (
                       <label className="flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-fg-3">높이 (Height)</span>
+                        <span className="text-[0.66rem] text-fg-3">높이 (Height)</span>
                         <input
                           type="number"
                           value={Math.round(selected.height)}
@@ -10584,7 +10584,7 @@ function StudioCuttoonEditor() {
                     )}
                     {(selected.type === "image" || selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
                       <label className="flex flex-col gap-0.5 col-span-2">
-                        <span className="text-[0.6rem] text-fg-3">회전 (Rotation)</span>
+                        <span className="text-[0.66rem] text-fg-3">회전 (Rotation)</span>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -10624,7 +10624,7 @@ function StudioCuttoonEditor() {
                   <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">집중선 설정</p>
 
                   <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
-                    <p className="text-[0.6rem] font-semibold text-fg-3">집중선 프리셋</p>
+                    <p className="text-[0.66rem] font-semibold text-fg-3">집중선 프리셋</p>
                     <div className="mt-1 grid grid-cols-2 gap-1.5">
                       {[
                         { label: "기본 집중선", config: { lineCount: 80, innerRadius: 100, outerRadius: 400, noise: 20, strokeWidth: 2.5 } },
@@ -10773,7 +10773,7 @@ function StudioCuttoonEditor() {
                   <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">속도선 설정</p>
 
                   <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
-                    <p className="text-[0.6rem] font-semibold text-fg-3">속도선 프리셋</p>
+                    <p className="text-[0.66rem] font-semibold text-fg-3">속도선 프리셋</p>
                     <div className="mt-1 grid grid-cols-2 gap-1.5">
                       {[
                         { label: "가로 질주", config: { direction: "horizontal", lineCount: 50, strokeWidth: 2.5 } },
@@ -10966,7 +10966,7 @@ function StudioCuttoonEditor() {
                                 type="button"
                                 onClick={() => patchEl(selected.id, { dashStyle: style.v as "solid" | "dashed" } as Partial<El>)}
                                 className={cn(
-                                  "flex-1 rounded py-0.5 text-[0.6rem] font-semibold transition-colors",
+                                  "flex-1 rounded py-0.5 text-[0.66rem] font-semibold transition-colors",
                                   (selected.dashStyle ?? "solid") === style.v
                                     ? "bg-accent text-on-accent"
                                     : "text-fg-2 hover:bg-raised"
@@ -11131,7 +11131,7 @@ function StudioCuttoonEditor() {
                       }
                     }}
                     className={cn(
-                      "flex-1 rounded py-1 text-[0.62rem] font-semibold transition-colors",
+                      "flex-1 rounded py-1 text-[0.68rem] font-semibold transition-colors",
                       drawMode === mode.v
                         ? "bg-accent text-on-accent"
                         : "text-fg-2 hover:bg-raised"
@@ -11365,7 +11365,7 @@ function StudioCuttoonEditor() {
                         type="button"
                         onClick={() => setSymmetryType(type.id)}
                         className={cn(
-                          "rounded py-1 text-[0.62rem] font-semibold border transition-colors cursor-pointer",
+                          "rounded py-1 text-[0.68rem] font-semibold border transition-colors cursor-pointer",
                           symmetryType === type.id
                             ? "border-accent bg-accent/15 text-accent"
                             : "border-line text-fg-2 hover:bg-raised"
@@ -11396,7 +11396,7 @@ function StudioCuttoonEditor() {
                       )}
 
                       <div className="flex gap-2">
-                        <label className="flex-1 flex flex-col gap-0.5 text-[0.62rem] text-fg-3">
+                        <label className="flex-1 flex flex-col gap-0.5 text-[0.68rem] text-fg-3">
                           <span>중앙 X</span>
                           <input
                             type="number"
@@ -11405,7 +11405,7 @@ function StudioCuttoonEditor() {
                             className="w-full rounded border border-line bg-card px-1 py-0.5 text-[0.65rem] text-fg focus-visible:outline focus-visible:outline-accent"
                           />
                         </label>
-                        <label className="flex-1 flex flex-col gap-0.5 text-[0.62rem] text-fg-3">
+                        <label className="flex-1 flex flex-col gap-0.5 text-[0.68rem] text-fg-3">
                           <span>중앙 Y</span>
                           <input
                             type="number"
@@ -11422,7 +11422,7 @@ function StudioCuttoonEditor() {
                           setSymmetryCenterX(400);
                           setSymmetryCenterY(canvasH / 2);
                         }}
-                        className="w-full rounded border border-line bg-card py-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised transition-colors cursor-pointer"
+                        className="w-full rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised transition-colors cursor-pointer"
                       >
                         대칭축 중앙 정렬
                       </button>
@@ -11440,7 +11440,7 @@ function StudioCuttoonEditor() {
                 <button
                   type="button"
                   onClick={() => addLayerGroup(selectedId ?? undefined)}
-                  className="flex items-center gap-1 rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.6rem] text-fg-2 hover:bg-raised transition-colors"
+                  className="flex items-center gap-1 rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.66rem] text-fg-2 hover:bg-raised transition-colors"
                   title="새 레이어 그룹(폴더). 선택한 레이어가 있으면 그 안에 넣어요."
                 >
                   <FolderPlus size={12} /> 그룹
