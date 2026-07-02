@@ -1,8 +1,16 @@
 import type { INestApplication } from "@nestjs/common";
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 
-/** 앱인토스가 번들을 호스팅하는 공개/QR 테스트 Origin. */
+/**
+ * 앱인토스가 번들을 호스팅하는 공개/QR 테스트 Origin.
+ * web-framework v3(WebView)는 `*.web.tossmini.com`/`*.private-web.tossmini.com`에서 서빙된다
+ * — 실기기 preflight Origin이 `toonspectrum.private-web.tossmini.com`으로 실측됨(2026-07-02,
+ * 구형 `*-apps` 호스트만 허용해 OPTIONS 404 → 토스 로그인 차단이 재현된 원인). 구형 호스트도
+ * 하위호환으로 유지한다.
+ */
 export const TOSS_CORS_ORIGINS = [
+  "https://toonspectrum.web.tossmini.com",
+  "https://toonspectrum.private-web.tossmini.com",
   "https://toonspectrum.apps.tossmini.com",
   "https://toonspectrum.private-apps.tossmini.com",
 ] as const;
