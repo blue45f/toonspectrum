@@ -206,7 +206,12 @@ export function WorkFxPanel({
           )}
 
           {error && <p className="text-xs text-bad">{error}</p>}
-          {savedMsg && !error && <p className="text-xs text-good">효과 설정을 저장했어요.</p>}
+          {savedMsg && !error && (
+            <p className="text-xs text-good">
+              효과 설정을 저장했어요. 저장한 연출은 아래 모션툰 영상 내보내기 패널에서 영상(WebM)
+              한 편으로 만들 수 있어요.
+            </p>
+          )}
           <div className="flex justify-end">
             <button
               type="button"

@@ -14,7 +14,7 @@ import {
   Trophy,
   WandSparkles,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { readWorkFx } from "./studio-motion-fx";
@@ -46,6 +46,11 @@ import {
 } from "@/src/infrastructure/creator-client";
 
 const MAX_COMMENT_LENGTH = 700;
+
+// 모션툰 영상(WebM) 내보내기 패널 — 작성자에게만 보이므로 녹화 엔진 청크를 지연 로드한다.
+const StudioMotionExportPanel = lazy(() =>
+  import("./StudioMotionExportPanel").then((mod) => ({ default: mod.StudioMotionExportPanel }))
+);
 
 // ── 연재·챌린지 설정(작성자 전용) — StudioPage를 건드리지 않는 추가 게시 설정 패널 ──
 function WorkCommunityPanel({
@@ -766,6 +771,13 @@ export function CreateWorkPage() {
             work={work}
             onUpdated={(doc) => setWork((current) => (current ? { ...current, doc } : current))}
           />
+        )}
+
+        {/* 작성자 전용: 모션툰 영상(WebM) 내보내기 — 저장된 doc.fx 연출·컷·BGM을 그대로 녹화 */}
+        {work.isOwner && (
+          <Suspense fallback={<div className="skeleton mt-4 h-10 rounded-xl" aria-hidden />}>
+            <StudioMotionExportPanel work={work} />
+          </Suspense>
         )}
       </header>
 
