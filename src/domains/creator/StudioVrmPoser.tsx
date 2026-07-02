@@ -4628,7 +4628,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 step="0.05"
                                 value={weight}
                                 disabled={!vrm}
-                                className="h-1 flex-1 accent-accent"
+                                className="h-2 flex-1 accent-accent"
                                 onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
                               />
                               <span className="w-8 text-right numeral">{Math.round(weight * 100)}%</span>
@@ -5035,7 +5035,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 step={0.05}
                                 value={equip.fit}
                                 onChange={(e) => updateWardrobeEquip(slot, { fit: Number(e.target.value) })}
-                                className="h-1 flex-1 accent-accent"
+                                className="h-2 flex-1 accent-accent"
                                 aria-label={`${WARDROBE_SLOT_LABELS[slot]} 품(핏)`}
                               />
                               <span className="w-8 text-right tabular-nums text-fg-3">{Math.round(equip.fit * 100)}%</span>
@@ -5238,7 +5238,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               max="180"
                               value={xDeg}
                               disabled={!vrm}
-                              className="h-1 flex-1 accent-accent"
+                              className="h-2 flex-1 accent-accent"
                               onChange={(e) => handleBoneRotationChange(boneName, 0, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{xDeg}°</span>
@@ -5252,7 +5252,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               max="180"
                               value={yDeg}
                               disabled={!vrm}
-                              className="h-1 flex-1 accent-accent"
+                              className="h-2 flex-1 accent-accent"
                               onChange={(e) => handleBoneRotationChange(boneName, 1, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{yDeg}°</span>
@@ -5266,7 +5266,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                               max="180"
                               value={zDeg}
                               disabled={!vrm}
-                              className="h-1 flex-1 accent-accent"
+                              className="h-2 flex-1 accent-accent"
                               onChange={(e) => handleBoneRotationChange(boneName, 2, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{zDeg}°</span>
@@ -5413,12 +5413,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">몸 비율</p>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">키</span>
-                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.height.toFixed(2)}×</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">너비</span>
-                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.width.toFixed(2)}×</span>
                     </label>
                   </div>
@@ -5428,17 +5428,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">조명 미세 조정</p>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">밝기</span>
-                      <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting(l => ({...l, intensity: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting(l => ({...l, intensity: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.intensity.toFixed(1)}</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">색온도</span>
-                      <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting(l => ({...l, colorTemp: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting(l => ({...l, colorTemp: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.colorTemp < 0.45 ? "차갑게" : lighting.colorTemp > 0.55 ? "따뜻하게" : "중간"}</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">방향</span>
-                      <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting(l => ({...l, directionDeg: parseFloat(e.target.value)}))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting(l => ({...l, directionDeg: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(lighting.directionDeg)}°</span>
                     </label>
                   </div>
@@ -5468,12 +5468,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">손가락 굽힘 (검지)</p>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">왼손</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('left', Number(e.target.value))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.leftIndexProximal?.[2] || 0))}°</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">오른손</span>
-                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="h-1 flex-1 accent-accent" />
+                      <input type="range" min="0" max="60" step="1" value={Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))} onChange={e => updateFingerCurl('right', Number(e.target.value))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(THREE.MathUtils.radToDeg(fingerEdits.rightIndexProximal?.[2] || 0))}°</span>
                     </label>
                     {(["left", "right"] as const).map((side) => (
@@ -5633,7 +5633,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                       {"XYZ"[axis]}: {item.position[axis].toFixed(2)}
                                       <input
                                         type="range" min="-0.5" max="0.5" step="0.01"
-                                        className="w-full accent-accent h-1"
+                                        className="w-full accent-accent h-2"
                                         value={item.position[axis]}
                                         onChange={(e) => {
                                           const next = [...item.position] as [number, number, number];
@@ -5653,7 +5653,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                       {"XYZ"[axis]}: {Math.round(item.rotationDeg[axis])}°
                                       <input
                                         type="range" min="-180" max="180"
-                                        className="w-full accent-accent h-1"
+                                        className="w-full accent-accent h-2"
                                         value={item.rotationDeg[axis]}
                                         onChange={(e) => {
                                           const next = [...item.rotationDeg] as [number, number, number];
@@ -5670,7 +5670,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   크기 {item.scale.toFixed(1)}x
                                   <input
                                     type="range" min="0.2" max="4" step="0.1"
-                                    className="w-full accent-accent h-1"
+                                    className="w-full accent-accent h-2"
                                     value={item.scale}
                                     onChange={(e) => updateVrmProp(item.uid, { scale: Number(e.target.value) })}
                                   />
@@ -5816,7 +5816,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <input
                           type="range" min="0" max="2" step="0.05"
                           aria-label="흔들림 강도(탄성)"
-                          className="w-full accent-accent h-1"
+                          className="w-full accent-accent h-2"
                           value={vrmPhysics.stiffnessScale}
                           onChange={(e) => updatePhysics({ stiffnessScale: Number(e.target.value) })}
                         />
@@ -5826,7 +5826,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <input
                           type="range" min="0" max="2" step="0.05"
                           aria-label="중력"
-                          className="w-full accent-accent h-1"
+                          className="w-full accent-accent h-2"
                           value={vrmPhysics.gravityScale}
                           onChange={(e) => updatePhysics({ gravityScale: Number(e.target.value) })}
                         />
@@ -5836,7 +5836,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <input
                           type="range" min="-180" max="180"
                           aria-label="바람 방향"
-                          className="w-full accent-accent h-1"
+                          className="w-full accent-accent h-2"
                           value={vrmPhysics.windDirectionDeg}
                           onChange={(e) => updatePhysics({ windDirectionDeg: Number(e.target.value) })}
                         />
@@ -5846,7 +5846,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         <input
                           type="range" min="0" max="2" step="0.05"
                           aria-label="바람 세기"
-                          className="w-full accent-accent h-1"
+                          className="w-full accent-accent h-2"
                           value={vrmPhysics.windStrength}
                           onChange={(e) => updatePhysics({ windStrength: Number(e.target.value) })}
                         />
@@ -6129,7 +6129,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 min="0.5"
                                 max="2"
                                 step="0.1"
-                                className="w-full accent-accent h-1"
+                                className="w-full accent-accent h-2"
                                 value={trackingOptions.sensitivity}
                                 onChange={(e) =>
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, sensitivity: Number(e.target.value) }))
@@ -6147,7 +6147,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 min="0.05"
                                 max="1.0"
                                 step="0.05"
-                                className="w-full accent-accent h-1"
+                                className="w-full accent-accent h-2"
                                 value={trackingOptions.smoothing}
                                 onChange={(e) =>
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, smoothing: Number(e.target.value) }))
@@ -6312,7 +6312,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   min="-0.5"
                                   max="0.5"
                                   step="0.01"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.offsetX}
                                   onChange={(e) => handleConfigChange({ offsetX: Number(e.target.value) })}
                                 />
@@ -6324,7 +6324,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   min="-0.5"
                                   max="0.5"
                                   step="0.01"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.offsetY}
                                   onChange={(e) => handleConfigChange({ offsetY: Number(e.target.value) })}
                                 />
@@ -6336,7 +6336,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   min="-0.5"
                                   max="0.5"
                                   step="0.01"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.offsetZ}
                                   onChange={(e) => handleConfigChange({ offsetZ: Number(e.target.value) })}
                                 />
@@ -6353,7 +6353,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   type="range"
                                   min="-180"
                                   max="180"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.rotX}
                                   onChange={(e) => handleConfigChange({ rotX: Number(e.target.value) })}
                                 />
@@ -6364,7 +6364,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   type="range"
                                   min="-180"
                                   max="180"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.rotY}
                                   onChange={(e) => handleConfigChange({ rotY: Number(e.target.value) })}
                                 />
@@ -6375,7 +6375,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   type="range"
                                   min="-180"
                                   max="180"
-                                  className="w-full accent-accent h-1"
+                                  className="w-full accent-accent h-2"
                                   value={config.rotZ}
                                   onChange={(e) => handleConfigChange({ rotZ: Number(e.target.value) })}
                                 />

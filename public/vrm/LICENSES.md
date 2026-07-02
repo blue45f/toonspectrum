@@ -10,8 +10,6 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Sendagaya_Shino.vrm` | 시노 | <https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Sendagaya_Shino.vrm> | VRoid 공식(구 베타) 샘플 모델 — pixiv VRoid 샘플 모델 이용조건에 따라 아바타·콘텐츠 제작 용도 사용 가능 |
 | `Sakurada_Fumiriya.vrm` | 후미 | <https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Sakurada_Fumiriya.vrm> | VRoid 공식(구 베타) 샘플 모델 — 위와 동일 |
 | `Darkness_Shibu.vrm` | 카게 (다크) | <https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Darkness_Shibu.vrm> | VRoid 공식(구 베타) 샘플 모델 — 위와 동일 |
-| `HairSample_Female.vrm` | 헤라 | <https://github.com/madjin/vrm-samples/blob/master/vroid/beta/HairSample_Female.vrm> | VRoid 공식(구 베타) 헤어 샘플 모델 — 위와 동일 |
-| `HairSample_Male.vrm` | 하루 | <https://github.com/madjin/vrm-samples/blob/master/vroid/beta/HairSample_Male.vrm> | VRoid 공식(구 베타) 헤어 샘플 모델 — 위와 동일 |
 | `fem_vroid.vrm` | 미오 | <https://github.com/madjin/vrm-samples/blob/master/vroid/fem_vroid.vrm> | VRoid Studio 기본 프리셋 기반 샘플 — pixiv VRoid Studio 프리셋(VRoidPreset) 이용조건 준수 |
 | `masc_vroid.vrm` | 노아 | <https://github.com/madjin/vrm-samples/blob/master/vroid/masc_vroid.vrm> | VRoid Studio 기본 프리셋 기반 샘플 — 위와 동일 |
 | `AliciaSolid.vrm` | 아리시아 | <https://github.com/vrm-c/UniVRM/blob/master/Tests/Models/Alicia_vrm-0.51/AliciaSolid_vrm-0.51.vrm> | 니코니 솔리드(ニコニ立体ちゃん, Alicia Solid) 캐릭터 모델 — 니코니 솔리드 라이선스(<https://3d.nicovideo.jp/alicia/rule.html>) 적용. 재배포·2차 이용 시 해당 라이선스 고지가 필요 |

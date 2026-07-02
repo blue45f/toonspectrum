@@ -122,7 +122,15 @@ export function httpStatus(err: unknown): number | null {
 export async function getApiErrorMessage(err: unknown, fallback: string): Promise<string> {
   if (err instanceof HTTPError) {
     // ky 2.x 는 본문을 error.data 로 미리 파싱한다(응답 body 는 이미 소비됨).
-    const parsed = err.data ?? (await safeParseJson<unknown>(err.response.clone()));
+    let parsed: unknown = err.data;
+    if (parsed === undefined && !err.response.bodyUsed) {
+      // body 미소비 응답만 clone 시도 — 소비된 응답에 clone 하면 TypeError 가 원래 에러를 가린다(502 등 비JSON 본문).
+      try {
+        parsed = await safeParseJson<unknown>(err.response.clone());
+      } catch {
+        parsed = undefined;
+      }
+    }
     return resolveApiError(parsed, `${fallback} (${err.response.status})`);
   }
   if (err instanceof Error) return err.message || fallback;

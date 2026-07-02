@@ -5,15 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
 
-// 2026-06 추가된 번들 17종 + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 60종
+// 2026-06 추가된 번들 15종(헤어 전용 샘플 2종은 캐릭터가 아니라 제외·정리됨) + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 60종
 // — 모두 public/vrm/LICENSES.md 고지 대상.
 const NEW_BUNDLE_FILES = [
   // 2026-06: madjin/vrm-samples + UniVRM + 100Avatars 1차분
   "Sendagaya_Shino.vrm",
   "Sakurada_Fumiriya.vrm",
   "Darkness_Shibu.vrm",
-  "HairSample_Female.vrm",
-  "HairSample_Male.vrm",
   "fem_vroid.vrm",
   "masc_vroid.vrm",
   "AliciaSolid.vrm",
@@ -109,8 +107,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 89 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(89);
+  it("bundles 87 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(87);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);

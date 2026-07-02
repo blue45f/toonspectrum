@@ -58,8 +58,6 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "shino", name: "시노", url: "/vrm/Sendagaya_Shino.vrm" },
   { id: "fumi", name: "후미", url: "/vrm/Sakurada_Fumiriya.vrm" },
   { id: "kage", name: "카게 (다크)", url: "/vrm/Darkness_Shibu.vrm" },
-  { id: "hera", name: "헤라", url: "/vrm/HairSample_Female.vrm" },
-  { id: "haru", name: "하루", url: "/vrm/HairSample_Male.vrm" },
   { id: "mio", name: "미오", url: "/vrm/fem_vroid.vrm" },
   { id: "noa", name: "노아", url: "/vrm/masc_vroid.vrm" },
   { id: "alicia", name: "아리시아", url: "/vrm/AliciaSolid.vrm" },
