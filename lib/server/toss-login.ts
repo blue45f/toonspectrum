@@ -231,6 +231,18 @@ async function generateAccessToken(
   return accessToken;
 }
 
+// login-me 응답의 userKey 필드는 scope 항목 표기(`user_key`)와 카멜 표기(`userKey`)가 혼재할 수
+// 있어 둘 다 받되, 문자열/유한수만 신뢰한다(객체가 오면 "[object Object]" 식별자 오염 방지).
+function extractUserKey(success: Record<string, unknown> | undefined): string | null {
+  const raw = success?.userKey ?? success?.user_key;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  return null;
+}
+
 // 2. AccessToken → userKey(앱별 고유·평문). PII 는 암호화라 식별엔 쓰지 않는다.
 async function fetchUserKey(accessToken: string): Promise<string> {
   let response: TossResponse;
@@ -244,14 +256,14 @@ async function fetchUserKey(accessToken: string): Promise<string> {
     );
   }
   const { status, body } = response;
-  const userKey = body?.success?.userKey;
+  const userKey = extractUserKey(body?.success);
   if (status !== 200 || body?.resultType !== "SUCCESS" || userKey == null) {
     throw new TossLoginExchangeError(
       "upstream-unavailable",
       `토스 사용자 정보를 확인하지 못했어요. (${status})`,
     );
   }
-  return String(userKey);
+  return userKey;
 }
 
 const AVATAR_COLORS = [
