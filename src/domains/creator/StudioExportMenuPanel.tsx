@@ -1,4 +1,4 @@
-import { Copy, Scissors } from "lucide-react";
+import { Copy, FileText, Scissors } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -18,14 +18,15 @@ import {
   validateExport,
   type PresetExportScope,
 } from "./studio-export-presets";
+import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 
 import type { Dispatch, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";
 
-/** 규격 내보내기 진행/결과 안내 — tone에 따라 색을 달리해 표시한다. */
-interface PresetExportStatus {
+/** 내보내기 진행/결과 안내(규격 슬라이스·PDF 공용) — tone에 따라 색을 달리해 표시한다. */
+interface ExportRunStatus {
   tone: "info" | "good" | "warn";
   text: string;
 }
@@ -78,7 +79,10 @@ export function StudioExportMenuPanel({
 }: StudioExportMenuPanelProps) {
   // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
   const [presetBusy, setPresetBusy] = useState(false);
-  const [presetStatus, setPresetStatus] = useState<PresetExportStatus | null>(null);
+  const [presetStatus, setPresetStatus] = useState<ExportRunStatus | null>(null);
+  // PDF 내보내기 실행 상태 — 규격 슬라이스와 독립 실행이라 상태도 따로 안내한다.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfStatus, setPdfStatus] = useState<ExportRunStatus | null>(null);
   const selectedPreset = exportPresetId ? EXPORT_PRESETS.find((preset) => preset.id === exportPresetId) : null;
   const outW = Math.round(canvasWidth * exportScale);
   const outH = Math.round(canvasHeight * exportScale);
@@ -89,9 +93,33 @@ export function StudioExportMenuPanel({
   const slices = maxH !== undefined && outH > maxH ? planStripSlices(outH, maxH) : null;
   const quality = exportQuality(exportFormat);
 
+  // 전체 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
+  async function runPdfExport() {
+    if (pdfBusy || presetBusy || isExporting) return;
+    setPdfBusy(true);
+    setPdfStatus({ tone: "info", text: pageCount > 1 ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
+    try {
+      const pages = await capturePagesForPreset("all");
+      const result = await exportPagesToPdf({
+        pages,
+        title: exportTitle,
+        watermark,
+        onProgress: (done, total) => setPdfStatus({ tone: "info", text: `${done}/${total}페이지 PDF 변환 중…` }),
+      });
+      setPdfStatus({ tone: "good", text: pdfExportResultMessage(result) });
+    } catch (err) {
+      setPdfStatus({
+        tone: "warn",
+        text: err instanceof Error ? err.message : "PDF 내보내기에 실패했어요.",
+      });
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
   async function runPresetSliceExport(scope: PresetExportScope) {
-    if (!selectedPreset || presetBusy) return;
+    if (!selectedPreset || presetBusy || pdfBusy) return;
     setPresetBusy(true);
     setPresetStatus({ tone: "info", text: scope === "all" ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
     try {
@@ -270,6 +298,28 @@ export function StudioExportMenuPanel({
           <Copy size={13} /> 클립보드로 복사
         </button>
       )}
+
+      {/* 전체 페이지 → PDF 한 파일 — JPG(품질 92%)로 담는 규격 무관 백업·제출·공유용. */}
+      <button
+        type="button"
+        onClick={() => void runPdfExport()}
+        disabled={pdfBusy || presetBusy || isExporting}
+        className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+        title={`전체 ${pageCount}페이지를 JPG로 담은 PDF 한 파일로 저장`}
+      >
+        <FileText size={13} /> PDF (전체 {pageCount}페이지)
+      </button>
+      <p
+        aria-live="polite"
+        className={cx(
+          pdfStatus ? "mt-1.5 rounded-md border px-2 py-1 text-[10px] leading-snug" : "sr-only",
+          pdfStatus?.tone === "info" && "border-line bg-card text-fg-3",
+          pdfStatus?.tone === "good" && "border-good/40 bg-good/10 text-good",
+          pdfStatus?.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+        )}
+      >
+        {pdfStatus?.text}
+      </p>
 
       <p className="mt-2 text-[10px] tabular-nums text-fg-3">
         출력 폭 {outW.toLocaleString()}px

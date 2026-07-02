@@ -374,8 +374,11 @@ function createSliceCanvas(width: number, height: number): HTMLCanvasElement {
   return canvas;
 }
 
-/** StudioPage 내보내기 경로와 같은 규칙의 워터마크 합성(어두운 외곽선 + 흰 채움). */
-function drawWatermarkOnSlice(canvas: HTMLCanvasElement, settings: WatermarkSettings): void {
+/**
+ * StudioPage 내보내기 경로와 같은 규칙의 워터마크 합성(어두운 외곽선 + 흰 채움).
+ * PDF 내보내기(studio-pdf-export)도 페이지 단위 서명에 이 함수를 재사용한다.
+ */
+export function drawWatermarkOnSlice(canvas: HTMLCanvasElement, settings: WatermarkSettings): void {
   if (!shouldDrawWatermark(settings)) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
