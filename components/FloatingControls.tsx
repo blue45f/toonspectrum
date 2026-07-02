@@ -104,7 +104,13 @@ export function FloatingControls({
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
   const fx = useFx();
-  const { enabled: bgmOn, mood: bgmMood, toggle: toggleBgm, next: nextBgm } = useAmbientBgm();
+  const {
+    enabled: bgmOn,
+    mood: bgmMood,
+    artist: bgmArtist,
+    toggle: toggleBgm,
+    next: nextBgm,
+  } = useAmbientBgm();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
   const isDark = theme === "dark";
@@ -187,7 +193,7 @@ export function FloatingControls({
         </button>
       )}
 
-      {/* 배경음악(보컬 애니 오프닝, 합성 BGM 폴백) — 기본 OFF, 첫 클릭에서 언락 */}
+      {/* 배경음악(보컬 플레이리스트, 합성 BGM 폴백) — 기본 OFF, 첫 클릭에서 언락 */}
       {showBgm && (
         <div className="inline-flex items-center gap-1">
           <button
@@ -195,7 +201,7 @@ export function FloatingControls({
             onClick={handleBgmClick}
             aria-label={bgmOn ? "배경음악 끄기" : "배경음악 켜기"}
             aria-pressed={bgmOn}
-            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다시 듣기)` : "보컬 배경음악 켜기"}
+            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다음 트랙)` : "보컬 배경음악 켜기"}
             data-no-sfx
             className={cx(
               PILL,
@@ -208,10 +214,19 @@ export function FloatingControls({
             <button
               type="button"
               onClick={() => nextBgm()}
-              title={`보컬 오프닝 다시 듣기 (현재: ${bgmMood})`}
-              className="inline-flex h-11 items-center rounded-full border border-line bg-panel/95 px-2.5 text-xs font-semibold text-fg-2 shadow-lg backdrop-blur hover:bg-raised hover:text-fg"
+              title={`다음 트랙으로 전환 (현재: ${bgmMood}${bgmArtist ? ` — ${bgmArtist}` : ""})`}
+              className="inline-flex h-11 max-w-52 items-center gap-1.5 rounded-full border border-line bg-panel/95 px-2.5 text-xs font-semibold text-fg-2 shadow-lg backdrop-blur hover:bg-raised hover:text-fg"
             >
-              ↻ {bgmMood}
+              <span aria-hidden>↻</span>
+              <span className="flex min-w-0 flex-col items-start leading-tight">
+                <span className="block max-w-40 truncate">{bgmMood}</span>
+                {/* 크레딧(아티스트) — Pixabay Content License 는 표기 의무가 없지만 출처를 UI 로 존중 표기. */}
+                {bgmArtist && (
+                  <span className="block max-w-40 truncate text-[10px] font-medium text-fg-3">
+                    {bgmArtist} · Pixabay
+                  </span>
+                )}
+              </span>
             </button>
           )}
         </div>

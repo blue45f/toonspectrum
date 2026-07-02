@@ -1,4 +1,5 @@
 import {
+  type BgmPlaylistEntry,
   type SfxName,
   playSfx,
   registerBgmPlaylist,
@@ -13,16 +14,42 @@ import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { RandomIntro } from "@/components/RandomIntro";
 import { pingVisit } from "@/lib/visits-api";
+import { resolveAssetUrl } from "@/src/catalog-static";
 
 // 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
 import "@toonspectrum/core/fx/fx.css";
 
-const VOCAL_BGM_PLAYLIST = [
+// 보컬 BGM manifest(`public/audio/playlist.json`) — 트랙 추가는 파일만 얹고 manifest 에 등록.
+// 스키마: { tracks: [{ src, title, artist, license, creditUrl }] }
+const BGM_MANIFEST_URL = "/audio/playlist.json";
+
+// manifest 로드 실패(오프라인·구버전 배포) 폴백 — 기존 수동 등록 트랙을 유지한다.
+const FALLBACK_BGM_PLAYLIST: readonly BgmPlaylistEntry[] = [
   {
     url: "/audio/toonspectrum-anime-vocal-opening.mp3",
     label: "별빛 페이지 · Vocal Opening",
+    artist: "PuyoPuyoMegaFan1234",
+    creditUrl: "https://pixabay.com/music/upbeat-anime-239882/",
   },
-] as const;
+];
+
+/** manifest JSON → 검증된 플레이리스트 항목. 토스 교차출처 WebView 용으로 src 를 배포 오리진에 절대화. */
+function parseBgmManifest(data: unknown): BgmPlaylistEntry[] {
+  const tracks = (data as { tracks?: unknown })?.tracks;
+  if (!Array.isArray(tracks)) return [];
+  return tracks.flatMap((raw): BgmPlaylistEntry[] => {
+    const track = raw as { src?: unknown; title?: unknown; artist?: unknown; creditUrl?: unknown };
+    if (typeof track?.src !== "string" || track.src.trim() === "") return [];
+    return [
+      {
+        url: resolveAssetUrl(track.src.trim()),
+        label: typeof track.title === "string" ? track.title : undefined,
+        artist: typeof track.artist === "string" ? track.artist : undefined,
+        creditUrl: typeof track.creditUrl === "string" ? track.creditUrl : undefined,
+      },
+    ];
+  });
+}
 
 const AgeGateHost = lazy(() =>
   import("@/components/age-gate-host").then((mod) => ({
@@ -88,10 +115,31 @@ function useVisitPing() {
   }, []);
 }
 
-/** 웹과 토스가 함께 쓰는 라이선스 보컬 BGM. 파일이 없거나 재생이 막히면 코어의 합성 BGM이 남는다. */
+/**
+ * 웹과 토스가 함께 쓰는 라이선스 보컬 BGM. manifest(`/audio/playlist.json`)를 읽어 등록하고,
+ * 로드 실패 시 기존 폴백 트랙을 유지한다(파일이 없거나 재생이 막히면 코어의 합성 BGM이 남는다).
+ * 토스 WebView(교차 출처)는 resolveAssetUrl 이 manifest·트랙 경로를 배포 오리진으로 절대화한다.
+ */
 function useVocalBgmPlaylist() {
   useEffect(() => {
-    registerBgmPlaylist(VOCAL_BGM_PLAYLIST);
+    let cancelled = false;
+    // 폴백 즉시 등록 — manifest 도착 전 첫 제스처에서 BGM을 켜도 보컬 트랙이 나오게 한다.
+    registerBgmPlaylist(
+      FALLBACK_BGM_PLAYLIST.map((track) => ({ ...track, url: resolveAssetUrl(track.url) })),
+    );
+    void fetch(resolveAssetUrl(BGM_MANIFEST_URL), { headers: { Accept: "application/json" } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: unknown) => {
+        if (cancelled || data == null) return;
+        const tracks = parseBgmManifest(data);
+        if (tracks.length > 0) registerBgmPlaylist(tracks);
+      })
+      .catch(() => {
+        // manifest 미존재/네트워크 실패 — 폴백 플레이리스트 유지(합성 BGM 최종 폴백).
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 }
 

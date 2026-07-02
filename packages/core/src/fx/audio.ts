@@ -1270,6 +1270,10 @@ interface PlaylistTrack {
   url: string;
   /** 라벨에 쓸 무드명(없으면 파일명에서 추론). */
   label: string;
+  /** (선택) 아티스트명 — UI 크레딧 표기용. */
+  artist?: string;
+  /** (선택) 원본 출처/크레딧 링크 — UI 크레딧 표기용. */
+  creditUrl?: string;
 }
 let playlist: PlaylistTrack[] = [];
 let playlistIndex = 0;
@@ -1593,6 +1597,10 @@ export interface AudioState {
   currentMood: string;
   /** 현재(또는 다음 시작할) 무드 id. */
   currentMoodId: string;
+  /** 현재 트랙 아티스트(플레이리스트 모드에서만, 없으면 ""). */
+  currentTrackArtist: string;
+  /** 현재 트랙 크레딧 링크(플레이리스트 모드에서만, 없으면 ""). */
+  currentTrackCreditUrl: string;
 }
 
 export type AudioStateListener = (state: AudioState) => void;
@@ -1664,6 +1672,8 @@ const state: AudioState = {
   volume: initialVolume,
   currentMood: BGM_PRESETS[presetIndex]?.name ?? "",
   currentMoodId: BGM_PRESETS[presetIndex]?.id ?? "",
+  currentTrackArtist: "",
+  currentTrackCreditUrl: "",
 };
 
 const listeners = new Set<AudioStateListener>();
@@ -1689,13 +1699,22 @@ const emit = (): void => {
   });
 };
 
-/** 엔진의 무드명 변경을 상태에 반영. 플레이리스트 모드면 트랙 인덱스를 id 로. */
+/** 엔진의 무드명 변경을 상태에 반영. 플레이리스트 모드면 트랙 인덱스를 id 로, 크레딧 메타도 동기화. */
 const syncTrackName = (name: string): void => {
-  const id =
-    playlist.length > 0 ? `playlist:${playlistIndex}` : (BGM_PRESETS[presetIndex]?.id ?? "");
-  if (state.currentMood !== name || state.currentMoodId !== id) {
+  const usingList = playlist.length > 0;
+  const id = usingList ? `playlist:${playlistIndex}` : (BGM_PRESETS[presetIndex]?.id ?? "");
+  const artist = usingList ? (playlist[playlistIndex]?.artist ?? "") : "";
+  const creditUrl = usingList ? (playlist[playlistIndex]?.creditUrl ?? "") : "";
+  if (
+    state.currentMood !== name ||
+    state.currentMoodId !== id ||
+    state.currentTrackArtist !== artist ||
+    state.currentTrackCreditUrl !== creditUrl
+  ) {
     state.currentMood = name;
     state.currentMoodId = id;
+    state.currentTrackArtist = artist;
+    state.currentTrackCreditUrl = creditUrl;
     emit();
   }
 };
@@ -1838,25 +1857,41 @@ export const getCurrentMoodName = (): string => state.currentMood;
 /** BGM 재생 중 여부(생성형/플레이리스트 어느 엔진이든). */
 export const isBgmPlaying = (): boolean => anyBgmPlaying();
 
+/** registerBgmPlaylist 입력 항목 — URL 문자열 또는 크레딧 메타 포함 객체. */
+export interface BgmPlaylistEntry {
+  url: string;
+  label?: string;
+  /** (선택) 아티스트명 — UI 크레딧 표기용. */
+  artist?: string;
+  /** (선택) 원본 출처/크레딧 링크. */
+  creditUrl?: string;
+}
+
 /**
  * (선택) 호스티드 mp3 플레이리스트를 등록해요. 비어 있지 않으면 BGM 켤 때 생성형 대신
  * 이 트랙들을 crossfade 로테이션합니다(없으면 생성형 폴백). 항목은 URL 문자열 또는
- * `{ url, label }`. 보통 앱 부팅 시 `public/audio/*.mp3` 존재를 확인하고 1회 호출하세요.
+ * `{ url, label, artist, creditUrl }`. 보통 앱 부팅 시 manifest(`/audio/playlist.json`)를
+ * 읽어 1회 호출하세요.
  *
  * 예) `registerBgmPlaylist(['/audio/upbeat-1.mp3', { url: '/audio/funky.mp3', label: '펑키' }])`
  * 빈 배열을 넘기면 등록 해제(생성형으로 복귀).
  */
 export const registerBgmPlaylist = (
-  tracks: ReadonlyArray<string | { url: string; label?: string }>,
+  tracks: ReadonlyArray<string | BgmPlaylistEntry>,
 ): void => {
   ensureWired();
   const wasPlaying = anyBgmPlaying();
   // 전환 전에 현재 재생을 깔끔히 멈춰요(엔진 교체).
   if (wasPlaying) bgmStop();
   playlist = tracks
-    .map((t) => (typeof t === "string" ? { url: t } : t))
-    .filter((t): t is { url: string; label?: string } => Boolean(t?.url))
-    .map((t) => ({ url: t.url, label: t.label?.trim() || labelFromUrl(t.url) }));
+    .map((t) => (typeof t === "string" ? ({ url: t } as BgmPlaylistEntry) : t))
+    .filter((t): t is BgmPlaylistEntry => Boolean(t?.url))
+    .map((t) => ({
+      url: t.url,
+      label: t.label?.trim() || labelFromUrl(t.url),
+      artist: t.artist?.trim() || undefined,
+      creditUrl: t.creditUrl?.trim() || undefined,
+    }));
   playlistIndex = 0;
   // 라벨/상태를 새 소스 기준으로 갱신.
   syncTrackName(

@@ -115,6 +115,10 @@ export interface UseAmbientBgm {
   mood: string;
   /** 현재 무드 id. */
   moodId: string;
+  /** 현재 트랙 아티스트(호스티드 플레이리스트에서만, 없으면 ""). */
+  artist: string;
+  /** 현재 트랙 크레딧/출처 링크(호스티드 플레이리스트에서만, 없으면 ""). */
+  creditUrl: string;
   /** 사용 가능한 무드 프리셋(메타). */
   presets: readonly BgmPreset[];
   /** on↔off 토글(켜졌으면 true 반환). 제스처 핸들러에서 호출하세요. */
@@ -141,6 +145,8 @@ export function useAmbientBgm(): UseAmbientBgm {
     enabled: audio.bgmEnabled,
     mood: audio.currentMood,
     moodId: audio.currentMoodId,
+    artist: audio.currentTrackArtist,
+    creditUrl: audio.currentTrackCreditUrl,
     presets: BGM_PRESETS,
     toggle,
     setEnabled,

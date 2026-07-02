@@ -1,0 +1,25 @@
+{
+  "tracks": [
+    {
+      "src": "/audio/toonspectrum-anime-vocal-opening.mp3",
+      "title": "별빛 페이지 · Vocal Opening",
+      "artist": "PuyoPuyoMegaFan1234",
+      "license": "Pixabay Content License",
+      "creditUrl": "https://pixabay.com/music/upbeat-anime-239882/"
+    },
+    {
+      "src": "/audio/boom-goes-my-heart-kpop.mp3",
+      "title": "Boom! Goes My Heart (Kpop Version)",
+      "artist": "Sekuora",
+      "license": "Pixabay Content License",
+      "creditUrl": "https://pixabay.com/music/pop-boom-goes-my-heart-kpop-version-242507/"
+    },
+    {
+      "src": "/audio/seollenayo.mp3",
+      "title": "설레나요",
+      "artist": "옴택",
+      "license": "Pixabay Content License",
+      "creditUrl": "https://pixabay.com/music/pop-설레나요-227248/"
+    }
+  ]
+}
