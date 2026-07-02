@@ -930,6 +930,8 @@ export type FullVrmState = {
   expressionId?: string;
   expressionWeights?: Record<string, number>;
   costume?: unknown;
+  /** 실장착 워드로브(studio-vrm-wardrobe SerializedWardrobe) — 옵셔널 하위호환. */
+  wardrobe?: unknown;
   props?: unknown;
   physics?: unknown;
   bodyScale?: BodyScale;
@@ -947,6 +949,7 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
     expressionId: state.expressionId,
     expressionWeights: state.expressionWeights,
     costume: state.costume,
+    wardrobe: state.wardrobe,
     props: state.props,
     physics: state.physics,
     bodyScale: state.bodyScale,
@@ -960,6 +963,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   applyPose: (bones: PoseBoneMap, y: number) => void;
   applyExpr: (weights: Record<string, number>) => void;
   applyCostume?: (c: unknown) => void;
+  applyWardrobe?: (w: unknown) => void;
   applyProps?: (p: unknown) => void;
   applyPhysics?: (p: unknown) => void;
 }) {
@@ -968,6 +972,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   if (state.bodyScale) applyBodyScale(vrm, state.bodyScale);
   if (state.fingerOverrides) applyFingerRotations(vrm, state.fingerOverrides);
   if (state.costume && applyers.applyCostume) applyers.applyCostume(state.costume);
+  if (state.wardrobe && applyers.applyWardrobe) applyers.applyWardrobe(state.wardrobe);
   if (state.props && applyers.applyProps) applyers.applyProps(state.props);
   if (state.physics && applyers.applyPhysics) applyers.applyPhysics(state.physics);
   // lighting/env applied in scene setup (UI side)
@@ -1010,6 +1015,7 @@ export function planFullStateRestore(state: FullVrmState): {
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
   costume?: unknown;
+  wardrobe?: unknown;
   propsItems?: unknown;
   physics?: unknown;
 } {
@@ -1022,6 +1028,7 @@ export function planFullStateRestore(state: FullVrmState): {
     env: state.env,
     fingerOverrides: state.fingerOverrides,
     costume: state.costume,
+    wardrobe: state.wardrobe,
     propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
     physics: state.physics,
   };

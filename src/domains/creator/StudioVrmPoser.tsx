@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -63,6 +63,30 @@ import {
   type PropAttachBone,
   type PropCategory,
 } from "./studio-vrm-props";
+import {
+  WARDROBE_SLOTS,
+  WARDROBE_SLOT_LABELS,
+  WARDROBE_SETS,
+  WARDROBE_FIT_MIN,
+  WARDROBE_FIT_MAX,
+  WARDROBE_HIDE_COSTUME_SLOTS,
+  wardrobeItemsBySlot,
+  wardrobeItemById,
+  wardrobeSetById,
+  applyWardrobeSet,
+  createWardrobeEquip,
+  buildGarmentParts,
+  parseWardrobe,
+  serializeWardrobe,
+  sanitizeWardrobeMetrics,
+  type GarmentPart,
+  type LimbMetric,
+  type WardrobeBone,
+  type WardrobeEquip,
+  type WardrobeMetrics,
+  type WardrobeSlot,
+  type WardrobeState,
+} from "./studio-vrm-wardrobe";
 import {
   initFaceLandmarker,
   disposeFaceLandmarker,
@@ -1939,6 +1963,182 @@ function VrmPropAttachment({ vrm, instance }: { vrm: VRM; instance: PropInstance
   return createPortal(<primitive object={object} />, boneNode);
 }
 
+/* ── 실장착 워드로브(studio-vrm-wardrobe) — 측정·조립·본 부착 ────────── */
+
+/** 정규화 휴머노이드 rest 포즈에서 골격 치수를 실측한다(로드 직후, 포즈 적용 전 호출). */
+function measureVrmWardrobeMetrics(vrm: VRM): WardrobeMetrics {
+  const humanoid = vrm.humanoid;
+  const fallback = sanitizeWardrobeMetrics(null);
+  if (!humanoid) return fallback;
+  vrm.scene.updateMatrixWorld(true);
+
+  const node = (name: VRMHumanBoneName) => humanoid.getNormalizedBoneNode(name);
+  const world = (name: VRMHumanBoneName): THREE.Vector3 | null => {
+    const n = node(name);
+    return n ? n.getWorldPosition(new THREE.Vector3()) : null;
+  };
+  // 본 로컬 공간에서 목표 월드 지점을 향하는 단위 방향.
+  const localDir = (from: VRMHumanBoneName, toWorld: THREE.Vector3): THREE.Vector3 | null => {
+    const n = node(from);
+    if (!n) return null;
+    const dir = n.worldToLocal(toWorld.clone()).normalize();
+    return Number.isFinite(dir.x) && dir.lengthSq() > 1e-8 ? dir : null;
+  };
+  const toVec3 = (v: THREE.Vector3 | null): [number, number, number] | null => (v ? [v.x, v.y, v.z] : null);
+
+  const hips = world("hips");
+  const spine = world("spine");
+  const neckW = world("neck") ?? world("head");
+  const limb = (from: VRMHumanBoneName, to: VRMHumanBoneName, fb: LimbMetric): LimbMetric => {
+    const a = world(from);
+    const b = world(to);
+    const axis = b ? localDir(from, b) : null;
+    if (!a || !b || !axis) return fb;
+    return { len: a.distanceTo(b), axis: toVec3(axis) ?? fb.axis };
+  };
+
+  const lUpArm = world("leftUpperArm");
+  const rUpArm = world("rightUpperArm");
+  const lUpLeg = world("leftUpperLeg");
+  const rUpLeg = world("rightUpperLeg");
+  const lFoot = world("leftFoot");
+  const rFoot = world("rightFoot");
+
+  // 몸통 위 방향(spine 로컬) + 발 앞 방향(해부학: 왼쪽×위 = 앞).
+  const upLocal = spine && neckW ? localDir("spine", neckW) : null;
+  let footForward = fallback.footForward;
+  if (lUpLeg && rUpLeg && hips && neckW && lFoot && rFoot) {
+    const leftWorld = lUpLeg.clone().sub(rUpLeg).normalize();
+    const upWorld = neckW.clone().sub(hips).normalize();
+    const fwdWorld = leftWorld.clone().cross(upWorld).normalize();
+    const footLocalDir = (name: VRMHumanBoneName, at: THREE.Vector3): [number, number, number] | null => {
+      const n = node(name);
+      if (!n) return null;
+      const origin = n.worldToLocal(at.clone());
+      const tip = n.worldToLocal(at.clone().add(fwdWorld));
+      const dir = tip.sub(origin).normalize();
+      return Number.isFinite(dir.x) && dir.lengthSq() > 1e-8 ? [dir.x, dir.y, dir.z] : null;
+    };
+    footForward = {
+      left: footLocalDir("leftFoot", lFoot) ?? fallback.footForward.left,
+      right: footLocalDir("rightFoot", rFoot) ?? fallback.footForward.right,
+    };
+  }
+
+  const sceneY = vrm.scene.getWorldPosition(new THREE.Vector3()).y;
+
+  return sanitizeWardrobeMetrics({
+    shoulderW: lUpArm && rUpArm ? lUpArm.distanceTo(rUpArm) : undefined,
+    hipW: lUpLeg && rUpLeg ? lUpLeg.distanceTo(rUpLeg) : undefined,
+    hipsToSpine: hips && spine ? hips.distanceTo(spine) : undefined,
+    spineToNeck: spine && neckW ? spine.distanceTo(neckW) : undefined,
+    ankleH: lFoot ? Math.max(0.02, lFoot.y - sceneY) : undefined,
+    up: upLocal ? (toVec3(upLocal) ?? undefined) : undefined,
+    footForward,
+    upperArm: {
+      left: limb("leftUpperArm", "leftLowerArm", fallback.upperArm.left),
+      right: limb("rightUpperArm", "rightLowerArm", fallback.upperArm.right),
+    },
+    lowerArm: {
+      left: limb("leftLowerArm", "leftHand", fallback.lowerArm.left),
+      right: limb("rightLowerArm", "rightHand", fallback.lowerArm.right),
+    },
+    upperLeg: {
+      left: limb("leftUpperLeg", "leftLowerLeg", fallback.upperLeg.left),
+      right: limb("rightUpperLeg", "rightLowerLeg", fallback.upperLeg.right),
+    },
+    lowerLeg: {
+      left: limb("leftLowerLeg", "leftFoot", fallback.lowerLeg.left),
+      right: limb("rightLowerLeg", "rightFoot", fallback.lowerLeg.right),
+    },
+  });
+}
+
+const GARMENT_Y = new THREE.Vector3(0, 1, 0);
+const GARMENT_Z = new THREE.Vector3(0, 0, 1);
+
+function buildGarmentGeometry(shape: GarmentPart["shape"]): THREE.BufferGeometry {
+  switch (shape.kind) {
+    case "cylinder":
+      return new THREE.CylinderGeometry(shape.rTop, shape.rBottom, shape.h, 26, 1, shape.open ?? false);
+    case "box":
+      return new THREE.BoxGeometry(shape.w, shape.h, shape.d);
+    case "sphere":
+      return new THREE.SphereGeometry(shape.r, 20, 14);
+    case "torus":
+      return new THREE.TorusGeometry(shape.r, shape.tube, 10, 26, shape.arc ?? Math.PI * 2);
+  }
+}
+
+/** 파츠 스펙 목록을 본별 three 그룹으로 조립한다. */
+function assembleGarmentGroups(parts: GarmentPart[], itemColor: string, name: string): Map<WardrobeBone, THREE.Group> {
+  const groups = new Map<WardrobeBone, THREE.Group>();
+  for (const part of parts) {
+    let group = groups.get(part.bone);
+    if (!group) {
+      group = new THREE.Group();
+      group.name = `${name}:${part.bone}`;
+      groups.set(part.bone, group);
+    }
+    const material = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(part.color ?? itemColor),
+      roughness: part.roughness ?? 0.75,
+      metalness: part.metalness ?? 0.05,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(buildGarmentGeometry(part.shape), material);
+    mesh.position.set(part.offset[0], part.offset[1], part.offset[2]);
+    if (part.align) {
+      // 실린더/박스/구는 +Y, 토러스는 링 축(+Z)을 목표 방향으로 정렬.
+      const source = part.shape.kind === "torus" ? GARMENT_Z : GARMENT_Y;
+      const target = new THREE.Vector3(part.align[0], part.align[1], part.align[2]).normalize();
+      if (target.lengthSq() > 1e-8) mesh.quaternion.setFromUnitVectors(source, target);
+    }
+    if (part.squash) mesh.scale.set(part.squash[0], part.squash[1], part.squash[2]);
+    group.add(mesh);
+  }
+  return groups;
+}
+
+function disposeGarmentGroup(group: THREE.Group) {
+  group.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry?.dispose();
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    materials.forEach((m) => m?.dispose());
+  });
+}
+
+/** 워드로브 한 슬롯 장착분을 humanoid 본들에 포털로 부착한다(파츠가 본을 따라 포즈 추종). */
+function VrmWardrobeAttachment({ vrm, equip, metrics }: { vrm: VRM; equip: WardrobeEquip; metrics: WardrobeMetrics }) {
+  const entries = useMemo(() => {
+    const def = wardrobeItemById(equip.itemId);
+    if (!def) return [];
+    const parts = buildGarmentParts(equip.itemId, metrics, equip.fit);
+    const groups = assembleGarmentGroups(parts, equip.color, `wardrobe:${def.slot}:${def.id}`);
+    const list: { bone: WardrobeBone; node: THREE.Object3D; object: THREE.Group }[] = [];
+    for (const [bone, object] of groups) {
+      const boneNode = vrm.humanoid?.getNormalizedBoneNode(bone as VRMHumanBoneName) ?? null;
+      if (boneNode) list.push({ bone, node: boneNode, object });
+    }
+    return list;
+  }, [vrm, equip.itemId, equip.color, equip.fit, metrics]);
+
+  // GPU 버퍼 정리 — 아이템/색/핏 교체나 언마운트 시 이전 지오메트리를 해제한다.
+  useEffect(() => {
+    return () => entries.forEach((entry) => disposeGarmentGroup(entry.object));
+  }, [entries]);
+
+  return (
+    <>
+      {entries.map((entry) => (
+        <group key={`${equip.itemId}-${entry.bone}`}>{createPortal(<primitive object={entry.object} />, entry.node)}</group>
+      ))}
+    </>
+  );
+}
+
 function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
   vrm.scene.rotation.y = baseRotationY + bodyRotation;
@@ -2271,6 +2471,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [costumeState, setCostumeState] = useState<CostumeState>({ hidden: [], recolor: {} });
   const [costumeMeshes, setCostumeMeshes] = useState<CostumeMeshEntry[]>([]);
   const [selectedCostumeKey, setSelectedCostumeKey] = useState<string | null>(null);
+  // 실장착 워드로브(studio-vrm-wardrobe) — 슬롯별 장착 + 모델 실측 치수.
+  const [wardrobeState, setWardrobeState] = useState<WardrobeState>({});
+  const [wardrobeMetrics, setWardrobeMetrics] = useState<WardrobeMetrics | null>(null);
+  const [wardrobeAutoHide, setWardrobeAutoHide] = useState(true);
   // 물리(studio-vrm-physics) — 스프링본 설정 + 미리보기/조인트 수.
   const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
   const [physicsPreview, setPhysicsPreview] = useState(false);
@@ -2351,6 +2555,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         yOffset: customYOffset,
         expressionWeights,
         costume: costumeState,
+        wardrobe: serializeWardrobe(wardrobeState),
         props: { items: vrmPropItems },
         physics: vrmPhysics,
         bodyScale,
@@ -2358,7 +2563,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         env: envVariant,
         fingerOverrides: fingerEdits,
       }),
-    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits]
+    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits]
   );
 
   const restoreHistoryAt = (index: number) => {
@@ -2475,6 +2680,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     modelName?: string;
     vrmProps?: unknown;
     costume?: unknown;
+    wardrobe?: unknown;
     physics?: unknown;
     // new high-level state for restore on load
     bodyScale?: BodyScale;
@@ -2895,7 +3101,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 풀 스테이트 copy/paste + local save/load (새 기능)
   function handleCopyFullState() {
     try {
-      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits });
+      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits });
       const json = JSON.stringify(full);
       navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
@@ -2911,7 +3117,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function handleSaveFullLocal() {
     const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
-    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits});
+    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits});
     const next = { ...savedFullStates, [name]: full };
     setSavedFullStates(next);
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
@@ -2927,6 +3133,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (plan.env) setEnvVariant(plan.env);
     if (plan.fingerOverrides) setFingerEdits(plan.fingerOverrides);
     if (plan.costume && typeof plan.costume === "object") setCostumeState(plan.costume as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    setWardrobeState(parseWardrobe(plan.wardrobe)); // 워드로브는 무조건 반영 — undo/redo에서 장착 변화도 되돌린다.
     if (plan.propsItems) setVrmPropItems(plan.propsItems as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -3078,6 +3285,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
+        wardrobe: serializeWardrobe(wardrobeState),
         physics: vrmPhysics,
       };
 
@@ -3152,6 +3360,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setCostumeState({ hidden: [], recolor: {} });
     setCostumeMeshes([]);
     setSelectedCostumeKey(null);
+    setWardrobeState({});
+    setWardrobeMetrics(null);
     setVrmPhysics(DEFAULT_VRM_PHYSICS);
     setPhysicsPreview(false);
     setSpringJointCount(0);
@@ -3255,6 +3465,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setVrm(nextVrm);
     setModelName(nextModelName);
     setActiveModelId(nextModelId);
+    // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
+    setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
 
     const pending = pendingPoseDataRef.current;
     if (pending) {
@@ -3274,6 +3486,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         lighting: pending.lighting,
         env: pending.env,
         costume: pending.costume,
+        wardrobe: pending.wardrobe,
         props: pending.vrmProps,
         physics: pending.physics,
       };
@@ -3304,9 +3517,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         body: "#ffffff",
         face: "#ffffff",
       });
-      // 본 부착 소품 초기화.
+      // 본 부착 소품·워드로브 초기화.
       setVrmPropItems([]);
       setSelectedVrmPropUid(null);
+      setWardrobeState({});
       // 의상 메시 수집 + 상태 초기화.
       const meshes = collectCostumeMeshes(nextVrm);
       setCostumeMeshes(meshes);
@@ -3725,6 +3939,64 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setSelectedCostumeKey(null);
   }
 
+  /* ── 실장착 워드로브 핸들러 ─────────────────────────────────────── */
+  /** 워드로브 슬롯과 겹치는 기존(베이크드) 의상 메시 키 목록. */
+  function costumeKeysForWardrobeSlot(slot: WardrobeSlot): string[] {
+    const targets = WARDROBE_HIDE_COSTUME_SLOTS[slot];
+    return costumeMeshes.filter((entry) => targets.includes(entry.slot)).map((entry) => entry.key);
+  }
+
+  function equipWardrobeItem(slot: WardrobeSlot, itemId: string | null) {
+    const keys = costumeKeysForWardrobeSlot(slot);
+    if (itemId) {
+      const equip = createWardrobeEquip(itemId);
+      if (!equip) return;
+      setWardrobeState((prev) => ({ ...prev, [slot]: equip }));
+      // 같은 부위의 기존 의상을 자동으로 숨겨 관통을 줄인다(의상 분리 UI에서 언제든 복원 가능).
+      if (wardrobeAutoHide && keys.length) {
+        updateCostume({ ...costumeState, hidden: Array.from(new Set([...costumeState.hidden, ...keys])) });
+      }
+    } else {
+      setWardrobeState((prev) => {
+        const next = { ...prev };
+        delete next[slot];
+        return next;
+      });
+      if (keys.length) {
+        updateCostume({ ...costumeState, hidden: costumeState.hidden.filter((k) => !keys.includes(k)) });
+      }
+    }
+  }
+
+  function updateWardrobeEquip(slot: WardrobeSlot, patch: Partial<WardrobeEquip>) {
+    setWardrobeState((prev) => {
+      const current = prev[slot];
+      if (!current) return prev;
+      return { ...prev, [slot]: { ...current, ...patch } };
+    });
+  }
+
+  function equipWardrobeSetById(setId: string) {
+    const set = wardrobeSetById(setId);
+    if (!set) return;
+    const nextState = applyWardrobeSet(set);
+    setWardrobeState(nextState);
+    if (wardrobeAutoHide) {
+      const keys = (Object.keys(nextState) as WardrobeSlot[]).flatMap((slot) => costumeKeysForWardrobeSlot(slot));
+      if (keys.length) {
+        updateCostume({ ...costumeState, hidden: Array.from(new Set([...costumeState.hidden, ...keys])) });
+      }
+    }
+  }
+
+  function clearWardrobe() {
+    const keys = (Object.keys(wardrobeState) as WardrobeSlot[]).flatMap((slot) => costumeKeysForWardrobeSlot(slot));
+    setWardrobeState({});
+    if (keys.length) {
+      updateCostume({ ...costumeState, hidden: costumeState.hidden.filter((k) => !keys.includes(k)) });
+    }
+  }
+
   /* ── 물리(스프링본) 핸들러 ──────────────────────────────────────── */
   function updatePhysics(patch: Partial<VrmPhysicsSettings>) {
     const next = parseVrmPhysicsSettings({ ...vrmPhysics, ...patch });
@@ -3803,6 +4075,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         modelId: activeModelId,
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
+        wardrobe: serializeWardrobe(wardrobeState),
         physics: vrmPhysics,
       };
       const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
@@ -3885,6 +4158,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   ) : null}
                   {vrm
                     ? vrmPropItems.map((item) => <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} />)
+                    : null}
+                  {vrm && wardrobeMetrics
+                    ? WARDROBE_SLOTS.map((slot) => {
+                        const equip = wardrobeState[slot];
+                        return equip ? <VrmWardrobeAttachment key={slot} vrm={vrm} equip={equip} metrics={wardrobeMetrics} /> : null;
+                      })
                     : null}
                   {activeProps.map((propId) => {
                     const propDef = SCENE_PROPS.find((p) => p.id === propId);
@@ -4664,6 +4943,132 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-fg">
+                  <Shirt size={14} className="text-accent" aria-hidden />
+                  3D 의상 실장착
+                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.55rem] font-bold text-accent">NEW</span>
+                </h3>
+                <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                  색만 바뀌는 게 아니라 실제 3D 옷·신발이 장착됩니다. 포즈를 바꿔도 몸을 따라 움직이고, 어떤 모델이든 체형에 맞게 자동 핏돼요.
+                </p>
+
+                {/* 원클릭 코디 세트 */}
+                <div className="mb-3 space-y-1.5 border-b border-line/35 pb-3">
+                  <p className="text-[0.65rem] font-bold text-fg-2">원클릭 코디 세트</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {WARDROBE_SETS.map((set) => (
+                      <button
+                        key={set.id}
+                        type="button"
+                        disabled={!vrm}
+                        onClick={() => equipWardrobeSetById(set.id)}
+                        className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-[0.68rem] font-medium text-fg hover:bg-raised disabled:opacity-40 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs" aria-hidden>{set.emoji}</span>
+                        <span className="truncate">{set.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 슬롯별 장착 */}
+                <div className="space-y-2.5">
+                  {WARDROBE_SLOTS.map((slot) => {
+                    const equip = wardrobeState[slot];
+                    const equippedDef = equip ? wardrobeItemById(equip.itemId) : undefined;
+                    return (
+                      <div key={slot} className="rounded-lg border border-line/60 bg-card/60 p-2">
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <p className="text-[0.65rem] font-bold text-fg-2">
+                            {WARDROBE_SLOT_LABELS[slot]}
+                            {equippedDef ? <span className="ml-1 font-semibold text-accent">{equippedDef.label}</span> : null}
+                          </p>
+                          {equip ? (
+                            <button
+                              type="button"
+                              onClick={() => equipWardrobeItem(slot, null)}
+                              className="rounded-md px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-bad"
+                            >
+                              해제
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {wardrobeItemsBySlot(slot).map((item) => {
+                            const active = equip?.itemId === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                disabled={!vrm}
+                                aria-pressed={active}
+                                title={item.hint}
+                                onClick={() => equipWardrobeItem(slot, active ? null : item.id)}
+                                className={`flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[0.6rem] font-medium transition-colors cursor-pointer disabled:opacity-40 ${
+                                  active ? "border-accent bg-accent/15 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                                }`}
+                              >
+                                <span className="text-sm" aria-hidden>{item.emoji}</span>
+                                <span className="w-full truncate text-center">{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {equip ? (
+                          <div className="mt-1.5 flex items-center gap-2.5">
+                            <label className="flex items-center gap-1 text-[0.62rem] font-semibold text-fg-2">
+                              색
+                              <input
+                                type="color"
+                                value={equip.color}
+                                onChange={(e) => updateWardrobeEquip(slot, { color: e.target.value })}
+                                className="size-5 cursor-pointer rounded border border-line bg-transparent p-0"
+                                aria-label={`${WARDROBE_SLOT_LABELS[slot]} 색상`}
+                              />
+                            </label>
+                            <label className="flex flex-1 items-center gap-1.5 text-[0.62rem] font-semibold text-fg-2">
+                              품
+                              <input
+                                type="range"
+                                min={WARDROBE_FIT_MIN}
+                                max={WARDROBE_FIT_MAX}
+                                step={0.05}
+                                value={equip.fit}
+                                onChange={(e) => updateWardrobeEquip(slot, { fit: Number(e.target.value) })}
+                                className="h-1 flex-1 accent-accent"
+                                aria-label={`${WARDROBE_SLOT_LABELS[slot]} 품(핏)`}
+                              />
+                              <span className="w-8 text-right tabular-nums text-fg-3">{Math.round(equip.fit * 100)}%</span>
+                            </label>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 text-[0.62rem] font-medium text-fg-2">
+                    <input
+                      type="checkbox"
+                      checked={wardrobeAutoHide}
+                      onChange={(e) => setWardrobeAutoHide(e.target.checked)}
+                      className="size-3.5 accent-accent"
+                    />
+                    같은 부위 기존 의상 자동 숨김
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!vrm || Object.keys(wardrobeState).length === 0}
+                    onClick={clearWardrobe}
+                    className="rounded-lg border border-line bg-card px-2 py-1 text-[0.65rem] text-fg hover:bg-raised disabled:opacity-45"
+                  >
+                    전체 해제
+                  </button>
+                </div>
+              </section>
+
+              <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   의상 및 신체 색상 변경
@@ -4686,6 +5091,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           if (vrmRef.current) {
                             applyVrmCustomColors(vrmRef.current, p.colors);
                           }
+                          // 테마 채색과 함께 대응하는 3D 의상 세트도 실장착한다(색놀이→진짜 옷).
+                          equipWardrobeSetById(p.id);
                         }}
                         className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-[0.68rem] font-medium text-fg hover:bg-raised disabled:opacity-40 transition-colors cursor-pointer"
                       >
