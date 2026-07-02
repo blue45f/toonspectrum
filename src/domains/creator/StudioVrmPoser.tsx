@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import * as THREE from "three";
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
-import { VrmBoneSmoother } from "./studio-vrm-bone-smoother";
+import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
+import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
   classifyMeshName,
   COSTUME_SLOT_LABELS,
@@ -64,6 +65,15 @@ import {
   type PropCategory,
 } from "./studio-vrm-props";
 import {
+  applyCalibration,
+  CALIBRATION_STORAGE_KEY,
+  CalibrationSampler,
+  deserializeCalibration,
+  serializeCalibration,
+  type TrackingCalibration,
+} from "./studio-vrm-tracking-calibration";
+import { AdaptiveQualityController } from "./studio-vrm-tracking-quality";
+import {
   WARDROBE_SLOTS,
   WARDROBE_SLOT_LABELS,
   WARDROBE_SETS,
@@ -96,9 +106,11 @@ import {
   disposeHandLandmarker,
   processTrackingResult,
   processPoseResult,
-  smoothRawChannels,
   convertChannelsToVrmData,
+  createChannelSmoother,
+  warmupLandmarkers,
   DEFAULT_TRACKING_OPTIONS,
+  NEUTRAL_CHANNELS,
   type TrackingOptions,
   type TrackingChannels,
   type VrmTrackingData,
@@ -378,6 +390,13 @@ const CANONICAL_LIMB_BONES = [
 const ZERO_EULER = [0, 0, 0] as const;
 // 추적 끊김 시 rest 복귀 속도(half-life, 초). 짧은 깜빡임엔 거의 흔들리지 않게 충분히 길게.
 const LIMB_FADE_HALF_LIFE = 0.5;
+// vrm.lookAt 직접 구동 시 이중 적용을 막을 시선 표정 이름(lookAt 부재 모델 폴백용).
+const LOOK_EXPRESSION_NAMES = new Set(["lookUp", "lookDown", "lookLeft", "lookRight"]);
+// 얼굴 로스트: 이 프레임 수까지는 마지막 채널을 홀드(~0.3s, 순간 드랍 마스킹),
+// 이후 중립 채널로 감쇠 복귀한다(One-Euro 필터가 전환을 스무딩 — 제로 스냅 없음).
+const FACE_HOLD_FRAMES = 10;
+// 얼굴 미검출이 이 프레임 수(~5초@30fps)를 넘으면 프리뷰에 힌트 배지를 띄운다.
+const FACE_LOST_HINT_FRAMES = 150;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
@@ -2145,6 +2164,16 @@ function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   vrm.scene.updateMatrixWorld(true);
 }
 
+/**
+ * vrm.lookAt 직접 구동. VRMLookAt.yaw/pitch 단위는 도(degree) —
+ * 라디안을 넣으면 거의 움직이지 않는다. useFrame 밖 헬퍼로 분리(react-compiler 프롭 변이 제약).
+ */
+function applyLookAtToVrm(vrm: VRM, lookAt: { yawDeg: number; pitchDeg: number }) {
+  if (!vrm.lookAt) return;
+  vrm.lookAt.yaw = lookAt.yawDeg;
+  vrm.lookAt.pitch = lookAt.pitchDeg;
+}
+
 function VrmActor({
   bodyRotation,
   customBones,
@@ -2187,9 +2216,15 @@ function VrmActor({
 
   // 팔/다리 본 시간축 스무딩(프레임 간 상태 유지). 웹캠 토글마다 리셋해 stale 보간 방지.
   const boneSmootherRef = useRef<VrmBoneSmoother>(new VrmBoneSmoother());
+  // head/neck 전용 스무더 — 시선이 머무는 비주얼 채널이라 지터 억제를 우선한 프리셋.
+  const headSmootherRef = useRef<VrmBoneSmoother>(new VrmBoneSmoother(HEAD_BONE_SMOOTHER));
   useEffect(() => {
     const smoother = boneSmootherRef.current;
-    return () => smoother.reset();
+    const headSmoother = headSmootherRef.current;
+    return () => {
+      smoother.reset();
+      headSmoother.reset();
+    };
   }, [webcamActive]);
 
   useFrame((state, delta) => {
@@ -2205,10 +2240,14 @@ function VrmActor({
         Object.entries(data.bones).forEach(([boneName, rot]) => {
           const bone = humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName);
           if (!bone) return;
-          // 팔/다리/발/손은 quaternion 슬러프로 스무딩(떨림 제거). 머리/목은 이미 EMA 스무딩됨.
+          // 팔/다리/발/손은 quaternion 슬러프로 스무딩(떨림 제거).
+          // head/neck 은 One-Euro 채널 필터 위에 본 레벨 스무딩을 한 겹 더 —
+          // 시선이 머무는 채널이라 잔여 지터까지 흡수한다.
           if (LIMB_BONE_RE.test(boneName)) {
             present.add(boneName);
             bone.quaternion.copy(smoother.smooth(boneName, rot, dVal));
+          } else if (boneName === "head" || boneName === "neck") {
+            bone.quaternion.copy(headSmootherRef.current.smooth(boneName, rot, dVal));
           } else {
             bone.rotation.set(rot[0], rot[1], rot[2]);
           }
@@ -2234,12 +2273,18 @@ function VrmActor({
 
       if (expressionManager) {
         expressionManager.resetValues();
+        // vrm.lookAt 이 있으면 시선은 lookAt 으로 직접 구동 — look* 표정과 이중 적용 방지.
+        const useLookAt = !!vrm.lookAt && !!data.lookAt;
         Object.entries(data.expressions).forEach(([name, weight]) => {
+          if (useLookAt && LOOK_EXPRESSION_NAMES.has(name)) return;
           if (expressionManager.getExpression(name)) {
             expressionManager.setValue(name, weight);
           }
         });
         expressionManager.update();
+      }
+      if (vrm.lookAt && data.lookAt) {
+        applyLookAtToVrm(vrm, data.lookAt);
       }
     } else if (idleAnimation) {
       if (humanoid) {
@@ -2489,13 +2534,32 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
   const [browserPermissionState, setBrowserPermissionState] = useState<"granted" | "denied" | "prompt" | "unsupported">("prompt");
+  // 정면 캘리브레이션 UI 상태(studio-vrm-tracking-calibration).
+  const [calibrating, setCalibrating] = useState(false);
+  const [calibrationCountdown, setCalibrationCountdown] = useState(0);
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [calibrated, setCalibrated] = useState(false);
+  // 얼굴 미검출 장기화(~5초) 힌트 배지.
+  const [faceLostLong, setFaceLostLong] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
-  const prevChannelsRef = useRef<TrackingChannels | null>(null);
+  // 트래킹 루프 상태 — 전부 ref(렌더 경로에서 변이 금지, 루프/effect 내부에서만 변이).
+  const channelSmootherRef = useRef(createChannelSmoother());
+  const blinkStabilizerRef = useRef(new BlinkStabilizer());
+  const qualityRef = useRef<AdaptiveQualityController | null>(null);
+  const calibrationRef = useRef<TrackingCalibration | null>(null);
+  const calibrationSamplerRef = useRef<CalibrationSampler | null>(null);
+  const faceLostFramesRef = useRef(0);
+  const faceLostLongRef = useRef(false);
+  const lastChannelsRef = useRef<TrackingChannels | null>(null);
+  const lastPoseBonesRef = useRef<Record<string, readonly [number, number, number]>>({});
+  const lastFingersRef = useRef<Record<string, readonly [number, number, number]> | null>(null);
+  const frameIndexRef = useRef(0);
+  const webcamActiveRef = useRef(false);
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
@@ -2728,6 +2792,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         console.error("Failed to load full vrm states", e);
       }
     }
+    // 저장된 트래킹 캘리브레이션 복원(손상/버전 불일치면 null → 미적용).
+    const storedCalibration = deserializeCalibration(localStorage.getItem(CALIBRATION_STORAGE_KEY));
+    if (storedCalibration) {
+      calibrationRef.current = storedCalibration;
+      setCalibrated(true);
+    }
   }, []);
 
   // Check camera permission state on mount or when webcam status changes
@@ -2769,6 +2839,40 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     trackingOptionsRef.current = trackingOptions;
   }, [trackingOptions]);
 
+  // webcamActive 를 ref 로 미러링 — visibilitychange 핸들러가 최신 값을 참조.
+  useEffect(() => {
+    webcamActiveRef.current = webcamActive;
+  }, [webcamActive]);
+
+  // 탭 숨김 → 카메라 완전 해제(LED 소등 = 프라이버시) + 루프 정지, 복귀 시 재시작.
+  // 기존 웹캠 effect 가 webcamActive=false 에서 track.stop 을 이미 수행하므로 토글을 재사용한다
+  // (권한은 granted 상태라 재시작 시 프롬프트 없음, 모델은 싱글턴 캐시라 재-init 비용 없음).
+  useEffect(() => {
+    const wasActive = { current: false };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        wasActive.current = webcamActiveRef.current;
+        if (wasActive.current) setWebcamActive(false);
+      } else if (wasActive.current) {
+        wasActive.current = false;
+        setWebcamActive(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  // 캘리브레이션 카운트다운(3·2·1) → 종료 시 샘플러 가동(완료 감지는 트래킹 루프에서).
+  useEffect(() => {
+    if (!calibrating) return;
+    if (calibrationCountdown > 0) {
+      const timer = setTimeout(() => setCalibrationCountdown((c) => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    setCalibrationProgress(0);
+    calibrationSamplerRef.current = new CalibrationSampler();
+  }, [calibrating, calibrationCountdown]);
+
   // Webcam live tracking loop
   useEffect(() => {
     if (!webcamActive) {
@@ -2776,15 +2880,30 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      prevChannelsRef.current = null;
+      // 트래킹 세션 상태 초기화 — 재시작 시 stale 필터/홀드 값 방지.
+      channelSmootherRef.current.reset();
+      blinkStabilizerRef.current.reset();
+      qualityRef.current = null;
+      calibrationSamplerRef.current = null;
+      faceLostFramesRef.current = 0;
+      faceLostLongRef.current = false;
+      lastChannelsRef.current = null;
+      lastPoseBonesRef.current = {};
+      lastFingersRef.current = null;
+      frameIndexRef.current = 0;
       trackingDataRef.current = null;
       setFaceDetected(false);
+      setFaceLostLong(false);
+      setCalibrating(false);
       return;
     }
 
     let active = true;
     let lastVideoTime = -1;
     let requestId: number;
+    let videoFrameCallbackId: number | null = null;
+    // rVFC 를 등록한 비디오 엘리먼트 — cleanup 에서 ref 재조회 대신 이 변수를 사용.
+    let schedulingVideo: HTMLVideoElement | null = null;
 
     const startCamera = async () => {
       setWebcamLoading(true);
@@ -2810,8 +2929,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             }
           } catch { /* ignore */ }
 
+          // 모델 내부 입력이 192~256px 라 640 초과는 낭비, 320×240 은 iris 정밀도 손실
+          // — 640×480 이 스윗스팟. exact 는 OverconstrainedError 위험이 있어 ideal 만 사용.
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 320, height: 240, facingMode: "user" },
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              frameRate: { ideal: 30, max: 30 },
+              facingMode: "user",
+            },
             audio: false,
           });
         } catch (cameraErr) {
@@ -2864,6 +2990,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             .catch((handErr) => console.warn("HandLandmarker init failed (손가락 추적 비활성):", handErr));
         }
 
+        // 적응형 품질 초기 티어 — 저사양 하드웨어 판정은 여기(호출부)서 주입해
+        // 컨트롤러 모듈은 navigator 무의존 순수 모듈로 유지한다.
+        const lowEnd =
+          (navigator.hardwareConcurrency ?? 8) <= 4 ||
+          ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4;
+        qualityRef.current = new AdaptiveQualityController(lowEnd ? "reduced" : "full");
+
+        // 첫 실제 프레임의 셰이더 컴파일/그래프 빌드 스톨을 트래킹 시작 전에 흡수.
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          warmupLandmarkers(videoRef.current, performance.now());
+        }
+
         setWebcamLoading(false);
 
         const loop = () => {
@@ -2872,66 +3010,124 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           const currentLandmarker = landmarkerRef.current;
           const currentPoseLandmarker = poseLandmarkerRef.current;
           if (currentVideo && currentLandmarker && currentPoseLandmarker && currentVideo.readyState >= 2) {
+            // detectForVideo 타임스탬프는 단조 증가 필수 — 추론 시간 측정 시작점 겸용.
             const timestamp = performance.now();
+            // rVFC 경로는 프레임당 1회 호출이지만 rAF 폴백을 위해 currentTime 가드 유지(무해).
             if (currentVideo.currentTime !== lastVideoTime) {
               lastVideoTime = currentVideo.currentTime;
-              const result = currentLandmarker.detectForVideo(currentVideo, timestamp);
-              const poseResult = currentPoseLandmarker.detectForVideo(currentVideo, timestamp);
-              
-              const rawChannels = processTrackingResult(result);
-              const poseBones = processPoseResult(poseResult, trackingOptionsRef.current.mirrorMode);
+              const frameIndex = frameIndexRef.current++;
+              const quality = qualityRef.current;
+              const options = trackingOptionsRef.current;
 
-              const faceChannels = rawChannels || {
-                headPitch: 0,
-                headYaw: 0,
-                headRoll: 0,
-                blinkLeft: 0,
-                blinkRight: 0,
-                gazeX: 0,
-                gazeY: 0,
-                mouthOpen: 0,
-                mouthSmile: 0,
-                browInnerUp: 0,
-                browOuterUpLeft: 0,
-                browOuterUpRight: 0,
-                browDown: 0,
-                mouthFrown: 0,
-                eyeWide: 0,
-              };
+              const result = currentLandmarker.detectForVideo(currentVideo, timestamp);
+              const rawChannels = processTrackingResult(result);
+
+              // 적응형 품질: pose 는 티어에 따라 격프레임 스킵(스킵 프레임은 직전 결과 재사용
+              // — 본 스무더가 보간을 겸한다).
+              if (!quality || quality.shouldRunPose(frameIndex)) {
+                const poseResult = currentPoseLandmarker.detectForVideo(currentVideo, timestamp);
+                lastPoseBonesRef.current = processPoseResult(poseResult, options.mirrorMode);
+              }
+              const poseBones = lastPoseBonesRef.current;
 
               setFaceDetected(!!rawChannels);
 
-              const smoothed = smoothRawChannels(
-                prevChannelsRef.current,
-                faceChannels,
-                trackingOptionsRef.current.smoothing
-              );
-              prevChannelsRef.current = smoothed;
+              // 얼굴 로스트: 짧은 드랍은 마지막 채널 홀드, 길어지면 중립으로 감쇠 복귀.
+              if (rawChannels) {
+                faceLostFramesRef.current = 0;
+                lastChannelsRef.current = rawChannels;
+                if (faceLostLongRef.current) {
+                  faceLostLongRef.current = false;
+                  setFaceLostLong(false);
+                }
+              } else {
+                faceLostFramesRef.current += 1;
+                if (!faceLostLongRef.current && faceLostFramesRef.current > FACE_LOST_HINT_FRAMES) {
+                  faceLostLongRef.current = true;
+                  setFaceLostLong(true);
+                }
+              }
+              const held =
+                (faceLostFramesRef.current <= FACE_HOLD_FRAMES ? lastChannelsRef.current : null) ??
+                NEUTRAL_CHANNELS;
 
-              const vrmData = convertChannelsToVrmData(smoothed, trackingOptionsRef.current);
+              // 캘리브레이션 샘플링 — 반드시 보정 "이전" raw 값으로, 얼굴 검출 프레임만 수집.
+              const sampler = calibrationSamplerRef.current;
+              if (sampler && rawChannels) {
+                sampler.add(rawChannels);
+                setCalibrationProgress(sampler.progress);
+                if (sampler.done) {
+                  calibrationSamplerRef.current = null;
+                  const cal = sampler.build();
+                  if (cal) {
+                    calibrationRef.current = cal;
+                    try {
+                      localStorage.setItem(CALIBRATION_STORAGE_KEY, serializeCalibration(cal));
+                    } catch (storageErr) {
+                      console.warn("캘리브레이션 저장 실패(이번 세션에서만 유지):", storageErr);
+                    }
+                    channelSmootherRef.current.reset();
+                  }
+                  setCalibrated(!!cal);
+                  setCalibrating(false);
+                }
+              }
+
+              // 적용 순서: raw → 캘리브레이션 → One-Euro → 블링크 안정화 → VRM 변환.
+              const calibratedChannels = applyCalibration(held, calibrationRef.current);
+              const smoothed = channelSmootherRef.current.smooth(
+                calibratedChannels,
+                timestamp / 1000, // 초 단위 실제 시간 — 프레임 인덱스 금지(가변 fps 왜곡).
+                options.smoothing
+              );
+              // blink 좌우는 카메라 좌표계 그대로 — 미러 스왑은 convertChannelsToVrmData
+              // 한 곳에서만 수행한다(이중 반전 금지).
+              const blink = blinkStabilizerRef.current.process(
+                smoothed.blinkLeft,
+                smoothed.blinkRight,
+                smoothed.headYaw
+              );
+              const vrmData = convertChannelsToVrmData(
+                { ...smoothed, blinkLeft: blink.left, blinkRight: blink.right },
+                options
+              );
               vrmData.bones = { ...vrmData.bones, ...poseBones };
 
-              // 손가락 추적: 감지된 각 손의 21개 랜드마크 → 아바타 측(미러 반영) 손가락 본.
+              // 손가락 추적: 티어에 따라 격프레임/비활성(스킵 프레임은 직전 결과 재사용).
               const handLm = handLandmarkerRef.current;
               if (handLm) {
-                const handResult = handLm.detectForVideo(currentVideo, timestamp);
-                const fingers: Record<string, readonly [number, number, number]> = {};
-                const hands = handResult?.landmarks ?? [];
-                const handed = handResult?.handednesses ?? [];
-                for (let i = 0; i < hands.length; i++) {
-                  const label = handed[i]?.[0]?.categoryName ?? "Right";
-                  const side = avatarSideForHand(label, trackingOptionsRef.current.mirrorMode);
-                  Object.assign(fingers, solveHandToFingerBones(hands[i], side));
+                if (!quality || quality.shouldRunHands(frameIndex, options.fingerTracking)) {
+                  const handResult = handLm.detectForVideo(currentVideo, timestamp);
+                  const fingers: Record<string, readonly [number, number, number]> = {};
+                  const hands = handResult?.landmarks ?? [];
+                  const handed = handResult?.handednesses ?? [];
+                  for (let i = 0; i < hands.length; i++) {
+                    const label = handed[i]?.[0]?.categoryName ?? "Right";
+                    const side = avatarSideForHand(label, options.mirrorMode);
+                    Object.assign(fingers, solveHandToFingerBones(hands[i], side));
+                  }
+                  lastFingersRef.current = fingers;
                 }
-                vrmData.fingers = fingers;
+                if (lastFingersRef.current) vrmData.fingers = lastFingersRef.current;
               }
 
               trackingDataRef.current = vrmData;
+              qualityRef.current?.recordFrame(performance.now() - timestamp, performance.now());
             }
           }
-          requestId = requestAnimationFrame(loop);
+          scheduleNext();
         };
-        requestId = requestAnimationFrame(loop);
+        // 30fps 웹캠에서 rAF(60Hz) 대비 호출 절반 — 새 비디오 프레임에만 깨어난다.
+        const scheduleNext = () => {
+          const video = videoRef.current;
+          if (video && "requestVideoFrameCallback" in video) {
+            schedulingVideo = video;
+            videoFrameCallbackId = video.requestVideoFrameCallback(() => loop());
+          } else {
+            requestId = requestAnimationFrame(loop);
+          }
+        };
+        scheduleNext();
       } catch (err) {
         console.error("Webcam start failed:", err);
         const errMsg = err instanceof Error ? err.message : "카메라 권한 접근에 실패했거나 트래킹 로드 오류가 발생했습니다.";
@@ -2947,6 +3143,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       active = false;
       setWebcamLoading(false);
       if (requestId) cancelAnimationFrame(requestId);
+      if (videoFrameCallbackId !== null && schedulingVideo && "cancelVideoFrameCallback" in schedulingVideo) {
+        schedulingVideo.cancelVideoFrameCallback(videoFrameCallbackId);
+      }
       // 핸드 랜드마커 참조 해제 — 재시작 시 옵션에 따라 다시 설정.
       handLandmarkerRef.current = null;
       if (streamRef.current) {
@@ -2963,6 +3162,24 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       disposeHandLandmarker();
     };
   }, []);
+
+  // 정면 캘리브레이션 시작 — 3초 카운트다운 후 샘플러 가동(완료는 트래킹 루프가 감지).
+  const handleStartCalibration = () => {
+    calibrationSamplerRef.current = null;
+    setCalibrationProgress(0);
+    setCalibrationCountdown(3);
+    setCalibrating(true);
+  };
+
+  const handleClearCalibration = () => {
+    calibrationRef.current = null;
+    try {
+      localStorage.removeItem(CALIBRATION_STORAGE_KEY);
+    } catch (storageErr) {
+      console.warn("캘리브레이션 삭제 실패:", storageErr);
+    }
+    setCalibrated(false);
+  };
 
   const handleCapturePose = () => {
     if (!trackingDataRef.current) return;
@@ -5922,6 +6139,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           />
                           {faceDetected ? "얼굴 감지됨" : "얼굴 감지 중..."}
                         </div>
+                        {faceLostLong && (
+                          <div
+                            className="absolute inset-x-2 bottom-2 rounded bg-black/70 px-2 py-1 text-center text-[0.6rem] font-semibold text-amber-300"
+                            role="status"
+                          >
+                            얼굴이 보이지 않아요 — 카메라 정면에 위치해 주세요
+                          </div>
+                        )}
+                        {calibrating && (
+                          <div
+                            className="absolute inset-0 grid place-items-center bg-black/45 px-3 text-center"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            <p className="text-[0.72rem] font-bold leading-relaxed text-white">
+                              {calibrationCountdown > 0
+                                ? `정면을 보고 무표정을 유지하세요… ${calibrationCountdown}`
+                                : `측정 중… ${Math.round(calibrationProgress * 100)}%`}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -5965,6 +6203,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 <li><strong>macOS 시스템:</strong> 시스템 설정 → 개인정보 보호 및 보안 → 카메라 → 브라우저 앱 스위치 <strong>켜기</strong></li>
                                 <li>설정 바꾼 후 브라우저 완전 종료 → 재시작 → 이 페이지 F5</li>
                               </ol>
+                              <button
+                                type="button"
+                                className="mt-2 rounded border border-line bg-card px-2.5 py-1 text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg"
+                                onClick={() => handlePanelTabChange("pose")}
+                              >
+                                웹캠 없이 포즈 프리셋 사용
+                              </button>
                             </div>
                           </div>
                         )}
@@ -6001,6 +6246,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             }}
                           >
                             권한 상태 재확인
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded border border-line bg-card px-2.5 py-1 text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg"
+                            onClick={() => handlePanelTabChange("pose")}
+                          >
+                            웹캠 없이 포즈 프리셋 사용
                           </button>
                         </div>
                       </div>
@@ -6153,6 +6405,39 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, smoothing: Number(e.target.value) }))
                                 }
                               />
+                            </div>
+                            <div className="space-y-1.5 border-t border-line/60 pt-2.5 text-[0.62rem] text-fg-2">
+                              <div className="flex items-center justify-between">
+                                <span>정면 캘리브레이션{calibrated && !calibrating ? " · 적용됨" : ""}</span>
+                                {calibrated && !calibrating && (
+                                  <button
+                                    type="button"
+                                    className="rounded border border-line px-2 py-0.5 text-[0.6rem] text-fg-3 hover:bg-raised hover:text-fg"
+                                    onClick={handleClearCalibration}
+                                  >
+                                    초기화
+                                  </button>
+                                )}
+                              </div>
+                              {calibrating ? (
+                                <p className="rounded bg-accent-soft/40 px-2 py-1.5 font-semibold text-accent" role="status">
+                                  {calibrationCountdown > 0
+                                    ? `정면을 보고 무표정을 유지하세요… ${calibrationCountdown}`
+                                    : `측정 중… ${Math.round(calibrationProgress * 100)}%`}
+                                </p>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={cx(CONTROL_BUTTON, "w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                                  onClick={handleStartCalibration}
+                                  disabled={!faceDetected}
+                                >
+                                  {calibrated ? "다시 캘리브레이션" : "정면 캘리브레이션"}
+                                </button>
+                              )}
+                              <p className="text-[0.58rem] leading-relaxed text-fg-3">
+                                정면·무표정 기준으로 머리 각도와 시선, 눈 크기를 보정합니다. 비스듬히 앉아도 정면 응시가 유지됩니다.
+                              </p>
                             </div>
                           </div>
                         )}
