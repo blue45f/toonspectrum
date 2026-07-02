@@ -1,3 +1,4 @@
+import { getCharacters } from "@toonspectrum/core";
 import {
   Sparkles,
   User,
@@ -17,9 +18,6 @@ import {
 } from "lucide-react";
 import { MotionConfig, motion } from "motion/react";
 import { useState, useEffect, useRef } from "react";
-
-
-
 
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
@@ -203,7 +201,9 @@ export function FortunePage() {
   const clearHistory = useFortuneStore((s) => s.clearHistory);
   const removeFromHistory = useFortuneStore((s) => s.removeFromHistory);
 
-  const [characters, setCharacters] = useState<Character[]>([]);
+  // 캐릭터 목록은 @toonspectrum/core 의 정적 데이터(웹·API·토스 단일 출처)로 즉시 채운다 —
+  // API(/api/fortune/characters, 로컬은 dev:api 필요)가 없거나 실패해도 피커가 동작한다.
+  const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [activeTab, setActiveTab] = useState<FortuneTab>("today");
 
@@ -324,7 +324,8 @@ export function FortunePage() {
     }
   };
 
-  // 1. 캐릭터 리스트 가져오기 (실패 시 재시도 버튼 노출)
+  // 1. 캐릭터 리스트 — 정적 데이터가 이미 채워져 있으니, API 는 최신본으로 "갱신"만 시도한다.
+  // API 가 유효한 배열을 주면 반영하고, 실패해도 정적 목록이 남아 피커는 계속 동작한다(에러 UI 억제).
   const loadCharacters = () => {
     setCharLoadFailed(false);
     fetch("/api/fortune/characters")
@@ -332,10 +333,13 @@ export function FortunePage() {
         if (!res.ok) throw new Error(`status ${res.status}`);
         return res.json();
       })
-      .then((data) => setCharacters(data))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setCharacters(data);
+      })
       .catch((err) => {
-        console.error("캐릭터 정보 로드 실패:", err);
-        setCharLoadFailed(true);
+        // 정적 폴백이 이미 있으므로 사용자에겐 에러를 띄우지 않는다(콘솔에만 기록).
+        console.error("캐릭터 정보 API 로드 실패 — 내장 정적 목록 사용:", err);
+        setCharacters((prev) => (prev.length > 0 ? prev : getCharacters()));
       });
   };
   useEffect(() => {
