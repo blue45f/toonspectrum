@@ -182,13 +182,15 @@ export function IntroSplash({ once = true }: IntroSplashProps = {}) {
     scene.add(bgStars);
 
     // 4. Animation loop
+    // THREE.Clock 은 deprecated(콘솔 경고) — 후속 THREE.Timer 로 교체(매 프레임 update 필요).
     let animationFrameId = 0;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      const elapsed = clock.getElapsedTime();
+      timer.update();
+      const elapsed = timer.getElapsed();
 
       // Slow overall rotation
       group.rotation.y = elapsed * 0.12;
