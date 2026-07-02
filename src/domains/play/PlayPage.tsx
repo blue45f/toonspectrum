@@ -6,6 +6,7 @@ import { findGame, PLAY_GAMES } from "./game-registry";
 import { PlayCheerCard } from "./PlayCheerCard";
 
 import { Container } from "@/components/section";
+import { SharePageButton } from "@/components/share-page-button";
 import { cn } from "@/lib/utils";
 
 
@@ -54,11 +55,15 @@ export function PlayPage() {
 
   return (
     <Container className="py-6">
-      <header className="mb-5">
-        <h1 ref={headingRef} tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold outline-none">
-          <Gamepad2 className="h-6 w-6 text-accent" /> 놀이터
-        </h1>
-        <p className="mt-1 text-sm text-fg-2">웹툰 캐릭터로 즐기는 미니게임 — 카드 배틀, 가위바위보, 퀴즈 등.</p>
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 ref={headingRef} tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold outline-none">
+            <Gamepad2 className="h-6 w-6 text-accent" /> 놀이터
+          </h1>
+          <p className="mt-1 text-sm text-fg-2">웹툰 캐릭터로 즐기는 미니게임 — 카드 배틀, 가위바위보, 퀴즈 등.</p>
+        </div>
+        {/* 놀이터 공유 — 토스 공식 공유 링크(1200×600 OG) → OS 시트 → 클립보드 폴백 */}
+        <SharePageButton path="/play" text="툰스펙트럼 놀이터 — 웹툰 캐릭터 미니게임" label="놀이터 공유" />
       </header>
 
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
