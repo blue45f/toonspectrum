@@ -102,17 +102,19 @@ export function showRewardedAd(): boolean {
   return provider?.show() ?? false;
 }
 
-const subscribe = (onStoreChange: () => void): (() => void) => {
+/** 상태 스냅샷 변경 구독(useSyncExternalStore 호환). 반환 함수로 해제. */
+export const subscribeRewardedAd = (onStoreChange: () => void): (() => void) => {
   stateListeners.add(onStoreChange);
   return () => {
     stateListeners.delete(onStoreChange);
   };
 };
 
-const getSnapshot = (): RewardedAdSnapshot => snapshot;
+/** 현재 보상형 광고 스냅샷(불변 — 상태가 실제로 바뀔 때만 참조 교체). */
+export const getRewardedAdSnapshot = (): RewardedAdSnapshot => snapshot;
 const getServerSnapshot = (): RewardedAdSnapshot => SERVER_SNAPSHOT;
 
 /** 보상형 광고 가용/준비 상태 구독 훅(웹에선 항상 `{available:false}` — UI 미노출). */
 export function useRewardedAd(): RewardedAdSnapshot {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(subscribeRewardedAd, getRewardedAdSnapshot, getServerSnapshot);
 }
