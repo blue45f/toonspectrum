@@ -5727,21 +5727,21 @@ function StudioCuttoonEditor() {
                 배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
               </p>
               <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                 <input
                   type="text"
                   placeholder="배경 씬 검색..."
                   value={bgSceneSearchQuery}
                   onChange={(e) => setBgSceneSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
                 />
                 {bgSceneSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setBgSceneSearchQuery("")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                   >
-                    <X size={10} />
+                    <X size={12} />
                   </button>
                 )}
               </div>
@@ -5775,7 +5775,7 @@ function StudioCuttoonEditor() {
                 {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
                   <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                     <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                   </div>
                 )}
                 {bgSceneSectionsFiltered.map((group) => (
@@ -5814,21 +5814,21 @@ function StudioCuttoonEditor() {
                 톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
               </p>
               <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                 <input
                   type="text"
                   placeholder="톤 검색 (망점·선·교차선...)"
                   value={toneSearchQuery}
                   onChange={(e) => setToneSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
                 />
                 {toneSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setToneSearchQuery("")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                   >
-                    <X size={10} />
+                    <X size={12} />
                   </button>
                 )}
               </div>
@@ -5851,21 +5851,21 @@ function StudioCuttoonEditor() {
                 선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
               </p>
               <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                 <input
                   type="text"
                   placeholder="이메레스 검색..."
                   value={emeresSearchQuery}
                   onChange={(e) => setEmeresSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
                 />
                 {emeresSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setEmeresSearchQuery("")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                   >
-                    <X size={10} />
+                    <X size={12} />
                   </button>
                 )}
               </div>
@@ -5897,7 +5897,7 @@ function StudioCuttoonEditor() {
                 {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
                   <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                     <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                    <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                   </div>
                 )}
                 {emeresSectionsFiltered.map((section) => (
@@ -5981,14 +5981,14 @@ function StudioCuttoonEditor() {
                 disabled={!selected}
                 className={cn(
                   "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
-                  selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-4"
+                  selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
                 )}
                 title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
               >
                 + 선택을 클립으로 저장
               </button>
               {clips.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-4">
+                <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
                   저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
                 </p>
               ) : (
@@ -6002,13 +6002,13 @@ function StudioCuttoonEditor() {
                         title="이 클립을 캔버스에 넣기"
                       >
                         {c.name}
-                        <span className="ml-1 text-[0.6rem] text-fg-4">{(c.els as unknown[]).length}개</span>
+                        <span className="ml-1 text-[0.6rem] text-fg-3">{(c.els as unknown[]).length}개</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => void deleteClip(c.id)}
                         aria-label={`${c.name} 클립 삭제`}
-                        className="shrink-0 text-fg-4 transition-colors hover:text-bad"
+                        className="shrink-0 text-fg-3 transition-colors hover:text-bad"
                       >
                         <X size={12} />
                       </button>
@@ -6043,7 +6043,7 @@ function StudioCuttoonEditor() {
               </div>
               <div className="mt-2 border-t border-line pt-2">
                 <p className="mb-1 text-[0.66rem] font-medium text-fg-3">대사 한 번에</p>
-                <p className="mb-1.5 text-[0.6rem] leading-snug text-fg-4">
+                <p className="mb-1.5 text-[0.6rem] leading-snug text-fg-3">
                   한 줄에 한 대사. <span className="text-fg-3">이름: 대사</span>로 화자 지정(좌/우 자동), <span className="text-fg-3">(지문)</span>은 나레이션.
                 </p>
                 <textarea
@@ -6051,7 +6051,7 @@ function StudioCuttoonEditor() {
                   onChange={(e) => setDialogueScript(e.target.value)}
                   placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
                   rows={4}
-                  className="w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-4 focus:border-accent/50"
+                  className="w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50"
                 />
                 <button
                   type="button"
@@ -6059,7 +6059,7 @@ function StudioCuttoonEditor() {
                   disabled={!dialogueScript.trim()}
                   className={cn(
                     "mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
-                    dialogueScript.trim() ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-4"
+                    dialogueScript.trim() ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
                   )}
                 >
                   말풍선으로 한 번에 넣기
@@ -6075,21 +6075,21 @@ function StudioCuttoonEditor() {
           {menu === "sticker" && (
             <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-4" />
+                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                 <input
                   type="text"
                   placeholder="효과 검색..."
                   value={fxSearchQuery}
                   onChange={(e) => setFxSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder-fg-4 outline-none focus:border-accent transition-colors"
+                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
                 />
                 {fxSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setFxSearchQuery("")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-fg-4 hover:text-fg-2 transition-colors"
+                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                   >
-                    <X size={10} />
+                    <X size={12} />
                   </button>
                 )}
               </div>
@@ -6209,7 +6209,7 @@ function StudioCuttoonEditor() {
               {!fxPickerHasResults && fxQuery !== "" && (
                 <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                   <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                  <p className="mt-1 text-[0.6rem] text-fg-4 leading-normal">다른 검색어로 찾아보세요.</p>
+                  <p className="mt-1 text-[0.6rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                 </div>
               )}
             </div>
@@ -8725,7 +8725,7 @@ function StudioCuttoonEditor() {
                               step={0.5}
                               value={selected.strokeWidth ?? 3}
                               onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
                           </span>
@@ -8778,7 +8778,7 @@ function StudioCuttoonEditor() {
                               step={1}
                               value={selected.shadowBlur ?? 6}
                               onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 6}px</span>
                           </span>
@@ -8794,7 +8794,7 @@ function StudioCuttoonEditor() {
                               step={1}
                               value={selected.shadowOffsetX ?? 2}
                               onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 2}px</span>
                           </span>
@@ -8810,7 +8810,7 @@ function StudioCuttoonEditor() {
                               step={1}
                               value={selected.shadowOffsetY ?? 3}
                               onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
                           </span>
@@ -8826,7 +8826,7 @@ function StudioCuttoonEditor() {
                               step={0.05}
                               value={selected.shadowOpacity ?? 0.15}
                               onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.15) * 100)}%</span>
                           </span>
@@ -9134,7 +9134,7 @@ function StudioCuttoonEditor() {
                             step={0.5}
                             value={selected.strokeWidth ?? 3}
                             onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                           />
                           <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
                         </span>
@@ -9155,7 +9155,7 @@ function StudioCuttoonEditor() {
                         step={0.5}
                         value={selected.letterSpacing ?? 0}
                         onChange={(e) => patchEl(selected.id, { letterSpacing: Number(e.target.value) } as Partial<El>)}
-                        className="w-20 accent-accent cursor-pointer sm:w-24"
+                        className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                       />
                       <span className="w-7 text-right text-xs tabular-nums text-fg-3">{selected.letterSpacing ?? 0}</span>
                     </span>
@@ -9170,7 +9170,7 @@ function StudioCuttoonEditor() {
                         step={0.1}
                         value={selected.lineHeight ?? 1}
                         onChange={(e) => patchEl(selected.id, { lineHeight: Number(e.target.value) } as Partial<El>)}
-                        className="w-20 accent-accent cursor-pointer sm:w-24"
+                        className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                       />
                       <span className="w-7 text-right text-xs tabular-nums text-fg-3">{(selected.lineHeight ?? 1).toFixed(1)}</span>
                     </span>
@@ -9222,7 +9222,7 @@ function StudioCuttoonEditor() {
                             step={1}
                             value={selected.shadowBlur ?? 5}
                             onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
-                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                           />
                           <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 5}px</span>
                         </span>
@@ -9238,7 +9238,7 @@ function StudioCuttoonEditor() {
                             step={1}
                             value={selected.shadowOffsetX ?? 3}
                             onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
-                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                           />
                           <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 3}px</span>
                         </span>
@@ -9254,7 +9254,7 @@ function StudioCuttoonEditor() {
                             step={1}
                             value={selected.shadowOffsetY ?? 3}
                             onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
-                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                           />
                           <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
                         </span>
@@ -9270,7 +9270,7 @@ function StudioCuttoonEditor() {
                             step={0.05}
                             value={selected.shadowOpacity ?? 0.6}
                             onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
-                            className="w-20 accent-accent cursor-pointer sm:w-24"
+                            className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                           />
                           <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.6) * 100)}%</span>
                         </span>
@@ -9832,7 +9832,7 @@ function StudioCuttoonEditor() {
                               step={0.5}
                               value={selected.strokeWidth ?? 3}
                               onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                              className="w-20 accent-accent cursor-pointer sm:w-24"
+                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
                             />
                             <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
                           </span>
@@ -10312,7 +10312,7 @@ function StudioCuttoonEditor() {
                         >
                           <Folder size={12} className="shrink-0 text-accent" />
                           <span className="truncate">{node.group.name}</span>
-                          <span className="shrink-0 text-fg-4">({node.items.length})</span>
+                          <span className="shrink-0 text-fg-3">({node.items.length})</span>
                         </button>
                         <button
                           type="button"

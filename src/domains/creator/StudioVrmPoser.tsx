@@ -5004,7 +5004,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                 aria-pressed={active}
                                 title={item.hint}
                                 onClick={() => equipWardrobeItem(slot, active ? null : item.id)}
-                                className={`flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[0.6rem] font-medium transition-colors cursor-pointer disabled:opacity-40 ${
+                                className={`flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-[0.66rem] font-medium transition-colors cursor-pointer disabled:opacity-40 ${
                                   active ? "border-accent bg-accent/15 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
                                 }`}
                               >
