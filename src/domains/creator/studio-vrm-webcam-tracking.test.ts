@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   smoothRawChannels,
   convertChannelsToVrmData,
+  createChannelSmoother,
+  GAZE_PITCH_MAX_DEG,
+  GAZE_YAW_MAX_DEG,
+  NEUTRAL_CHANNELS,
   type TrackingChannels,
   type TrackingOptions,
 } from "./studio-vrm-webcam-tracking";
@@ -134,6 +138,63 @@ describe("studio-vrm-webcam-tracking", () => {
       expect(result.expressions.browInnerUp).toBeCloseTo(0.1 * 1.5);
       expect(result.expressions.aa).toBeCloseTo(0.9);
       expect(result.expressions.happy).toBeCloseTo(1.0);
+    });
+
+    it("lookAt을 도 단위로 출력한다: gazeX=1 → yawDeg=상한, 미러 시 부호 반전", () => {
+      const options: TrackingOptions = {
+        gazeLock: false,
+        mirrorMode: false,
+        sensitivity: 1.0,
+        smoothing: 0.35,
+        fingerTracking: true,
+      };
+      const channels: TrackingChannels = { ...mockChannels, gazeX: 1, gazeY: 0.5 };
+
+      const straight = convertChannelsToVrmData(channels, options);
+      expect(straight.lookAt).toBeDefined();
+      expect(straight.lookAt!.yawDeg).toBeCloseTo(GAZE_YAW_MAX_DEG);
+      expect(straight.lookAt!.pitchDeg).toBeCloseTo(0.5 * GAZE_PITCH_MAX_DEG);
+
+      const mirrored = convertChannelsToVrmData(channels, { ...options, mirrorMode: true });
+      expect(mirrored.lookAt!.yawDeg).toBeCloseTo(-GAZE_YAW_MAX_DEG);
+      expect(mirrored.lookAt!.pitchDeg).toBeCloseTo(0.5 * GAZE_PITCH_MAX_DEG); // 상하는 반전 없음
+    });
+
+    it("gazeLock이 켜지면 lookAt도 0으로 고정된다", () => {
+      const options: TrackingOptions = {
+        gazeLock: true,
+        mirrorMode: true,
+        sensitivity: 1.0,
+        smoothing: 0.35,
+        fingerTracking: true,
+      };
+      const result = convertChannelsToVrmData({ ...mockChannels, gazeX: 1, gazeY: -1 }, options);
+      expect(result.lookAt!.yawDeg).toBe(0);
+      expect(result.lookAt!.pitchDeg).toBe(0);
+    });
+  });
+
+  describe("NEUTRAL_CHANNELS", () => {
+    it("모든 트래킹 채널을 0으로 갖는다(제로 스냅 대신 감쇠 복귀의 목표값)", () => {
+      expect(Object.keys(NEUTRAL_CHANNELS).sort()).toEqual(Object.keys(mockChannels).sort());
+      for (const value of Object.values(NEUTRAL_CHANNELS)) expect(value).toBe(0);
+    });
+  });
+
+  describe("createChannelSmoother", () => {
+    it("One-Euro 뱅크에 위임하고 reset 후 첫 프레임은 입력 스냅이다", () => {
+      const smoother = createChannelSmoother();
+      const first = smoother.smooth(mockChannels, 0, 0.35);
+      expect(first).toEqual(mockChannels);
+
+      // 스텝 입력은 즉시 반영되지 않는다(필터링 동작 확인).
+      const stepped = smoother.smooth({ ...mockChannels, headYaw: 1 }, 1 / 30, 0.35);
+      expect(stepped.headYaw).toBeGreaterThan(mockChannels.headYaw);
+      expect(stepped.headYaw).toBeLessThan(1);
+
+      smoother.reset();
+      const afterReset = smoother.smooth({ ...mockChannels, headYaw: 1 }, 1, 0.35);
+      expect(afterReset.headYaw).toBe(1); // 리셋 후 스냅
     });
   });
 });

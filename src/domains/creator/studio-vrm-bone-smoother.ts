@@ -33,6 +33,14 @@ export const DEFAULT_BONE_SMOOTHER: Readonly<BoneSmootherOptions> = {
   maxStep: 1.2,
 };
 
+/** head/neck 용 — 시선이 머무는 비주얼 채널이라 팔다리보다 지터 억제를 우선한다. */
+export const HEAD_BONE_SMOOTHER: Readonly<BoneSmootherOptions> = {
+  minCutoff: 1.5,
+  beta: 0.5,
+  deadBand: 0.002,
+  maxStep: 0.8,
+};
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** One-Euro: 각속도(speed)에 따라 컷오프를 올려 보간 계수 α(0~1)를 만든다. */

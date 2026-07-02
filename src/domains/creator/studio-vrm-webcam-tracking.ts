@@ -9,6 +9,7 @@
 //  - TrackingChannels는 "카메라 좌표계"(미러 전)이고,
 //    convertChannelsToVrmData에서 mirrorMode·gazeLock·sensitivity를 반영한다.
 
+import { TrackingChannelFilterBank } from "./studio-vrm-one-euro";
 import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 
 import type {
@@ -78,6 +79,11 @@ export interface VrmTrackingData {
   expressions: Record<string, number>;
   /** 손가락 본 이름 → Euler radians (손가락 추적 시). */
   fingers?: Record<string, readonly [number, number, number]>;
+  /**
+   * VRM lookAt 직접 구동용(단위: 도(degree), mirror 반영 완료).
+   * vrm.lookAt 이 없는 모델은 look* 표정 폴백을 사용한다.
+   */
+  lookAt?: { yawDeg: number; pitchDeg: number };
 }
 
 /* ── Constants ────────────────────────────────────────────────────────── */
@@ -94,9 +100,32 @@ export const DEFAULT_TRACKING_OPTIONS: Readonly<TrackingOptions> = {
   fingerTracking: true,
 };
 
-/** CDN 에셋 경로 — MediaPipe Vision WASM. */
+/**
+ * CDN 에셋 경로 — MediaPipe Vision WASM.
+ * package.json 의 @mediapipe/tasks-vision 버전과 함께 올릴 것.
+ * @latest 금지 — 런타임(JS)과 WASM 버전이 어긋나면 조용히 깨진다(0.10.16 wasm 누락 전례).
+ */
 const MEDIAPIPE_VISION_CDN =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
+
+/** 얼굴 미검출 시 복귀 기준이 되는 중립 채널(전부 0). */
+export const NEUTRAL_CHANNELS: Readonly<TrackingChannels> = {
+  headPitch: 0,
+  headYaw: 0,
+  headRoll: 0,
+  blinkLeft: 0,
+  blinkRight: 0,
+  gazeX: 0,
+  gazeY: 0,
+  mouthOpen: 0,
+  mouthSmile: 0,
+  browInnerUp: 0,
+  browOuterUpLeft: 0,
+  browOuterUpRight: 0,
+  browDown: 0,
+  mouthFrown: 0,
+  eyeWide: 0,
+};
 
 /** 블렌드셰이프 이름 인덱스 빌드용. */
 const BS = {
@@ -147,6 +176,16 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
 
     // Try GPU first, fallback to CPU (some GPUs / environments fail on GPU delegate)
+    // 신뢰도 0.5→0.6: 저품질 프레임의 랜드마크 튐 컷.
+    // 0.7 이상은 재탐지 빈발로 fps 출렁임을 유발하므로 금지.
+    const faceOptions = {
+      runningMode: "VIDEO",
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: true,
+      numFaces: 1,
+      minFacePresenceConfidence: 0.6,
+      minTrackingConfidence: 0.6,
+    } as const;
     let landmarker: FaceLandmarker;
     try {
       landmarker = await FLM.createFromOptions(vision, {
@@ -155,10 +194,7 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
             "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
           delegate: "GPU",
         },
-        runningMode: "VIDEO",
-        outputFaceBlendshapes: true,
-        outputFacialTransformationMatrixes: true,
-        numFaces: 1,
+        ...faceOptions,
       });
     } catch (gpuErr) {
       console.warn("FaceLandmarker GPU delegate failed, falling back to CPU:", gpuErr);
@@ -168,10 +204,7 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
             "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
           delegate: "CPU",
         },
-        runningMode: "VIDEO",
-        outputFaceBlendshapes: true,
-        outputFacialTransformationMatrixes: true,
-        numFaces: 1,
+        ...faceOptions,
       });
     }
 
@@ -307,6 +340,29 @@ export function disposeHandLandmarker(): void {
     cachedHandLandmarker = null;
   }
   initHandPromise = null;
+}
+
+/**
+ * 비디오 준비 직후 1회 호출 — 첫 실제 프레임에서 발생하는 셰이더 컴파일/
+ * 그래프 빌드 지연(수백 ms 스톨)을 트래킹 시작 전에 흡수한다.
+ * 초기화된 랜드마커에 detectForVideo 를 1회씩 호출하고 결과는 버린다.
+ */
+export function warmupLandmarkers(video: HTMLVideoElement, timestamp: number): void {
+  try {
+    cachedLandmarker?.detectForVideo(video, timestamp);
+  } catch (err) {
+    console.warn("FaceLandmarker warmup failed (무시):", err);
+  }
+  try {
+    cachedPoseLandmarker?.detectForVideo(video, timestamp);
+  } catch (err) {
+    console.warn("PoseLandmarker warmup failed (무시):", err);
+  }
+  try {
+    cachedHandLandmarker?.detectForVideo(video, timestamp);
+  } catch (err) {
+    console.warn("HandLandmarker warmup failed (무시):", err);
+  }
 }
 
 /* ── Blendshape extraction helpers ────────────────────────────────────── */
@@ -474,6 +530,8 @@ function lerp(a: number, b: number, t: number): number {
  * prev가 null이면(첫 프레임) next를 그대로 반환한다.
  *
  * @param alpha 0 < alpha ≤ 1. 작을수록 부드럽고 지연이 크며, 1이면 즉시 반영.
+ * @deprecated 고정 α EMA 는 프레임레이트 종속 — 신규 코드는 createChannelSmoother()
+ *   (One-Euro 필터뱅크, 시간 기반 컷오프)를 사용할 것.
  */
 export function smoothRawChannels(
   prev: TrackingChannels | null,
@@ -503,6 +561,29 @@ export function smoothRawChannels(
   };
 }
 
+/** 프레임 간 상태를 보관하는 채널 스무더 인터페이스. */
+export interface ChannelSmoother {
+  /**
+   * @param tSec 초 단위 실제 시간(performance.now()/1000) — 프레임 인덱스 금지
+   *   (가변 fps 에서 컷오프가 왜곡된다).
+   * @param smoothing 사용자 슬라이더 값(0.05~1, 기존 TrackingOptions.smoothing 재사용).
+   */
+  smooth(channels: TrackingChannels, tSec: number, smoothing: number): TrackingChannels;
+  reset(): void;
+}
+
+/**
+ * One-Euro 필터뱅크 기반 채널 스무더 팩토리.
+ * useRef 에 보관하고 세션 시작/캘리브레이션 완료 시 reset 한다.
+ */
+export function createChannelSmoother(): ChannelSmoother {
+  const bank = new TrackingChannelFilterBank();
+  return {
+    smooth: (channels, tSec, smoothing) => bank.filter(channels, tSec, smoothing),
+    reset: () => bank.reset(),
+  };
+}
+
 /* ── Convert channels → VRM data ──────────────────────────────────────── */
 
 function clamp01(v: number): number {
@@ -512,6 +593,10 @@ function clamp01(v: number): number {
 function clamp01Signed(v: number): number {
   return Math.max(-1, Math.min(1, v));
 }
+
+// VRMLookAt.yaw/pitch 는 "도(degree)" 단위다(라디안 아님!) — 시선 가동 범위 상한.
+export const GAZE_YAW_MAX_DEG = 20;
+export const GAZE_PITCH_MAX_DEG = 12;
 
 /**
  * TrackingChannels를 VRM 뼈 회전 + 표정 가중치로 변환한다.
@@ -565,10 +650,17 @@ export function convertChannelsToVrmData(
   gazeY = clamp01Signed(gazeY);
 
   // VRM uses lookLeft/lookRight/lookUp/lookDown (all 0-1)
+  // — lookAt 이 없는 모델의 폴백으로 유지한다(적용 우선순위는 VrmActor 가 결정).
   const lookLeft = clamp01(gazeX < 0 ? -gazeX : 0);
   const lookRight = clamp01(gazeX > 0 ? gazeX : 0);
   const lookUp = clamp01(gazeY > 0 ? gazeY : 0);
   const lookDown = clamp01(gazeY < 0 ? -gazeY : 0);
+
+  // VRM lookAt 직접 구동용 — gazeX/gazeY 는 이미 mirror·gazeLock 반영된 값.
+  const lookAt = {
+    yawDeg: gazeX * GAZE_YAW_MAX_DEG,
+    pitchDeg: gazeY * GAZE_PITCH_MAX_DEG,
+  };
 
   // — Brows (mirror swaps outer left/right) —
   const browOuterL = mirrorMode
@@ -600,7 +692,7 @@ export function convertChannelsToVrmData(
     sad: clamp01((channels.mouthFrown * 0.7 + channels.browInnerUp * 0.3) * s),
   };
 
-  return { bones, expressions };
+  return { bones, expressions, lookAt };
 }
 
 /**
