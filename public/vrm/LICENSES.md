@@ -24,34 +24,77 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Eggplant.vrm` | 에그플랜트 (가지) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
-| `Nasera.vrm` | 나세라 | <https://hub.vroid.com/en/characters/3923917519236577321/models/4937377628437742180> | 柏太刀카즈키 제작 — 아바타 이용 허용, 상업적 이용 불가, 출처 표기 필요 |
-| `Katya.vrm` | 카츄아 | <https://booth.pm/en/items/2552633> | らてのす의 숍 — 무료 배포 모델, 상업적 이용 가능 여부 개별 확인 필요 |
-| `Emma.vrm` | 엠마 | <https://booth.pm/en/items/6938344> | Neural4D-AnimeArt — 무료 배포 모델, 아바타 이용 허용 |
-| `Shiromochi.vrm` | 시로모치 | <https://booth.pm/en/items/2852497> | うさみみ店 — VRChat/VRM 대응, 무료 배포 |
-| `RadDollV3.vrm` | 라드돌 (RadDoll) | <https://booth.pm/en/items/3741802> | 三丁目の魔界 — 무료 배포 아바타 모델 |
-| `Julius.vrm` | 유리우스 | <https://booth.pm/en/items/5380991> | brochiManac — 무료 VRChat 아바타 |
-| `Inuinu.vrm` | 이누이누 | <https://booth.pm/en/items/5271321> | zuchicorn — 무료 Quest 대응 아바타 |
-| `MikuNT.vrm` | 하츠네 미쿠 NT | <https://booth.pm/en/items/3226395> | 止丸堂 — 팬메이드 3D 모델, 무료 배포 |
-| `Kamome.vrm` | 카모메 | <https://booth.pm/en/items/2126260> | 夢天狗 — 팬메이드 캐릭터 모델 |
-| `Riku.vrm` | 리쿠 | <https://booth.pm/en/items/1126131> | ラクリハウス — 무료 3D 모델 |
-| `SteampunkDress.vrm` | 스팀펑크 드레스 | <https://booth.pm/en/items/4126260> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
-| `MeowCostume.vrm` | 야옹이 코스튬 | <https://booth.pm/en/items/4595463> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
-| `HalloweenCat.vrm` | 할로윈 캣 | <https://booth.pm/en/items/4168930> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
-| `ClownDoll.vrm` | 광대 인형 | <https://booth.pm/en/items/4244865> | ぴケ의 創作屋さん — 무료 VRoid 의상 세트 |
-| `SakuraDress.vrm` | 사쿠라 드레스 | <https://booth.pm/en/items/3759805> | ぴ케의 創作屋さん — 무료 VRoid 의상 세트 |
-| `MaidUniform.vrm` | 메이드 제복 | <https://booth.pm/en/items/4051150> | ぴ케의 創作屋さん — 무료 VRoid 의상 세트 |
-| `ButlerModel.vrm` | 집사 모델 | <https://booth.pm/en/items/4051150> | 무료 헤어 조합 모델 |
-| `NurseCostume.vrm` | 간호사 코스튬 | <https://booth.pm/en/items/2552633> | 무료 VRoid 의상 |
-| `YukataSet.vrm` | 유카타 세트 | <https://booth.pm/en/items/1405107> | 무료 VRoid 의상 테스처 |
-| `Wings.vrm` | 날개 | <https://booth.pm/en/items/5578944> | ぴ케의 創作屋さん — 무료 액세서리 |
-| `JellyfishHat.vrm` | 해파리 모자 | <https://booth.pm/en/items/5769426> | ぴ케의 創作屋さん — 무료 액세서리 |
-| `RoundGlasses.vrm` | 둥근 안경 | <https://booth.pm/en/items/3226395> | 무료 안경 액세서리 |
-| `HeartChoker.vrm` | 하트 초커 | <https://booth.pm/en/items/3274556> | 무료 초커 액세서리 |
-
-
 
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
 - Alicia Solid 원 배포처: <https://3d.nicovideo.jp/works/td14712> — UniVRM 저장소의 VRM 0.51 변환본을 사용.
+
+## 오픈소스 아바타 레지스트리 모델 (2026-07)
+
+출처: 오픈소스 아바타 레지스트리 <https://github.com/ToxSam/open-source-avatars> (모델 파일은 레지스트리가 가리키는 arweave.net 영구 저장소에서 다운로드).
+아래 60종은 전부 Polygonal Mind가 제작·공개한 100Avatars R1~R3 시리즈로, **CC0(퍼블릭 도메인)** 라이선스입니다.
+
+| 파일 | 스튜디오 이름 | 프로젝트 | 라이선스 |
+| --- | --- | --- | --- |
+| `CoolAlien.vrm` | 쿨에일리언 (외계인) | 100Avatars R1 (#002 CoolAlien) | CC0 (Polygonal Mind) |
+| `Jimmy.vrm` | 지미 | 100Avatars R1 (#003 Jimmy) | CC0 (Polygonal Mind) |
+| `Froggy.vrm` | 프로기 (개구리) | 100Avatars R1 (#010 Froggy) | CC0 (Polygonal Mind) |
+| `Teddy.vrm` | 테디 (곰인형) | 100Avatars R1 (#011 Teddy) | CC0 (Polygonal Mind) |
+| `Nightmare.vrm` | 나이트메어 (악몽) | 100Avatars R1 (#015 Nightmare) | CC0 (Polygonal Mind) |
+| `Pumpkin.vrm` | 펌킨 (호박) | 100Avatars R1 (#016 Pumpkin) | CC0 (Polygonal Mind) |
+| `Wizzir.vrm` | 위지르 (마법사) | 100Avatars R1 (#019 Wizzir) | CC0 (Polygonal Mind) |
+| `Clown.vrm` | 클라운 (광대) | 100Avatars R1 (#032 Clown) | CC0 (Polygonal Mind) |
+| `Wolfman.vrm` | 울프맨 (늑대인간) | 100Avatars R1 (#035 Wolfman) | CC0 (Polygonal Mind) |
+| `Mummy.vrm` | 머미 (미라) | 100Avatars R1 (#036 Mummy) | CC0 (Polygonal Mind) |
+| `Kate.vrm` | 케이트 | 100Avatars R1 (#038 Kate) | CC0 (Polygonal Mind) |
+| `Witch.vrm` | 위치 (마녀) | 100Avatars R1 (#039 Witch) | CC0 (Polygonal Mind) |
+| `Dracula.vrm` | 드라큘라 (뱀파이어) | 100Avatars R1 (#043 Dracula) | CC0 (Polygonal Mind) |
+| `Zombie.vrm` | 좀비 | 100Avatars R1 (#044 Zombie) | CC0 (Polygonal Mind) |
+| `DinoKid.vrm` | 디노키드 (공룡) | 100Avatars R1 (#045 DinoKid) | CC0 (Polygonal Mind) |
+| `Astronaut.vrm` | 애스트로넛 (우주비행사) | 100Avatars R1 (#048 Astronaut) | CC0 (Polygonal Mind) |
+| `Polybot.vrm` | 폴리봇 (로봇) | 100Avatars R1 (#051 Polybot) | CC0 (Polygonal Mind) |
+| `Jennifer.vrm` | 제니퍼 | 100Avatars R1 (#052 Jennifer) | CC0 (Polygonal Mind) |
+| `Erika.vrm` | 에리카 | 100Avatars R1 (#053 Erika) | CC0 (Polygonal Mind) |
+| `Olivia.vrm` | 올리비아 | 100Avatars R1 (#056 Olivia) | CC0 (Polygonal Mind) |
+| `Avocado.vrm` | 아보카도 | 100Avatars R1 (#088 Avocado) | CC0 (Polygonal Mind) |
+| `IceCream.vrm` | 아이스크림 | 100Avatars R1 (#093 IceCream) | CC0 (Polygonal Mind) |
+| `PyreSorcerer.vrm` | 파이어소서러 (화염술사) | 100Avatars R2 (#107 PyreSorcerer) | CC0 (Polygonal Mind) |
+| `UnicornPerson.vrm` | 유니콘퍼슨 (유니콘) | 100Avatars R2 (#110 UnicornPerson) | CC0 (Polygonal Mind) |
+| `LaloBot.vrm` | 랄로봇 (로봇) | 100Avatars R2 (#115 LaloBOT) | CC0 (Polygonal Mind) |
+| `SharkPerson.vrm` | 샤크퍼슨 (상어) | 100Avatars R2 (#120 SharkPerson) | CC0 (Polygonal Mind) |
+| `ChillPenguin.vrm` | 칠펭귄 (펭귄) | 100Avatars R2 (#160 ChillPenguin) | CC0 (Polygonal Mind) |
+| `CoolTurtle.vrm` | 쿨터틀 (거북이) | 100Avatars R2 (#182 CoolTurtle) | CC0 (Polygonal Mind) |
+| `MoonGirl.vrm` | 문걸 (달소녀) | 100Avatars R2 (#177 MoonGirl) | CC0 (Polygonal Mind) |
+| `EyeWizard.vrm` | 아이위저드 (외눈 마법사) | 100Avatars R2 (#113 EYEWizard) | CC0 (Polygonal Mind) |
+| `CoolPizza.vrm` | 쿨피자 | 100Avatars R2 (#103 CoolPizza) | CC0 (Polygonal Mind) |
+| `CoolRamen.vrm` | 쿨라멘 | 100Avatars R2 (#138 CoolRamen) | CC0 (Polygonal Mind) |
+| `CoolTaco.vrm` | 쿨타코 | 100Avatars R2 (#162 CoolTaco) | CC0 (Polygonal Mind) |
+| `CoolPirate.vrm` | 쿨파이럿 (해적) | 100Avatars R2 (#145 CoolPirate) | CC0 (Polygonal Mind) |
+| `CosmicDweller.vrm` | 코스믹드웰러 (우주인) | 100Avatars R2 (#124 CosmicDweller) | CC0 (Polygonal Mind) |
+| `ChillPalm.vrm` | 칠팜 (야자수) | 100Avatars R2 (#108 ChillPalm) | CC0 (Polygonal Mind) |
+| `GoodKnight.vrm` | 굿나이트 (기사) | 100Avatars R3 (#202 GoodKnight) | CC0 (Polygonal Mind) |
+| `BadBot.vrm` | 배드봇 (로봇) | 100Avatars R3 (#203 BadBot) | CC0 (Polygonal Mind) |
+| `PirateBot.vrm` | 파이럿봇 (해적 로봇) | 100Avatars R3 (#207 PirateBot) | CC0 (Polygonal Mind) |
+| `Cyberpal.vrm` | 사이버팔 (사이보그) | 100Avatars R3 (#208 Cyberpal) | CC0 (Polygonal Mind) |
+| `BaoSamurai.vrm` | 바오사무라이 | 100Avatars R3 (#209 BaoSamurai) | CC0 (Polygonal Mind) |
+| `Kiba.vrm` | 키바 (늑대) | 100Avatars R3 (#213 Kiba) | CC0 (Polygonal Mind) |
+| `StitchWitch.vrm` | 스티치위치 (마녀 인형) | 100Avatars R3 (#215 StitchWitch) | CC0 (Polygonal Mind) |
+| `MegaAngel.vrm` | 메가엔젤 (천사) | 100Avatars R3 (#219 MegaAngel) | CC0 (Polygonal Mind) |
+| `MushroomFairy.vrm` | 머시룸페어리 (버섯 요정) | 100Avatars R3 (#220 MushroomFairy) | CC0 (Polygonal Mind) |
+| `WeirdCat.vrm` | 위어드캣 (고양이) | 100Avatars R3 (#227 WeirdCat) | CC0 (Polygonal Mind) |
+| `CuteSaurus.vrm` | 큐트사우루스 (공룡) | 100Avatars R3 (#229 CuteSaurus) | CC0 (Polygonal Mind) |
+| `Crowley.vrm` | 크롤리 | 100Avatars R3 (#230 Crowley) | CC0 (Polygonal Mind) |
+| `LadyKoi.vrm` | 레이디코이 (비단잉어) | 100Avatars R3 (#255 LadyKoi) | CC0 (Polygonal Mind) |
+| `YetiDude.vrm` | 예티듀드 (예티) | 100Avatars R3 (#260 YetiDude) | CC0 (Polygonal Mind) |
+| `Anna.vrm` | 안나 | 100Avatars R3 (#270 Anna) | CC0 (Polygonal Mind) |
+| `MeganTheFox.vrm` | 메간 (여우) | 100Avatars R3 (#278 MeganTheFox) | CC0 (Polygonal Mind) |
+| `CoolTiger.vrm` | 쿨타이거 (호랑이) | 100Avatars R3 (#283 CoolTiger) | CC0 (Polygonal Mind) |
+| `LilRam.vrm` | 릴램 (양) | 100Avatars R3 (#285 LilRam) | CC0 (Polygonal Mind) |
+| `LadyFawn.vrm` | 레이디폰 (아기사슴) | 100Avatars R3 (#289 LadyFawn) | CC0 (Polygonal Mind) |
+| `StrawberryPrincess.vrm` | 스트로베리 프린세스 (공주) | 100Avatars R3 (#291 StrawberryPrincess) | CC0 (Polygonal Mind) |
+| `BluePixie.vrm` | 블루픽시 (요정) | 100Avatars R3 (#295 BluePixie) | CC0 (Polygonal Mind) |
+| `BotBunny.vrm` | 봇버니 (토끼 로봇) | 100Avatars R3 (#297 BotBunny) | CC0 (Polygonal Mind) |
+| `SportMecha.vrm` | 스포츠메카 (메카) | 100Avatars R3 (#239 SportMecha) | CC0 (Polygonal Mind) |
+| `CosmicBot.vrm` | 코스믹봇 (로봇) | 100Avatars R3 (#237 CosmicBot) | CC0 (Polygonal Mind) |
 
 ## 기존 번들 모델 (참고)
 

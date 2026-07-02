@@ -1,12 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
 
-// 2026-06 추가된 신규 번들 8종, 2026-07 추가된 9종, 2026-07 추가된 23종 — public/vrm/LICENSES.md 고지 대상.
+// 2026-06 추가된 번들 17종 + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 60종
+// — 모두 public/vrm/LICENSES.md 고지 대상.
 const NEW_BUNDLE_FILES = [
+  // 2026-06: madjin/vrm-samples + UniVRM + 100Avatars 1차분
   "Sendagaya_Shino.vrm",
   "Sakurada_Fumiriya.vrm",
   "Darkness_Shibu.vrm",
@@ -24,98 +26,98 @@ const NEW_BUNDLE_FILES = [
   "Eggplant.vrm",
   "CoolBanana.vrm",
   "Skull.vrm",
-  "Nasera.vrm",
-  "Katya.vrm",
-  "Emma.vrm",
-  "Shiromochi.vrm",
-  "RadDollV3.vrm",
-  "Julius.vrm",
-  "Inuinu.vrm",
-  "MikuNT.vrm",
-  "Kamome.vrm",
-  "Riku.vrm",
-  "SteampunkDress.vrm",
-  "MeowCostume.vrm",
-  "HalloweenCat.vrm",
-  "ClownDoll.vrm",
-  "SakuraDress.vrm",
-  "MaidUniform.vrm",
-  "ButlerModel.vrm",
-  "NurseCostume.vrm",
-  "YukataSet.vrm",
-  "Wings.vrm",
-  "JellyfishHat.vrm",
-  "RoundGlasses.vrm",
-  "HeartChoker.vrm",
+  // 2026-07: github.com/ToxSam/open-source-avatars 레지스트리 (100Avatars R1~R3, CC0)
+  "CoolAlien.vrm",
+  "Jimmy.vrm",
+  "Froggy.vrm",
+  "Teddy.vrm",
+  "Nightmare.vrm",
+  "Pumpkin.vrm",
+  "Wizzir.vrm",
+  "Clown.vrm",
+  "Wolfman.vrm",
+  "Mummy.vrm",
+  "Kate.vrm",
+  "Witch.vrm",
+  "Dracula.vrm",
+  "Zombie.vrm",
+  "DinoKid.vrm",
+  "Astronaut.vrm",
+  "Polybot.vrm",
+  "Jennifer.vrm",
+  "Erika.vrm",
+  "Olivia.vrm",
+  "Avocado.vrm",
+  "IceCream.vrm",
+  "PyreSorcerer.vrm",
+  "UnicornPerson.vrm",
+  "LaloBot.vrm",
+  "SharkPerson.vrm",
+  "ChillPenguin.vrm",
+  "CoolTurtle.vrm",
+  "MoonGirl.vrm",
+  "EyeWizard.vrm",
+  "CoolPizza.vrm",
+  "CoolRamen.vrm",
+  "CoolTaco.vrm",
+  "CoolPirate.vrm",
+  "CosmicDweller.vrm",
+  "ChillPalm.vrm",
+  "GoodKnight.vrm",
+  "BadBot.vrm",
+  "PirateBot.vrm",
+  "Cyberpal.vrm",
+  "BaoSamurai.vrm",
+  "Kiba.vrm",
+  "StitchWitch.vrm",
+  "MegaAngel.vrm",
+  "MushroomFairy.vrm",
+  "WeirdCat.vrm",
+  "CuteSaurus.vrm",
+  "Crowley.vrm",
+  "LadyKoi.vrm",
+  "YetiDude.vrm",
+  "Anna.vrm",
+  "MeganTheFox.vrm",
+  "CoolTiger.vrm",
+  "LilRam.vrm",
+  "LadyFawn.vrm",
+  "StrawberryPrincess.vrm",
+  "BluePixie.vrm",
+  "BotBunny.vrm",
+  "SportMecha.vrm",
+  "CosmicBot.vrm",
 ] as const;
+
+const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
 
 describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
-    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name)).toEqual([
-      "루미",
-      "하린",
-      "세라",
-      "유나",
-      "시온",
-      "비비",
-      "비타",
-      "루빈",
-      "오리온 (로봇)",
-      "크립토 (복셀봇)",
-      "미빗 (블록맨)",
-      "시드상 (마스코트)",
-      "시노",
-      "후미",
-      "카게 (다크)",
-      "헤라",
-      "하루",
-      "미오",
-      "노아",
-      "아리시아",
-      "데빌 (악마)",
-      "폴리댄서",
-      "로즈",
-      "로버트",
-      "블러디 (빌런)",
-      "래빗 (토끼)",
-      "에그플랜트 (가지)",
-      "쿨바나나",
-      "스컬 (해골)",
-      "나세라",
-      "카츄아",
-      "엠마",
-      "시로모치",
-      "라드돌 (RadDoll)",
-      "유리우스",
-      "이누이누",
-      "하츠네 미쿠 NT",
-      "카모메",
-      "리쿠",
-      "스팀펑크 드레스 (세트)",
-      "야옹이 코스튬 (세트)",
-      "할로윈 캣 (세트)",
-      "광대 인형 (세트)",
-      "사쿠라 드레스 (세트)",
-      "메이드 제복 (세트)",
-      "집사 모델 (헤어 세트)",
-      "간호사 코스튬",
-      "유카타 세트",
-      "날개 (액세서리)",
-      "해파리 모자 (액세서리)",
-      "둥근 안경 (액세서리)",
-      "하트 초커 (액세서리)",
-    ]);
-    expect(SAMPLE_VRM_ENTRIES.map((entry) => entry.name).join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
+    const names = SAMPLE_VRM_ENTRIES.map((entry) => entry.name);
+
+    // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
+    expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(names).toContain("데빌 (악마)");
+    expect(names).toContain("쿨에일리언 (외계인)");
+    expect(names).toContain("스포츠메카 (메카)");
+
+    // 이름은 전부 비어있지 않고 유일해야 하며, 기술 용어 흔적이 없어야 한다.
+    expect(new Set(names).size).toBe(names.length);
+    for (const name of names) {
+      expect(name.trim().length, `empty name`).toBeGreaterThan(0);
+    }
+    expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 52 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(52);
+  it("bundles 89 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(89);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const sample of SAMPLE_VRMS) {
       expect(sample.url, `${sample.id} url`).toMatch(/^\/vrm\/[A-Za-z0-9_.-]+\.vrm$/);
+      expect(sample.id, `${sample.id} id format`).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
     }
 
     const urls = SAMPLE_VRMS.map((sample) => sample.url);
@@ -141,39 +143,29 @@ describe("VRM library helpers", () => {
     expect(licenses).toContain("github.com/madjin/vrm-samples");
     expect(licenses).toContain("github.com/vrm-c/UniVRM");
     expect(licenses).toContain("3d.nicovideo.jp/alicia");
+    // 2026-07 오픈소스 아바타 레지스트리 출처와 CC0 고지가 명시되어야 한다.
+    expect(licenses).toContain("github.com/ToxSam/open-source-avatars");
+    expect(licenses).toContain("CC0");
   });
 
-  it("backs every bundled character with an actual local VRM asset", () => {
-    // CI 환경에서는 gitignore된 VRM 파일들이 없을 수 있으므로
-    // 실제 존재하는 tracked 파일들만 검증하거나, CI일 경우 존재 여부를 체크하지 않습니다.
-    if (process.env.CI) {
-      const trackedSampleIds = ["sample-vrm", "avatar-a", "avatar-b", "avatar-c"];
-      const missingFiles = SAMPLE_VRM_ENTRIES.filter((e) => trackedSampleIds.includes(e.id)).flatMap((entry) => {
-        const url = sampleVrmUrl(entry.id);
-        const filePath = join(process.cwd(), "public", url.replace(/^\//, ""));
-        return existsSync(filePath) ? [] : [`${entry.id}:${url}`];
-      });
-      expect(missingFiles).toEqual([]);
-      return;
-    }
-
-    const missingFiles = SAMPLE_VRM_ENTRIES.flatMap((entry) => {
-      // 신규 추가된 23종은 런타임에 외부 URL에서 로드되거나 별도 다운로드 대상이므로 파일 존재 검사에서 제외
-      const skipFileCheckIds = [
-        "nasera", "katya", "emma", "shiromochi", "raddoll", "julius", "inuinu",
-        "miku-nt", "kamome", "riku", "steampunk-dress", "meow-costume",
-        "halloween-cat", "clown-doll", "sakura-dress", "maid-uniform",
-        "butler-model", "nurse-costume", "yukata-set", "wings-acc",
-        "jellyfish-hat", "glasses-round", "choker-heart"
-      ];
-      if (skipFileCheckIds.includes(entry.id)) return [];
-
-      const url = sampleVrmUrl(entry.id);
-      const filePath = join(process.cwd(), "public", url.replace(/^\//, ""));
-      return existsSync(filePath) ? [] : [`${entry.id}:${url}`];
+  // 회귀 방지: 파일 없는 "유령 엔트리"(선택 시 404)가 다시 생기지 않도록
+  // 모든 SAMPLE_VRMS url이 public/vrm/ 실파일(>100KB)로 뒷받침되는지 검사한다.
+  it("backs every bundled character with a real local VRM asset larger than 100KB", () => {
+    const problems = SAMPLE_VRMS.flatMap((sample) => {
+      const filePath = join(process.cwd(), "public", sample.url.replace(/^\//, ""));
+      if (!existsSync(filePath)) return [`${sample.id}: missing file for ${sample.url}`];
+      const { size } = statSync(filePath);
+      if (size <= MIN_BUNDLE_FILE_BYTES) return [`${sample.id}: file too small (${size}B) for ${sample.url}`];
+      return [];
     });
 
-    expect(missingFiles).toEqual([]);
+    expect(problems).toEqual([]);
+  });
+
+  it("resolves sample urls by id and falls back to the default", () => {
+    expect(sampleVrmUrl("cool-alien")).toBe("/vrm/CoolAlien.vrm");
+    expect(sampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
+    expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
   });
 
   it("keeps every bundled sample before uploaded library entries", () => {
