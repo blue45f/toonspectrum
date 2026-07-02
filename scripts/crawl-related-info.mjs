@@ -18,6 +18,14 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  decodeEntities,
+  jsonUnescape,
+  mapNaverBlogItems,
+  mapNaverNewsItems,
+  mapYoutubeApiItems,
+} from "./related-info-parse.mjs";
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CATALOG = join(ROOT, "public", "data", "catalog.json");
 const OUT = join(ROOT, "data", "related-info.json");
@@ -64,28 +72,7 @@ async function fetchHtml(url, { referer } = {}) {
   }
 }
 
-// JSON 문자열 리터럴 정확 언이스케이프(\", \\, \uXXXX, \n 등). ytInitialData 제목용.
-function jsonUnescape(s) {
-  try {
-    return JSON.parse(`"${s}"`);
-  } catch {
-    return s
-      .replace(/\\u([\dA-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-      .replace(/\\(.)/g, "$1");
-  }
-}
-
-function decodeEntities(s) {
-  return String(s || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&#x27;/gi, "'")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// decodeEntities·jsonUnescape 는 순수 파싱이라 ./related-info-parse.mjs 로 분리(단위 테스트 대상).
 
 // 목적지 페이지의 실제 제목(og:title 우선, 없으면 <title>). URL 마다 정확한 제목이라 오귀속 없음.
 async function fetchOgTitle(url) {
@@ -139,11 +126,7 @@ async function youtubeApi(query, max) {
     );
     if (!r.ok) return [];
     const j = await r.json();
-    return (j.items || [])
-      .filter((it) => it.id?.videoId)
-      .slice(0, max)
-      .map((it) => ({ id: it.id.videoId, title: decodeEntities(it.snippet?.title || ""), views: undefined }))
-      .filter((v) => v.title);
+    return mapYoutubeApiItems(j.items, max);
   } catch {
     return [];
   }
@@ -226,11 +209,7 @@ async function naverSearchApi(kind, query, display) {
 // ── 네이버 뉴스: 공식 API 우선(키 있으면), 없으면 실제 기사 링크 + og:title 스크래핑 ──
 async function crawlNaverNews(query, max = 2) {
   if (hasNaverApi) {
-    const items = await naverSearchApi("news", query, max);
-    return items.slice(0, max).map((it, i) => ({
-      url: it.link || it.originallink,
-      title: decodeEntities(it.title) || `${query} 관련 뉴스 ${i + 1}`,
-    })).filter((it) => it.url);
+    return mapNaverNewsItems(await naverSearchApi("news", query, max), query, max);
   }
   const urls = await naverResultUrls("news", query, /https?:\/\/n\.news\.naver\.com\/[^\s"'<>\\]+/g, max);
   const titles = await Promise.all(urls.map((u) => fetchOgTitle(u)));
@@ -243,11 +222,7 @@ async function crawlNaverNews(query, max = 2) {
 // ── 네이버 블로그: 공식 API 우선(키 있으면), 없으면 실제 포스트 링크 + og:title 스크래핑 ──
 async function crawlNaverBlog(query, max = 1) {
   if (hasNaverApi) {
-    const items = await naverSearchApi("blog", query, max);
-    return items.slice(0, max).map((it) => ({
-      url: it.link,
-      title: decodeEntities(it.title) || `${query} 후기·리뷰 블로그`,
-    })).filter((it) => it.url);
+    return mapNaverBlogItems(await naverSearchApi("blog", query, max), query, max);
   }
   const urls = await naverResultUrls("blog", query, /https?:\/\/blog\.naver\.com\/[A-Za-z0-9_-]+\/\d{6,}/g, max);
   // 데스크톱 blog.naver.com 은 iframe 이라 og:title 이 빈약 → m.blog 로 실제 제목을 읽는다.
