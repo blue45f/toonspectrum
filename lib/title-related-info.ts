@@ -314,80 +314,24 @@ export function getRelatedInfoForTitle(title: Title): RelatedInfoItem[] {
     return CURATED_DB[foundKey];
   }
 
-  // 폴백: 수천 개의 전체 카탈로그 작품에 대해 검색 엔진 링크가 아닌 개별 직연결 목적지 URL을 구성합니다.
+  // 폴백(아직 크롤되지 않은 작품): 이전에는 유튜브 자리에 플랫폼 페이지를, 뉴스 자리에 모든 작품
+  // 공통의 하드코딩 기사를 "공식 트레일러/단독 보도"인 양 넣어 사용자를 오도했다. 정직하게 —
+  // 실제 목적지가 확실한 나무위키 문서(작품명 = 정식 문서명) 직링크만 제공한다. 유튜브·뉴스·블로그는
+  // 실제 링크가 크롤(scripts/crawl-related-info.mjs)/공식 API 로 채워질 때만 노출한다. 없는 항목은
+  // 카테고리 탭 자체가 숨겨지고(count 0), 아무 항목도 없으면 "아직 집계되지 않았습니다" 안내가 뜬다.
   const t = title.title;
-  const kind = title.type === "webnovel" ? "웹소설" : "웹툰";
-  const author = (title.author || "").split(",")[0]?.trim() || "작가";
   const encT = encodeURIComponent(t);
 
-  // 플랫폼 실제 연재 페이지 URL (있으면 사용, 없으면 네이버웹툰/네이버시리즈 직연결 메인)
-  const platformDirectUrl = title.availability?.[0]?.url || (title.type === "webnovel" ? "https://series.naver.com" : "https://comic.naver.com");
-
-  const dynamicItems: RelatedInfoItem[] = [
+  return [
     {
       id: `gen-wiki-${title.id}`,
       category: "wiki",
-      title: `나무위키: ${t} (${kind}) 공식 문서 및 설정`,
+      title: `나무위키: ${t}`,
       url: `https://namu.wiki/w/${encT}`,
-      sourceName: "나무위키 (NamuWiki)",
-      dateOrViews: "공식 위키 문서",
-      snippet: `${t}의 개요, 줄거리, 세계관 설정 및 등장인물 상세 관계도 문서로 이동합니다.`,
-      badge: "위키 바로가기",
-    },
-    {
-      id: `gen-wiki-char-${title.id}`,
-      category: "wiki",
-      title: `나무위키: ${t}/등장인물 상세 관계도 및 스펙`,
-      url: `https://namu.wiki/w/${encT}/%EB%93%B1%EC%9E%A5%EC%9D%B8%EB%AC%BC`,
-      sourceName: "나무위키 캐릭터 문서",
-      dateOrViews: "등장인물 위키",
-      snippet: `${t} 주요 등장인물의 능력을 포함한 캐릭터별 스펙 정리 문서로 연결됩니다.`,
-      badge: "캐릭터 문서",
-    },
-    {
-      id: `gen-yt-1-${title.id}`,
-      category: "youtube",
-      title: `[${t}] 공식 트레일러 및 플랫폼 연재 비디오`,
-      url: platformDirectUrl,
-      sourceName: "공식 연재 플랫폼",
-      dateOrViews: "공식 서비스 페이지",
-      snippet: `${t} 작품의 공식 연재 서비스 페이지로 이동하여 최신 회차를 직접 감상하실 수 있습니다.`,
-      badge: "공식 바로가기",
-    },
-    {
-      id: `gen-news-1-${title.id}`,
-      category: "news",
-      title: `'${t}' 연재 및 연재 플랫폼 공식 기획 보도`,
-      url: "https://n.news.naver.com/mnews/article/092/0002280123",
-      sourceName: "네이버 뉴스 / 문화 보도",
-      dateOrViews: "산업 분석 기사",
-      snippet: `${t}을 비롯한 한국 인기 ${kind} IP의 시장 성과 및 미디어믹스 동향 보도 기사입니다.`,
-      badge: "관련 보도",
-    },
-    {
-      id: `gen-blog-1-${title.id}`,
-      category: "blog",
-      title: `[공식 블로그] ${t} 작품 소개 및 연재 오픈 스페셜`,
-      url: platformDirectUrl,
-      sourceName: "공식 브랜드 채널",
-      dateOrViews: "공식 안내 포스트",
-      snippet: `${t}의 공식 줄거리 소개, 캐릭터 일러스트 및 연재 스케줄을 제공하는 페이지입니다.`,
-      badge: "공식 브랜딩",
+      sourceName: "나무위키",
+      dateOrViews: "위키 문서",
+      snippet: `${t}의 개요·줄거리·등장인물 등을 정리한 나무위키 문서로 이동합니다.`,
+      badge: "세계관 설정",
     },
   ];
-
-  if (author && author !== "미상") {
-    dynamicItems.push({
-      id: `gen-interview-${title.id}`,
-      category: "interview",
-      title: `${author} 작가의 프로필 및 대표작 스페셜 리포트`,
-      url: platformDirectUrl,
-      sourceName: "창작자 프로필 보도",
-      dateOrViews: author,
-      snippet: `${author} 작가의 대표 작품 세계관과 연재 창작 이력을 확인하실 수 있습니다.`,
-      badge: "작가 프로필",
-    });
-  }
-
-  return dynamicItems;
 }
