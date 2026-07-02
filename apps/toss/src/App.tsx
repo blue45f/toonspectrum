@@ -19,6 +19,7 @@ import { AppShell } from "@/src/app/AppShell";
 
 import { BannerAd } from "./components/BannerAd.tsx";
 import { MoreMenu } from "./components/MoreMenu.tsx";
+import { RewardedAdBridge } from "./components/RewardedAdBridge.tsx";
 import { TossTopBar, TOP_BAR_HEIGHT } from "./components/TossTopBar.tsx";
 import { getBannerAdGroupId, useTossFullScreenAd } from "./lib/ads.ts";
 import { hapticFeedback, isInToss } from "./lib/toss.ts";
@@ -77,10 +78,15 @@ function isImmersiveEditor(path: string): boolean {
   return false;
 }
 
-// 인증 처리·몰입형 에디터처럼 임시/전체화면 UI에는 광고를 붙이지 않는다. 나머지 화면은 하단 내비와
-// 본문 사이의 전용 빈 영역에 표준 배너 한 슬롯을 유지해, 핵심 액션을 덮지 않으면서 노출을 넓힌다.
+// 광고 미부착 화면 — 인증 처리·설정·법적 고지(약관/개인정보/저작권)는 광고 없는 화면으로 유지한다.
+const AD_FREE_PATHS = ["/auth/callback", "/settings", "/terms", "/privacy", "/copyright"];
+
+// 임시/전체화면 UI(몰입형 에디터)와 광고 미부착 화면을 제외한 **모든 화면**(홈·랭킹·탐색·상세·
+// 커뮤니티·운세·놀이터 등)은 하단 내비와 본문 사이의 전용 빈 영역에 표준 배너 한 슬롯을 유지한다 —
+// 핵심 액션을 덮지 않으면서 인벤토리를 넓힌다(한 화면 1슬롯 정책).
 function canShowPersistentBanner(path: string): boolean {
-  return !isImmersiveEditor(path) && !path.startsWith("/auth/callback");
+  if (isImmersiveEditor(path)) return false;
+  return !AD_FREE_PATHS.some((prefix) => path.startsWith(prefix));
 }
 
 function BottomNav({ tab, onNavigate }: { tab: ActiveTab; onNavigate: (to: string) => void }) {
@@ -174,6 +180,16 @@ function TossChrome() {
   const interstitial = useTossFullScreenAd("interstitial");
   const eligibleNavigationCountRef = useRef(0);
   const lastInterstitialAtRef = useRef(0);
+  const prevPathnameRef = useRef(pathname);
+
+  // 전면형 케이던스 카운터 — 하단 탭/More 시트뿐 아니라 본문 링크(카드 탭 등)를 포함한 **모든**
+  // 라우트 전환을 계상한다. 노출(show)은 여전히 사용자 탭 핸들러(handleNavigate) 안에서만
+  // 일어난다(제스처 요건 + 진입 직후 자동 노출 금지).
+  useEffect(() => {
+    if (prevPathnameRef.current === pathname) return;
+    prevPathnameRef.current = pathname;
+    eligibleNavigationCountRef.current += 1;
+  }, [pathname]);
 
   const { status } = useSession();
   const hasAttemptedAutoLoginRef = useRef(false);
@@ -267,7 +283,7 @@ function TossChrome() {
     if (`${pathname}${search}` === to) return;
 
     if (interstitial.configured && interstitial.supported) {
-      eligibleNavigationCountRef.current += 1;
+      // 카운터는 위 pathname 효과가 모든 라우트 전환에서 누적한다(중복 가산 없음).
       const now = Date.now();
       const frequencyReached =
         eligibleNavigationCountRef.current >= INTERSTITIAL_NAVIGATION_INTERVAL;
@@ -285,6 +301,8 @@ function TossChrome() {
 
   return (
     <>
+      {/* 보상형 광고 브릿지 — 공유 페이지(운세/놀이터)의 옵트인 버튼이 소비할 provider 게시. UI 없음. */}
+      <RewardedAdBridge />
       {/* 상단 브랜드 바 — 몰입형 에디터(자체 풀스크린)에서만 숨긴다. 그 외엔 항상 노출해
           상태바 스크림 + 브랜딩 + 검색/더보기 액션을 책임진다(작품 상세 포함: full-bleed 아트가
           토스 상태바 밑으로 파고드는 충돌을 이 바의 warm-ink 스크림이 막는다). */}

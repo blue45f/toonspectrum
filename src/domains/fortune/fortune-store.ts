@@ -30,15 +30,17 @@ export interface FortuneProfile {
 interface FortuneStore extends FortuneProfile {
   viewedDates: string[]; // 운세를 본 KST 날짜(YYYY-MM-DD) 모음
   history: SavedFortune[]; // 최근 본 운세(최신순, 최대 8개)
+  bonusDates: string[]; // 스페셜 부적 카드를 연 KST 날짜(보상형 광고 보상 — 하루 1회 잠금해제)
   setProfile: (patch: Partial<FortuneProfile>) => void;
   recordView: () => void;
+  recordBonusUnlock: () => void;
   addToHistory: (rec: Omit<SavedFortune, "id" | "dateLabel">) => void;
   removeFromHistory: (id: string) => void;
   clearHistory: () => void;
 }
 
 // KST 기준 오늘 날짜
-function todayKst(): string {
+export function todayKst(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
@@ -53,6 +55,7 @@ export const useFortuneStore = create<FortuneStore>()(
       partnerBirthTime: "",
       viewedDates: [],
       history: [],
+      bonusDates: [],
       setProfile: (patch) => set(patch),
       recordView: () =>
         set((s) => {
@@ -61,6 +64,13 @@ export const useFortuneStore = create<FortuneStore>()(
           // 최근 60일치만 보관
           const next = [...s.viewedDates, today].slice(-60);
           return { viewedDates: next };
+        }),
+      // 보상형 광고 userEarnedReward 수신 시에만 호출 — 오늘의 스페셜 부적 카드를 잠금해제한다.
+      recordBonusUnlock: () =>
+        set((s) => {
+          const today = todayKst();
+          if (s.bonusDates.includes(today)) return s;
+          return { bonusDates: [...s.bonusDates, today].slice(-60) };
         }),
       addToHistory: (rec) =>
         set((s) => {

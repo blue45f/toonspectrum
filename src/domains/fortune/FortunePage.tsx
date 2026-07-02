@@ -24,6 +24,7 @@ import { useState, useEffect, useRef } from "react";
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
 import { charThemeVars } from "./fortune-theme";
+import { FortuneBonusCard } from "./FortuneBonusCard";
 import { FortuneLoading } from "./FortuneLoading";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
@@ -232,6 +233,22 @@ export function FortunePage() {
 
   // 결과 공유/저장 모달
   const [shareOpen, setShareOpen] = useState(false);
+
+  // 보상형 광고 중 낭독(Web Speech) 일시정지·재개 — 광고 훅(pauseAudioForAd)은 BGM/AudioContext
+  // 만 멈추므로, 낭독은 여기서 pause/resume 한다(광고 전에 재생 중이었을 때만 재개).
+  const playbackPausedForAdRef = useRef(false);
+  const handleAdStart = () => {
+    if (playback.status === "playing") {
+      playbackPausedForAdRef.current = true;
+      playback.pause();
+    }
+  };
+  const handleAdEnd = () => {
+    if (playbackPausedForAdRef.current) {
+      playbackPausedForAdRef.current = false;
+      playback.resume();
+    }
+  };
 
   // 에러·재시도 (운세 호출 실패 시)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1294,6 +1311,13 @@ export function FortunePage() {
                       />
                     </div>
                   )}
+
+                  {/* 스페셜 부적 카드 — 보상형 광고 옵트인(토스 전용, 웹/미구성 환경은 자동 숨김) */}
+                  <FortuneBonusCard
+                    character={selectedChar}
+                    onAdStart={handleAdStart}
+                    onAdEnd={handleAdEnd}
+                  />
 
                   {/* 행운의 웹툰/웹소설 추천 영역 */}
                   <div className="border-t border-line/80 pt-6">

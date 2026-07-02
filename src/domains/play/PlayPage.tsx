@@ -3,6 +3,7 @@ import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { findGame, PLAY_GAMES } from "./game-registry";
+import { PlayCheerCard } from "./PlayCheerCard";
 
 import { Container } from "@/components/section";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,9 @@ export function PlayPage() {
           </li>
         ))}
       </ul>
+
+      {/* 보상형 광고 옵트인(응원 샤워) — 토스에서만 노출, 웹/미구성 환경은 자동 숨김. */}
+      <PlayCheerCard />
 
       <p className="mt-6 text-[0.68rem] leading-relaxed text-fg-3">
         놀이터 게임은 공개 카탈로그의 메타데이터(제목·작가·장르·지표)를 사용합니다. 표지 썸네일은 사이트

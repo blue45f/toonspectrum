@@ -42,18 +42,24 @@ export function getBannerAdGroupId(format: AdFormat = "banner"): string | null {
   return import.meta.env.DEV ? TEST_BANNER_AD_GROUP_ID : null;
 }
 
+// WebView 보상형 테스트 ID(공식 문서). 보상형은 사용자가 버튼으로 옵트인해야만 노출되므로
+// 개발 환경에선 테스트 ID 로 폴백해 흐름(load→loaded→show→reward)을 검증할 수 있게 한다.
+const TEST_REWARDED_AD_GROUP_ID = "ait-ad-test-rewarded-id";
+
 /**
- * 전면 광고 그룹 ID. 운영 콘솔에서 발급받은 값만 사용하고, 미설정 시 광고를 요청하지 않아요.
- * 전면형은 배너와 달리 사용자의 진행을 가리므로 개발 환경에서도 임의 테스트 ID로 폴백하지 않아요.
+ * 전면 광고 그룹 ID. 운영은 콘솔에서 발급받은 값만 사용하고, 미설정 시 광고를 요청하지 않아요.
+ * - 전면형(interstitial)은 사용자의 진행을 가리므로 개발 환경에서도 테스트 ID 로 폴백하지 않아요.
+ * - 보상형(rewarded)은 옵트인 버튼에서만 노출되므로 개발 환경 한정 테스트 ID 폴백을 허용해요.
  */
 export function getFullScreenAdGroupId(
   format: FullScreenAdFormat,
 ): string | null {
-  const value =
-    format === "rewarded"
-      ? import.meta.env.VITE_TOSS_REWARDED_AD_GROUP_ID
-      : import.meta.env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
-  return value?.trim() || null;
+  if (format === "rewarded") {
+    const rewarded = import.meta.env.VITE_TOSS_REWARDED_AD_GROUP_ID?.trim();
+    if (rewarded) return rewarded;
+    return import.meta.env.DEV ? TEST_REWARDED_AD_GROUP_ID : null;
+  }
+  return import.meta.env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID?.trim() || null;
 }
 
 // SDK는 앱 전체에서 한 번만 초기화(중복 초기화 금지) — 모듈 스코프로 상태 공유.
@@ -119,6 +125,8 @@ export function useTossBanner() {
 type FullScreenAdCallbacks = Readonly<{
   /** 보상형 광고에서 SDK의 userEarnedReward 이벤트가 온 경우에만 호출해요. */
   onReward?: (reward: { unitType: string; unitAmount: number }) => void;
+  /** 광고 노출이 끝났을 때(dismissed/failedToShow/오류 정리 포함) 1회 호출해요. */
+  onClosed?: () => void;
   onError?: (error: Error) => void;
 }>;
 
@@ -154,9 +162,11 @@ export function useTossFullScreenAd(
   const showUnregisterRef = useRef<(() => void) | null>(null);
   const loadRef = useRef<() => void>(() => undefined);
   const onRewardRef = useRef(callbacks.onReward);
+  const onClosedRef = useRef(callbacks.onClosed);
   const onErrorRef = useRef(callbacks.onError);
 
   onRewardRef.current = callbacks.onReward;
+  onClosedRef.current = callbacks.onClosed;
   onErrorRef.current = callbacks.onError;
 
   const unregisterLoad = () => {
@@ -213,6 +223,7 @@ export function useTossFullScreenAd(
       finished = true;
       unregisterShow();
       resumeAudioAfterAd();
+      onClosedRef.current?.();
       loadRef.current();
     };
 
