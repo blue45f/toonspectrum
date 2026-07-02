@@ -2,6 +2,7 @@ import { triggerParticleBurst } from "@toonspectrum/core/fx";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { resolveAssetUrl } from "@/src/catalog-static";
 
 /**
  * SplashScreen — 웹(/)·토스(apps/toss) **공유** 동적 인트로/스플래시.
@@ -135,7 +136,7 @@ export function SplashScreen({
           </div>
           <div className="pf-glow flex h-[clamp(46px,13vw,58px)] w-[clamp(46px,13vw,58px)] items-center justify-center overflow-hidden rounded-2xl">
             <img
-              src="/icon-192.png"
+              src={resolveAssetUrl("/icon-192.png")}
               alt=""
               className="ts-splash-logo size-full object-cover"
               decoding="async"

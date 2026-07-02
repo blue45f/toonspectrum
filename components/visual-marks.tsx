@@ -4,6 +4,7 @@ import type { Platform } from "@/lib/types";
 import type { CSSProperties } from "react";
 
 import { cx } from "@/lib/cx";
+import { resolveAssetUrl } from "@/src/catalog-static";
 
 type MarkSize = "dot" | "xs" | "sm" | "md" | "lg";
 
@@ -364,7 +365,7 @@ export function ToonSpectrumMark({ className }: { className?: string }) {
       )}
       aria-hidden
     >
-      <img src="/icon-192.png" alt="" className="size-full object-cover" decoding="async" />
+      <img src={resolveAssetUrl("/icon-192.png")} alt="" className="size-full object-cover" decoding="async" />
     </span>
   );
 }
