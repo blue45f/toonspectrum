@@ -192,6 +192,30 @@ import {
   unionBounds,
 } from "./studio-selection";
 import {
+  applySelectionAdjustToCanvas,
+  beginSelectionDrag,
+  buildSelectionMaskPlan,
+  canvasPointToNormalized,
+  commitSelectionDrag,
+  emptyPixelSelection,
+  isSelectionAdjustNoop,
+  isSelectionUsable,
+  marchingAntsPasses,
+  planSelectionAdjust,
+  rasterizeSelectionMask,
+  removeLastSubpath,
+  setSelectionFeather,
+  subpathOutlinePoints,
+  toggleSelectionInvert,
+  updateSelectionDrag,
+  type PixelSelection,
+  type SelectionAdjustPlan,
+  type SelectionCombineMode,
+  type SelectionDragState,
+  type SelectionFrame,
+  type SelectionToolKind,
+} from "./studio-selection-tools";
+import {
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
   SMART_SNAP_THRESHOLD,
@@ -304,6 +328,9 @@ const StudioTonePanel = lazy(() =>
 );
 const StudioStrokeShapePanel = lazy(() =>
   import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel }))
+);
+const StudioSelectionToolsPanel = lazy(() =>
+  import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel }))
 );
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
 
@@ -1624,6 +1651,31 @@ function downscaleDataUrl(dataUrl: string, maxW: number, quality = 0.72) {
   });
 }
 
+// 픽셀 선택 편집용 오프스크린 캔버스 팩토리 — studio-selection-tools 의 SelectionCanvasFactory
+// 구조에 맞는 실제 DOM 캔버스를 만든다(2D 컨텍스트를 못 얻으면 null → 코어가 중단 신호로 처리).
+function createPixelEditCanvas(
+  width: number,
+  height: number
+): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
+  const ctx = canvas.getContext("2d");
+  return ctx ? { canvas, ctx } : null;
+}
+
+// 픽셀 편집용 원본 이미지 로드 — data: URL 이 아니면 CORS 를 요청해 캔버스 오염(taint)으로
+// toDataURL 이 막히는 것을 피한다(업로드/에셋은 대부분 data: 라 영향 없음).
+function loadPixelEditImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new globalThis.Image();
+    if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("이미지 원본을 불러오지 못했습니다."));
+    img.src = src;
+  });
+}
+
 function coverFitRect(containerW: number, containerH: number, imageW: number, imageH: number) {
   if (imageW <= 0 || imageH <= 0) {
     return { x: 0, y: 0, width: containerW, height: containerH };
@@ -1690,6 +1742,89 @@ function cachedBuildImageFilters(el: ImageEl, key: string, mod: StudioKonvaFilte
   }
   imageFilterBuildCache.set(key, built);
   return built;
+}
+
+// 픽셀 선택 마칭앤츠 오버레이 — 자체 RAF 로 대시 오프셋만 갱신해 StudioPage 전체 리렌더 없이
+// 자기 자신(전용 Layer 안 소수 노드)만 다시 그린다. 오프셋은 경과시간의 순수 함수(결정적).
+function StudioSelectionAntsOverlay({
+  selection,
+  drag,
+  frame,
+  scale,
+}: {
+  selection: PixelSelection | null;
+  drag: SelectionDragState | null;
+  frame: SelectionFrame;
+  scale: number;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      // 50ms(20fps) 양자화 — 같은 값이면 setState 가 리렌더를 건너뛴다(고전 마칭앤츠 감성 + 절전).
+      setElapsedMs(Math.floor((now - start) / 50) * 50);
+      raf = globalThis.requestAnimationFrame(tick);
+    };
+    raf = globalThis.requestAnimationFrame(tick);
+    return () => globalThis.cancelAnimationFrame(raf);
+  }, []);
+
+  const passes = marchingAntsPasses(elapsedMs, scale);
+  const size = { width: frame.width, height: frame.height };
+  const dragPoints =
+    drag && drag.points.length >= 2 ? subpathOutlinePoints({ mode: drag.mode, points: drag.points }, size) : null;
+  const dragFill = drag?.mode === "subtract" ? "rgba(244, 63, 94, 0.12)" : "rgba(124, 92, 252, 0.10)";
+  return (
+    <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
+      {selection?.subpaths.map((sp, i) => {
+        const pts = subpathOutlinePoints(sp, size);
+        return passes.map((pass, j) => (
+          <Line
+            key={`ants-${i}-${j}`}
+            points={pts}
+            closed
+            stroke={pass.stroke}
+            strokeWidth={pass.strokeWidth}
+            dash={pass.dash ?? undefined}
+            dashOffset={pass.dashOffset}
+          />
+        ));
+      })}
+      {/* 반전 선택은 이미지 테두리에도 앤츠를 둘러 "바깥이 선택됨"을 표시한다. */}
+      {selection?.invert &&
+        passes.map((pass, j) => (
+          <Rect
+            key={`ants-inv-${j}`}
+            x={0}
+            y={0}
+            width={frame.width}
+            height={frame.height}
+            stroke={pass.stroke}
+            strokeWidth={pass.strokeWidth}
+            dash={pass.dash ?? undefined}
+            dashOffset={pass.dashOffset}
+          />
+        ))}
+      {/* 진행 중 드래그 미리보기 — 합치기=보라, 빼기=적색 반투명 채움 + 앤츠 외곽선. */}
+      {dragPoints && (
+        <>
+          <Line points={dragPoints} closed fill={dragFill} />
+          {passes.map((pass, j) => (
+            <Line
+              key={`ants-drag-${j}`}
+              points={dragPoints}
+              closed
+              stroke={pass.stroke}
+              strokeWidth={pass.strokeWidth}
+              dash={pass.dash ?? undefined}
+              dashOffset={pass.dashOffset}
+            />
+          ))}
+        </>
+      )}
+    </Group>
+  );
 }
 
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
@@ -2963,6 +3098,53 @@ function StudioCuttoonEditor() {
     },
     []
   );
+  // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
+  // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
+  const [pixelSel, setPixelSel] = useState<PixelSelection | null>(null);
+  const [pixelTool, setPixelTool] = useState<SelectionToolKind | null>(null);
+  const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
+  const [pixelBusy, setPixelBusy] = useState(false);
+  // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
+  // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
+  const pixelDragRef = useRef<{ elId: string; frame: SelectionFrame; drag: SelectionDragState } | null>(null);
+  const pixelDragRafRef = useRef<number | null>(null);
+  const pendingPixelDragRef = useRef<SelectionDragState | null>(null);
+  const [pixelDragPreview, setPixelDragPreview] = useState<SelectionDragState | null>(null);
+  const schedulePixelDragPreview = (next: SelectionDragState | null) => {
+    pendingPixelDragRef.current = next;
+    if (pixelDragRafRef.current !== null) return;
+    pixelDragRafRef.current = globalThis.requestAnimationFrame(() => {
+      pixelDragRafRef.current = null;
+      setPixelDragPreview(pendingPixelDragRef.current);
+    });
+  };
+  const clearPixelDragPreview = () => {
+    pendingPixelDragRef.current = null;
+    if (pixelDragRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(pixelDragRafRef.current);
+      pixelDragRafRef.current = null;
+    }
+    setPixelDragPreview(null);
+  };
+  useEffect(
+    () => () => {
+      if (pixelDragRafRef.current !== null) globalThis.cancelAnimationFrame(pixelDragRafRef.current);
+    },
+    []
+  );
+  // 선택 요소가 바뀌면 픽셀 선택·진행 중 드래그·busy 를 해제한다(선택 영역은 이미지 1개 귀속).
+  useEffect(() => {
+    void selectedId; // 값 자체는 안 쓰지만 "바뀌면 초기화"를 위해 의존성으로 구독한다.
+    pixelDragRef.current = null;
+    pendingPixelDragRef.current = null;
+    if (pixelDragRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(pixelDragRafRef.current);
+      pixelDragRafRef.current = null;
+    }
+    setPixelDragPreview(null);
+    setPixelSel(null);
+    setPixelBusy(false);
+  }, [selectedId]);
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
@@ -3023,6 +3205,15 @@ function StudioCuttoonEditor() {
   }, [menu]);
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
+  // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
+  const pixelToolArmed = pixelTool !== null && selected?.type === "image";
+  // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
+  const pixelOverlayFrame: SelectionFrame | null =
+    selected?.type === "image"
+      ? { x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: selected.rotation }
+      : null;
+  const pixelOverlaySel = pixelSel && (pixelSel.subpaths.length > 0 || pixelSel.invert) ? pixelSel : null;
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -4363,7 +4554,12 @@ function StudioCuttoonEditor() {
         setZoom(1);
       } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
-        removeSelected();
+        // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
+        if (selected?.type === "image" && isSelectionUsable(pixelSel) && !pixelBusy) {
+          void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
+        } else {
+          removeSelected();
+        }
       } else if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
@@ -4375,6 +4571,10 @@ function StudioCuttoonEditor() {
           // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
           menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
           setMenu(null);
+        } else if (pixelTool || pixelSel) {
+          // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
+          setPixelTool(null);
+          setPixelSel(null);
         } else {
           setSelectedId(null);
           setMarqueeIds([]);
@@ -4976,9 +5176,70 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 픽셀 선택 한정 조정 적용(밝기/색조/삭제) — 원본 픽셀에 굽는 파괴적 작업 ──
+  // 원본 자연 해상도로 마스크를 래스터해 합성하고, 결과를 data URL 로 교체(patchEl)해
+  // 일반 요소 편집과 같은 히스토리 1항목(⌘Z 복구 가능)으로 남긴다. 선택 영역은 유지되어
+  // 같은 영역에 조정을 연달아 가할 수 있다(포토샵 대화상자와 동일).
+  async function applyPixelSelectionAdjust(plan: SelectionAdjustPlan) {
+    if (pixelBusy || isSelectionAdjustNoop(plan)) return;
+    if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
+    const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷.
+    const sel = pixelSel;
+    setPixelBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      // 페더는 캔버스 표시 px 기준 → 원본 px 환산 배율. 선택은 화면(반전 표시) 기준으로
+      // 그려지므로 원본 픽셀 좌표로 되반전(flipX/flipY)해 마스크를 만든다.
+      const maskPlan = buildSelectionMaskPlan(sel, w, h, {
+        featherScale: target.width > 0 ? w / target.width : 1,
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!maskPlan) return;
+      const mask = rasterizeSelectionMask(maskPlan, createPixelEditCanvas);
+      const out = mask && applySelectionAdjustToCanvas(img, w, h, mask, plan, createPixelEditCanvas);
+      if (!out) throw new Error("조정 캔버스를 만들지 못했습니다.");
+      // 팩토리가 HTMLCanvasElement 만 만들므로 구조 타입 → DOM 타입 복원은 안전하다.
+      // PNG: 삭제(투명)·페더의 알파를 보존하는 무손실 포맷.
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { src } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply pixel selection adjust:", err);
+      setError(err instanceof Error ? err.message : "선택 영역 조정에 실패했습니다.");
+    } finally {
+      setPixelBusy(false);
+    }
+  }
+
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle") {
+      return;
+    }
+    // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
+    // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
+    // Space 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
+    if (
+      pixelTool &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame));
+      pixelDragRef.current = { elId: selected.id, frame, drag };
+      schedulePixelDragPreview(drag);
       return;
     }
     if (tool === "draw") {
@@ -5040,6 +5301,20 @@ function StudioCuttoonEditor() {
     }
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // 픽셀 선택 드래그 중이면 궤적/박스를 갱신한다(시작 시점 프레임 스냅샷 기준 좌표 변환).
+    // 올가미는 최소 간격 미만이면 같은 상태를 돌려주므로 그때는 RAF 예약도 건너뛴다.
+    if (pixelDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = pixelDragRef.current;
+        const next = updateSelectionDrag(session.drag, canvasPointToNormalized(pos.x, pos.y, session.frame));
+        if (next !== session.drag) {
+          session.drag = next;
+          schedulePixelDragPreview(next);
+        }
+      }
+      return;
+    }
     // 마퀴 드래그 중이면 선택 박스를 갱신한다.
     if (marqueeStartRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -5136,6 +5411,14 @@ function StudioCuttoonEditor() {
     scheduleDraft(next);
   }
   function onStageUp() {
+    // 픽셀 선택 드래그 종료: 의미 있는 면적이면 서브패스로 결합(찰나 클릭은 변화 없음 = null).
+    if (pixelDragRef.current) {
+      const session = pixelDragRef.current;
+      pixelDragRef.current = null;
+      clearPixelDragPreview();
+      setPixelSel((prev) => commitSelectionDrag(prev, session.drag) ?? prev);
+      return;
+    }
     // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
     if (marqueeStartRef.current) {
       const rect = pendingMarqueeRectRef.current ?? marqueeRect;
@@ -7449,10 +7732,12 @@ function StudioCuttoonEditor() {
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
-                const draggable = !opts.asMask && tool === "select" && !locked;
+                // 픽셀 선택 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 선택 그리기로 간다.
+                const draggable = !opts.asMask && tool === "select" && !locked && !pixelToolArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
-                const onSelect = opts.asMask ? () => {} : () => tool === "select" && setSelectedId(el.id);
+                // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
+                const onSelect = opts.asMask ? () => {} : () => tool === "select" && !pixelToolArmed && setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -8173,6 +8458,17 @@ function StudioCuttoonEditor() {
                   stroke="rgba(90,140,255,0.85)"
                   strokeWidth={1 / effScale}
                   dash={[4 / effScale, 4 / effScale]}
+                />
+              </Layer>
+            )}
+            {/* 픽셀 선택 마칭앤츠 — 전용 레이어라 RAF 틱마다 이 레이어만 다시 그린다. */}
+            {!isExporting && pixelOverlayFrame && (pixelOverlaySel || pixelDragPreview) && (
+              <Layer listening={false}>
+                <StudioSelectionAntsOverlay
+                  selection={pixelOverlaySel}
+                  drag={pixelDragPreview}
+                  frame={pixelOverlayFrame}
+                  scale={effScale}
                 />
               </Layer>
             )}
@@ -10280,12 +10576,28 @@ function StudioCuttoonEditor() {
               )}
 
               {selected.type === "image" && (
-                <StudioImageAdjustmentsPanel
-                  selected={selected}
-                  filterClipboard={filterClipboard}
-                  onSetFilterClipboard={setFilterClipboard}
-                  onPatch={(patch) => patchEl(selected.id, patch)}
-                />
+                <>
+                  <StudioImageAdjustmentsPanel
+                    selected={selected}
+                    filterClipboard={filterClipboard}
+                    onSetFilterClipboard={setFilterClipboard}
+                    onPatch={(patch) => patchEl(selected.id, patch)}
+                  />
+                  {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미로 선택해 부분 조정/삭제. */}
+                  <StudioSelectionToolsPanel
+                    selection={pixelSel}
+                    activeTool={pixelTool}
+                    combineMode={pixelCombine}
+                    busy={pixelBusy}
+                    onPickTool={setPixelTool}
+                    onCombineModeChange={setPixelCombine}
+                    onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
+                    onToggleInvert={() => setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()))}
+                    onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
+                    onClearSelection={() => setPixelSel(null)}
+                    onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
+                  />
+                </>
               )}
 
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
