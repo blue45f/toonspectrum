@@ -2329,9 +2329,11 @@ function VrmActor({
       }
     }
 
-    // 흔들림 미리보기: 매 프레임 스프링본을 갱신(델타 상한으로 폭주 방지).
+    // 흔들림 미리보기·웹캠 트래킹 중: 매 프레임 스프링본을 갱신(델타 상한으로 탭 복귀 폭주 방지)
+    // — 머리 회전에 머리카락/의상 물리가 자연스럽게 따라온다.
     // 정지 모드: delta 0으로 표정/제약만 동기화하고 스프링본은 정착 프레임에서 멈춘다.
-    vrm.update(physicsPreview ? Math.min(dVal, PHYSICS_PREVIEW_MAX_DELTA) : 0);
+    const springDelta = webcamActive || physicsPreview ? Math.min(dVal, PHYSICS_PREVIEW_MAX_DELTA) : 0;
+    vrm.update(springDelta);
   });
 
   return <primitive object={vrm.scene} />;
