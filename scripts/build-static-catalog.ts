@@ -56,14 +56,34 @@ async function buildRankingFiles(writeJson: (name: string, data: unknown) => voi
   }
 }
 
-// 상세 전용 필드(시놉시스 원문·보러가기 URL·평점분포)를 해시 버킷 샤드로 분리 —
+// 크롤러(scripts/crawl-related-info.mjs)가 수집한 작품별 관련 정보 실링크 스냅샷.
+// { [titleId]: RelatedInfoItem[] } — 커밋된 JSON 이라 빌드가 결정적(카탈로그 스냅샷과 동일 규약).
+type RelatedSnapshot = Record<string, Title["relatedInfo"]>;
+function loadRelatedInfoSnapshot(): RelatedSnapshot {
+  const file = path.join(ROOT, "data", "related-info.json");
+  if (!existsSync(file)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf-8"));
+    return parsed && typeof parsed === "object" ? (parsed as RelatedSnapshot) : {};
+  } catch (e) {
+    // 손상된 스냅샷을 조용히 무시하면 관련 정보가 통째로 사라진 채 green 빌드가 나간다 → 경고로 알린다.
+    console.warn(`⚠️  related-info.json 파싱 실패 — 관련 정보를 이번 빌드에서 생략합니다: ${String(e)}`);
+    return {};
+  }
+}
+
+// 상세 전용 필드(시놉시스 원문·보러가기 URL·평점분포·관련 정보)를 해시 버킷 샤드로 분리 —
 // 상세/비교 화면이 작은 샤드 1개만 추가로 받아 병합한다(src/catalog-static-engine.ts).
 function buildDetailShards(titles: readonly Title[]): { files: DetailShardFile[]; entryCount: number } {
   const files: DetailShardFile[] = Array.from({ length: DETAIL_SHARD_COUNT }, () => ({}));
+  const related = loadRelatedInfoSnapshot();
   let entryCount = 0;
   for (const title of titles) {
-    const extra = buildDetailExtra(title);
-    if (!extra) continue;
+    // buildDetailExtra 는 s/u/d 가 없으면 null — 관련 정보만 있는 작품도 샤드에 실어야 하므로 {} 로 시작.
+    const extra = buildDetailExtra(title) ?? {};
+    const rel = related[title.id];
+    if (Array.isArray(rel) && rel.length > 0) extra.r = rel;
+    if (Object.keys(extra).length === 0) continue;
     files[detailShardBucket(title.id)][title.id] = extra;
     entryCount += 1;
   }

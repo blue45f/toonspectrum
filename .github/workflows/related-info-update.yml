@@ -1,0 +1,81 @@
+name: related-info-update
+
+# 관련 정보(작품별 유튜브 영상·네이버 뉴스/블로그·나무위키 실링크) 주기 크롤 → data/related-info.json
+# 커밋. 카탈로그(catalog-update.yml)와 같은 규약: additive 스냅샷을 git 이 소스로 갖고, 빌드
+# 시 prebuild(catalog:gen)가 이 JSON 을 읽어 detail 샤드에 관련 정보를 실어 정적 서빙한다.
+#
+# ⚠️ 카탈로그와 동일한 현실: GitHub 러너(US egress)의 유튜브·네이버 크롤은 KR 로케일 결과·차단
+#    측면에서 로컬(KR) 크롤보다 품질이 낮을 수 있다. 그래서 이 워크플로는 best-effort 자동 확장이고,
+#    고품질 갱신은 로컬에서 `pnpm related:update`(크롤 + catalog:gen) 후 커밋하는 것이 primary 다.
+#    변경이 있을 때만 커밋하며, 없으면 조용히 종료한다.
+#
+# 선택 Secret (미설정 시 안전하게 skip): VERCEL_DEPLOY_HOOK_URL — 커밋 후 배포 트리거.
+
+on:
+  schedule:
+    - cron: "30 18 * * 1" # 매주 월요일 1회(03:30 KST). 관련 정보는 느리게 변해 주 1회로 충분.
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "크롤할 상위 인기작 수"
+        default: "300"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: related-info-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 정적 카탈로그가 있어야 크롤러가 인기 상위 작품을 고른다.
+      - name: Ensure catalog present
+        run: pnpm catalog:gen
+
+      - name: Crawl related info (additive)
+        env:
+          TZ: Asia/Seoul
+        run: node scripts/crawl-related-info.mjs --limit "${{ github.event.inputs.limit || '300' }}"
+
+      - name: Commit & push (변경 있을 때만)
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/related-info.json
+          if git diff --staged --quiet; then
+            echo "변경 없음 — 커밋 생략."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+          else
+            COUNT=$(node -e "console.log(Object.keys(require('./data/related-info.json')).length)")
+            git commit -m "chore(related): 관련 정보 스냅샷 갱신 (${COUNT}개 작품)"
+            git push
+            echo "committed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger production deploy
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "${HOOK:-}" ]; then
+            curl -fsS -X POST "$HOOK" >/dev/null && echo "Vercel 배포 훅 트리거됨"
+          else
+            echo "::notice::VERCEL_DEPLOY_HOOK_URL 미설정 — Vercel Git 자동배포에 의존(설정돼 있으면 정상)"
+          fi

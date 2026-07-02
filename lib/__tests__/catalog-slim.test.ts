@@ -80,6 +80,26 @@ describe("catalog-slim — 정적 카탈로그 경량화 규약", () => {
     expect("ratingDist" in card.stats).toBe(false);
   });
 
+  it("관련 정보(extra.r)는 병합 시 title.relatedInfo 로 복원된다(크롤 실링크)", () => {
+    const card = toListTitle(heavy) as unknown as Title;
+    const related = [
+      {
+        id: "yt-x-0",
+        category: "youtube" as const,
+        title: "리뷰 영상",
+        url: "https://www.youtube.com/watch?v=abcdef12345",
+        sourceName: "유튜브",
+      },
+    ];
+    const restored = mergeDetailExtra(card, { r: related });
+    expect(restored.relatedInfo).toEqual(related);
+    // 빈 배열·부재는 relatedInfo 를 붙이지 않는다.
+    expect(mergeDetailExtra(card, { r: [] }).relatedInfo).toBeUndefined();
+    expect(mergeDetailExtra(card, {}).relatedInfo).toBeUndefined();
+    // 원본 카드는 변형되지 않는다.
+    expect(card.relatedInfo).toBeUndefined();
+  });
+
   it("떼어낼 상세 필드가 없으면 샤드 항목을 만들지 않고, 병합은 무해하게 통과한다", () => {
     const bare = makeTitle({
       synopsis: "짧은 소개",

@@ -91,6 +91,25 @@ export interface Title {
   statsEstimated?: boolean;
   featured?: boolean; // 에디터 추천
   editorNote?: string; // 에디터 한줄평
+  // 관련 정보(유튜브 영상·뉴스 기사·나무위키·블로그 등 실제 목적지 직링크) — 크롤러가 주기적으로
+  // 수집해 detail 샤드(TitleDetailExtra.r)에 실어 병합한다. 상세 화면에서만 사용(목록엔 없음).
+  relatedInfo?: RelatedInfoItem[];
+}
+
+// ── 관련 정보 항목 (크롤 수집 · detail 샤드에 저장) ─────────────────────────
+// "단순 검색 결과 페이지"가 아니라 실제 영상·기사·문서로 직접 연결되는 목적지 URL.
+export type RelatedInfoCategory = "youtube" | "blog" | "news" | "wiki" | "interview";
+
+export interface RelatedInfoItem {
+  id: string;
+  category: RelatedInfoCategory;
+  title: string;
+  url: string; // 실제 목적지(영상/기사/문서) 직링크
+  sourceName: string; // 출처 표기 (예: "유튜브", "네이버 뉴스", "나무위키")
+  dateOrViews?: string; // 조회수·발행일 등 부가 정보
+  snippet?: string; // 요약
+  thumbnail?: string; // 썸네일 URL (유튜브 등)
+  badge?: string; // "공식 PV", "단독 보도" 등
 }
 
 // ── 정적 카탈로그 경량 카드 (additive) ─────────────────────────

@@ -12,7 +12,7 @@
 //
 // 생산자: scripts/build-static-catalog.ts / 소비자: src/catalog-static-engine.ts.
 // apps/api/data/catalog.json.gz(정규화 Title[] 교환 포맷)와 DB 스냅샷 계약은 건드리지 않는다.
-import type { Availability, Title, TitleCard, TitleStats } from "./types";
+import type { Availability, RelatedInfoItem, Title, TitleCard, TitleStats } from "./types";
 
 // 카드 시놉시스 최대 길이(코드포인트) — 카드 UI는 line-clamp 1~3줄이라 이 이상은 노출되지 않는다.
 export const SYNOPSIS_CARD_MAX = 160;
@@ -28,6 +28,8 @@ export interface TitleDetailExtra {
   u?: (string | null)[];
   /** stats.ratingDist 원본 */
   d?: TitleStats["ratingDist"];
+  /** 관련 정보(크롤 수집 실링크) — 목록엔 없고 상세 샤드에만 실린다. */
+  r?: RelatedInfoItem[];
 }
 
 export type DetailShardFile = Record<string, TitleDetailExtra>;
@@ -109,5 +111,6 @@ export function mergeDetailExtra(title: Title, extra: TitleDetailExtra | undefin
         })
       : title.availability,
     stats: extra.d ? { ...title.stats, ratingDist: extra.d } : title.stats,
+    ...(extra.r && extra.r.length > 0 ? { relatedInfo: extra.r } : {}),
   };
 }

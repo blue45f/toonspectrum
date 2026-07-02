@@ -1,18 +1,9 @@
-import type { Title } from "@toonspectrum/core";
+import type { RelatedInfoItem, Title } from "@toonspectrum/core";
 
-export type RelatedCategory = "all" | "youtube" | "blog" | "news" | "wiki" | "interview";
+// RelatedInfoItem 은 @toonspectrum/core 단일 출처(크롤러·detail 샤드·프론트 공용). 여기선 재노출만.
+export type { RelatedInfoItem };
 
-export interface RelatedInfoItem {
-  id: string;
-  category: "youtube" | "blog" | "news" | "wiki" | "interview";
-  title: string;
-  url: string; // 절대 검색 페이지가 아닌 실제 영상, 기사, 블로그, 위키 문서의 직연결 URL
-  sourceName: string; // 출처 (예: "유튜브 (애니플러스)", "네이버 뉴스 (연합뉴스)", "나무위키 공식 문서")
-  dateOrViews?: string; // 조회수, 발행일자 또는 부가 정보
-  snippet?: string; // 요약/핵심 내용
-  thumbnail?: string; // 썸네일 URL
-  badge?: string; // "공식 PV", "단독 보도", "세계관 설정" 등
-}
+export type RelatedCategory = "all" | RelatedInfoItem["category"];
 
 export const CATEGORY_LABELS: Record<RelatedCategory, { label: string; icon: string }> = {
   all: { label: "전체 목록", icon: "LayoutGrid" },
@@ -311,6 +302,11 @@ const CURATED_DB: Record<string, RelatedInfoItem[]> = {
  * 단순 검색 결과 페이지(URL)는 100% 배제하며, 개별 목적지 문서/영상/플랫폼 페이지로 직접 연결합니다.
  */
 export function getRelatedInfoForTitle(title: Title): RelatedInfoItem[] {
+  // 1순위: 크롤러가 수집해 detail 샤드에 실은 실제 링크(주기적 갱신, 작품별 정밀 큐레이션).
+  if (Array.isArray(title.relatedInfo) && title.relatedInfo.length > 0) {
+    return title.relatedInfo;
+  }
+
   const k = norm(title.title);
   const foundKey = Object.keys(CURATED_DB).find((ck) => norm(ck) === k || k.includes(norm(ck)));
 

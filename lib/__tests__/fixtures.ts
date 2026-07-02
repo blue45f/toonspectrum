@@ -43,5 +43,6 @@ export function makeTitle(
     statsEstimated: p.statsEstimated,
     featured: p.featured,
     editorNote: p.editorNote,
+    relatedInfo: p.relatedInfo,
   };
 }
