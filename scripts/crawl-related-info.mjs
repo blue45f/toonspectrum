@@ -19,7 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  decodeEntities,
+  extractOgTitle,
   jsonUnescape,
   mapNaverBlogItems,
   mapNaverNewsItems,
@@ -76,16 +76,7 @@ async function fetchHtml(url, { referer } = {}) {
 
 // 목적지 페이지의 실제 제목(og:title 우선, 없으면 <title>). URL 마다 정확한 제목이라 오귀속 없음.
 async function fetchOgTitle(url) {
-  const html = await fetchHtml(url);
-  if (!html) return "";
-  const og =
-    html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i) ||
-    html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const t = og ? decodeEntities(og[1]) : "";
-  // 네이버 기본 타이틀/뉴스 섹션 라벨 등 무의미 제목은 폴백을 쓰게 버린다.
-  if (!t || /^(네이버\s*(뉴스|블로그|포스트)?|NAVER)$/i.test(t)) return "";
-  return t.slice(0, 110);
+  return extractOgTitle(await fetchHtml(url)); // 순수 파싱은 related-info-parse.mjs(따옴표 안전·테스트됨)
 }
 
 // 유튜브(구글)는 IP당 ~5~10회 급속 요청 후 google.com/sorry/ 봇체크로 302 스로틀한다(rate 기반).

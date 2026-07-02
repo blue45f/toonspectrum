@@ -26,6 +26,31 @@ export function decodeEntities(s) {
     .trim();
 }
 
+// 제목 끝의 잘림 흔적(쉼표·중점·하이픈·연속공백)을 정리한다.
+export function trimTitle(s) {
+  return String(s || "")
+    .replace(/[\s,·ㆍ、\-–—]+$/u, "")
+    .trim();
+}
+
+// HTML 에서 og:title(없으면 <title>) 추출. content 속성값에 작은/큰따옴표가 들어가도 잘리지 않게
+// 여는 따옴표를 역참조(\1)로 닫는다(한국 헤드라인의 '인용'·"강조" 대응). 무의미한 네이버 기본
+// 타이틀은 "" 로 버려 호출부가 폴백을 쓰게 한다.
+export function extractOgTitle(html) {
+  const s = String(html || "");
+  const og =
+    s.match(/<meta[^>]+property=["']og:title["'][^>]+content=(["'])([\s\S]*?)\1/i) ||
+    s.match(/<meta[^>]+content=(["'])([\s\S]*?)\1[^>]+property=["']og:title["']/i);
+  let raw = og ? og[2] : "";
+  if (!raw) {
+    const tm = s.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    raw = tm ? tm[1] : "";
+  }
+  const t = trimTitle(decodeEntities(raw));
+  if (!t || /^(네이버\s*(뉴스|블로그|포스트)?|NAVER)$/i.test(t)) return "";
+  return t.slice(0, 110);
+}
+
 // 네이버 뉴스 검색 API items[] → {url, title}[]. url 은 네이버 기사(link) 우선, 없으면 원문(originallink).
 export function mapNaverNewsItems(items, query, max) {
   const list = Array.isArray(items) ? items : [];

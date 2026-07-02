@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   decodeEntities,
+  extractOgTitle,
   jsonUnescape,
   mapNaverBlogItems,
   mapNaverNewsItems,
   mapYoutubeApiItems,
+  trimTitle,
 } from "../related-info-parse.mjs";
 
 describe("related-info-parse — 공식 API/스크래핑 응답 파싱", () => {
@@ -53,6 +55,24 @@ describe("related-info-parse — 공식 API/스크래핑 응답 파싱", () => {
     const out = mapYoutubeApiItems(items, 1);
     expect(out).toHaveLength(1);
     expect(out[0]).toEqual({ id: "abc12345678", title: '덴마 리뷰 "완결"', views: undefined });
+  });
+
+  it("trimTitle 은 잘린 og:title 끝의 쉼표·중점·공백을 정리한다", () => {
+    expect(trimTitle("웹툰으로 하는 영어 공부,")).toBe("웹툰으로 하는 영어 공부");
+    expect(trimTitle("반려동물이 등장하는 웹툰, ,")).toBe("반려동물이 등장하는 웹툰");
+    expect(trimTitle("정상 제목")).toBe("정상 제목");
+  });
+
+  it("extractOgTitle 은 content 값에 따옴표가 있어도 잘리지 않는다(잘린 제목 버그 수정)", () => {
+    // 버그 재현: 예전 정규식 [^\"']+ 은 첫 ' 에서 잘려 '네이버웹툰,' 이 됐다.
+    const html = `<html><head><meta property="og:title" content="네이버웹툰, '덴마'·'고수' 등 완결작 9편 무료" /></head></html>`;
+    expect(extractOgTitle(html)).toBe("네이버웹툰, '덴마'·'고수' 등 완결작 9편 무료");
+    // 속성 순서 반대(content 먼저)도 처리.
+    const html2 = `<meta content='"설렘·어긋남" 담았다…카카오엔터' property='og:title'>`;
+    expect(extractOgTitle(html2)).toBe('"설렘·어긋남" 담았다…카카오엔터');
+    // og 없으면 <title> 폴백, 네이버 기본 타이틀은 버림.
+    expect(extractOgTitle("<title>진짜 제목</title>")).toBe("진짜 제목");
+    expect(extractOgTitle(`<meta property="og:title" content="네이버 뉴스">`)).toBe("");
   });
 
   it("빈/비배열 입력에 안전하다(무효 응답)", () => {
