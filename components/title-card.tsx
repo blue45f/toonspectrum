@@ -43,6 +43,18 @@ function StretchedTitleLink({ title }: { title: Title }) {
   );
 }
 
+// 표지 호버 빛 스윕 — group-hover 시 비스듬한 반투명 띠가 표지를 좌→우로 한 번 가로지른다.
+// Tailwind v4 의 group-hover 는 (hover: hover) 미디어 게이트가 걸려 터치 기기에선 발화하지 않고,
+// motion-safe 로 reduced-motion 도 제외된다. 부모는 relative + overflow-hidden 이어야 한다.
+function CoverSheen() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 -left-[45%] z-10 w-[45%] bg-[linear-gradient(90deg,transparent,oklch(1_0_0/0.16),transparent)] opacity-0 motion-safe:group-hover:[animation:card-sheen_0.9s_var(--ease-out-quint)]"
+    />
+  );
+}
+
 // 표준 그리드 카드 — 포스터 + 메타.
 // feature: 그리드의 리드 카드(가로 에디토리얼 레이아웃, 2칸 span).
 //   균일한 카드 매트릭스를 깨는 비대칭 리듬용.
@@ -70,10 +82,11 @@ export function TitleCard({
     return (
       <Card3D maxTilt={12} scale={1.02} className={cn("group relative block rounded-2xl", className)}>
         <article className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[box-shadow,border-color] duration-200 surface-hl group-hover:border-line-strong group-hover:shadow-[0_22px_48px_-16px_oklch(0.14_0.02_68/0.45)] group-focus-within:border-line-strong">
-          <div className="w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
+          <div className="relative w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
             <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.04]">
               <TitlePoster title={title} size={size} rank={rank} />
             </div>
+            <CoverSheen />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-0.5">
             <div className="flex flex-wrap gap-1.5">
@@ -114,8 +127,9 @@ export function TitleCard({
     <Card3D maxTilt={10} scale={1.025} className={cn("group relative block rounded-2xl", className)}>
       <article className="relative block rounded-2xl">
         <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[box-shadow,border-color] duration-200 group-hover:border-line-strong group-hover:shadow-[0_20px_45px_-18px_oklch(0.14_0.02_68/0.4)] group-focus-within:border-line-strong">
-          <div className="overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
+          <div className="relative overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
             <TitlePoster title={title} size={size} rank={rank} />
+            <CoverSheen />
           </div>
           {/* 호버 보더 */}
           <div className="pointer-events-none absolute inset-1 rounded-[0.9rem] ring-1 ring-inset ring-transparent transition-colors duration-200 group-hover:ring-accent/50" />

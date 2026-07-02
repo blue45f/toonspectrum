@@ -1,11 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Trash2, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
 import { RatingInput, ScaleSwitcher } from "./rating-input";
 import { Button } from "./ui/button";
+import { useCelebrate } from "./use-celebrate";
 
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,11 @@ export function ReviewForm({ titleId }: { titleId: string }) {
     setSynced(true);
   }
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const celebrate = useCelebrate();
+
   const submit = handleSubmit((values) => {
+    const isNew = !existing;
     upsert({
       titleId,
       rating: values.rating,
@@ -79,12 +84,19 @@ export function ReviewForm({ titleId }: { titleId: string }) {
       spoiler: values.spoiler,
       createdAt: new Date().toISOString(),
     });
+    // 저장 성공 축하 — 신규 등록은 크게, 수정 저장은 절제해서(파티클 + success 효과음 + 햅틱).
+    celebrate(formRef.current, {
+      chars: ["⭐", "✨", "💬"],
+      count: isNew ? 18 : 10,
+      spread: isNew ? 1.05 : 0.8,
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   });
 
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
       className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-5 surface-hl"
     >

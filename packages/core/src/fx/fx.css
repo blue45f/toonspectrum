@@ -3,6 +3,8 @@
  *
  * 클래스 1개만 붙이면 동작하도록 keyframes + .pf-* 헬퍼를 함께 제공합니다.
  *   - pf-jelly-pop  : 탭 스프링(눌렀다 통 튀는 젤리감) — 1회성
+ *   - pf-flip-pop   : 아이콘이 한 바퀴 도는 3D 플립(서재 담기 성공) — 1회성
+ *   - pf-bell-ring  : 종이 좌우로 흔들리는 링(연재 알림 구독 성공) — 1회성
  *   - pf-sparkle    : 연속 반짝임(밝기/스케일 미세 펄스)
  *   - pf-aurora     : 아주 느린 배경 그라데이션 흐름(오로라)
  *   - pf-glow       : 부드러운 발광 펄스(그림자 호흡)
@@ -59,6 +61,52 @@
 .pf-jelly-pop {
   animation: pf-jelly-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: center;
+}
+
+/* ── pf-flip-pop — 아이콘이 한 바퀴 도는 3D 플립(서재 담기 성공) ─────────────── */
+@keyframes pf-flip-pop {
+  0% {
+    transform: perspective(240px) rotateY(0deg) scale(1);
+  }
+  45% {
+    transform: perspective(240px) rotateY(180deg) scale(1.28);
+  }
+  100% {
+    transform: perspective(240px) rotateY(360deg) scale(1);
+  }
+}
+
+.pf-flip-pop {
+  animation: pf-flip-pop 0.5s var(--ts-ease-out-quint) both;
+  transform-origin: center;
+}
+
+/* ── pf-bell-ring — 종이 좌우로 흔들리는 1회성 링(연재 알림 구독 성공) ─────────── */
+@keyframes pf-bell-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  18% {
+    transform: rotate(16deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  62% {
+    transform: rotate(8deg);
+  }
+  82% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.pf-bell-ring {
+  animation: pf-bell-ring 0.55s var(--ts-ease-out-quint) both;
+  /* 종 손잡이(윗부분)를 축으로 흔들려야 자연스럽다. */
+  transform-origin: 50% 12%;
 }
 
 /* ── pf-sparkle — 연속 반짝임(밝기/스케일 미세 펄스) ────────────────────────── */
@@ -400,6 +448,8 @@
 /* 접근성 — 모션 최소화 사용자에겐 fx 애니메이션을 멈춥니다. */
 @media (prefers-reduced-motion: reduce) {
   .pf-jelly-pop,
+  .pf-flip-pop,
+  .pf-bell-ring,
   .pf-sparkle,
   .pf-aurora,
   .pf-glow,

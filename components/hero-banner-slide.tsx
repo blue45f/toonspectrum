@@ -23,11 +23,13 @@ export function HeroBannerSlide({ title }: { title: Title }) {
     <Link href={`/title/${title.slug}`} className="group/slide relative block">
       <div className="absolute inset-0" aria-hidden>
         {title.coverImage && !isRestricted ? (
+          // Ken Burns — 배경 표지가 14s 왕복으로 느리게 확대·팬(시네마틱 호흡). 캐러셀 래퍼가
+          // overflow-hidden 이라 레이아웃 시프트 없음. reduced-motion 은 scale-110 정지 상태 유지.
           <img
             src={title.coverImage}
             alt=""
             loading="lazy"
-            className="size-full scale-110 object-cover opacity-[0.14] transition-transform duration-700 ease-out-expo group-hover/slide:scale-[1.16]"
+            className="size-full scale-110 object-cover opacity-[0.14] motion-safe:[animation:kenburns-drift_14s_ease-in-out_infinite_alternate]"
           />
         ) : null}
         <div

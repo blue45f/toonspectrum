@@ -37,12 +37,13 @@ export function HeroBannerStatic({
         <Link href={`/title/${first.slug}`} className="group/slide relative block">
           <div className="absolute inset-0" aria-hidden>
             {first.coverImage && !isRestricted ? (
+              // Ken Burns — 인터랙티브 배너(hero-banner-slide)와 동일한 배경 표지 드리프트.
               <img
                 src={first.coverImage}
                 alt=""
                 loading="eager"
                 fetchPriority="high"
-                className="size-full scale-110 object-cover opacity-[0.14] transition-transform duration-700 ease-out-expo group-hover/slide:scale-[1.16]"
+                className="size-full scale-110 object-cover opacity-[0.14] motion-safe:[animation:kenburns-drift_14s_ease-in-out_infinite_alternate]"
               />
             ) : null}
             <div

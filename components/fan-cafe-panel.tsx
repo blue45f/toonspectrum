@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { KIND_LABEL } from "./fan-cafe-utils";
 import { Card3D } from "./ui/card-3d";
+import { useCelebrate } from "./use-celebrate";
 
 import type { FanCafePost, FanCafePostKind, FanCafeReply, FanCafeScopeFilter } from "@/lib/types";
 
@@ -109,6 +110,7 @@ export function FanCafePanel({
   const postsRequestSignatureRef = useRef("");
   const postPulseTimerRef = useRef<number | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
+  const celebrate = useCelebrate();
   const selectedTagContext = `${scope}|${targetId ?? ""}`;
 
   function applyTopLevelReplyDelta(postItem: FanCafePost, delta: number) {
@@ -367,7 +369,7 @@ export function FanCafePanel({
     }
   }
 
-  async function submit() {
+  async function submit(sourceEl?: HTMLElement | null) {
     if (!userId) return;
     if (!title.trim() || !text.trim()) return;
     if (!canComposePost) {
@@ -405,6 +407,8 @@ export function FanCafePanel({
         return;
       }
       const created = data as FanCafePost;
+      // 게시 성공 축하 — 등록 버튼에서 파티클 팡 + success 효과음 + 햅틱(모션 최소화 시 파티클 생략).
+      celebrate(sourceEl, { chars: ["🎉", "✨", "💬"], count: 18 });
       onTopLevelPostCreated?.(created);
       const normalizedCreatedTags = created.tags.map((tag) => tag.toLowerCase());
       const tagMatch = !selectedTag || normalizedCreatedTags.includes(selectedTag);
@@ -711,7 +715,7 @@ export function FanCafePanel({
                 )}
                 <button
                   type="button"
-                  onClick={submit}
+                  onClick={(event) => void submit(event.currentTarget)}
                   disabled={!title.trim() || !text.trim() || isSubmittingPost || attachBusy}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                 >
@@ -996,6 +1000,7 @@ export function FanPostReplySection({
   const [replyAutoRefreshEnabled, setReplyAutoRefreshEnabled] = useState(false);
   const [replyRefreshTick, setReplyRefreshTick] = useState(0);
   const replyRefreshControllerRef = useRef<AbortController | null>(null);
+  const celebrate = useCelebrate();
 
   function refreshReplies() {
     setReplyRefreshTick((current) => current + 1);
@@ -1104,7 +1109,7 @@ export function FanPostReplySection({
     return next;
   }
 
-  async function submitReply(parentId: string | null) {
+  async function submitReply(parentId: string | null, sourceEl?: HTMLElement | null) {
     if (!userId) return;
     const draft = getDraft(parentId ?? "__root__").trim();
     if (!draft) return;
@@ -1134,6 +1139,8 @@ export function FanPostReplySection({
         return;
       }
       const created = data as FanCafeReply;
+      // 댓글 등록 축하 — 등록 버튼에서 작게 팡(글 등록보다 한 단계 절제).
+      celebrate(sourceEl, { chars: ["🎉", "✨", "💬"], count: 14, spread: 0.9 });
       setReplies((current) => insertReply(current, parentId, created));
       onReplyDelta?.(1);
       setReplySyncAt(new Date().toISOString());
@@ -1240,7 +1247,7 @@ export function FanPostReplySection({
             <span>{rootDraft.length}/{FAN_CAFE_REPLY_MAX_LENGTH}</span>
             <button
               type="button"
-              onClick={() => submitReply(null)}
+              onClick={(event) => void submitReply(null, event.currentTarget)}
               disabled={!rootDraft.trim() || isRootSubmitting}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -1284,7 +1291,7 @@ function ReplyThread({
 }: {
   items: FanCafeReply[];
   userId: string | null;
-  onSubmit: (parentId: string | null) => Promise<void>;
+  onSubmit: (parentId: string | null, sourceEl?: HTMLElement | null) => Promise<void>;
   onDelete: (replyId: string) => Promise<void>;
   onToggleComposer: (parentId: string | null) => void;
   openComposerFor: string | null;
@@ -1336,7 +1343,7 @@ function FanPostReplyItem({
   depth: number;
   userId: string | null;
   canReply: boolean;
-  onSubmit: (parentId: string | null) => Promise<void>;
+  onSubmit: (parentId: string | null, sourceEl?: HTMLElement | null) => Promise<void>;
   onDelete: (replyId: string) => Promise<void>;
   onToggleComposer: (parentId: string | null) => void;
   openComposerFor: string | null;
@@ -1426,7 +1433,7 @@ function FanPostReplyItem({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onSubmit(reply.id)}
+                    onClick={(event) => void onSubmit(reply.id, event.currentTarget)}
                     disabled={!draft.trim() || isSubmitting}
                     className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-accent px-2.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
                   >

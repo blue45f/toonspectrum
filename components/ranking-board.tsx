@@ -24,7 +24,14 @@ import {
 import { useEffect, useRef, useState, type ComponentType } from "react";
 
 import { PlatformTags } from "./availability";
-import { RankRow, MiniPoster } from "./rank-row";
+import { CountUp } from "./count-up";
+import {
+  RankRow,
+  MiniPoster,
+  RANK_ENTRY_STAGGER_CAP,
+  RANK_ENTRY_STAGGER_STEP_MS,
+  RANK_ENTRY_ANIMATION_CLASS,
+} from "./rank-row";
 import { TitleCard } from "./title-card";
 import { TitleFilterPanel } from "./title-filter-panel";
 import { Segmented } from "./ui/segmented";
@@ -145,25 +152,45 @@ const PLATFORM_FILTER_ITEMS: { value: PlatformId | "all"; label: string }[] = [
   ...PLATFORM_LIST.map((platform) => ({ value: platform.id, label: platform.short })),
 ];
 
-function metricFor(axis: RankAxis): (t: Title) => { label: string; value: string } {
+// countTo — 정수 스코어 지표(트렌드·몰입·완독률)만 진입 카운트업 대상으로 원시값을 함께 넘긴다.
+// 단위 포맷 문자열(1.2만 등)·연도·소수점 평점은 카운트업이 어색하거나 포맷을 깨므로 제외.
+function metricFor(
+  axis: RankAxis
+): (t: Title) => { label: string; value: string; countTo?: number; countSuffix?: string } {
   switch (axis) {
     case "trending":
-      return (t) => ({ label: "트렌드", value: String(Math.round(t.stats.trendingScore)) });
+      return (t) => {
+        const n = Math.round(t.stats.trendingScore);
+        return { label: "트렌드", value: String(n), countTo: n };
+      };
     case "rating":
     case "hidden":
       return (t) => ({ label: "평점", value: t.stats.ratingAvg.toFixed(1) });
     case "favorites":
       return (t) => ({ label: "관심", value: formatCount(t.stats.bookmarks) });
     case "binge":
-      return (t) => ({ label: "몰입지수", value: String(Math.round(t.stats.bingeIndex)) });
+      return (t) => {
+        const n = Math.round(t.stats.bingeIndex);
+        return { label: "몰입지수", value: String(n), countTo: n };
+      };
     case "completed":
-      return (t) => ({ label: "완독률", value: `${Math.round(t.stats.completionRate)}%` });
+      return (t) => {
+        const n = Math.round(t.stats.completionRate);
+        return { label: "완독률", value: `${n}%`, countTo: n, countSuffix: "%" };
+      };
     case "rookie":
       return (t) => ({ label: "데뷔", value: String(t.releaseYear) });
     case "popular":
     default:
       return (t) => ({ label: "조회", value: formatCount(t.stats.views) });
   }
+}
+
+// 목록 진입 스태거 — 첫 화면 분량(캡)까지만 지연을 주고, 캡 밖 행은 애니메이션 없이 즉시 표시.
+function entryStaggerStyle(index: number): React.CSSProperties | undefined {
+  return index < RANK_ENTRY_STAGGER_CAP
+    ? { animationDelay: `${index * RANK_ENTRY_STAGGER_STEP_MS}ms` }
+    : undefined;
 }
 
 function formatUpdatedAt(value?: string) {
@@ -232,7 +259,8 @@ function SignalWorkbench({
           <div className="mt-1 flex items-end gap-2">
             <TrustIcon size={18} className={cn("mb-0.5 shrink-0", trustTone)} />
             <p className={cn("font-display text-2xl font-bold leading-none tnum", trustTone)}>
-              {reliability?.confidence ?? 0}
+              {/* 신뢰도 카운트업 — 값이 바뀔 때만 재카운트(폴링 시 동일 값이면 정지 상태 유지). */}
+              <CountUp value={reliability?.confidence ?? 0} duration={0.9} />
             </p>
             <span className="pb-0.5 text-xs text-fg-3">/100</span>
           </div>
@@ -263,7 +291,9 @@ function SignalWorkbench({
         </div>
         <div className="min-w-0">
           <p className="eyebrow text-[0.58rem] text-fg-3">SPREAD</p>
-          <p className="mt-1 font-display text-xl font-bold text-fg tnum">{insights?.scoreSpread ?? 0}</p>
+          <p className="mt-1 font-display text-xl font-bold text-fg tnum">
+            <CountUp value={insights?.scoreSpread ?? 0} duration={0.9} />
+          </p>
           <p className="mt-0.5 text-xs text-fg-3">1위와 하위권 점수 간격</p>
         </div>
       </div>
@@ -812,19 +842,26 @@ export function RankingBoard({
         </div>
       ) : view === "list" ? (
         <div className="rounded-xl border border-line bg-panel/30 p-2 sm:p-3">
-          {visibleRanked.map((r) => (
-            <RankRow key={r.title.id} ranked={r} axis={axis} metric={metric} />
+          {visibleRanked.map((r, i) => (
+            <RankRow key={r.title.id} ranked={r} axis={axis} metric={metric} entryIndex={i} />
           ))}
         </div>
       ) : view === "poster" ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {visibleRanked.map((r) => (
-            <TitleCard key={r.title.id} title={r.title} rank={r.rank} />
+          {/* 진입 스태거 — TitleCard API 는 그대로 두고 얇은 래퍼에 지연만 입힌다(캡 밖은 즉시). */}
+          {visibleRanked.map((r, i) => (
+            <div
+              key={r.title.id}
+              className={cn(i < RANK_ENTRY_STAGGER_CAP && RANK_ENTRY_ANIMATION_CLASS)}
+              style={entryStaggerStyle(i)}
+            >
+              <TitleCard title={r.title} rank={r.rank} />
+            </div>
           ))}
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
-          {visibleRanked.map((r) => {
+          {visibleRanked.map((r, i) => {
             const mm = metric(r.title);
             // 별점 축은 RatingInline이 ≈를 붙이므로 지표 컬럼 중복 표기를 피한다.
             const mmEstimated = statsAreEstimated(r.title) && axis !== "rating" && axis !== "hidden";
@@ -832,7 +869,11 @@ export function RankingBoard({
               <Link
                 key={r.title.id}
                 href={`/title/${r.title.slug}`}
-                className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2 transition-colors hover:border-line-strong"
+                className={cn(
+                  "group flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2 transition-colors hover:border-line-strong",
+                  i < RANK_ENTRY_STAGGER_CAP && RANK_ENTRY_ANIMATION_CLASS
+                )}
+                style={entryStaggerStyle(i)}
               >
                 <span
                   className={cn(

@@ -268,6 +268,44 @@
   }
 }
 
+/* 히어로 표지 Ken Burns — 배경 표지 레이어가 아주 느리게 확대·팬(왕복). scale 1.1 시작이라
+   비애니메이션(reduced-motion) 기본 상태(scale-110)와 이어지고, 팬 폭(≤2%)은 확대 여유(≥5%)
+   안이라 컨테이너(overflow-hidden) 밖 여백이 드러나지 않는다. transform 만 사용(합성 전용). */
+@keyframes kenburns-drift {
+  from {
+    transform: scale(1.1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.18) translate3d(-1.8%, 1.2%, 0);
+  }
+}
+
+/* 랭킹 Top3 메달 글로 — 순위 배지가 은은히 맥동. 톤은 --medal-glow(금/은/동)로 행에서 주입.
+   box-shadow 만 애니메이션(레이아웃 무관). 전역 reduced-motion 가드가 무한 반복을 무효화한다. */
+@keyframes rank-medal-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 2px 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 13px 2px var(--medal-glow, oklch(0.72 0.185 42 / 0.4));
+  }
+}
+
+/* 카드 표지 호버 빛 스윕 — 비스듬한 반투명 띠가 표지를 좌→우로 한 번 스친다.
+   group-hover(+motion-safe)로만 발화 — Tailwind v4 hover 계열은 (hover: hover) 게이트라
+   터치 기기에선 붙지 않는다. 띠 폭 45% 기준 translateX(340%)면 컨테이너 오른쪽 밖까지 완주. */
+@keyframes card-sheen {
+  from {
+    transform: translateX(0) skewX(-18deg);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(340%) skewX(-18deg);
+    opacity: 1;
+  }
+}
+
 /* ============================================================
    Base
    ============================================================ */

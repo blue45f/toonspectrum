@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { AdultOverlay } from "./adult-overlay";
 import { PlatformTags } from "./availability";
+import { CountUp } from "./count-up";
 import { CoverImage } from "./cover-image";
 import { GenreChip } from "./ui/chip";
 import { RatingInline } from "./ui/stars";
@@ -49,6 +50,20 @@ export function MiniPoster({
   );
 }
 
+// 목록 진입 스태거 — 첫 화면 분량(12행)까지만 순차 등장시키고, 이후 행은 즉시 표시한다.
+// 200행짜리 긴 리스트에서 아래 행들이 하염없이 늦게 나타나는 느낌을 방지(캡 밖은 애니메이션 자체 생략).
+export const RANK_ENTRY_STAGGER_CAP = 12;
+export const RANK_ENTRY_STAGGER_STEP_MS = 45;
+export const RANK_ENTRY_ANIMATION_CLASS =
+  "motion-safe:[animation:fade-up_0.45s_var(--ease-out-expo)_both]";
+
+// Top3 메달 글로 톤 — 금/은/동. rank-medal-pulse 키프레임이 --medal-glow 로 소비한다.
+const MEDAL_GLOW: Record<number, string> = {
+  1: "oklch(0.84 0.16 85 / 0.5)", // 금
+  2: "oklch(0.85 0.02 250 / 0.4)", // 은
+  3: "oklch(0.7 0.12 55 / 0.45)", // 동
+};
+
 function Delta({ delta }: { delta: number }) {
   if (delta > 0)
     return (
@@ -72,11 +87,20 @@ export function RankRow({
   axis = "popular",
   metric,
   className,
+  entryIndex,
 }: {
   ranked: RankedTitle;
   axis?: RankAxis;
-  metric?: (t: RankedTitle["title"]) => { label: string; value: string };
+  metric?: (t: RankedTitle["title"]) => {
+    label: string;
+    value: string;
+    /** 정수 지표(트렌드·몰입·완독률)일 때 진입 카운트업용 원시값. 없으면 문자열 그대로 표시. */
+    countTo?: number;
+    countSuffix?: string;
+  };
   className?: string;
+  /** 목록 진입 스태거 인덱스 — 캡(12) 미만이면 순차 fade-up + 지표 카운트업. */
+  entryIndex?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { title, rank, delta } = ranked;
@@ -87,14 +111,18 @@ export function RankRow({
   // 별점 축(rating·hidden)은 RatingInline이 이미 ≈를 붙이므로 중복 표기를 피한다.
   const estimated = statsAreEstimated(title);
   const metricEstimated = estimated && axis !== "rating" && axis !== "hidden";
+  // 진입 스태거 대상(첫 화면 분량)만 모션·카운트업 — 캡 밖 행은 즉시 정적 표시(rAF 낭비 방지).
+  const staggered = entryIndex !== undefined && entryIndex < RANK_ENTRY_STAGGER_CAP;
 
   return (
     <div
       className={cn(
         "group/row flex flex-col rounded-xl border border-line/45 bg-card/35 transition-all duration-150 hover:border-line hover:bg-card mb-2 last:mb-0 overflow-hidden",
+        staggered && RANK_ENTRY_ANIMATION_CLASS,
         expanded && "border-accent/40 bg-card shadow-sm",
         className
       )}
+      style={staggered ? { animationDelay: `${entryIndex * RANK_ENTRY_STAGGER_STEP_MS}ms` } : undefined}
     >
       {/* Main Row Content — 좁은 화면(320px)에선 표지/메트릭 칼럼을 좁히고 gap을 줄여 제목 폭을 확보 */}
       <div className="grid grid-cols-[2.5rem_2.25rem_1fr_auto] items-center gap-2 px-2 py-2.5 sm:grid-cols-[2.75rem_2.5rem_1fr_auto] sm:gap-4 sm:px-3">
@@ -106,8 +134,11 @@ export function RankRow({
           className={cn(
             "relative flex min-h-11 flex-col items-center justify-center rounded-xl border px-1.5 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/30",
             top3 ? "border-accent/45 bg-accent/10 text-accent" : "border-line/70 bg-canvas/40 text-fg-3",
+            // Top3 메달 글로 — 은은한 무한 맥동. ring 도 box-shadow 라 확장 시(ring 표시)엔 꺼서 충돌 회피.
+            top3 && !expanded && "motion-safe:[animation:rank-medal-pulse_2.8s_ease-in-out_infinite]",
             expanded && "border-accent bg-accent-soft/40 ring-2 ring-accent/10"
           )}
+          style={top3 ? ({ "--medal-glow": MEDAL_GLOW[rank] } as React.CSSProperties) : undefined}
         >
           <span
             className={cn(
@@ -173,7 +204,14 @@ export function RankRow({
             <div className="text-right">
               <div className="numeral tnum text-sm text-fg font-semibold">
                 {metricEstimated && <span className="text-fg-3" aria-hidden>≈</span>}
-                {m ? m.value : formatCount(title.stats.views)}
+                {/* 정수 지표 + 스태거 구간이면 카운트업(첫 화면만 — 캡 밖 행은 정적 표시). */}
+                {m?.countTo !== undefined && staggered ? (
+                  <CountUp value={m.countTo} suffix={m.countSuffix ?? ""} duration={0.85} />
+                ) : m ? (
+                  m.value
+                ) : (
+                  formatCount(title.stats.views)
+                )}
               </div>
               <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
             </div>
