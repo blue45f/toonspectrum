@@ -5,7 +5,10 @@
  * - BGM: 무드 자동생성(Web Audio) 또는 커스텀 URL을 사용자 제스처 후 재생.
  * - 컷 오디오 연출: 컷 진입 시 SE 스팅어 1회 재생 + BGM 무드 전환(소리 꺼짐이면 무시,
  *   빠른 스크롤 연타는 쿨다운으로 억제).
- * 접근성: prefers-reduced-motion이면 리빌·파티클을 끄고 정적으로 보여준다(소리는 별개 토글).
+ * - 컷 연출 마크(seq): 컷 진입 시 지정 영역 위에 delayMs 순서로 오버레이 연출(포커스 링·
+ *   플래시…)을 1회 재생. 컷은 플랫 이미지 한 장이라 레이어 분리 재생이 아닌 "이미지 위
+ *   오버레이"다. 재생 규약은 리빌과 동일 — 컷당 1회, 재진입해도 다시 재생하지 않는다.
+ * 접근성: prefers-reduced-motion이면 리빌·파티클·연출 마크를 끄고 정적으로 보여준다(소리는 별개 토글).
  */
 import { Music, Pause, Play, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -29,9 +32,12 @@ import {
   hasAnyFx,
   hasCutAudioFx,
   revealHiddenStyle,
+  seqMarkAnimation,
+  seqMarkBaseStyle,
   stepAmbientParticle,
   type AmbientParticle,
   type AmbientPreset,
+  type WorkCutSeqMark,
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
@@ -64,15 +70,53 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// 한 페이지(컷) 이미지를 감싸 스크롤 등장 효과 + 컷 강조 애니메이션 + 컷 진입 오디오
-// 트리거를 적용한다. 바깥 div가 리빌(opacity/transform transition), 안쪽 div가
-// 강조(Web Animations)를 맡아 서로 안 부딪힌다. 오디오 연출(SE·BGM 전환)은 모션이
-// 아니므로 prefers-reduced-motion과 무관하게 관찰한다(소리 여부는 디렉터가 판단).
+// 연출 마크 오버레이 하나 — 마운트 시(컷 진입 1회) delayMs만큼 기다렸다 Web Animations로
+// 재생한다. 기본 opacity 0 + 시작/끝 키프레임 opacity 0 → 대기 중·재생 후 모두 안 보인다.
+// 플랫 컷 이미지 "위"에 얹는 시선 유도 연출이라 그림 속 요소가 실제로 움직이진 않는다.
+function SeqMarkOverlay({ mark }: { mark: WorkCutSeqMark }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // 원시값 의존 — cutFx가 렌더마다 새 마크 객체를 만들어도(불변 복사) 값이 같으면
+  // 애니메이션을 다시 재생하지 않는다(객체 정체 의존이면 부모 리렌더에 연출이 반복된다).
+  const { anim, delayMs } = mark;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof el.animate !== "function") return; // 미지원 환경 — 조용히 생략(opacity 0 유지)
+    const spec = seqMarkAnimation(anim);
+    if (!spec) return;
+    const animation = el.animate(spec.keyframes, { ...spec.options, delay: delayMs });
+    return () => animation.cancel();
+  }, [anim, delayMs]);
+
+  const look = seqMarkBaseStyle(mark.anim);
+  return (
+    <div
+      ref={ref}
+      className="absolute rounded-lg will-change-transform"
+      style={{
+        left: `${mark.x * 100}%`,
+        top: `${mark.y * 100}%`,
+        width: `${mark.w * 100}%`,
+        height: `${mark.h * 100}%`,
+        background: look.background,
+        boxShadow: look.boxShadow,
+        opacity: 0,
+      }}
+    />
+  );
+}
+
+// 한 페이지(컷) 이미지를 감싸 스크롤 등장 효과 + 컷 강조 애니메이션 + 컷 연출 마크 +
+// 컷 진입 오디오 트리거를 적용한다. 바깥 div가 리빌(opacity/transform transition), 안쪽
+// div가 강조(Web Animations)·마크 오버레이를 맡아 서로 안 부딪힌다. 오디오 연출(SE·BGM
+// 전환)은 모션이 아니므로 prefers-reduced-motion과 무관하게 관찰한다(소리 여부는 디렉터가
+// 판단). 연출 마크는 모션이라 reduced-motion이면 재생하지 않는다.
 function RevealPage({
   src,
   alt,
   reveal,
   emphasis,
+  seqMarks,
   hasAudioFx,
   motionAllowed,
   onEnter,
@@ -81,6 +125,7 @@ function RevealPage({
   alt: string;
   reveal: string;
   emphasis: string;
+  seqMarks: WorkCutSeqMark[];
   hasAudioFx: boolean;
   motionAllowed: boolean;
   onEnter: () => void;
@@ -89,8 +134,11 @@ function RevealPage({
   const innerRef = useRef<HTMLDivElement>(null);
   const revealActive = motionAllowed && reveal !== "none";
   const emphasisActive = motionAllowed && emphasis !== "none";
-  const observe = revealActive || emphasisActive || hasAudioFx;
+  const seqActive = motionAllowed && seqMarks.length > 0;
+  const observe = revealActive || emphasisActive || hasAudioFx || seqActive;
   const [shown, setShown] = useState(!revealActive);
+  // 컷 진입 시 1회만 마크 시퀀스를 마운트 — 리빌과 같은 규약(재진입해도 다시 재생 안 함).
+  const [seqStarted, setSeqStarted] = useState(false);
   // 컷 진입 1회 판정 — effect 재구독(옵저버 재생성)이 있어도 오디오가 중복 발화하지 않게.
   const enteredRef = useRef(false);
   // 최신 onEnter 유지(latest-ref) — 콜백 정체가 바뀌어도 옵저버를 재구독하지 않는다.
@@ -118,6 +166,7 @@ function RevealPage({
             const anim = emphasisAnimation(emphasis);
             if (anim) innerRef.current.animate(anim.keyframes, anim.options);
           }
+          if (seqActive) setSeqStarted(true); // 이미 true면 no-op — 중복 재생 없음
           if (hasAudioFx && !enteredRef.current) {
             enteredRef.current = true;
             onEnterRef.current();
@@ -129,7 +178,7 @@ function RevealPage({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [observe, emphasisActive, emphasis, hasAudioFx]);
+  }, [observe, emphasisActive, emphasis, hasAudioFx, seqActive]);
 
   const style = revealActive && !shown ? revealHiddenStyle(reveal) : REVEAL_SHOWN_STYLE;
   return (
@@ -142,7 +191,7 @@ function RevealPage({
           : undefined,
       }}
     >
-      <div ref={innerRef}>
+      <div ref={innerRef} className="relative">
         <CoverImage
           src={src}
           alt={alt}
@@ -153,6 +202,13 @@ function RevealPage({
             </span>
           }
         />
+        {seqActive && seqStarted && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+            {seqMarks.map((mark, index) => (
+              <SeqMarkOverlay key={index} mark={mark} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -454,7 +510,7 @@ export function WebtoonFxPlayer({
           <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
         ) : (
           pages.map((page, index) => {
-            const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조 + 오디오 연출
+            const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조 + 연출 마크 + 오디오 연출
             return (
               <RevealPage
                 key={`${page}-${index}`}
@@ -462,6 +518,7 @@ export function WebtoonFxPlayer({
                 alt={`${title} ${index + 1}컷`}
                 reveal={cut.reveal}
                 emphasis={cut.emphasis}
+                seqMarks={cut.seq?.marks ?? []}
                 hasAudioFx={cut.sfx != null || cut.bgmShift != null}
                 motionAllowed={!reduced}
                 onEnter={() => handleCutEnter(index)}

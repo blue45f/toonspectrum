@@ -7,8 +7,16 @@ import {
   DEFAULT_WORK_FX,
   EMPHASIS_PRESETS,
   REVEAL_PRESETS,
+  SEQ_DEFAULT_MARK_H,
+  SEQ_DEFAULT_MARK_W,
+  SEQ_MARK_ANIMS,
+  SEQ_MAX_DELAY_MS,
+  SEQ_MAX_MARKS,
+  SEQ_SUGGEST_BASE_DELAY_MS,
+  SEQ_SUGGEST_STEP_MS,
   SFX_STINGER_PRESETS,
   buildAmbientParticles,
+  createSeqMarkAtPoint,
   cutFx,
   emphasisAnimation,
   findAmbientPreset,
@@ -17,7 +25,11 @@ import {
   hasCutAudioFx,
   readWorkFx,
   revealHiddenStyle,
+  seqMarkAnimation,
+  seqMarkBaseStyle,
   stepAmbientParticle,
+  suggestSeqMarksFromStudioDoc,
+  type WorkCutSeqMark,
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
@@ -216,9 +228,273 @@ describe("컷 오디오 필드(sfx·bgmShift) 정규화", () => {
   });
 });
 
-// studio-motion-export는 수정 없이 새 컷 오디오 필드를 "모른 채" 동작해야 한다(무시 보장).
+// ── 컷 연출 마크(seq) — 요소 단위 시간차 오버레이 ─────────────────────
+const MARK: WorkCutSeqMark = { x: 0.1, y: 0.2, w: 0.3, h: 0.15, delayMs: 600, anim: "focus" };
+
+describe("컷 연출 마크(seq) 정규화", () => {
+  it("유효한 마크를 그대로 읽는다", () => {
+    const fx = readWorkFx({ fx: { cuts: [{ seq: { marks: [MARK, { ...MARK, y: 0.5, anim: "flash" }] } }] } });
+    expect(fx.cuts[0].seq).toEqual({ marks: [MARK, { ...MARK, y: 0.5, anim: "flash" }] });
+  });
+
+  it("좌표는 0..1로 클램프되고 넘치는 너비/높이는 캔버스 안으로 줄인다", () => {
+    const fx = readWorkFx({
+      fx: { cuts: [{ seq: { marks: [{ x: -0.2, y: 0.9, w: 5, h: 0.4, delayMs: -50, anim: "shake" }] } }] },
+    });
+    const m = fx.cuts[0].seq!.marks[0];
+    expect(m.x).toBe(0); // 음수 → 0
+    expect(m.w).toBe(1); // 폭 5 → 1-x
+    expect(m.y).toBe(0.9);
+    expect(m.h).toBeCloseTo(0.1, 10); // 높이 0.4 → 1-y (부동소수 근사)
+    expect(m.y + m.h).toBeLessThanOrEqual(1); // 캔버스를 벗어나지 않는다
+    expect(m.delayMs).toBe(0);
+    expect(m.anim).toBe("shake");
+  });
+
+  it("지연은 0..SEQ_MAX_DELAY_MS 정수로 클램프·반올림, 없으면 0", () => {
+    const fx = readWorkFx({
+      fx: {
+        cuts: [
+          {
+            seq: {
+              marks: [
+                { ...MARK, delayMs: 250.6 },
+                { ...MARK, delayMs: 99999 },
+                { ...MARK, delayMs: "nope" },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    expect(fx.cuts[0].seq!.marks.map((m) => m.delayMs)).toEqual([251, SEQ_MAX_DELAY_MS, 0]);
+  });
+
+  it(`마크는 컷당 최대 ${SEQ_MAX_MARKS}개로 자른다`, () => {
+    const many = Array.from({ length: SEQ_MAX_MARKS + 3 }, (_, i) => ({ ...MARK, delayMs: i * 100 }));
+    const fx = readWorkFx({ fx: { cuts: [{ seq: { marks: many } }] } });
+    expect(fx.cuts[0].seq!.marks).toHaveLength(SEQ_MAX_MARKS);
+    expect(fx.cuts[0].seq!.marks[SEQ_MAX_MARKS - 1].delayMs).toBe((SEQ_MAX_MARKS - 1) * 100);
+  });
+
+  it("잘못된 마크(비수치 좌표·퇴화 면적·모르는 anim·객체 아님)는 버린다", () => {
+    const fx = readWorkFx({
+      fx: {
+        cuts: [
+          {
+            seq: {
+              marks: [
+                { ...MARK, x: "a" }, // 비수치
+                { ...MARK, w: 0 }, // 면적 없음
+                { ...MARK, x: 1, w: 0.5 }, // 클램프 후 면적 없음(x=1 → w=0)
+                { ...MARK, anim: "ripple" }, // 모르는 anim(미래 추가분은 우아하게 무시)
+                { ...MARK, anim: 3 },
+                42,
+                MARK, // 유일한 생존자
+              ],
+            },
+          },
+        ],
+      },
+    });
+    expect(fx.cuts[0].seq).toEqual({ marks: [MARK] });
+  });
+
+  it("빈/전부 무효/비객체 seq는 키 자체를 만들지 않는다(직렬화 하위호환)", () => {
+    const fx = readWorkFx({
+      fx: {
+        cuts: [
+          { seq: { marks: [] } },
+          { seq: { marks: [{ ...MARK, x: NaN }] } },
+          { seq: "marks" },
+          { seq: { marks: "nope" } },
+          { reveal: "fade-up", emphasis: "shake" }, // 구버전 컷
+        ],
+      },
+    });
+    for (const c of fx.cuts) expect("seq" in c).toBe(false);
+    expect(Object.keys(fx.cuts[4])).toEqual(["reveal", "emphasis"]);
+  });
+
+  it("cutFx는 seq를 실효 효과에 불변 복사로 실어 나른다", () => {
+    const src: WorkFxSettings = {
+      ...DEFAULT_WORK_FX,
+      reveal: "fade",
+      cuts: [{ reveal: "", emphasis: "none", seq: { marks: [{ ...MARK }] } }],
+    };
+    const out = cutFx(src, 0);
+    expect(out.seq).toEqual({ marks: [MARK] });
+    out.seq!.marks[0].delayMs = 9999; // 소비자가 변형해도 원본 설정은 그대로
+    expect(src.cuts[0].seq!.marks[0].delayMs).toBe(600);
+    expect(cutFx(src, 3).seq).toBeUndefined(); // 범위 밖 컷은 마크 없음
+  });
+
+  it("hasAnyFx — 연출 마크만 있어도 효과로 친다(빈 marks는 아님)", () => {
+    expect(hasAnyFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "", emphasis: "none", seq: { marks: [MARK] } }] })).toBe(true);
+    expect(hasAnyFx({ ...DEFAULT_WORK_FX, cuts: [{ reveal: "", emphasis: "none", seq: { marks: [] } }] })).toBe(false);
+  });
+});
+
+describe("seqMarkAnimation / seqMarkBaseStyle", () => {
+  it("프리셋 id는 4종이고 유일하다", () => {
+    expect(SEQ_MARK_ANIMS.map((p) => p.id)).toEqual(["focus", "flash", "zoompulse", "shake"]);
+  });
+
+  it("모든 anim은 시작·끝 opacity 0 키프레임을 가진다(대기 중·재생 후 안 보임 규약)", () => {
+    for (const p of SEQ_MARK_ANIMS) {
+      const a = seqMarkAnimation(p.id);
+      expect(a).not.toBeNull();
+      expect(a!.keyframes.length).toBeGreaterThanOrEqual(2);
+      expect(a!.options.duration).toBeGreaterThan(0);
+      expect(a!.keyframes[0].opacity).toBe(0);
+      expect(a!.keyframes[a!.keyframes.length - 1].opacity).toBe(0);
+    }
+  });
+
+  it("모르는 anim은 null / 투명 스타일(안전 no-op)", () => {
+    expect(seqMarkAnimation("nope")).toBeNull();
+    expect(seqMarkBaseStyle("nope")).toEqual({ background: "transparent", boxShadow: "none" });
+  });
+
+  it("플래시는 채움, 나머지는 링(box-shadow)으로 그린다", () => {
+    expect(seqMarkBaseStyle("flash").background).not.toBe("transparent");
+    for (const id of ["focus", "zoompulse", "shake"]) {
+      expect(seqMarkBaseStyle(id).boxShadow).not.toBe("none");
+      expect(seqMarkBaseStyle(id).background).toBe("transparent");
+    }
+  });
+});
+
+describe("createSeqMarkAtPoint (썸네일 클릭 → 마크)", () => {
+  it("클릭 지점을 중심으로 기본 크기 마크를 만든다", () => {
+    const m = createSeqMarkAtPoint(180, 120, 360, 240, 500);
+    expect(m).toEqual({
+      x: 0.5 - SEQ_DEFAULT_MARK_W / 2,
+      y: 0.5 - SEQ_DEFAULT_MARK_H / 2,
+      w: SEQ_DEFAULT_MARK_W,
+      h: SEQ_DEFAULT_MARK_H,
+      delayMs: 500,
+      anim: "focus",
+    });
+  });
+
+  it("모서리 클릭은 캔버스 안으로 클램프된다", () => {
+    expect(createSeqMarkAtPoint(0, 0, 360, 240, 0)).toMatchObject({ x: 0, y: 0 });
+    const br = createSeqMarkAtPoint(360, 240, 360, 240, 0)!;
+    expect(br.x).toBeCloseTo(1 - SEQ_DEFAULT_MARK_W, 4);
+    expect(br.y).toBeCloseTo(1 - SEQ_DEFAULT_MARK_H, 4);
+  });
+
+  it("지연은 클램프·반올림, 표시 크기가 0 이하이거나 좌표가 무한이면 null", () => {
+    expect(createSeqMarkAtPoint(10, 10, 100, 100, 123.7)!.delayMs).toBe(124);
+    expect(createSeqMarkAtPoint(10, 10, 100, 100, -5)!.delayMs).toBe(0);
+    expect(createSeqMarkAtPoint(10, 10, 100, 100, 99999)!.delayMs).toBe(SEQ_MAX_DELAY_MS);
+    expect(createSeqMarkAtPoint(10, 10, 0, 100, 0)).toBeNull();
+    expect(createSeqMarkAtPoint(10, 10, 100, -1, 0)).toBeNull();
+    expect(createSeqMarkAtPoint(NaN, 10, 100, 100, 0)).toBeNull();
+  });
+});
+
+describe("suggestSeqMarksFromStudioDoc (게시 doc → 마크 시드)", () => {
+  // 스튜디오 게시 doc 형태: width=캔버스 폭, pagesList[i] = { canvasH, elements }.
+  const doc = {
+    width: 720,
+    pagesList: [
+      {
+        canvasH: 1000,
+        elements: [
+          { id: "t1", type: "text", x: 360, y: 500, width: 144, fontSize: 25, text: "가\n나" },
+          { id: "b1", type: "bubble", x: 72, y: 100, width: 144, height: 100, text: "안녕" },
+          { id: "img", type: "image", x: 0, y: 0, width: 720, height: 1000 }, // 대상 아님
+          { id: "hid", type: "bubble", x: 10, y: 10, width: 80, height: 60, hidden: true }, // 숨김
+        ],
+      },
+      { canvasH: 1000, elements: [] },
+    ],
+  };
+
+  it("말풍선·텍스트만 정규화해 읽기 순서(위→아래)로 제안한다", () => {
+    const marks = suggestSeqMarksFromStudioDoc(doc, 0);
+    expect(marks).toHaveLength(2);
+    // 말풍선(y=100)이 텍스트(y=500)보다 먼저.
+    expect(marks[0]).toEqual({
+      x: 0.1,
+      y: 0.1,
+      w: 0.2,
+      h: 0.1,
+      delayMs: SEQ_SUGGEST_BASE_DELAY_MS,
+      anim: "focus",
+    });
+    // 텍스트 높이는 스튜디오 바운즈 관용(fontSize×1.4)×줄 수 근사: 25×1.4×2 = 70px → 0.07.
+    expect(marks[1]).toEqual({
+      x: 0.5,
+      y: 0.5,
+      w: 0.2,
+      h: 0.07,
+      delayMs: SEQ_SUGGEST_BASE_DELAY_MS + SEQ_SUGGEST_STEP_MS,
+      anim: "focus",
+    });
+  });
+
+  it("같은 y는 x 순으로 정렬하고 상한을 지킨다", () => {
+    const many = {
+      width: 720,
+      pagesList: [
+        {
+          canvasH: 720,
+          elements: Array.from({ length: SEQ_MAX_MARKS + 4 }, (_, i) => ({
+            id: `b${i}`,
+            type: "bubble",
+            x: (SEQ_MAX_MARKS + 3 - i) * 36, // 역순 x — 정렬 검증
+            y: 100,
+            width: 72,
+            height: 72,
+          })),
+        },
+      ],
+    };
+    const marks = suggestSeqMarksFromStudioDoc(many, 0);
+    expect(marks).toHaveLength(SEQ_MAX_MARKS);
+    const xs = marks.map((m) => m.x);
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    expect(marks[SEQ_MAX_MARKS - 1].delayMs).toBe(
+      SEQ_SUGGEST_BASE_DELAY_MS + (SEQ_MAX_MARKS - 1) * SEQ_SUGGEST_STEP_MS
+    );
+  });
+
+  it("width가 없으면 스튜디오 기본 폭 720으로 정규화한다", () => {
+    const noWidth = { pagesList: [{ canvasH: 1000, elements: [{ id: "b", type: "bubble", x: 360, y: 0, width: 72, height: 100 }] }] };
+    expect(suggestSeqMarksFromStudioDoc(noWidth, 0)[0].x).toBe(0.5);
+  });
+
+  it("제안 불가 doc(업로드형·범위 밖·canvasH 없음)은 빈 배열", () => {
+    expect(suggestSeqMarksFromStudioDoc(null, 0)).toEqual([]);
+    expect(suggestSeqMarksFromStudioDoc({}, 0)).toEqual([]); // pagesList 없음(업로드형 작품)
+    expect(suggestSeqMarksFromStudioDoc(doc, 5)).toEqual([]); // 페이지 범위 밖
+    expect(suggestSeqMarksFromStudioDoc(doc, 1)).toEqual([]); // 요소 없는 페이지
+    expect(suggestSeqMarksFromStudioDoc({ width: 720, pagesList: [{ elements: [] }] }, 0)).toEqual([]); // canvasH 없음
+  });
+
+  it("캔버스 밖·퇴화 요소는 제안하지 않는다", () => {
+    const off = {
+      width: 720,
+      pagesList: [
+        {
+          canvasH: 1000,
+          elements: [
+            { id: "out", type: "bubble", x: 900, y: 100, width: 100, height: 100 }, // x가 캔버스 밖
+            { id: "tiny", type: "bubble", x: 100, y: 100, width: 1, height: 1 }, // 퇴화(1% 미만)
+          ],
+        },
+      ],
+    };
+    expect(suggestSeqMarksFromStudioDoc(off, 0)).toEqual([]);
+  });
+});
+
+// studio-motion-export는 수정 없이 새 컷 필드(sfx·bgmShift·seq)를 "모른 채" 동작해야 한다(무시 보장).
 describe("모션툰 영상 내보내기 하위호환", () => {
-  it("planMotionExport는 sfx·bgmShift가 있어도 플랜이 동일하다(필드 무시)", () => {
+  it("planMotionExport는 sfx·bgmShift·seq가 있어도 플랜이 동일하다(필드 무시)", () => {
     const opts = { fps: 10, revealSec: 0.5, holdSec: 1, tailSec: 0.5, width: 72, height: 128 };
     const base: WorkFxSettings = {
       ...DEFAULT_WORK_FX,
@@ -232,8 +508,20 @@ describe("모션툰 영상 내보내기 하위호환", () => {
     const withAudio: WorkFxSettings = {
       ...base,
       cuts: [
-        { reveal: "", emphasis: "shake", sfx: { preset: "thud" }, bgmShift: { mood: "tense" } },
-        { reveal: "slide-in", emphasis: "none", sfx: { preset: "sparkle" }, bgmShift: { mood: CUT_BGM_SILENCE } },
+        {
+          reveal: "",
+          emphasis: "shake",
+          sfx: { preset: "thud" },
+          bgmShift: { mood: "tense" },
+          seq: { marks: [MARK] },
+        },
+        {
+          reveal: "slide-in",
+          emphasis: "none",
+          sfx: { preset: "sparkle" },
+          bgmShift: { mood: CUT_BGM_SILENCE },
+          seq: { marks: [{ ...MARK, anim: "zoompulse" }, { ...MARK, y: 0.6, anim: "flash" }] },
+        },
       ],
     };
     expect(planMotionExport(2, withAudio, opts)).toEqual(planMotionExport(2, base, opts));

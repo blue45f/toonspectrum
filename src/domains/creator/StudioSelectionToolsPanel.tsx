@@ -1,19 +1,25 @@
 /**
  * Studio Selection Tools Panel
- * 픽셀 선택 도구 인스펙터 — 사각/타원/올가미 도구 토글 + 결합 모드(합치기/빼기) +
+ * 픽셀 선택 도구 인스펙터 — 사각/타원/올가미/브러시 도구 토글 + 결합 모드(합치기/빼기) +
  * 페더/반전 + 선택 영역 한정 조정(밝기/색조/삭제) 실행 버튼.
  *
  * ⚠️ studio-selection.ts(요소 다중 선택)가 아니라 studio-selection-tools.ts(이미지 안쪽
  * "픽셀 영역" 선택)의 UI 다. 선택 상태·도구 모드는 상위(StudioPage)가 소유하는
  * fully-controlled 프레젠테이션 컴포넌트 — 로컬 상태는 "적용 전" 밝기/색조 양뿐이며
  * 적용 시 planSelectionAdjust 로 계획을 만들어 onApplyAdjust 로 돌려준다.
+ *
+ * 브러시 도구는 상위가 onBrushRadiusChange 를 넘겨줄 때만 노출한다(능력 게이트) —
+ * StudioPage 가 브러시 드래그(반경 전달)를 배선하기 전에는 칩 자체를 숨겨서
+ * "눌러도 아무 일 없는" 죽은 도구가 보이지 않게 한다(정직한 점진 통합).
  */
-import { Circle, Eraser, Lasso, RotateCcw, Square, Undo2 } from "lucide-react";
+import { Circle, Eraser, Lasso, Paintbrush, RotateCcw, Square, Undo2 } from "lucide-react";
 import { useState } from "react";
 
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import {
   SELECTION_BRIGHTNESS_RANGE,
+  SELECTION_BRUSH_RADIUS_DEFAULT,
+  SELECTION_BRUSH_RADIUS_RANGE,
   SELECTION_COMBINE_MODES,
   SELECTION_FEATHER_RANGE,
   SELECTION_HUE_RANGE,
@@ -36,6 +42,7 @@ const TOOL_ICONS: Record<SelectionToolKind, typeof Square> = {
   rect: Square,
   ellipse: Circle,
   lasso: Lasso,
+  brush: Paintbrush,
 };
 
 export type StudioSelectionToolsPanelProps = {
@@ -45,11 +52,18 @@ export type StudioSelectionToolsPanelProps = {
   activeTool: SelectionToolKind | null;
   /** 다음 드래그의 결합 모드(합치기/빼기). */
   combineMode: SelectionCombineMode;
+  /** 브러시 반경(캔버스 px, 8..120) — 미지정 시 기본값 표시. */
+  brushRadius?: number;
   /** 마스크 래스터화·적용 진행 중 — 컨트롤 잠금. */
   busy?: boolean;
   /** 도구 토글 — 같은 도구를 다시 고르면 null(끄기)로 호출된다. */
   onPickTool: (tool: SelectionToolKind | null) => void;
   onCombineModeChange: (mode: SelectionCombineMode) => void;
+  /**
+   * 브러시 반경 변경 — 이 콜백이 있어야 브러시 칩/반경 슬라이더가 노출된다(능력 게이트).
+   * 상위가 드래그 시 반경을 beginSelectionDrag 로 전달하도록 배선된 뒤에 넘겨줄 것.
+   */
+  onBrushRadiusChange?: (px: number) => void;
   onFeatherChange: (px: number) => void;
   onToggleInvert: () => void;
   /** 마지막 서브패스 한 단계 되돌리기. */
@@ -64,9 +78,11 @@ export function StudioSelectionToolsPanel({
   selection,
   activeTool,
   combineMode,
+  brushRadius = SELECTION_BRUSH_RADIUS_DEFAULT,
   busy = false,
   onPickTool,
   onCombineModeChange,
+  onBrushRadiusChange,
   onFeatherChange,
   onToggleInvert,
   onUndoSubpath,
@@ -80,6 +96,8 @@ export function StudioSelectionToolsPanel({
   const usable = isSelectionUsable(selection);
   const subpathCount = selection?.subpaths.length ?? 0;
   const canAdjust = usable && !busy;
+  // 능력 게이트 — 상위가 반경 배선을 넘겨주기 전에는 브러시 칩을 숨긴다(죽은 도구 방지).
+  const tools = onBrushRadiusChange ? SELECTION_TOOLS : SELECTION_TOOLS.filter((t) => t.id !== "brush");
 
   const applyThenReset = (plan: SelectionAdjustPlan, reset: () => void) => {
     onApplyAdjust(plan);
@@ -105,7 +123,7 @@ export function StudioSelectionToolsPanel({
 
       {/* 도구 — 켜면 이미지 위 드래그가 픽셀 선택이 된다. 같은 도구 재클릭 = 끄기. */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {SELECTION_TOOLS.map((tool) => {
+        {tools.map((tool) => {
           const Icon = TOOL_ICONS[tool.id];
           const active = activeTool === tool.id;
           return (
@@ -123,6 +141,19 @@ export function StudioSelectionToolsPanel({
           );
         })}
       </div>
+
+      {/* 브러시 반경 — 브러시 도구가 켜져 있을 때만 의미가 있어 그때만 노출한다. */}
+      {activeTool === "brush" && onBrushRadiusChange && (
+        <StudioSliderRow
+          label="반경"
+          min={SELECTION_BRUSH_RADIUS_RANGE.min}
+          max={SELECTION_BRUSH_RADIUS_RANGE.max}
+          step={SELECTION_BRUSH_RADIUS_RANGE.step}
+          value={brushRadius}
+          onChange={onBrushRadiusChange}
+          readout={`${brushRadius}px`}
+        />
+      )}
 
       {/* 결합 모드 — 다음 드래그를 기존 선택에 합칠지/뺄지. */}
       <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
@@ -171,13 +202,15 @@ export function StudioSelectionToolsPanel({
         </button>
       </div>
 
-      {/* 상태 라인 — 도구 사용법 힌트 또는 현재 선택 요약. */}
+      {/* 상태 라인 — 도구 사용법 힌트 또는 현재 선택 요약. 브러시는 표시 방식이 달라 별도 힌트. */}
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
         {usable
           ? `영역 ${subpathCount}개 · 페더 ${selection!.featherPx}px${selection!.invert ? " · 반전" : ""}`
-          : activeTool
-            ? "이미지 위에서 드래그해 영역을 그리세요. 마칭앤츠(점선)가 선택을 표시합니다."
-            : "도구를 켜고 이미지 위에서 드래그하면 픽셀 영역을 선택할 수 있습니다."}
+          : activeTool === "brush"
+            ? "이미지 위를 붓으로 칠하면 칠한 자리가 선택됩니다. 브러시 선택은 점선 대신 반투명 띠로 표시됩니다."
+            : activeTool
+              ? "이미지 위에서 드래그해 영역을 그리세요. 마칭앤츠(점선)가 선택을 표시합니다."
+              : "도구를 켜고 이미지 위에서 드래그하면 픽셀 영역을 선택할 수 있습니다."}
       </p>
 
       {/* 선택 영역 한정 조정 — 밝기/색조는 슬라이더로 양을 정하고 적용, 삭제는 즉시. */}

@@ -19,6 +19,7 @@ import {
   type PresetExportScope,
 } from "./studio-export-presets";
 import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
+import { SVG_EXPORT_MIME, svgExportFileName, svgExportResultMessage, type SvgExportResult } from "./studio-svg-export";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 
 import type { Dispatch, SetStateAction } from "react";
@@ -56,6 +57,12 @@ export interface StudioExportMenuPanelProps {
    * 찍지 않는다(슬라이스 단계에서 장마다 합성 — 절단면에서 잘리지 않게).
    */
   capturePagesForPreset: (scope: PresetExportScope) => Promise<HTMLCanvasElement[]>;
+  /**
+   * 현재 페이지를 벡터 SVG로 직렬화 — 요소 데이터가 필요하므로 StudioPage가 페이지
+   * elements/배경/그룹/테마를 넘겨 studio-svg-export.exportPageToSvg 를 호출해 결과를 준다.
+   * (래스터 캡처와 달리 원본 벡터를 보존하되, 픽셀 필터·톤 등 일부는 스킵 집계로 고지.)
+   */
+  exportCurrentPageToSvg?: () => SvgExportResult;
 }
 
 export function StudioExportMenuPanel({
@@ -76,6 +83,7 @@ export function StudioExportMenuPanel({
   setWatermark,
   onCopyToClipboard,
   capturePagesForPreset,
+  exportCurrentPageToSvg,
 }: StudioExportMenuPanelProps) {
   // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
   const [presetBusy, setPresetBusy] = useState(false);
@@ -83,6 +91,8 @@ export function StudioExportMenuPanel({
   // PDF 내보내기 실행 상태 — 규격 슬라이스와 독립 실행이라 상태도 따로 안내한다.
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<ExportRunStatus | null>(null);
+  // SVG(벡터) 내보내기 결과 안내 — 스킵/근사 집계를 사용자에게 고지한다.
+  const [svgStatus, setSvgStatus] = useState<ExportRunStatus | null>(null);
   const selectedPreset = exportPresetId ? EXPORT_PRESETS.find((preset) => preset.id === exportPresetId) : null;
   const outW = Math.round(canvasWidth * exportScale);
   const outH = Math.round(canvasHeight * exportScale);
@@ -114,6 +124,27 @@ export function StudioExportMenuPanel({
       });
     } finally {
       setPdfBusy(false);
+    }
+  }
+
+  // 현재 페이지 → 벡터 SVG 한 파일. 요소 직렬화는 StudioPage(exportCurrentPageToSvg)가 하고,
+  // 여기선 Blob 다운로드 + 스킵/근사 고지만 담당한다.
+  function runSvgExport() {
+    if (!exportCurrentPageToSvg || isExporting) return;
+    try {
+      const result = exportCurrentPageToSvg();
+      const blob = new Blob([result.svg], { type: SVG_EXPORT_MIME });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = svgExportFileName(exportTitle);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setSvgStatus({ tone: result.skipped.length > 0 ? "warn" : "good", text: svgExportResultMessage(result) });
+    } catch (err) {
+      setSvgStatus({ tone: "warn", text: err instanceof Error ? err.message : "SVG 내보내기에 실패했어요." });
     }
   }
 
@@ -320,6 +351,32 @@ export function StudioExportMenuPanel({
       >
         {pdfStatus?.text}
       </p>
+
+      {/* 현재 페이지 → 벡터 SVG — 도형·말풍선·텍스트를 벡터로 보존(픽셀 필터·톤 등 일부는 스킵 고지). */}
+      {exportCurrentPageToSvg && (
+        <>
+          <button
+            type="button"
+            onClick={runSvgExport}
+            disabled={isExporting}
+            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+            title="현재 페이지를 벡터 SVG 파일로 저장 (도형·텍스트·말풍선 벡터 보존)"
+          >
+            <FileText size={13} /> SVG (벡터, 현재 페이지)
+          </button>
+          <p
+            aria-live="polite"
+            className={cx(
+              svgStatus ? "mt-1.5 rounded-md border px-2 py-1 text-[10px] leading-snug" : "sr-only",
+              svgStatus?.tone === "info" && "border-line bg-card text-fg-3",
+              svgStatus?.tone === "good" && "border-good/40 bg-good/10 text-good",
+              svgStatus?.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+            )}
+          >
+            {svgStatus?.text}
+          </p>
+        </>
+      )}
 
       <p className="mt-2 text-[10px] tabular-nums text-fg-3">
         출력 폭 {outW.toLocaleString()}px

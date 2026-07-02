@@ -1,11 +1,11 @@
 /**
  * WorkFxPanel — 작성자 전용 "효과툰" 설정 패널. 작품에 배경음악·스크롤 모션·분위기
- * 오버레이, 그리고 컷별 SE 스팅어·BGM 무드 전환(코미포식)을 붙인다. 설정은 작품 doc의
- * `fx` 키에 저장되므로 백엔드 스키마 변경이 없다.
+ * 오버레이, 컷별 SE 스팅어·BGM 무드 전환, 그리고 컷 연출 마크(요소 단위 시간차 오버레이,
+ * 코미포식)를 붙인다. 설정은 작품 doc의 `fx` 키에 저장되므로 백엔드 스키마 변경이 없다.
  * StudioPage는 건드리지 않고, 상세 페이지에서 추가 게시 설정으로 동작한다.
  */
-import { Music4, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { Music4, Settings2, Target } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 
 import { BGM_MOODS } from "./studio-bgm";
 import {
@@ -13,9 +13,17 @@ import {
   CUT_BGM_SILENCE,
   EMPHASIS_PRESETS,
   REVEAL_PRESETS,
+  SEQ_MARK_ANIMS,
+  SEQ_MAX_DELAY_MS,
+  SEQ_MAX_MARKS,
+  SEQ_SUGGEST_BASE_DELAY_MS,
+  SEQ_SUGGEST_STEP_MS,
   SFX_STINGER_PRESETS,
+  createSeqMarkAtPoint,
   readWorkFx,
+  suggestSeqMarksFromStudioDoc,
   type WorkCutFx,
+  type WorkCutSeqMark,
   type WorkFxSettings,
 } from "./studio-motion-fx";
 
@@ -39,6 +47,8 @@ export function WorkFxPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState(false);
+  // 연출 마크를 편집 중인 컷(0-based) — 컷 목록과 별개로 한 컷씩 집중 편집한다.
+  const [markCutIndex, setMarkCutIndex] = useState(0);
 
   const patch = (p: Partial<WorkFxSettings>) => setFx((prev) => ({ ...prev, ...p }));
 
@@ -51,6 +61,37 @@ export function WorkFxPanel({
       cuts[index] = { ...cuts[index], ...p };
       return { ...prev, cuts };
     });
+
+  // ── 컷 연출 마크(요소 타이밍 오버레이) 편집 ──
+  const markCut = Math.min(markCutIndex, Math.max(0, cutCount - 1));
+  const marks: WorkCutSeqMark[] = cutAt(markCut).seq?.marks ?? [];
+  // 스튜디오 게시 doc에 말풍선·텍스트 좌표가 있으면 자동 제안 가능(업로드형 작품은 빈 배열).
+  const seedMarks = suggestSeqMarksFromStudioDoc(work.doc, markCut);
+
+  // 빈 마크 시퀀스는 seq 키를 지운다(undefined는 JSON 직렬화에서 빠져 구버전 doc 형태 유지).
+  const setCutMarks = (index: number, next: WorkCutSeqMark[]) =>
+    patchCut(index, { seq: next.length > 0 ? { marks: next } : undefined });
+
+  // 썸네일 클릭 → 클릭 지점 중심의 기본 크기 마크 추가. 키보드 활성화(detail 0)는 중앙에.
+  const addMarkAtClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (marks.length >= SEQ_MAX_MARKS) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const keyboard = event.detail === 0;
+    const px = keyboard ? rect.width / 2 : event.clientX - rect.left;
+    const py = keyboard ? rect.height / 2 : event.clientY - rect.top;
+    const delayMs = Math.min(SEQ_MAX_DELAY_MS, SEQ_SUGGEST_BASE_DELAY_MS + marks.length * SEQ_SUGGEST_STEP_MS);
+    const mark = createSeqMarkAtPoint(px, py, rect.width, rect.height, delayMs);
+    if (mark) setCutMarks(markCut, [...marks, mark]);
+  };
+
+  const updateMark = (markIndex: number, p: Partial<WorkCutSeqMark>) =>
+    setCutMarks(
+      markCut,
+      marks.map((m, i) => (i === markIndex ? { ...m, ...p } : m))
+    );
+
+  const removeMark = (markIndex: number) =>
+    setCutMarks(markCut, marks.filter((_, i) => i !== markIndex));
 
   async function save() {
     if (saving) return;
@@ -70,7 +111,12 @@ export function WorkFxPanel({
   }
 
   const cutFxCount = fx.cuts.filter(
-    (c) => (c.reveal && c.reveal !== "none") || c.emphasis !== "none" || c.sfx != null || c.bgmShift != null
+    (c) =>
+      (c.reveal && c.reveal !== "none") ||
+      c.emphasis !== "none" ||
+      c.sfx != null ||
+      c.bgmShift != null ||
+      (c.seq != null && c.seq.marks.length > 0)
   ).length;
   const summary = [
     fx.bgmMood || fx.bgmUrl ? "BGM" : null,
@@ -88,7 +134,7 @@ export function WorkFxPanel({
         className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Music4 size={13} className="text-accent" />
-        효과툰 설정 (배경음악·모션·분위기·컷 효과음)
+        효과툰 설정 (배경음악·모션·분위기·컷 연출)
         <span className="ml-auto text-[0.7rem] text-fg-3">{summary.length ? summary.join(" · ") : "효과 없음"}</span>
       </button>
       {open && (
@@ -231,6 +277,147 @@ export function WorkFxPanel({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {cutCount > 0 && (
+            <div className="rounded-lg border border-line bg-panel/40 px-2.5 py-2">
+              <p className="mb-1.5 flex items-center gap-1 text-[0.72rem] font-semibold text-fg-2">
+                <Target size={12} className="text-accent" />
+                컷 연출 마크 — 요소 타이밍 (선택)
+              </p>
+              <p className="mb-2 text-[0.72rem] leading-snug text-fg-3">
+                컷 이미지에서 강조하고 싶은 자리(말풍선·효과음 등)를 클릭해 마크를 찍으면, 독자
+                화면에서 컷이 등장한 뒤 지연 시간 순서대로 그 영역 위에 포커스 링·플래시 같은
+                오버레이 연출이 한 번씩 재생돼요(컷당 최대 {SEQ_MAX_MARKS}개). 플랫하게 내보낸
+                이미지 위에 얹는 연출이라 그림 속 요소가 실제로 분리되어 움직이지는 않고, 움직임
+                줄이기 설정을 켠 독자와 모션툰 영상(WebM) 내보내기에는 적용되지 않아요.
+              </p>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <label className="flex items-center gap-1.5 text-[0.72rem] text-fg-2">
+                  편집할 컷
+                  <select
+                    value={markCut}
+                    onChange={(e) => setMarkCutIndex(Number(e.target.value))}
+                    className={CUT_SELECT_CLASS}
+                    aria-label="연출 마크를 편집할 컷"
+                  >
+                    {Array.from({ length: cutCount }, (_, i) => {
+                      const count = cutAt(i).seq?.marks.length ?? 0;
+                      return (
+                        <option key={i} value={i}>
+                          {i + 1}컷{count > 0 ? ` · 마크 ${count}` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                <span className="numeral text-[0.72rem] text-fg-3">
+                  마크 {marks.length}/{SEQ_MAX_MARKS}
+                </span>
+                {seedMarks.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCutMarks(markCut, seedMarks)}
+                    className="ml-auto rounded-md border border-line bg-card px-2 py-1 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
+                    title="스튜디오에서 게시한 말풍선·텍스트 좌표로 이 컷의 마크를 새로 채웁니다(기존 마크 대체)."
+                  >
+                    말풍선·텍스트로 자동 제안 ({seedMarks.length}개)
+                  </button>
+                )}
+              </div>
+              <div className="max-h-80 overflow-y-auto rounded-lg border border-line bg-canvas/60">
+                <button
+                  type="button"
+                  onClick={addMarkAtClick}
+                  disabled={marks.length >= SEQ_MAX_MARKS}
+                  aria-label={`${markCut + 1}컷 이미지 — 클릭한 위치에 연출 마크 추가`}
+                  title={
+                    marks.length >= SEQ_MAX_MARKS
+                      ? `컷당 마크는 최대 ${SEQ_MAX_MARKS}개예요. 아래 목록에서 지우고 다시 찍어주세요.`
+                      : "클릭한 위치에 연출 마크를 추가해요."
+                  }
+                  className="relative block w-full cursor-crosshair disabled:cursor-not-allowed"
+                >
+                  <img src={work.pages[markCut]} alt="" draggable={false} className="block w-full" />
+                  {marks.map((m, idx) => (
+                    <span
+                      key={idx}
+                      aria-hidden
+                      className="pointer-events-none absolute rounded border-2 border-accent bg-accent/10"
+                      style={{
+                        left: `${m.x * 100}%`,
+                        top: `${m.y * 100}%`,
+                        width: `${m.w * 100}%`,
+                        height: `${m.h * 100}%`,
+                      }}
+                    >
+                      <span className="numeral absolute left-0 top-0 rounded-br bg-accent px-1 text-[0.72rem] font-semibold leading-4 text-on-accent">
+                        {idx + 1}
+                      </span>
+                    </span>
+                  ))}
+                </button>
+              </div>
+              {marks.length === 0 ? (
+                <p className="mt-2 text-[0.72rem] text-fg-3">
+                  아직 마크가 없어요. 위 컷 이미지를 클릭해 첫 마크를 찍어보세요.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-1.5">
+                  {marks.map((m, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <span className="numeral w-5 shrink-0 text-center text-[0.72rem] font-semibold text-accent">
+                        {idx + 1}
+                      </span>
+                      <select
+                        value={m.anim}
+                        onChange={(e) => {
+                          const next = SEQ_MARK_ANIMS.find((a) => a.id === e.target.value);
+                          if (next) updateMark(idx, { anim: next.id });
+                        }}
+                        className={CUT_SELECT_CLASS + " flex-1"}
+                        aria-label={`${markCut + 1}컷 마크 ${idx + 1} 연출 종류`}
+                      >
+                        {SEQ_MARK_ANIMS.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.label} — {a.description}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="flex shrink-0 items-center gap-1 text-[0.72rem] text-fg-3">
+                        지연
+                        <input
+                          type="number"
+                          min={0}
+                          max={SEQ_MAX_DELAY_MS}
+                          step={100}
+                          value={m.delayMs}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            updateMark(idx, {
+                              delayMs: Number.isFinite(v)
+                                ? Math.round(Math.min(SEQ_MAX_DELAY_MS, Math.max(0, v)))
+                                : 0,
+                            });
+                          }}
+                          className="numeral h-8 w-[4.5rem] rounded-md border border-line bg-canvas px-1.5 text-[0.72rem] text-fg outline-none focus:border-accent/50"
+                          aria-label={`${markCut + 1}컷 마크 ${idx + 1} 지연 시간 (밀리초)`}
+                        />
+                        ms
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeMark(idx)}
+                        className="shrink-0 rounded-md border border-line bg-card px-2 py-1.5 text-[0.72rem] text-fg-3 transition-colors hover:border-bad/50 hover:text-bad"
+                        aria-label={`${markCut + 1}컷 마크 ${idx + 1} 삭제`}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

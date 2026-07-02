@@ -1,18 +1,21 @@
 /**
  * Studio Motion FX — "무빙툰/효과툰" 동적 효과 데이터 + 순수 헬퍼.
  *
- * 정적 만화(플랫 PNG 페이지)에 동적인 느낌을 주기 위한 두 축을 정의한다.
+ * 정적 만화(플랫 PNG 페이지)에 동적인 느낌을 주기 위한 세 축을 정의한다.
  * 1) 스크롤 리빌(reveal): 페이지가 화면에 들어올 때의 등장 애니메이션(페이드업·줌·슬라이드…).
  *    키프레임 CSS 없이, "숨김 상태 스타일 → 보임 상태(원래대로) 전환"으로 구현한다.
  * 2) 분위기 오버레이(ambient): 만화 위에 깔리는 파티클(비·눈·벚꽃·반짝이…). 결정적
  *    시드 PRNG로 입자를 만들고 매 프레임 step으로 전진시킨다(리더의 canvas 루프가 호출).
+ * 3) 컷 연출 마크(seq): 컷 진입 후 지정 영역 위에 시간차로 재생되는 요소 단위 오버레이
+ *    연출(포커스 링·플래시…). 뷰어가 받는 것은 플랫 이미지 한 장뿐이라 레이어 분리
+ *    재생은 불가능하고, 이미지 "위"에 얹는 오버레이로 코미포식 모션툰 타이밍을 근사한다.
  *
  * BGM 설정과 함께 작품 doc(Record<string, unknown>)의 `fx` 키에 저장되므로 백엔드
  * 스키마 변경이 필요 없다. 전부 순수·결정적. 사용자 노출 문자열은 한글.
  */
 
 // 컷(페이지)별 효과 — 작품 기본 효과 위에 특정 컷만 다르게 연출한다.
-// sfx·bgmShift는 나중에 추가된 옵셔널 필드 — 구버전 doc(필드 없음)·구버전 소비자와 완전 하위호환.
+// sfx·bgmShift·seq는 나중에 추가된 옵셔널 필드 — 구버전 doc(필드 없음)·구버전 소비자와 완전 하위호환.
 export interface WorkCutFx {
   reveal: string; // "" = 작품 기본 리빌 상속, 그 외 RevealId
   emphasis: string; // EmphasisId — 등장 시 1회 재생되는 강조 애니메이션
@@ -21,7 +24,35 @@ export interface WorkCutFx {
   /** 컷 진입 시 BGM 무드 전환 — BgmMood id 또는 CUT_BGM_SILENCE("silence" = 음악 멈춤).
    *  자동 생성(무드) BGM에서만 동작하고, 커스텀 URL BGM에서는 소비자가 조용히 무시한다. */
   bgmShift?: { mood: string };
+  /** 컷 진입 후 요소 단위 시간차 "오버레이 연출" 시퀀스(코미포식 모션툰 타이밍 근사).
+   *  주의 — 레이어 분리 재생이 아니다: 뷰어는 플랫하게 내보낸 컷 이미지 한 장만 받으므로,
+   *  이미지 속 요소(말풍선 등)를 실제로 움직일 수는 없고, 지정 영역 "위에" 포커스 링·플래시
+   *  같은 오버레이 애니메이션을 delayMs 순서로 1회 재생한다. 없으면 연출 없음. */
+  seq?: WorkCutSeq;
 }
+
+// ── 컷 연출 마크(요소 오버레이 시퀀스) 데이터 ────────────────────────
+/** 마크 오버레이 애니메이션 종류 — 뷰어(WebtoonFxPlayer)가 CSS/Web Animations로 재생. */
+export type SeqMarkAnim = "focus" | "flash" | "zoompulse" | "shake";
+
+/** 연출 마크 하나 — 좌표·크기는 컷 이미지 기준 정규화(0..1, 좌상단 원점). */
+export interface WorkCutSeqMark {
+  x: number; // 0..1 — 마크 좌상단 가로 위치(컷 폭 비율)
+  y: number; // 0..1 — 마크 좌상단 세로 위치(컷 높이 비율)
+  w: number; // 0..1 — 마크 너비(컷 폭 비율), x+w ≤ 1
+  h: number; // 0..1 — 마크 높이(컷 높이 비율), y+h ≤ 1
+  delayMs: number; // 컷 진입 후 재생 지연(ms, 0..SEQ_MAX_DELAY_MS)
+  anim: SeqMarkAnim;
+}
+
+export interface WorkCutSeq {
+  marks: WorkCutSeqMark[]; // 정규화 후 항상 1..SEQ_MAX_MARKS개(빈 시퀀스는 키 자체가 없다)
+}
+
+/** 컷당 연출 마크 상한 — 과밀 오버레이(가독성·성능)를 막는 직렬화 규약. */
+export const SEQ_MAX_MARKS = 8;
+/** 마크 지연 상한(ms) — 컷 하나에서 10초 넘게 기다리는 연출은 스크롤 리듬을 깬다. */
+export const SEQ_MAX_DELAY_MS = 10000;
 
 // ── 작품 doc에 저장되는 효과 설정(BGM 무드/URL은 studio-bgm이 소유, 여기선 문자열로만 보관) ──
 export interface WorkFxSettings {
@@ -78,7 +109,47 @@ function normalizeCutFx(v: unknown): WorkCutFx {
   if (sfx) cut.sfx = sfx;
   const bgmShift = readCutBgmShift(o.bgmShift);
   if (bgmShift) cut.bgmShift = bgmShift;
+  const seq = readCutSeq(o.seq);
+  if (seq) cut.seq = seq;
   return cut;
+}
+
+/** 컷 연출 마크 시퀀스 정규화 — 유효 마크만 통과, 상한 SEQ_MAX_MARKS, 빈 결과는 undefined. */
+function readCutSeq(v: unknown): WorkCutFx["seq"] {
+  if (!v || typeof v !== "object") return undefined;
+  const marks = (v as Record<string, unknown>).marks;
+  if (!Array.isArray(marks)) return undefined;
+  const out: WorkCutSeqMark[] = [];
+  for (const m of marks) {
+    const mark = readSeqMark(m);
+    if (mark) out.push(mark);
+    if (out.length >= SEQ_MAX_MARKS) break;
+  }
+  return out.length > 0 ? { marks: out } : undefined;
+}
+
+// 마크 하나 정규화 — 좌표는 0..1로 클램프(넘치는 너비/높이는 캔버스 안으로 축소),
+// 면적이 사라진 마크·모르는 anim은 통째로 버린다(미래 anim 추가 시 구버전은 우아하게 무시).
+function readSeqMark(v: unknown): WorkCutSeqMark | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (!isSeqMarkAnim(o.anim)) return null;
+  if (!isFiniteNumber(o.x) || !isFiniteNumber(o.y) || !isFiniteNumber(o.w) || !isFiniteNumber(o.h)) {
+    return null;
+  }
+  const x = clamp01(o.x);
+  const y = clamp01(o.y);
+  const w = Math.min(1 - x, Math.max(0, o.w));
+  const h = Math.min(1 - y, Math.max(0, o.h));
+  if (w <= 0 || h <= 0) return null;
+  const delayMs = isFiniteNumber(o.delayMs)
+    ? Math.round(Math.min(SEQ_MAX_DELAY_MS, Math.max(0, o.delayMs)))
+    : 0;
+  return { x, y, w, h, delayMs, anim: o.anim };
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
 }
 
 /** 컷 SE 설정 정규화 — 알려진 스팅어 프리셋 id만 통과시킨다. */
@@ -103,9 +174,10 @@ export function cutFx(fx: WorkFxSettings, index: number): WorkCutFx {
     reveal: c && c.reveal ? c.reveal : fx.reveal,
     emphasis: c ? c.emphasis : "none",
   };
-  // 오디오 연출은 상속 개념이 없다 — 해당 컷에 지정된 것만 그대로 실어 나른다(불변 복사).
+  // 오디오·마크 연출은 상속 개념이 없다 — 해당 컷에 지정된 것만 그대로 실어 나른다(불변 복사).
   if (c?.sfx) out.sfx = { preset: c.sfx.preset };
   if (c?.bgmShift) out.bgmShift = { mood: c.bgmShift.mood };
+  if (c?.seq) out.seq = { marks: c.seq.marks.map((m) => ({ ...m })) };
   return out;
 }
 
@@ -117,7 +189,12 @@ export function hasAnyFx(fx: WorkFxSettings): boolean {
     fx.bgmMood !== "" ||
     fx.bgmUrl !== "" ||
     fx.cuts.some(
-      (c) => (c.reveal && c.reveal !== "none") || c.emphasis !== "none" || c.sfx != null || c.bgmShift != null
+      (c) =>
+        (c.reveal && c.reveal !== "none") ||
+        c.emphasis !== "none" ||
+        c.sfx != null ||
+        c.bgmShift != null ||
+        (c.seq != null && c.seq.marks.length > 0)
     )
   );
 }
@@ -389,6 +466,205 @@ export function findSfxStingerPreset(id: string): SfxStingerPreset | undefined {
 
 /** 컷 BGM 전환(bgmShift.mood)에서 "음악 멈춤(침묵)"을 뜻하는 예약 id. */
 export const CUT_BGM_SILENCE = "silence";
+
+// ── 컷 연출 마크(요소 오버레이 시퀀스) 프리셋·헬퍼 ───────────────────
+// 다시 강조: 이 연출은 플랫 컷 이미지 "위"에 얹는 오버레이다. 그림 속 요소가 분리되어
+// 움직이는 것이 아니라, 지정 영역에 시선 유도용 링/플래시가 시간차로 재생될 뿐이다.
+
+export interface SeqMarkAnimPreset {
+  id: SeqMarkAnim;
+  label: string;
+  description: string;
+}
+
+export const SEQ_MARK_ANIMS: SeqMarkAnimPreset[] = [
+  { id: "focus", label: "포커스", description: "시선 유도 — 하얀 포커스 링이 조여들며 반짝" },
+  { id: "flash", label: "플래시", description: "번쩍 — 영역이 밝게 두 번 깜빡" },
+  { id: "zoompulse", label: "줌펄스", description: "두근 — 노란 테두리가 크게 두 번 맥동" },
+  { id: "shake", label: "셰이크", description: "충격 — 붉은 테두리가 좌우로 부르르" },
+];
+
+const SEQ_MARK_ANIM_IDS = new Set<string>(SEQ_MARK_ANIMS.map((p) => p.id));
+function isSeqMarkAnim(v: unknown): v is SeqMarkAnim {
+  return typeof v === "string" && SEQ_MARK_ANIM_IDS.has(v);
+}
+
+/** 마크 오버레이의 정적 룩(테두리 링/채움) — 애니메이션 전후엔 opacity 0이라 안 보인다. */
+export interface SeqMarkStyle {
+  background: string; // CSS background 값("transparent" 가능)
+  boxShadow: string; // CSS box-shadow 값("none" 가능) — 링은 spread로 그린다
+}
+
+/** anim별 오버레이 기본 스타일. 모르는 id는 투명(안전 no-op). */
+export function seqMarkBaseStyle(anim: string): SeqMarkStyle {
+  switch (anim) {
+    case "focus":
+      return {
+        background: "transparent",
+        boxShadow: "0 0 0 3px rgba(255,255,255,0.92), 0 0 24px 4px rgba(255,255,255,0.35)",
+      };
+    case "flash":
+      return { background: "rgba(255,255,255,0.88)", boxShadow: "none" };
+    case "zoompulse":
+      return {
+        background: "transparent",
+        boxShadow: "0 0 0 2.5px rgba(255,214,120,0.95), 0 0 20px 3px rgba(255,214,120,0.4)",
+      };
+    case "shake":
+      return {
+        background: "transparent",
+        boxShadow: "0 0 0 3px rgba(255,122,122,0.95), 0 0 18px 3px rgba(255,122,122,0.4)",
+      };
+    default:
+      return { background: "transparent", boxShadow: "none" };
+  }
+}
+
+/**
+ * 마크 진입 시 1회 재생할 Web Animations 키프레임(불투명도·변형만 — 룩은 seqMarkBaseStyle).
+ * 시작·끝이 opacity 0이라 delay 대기 중·재생 후 모두 보이지 않는다. 모르는 id는 null.
+ */
+export function seqMarkAnimation(anim: string): EmphasisAnimation | null {
+  switch (anim) {
+    case "focus":
+      return {
+        keyframes: [
+          { opacity: 0, transform: "scale(1.22)" },
+          { opacity: 1, transform: "scale(1)", offset: 0.3 },
+          { opacity: 1, transform: "scale(1)", offset: 0.72 },
+          { opacity: 0, transform: "scale(1)" },
+        ],
+        options: { duration: 950, easing: "ease-out" },
+      };
+    case "flash":
+      return {
+        keyframes: [
+          { opacity: 0 },
+          { opacity: 0.95, offset: 0.12 },
+          { opacity: 0.15, offset: 0.4 },
+          { opacity: 0.7, offset: 0.58 },
+          { opacity: 0 },
+        ],
+        options: { duration: 520, easing: "ease-out" },
+      };
+    case "zoompulse":
+      return {
+        keyframes: [
+          { opacity: 0, transform: "scale(0.9)" },
+          { opacity: 1, transform: "scale(1.14)", offset: 0.3 },
+          { opacity: 0.9, transform: "scale(1)", offset: 0.55 },
+          { opacity: 0.9, transform: "scale(1.1)", offset: 0.78 },
+          { opacity: 0, transform: "scale(1)" },
+        ],
+        options: { duration: 840, easing: "ease-in-out" },
+      };
+    case "shake":
+      return {
+        keyframes: [
+          { opacity: 0, transform: "translateX(0)" },
+          { opacity: 1, transform: "translateX(-4%)", offset: 0.18 },
+          { opacity: 1, transform: "translateX(4%)", offset: 0.38 },
+          { opacity: 1, transform: "translateX(-3%)", offset: 0.58 },
+          { opacity: 1, transform: "translateX(2%)", offset: 0.76 },
+          { opacity: 0, transform: "translateX(0)" },
+        ],
+        options: { duration: 640, easing: "ease-in-out" },
+      };
+    default:
+      return null;
+  }
+}
+
+// 패널 클릭 추가 마크의 기본 크기(컷 대비 비율) — 말풍선 하나를 덮는 감각의 영역.
+export const SEQ_DEFAULT_MARK_W = 0.28;
+export const SEQ_DEFAULT_MARK_H = 0.14;
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
+/**
+ * 패널 썸네일 클릭 좌표 → 새 연출 마크(클릭 지점을 중심으로 기본 크기 박스, 경계는 안으로
+ * 클램프). px/py는 썸네일 표시 영역 내 픽셀 오프셋, rectW/rectH는 표시 크기 — 썸네일이
+ * 원본 비율 그대로(레터박스 없이) 그려질 때 정규화가 컷 이미지와 1:1로 일치한다. 순수.
+ * 표시 크기가 0 이하이거나 좌표가 유한수가 아니면 null.
+ */
+export function createSeqMarkAtPoint(
+  px: number,
+  py: number,
+  rectW: number,
+  rectH: number,
+  delayMs: number
+): WorkCutSeqMark | null {
+  if (!isFiniteNumber(px) || !isFiniteNumber(py)) return null;
+  if (!isFiniteNumber(rectW) || !isFiniteNumber(rectH) || rectW <= 0 || rectH <= 0) return null;
+  const cx = clamp01(px / rectW);
+  const cy = clamp01(py / rectH);
+  const w = SEQ_DEFAULT_MARK_W;
+  const h = SEQ_DEFAULT_MARK_H;
+  const x = Math.min(1 - w, Math.max(0, cx - w / 2));
+  const y = Math.min(1 - h, Math.max(0, cy - h / 2));
+  const delay = isFiniteNumber(delayMs) ? Math.round(Math.min(SEQ_MAX_DELAY_MS, Math.max(0, delayMs))) : 0;
+  return { x: round4(x), y: round4(y), w, h, delayMs: delay, anim: "focus" };
+}
+
+// 자동 제안 마크의 시간차 — 컷 등장(리빌 ~760ms)이 얼추 가라앉은 뒤 읽기 순서대로.
+export const SEQ_SUGGEST_BASE_DELAY_MS = 600;
+export const SEQ_SUGGEST_STEP_MS = 700;
+
+/**
+ * 스튜디오 게시 doc(pagesList[pageIndex].elements)에서 말풍선·텍스트 요소 위치를 읽어
+ * 연출 마크 초깃값을 제안한다(읽기 순서 위→아래·좌→우, SEQ_SUGGEST_* 시간차, anim은 focus).
+ *
+ * 정직 범위 — 스튜디오(컷툰) 게시 doc 전용 근사치다:
+ * - 게시 doc은 `width`(캔버스 폭)와 페이지별 `canvasH`를 저장하고, 컷 이미지는 그 캔버스
+ *   전체를 그대로 내보내므로 요소 좌표/캔버스 크기 비율이 곧 정규화 마크 좌표가 된다.
+ * - 텍스트 요소는 높이를 저장하지 않아 스튜디오 자체 바운즈 관용(fontSize×1.4)을 줄 수만큼
+ *   늘린 근사 높이를 쓰고, 회전은 무시한다(제안 초깃값 용도 — 작성자가 패널에서 다듬는다).
+ * - 업로드형 작품 등 pagesList/canvasH가 없는 doc은 빈 배열(제안 불가)을 돌려준다. 순수.
+ */
+export function suggestSeqMarksFromStudioDoc(doc: unknown, pageIndex: number): WorkCutSeqMark[] {
+  if (!doc || typeof doc !== "object") return [];
+  const d = doc as { width?: unknown; pagesList?: unknown };
+  const canvasW = isFiniteNumber(d.width) && d.width > 0 ? d.width : 720; // 스튜디오 CANVAS_W 기본
+  if (!Array.isArray(d.pagesList)) return [];
+  const page = d.pagesList[pageIndex] as { canvasH?: unknown; elements?: unknown } | undefined;
+  if (!page || typeof page !== "object") return [];
+  if (!isFiniteNumber(page.canvasH) || page.canvasH <= 0) return [];
+  const canvasH = page.canvasH;
+  if (!Array.isArray(page.elements)) return [];
+
+  const boxes: { x: number; y: number; w: number; h: number }[] = [];
+  for (const el of page.elements) {
+    if (!el || typeof el !== "object") continue;
+    const e = el as Record<string, unknown>;
+    if (e.hidden === true) continue;
+    if (e.type !== "bubble" && e.type !== "text") continue;
+    if (!isFiniteNumber(e.x) || !isFiniteNumber(e.y) || !isFiniteNumber(e.width)) continue;
+    let heightPx: number;
+    if (e.type === "bubble") {
+      if (!isFiniteNumber(e.height)) continue;
+      heightPx = e.height;
+    } else {
+      const fontSize = isFiniteNumber(e.fontSize) && e.fontSize > 0 ? e.fontSize : 24;
+      const lineCount = typeof e.text === "string" ? Math.max(1, e.text.split("\n").length) : 1;
+      heightPx = fontSize * 1.4 * lineCount;
+    }
+    const x = clamp01(e.x / canvasW);
+    const y = clamp01(e.y / canvasH);
+    const w = Math.min(1 - x, Math.max(0, e.width / canvasW));
+    const h = Math.min(1 - y, Math.max(0, heightPx / canvasH));
+    if (w < 0.01 || h < 0.01) continue; // 캔버스 밖·퇴화 영역은 제안하지 않는다
+    boxes.push({ x: round4(x), y: round4(y), w: round4(w), h: round4(h) });
+  }
+
+  boxes.sort((a, b) => a.y - b.y || a.x - b.x);
+  return boxes.slice(0, SEQ_MAX_MARKS).map((b, i) => ({
+    ...b,
+    delayMs: Math.min(SEQ_MAX_DELAY_MS, SEQ_SUGGEST_BASE_DELAY_MS + i * SEQ_SUGGEST_STEP_MS),
+    anim: "focus" as const,
+  }));
+}
 
 // ── 분위기 오버레이(파티클) ──────────────────────────────────────────
 export type AmbientShape = "line" | "dot" | "petal" | "spark" | "blob";

@@ -1,19 +1,26 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BRUSH_PREVIEW_COLORS,
   ELLIPSE_POLYGON_SEGMENTS,
   LASSO_MIN_POINT_DIST,
   MARCHING_ANTS_DASH,
   MIN_SELECTION_SUBPATH_AREA,
   SELECTION_BRIGHTNESS_RANGE,
+  SELECTION_BRUSH_RADIUS_DEFAULT,
+  SELECTION_BRUSH_RADIUS_RANGE,
   SELECTION_COMBINE_MODES,
   SELECTION_FEATHER_RANGE,
   SELECTION_HUE_RANGE,
   SELECTION_TOOLS,
+  addBrushSubpath,
   addSelectionSubpath,
+  appendBrushPoint,
   appendLassoPoint,
   applySelectionAdjustToCanvas,
   beginSelectionDrag,
+  brushPointMinDist,
+  brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
   commitSelectionDrag,
@@ -28,6 +35,7 @@ import {
   planSelectionAdjust,
   pointInPolygon,
   pointInSelection,
+  pointOnBrushSubpath,
   polygonAreaNorm,
   rasterizeSelectionMask,
   rectSelectionPolygon,
@@ -42,6 +50,7 @@ import {
   type MaskCtx2DLike,
   type MaskImageSource,
   type PixelSelection,
+  type SelectionBrushSubpath,
   type SelectionCanvasFactory,
   type SelectionMaskPlan,
   type SelPoint,
@@ -64,6 +73,30 @@ function fakeCtx(log: string[], label: string): MaskCtx2DLike {
     get fillStyle(): unknown {
       return "#ffffff";
     },
+    set strokeStyle(v: unknown) {
+      log.push(`${label}:strokeStyle=${String(v)}`);
+    },
+    get strokeStyle(): unknown {
+      return "#ffffff";
+    },
+    set lineWidth(v: number) {
+      log.push(`${label}:lineWidth=${v}`);
+    },
+    get lineWidth(): number {
+      return 1;
+    },
+    set lineCap(v: "butt" | "round" | "square") {
+      log.push(`${label}:lineCap=${v}`);
+    },
+    get lineCap(): "butt" | "round" | "square" {
+      return "butt";
+    },
+    set lineJoin(v: "round" | "bevel" | "miter") {
+      log.push(`${label}:lineJoin=${v}`);
+    },
+    get lineJoin(): "round" | "bevel" | "miter" {
+      return "miter";
+    },
     set globalCompositeOperation(v: string) {
       gco = v;
       log.push(`${label}:gco=${v}`);
@@ -83,6 +116,7 @@ function fakeCtx(log: string[], label: string): MaskCtx2DLike {
     lineTo: (x, y) => log.push(`${label}:lineTo(${x},${y})`),
     closePath: () => log.push(`${label}:closePath`),
     fill: (rule) => log.push(`${label}:fill(${rule ?? ""})`),
+    stroke: () => log.push(`${label}:stroke`),
     fillRect: (x, y, w, h) => log.push(`${label}:fillRect(${x},${y},${w},${h})`),
     clearRect: (x, y, w, h) => log.push(`${label}:clearRect(${x},${y},${w},${h})`),
     drawImage: (image, dx, dy) => log.push(`${label}:drawImage(#${(image as FakeCanvas).id},${dx},${dy})`),
@@ -126,8 +160,8 @@ function leftHalfSelection(over: Partial<PixelSelection> = {}): PixelSelection {
 // ---------------------------------------------------------------------------
 
 describe("상수·칩 목록", () => {
-  it("도구 3종(rect/ellipse/lasso)·결합 2종(add/subtract) — id 고유·한글 라벨", () => {
-    expect(SELECTION_TOOLS.map((t) => t.id)).toEqual(["rect", "ellipse", "lasso"]);
+  it("도구 4종(rect/ellipse/lasso/brush)·결합 2종(add/subtract) — id 고유·한글 라벨", () => {
+    expect(SELECTION_TOOLS.map((t) => t.id)).toEqual(["rect", "ellipse", "lasso", "brush"]);
     expect(SELECTION_COMBINE_MODES.map((m) => m.id)).toEqual(["add", "subtract"]);
     for (const item of [...SELECTION_TOOLS, ...SELECTION_COMBINE_MODES]) {
       expect(item.label.length).toBeGreaterThan(0);
@@ -135,10 +169,19 @@ describe("상수·칩 목록", () => {
     }
   });
 
-  it("슬라이더 범위 — 페더 0..60, 밝기 ±100, 색조 ±180", () => {
+  it("슬라이더 범위 — 페더 0..60, 밝기 ±100, 색조 ±180, 브러시 반경 8..120(기본값 포함)", () => {
     expect(SELECTION_FEATHER_RANGE).toEqual({ min: 0, max: 60, step: 1 });
     expect(SELECTION_BRIGHTNESS_RANGE.min).toBe(-100);
     expect(SELECTION_HUE_RANGE.max).toBe(180);
+    expect(SELECTION_BRUSH_RADIUS_RANGE).toEqual({ min: 8, max: 120, step: 1 });
+    expect(SELECTION_BRUSH_RADIUS_DEFAULT).toBeGreaterThanOrEqual(SELECTION_BRUSH_RADIUS_RANGE.min);
+    expect(SELECTION_BRUSH_RADIUS_DEFAULT).toBeLessThanOrEqual(SELECTION_BRUSH_RADIUS_RANGE.max);
+  });
+
+  it("브러시 미리보기 틴트 — 결합 모드별 반투명 rgba", () => {
+    expect(BRUSH_PREVIEW_COLORS.add).toMatch(/^rgba\(/);
+    expect(BRUSH_PREVIEW_COLORS.subtract).toMatch(/^rgba\(/);
+    expect(BRUSH_PREVIEW_COLORS.add).not.toBe(BRUSH_PREVIEW_COLORS.subtract);
   });
 });
 
@@ -227,6 +270,24 @@ describe("올가미 — appendLassoPoint / simplifyLassoPolygon", () => {
 
   it("3점 미만이면 그대로(짧은 배열) 반환", () => {
     expect(simplifyLassoPolygon([{ x: 0, y: 0 }])).toHaveLength(1);
+  });
+});
+
+describe("브러시 궤적 — brushPointMinDist / appendBrushPoint", () => {
+  it("최소 간격 = max(올가미 최소 간격, 반경의 20%) — 비정상 반경은 0으로", () => {
+    expect(brushPointMinDist(0.1)).toBeCloseTo(0.02, 10);
+    expect(brushPointMinDist(0.001)).toBe(LASSO_MIN_POINT_DIST);
+    expect(brushPointMinDist(Number.NaN)).toBe(LASSO_MIN_POINT_DIST);
+    expect(brushPointMinDist(-1)).toBe(LASSO_MIN_POINT_DIST);
+  });
+
+  it("반경 비례 간격보다 가까우면 같은 배열(추가 없음), 멀면 새 배열", () => {
+    const pts = [{ x: 0.5, y: 0.5 }];
+    // 반경 0.1 → 최소 간격 0.02: 0.01 이동은 무시, 0.03 이동은 추가.
+    expect(appendBrushPoint(pts, { x: 0.51, y: 0.5 }, 0.1)).toBe(pts);
+    const grown = appendBrushPoint(pts, { x: 0.53, y: 0.5 }, 0.1);
+    expect(grown).toHaveLength(2);
+    expect(grown).not.toBe(pts);
   });
 });
 
@@ -356,6 +417,80 @@ describe("pointInSelection — 래스터와 같은 순차 덮어쓰기 의미론
   });
 });
 
+describe("브러시 서브패스 — addBrushSubpath / pointOnBrushSubpath", () => {
+  it("null 에서 시작해 kind:brush 서브패스를 추가하고 점 1개(탭)도 유효하다", () => {
+    const sel = addBrushSubpath(null, "add", [{ x: 0.5, y: 0.5 }], 0.1);
+    expect(sel).not.toBeNull();
+    expect(sel!.subpaths).toHaveLength(1);
+    expect(sel!.subpaths[0]).toEqual({ mode: "add", kind: "brush", points: [{ x: 0.5, y: 0.5 }], radius: 0.1 });
+    expect(isSelectionUsable(sel)).toBe(true);
+  });
+
+  it("반경 0 이하·NaN·빈 궤적은 기존 선택 그대로, 과대 반경은 4로 클램프, NaN 점은 위생 처리", () => {
+    const base = leftHalfSelection();
+    expect(addBrushSubpath(base, "add", [{ x: 0.5, y: 0.5 }], 0)).toBe(base);
+    expect(addBrushSubpath(base, "add", [{ x: 0.5, y: 0.5 }], Number.NaN)).toBe(base);
+    expect(addBrushSubpath(null, "add", [], 0.1)).toBeNull();
+    const clamped = addBrushSubpath(null, "add", [{ x: Number.NaN, y: 0.5 }], 99)!;
+    expect(clamped.subpaths[0]).toMatchObject({ kind: "brush", radius: 4, points: [{ x: 0, y: 0.5 }] });
+    expect(base.subpaths).toHaveLength(1); // 원본 불변
+  });
+
+  it("점-획 거리 판정 — 점/선분, 반경 경계, aspect(세로/가로) 이방성 보정", () => {
+    const dot: SelectionBrushSubpath = { mode: "add", kind: "brush", points: [{ x: 0.5, y: 0.5 }], radius: 0.1 };
+    expect(pointOnBrushSubpath({ x: 0.55, y: 0.5 }, dot)).toBe(true);
+    expect(pointOnBrushSubpath({ x: 0.65, y: 0.5 }, dot)).toBe(false);
+    // aspect=2(세로가 가로의 2배 px): y 오프셋 0.08 → 보정 거리 0.16 > 반경 0.1.
+    expect(pointOnBrushSubpath({ x: 0.5, y: 0.58 }, dot, 1)).toBe(true);
+    expect(pointOnBrushSubpath({ x: 0.5, y: 0.58 }, dot, 2)).toBe(false);
+    const stroke: SelectionBrushSubpath = {
+      mode: "add",
+      kind: "brush",
+      points: [
+        { x: 0.2, y: 0.5 },
+        { x: 0.8, y: 0.5 },
+      ],
+      radius: 0.1,
+    };
+    expect(pointOnBrushSubpath({ x: 0.5, y: 0.55 }, stroke)).toBe(true); // 선분 중간 위
+    expect(pointOnBrushSubpath({ x: 0.5, y: 0.65 }, stroke)).toBe(false);
+    expect(pointOnBrushSubpath({ x: 0.15, y: 0.5 }, stroke)).toBe(true); // 끝점 캡 안
+    // 반경 0 브러시는 어떤 점도 히트하지 않는다(마스크 계획의 "칠하지 않음"과 일치).
+    expect(pointOnBrushSubpath({ x: 0.5, y: 0.5 }, { ...dot, radius: 0 })).toBe(false);
+  });
+
+  it("pointInSelection — 브러시도 '마지막 덮는 서브패스' 의미론에 참여한다", () => {
+    // 전체 폴리곤 add → 가운데 가로 획 brush subtract → 획 위 다시 brush add.
+    let sel = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0, y: 0 }, { x: 1, y: 1 }));
+    sel = addBrushSubpath(
+      sel,
+      "subtract",
+      [
+        { x: 0.1, y: 0.5 },
+        { x: 0.9, y: 0.5 },
+      ],
+      0.05
+    );
+    expect(pointInSelection(sel, { x: 0.5, y: 0.5 })).toBe(false); // 긁어낸 띠
+    expect(pointInSelection(sel, { x: 0.5, y: 0.1 })).toBe(true);
+    sel = addBrushSubpath(sel, "add", [{ x: 0.5, y: 0.5 }], 0.02);
+    expect(pointInSelection(sel, { x: 0.5, y: 0.5 })).toBe(true); // 다시 칠함
+    // aspect 옵션이 브러시 판정에 전달된다.
+    const dotSel = addBrushSubpath(null, "add", [{ x: 0.5, y: 0.5 }], 0.1);
+    expect(pointInSelection(dotSel, { x: 0.5, y: 0.58 }, { aspect: 2 })).toBe(false);
+    expect(pointInSelection(dotSel, { x: 0.5, y: 0.58 })).toBe(true);
+  });
+
+  it("selectionBoundsNorm — 브러시 add 는 궤적을 반경만큼 부풀린 bbox(0..1 클램프)", () => {
+    const sel = addBrushSubpath(null, "add", [{ x: 0.5, y: 0.05 }], 0.1)!;
+    const b = selectionBoundsNorm(sel)!;
+    expect(b.x).toBeCloseTo(0.4, 10);
+    expect(b.y).toBe(0); // 0.05 - 0.1 → 0 으로 클램프
+    expect(b.x + b.w).toBeCloseTo(0.6, 10);
+    expect(b.y + b.h).toBeCloseTo(0.15, 10);
+  });
+});
+
 describe("selectionBoundsNorm", () => {
   it("합치기 서브패스들의 합집합 bbox(빼기는 무시), 0..1 클램프", () => {
     let sel = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.1, y: 0.2 }, { x: 0.4, y: 0.5 }));
@@ -417,6 +552,31 @@ describe("드래그 세션 — begin/update/commit", () => {
     line = updateSelectionDrag(line, { x: 0.9, y: 0.9 });
     expect(commitSelectionDrag(sel, line)).toBeNull();
   });
+
+  it("brush: 시작점 1개 + 정규화 반경으로 시작하고, 반경 비례 간격으로 궤적을 누적한다", () => {
+    let drag = beginSelectionDrag("brush", "add", { x: 0.2, y: 0.2 }, 0.1);
+    expect(drag.points).toEqual([{ x: 0.2, y: 0.2 }]);
+    expect(drag.brushRadius).toBeCloseTo(0.1, 10);
+    const before = drag;
+    drag = updateSelectionDrag(drag, { x: 0.21, y: 0.2 }); // 간격 0.01 < 반경×0.2=0.02 → 무시
+    expect(drag).toBe(before);
+    drag = updateSelectionDrag(drag, { x: 0.5, y: 0.2 });
+    drag = updateSelectionDrag(drag, { x: 0.5, y: 0.6 });
+    expect(drag.points).toHaveLength(3);
+    // 비브러시 도구는 brushRadius 인자를 무시(0 고정), 브러시 반경은 0..4 클램프.
+    expect(beginSelectionDrag("rect", "add", { x: 0, y: 0 }, 0.5).brushRadius).toBe(0);
+    expect(beginSelectionDrag("brush", "add", { x: 0, y: 0 }, 99).brushRadius).toBe(4);
+    expect(beginSelectionDrag("brush", "add", { x: 0, y: 0 }, Number.NaN).brushRadius).toBe(0);
+  });
+
+  it("brush commit: 탭(점 1개)도 점 찍기로 결합, 반경 0 이면 null(변화 없음)", () => {
+    const tap = beginSelectionDrag("brush", "subtract", { x: 0.5, y: 0.5 }, 0.08);
+    const sel = commitSelectionDrag(leftHalfSelection(), tap);
+    expect(sel!.subpaths).toHaveLength(2);
+    expect(sel!.subpaths[1]).toMatchObject({ mode: "subtract", kind: "brush", radius: 0.08 });
+    const zero = beginSelectionDrag("brush", "add", { x: 0.5, y: 0.5 }, 0);
+    expect(commitSelectionDrag(null, zero)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -461,6 +621,48 @@ describe("subpathOutlinePoints", () => {
   it("정규화 점을 요소 로컬 px 평탄 배열로", () => {
     const sp = leftHalfSelection().subpaths[0]!;
     expect(subpathOutlinePoints(sp, { width: 200, height: 100 })).toEqual([0, 0, 100, 0, 100, 100, 0, 100]);
+  });
+
+  it("브러시 서브패스는 궤적 중심선을 그대로 반환한다(획 폭 미반영 — 표시는 brushStrokePreview)", () => {
+    const sp: SelectionBrushSubpath = {
+      mode: "add",
+      kind: "brush",
+      points: [
+        { x: 0.1, y: 0.2 },
+        { x: 0.5, y: 0.6 },
+      ],
+      radius: 0.1,
+    };
+    expect(subpathOutlinePoints(sp, { width: 100, height: 50 })).toEqual([10, 10, 50, 30]);
+  });
+});
+
+describe("brushStrokePreview", () => {
+  it("궤적 → 로컬 px 평탄 배열 + 획 굵기(2×반경×폭) — Konva Line(round cap/join) 대응", () => {
+    const pv = brushStrokePreview(
+      [
+        { x: 0.1, y: 0.2 },
+        { x: 0.5, y: 0.6 },
+      ],
+      0.1,
+      { width: 200, height: 100 }
+    )!;
+    expect(pv.points).toEqual([20, 20, 100, 60]);
+    expect(pv.strokeWidth).toBeCloseTo(40, 10);
+  });
+
+  it("점 1개(탭)는 같은 점을 복제해 라운드 캡이 원을 그리게 한다", () => {
+    const pv = brushStrokePreview([{ x: 0.5, y: 0.5 }], 0.05, { width: 100, height: 100 })!;
+    expect(pv.points).toEqual([50, 50, 50, 50]);
+    expect(pv.strokeWidth).toBeCloseTo(10, 10);
+  });
+
+  it("빈 궤적·반경 0·비정상 크기는 null(그릴 것 없음)", () => {
+    expect(brushStrokePreview([], 0.1, { width: 100, height: 100 })).toBeNull();
+    expect(brushStrokePreview([{ x: 0.5, y: 0.5 }], 0, { width: 100, height: 100 })).toBeNull();
+    expect(brushStrokePreview([{ x: 0.5, y: 0.5 }], Number.NaN, { width: 100, height: 100 })).toBeNull();
+    expect(brushStrokePreview([{ x: 0.5, y: 0.5 }], 0.1, { width: 0, height: 100 })).toBeNull();
+    expect(brushStrokePreview([{ x: 0.5, y: 0.5 }], 0.1, { width: 100, height: Number.NaN })).toBeNull();
   });
 });
 
@@ -532,6 +734,49 @@ describe("buildSelectionMaskPlan", () => {
     expect(plan.steps[0]!.points[1]).toEqual([50, 50]);
   });
 
+  it("브러시 서브패스 → 스트로크 단계(굵기 = 2×반경×마스크 폭), flip 은 점에만 적용", () => {
+    const sel = addBrushSubpath(
+      leftHalfSelection(),
+      "subtract",
+      [
+        { x: 0.25, y: 0.5 },
+        { x: 0.75, y: 0.5 },
+      ],
+      0.05
+    )!;
+    const plan = buildSelectionMaskPlan(sel, 800, 600)!;
+    expect(plan.steps).toHaveLength(2);
+    expect(plan.steps[0]!.strokeWidth).toBeUndefined(); // 폴리곤은 기존 그대로(하위호환)
+    expect(plan.steps[1]).toEqual({
+      op: "erase",
+      points: [
+        [200, 300],
+        [600, 300],
+      ],
+      strokeWidth: 80, // 2 × 0.05 × 800
+    });
+    const flipped = buildSelectionMaskPlan(sel, 800, 600, { flipX: true })!;
+    expect(flipped.steps[1]!.points).toEqual([
+      [600, 300],
+      [200, 300],
+    ]);
+    expect(flipped.steps[1]!.strokeWidth).toBe(80); // 대칭 도형이라 굵기 불변
+  });
+
+  it("반경 0 브러시는 칠할 게 없어 단계에서 제외된다(히트테스트와 일치)", () => {
+    const sel: PixelSelection = {
+      subpaths: [
+        leftHalfSelection().subpaths[0]!,
+        { mode: "add", kind: "brush", points: [{ x: 0.5, y: 0.5 }], radius: 0 },
+      ],
+      featherPx: 0,
+      invert: false,
+    };
+    const plan = buildSelectionMaskPlan(sel, 100, 100)!;
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]!.strokeWidth).toBeUndefined();
+  });
+
   it("못 쓰는 선택·비정상 크기는 null", () => {
     expect(buildSelectionMaskPlan(null, 100, 100)).toBeNull();
     expect(buildSelectionMaskPlan(emptyPixelSelection(), 100, 100)).toBeNull();
@@ -556,11 +801,53 @@ describe("paintSelectionMaskSteps / rasterizeSelectionMask", () => {
     expect(log[log.length - 1]).toBe("m:gco=source-over");
   });
 
+  it("브러시 단계 — 라운드 캡/조인 흰 스트로크, erase 는 destination-out, 탭은 제자리 lineTo", () => {
+    const log: string[] = [];
+    const sel = addBrushSubpath(
+      addBrushSubpath(
+        null,
+        "add",
+        [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ],
+        0.1
+      ),
+      "subtract",
+      [{ x: 0.5, y: 0.5 }],
+      0.05
+    )!;
+    paintSelectionMaskSteps(fakeCtx(log, "m"), planOf(sel));
+    // 획 스타일 — 흰색(alpha 1) 라운드 캡/조인, 굵기 = 2×반경×폭.
+    expect(log).toContain("m:strokeStyle=#ffffff");
+    expect(log).toContain("m:lineWidth=20");
+    expect(log).toContain("m:lineWidth=10");
+    expect(log.filter((l) => l === "m:lineCap=round")).toHaveLength(2);
+    expect(log.filter((l) => l === "m:lineJoin=round")).toHaveLength(2);
+    expect(log.filter((l) => l === "m:stroke")).toHaveLength(2);
+    expect(log.filter((l) => l.startsWith("m:fill("))).toHaveLength(0); // 브러시만 → 폴리곤 채움 없음
+    const gcoWrites = log.filter((l) => l.startsWith("m:gco="));
+    expect(gcoWrites).toEqual(["m:gco=source-over", "m:gco=destination-out", "m:gco=source-over"]);
+    // 탭(점 1개)은 moveTo 후 제자리 lineTo — 라운드 캡이 원(점 찍기)을 그린다.
+    expect(log).toContain("m:moveTo(50,50)");
+    expect(log).toContain("m:lineTo(50,50)");
+  });
+
   it("페더·반전 없음 → 캔버스 1장으로 끝", () => {
     const log: string[] = [];
     const mask = rasterizeSelectionMask(planOf(leftHalfSelection()), fakeFactory(log));
     expect((mask as FakeCanvas).id).toBe(1);
     expect(log.filter((l) => l.startsWith("create#"))).toEqual(["create#1(100x100)"]);
+  });
+
+  it("브러시 + 페더 — 스트로크 마스크도 동일하게 blur 캔버스로 옮겨 그린다", () => {
+    const log: string[] = [];
+    const sel = setSelectionFeather(addBrushSubpath(null, "add", [{ x: 0.5, y: 0.5 }], 0.1)!, 6);
+    const mask = rasterizeSelectionMask(planOf(sel), fakeFactory(log));
+    expect((mask as FakeCanvas).id).toBe(2);
+    expect(log).toContain("c1:stroke");
+    expect(log).toContain("c2:filter=blur(6px)");
+    expect(log).toContain("c2:drawImage(#1,0,0)");
   });
 
   it("페더 → 두 번째 캔버스에 blur 필터로 옮겨 그림", () => {

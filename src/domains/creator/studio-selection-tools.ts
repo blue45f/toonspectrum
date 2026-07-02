@@ -4,7 +4,7 @@
  * ⚠️ 이름이 비슷한 studio-selection.ts 와는 **다른 개념**이다:
  *   - studio-selection.ts       : "요소 선택" — 캔버스 위 요소(El)들을 마퀴로 다중 선택/정렬.
  *   - studio-selection-tools.ts : "픽셀 선택" — 한 이미지 요소 **안쪽 픽셀 영역**을
- *     사각/타원/올가미로 선택해 부분 조정(밝기/색조)·부분 삭제를 가하는 도구.
+ *     사각/타원/올가미/브러시로 선택해 부분 조정(밝기/색조)·부분 삭제를 가하는 도구.
  *
  * 좌표 규약 3계층:
  *   1. 정규화(u,v 0..1)  — 이미지 요소의 비회전 로컬 박스 기준. 선택 영역의 저장 형식.
@@ -16,6 +16,8 @@
  *   합치기(add)=fill(source-over), 빼기(subtract)=erase(destination-out)를 서브패스 순서대로
  *   칠한다 → 픽셀의 최종 상태는 "그 픽셀을 덮는 마지막 서브패스의 모드". pointInSelection 이
  *   동일 규칙을 수식으로 구현해 히트테스트와 래스터 결과가 항상 일치한다.
+ *   폴리곤 서브패스는 evenodd 채움, 브러시 서브패스는 라운드 캡/조인 스트로크(굵기=2×반경)로
+ *   칠한다 — 같은 add/subtract·feather·invert 규약을 공유한다.
  *   feather 는 완성된 하드 마스크 전체에 blur(px) 한 번, invert 는 맨 마지막에 알파 반전.
  *
  * DOM 의존성 없음 — 캔버스에 실제로 그리는 함수(paintSelectionMaskSteps 등)도 구조 타입
@@ -31,14 +33,26 @@
 /** 정규화 점 — 이미지 요소 비회전 로컬 박스 기준 0..1(올가미는 살짝 벗어남 허용). */
 export type SelPoint = { x: number; y: number };
 
-/** 픽셀 선택 도구 종류 — 전부 최종적으로 폴리곤(정규화)으로 수렴한다. */
-export type SelectionToolKind = "rect" | "ellipse" | "lasso";
+/** 픽셀 선택 도구 종류 — rect/ellipse/lasso 는 폴리곤으로, brush 는 궤적+반경으로 저장된다. */
+export type SelectionToolKind = "rect" | "ellipse" | "lasso" | "brush";
 
 /** 서브패스 결합 모드 — 합치기(fill) / 빼기(erase). */
 export type SelectionCombineMode = "add" | "subtract";
 
-/** 선택 서브패스 — 도구와 무관하게 폴리곤(≥3점, 자동 닫힘)으로 저장한다. */
-export type SelectionSubpath = { mode: SelectionCombineMode; points: SelPoint[] };
+/** 폴리곤 서브패스 — rect/ellipse/lasso 가 수렴하는 형식(≥3점, 자동 닫힘). kind 없음 = 하위호환. */
+export type SelectionPolygonSubpath = { mode: SelectionCombineMode; kind?: never; points: SelPoint[] };
+
+/**
+ * 브러시 서브패스 — 드래그 궤적(정규화 점 ≥1개)과 정규화 반경. 래스터 시 라운드 캡/조인
+ * 스트로크(굵기 2×반경)로 칠한다 — 점 1개는 반경만큼의 점 찍기(탭)다.
+ * 반경은 요소 "폭" 대비 비율 한 축으로 정규화한다(캔버스 px ÷ 요소 폭 — 페더의
+ * featherScale(원본폭/요소폭) 환산과 같은 규약). 요소가 원본 종횡비와 다르게 늘려져
+ * 있으면 세로 방향 실효 반경이 그 비율만큼 달라진다(정직한 근사 — 주석으로 명시).
+ */
+export type SelectionBrushSubpath = { mode: SelectionCombineMode; kind: "brush"; points: SelPoint[]; radius: number };
+
+/** 선택 서브패스 — 폴리곤 또는 브러시 획. 기존 {mode, points} 데이터는 폴리곤으로 파싱된다. */
+export type SelectionSubpath = SelectionPolygonSubpath | SelectionBrushSubpath;
 
 /** 픽셀 선택 영역 전체 상태 — 이미지 요소 1개에 귀속된다(요소 전환 시 해제). */
 export type PixelSelection = {
@@ -55,6 +69,10 @@ export const SELECTION_FEATHER_RANGE = { min: 0, max: 60, step: 1 } as const;
 export const SELECTION_BRIGHTNESS_RANGE = { min: -100, max: 100, step: 1 } as const;
 /** 선택 영역 색조 회전 범위(° — 0=변화 없음). */
 export const SELECTION_HUE_RANGE = { min: -180, max: 180, step: 1 } as const;
+/** 브러시 선택 반경 슬라이더 범위(캔버스 표시 px). */
+export const SELECTION_BRUSH_RADIUS_RANGE = { min: 8, max: 120, step: 1 } as const;
+/** 브러시 선택 반경 기본값(캔버스 표시 px). */
+export const SELECTION_BRUSH_RADIUS_DEFAULT = 28;
 
 /** 타원 → 폴리곤 근사 분할 수(기본). 48이면 픽셀 마스크에서 사실상 매끈하다. */
 export const ELLIPSE_POLYGON_SEGMENTS = 48;
@@ -67,12 +85,15 @@ const SEL_POINT_MIN = -0.25;
 const SEL_POINT_MAX = 1.25;
 /** 원본 해상도 환산 후 페더 상한(px) — 비정상 배율로 인한 과도한 blur 방지. */
 const MAX_DEVICE_FEATHER_PX = 250;
+/** 정규화 브러시 반경 상한(요소 폭 대비 4배) — 비정상 입력 방어(음수/NaN 은 0으로). */
+const MAX_BRUSH_RADIUS_NORM = 4;
 
 /** 도구 선택 칩 목록 — 패널에서 id/라벨/설명으로 사용. */
 export const SELECTION_TOOLS: { id: SelectionToolKind; label: string; tip: string }[] = [
   { id: "rect", label: "사각형", tip: "드래그한 사각형 안쪽 픽셀을 선택합니다." },
   { id: "ellipse", label: "타원", tip: "드래그한 박스에 내접하는 타원 안쪽을 선택합니다." },
   { id: "lasso", label: "올가미", tip: "자유롭게 그린 궤적 안쪽을 선택합니다(자동 닫힘)." },
+  { id: "brush", label: "브러시", tip: "붓으로 칠한 자리(둥근 획)를 선택합니다. 반경 슬라이더로 굵기를 조절하세요." },
 ];
 
 /** 결합 모드 칩 목록. */
@@ -157,6 +178,16 @@ export function appendLassoPoint(
   return [...points, next];
 }
 
+/** 브러시 이웃 점 최소 간격(정규화) — 반경의 20%. 굵을수록 성기게 저장해도 라운드 조인이 획을 메운다. */
+export function brushPointMinDist(radiusNorm: number): number {
+  return Math.max(LASSO_MIN_POINT_DIST, clampNum(radiusNorm, 0, MAX_BRUSH_RADIUS_NORM) * 0.2);
+}
+
+/** 브러시 궤적에 점 추가 — appendLassoPoint 와 동일한 불변 규약(안 늘면 같은 배열), 간격만 반경 비례. */
+export function appendBrushPoint(points: readonly SelPoint[], p: SelPoint, radiusNorm: number): SelPoint[] {
+  return appendLassoPoint(points, p, brushPointMinDist(radiusNorm));
+}
+
 /**
  * 올가미 폴리곤 단순화 — 이웃 중복점 제거 + 일직선 위 중간점 제거 + 시작·끝 중복 닫음 제거.
  * 마스크 품질은 유지하면서 문서에 저장되는 점 수를 줄인다.
@@ -224,6 +255,38 @@ export function pointInPolygon(p: SelPoint, poly: readonly SelPoint[]): boolean 
   return inside;
 }
 
+/** 점-선분 최소 거리² — y 에 aspect(세로/가로 px 비)를 곱한 "폭 정규화" 공간에서 잰다. */
+function distSqToSegmentScaled(p: SelPoint, a: SelPoint, b: SelPoint, aspect: number): number {
+  const px = p.x;
+  const py = p.y * aspect;
+  const ax = a.x;
+  const ay = a.y * aspect;
+  const dx = b.x - ax;
+  const dy = b.y * aspect - ay;
+  const lenSq = dx * dx + dy * dy;
+  const t = lenSq > 0 ? clampNum(((px - ax) * dx + (py - ay) * dy) / lenSq, 0, 1) : 0;
+  const ex = px - (ax + t * dx);
+  const ey = py - (ay + t * dy);
+  return ex * ex + ey * ey;
+}
+
+/**
+ * 점이 브러시 서브패스(둥근 획) 위인지 — 궤적 선분까지의 거리 ≤ 반경.
+ * 브러시는 디바이스 px 에서 원형이므로, 정규화 공간에서 정확히 재려면 aspect(=높이px/폭px)가
+ * 필요하다. 기본 1 = 정사각 가정 근사(마스크 래스터가 진실이며 이 판정은 보조 히트테스트).
+ */
+export function pointOnBrushSubpath(p: SelPoint, sp: SelectionBrushSubpath, aspect = 1): boolean {
+  const r = clampNum(sp.radius, 0, MAX_BRUSH_RADIUS_NORM);
+  if (r <= 0 || sp.points.length === 0) return false;
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const rSq = r * r;
+  if (sp.points.length === 1) return distSqToSegmentScaled(p, sp.points[0]!, sp.points[0]!, a) <= rSq;
+  for (let i = 0; i < sp.points.length - 1; i += 1) {
+    if (distSqToSegmentScaled(p, sp.points[i]!, sp.points[i + 1]!, a) <= rSq) return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // (3) 선택 상태 — 생성·결합(합집합/빼기)·페더·반전 (전부 불변)
 // ---------------------------------------------------------------------------
@@ -246,6 +309,23 @@ export function addSelectionSubpath(
   if (clean.length < 3 || polygonAreaNorm(clean) < MIN_SELECTION_SUBPATH_AREA) return sel;
   const base = sel ?? emptyPixelSelection();
   return { ...base, subpaths: [...base.subpaths, { mode, points: clean }] };
+}
+
+/**
+ * 브러시 서브패스 추가 — 점 1개(탭 = 반경만큼 점 찍기)도 유효하다(폴리곤과 달리 면적 문턱 없음).
+ * 반경이 0 이하·비유한이거나 점이 없으면 아무것도 칠할 수 없으므로 기존 선택을 그대로 반환.
+ */
+export function addBrushSubpath(
+  sel: PixelSelection | null,
+  mode: SelectionCombineMode,
+  points: readonly SelPoint[],
+  radiusNorm: number
+): PixelSelection | null {
+  const radius = clampNum(radiusNorm, 0, MAX_BRUSH_RADIUS_NORM);
+  if (points.length === 0 || radius <= 0) return sel;
+  const clean = points.map((p) => sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX));
+  const base = sel ?? emptyPixelSelection();
+  return { ...base, subpaths: [...base.subpaths, { mode, kind: "brush", points: clean, radius }] };
 }
 
 /** 마지막 서브패스 한 단계 되돌리기 — 남는 게 없고 반전도 없으면 null(선택 해제). */
@@ -275,12 +355,14 @@ export function isSelectionUsable(sel: PixelSelection | null): boolean {
 /**
  * 점이 최종 선택 영역 안인지 — 래스터와 동일한 "마지막 덮는 서브패스" 의미론 + 반전.
  * (fill 은 폴리곤 안을 불투명으로, erase 는 투명으로 만들므로 마지막 서브패스가 이긴다.)
+ * opts.aspect: 브러시 원형 판정용 세로/가로 px 비(기본 1) — pointOnBrushSubpath 참고.
  */
-export function pointInSelection(sel: PixelSelection | null, p: SelPoint): boolean {
+export function pointInSelection(sel: PixelSelection | null, p: SelPoint, opts?: { aspect?: number }): boolean {
   if (!sel) return false;
   let inside = false;
   for (const sp of sel.subpaths) {
-    if (pointInPolygon(p, sp.points)) inside = sp.mode === "add";
+    const hit = sp.kind === "brush" ? pointOnBrushSubpath(p, sp, opts?.aspect ?? 1) : pointInPolygon(p, sp.points);
+    if (hit) inside = sp.mode === "add";
   }
   return sel.invert ? !inside : inside;
 }
@@ -295,11 +377,13 @@ export function selectionBoundsNorm(sel: PixelSelection | null): { x: number; y:
   let maxY = -Infinity;
   for (const sp of sel!.subpaths) {
     if (sp.mode !== "add") continue; // 빼기는 영역을 넓히지 못한다.
+    // 브러시는 궤적에서 반경만큼 부풀린다(y 도 폭 정규화 반경 그대로 — 약간 과대평가 근사).
+    const r = sp.kind === "brush" ? clampNum(sp.radius, 0, MAX_BRUSH_RADIUS_NORM) : 0;
     for (const p of sp.points) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
+      minX = Math.min(minX, p.x - r);
+      minY = Math.min(minY, p.y - r);
+      maxX = Math.max(maxX, p.x + r);
+      maxY = Math.max(maxY, p.y + r);
     }
   }
   const x = clampNum(minX, 0, 1);
@@ -311,25 +395,37 @@ export function selectionBoundsNorm(sel: PixelSelection | null): { x: number; y:
 // (4) 드래그 세션 — StudioPage 포인터 핸들러가 쓰는 얇은 순수 리듀서
 // ---------------------------------------------------------------------------
 
-/** 진행 중 드래그 상태 — points 는 실시간 미리보기 폴리곤(정규화)으로 바로 그릴 수 있다. */
+/** 진행 중 드래그 상태 — points 는 실시간 미리보기 폴리곤/궤적(정규화)으로 바로 그릴 수 있다. */
 export type SelectionDragState = {
   tool: SelectionToolKind;
   mode: SelectionCombineMode;
   start: SelPoint;
   points: SelPoint[];
+  /** 브러시 전용 — 정규화 반경(요소 폭 대비). 다른 도구는 0. */
+  brushRadius: number;
 };
 
-/** 드래그 시작 — 시작점 기준의 퇴화 폴리곤(면적 0)으로 초기화한다. */
-export function beginSelectionDrag(tool: SelectionToolKind, mode: SelectionCombineMode, p: SelPoint): SelectionDragState {
+/**
+ * 드래그 시작 — rect/ellipse 는 퇴화 폴리곤(면적 0), lasso/brush 는 시작점 1개로 초기화한다.
+ * brushRadiusNorm: 브러시 도구의 정규화 반경(캔버스 px ÷ 요소 폭). 다른 도구는 무시된다.
+ */
+export function beginSelectionDrag(
+  tool: SelectionToolKind,
+  mode: SelectionCombineMode,
+  p: SelPoint,
+  brushRadiusNorm = 0
+): SelectionDragState {
   const start = sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX);
-  const points = tool === "lasso" ? [start] : rectSelectionPolygon(start, start);
-  return { tool, mode, start, points };
+  const points = tool === "lasso" || tool === "brush" ? [start] : rectSelectionPolygon(start, start);
+  const brushRadius = tool === "brush" ? clampNum(brushRadiusNorm, 0, MAX_BRUSH_RADIUS_NORM) : 0;
+  return { tool, mode, start, points, brushRadius };
 }
 
-/** 드래그 이동 — rect/ellipse 는 시작→현재 박스로 재계산, lasso 는 궤적 누적. */
+/** 드래그 이동 — rect/ellipse 는 시작→현재 박스로 재계산, lasso/brush 는 궤적 누적. */
 export function updateSelectionDrag(drag: SelectionDragState, p: SelPoint): SelectionDragState {
-  if (drag.tool === "lasso") {
-    const points = appendLassoPoint(drag.points, p);
+  if (drag.tool === "lasso" || drag.tool === "brush") {
+    const points =
+      drag.tool === "brush" ? appendBrushPoint(drag.points, p, drag.brushRadius) : appendLassoPoint(drag.points, p);
     return points === drag.points ? drag : { ...drag, points };
   }
   const points = drag.tool === "rect" ? rectSelectionPolygon(drag.start, p) : ellipseSelectionPolygon(drag.start, p);
@@ -338,9 +434,13 @@ export function updateSelectionDrag(drag: SelectionDragState, p: SelPoint): Sele
 
 /**
  * 드래그 확정 — 올가미는 단순화 후 서브패스로 결합. 면적이 무의미하면 null(변화 없음 신호).
- * 반환값이 null 이 아니면 그대로 선택 상태로 set 하면 된다.
+ * 브러시는 탭(점 1개)도 유효하나 반경 0 이면 null. 반환값이 null 이 아니면 그대로 set 하면 된다.
  */
 export function commitSelectionDrag(sel: PixelSelection | null, drag: SelectionDragState): PixelSelection | null {
+  if (drag.tool === "brush") {
+    const next = addBrushSubpath(sel, drag.mode, drag.points, drag.brushRadius);
+    return next === sel ? null : next;
+  }
   const points = drag.tool === "lasso" ? simplifyLassoPolygon(drag.points) : drag.points;
   if (points.length < 3 || polygonAreaNorm(points) < MIN_SELECTION_SUBPATH_AREA) return null;
   const next = addSelectionSubpath(sel, drag.mode, points);
@@ -379,7 +479,11 @@ export function normalizedPointToCanvas(p: SelPoint, frame: SelectionFrame): { x
   return { x: frame.x + lx * cos - ly * sin, y: frame.y + lx * sin + ly * cos };
 }
 
-/** 서브패스 → 요소 로컬 px 평탄 배열([x0,y0,x1,y1,…]) — Konva Line(points, closed)용. */
+/**
+ * 서브패스 → 요소 로컬 px 평탄 배열([x0,y0,x1,y1,…]) — Konva Line(points, closed)용.
+ * 브러시 서브패스는 궤적 "중심선"을 반환한다(획 폭 미반영) — 마칭앤츠를 중심선에 두르면
+ * 어색하므로 브러시 표시는 brushStrokePreview(반투명 획)를 쓰는 것이 표준이다.
+ */
 export function subpathOutlinePoints(subpath: SelectionSubpath, size: { width: number; height: number }): number[] {
   const out: number[] = [];
   for (const p of subpath.points) {
@@ -388,9 +492,42 @@ export function subpathOutlinePoints(subpath: SelectionSubpath, size: { width: n
   return out;
 }
 
+/**
+ * 브러시 미리보기 획 기하 — Konva Line(points, strokeWidth, lineCap/Join="round")에 그대로 대응.
+ * 오프셋 폴리곤(마칭앤츠) 대신 반투명 라운드 획을 쓰는 이유: 획 기하가 마스크 래스터의
+ * 스트로크와 **동일 도형**이라 미리보기=결과가 근사 없이 일치한다(자기교차 궤적도 안전).
+ * 점 1개(탭)는 같은 점을 복제해 라운드 캡이 원(점 찍기)을 그리게 한다.
+ * 반환 null = 그릴 것 없음(빈 궤적·반경 0·비정상 크기).
+ */
+export function brushStrokePreview(
+  points: readonly SelPoint[],
+  radiusNorm: number,
+  size: { width: number; height: number }
+): { points: number[]; strokeWidth: number } | null {
+  const radius = clampNum(radiusNorm, 0, MAX_BRUSH_RADIUS_NORM);
+  const w = Number.isFinite(size.width) && size.width > 0 ? size.width : 0;
+  const h = Number.isFinite(size.height) && size.height > 0 ? size.height : 0;
+  if (radius <= 0 || w <= 0 || h <= 0 || points.length === 0) return null;
+  const flat: number[] = [];
+  for (const p of points) {
+    flat.push(p.x * w, p.y * h);
+  }
+  if (points.length === 1) flat.push(flat[0]!, flat[1]!);
+  return { points: flat, strokeWidth: 2 * radius * w };
+}
+
 // ---------------------------------------------------------------------------
 // (6) 마칭앤츠 — 대시 오프셋 애니메이션 파라미터
 // ---------------------------------------------------------------------------
+
+/**
+ * 브러시 선택 미리보기 틴트(결합 모드별) — 브러시 서브패스는 마칭앤츠 대신 이 색의
+ * 반투명 획(퀵 마스크식)으로 표시한다. 드래그 미리보기 채움색과 같은 계열(보라/적).
+ */
+export const BRUSH_PREVIEW_COLORS: Record<SelectionCombineMode, string> = {
+  add: "rgba(124, 92, 252, 0.24)",
+  subtract: "rgba(244, 63, 94, 0.24)",
+};
 
 /** 마칭앤츠 대시 패턴(px) — [칠함, 빔]. 합(9px)이 한 주기. */
 export const MARCHING_ANTS_DASH: readonly [number, number] = [5, 4];
@@ -443,8 +580,11 @@ export function marchingAntsPasses(elapsedMs: number, scale = 1): MarchingAntsPa
 // (7) 마스크 래스터화 — 파라미터 계산(순수) + ctx 실행(구조 타입 주입)
 // ---------------------------------------------------------------------------
 
-/** 마스크 그리기 한 단계 — 디바이스 px 폴리곤을 fill(합치기)/erase(빼기)로 칠한다. */
-export type SelectionMaskStep = { op: "fill" | "erase"; points: [number, number][] };
+/**
+ * 마스크 그리기 한 단계 — 디바이스 px 좌표를 fill(합치기)/erase(빼기)로 칠한다.
+ * strokeWidth 가 있으면(브러시) 폴리곤 채움 대신 라운드 캡/조인 폴리라인 스트로크.
+ */
+export type SelectionMaskStep = { op: "fill" | "erase"; points: [number, number][]; strokeWidth?: number };
 
 /** 오프스크린 알파 마스크 래스터화 계획 — 계산은 순수, 실행은 ctx 주입. */
 export type SelectionMaskPlan = {
@@ -479,14 +619,24 @@ export function buildSelectionMaskPlan(
   const rawScale = opts?.featherScale;
   const featherScale = Number.isFinite(rawScale) && rawScale! > 0 ? rawScale! : 1;
   const featherPx = clampNum(Math.round(sel!.featherPx * featherScale * 10) / 10, 0, MAX_DEVICE_FEATHER_PX);
-  const steps: SelectionMaskStep[] = sel!.subpaths.map((sp) => ({
-    op: sp.mode === "add" ? "fill" : "erase",
-    points: sp.points.map((p): [number, number] => {
+  const steps: SelectionMaskStep[] = [];
+  for (const sp of sel!.subpaths) {
+    const op: "fill" | "erase" = sp.mode === "add" ? "fill" : "erase";
+    const points = sp.points.map((p): [number, number] => {
       const x = p.x * width;
       const y = p.y * height;
       return [opts?.flipX ? width - x : x, opts?.flipY ? height - y : y];
-    }),
-  }));
+    });
+    if (sp.kind === "brush") {
+      // 브러시 획 굵기 = 2×반경×마스크 폭(반경이 폭 정규화라 페더 환산과 같은 축).
+      // 반전(flip)은 점대칭 도형인 획에 영향 없음. 반경 0 은 칠할 게 없어 계획에서 제외
+      // (pointInSelection 의 "반경 0 = 히트 없음"과 일치).
+      const strokeWidth = 2 * clampNum(sp.radius, 0, MAX_BRUSH_RADIUS_NORM) * width;
+      if (strokeWidth > 0 && points.length > 0) steps.push({ op, points, strokeWidth });
+      continue;
+    }
+    steps.push({ op, points });
+  }
   return { width, height, steps, featherPx, invert: sel!.invert };
 }
 
@@ -502,13 +652,18 @@ export type MaskCanvasLike = { width: number; height: number };
  */
 export type MaskCtx2DLike = {
   fillStyle: unknown;
+  strokeStyle: unknown;
   globalCompositeOperation: string;
   filter: string;
+  lineWidth: number;
+  lineCap: "butt" | "round" | "square";
+  lineJoin: "round" | "bevel" | "miter";
   beginPath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
   closePath(): void;
   fill(fillRule?: "nonzero" | "evenodd"): void;
+  stroke(): void;
   fillRect(x: number, y: number, w: number, h: number): void;
   clearRect(x: number, y: number, w: number, h: number): void;
   drawImage(image: MaskImageSource, dx: number, dy: number): void;
@@ -522,12 +677,30 @@ export type SelectionCanvasFactory = (
 
 /**
  * 계획의 steps 를 ctx 에 하드 엣지로 칠한다(feather/invert 이전 단계).
- * fill=source-over 흰색, erase=destination-out. 끝나면 합성 모드를 원복한다.
+ * fill=source-over 흰색, erase=destination-out. 폴리곤은 evenodd 채움, strokeWidth 가 있는
+ * 단계(브러시)는 라운드 캡/조인 스트로크 — 점 1개는 제자리 lineTo 로 라운드 캡 원(점 찍기).
+ * 끝나면 합성 모드를 원복한다.
  */
 export function paintSelectionMaskSteps(ctx: MaskCtx2DLike, plan: SelectionMaskPlan): void {
   ctx.clearRect(0, 0, plan.width, plan.height);
   ctx.fillStyle = "#ffffff";
   for (const step of plan.steps) {
+    if (step.strokeWidth !== undefined) {
+      if (!(step.strokeWidth > 0) || step.points.length === 0) continue; // 방어 — 퇴화 획은 건너뜀
+      ctx.globalCompositeOperation = step.op === "fill" ? "source-over" : "destination-out";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = step.strokeWidth;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(step.points[0]![0], step.points[0]![1]);
+      if (step.points.length === 1) ctx.lineTo(step.points[0]![0], step.points[0]![1]);
+      for (let i = 1; i < step.points.length; i += 1) {
+        ctx.lineTo(step.points[i]![0], step.points[i]![1]);
+      }
+      ctx.stroke();
+      continue;
+    }
     if (step.points.length < 3) continue; // 방어 — 퇴화 폴리곤은 건너뜀
     ctx.globalCompositeOperation = step.op === "fill" ? "source-over" : "destination-out";
     ctx.beginPath();

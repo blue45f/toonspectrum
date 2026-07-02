@@ -1,0 +1,1469 @@
+/**
+ * Studio SVG Vector Export — 일러스트레이터급 벡터 내보내기 직렬화 엔진.
+ *
+ * 래스터 내보내기(studio-export, png/jpg/webp)가 "캔버스 픽셀 캡처"라면, 이 모듈은
+ * StudioPage 의 요소(El) 배열을 **SVG 마크업으로 직접 직렬화**해 도형·텍스트·말풍선·
+ * 프레임·효과선을 벡터로 보존한다(Illustrator/Inkscape/브라우저에서 무손실 확대·재편집).
+ *
+ * 재현 규약(캔버스 렌더와 동일 지오메트리 소스 공유):
+ *  - 도형(draw): studio-stroke-shapes 의 별/다각형 포인트·점선 프리셋·화살촉 지오메트리,
+ *    studio-gradient-engine 그라데이션(defs), studio-pattern-fill 패턴(defs <pattern>).
+ *    채우기 우선순위는 캔버스와 동일: 패턴 > 그라데이션 > 단색.
+ *  - 말풍선: studio-bubble-path 의 bubblePathData/Multi 를 그대로 재사용(이음새 없는 단일 path).
+ *  - 텍스트: 글꼴/크기/자간/행간/정렬 + 곡선 텍스트(studio-text-path)는 <textPath> 로.
+ *  - 이미지: <image> 태그(data URL 은 그대로 임베드), 프레임은 <clipPath> 클립.
+ *  - 회전/기울이기: Konva 변환 순서(translate→rotate→skew)와 동일한 transform 문자열.
+ *  - 집중선/속도선: StudioPage 와 동일한 seededRandom(id) 시드 난수로 같은 선 배치를 재현.
+ *
+ * 정직성 규약: 완벽 재현이 불가한 것은 그리지 않거나 근사하고, 전부 skipped 목록으로
+ * 집계해 반환한다(콜러가 사용자에게 고지). 예: 픽셀 필터/보정(제외 아님, 원본 이미지로
+ * 근사), 지우개 합성(destination-out — 제외), 아래 레이어 클리핑(근사), 자동 줄바꿈(근사).
+ * 말풍선 그룹 그림자는 캔버스에서도 그려지지 않으므로(Konva 컨테이너 그림자는 cache 필요)
+ * 내보내지 않는다 — 화면과 동일.
+ *
+ * 전부 순수·결정적(입력이 같으면 출력 바이트 동일) — DOM/Konva 무의존. Blob 생성·다운로드는
+ * 콜러(StudioPage) 몫이다. 사용자 노출 문자열은 한글.
+ */
+
+import { gpenSegmentWidths, processFreehandPoints, processPencilPoints, screentoneDotRadius, screentoneDotsForStroke } from "./studio-brush";
+import { bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  estimateTextGradientBBox,
+  legacyTextGradientToSpec,
+  linearGradientPoints,
+  normalizeGradientSpec,
+  radialGradientGeometry,
+  type GradientBBox,
+  type StudioGradientSpec,
+} from "./studio-gradient-engine";
+import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
+import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
+import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
+import { skewDegToKonva, type SkewFields } from "./studio-skew";
+import {
+  effectiveCornerRadius,
+  lineArrowHeadGeoms,
+  normalizeShapeParams,
+  normalizeStrokeStyle,
+  polygonPathPoints,
+  starPathPoints,
+  strokeDashArray,
+  type ShapeParams,
+  type StrokeStyle,
+} from "./studio-stroke-shapes";
+import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "./studio-text-path";
+
+import type { BubbleVariant } from "./studio-assets";
+
+// ---------------------------------------------------------------------------
+// 요소 구조 타입 — StudioPage 의 El 유니온과 구조 호환(필드 부분집합, 전부 옵셔널 위주).
+// StudioPage 를 임포트하지 않고(순수 모듈 규약) 구조 타이핑으로 El[] 를 그대로 받는다.
+// ---------------------------------------------------------------------------
+
+/** 모든 요소가 공유하는 레이어 메타(El 인터섹션과 동일 필드). */
+interface SvgElMeta {
+  name?: string;
+  hidden?: boolean;
+  locked?: boolean;
+  noClip?: boolean;
+  opacity?: number;
+  blendMode?: string;
+  lockAspect?: boolean;
+  groupId?: string;
+  clipBelow?: boolean;
+}
+
+export interface SvgImageElLike extends SvgElMeta, SkewFields, ImageFilterFields {
+  id: string;
+  type: "image";
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  flipped?: boolean;
+  flippedY?: boolean;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  cornerRadius?: number;
+}
+
+export interface SvgTextElLike extends SvgElMeta, SkewFields {
+  id: string;
+  type: "text";
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fill: string;
+  rotation: number;
+  font?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  letterSpacing?: number;
+  lineHeight?: number;
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  fillType?: "solid" | "gradient";
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
+  gradientDirection?: "vertical" | "horizontal";
+  gradient?: StudioGradientSpec;
+  textPath?: TextPathConfig;
+}
+
+export interface SvgBubbleElLike extends SvgElMeta {
+  id: string;
+  type: "bubble";
+  variant: BubbleVariant;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  textFill: string;
+  rotation: number;
+  tail?: "left" | "right" | "none";
+  tailDirection?: "bottom" | "top" | "left" | "right";
+  extraTails?: BubbleTailSpec[];
+  font?: string;
+  fontSize?: number;
+  lineHeight?: number;
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  tailXRatio?: number;
+  tailHeight?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+}
+
+export interface SvgFrameElLike extends SvgElMeta {
+  id: string;
+  type: "frame";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  bg?: string;
+  bgColor?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dashStyle?: "solid" | "dashed";
+  points?: number[];
+}
+
+export interface SvgStickerElLike extends SvgElMeta, SkewFields {
+  id: string;
+  type: "sticker";
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  rotation: number;
+}
+
+export interface SvgDrawElLike extends SvgElMeta {
+  id: string;
+  type: "draw";
+  kind?: "freehand" | "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
+  mode?: "pen" | "eraser";
+  points: number[];
+  stroke: string;
+  strokeWidth: number;
+  fill?: string;
+  gradient?: StudioGradientSpec;
+  pattern?: StudioPatternSpec;
+  brush?: string;
+  pressures?: number[];
+  strokeStyle?: StrokeStyle;
+  shapeParams?: ShapeParams;
+  symmetry?: {
+    type: "none" | "vertical" | "horizontal" | "radial";
+    centerX: number;
+    centerY: number;
+    radialCount?: number;
+  };
+}
+
+export interface SvgFocusLinesElLike extends SvgElMeta {
+  id: string;
+  type: "focusLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // 캔버스 렌더(FocusLinesNode)와 동일한 방어적 기본값(?? 80/120/600/24 등)을 위해 옵셔널.
+  lineCount?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  noise?: number;
+  rotation?: number;
+  centerXRatio?: number;
+  centerYRatio?: number;
+}
+
+export interface SvgSpeedLinesElLike extends SvgElMeta {
+  id: string;
+  type: "speedLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  // 캔버스 렌더(SpeedLinesNode)와 동일한 방어적 기본값(?? 60/horizontal 등)을 위해 옵셔널.
+  lineCount?: number;
+  direction?: "horizontal" | "vertical";
+  stroke?: string;
+  strokeWidth?: number;
+  noise?: number;
+  rotation?: number;
+}
+
+/** StudioPage El 유니온과 구조 호환하는 내보내기 입력 요소. */
+export type SvgExportEl =
+  | SvgImageElLike
+  | SvgTextElLike
+  | SvgBubbleElLike
+  | SvgFrameElLike
+  | SvgStickerElLike
+  | SvgDrawElLike
+  | SvgFocusLinesElLike
+  | SvgSpeedLinesElLike;
+
+// ---------------------------------------------------------------------------
+// 입출력 타입
+// ---------------------------------------------------------------------------
+
+/** 말풍선/프레임 렌더 파라미터를 좌우하는 웹툰 테마 — StudioPage webtoonTheme 와 동일. */
+export type SvgExportTheme = "classic" | "soft" | "vivid";
+
+export interface SvgExportPageInput {
+  /** 페이지 캔버스 폭(px) — StudioPage CANVAS_W. */
+  width: number;
+  /** 페이지 캔버스 높이(px). */
+  height: number;
+  /** 배경 단색 — bgGrad 가 없을 때 사용(기본 #ffffff). */
+  bg?: string;
+  /** 배경 세로 2색 그라데이션([위, 아래]) — 있으면 bg 보다 우선(캔버스와 동일). */
+  bgGrad?: readonly string[] | null;
+  /** true 면 배경을 그리지 않는다(투명 내보내기). */
+  transparentBg?: boolean;
+  /** z-order 요소 배열(인덱스 0 = 맨 뒤) — StudioPage 페이지 elements 그대로. */
+  elements: readonly SvgExportEl[];
+  /** 레이어 그룹(폴더) — 그룹 숨김을 반영한다. */
+  groups?: readonly LayerGroup[];
+  /** 웹툰 테마(말풍선/프레임 기본 선 굵기·모서리) — 미지정 시 "classic". */
+  theme?: SvgExportTheme;
+}
+
+/** 재현 불가/근사 항목 한 건 — 콜러가 사용자에게 고지한다. */
+export interface SvgExportSkip {
+  /** 요소 id. */
+  id: string;
+  /** 요소 타입(El type). */
+  type: string;
+  /** "skipped"=그리지 않음, "approximated"=그렸지만 화면과 일부 다름. */
+  mode: "skipped" | "approximated";
+  /** 사용자 안내용 한글 사유. */
+  label: string;
+}
+
+export interface SvgExportResult {
+  /** 완성된 SVG 마크업(단일 문자열, 결정적). */
+  svg: string;
+  /** 재현 불가/근사 집계 — 비어 있으면 전부 벡터 보존. */
+  skipped: SvgExportSkip[];
+  /** 사용된 글꼴 패밀리 목록(SVG 에 임베드되지 않음 — 고지용). */
+  fontFamilies: string[];
+  /** 전역 주의사항(글꼴 미임베드 등) — 사용자 고지용 한글 문장. */
+  caveats: string[];
+  /** 실제로 직렬화 대상이 된(숨김 제외) 요소 수. */
+  elementCount: number;
+}
+
+/** 콜러가 Blob 생성에 쓸 MIME 타입. */
+export const SVG_EXPORT_MIME = "image/svg+xml;charset=utf-8";
+
+/** 단일 페이지 SVG 파일명 — 래스터 내보내기(pageExportFileName)와 같은 제목 규칙. */
+export function svgExportFileName(title: string): string {
+  return `${title.trim() || "toonspectrum-comic"}.svg`;
+}
+
+// ---------------------------------------------------------------------------
+// 공용 유틸 — 수 포맷·XML 이스케이프·transform
+// ---------------------------------------------------------------------------
+
+/** 좌표/치수 포맷 — 소수 둘째 자리 반올림, 꼬리 0 제거, -0/비유한수는 0. */
+function fmt(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 100) / 100 + 0;
+  return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+/** XML 텍스트/속성 이스케이프 — & < > " ' 전부 치환(속성·본문 공용). */
+export function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+/** 속성 문자열 조각 — 값이 undefined/null 이면 빈 문자열(속성 생략). */
+function att(name: string, value: string | number | undefined | null): string {
+  if (value === undefined || value === null) return "";
+  return ` ${name}="${typeof value === "number" ? fmt(value) : escapeXml(value)}"`;
+}
+
+/**
+ * Konva 노드 변환과 동일한 transform 문자열 — translate → rotate → skew 순.
+ * Konva skewX/skewY 는 tangent 계수라 SVG matrix(1, tanY, tanX, 1, 0, 0) 로 표현한다.
+ * 항등 성분은 생략하고, 전부 항등이면 undefined(속성 생략).
+ */
+function nodeTransform(x: number, y: number, rotation?: number, skew?: SkewFields): string | undefined {
+  const parts: string[] = [];
+  if (x !== 0 || y !== 0) parts.push(`translate(${fmt(x)} ${fmt(y)})`);
+  if (rotation && rotation !== 0) parts.push(`rotate(${fmt(rotation)})`);
+  const tanX = skewDegToKonva(skew?.skewX ?? 0);
+  const tanY = skewDegToKonva(skew?.skewY ?? 0);
+  if (tanX !== 0 || tanY !== 0) parts.push(`matrix(1 ${fmt(tanY)} ${fmt(tanX)} 1 0 0)`);
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
+/** 평탄 포인트 → path d("M x0 y0 L x1 y1 ...") — closed 면 "Z" 로 닫는다. */
+function pointsToPathD(points: readonly number[], closed = false): string {
+  if (points.length < 2) return "";
+  const parts = [`M ${fmt(points[0])} ${fmt(points[1])}`];
+  for (let i = 2; i + 1 < points.length; i += 2) parts.push(`L ${fmt(points[i])} ${fmt(points[i + 1])}`);
+  if (closed) parts.push("Z");
+  return parts.join(" ");
+}
+
+/** 평탄 포인트 → polygon points 속성("x,y x,y ..."). */
+function pointsAttr(points: readonly number[]): string {
+  const pairs: string[] = [];
+  for (let i = 0; i + 1 < points.length; i += 2) pairs.push(`${fmt(points[i])},${fmt(points[i + 1])}`);
+  return pairs.join(" ");
+}
+
+/** StudioPage seededRandom 포트 — 같은 id 면 같은 난수열(집중선/속도선 재현의 핵심). */
+function seededRandom(seedStr: string): () => number {
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return () => {
+    const x = Math.sin(hash++) * 10000;
+    return x - Math.floor(x);
+  };
+}
+
+/** StudioPage drawBounds 포트 — 도형 드래그 박스(첫 두 점 기준). */
+function drawBounds(points: readonly number[]): { x: number; y: number; width: number; height: number } {
+  const x1 = points[0] ?? 0;
+  const y1 = points[1] ?? 0;
+  const x2 = points[2] ?? x1;
+  const y2 = points[3] ?? y1;
+  return { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+}
+
+/** StudioPage getSymmetricPoints 포트 — 대칭 드로잉 변형 좌표열. */
+function getSymmetricPoints(points: number[], symmetry: SvgDrawElLike["symmetry"]): number[][] {
+  if (!symmetry || symmetry.type === "none" || points.length === 0) return [points];
+  const result: number[][] = [points];
+  const cx = symmetry.centerX;
+  const cy = symmetry.centerY;
+  if (symmetry.type === "vertical") {
+    const mirrored: number[] = [];
+    for (let i = 0; i + 1 < points.length; i += 2) mirrored.push(cx * 2 - points[i], points[i + 1]);
+    result.push(mirrored);
+  } else if (symmetry.type === "horizontal") {
+    const mirrored: number[] = [];
+    for (let i = 0; i + 1 < points.length; i += 2) mirrored.push(points[i], cy * 2 - points[i + 1]);
+    result.push(mirrored);
+  } else if (symmetry.type === "radial") {
+    const count = symmetry.radialCount ?? 4;
+    for (let s = 1; s < count; s++) {
+      const angle = (s * 2 * Math.PI) / count;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const rotated: number[] = [];
+      for (let i = 0; i + 1 < points.length; i += 2) {
+        const dx = points[i] - cx;
+        const dy = points[i + 1] - cy;
+        rotated.push(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
+      }
+      result.push(rotated);
+    }
+  }
+  return result;
+}
+
+/** StudioPage formatVerticalText 포트 — 세로쓰기(열 우→좌, 빈 칸은 전각 공백). */
+function formatVerticalText(text: string): string {
+  const lines = text.split("\n");
+  const maxLen = Math.max(...lines.map((l) => l.length));
+  const resultLines: string[] = [];
+  for (let charIdx = 0; charIdx < maxLen; charIdx++) {
+    const rowChars: string[] = [];
+    for (let lineIdx = lines.length - 1; lineIdx >= 0; lineIdx--) {
+      rowChars.push(lines[lineIdx]?.[charIdx] ?? "　");
+    }
+    resultLines.push(rowChars.join("  "));
+  }
+  return resultLines.join("\n");
+}
+
+/**
+ * Konva Line(tension) 곡선 포트 — 카디널 스플라인 제어점(getControlPoints/expandPoints)을
+ * 그대로 재현해 Q/C 커맨드 path 로 만든다. 점이 2개 이하이거나 제어점이 없으면 직선.
+ */
+function tensionPathD(points: readonly number[], tension: number): string {
+  if (points.length < 6 || tension === 0) return pointsToPathD(points);
+  const tp: number[] = [];
+  for (let n = 2; n < points.length - 2; n += 2) {
+    const x0 = points[n - 2];
+    const y0 = points[n - 1];
+    const x1 = points[n];
+    const y1 = points[n + 1];
+    const x2 = points[n + 2];
+    const y2 = points[n + 3];
+    const d01 = Math.hypot(x1 - x0, y1 - y0);
+    const d12 = Math.hypot(x2 - x1, y2 - y1);
+    const fa = (tension * d01) / (d01 + d12);
+    const fb = (tension * d12) / (d01 + d12);
+    if (Number.isNaN(fa)) continue; // 겹친 점(d01+d12=0) — Konva 와 동일하게 건너뜀
+    tp.push(x1 - fa * (x2 - x0), y1 - fa * (y2 - y0), x1, y1, x1 + fb * (x2 - x0), y1 + fb * (y2 - y0));
+  }
+  if (tp.length < 4) return pointsToPathD(points);
+  const parts = [`M ${fmt(points[0])} ${fmt(points[1])}`, `Q ${fmt(tp[0])} ${fmt(tp[1])} ${fmt(tp[2])} ${fmt(tp[3])}`];
+  let n = 4;
+  while (n < tp.length - 2) {
+    parts.push(`C ${fmt(tp[n])} ${fmt(tp[n + 1])} ${fmt(tp[n + 2])} ${fmt(tp[n + 3])} ${fmt(tp[n + 4])} ${fmt(tp[n + 5])}`);
+    n += 6;
+  }
+  parts.push(
+    `Q ${fmt(tp[tp.length - 2])} ${fmt(tp[tp.length - 1])} ${fmt(points[points.length - 2])} ${fmt(points[points.length - 1])}`
+  );
+  return parts.join(" ");
+}
+
+/** 별 폴리곤(클램프 없는 원시 버전) — 말풍선 shout/angry 의 20/22꼭짓점 별용. */
+function rawStarPoints(cx: number, cy: number, numPoints: number, innerRadius: number, outerRadius: number): number[] {
+  const pts: number[] = [];
+  for (let i = 0; i < numPoints * 2; i++) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + (i * Math.PI) / numPoints;
+    pts.push(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+  }
+  return pts;
+}
+
+// ---------------------------------------------------------------------------
+// 내보내기 컨텍스트 — defs/스킵/글꼴 수집 + 결정적 def id 발급
+// ---------------------------------------------------------------------------
+
+interface ExportCtx {
+  defs: string[];
+  skips: SvgExportSkip[];
+  fonts: Set<string>;
+  theme: SvgExportTheme;
+  /** def id 일련번호 — 입력 순서에만 의존해 결정적. */
+  seq: number;
+}
+
+function nextId(ctx: ExportCtx, prefix: string): string {
+  ctx.seq += 1;
+  return `${prefix}${ctx.seq}`;
+}
+
+function addSkip(ctx: ExportCtx, el: { id: string; type: string }, mode: SvgExportSkip["mode"], label: string): void {
+  ctx.skips.push({ id: el.id, type: el.type, mode, label });
+}
+
+/** 그라데이션 defs — userSpaceOnUse 좌표(노드 로컬 bbox + 로컬 원점 오프셋). */
+function gradientDef(ctx: ExportCtx, spec: StudioGradientSpec, bbox: GradientBBox, origin: { x: number; y: number }): string {
+  const safe = normalizeGradientSpec(spec);
+  const id = nextId(ctx, "sg");
+  const stops = safe.stops.map((s) => `<stop offset="${fmt(s.offset * 100)}%" stop-color="${s.color}"/>`).join("");
+  if (safe.type === "radial") {
+    const geo = radialGradientGeometry(bbox);
+    ctx.defs.push(
+      `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${fmt(origin.x + geo.center.x)}" cy="${fmt(origin.y + geo.center.y)}" r="${fmt(geo.endRadius)}">${stops}</radialGradient>`
+    );
+  } else {
+    const { start, end } = linearGradientPoints(safe, bbox);
+    ctx.defs.push(
+      `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${fmt(origin.x + start.x)}" y1="${fmt(origin.y + start.y)}" x2="${fmt(origin.x + end.x)}" y2="${fmt(origin.y + end.y)}">${stops}</linearGradient>`
+    );
+  }
+  return `url(#${id})`;
+}
+
+/** 패턴 defs — 타일 마크업(studio-pattern-fill)을 노드 로컬 원점에 정렬해 반복. */
+function patternDefFill(ctx: ExportCtx, spec: StudioPatternSpec, origin: { x: number; y: number }): string {
+  const safe = normalizePatternSpec(spec);
+  const def = getPatternDef(safe.patternId);
+  const id = nextId(ctx, "sp");
+  const size = def.tile * safe.scale;
+  const bgRect = safe.bg ? `<rect width="${fmt(def.tile)}" height="${fmt(def.tile)}" fill="${safe.bg}"/>` : "";
+  ctx.defs.push(
+    `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${fmt(size)}" height="${fmt(size)}" patternTransform="translate(${fmt(origin.x)} ${fmt(origin.y)})"><g transform="scale(${fmt(safe.scale)})">${bgRect}${def.inner(safe.fg)}</g></pattern>`
+  );
+  return `url(#${id})`;
+}
+
+/** 그림자 필터 defs — canvas shadow* 를 feDropShadow 로 근사(σ ≈ blur/2). */
+function shadowFilterDef(
+  ctx: ExportCtx,
+  shadow: { color: string; blur: number; offsetX: number; offsetY: number; opacity: number }
+): string {
+  const id = nextId(ctx, "sf");
+  ctx.defs.push(
+    `<filter id="${id}" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="${fmt(shadow.offsetX)}" dy="${fmt(shadow.offsetY)}" stdDeviation="${fmt(shadow.blur / 2)}" flood-color="${escapeXml(shadow.color)}" flood-opacity="${fmt(shadow.opacity)}"/></filter>`
+  );
+  return `url(#${id})`;
+}
+
+// ---------------------------------------------------------------------------
+// 텍스트 공통 — 줄 배치·정렬·폭 초과(자동 줄바꿈 없음) 근사 판정
+// ---------------------------------------------------------------------------
+
+// 알파벳 기준선 근사 오프셋(em) — Konva 10 은 폰트 메트릭 (ascent-descent)/2 를 쓰고,
+// 한글/라틴 통상 메트릭(ascent≈0.86em, descent≈0.14em)에서 0.36em 에 수렴한다.
+const BASELINE_EM = 0.36;
+
+/** 한 줄 폭 근사(px) — CJK/전각 1em, 그 외 0.55em + 자간. 자동 줄바꿈 경고 판정 전용. */
+function estimateLineWidth(line: string, fontSize: number, letterSpacing: number): number {
+  let units = 0;
+  for (const ch of line) {
+    const code = ch.codePointAt(0) ?? 0;
+    units += code > 0x2e7f ? 1 : 0.55;
+  }
+  return units * fontSize + Math.max(0, line.length - 1) * letterSpacing;
+}
+
+interface TextBlockOptions {
+  text: string;
+  x: number; // 정렬 기준 박스 로컬 x
+  y: number; // 박스 로컬 y(첫 줄 상단)
+  boxWidth: number; // 정렬 박스 폭(0 이면 왼쪽 앵커 고정)
+  boxHeight?: number; // verticalAlign middle 용(미지정 시 상단 정렬)
+  fontSize: number;
+  lineHeight: number; // 배수
+  letterSpacing: number;
+  align: "left" | "center" | "right";
+  fontFamily: string;
+  fontStyle: "normal" | "bold" | "italic" | "bold italic";
+  fill: string; // 색 또는 url(#...)
+  stroke?: string;
+  strokeWidth?: number;
+  filter?: string;
+}
+
+/** 여러 줄 텍스트 <text> 마크업 — Konva Text 의 줄 중앙(midline) 배치와 동일 산식. */
+function textBlockMarkup(opts: TextBlockOptions): string {
+  const lines = opts.text.split("\n");
+  const lineHeightPx = opts.fontSize * opts.lineHeight;
+  // verticalAlign middle — 블록 높이를 박스 안 가운데로(Konva alignY 산식).
+  const alignY = opts.boxHeight !== undefined ? (opts.boxHeight - lines.length * lineHeightPx) / 2 : 0;
+  const anchor = opts.align === "center" ? "middle" : opts.align === "right" ? "end" : "start";
+  const anchorX = opts.align === "center" ? opts.x + opts.boxWidth / 2 : opts.align === "right" ? opts.x + opts.boxWidth : opts.x;
+  const weight = opts.fontStyle.includes("bold") ? "bold" : undefined;
+  const style = opts.fontStyle.includes("italic") ? "italic" : undefined;
+  const spans = lines
+    .map((line, i) => {
+      const baseline = opts.y + alignY + (i + 0.5) * lineHeightPx + opts.fontSize * BASELINE_EM;
+      return `<tspan x="${fmt(anchorX)}" y="${fmt(baseline)}">${escapeXml(line)}</tspan>`;
+    })
+    .join("");
+  const strokeAttrs =
+    opts.stroke && (opts.strokeWidth ?? 0) > 0
+      ? `${att("stroke", opts.stroke)}${att("stroke-width", opts.strokeWidth)} paint-order="stroke" stroke-linejoin="round"`
+      : "";
+  return (
+    `<text xml:space="preserve" font-family="${escapeXml(opts.fontFamily)}" font-size="${fmt(opts.fontSize)}"` +
+    `${att("font-weight", weight)}${att("font-style", style)}` +
+    `${opts.letterSpacing !== 0 ? att("letter-spacing", opts.letterSpacing) : ""}` +
+    ` text-anchor="${anchor}" fill="${escapeXml(opts.fill)}"${strokeAttrs}${opts.filter ? att("filter", opts.filter) : ""}>` +
+    `${spans}</text>`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 요소별 직렬화
+// ---------------------------------------------------------------------------
+
+/** 도형/선 채우기 값 — 우선순위 패턴 > 그라데이션 > 단색 > 없음(none). */
+function resolveDrawFill(
+  ctx: ExportCtx,
+  el: SvgDrawElLike,
+  origin: { x: number; y: number },
+  gradientBBox: GradientBBox | null
+): string {
+  if (el.pattern) return patternDefFill(ctx, el.pattern, origin);
+  if (el.gradient && gradientBBox) return gradientDef(ctx, el.gradient, gradientBBox, origin);
+  return el.fill ?? "none";
+}
+
+function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
+  if (el.mode === "eraser") {
+    addSkip(ctx, el, "skipped", "지우개 자국은 벡터로 재현할 수 없어 제외했어요.");
+    return "";
+  }
+  const kind = el.kind ?? "freehand";
+  const opacity = el.opacity ?? 1;
+  const stroke = el.stroke;
+  const strokeWidth = Math.max(1, el.strokeWidth);
+  const strokeStyle = normalizeStrokeStyle(el.strokeStyle);
+  const shapeParams = normalizeShapeParams(el.shapeParams);
+  const dash = strokeDashArray(strokeStyle.dash, strokeWidth);
+  const dashAttr = dash ? att("stroke-dasharray", dash.map(fmt).join(" ")) : "";
+  const opacityAttr = opacity !== 1 ? att("opacity", opacity) : "";
+  const strokeAttrs = `${att("stroke", stroke)}${att("stroke-width", strokeWidth)}`;
+
+  const variations = getSymmetricPoints(el.points, el.symmetry);
+  const parts: string[] = [];
+  for (const points of variations) {
+    if (kind === "rect") {
+      const box = drawBounds(points);
+      const w = Math.max(0.1, box.width);
+      const h = Math.max(0.1, box.height);
+      const fill = resolveDrawFill(ctx, el, { x: box.x, y: box.y }, { x: 0, y: 0, width: w, height: h });
+      const rx = effectiveCornerRadius(box.width, box.height, shapeParams.cornerRadius);
+      parts.push(
+        `<rect x="${fmt(box.x)}" y="${fmt(box.y)}" width="${fmt(w)}" height="${fmt(h)}"${rx > 0 ? att("rx", rx) : ""} fill="${escapeXml(fill)}"${strokeAttrs}${dashAttr} stroke-linejoin="round"${opacityAttr}/>`
+      );
+    } else if (kind === "ellipse") {
+      const box = drawBounds(points);
+      const w = Math.max(0.1, box.width);
+      const h = Math.max(0.1, box.height);
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      const fill = resolveDrawFill(ctx, el, { x: cx, y: cy }, { x: -box.width / 2, y: -box.height / 2, width: w, height: h });
+      parts.push(
+        `<ellipse cx="${fmt(cx)}" cy="${fmt(cy)}" rx="${fmt(w / 2)}" ry="${fmt(h / 2)}" fill="${escapeXml(fill)}"${strokeAttrs}${dashAttr}${opacityAttr}/>`
+      );
+    } else if (kind === "star" || kind === "triangle" || kind === "polygon") {
+      const box = drawBounds(points);
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      const m = Math.max(0.1, Math.min(box.width, box.height));
+      // 캔버스 규약: 그라데이션은 별에만(triangle/polygon 은 패턴·단색만) — 동일하게 반영.
+      const gradientBBox = kind === "star" ? { x: -m / 2, y: -m / 2, width: m, height: m } : null;
+      const fill = resolveDrawFill(ctx, el, { x: cx, y: cy }, gradientBBox);
+      const pts =
+        kind === "star"
+          ? starPathPoints(cx, cy, m / 2, shapeParams)
+          : polygonPathPoints(cx, cy, m / 2, kind === "triangle" ? 3 : shapeParams.polygonSides);
+      parts.push(
+        `<polygon points="${pointsAttr(pts)}" fill="${escapeXml(fill)}"${strokeAttrs}${dashAttr} stroke-linejoin="round"${opacityAttr}/>`
+      );
+    } else if (kind === "line") {
+      const heads = lineArrowHeadGeoms(points, strokeStyle, strokeWidth)
+        .map((head) =>
+          head.kind === "dot"
+            ? `<circle cx="${fmt(head.cx)}" cy="${fmt(head.cy)}" r="${fmt(head.r)}" fill="${escapeXml(stroke)}"/>`
+            : `<path d="${pointsToPathD(head.points, true)}" fill="${escapeXml(stroke)}" stroke-linejoin="round"/>`
+        )
+        .join("");
+      parts.push(
+        `<g${opacityAttr}><path d="${pointsToPathD(points)}" fill="none"${strokeAttrs}${dashAttr} stroke-linecap="${strokeStyle.lineCap}" stroke-linejoin="round"/>${heads}</g>`
+      );
+    } else if (kind === "arrow") {
+      // Konva Arrow 재현 — 몸통 폴리라인 + 끝점 삼각 화살촉(굵기 비례, 화살촉은 점선 미적용).
+      const pointer = Math.max(8, strokeWidth * 2);
+      let head = "";
+      if (points.length >= 4) {
+        const xe = points[points.length - 2];
+        const ye = points[points.length - 1];
+        const angle = Math.atan2(ye - points[points.length - 3], xe - points[points.length - 4]);
+        const bx = xe - pointer * Math.cos(angle);
+        const by = ye - pointer * Math.sin(angle);
+        const px = (pointer / 2) * Math.cos(angle + Math.PI / 2);
+        const py = (pointer / 2) * Math.sin(angle + Math.PI / 2);
+        head = `<path d="${pointsToPathD([xe, ye, bx + px, by + py, bx - px, by - py], true)}" fill="${escapeXml(stroke)}"${strokeAttrs}/>`;
+      }
+      parts.push(
+        `<g${opacityAttr}><path d="${pointsToPathD(points)}" fill="none"${strokeAttrs}${dashAttr} stroke-linecap="${strokeStyle.lineCap}"/>${head}</g>`
+      );
+    } else {
+      parts.push(serializeFreehand(ctx, el, points, stroke, strokeWidth, opacityAttr));
+    }
+  }
+  return parts.join("");
+}
+
+/** 자유곡선(브러시별) — 캔버스 렌더 경로와 같은 지오메트리 소스(studio-brush)를 쓴다. */
+function serializeFreehand(
+  ctx: ExportCtx,
+  el: SvgDrawElLike,
+  points: number[],
+  stroke: string,
+  strokeWidth: number,
+  opacityAttr: string
+): string {
+  const brush = el.brush ?? "pen";
+
+  if (brush === "brush") {
+    // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
+    const smoothed = processFreehandPoints(points);
+    if (smoothed.length < 2) return "";
+    const angle = -Math.PI / 6;
+    const dx = (strokeWidth / 2) * Math.cos(angle);
+    const dy = (strokeWidth / 2) * Math.sin(angle);
+    const sub: string[] = [];
+    if (smoothed.length === 2) {
+      sub.push(`M ${fmt(smoothed[0] - dx)} ${fmt(smoothed[1] - dy)} L ${fmt(smoothed[0] + dx)} ${fmt(smoothed[1] + dy)}`);
+    } else {
+      for (let i = 0; i < smoothed.length - 2; i += 2) {
+        const x0 = smoothed[i];
+        const y0 = smoothed[i + 1];
+        const x1 = smoothed[i + 2];
+        const y1 = smoothed[i + 3];
+        sub.push(
+          `M ${fmt(x0 - dx)} ${fmt(y0 - dy)} L ${fmt(x0 + dx)} ${fmt(y0 + dy)} L ${fmt(x1 + dx)} ${fmt(y1 + dy)} L ${fmt(x1 - dx)} ${fmt(y1 - dy)} Z`
+        );
+      }
+    }
+    return `<path d="${sub.join(" ")}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+  }
+
+  if (brush === "gpen") {
+    // G펜 — 세그먼트별 굵기(필압 테이퍼)를 세그먼트 path 로 그대로 재현.
+    const smoothed = processFreehandPoints(points);
+    const segmentCount = Math.floor(smoothed.length / 2);
+    const rawPressures = el.pressures ?? [];
+    const sampled = Array.from({ length: segmentCount }, (_, i) => {
+      if (rawPressures.length === 0) return 0.6;
+      const idx = segmentCount <= 1 ? 0 : Math.round((i / (segmentCount - 1)) * (rawPressures.length - 1));
+      return rawPressures[idx] ?? 0.6;
+    });
+    const widths = gpenSegmentWidths(sampled, strokeWidth);
+    const segs: string[] = [];
+    for (let i = 2; i < smoothed.length; i += 2) {
+      const w = widths[Math.floor(i / 2)] ?? strokeWidth;
+      segs.push(
+        `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
+      );
+    }
+    return `<g${opacityAttr}>${segs.join("")}</g>`;
+  }
+
+  if (brush === "screentone") {
+    // 스크린톤 — 전역 격자 정렬 망점(결정적)을 원으로 그대로 재현.
+    const pitch = Math.max(3, strokeWidth * 0.42);
+    const radius = Math.max(2, strokeWidth / 2);
+    const dots = screentoneDotsForStroke(points, radius, pitch);
+    const dotR = screentoneDotRadius(pitch);
+    const circles: string[] = [];
+    for (let i = 0; i + 1 < dots.length; i += 2) {
+      circles.push(`<circle cx="${fmt(dots[i])}" cy="${fmt(dots[i + 1])}" r="${fmt(dotR)}"/>`);
+    }
+    return `<g fill="${escapeXml(stroke)}"${opacityAttr}>${circles.join("")}</g>`;
+  }
+
+  if (brush === "pencil") {
+    // 연필 — 결정적 지터 + tension 0.2 곡선.
+    const jittered = processPencilPoints(points);
+    return `<path d="${tensionPathD(jittered, 0.2)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+  }
+
+  if (brush === "highlighter") {
+    // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
+    const smoothed = processFreehandPoints(points);
+    return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+  }
+
+  // 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기(캔버스 산식 0.3+p×1.4)로 재현.
+  const smoothed = processFreehandPoints(points);
+  const pressures = el.pressures;
+  if (pressures && pressures.length > 0 && smoothed.length >= 4) {
+    const segs: string[] = [];
+    for (let i = 2; i < smoothed.length; i += 2) {
+      const p = pressures[Math.floor(i / 2)] ?? 0.5;
+      const w = Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
+      segs.push(
+        `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
+      );
+    }
+    return `<g${opacityAttr}>${segs.join("")}</g>`;
+  }
+  return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+}
+
+function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
+  const fontFamily = el.font ?? "Pretendard, sans-serif";
+  ctx.fonts.add(fontFamily);
+  const transform = nodeTransform(el.x, el.y, el.rotation, el);
+  const opacity = el.opacity ?? 1;
+  const shadowEnabled = !!el.shadowColor && (el.shadowOpacity ?? 0) > 0;
+  const filter = shadowEnabled
+    ? shadowFilterDef(ctx, {
+        color: el.shadowColor ?? "#000000",
+        blur: el.shadowBlur ?? 0,
+        offsetX: el.shadowOffsetX ?? 0,
+        offsetY: el.shadowOffsetY ?? 0,
+        opacity: el.shadowOpacity ?? 1,
+      })
+    : undefined;
+
+  const textPath = normalizeTextPath(el.textPath);
+  const usesPath = el.textPath && !isFlatTextPath(textPath);
+
+  // 채우기 — 그라데이션이면 로컬(0,0 원점) bbox 로 defs 생성(그룹 translate 안이라 로컬 좌표).
+  const gradientSpec =
+    el.fillType === "gradient"
+      ? (el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection))
+      : null;
+
+  if (usesPath) {
+    const pathData = buildTextPathData(textPath, el.width, el.fontSize);
+    const pathId = nextId(ctx, "stp");
+    ctx.defs.push(`<path id="${pathId}" d="${escapeXml(pathData)}" fill="none"/>`);
+    const fill = gradientSpec
+      ? gradientDef(ctx, gradientSpec, { x: 0, y: 0, width: Math.max(1, el.width), height: el.fontSize * 2.8 }, { x: 0, y: 0 })
+      : el.fill;
+    const align = el.align ?? "left";
+    const startOffset = align === "center" ? "50%" : align === "right" ? "100%" : "0";
+    const anchor = align === "center" ? "middle" : align === "right" ? "end" : "start";
+    const weight = (el.fontStyle ?? "bold").includes("bold") ? "bold" : undefined;
+    const style = (el.fontStyle ?? "bold").includes("italic") ? "italic" : undefined;
+    const strokeAttrs =
+      el.stroke && (el.strokeWidth ?? 0) > 0
+        ? `${att("stroke", el.stroke)}${att("stroke-width", el.strokeWidth)} paint-order="stroke" stroke-linejoin="round"`
+        : "";
+    return (
+      `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>` +
+      `<text xml:space="preserve" font-family="${escapeXml(fontFamily)}" font-size="${fmt(el.fontSize)}"` +
+      `${att("font-weight", weight)}${att("font-style", style)}` +
+      `${(el.letterSpacing ?? 0) !== 0 ? att("letter-spacing", el.letterSpacing ?? 0) : ""}` +
+      ` fill="${escapeXml(fill)}"${strokeAttrs}${filter ? att("filter", filter) : ""}>` +
+      `<textPath href="#${pathId}" startOffset="${startOffset}" text-anchor="${anchor}">${escapeXml(el.text)}</textPath>` +
+      `</text></g>`
+    );
+  }
+
+  const content = el.vertical ? formatVerticalText(el.text) : el.text;
+  const lineHeight = el.lineHeight ?? 1;
+  const letterSpacing = el.letterSpacing ?? 0;
+  const fill = gradientSpec
+    ? gradientDef(
+        ctx,
+        gradientSpec,
+        estimateTextGradientBBox({ width: el.width, text: content, fontSize: el.fontSize, lineHeight }),
+        { x: 0, y: 0 }
+      )
+    : el.fill;
+  // 자동 줄바꿈은 SVG 에 없음 — 수동 줄바꿈 없이 박스 폭을 넘길 것으로 추정되면 근사 고지.
+  if (content.split("\n").some((line) => estimateLineWidth(line, el.fontSize, letterSpacing) > el.width * 1.02)) {
+    addSkip(ctx, el, "approximated", "자동 줄바꿈은 SVG에 없어 수동 줄바꿈(엔터)만 반영돼요.");
+  }
+  const block = textBlockMarkup({
+    text: content,
+    x: 0,
+    y: 0,
+    boxWidth: el.width,
+    fontSize: el.fontSize,
+    lineHeight,
+    letterSpacing,
+    align: el.align ?? "left",
+    fontFamily,
+    fontStyle: el.fontStyle ?? "bold",
+    fill,
+    stroke: el.stroke,
+    strokeWidth: el.strokeWidth,
+    filter,
+  });
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${block}</g>`;
+}
+
+function serializeSticker(ctx: ExportCtx, el: SvgStickerElLike): string {
+  ctx.fonts.add("Arial");
+  const transform = nodeTransform(el.x, el.y, el.rotation, el);
+  const opacity = el.opacity ?? 1;
+  const block = textBlockMarkup({
+    text: el.text,
+    x: 0,
+    y: 0,
+    boxWidth: 0,
+    fontSize: el.fontSize,
+    lineHeight: 1,
+    letterSpacing: 0,
+    align: "left",
+    fontFamily: "Arial",
+    fontStyle: "normal",
+    fill: "black",
+  });
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${block}</g>`;
+}
+
+/** 말풍선 테마 파라미터(StudioPage 렌더의 classic/soft/vivid 분기 포트). */
+function bubbleThemeParams(el: SvgBubbleElLike, theme: SvgExportTheme) {
+  const avgSize = (el.width + el.height) / 2;
+  let stroke = el.stroke ?? "#1f1a16";
+  let strokeW = el.strokeWidth ?? (avgSize < 300 ? 2.5 : avgSize < 500 ? 3 : 3.5);
+  let radius = 18;
+  let tailHeightAdjust = 0;
+  let borderRatio = 0.08;
+  if (theme === "soft") {
+    stroke = el.stroke ?? "#2d2d2d";
+    strokeW = el.strokeWidth ?? (avgSize < 300 ? 1.5 : avgSize < 500 ? 1.8 : 2);
+    radius = 24;
+    tailHeightAdjust = -10;
+  } else if (theme === "vivid") {
+    stroke = el.stroke ?? "#444444";
+    strokeW = el.strokeWidth ?? (avgSize < 300 ? 1.2 : avgSize < 500 ? 1.5 : 1.8);
+    radius = Math.min(el.width, el.height) / 2;
+    tailHeightAdjust = -14;
+    borderRatio = 0.06;
+  }
+  return { stroke, strokeW, radius, tailHeightAdjust, borderRatio };
+}
+
+function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
+  const theme = ctx.theme;
+  const { stroke: bStroke, strokeW: bStrokeW, radius: bRadius, tailHeightAdjust, borderRatio } = bubbleThemeParams(el, theme);
+  const tXRatio = el.tailXRatio ?? 0.35;
+  const tHeight = el.tailHeight ?? 30;
+  const tailDir = el.tail ?? "left";
+  const tailDirection = el.tailDirection ?? "bottom";
+  const showTail = tailDir !== "none";
+
+  const flipTailX = (pts: number[]): number[] => {
+    if (tailDir !== "right") return pts;
+    if (tailDirection === "bottom" || tailDirection === "top") {
+      return pts.map((v, i) => (i % 2 === 0 ? el.width - v : v));
+    }
+    return pts;
+  };
+
+  // 본체+꼬리 단일 path — StudioPage 와 동일 정규화(최소변 비례 꼬리 길이/밑동).
+  const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
+  const bMinDim = Math.min(el.width, el.height);
+  const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeight + tailHeightAdjust), bMinDim * 0.3));
+  const bTailBase = Math.max(bMinDim * 0.1, (tailIsVertical ? el.width : el.height) * borderRatio * 1.8);
+  const bubbleTailSpec: BubbleTailSpec | null = showTail
+    ? {
+        direction: tailDirection,
+        ratio: tailDir === "right" && tailIsVertical ? 1 - tXRatio : tXRatio,
+        length: bTailLen,
+        base: bTailBase,
+        side: "center",
+      }
+    : null;
+  const bubbleExtraTails = normalizeExtraTails(el.extraTails);
+  const speechPathData =
+    bubbleExtraTails.length > 0
+      ? bubblePathDataMulti(el.width, el.height, bRadius, [...(bubbleTailSpec ? [bubbleTailSpec] : []), ...bubbleExtraTails])
+      : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
+
+  const body: string[] = [];
+  const strokeAttrs = `${att("stroke", bStroke)}${att("stroke-width", bStrokeW)}`;
+
+  if (el.variant === "shout" || el.variant === "angry") {
+    const isShout = el.variant === "shout";
+    const base = isShout ? 136 : 160;
+    const pts = isShout ? rawStarPoints(0, 0, 20, 36, 68) : rawStarPoints(0, 0, 22, 28, 64);
+    const starStroke = isShout
+      ? bStroke
+      : theme === "soft"
+        ? "#dc2626"
+        : theme === "vivid"
+          ? "#7f1d1d"
+          : "#991b1b";
+    const starStrokeW = isShout ? bStrokeW : Math.max(bStrokeW, 3.5);
+    body.push(
+      `<polygon points="${pointsAttr(pts)}" transform="translate(${fmt(el.width / 2)} ${fmt(el.height / 2)}) scale(${fmt(el.width / base)} ${fmt(el.height / base)})" fill="${escapeXml(el.fill)}" stroke="${escapeXml(starStroke)}" stroke-width="${fmt(starStrokeW)}" stroke-linejoin="round"/>`
+    );
+  } else if (el.variant === "thought") {
+    body.push(
+      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(Math.min(el.width, el.height) / 2)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+    );
+    if (showTail) {
+      const thoughtSW = bStrokeW * 0.8;
+      const bigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
+      const smallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
+      const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
+      const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
+      const dot = (x: number, y: number, rx: number, ry: number) =>
+        `<ellipse cx="${fmt(x)}" cy="${fmt(y)}" rx="${fmt(rx)}" ry="${fmt(ry)}" fill="${escapeXml(el.fill)}" stroke="${escapeXml(bStroke)}" stroke-width="${fmt(thoughtSW)}"/>`;
+      if (tailDirection === "bottom") {
+        body.push(dot(bigX, el.height + 14, 14, 11), dot(bigX, el.height + 32, 10, 8), dot(smallX, el.height + 54, 6, 5));
+      } else if (tailDirection === "top") {
+        body.push(dot(bigX, -14, 14, 11), dot(bigX, -32, 10, 8), dot(smallX, -54, 6, 5));
+      } else if (tailDirection === "left") {
+        body.push(dot(-14, bigY, 11, 14), dot(-32, bigY, 8, 10), dot(-54, smallY, 5, 6));
+      } else {
+        body.push(dot(el.width + 14, bigY, 11, 14), dot(el.width + 32, bigY, 8, 10), dot(el.width + 54, smallY, 5, 6));
+      }
+    }
+  } else if (el.variant === "whisper") {
+    body.push(
+      `<path d="${escapeXml(speechPathData)}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="8 5"/>`
+    );
+  } else if (el.variant === "scared") {
+    const scaredFill = el.fill === "transparent" ? "transparent" : el.fill === "#ffffff" ? "#f5f3ff" : el.fill;
+    body.push(
+      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="14" fill="${escapeXml(scaredFill)}" stroke="#7c3aed" stroke-width="2"/>`
+    );
+    if (showTail) {
+      let pts: number[];
+      if (tailDirection === "bottom") {
+        pts = [el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2];
+      } else if (tailDirection === "top") {
+        pts = [el.width * 0.32, 2, el.width * 0.26, -22, el.width * 0.45, 2];
+      } else if (tailDirection === "left") {
+        pts = [2, el.height * 0.32, -22, el.height * 0.26, 2, el.height * 0.45];
+      } else {
+        pts = [el.width - 2, el.height * 0.32, el.width + 22, el.height * 0.26, el.width - 2, el.height * 0.45];
+      }
+      body.push(`<path d="${pointsToPathD(flipTailX(pts), true)}" fill="${escapeXml(scaredFill)}" stroke="#7c3aed" stroke-width="2"/>`);
+    }
+  } else if (el.variant === "system") {
+    body.push(
+      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="4" fill="#0a0f24" opacity="0.88" stroke="#0ea5e9" stroke-width="2.5"/>`,
+      `<rect x="4" y="4" width="${fmt(el.width - 8)}" height="${fmt(el.height - 8)}" rx="2" fill="none" stroke="#38bdf8" stroke-width="1" opacity="0.5"/>`
+    );
+  } else if (el.variant === "phone") {
+    const phoneRadius = theme === "soft" ? 10 : theme === "vivid" ? 6 : 8;
+    body.push(
+      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(phoneRadius)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+    );
+    if (showTail) {
+      let pts: number[];
+      if (tailDirection === "bottom") {
+        pts =
+          tailDir === "right"
+            ? [el.width - 26, el.height - 1, el.width - 20, el.height + 10, el.width - 14, el.height - 1]
+            : [14, el.height - 1, 20, el.height + 10, 26, el.height - 1];
+      } else if (tailDirection === "top") {
+        pts = tailDir === "right" ? [el.width - 26, 1, el.width - 20, -10, el.width - 14, 1] : [14, 1, 20, -10, 26, 1];
+      } else if (tailDirection === "left") {
+        pts = [1, el.height * 0.35, -10, el.height * 0.45, 1, el.height * 0.55];
+      } else {
+        pts = [el.width - 1, el.height * 0.35, el.width + 10, el.height * 0.45, el.width - 1, el.height * 0.55];
+      }
+      body.push(`<path d="${pointsToPathD(pts, true)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`);
+    }
+  } else if (el.variant === "heart") {
+    const HEART_PATH =
+      "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
+    body.push(
+      `<path d="${HEART_PATH}" transform="scale(${fmt(el.width / 24)} ${fmt(el.height / 24)})" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+    );
+  } else if (el.variant === "box") {
+    const boxRadius = theme === "soft" ? 6 : theme === "vivid" ? 3 : 4;
+    body.push(
+      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(boxRadius)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+    );
+  } else {
+    // speech(기본) — 본체+꼬리 단일 path.
+    body.push(
+      `<path d="${escapeXml(speechPathData)}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
+    );
+  }
+
+  // 말풍선 텍스트 — StudioPage 여백/행간/자간 규약 그대로.
+  const fontFamily = el.font ?? "Pretendard, sans-serif";
+  ctx.fonts.add(fontFamily);
+  const bFs = el.fontSize ?? 24;
+  const bHPad = Math.max(12, Math.round(bFs * 0.6));
+  const bVPadTop = Math.max(8, Math.round(bFs * 0.48));
+  const bVPadBot = Math.max(10, Math.round(bFs * 0.64));
+  const lineHeight = el.lineHeight ?? (el.vertical ? 1.4 : theme === "soft" ? 1.35 : theme === "vivid" ? 1.2 : 1.25);
+  const letterSpacing = theme === "vivid" ? 0 : 0.3;
+  const content = el.vertical ? formatVerticalText(el.text) : el.text;
+  const boxWidth = Math.max(8, el.width - bHPad * 2);
+  const boxHeight = Math.max(8, el.height - (bVPadTop + bVPadBot));
+  if (content.split("\n").some((line) => estimateLineWidth(line, bFs, letterSpacing) > boxWidth * 1.02)) {
+    addSkip(ctx, el, "approximated", "말풍선 자동 줄바꿈은 SVG에 없어 수동 줄바꿈(엔터)만 반영돼요.");
+  }
+  if (content.trim().length > 0) {
+    body.push(
+      textBlockMarkup({
+        text: content,
+        x: bHPad,
+        y: bVPadTop,
+        boxWidth,
+        boxHeight,
+        fontSize: bFs,
+        lineHeight,
+        letterSpacing,
+        align: el.align ?? "center",
+        fontFamily,
+        fontStyle: el.fontStyle ?? "bold",
+        fill: el.textFill,
+      })
+    );
+  }
+
+  const transform = nodeTransform(el.x, el.y, el.rotation);
+  const opacity = el.opacity ?? 1;
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${body.join("")}</g>`;
+}
+
+/** 프레임(패널) 테마 파라미터 — StudioPage FramePanel 분기 포트. */
+function frameThemeParams(el: SvgFrameElLike, theme: SvgExportTheme) {
+  let stroke = el.stroke ?? "#16100c";
+  let strokeW = el.strokeWidth ?? 3;
+  let radius = 4;
+  let shadow: { color: string; blur: number; offsetX: number; offsetY: number; opacity: number } | null = null;
+  if (theme === "soft") {
+    stroke = el.stroke ?? "#222222";
+    strokeW = el.strokeWidth ?? 1.8;
+    radius = 0;
+  } else if (theme === "vivid") {
+    stroke = el.stroke ?? "#3a3a3a";
+    strokeW = el.strokeWidth ?? 1.2;
+    radius = 6;
+    shadow = { color: "black", blur: 5, offsetX: 1, offsetY: 2, opacity: 0.08 };
+  }
+  return { stroke, strokeW, radius, shadow };
+}
+
+function serializeFrame(ctx: ExportCtx, el: SvgFrameElLike): string {
+  const { stroke, strokeW, radius, shadow } = frameThemeParams(el, ctx.theme);
+  const poly = el.points && el.points.length >= 6 ? el.points : null;
+  const clipId = nextId(ctx, "sc");
+  ctx.defs.push(
+    `<clipPath id="${clipId}">${
+      poly ? `<polygon points="${pointsAttr(poly)}"/>` : `<rect width="${fmt(el.width)}" height="${fmt(el.height)}"/>`
+    }</clipPath>`
+  );
+
+  const parts: string[] = [];
+  // 배경 채움(폴리곤이면 폴리곤 그대로).
+  const bgFill = el.bgColor ?? "#ffffff";
+  parts.push(
+    poly
+      ? `<polygon points="${pointsAttr(poly)}" fill="${escapeXml(bgFill)}"/>`
+      : `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" fill="${escapeXml(bgFill)}"/>`
+  );
+  // 배경 이미지 — cover-fit 은 preserveAspectRatio slice 로 동일 재현.
+  if (el.bg) {
+    if (!el.bg.startsWith("data:")) {
+      addSkip(ctx, el, "approximated", "프레임 배경 이미지가 외부 주소라 SVG에 데이터로 담기지 않았어요.");
+    }
+    parts.push(
+      `<image href="${escapeXml(el.bg)}" width="${fmt(el.width)}" height="${fmt(el.height)}" preserveAspectRatio="xMidYMid slice"/>`
+    );
+  }
+  // 테두리 — 캔버스와 동일하게 클립 안쪽에서 절반 인셋으로 그린다.
+  if (strokeW > 0) {
+    const dashAttr = el.dashStyle === "dashed" ? att("stroke-dasharray", "10 5") : "";
+    const filterAttr = shadow ? att("filter", shadowFilterDef(ctx, shadow)) : "";
+    if (poly) {
+      parts.push(
+        `<polygon points="${pointsAttr(poly)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeW)}"${dashAttr}${filterAttr}/>`
+      );
+    } else {
+      const inset = strokeW / 2;
+      parts.push(
+        `<rect x="${fmt(inset)}" y="${fmt(inset)}" width="${fmt(Math.max(0, el.width - strokeW))}" height="${fmt(Math.max(0, el.height - strokeW))}"${Math.max(0, radius - inset) > 0 ? att("rx", Math.max(0, radius - inset)) : ""} fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeW)}"${dashAttr}${filterAttr}/>`
+      );
+    }
+  }
+  const transform = nodeTransform(el.x, el.y);
+  return `<g${transform ? att("transform", transform) : ""} clip-path="url(#${clipId})">${parts.join("")}</g>`;
+}
+
+function serializeImage(ctx: ExportCtx, el: SvgImageElLike): string {
+  if (!el.src.startsWith("data:")) {
+    addSkip(ctx, el, "approximated", "이미지가 외부 주소라 SVG에 데이터로 담기지 않았어요(오프라인에서 안 보일 수 있음).");
+  }
+  if (hasActiveImageFilters(el)) {
+    addSkip(ctx, el, "approximated", "픽셀 필터·색보정은 SVG에 적용되지 않아 원본 이미지로 표시돼요.");
+  }
+  const transform = nodeTransform(el.x, el.y, el.rotation, el);
+  const opacity = el.opacity ?? 1;
+  const attrs: string[] = [];
+  // 둥근 모서리 — 로컬 좌표 둥근 사각형 클립.
+  if ((el.cornerRadius ?? 0) > 0) {
+    const clipId = nextId(ctx, "sc");
+    const rx = Math.min(el.cornerRadius ?? 0, Math.min(el.width, el.height) / 2);
+    ctx.defs.push(`<clipPath id="${clipId}"><rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(rx)}"/></clipPath>`);
+    attrs.push(` clip-path="url(#${clipId})"`);
+  }
+  if (el.shadowColor) {
+    attrs.push(
+      att(
+        "filter",
+        shadowFilterDef(ctx, {
+          color: el.shadowColor,
+          blur: el.shadowBlur ?? 0,
+          offsetX: el.shadowOffsetX ?? 0,
+          offsetY: el.shadowOffsetY ?? 0,
+          opacity: el.shadowOpacity ?? 1,
+        })
+      )
+    );
+  }
+  // 좌우/상하 반전 — 캔버스는 비트맵을 미리 뒤집는다. SVG 는 로컬 반전 변환으로 동일 결과.
+  let flip = "";
+  if (el.flipped || el.flippedY) {
+    const sx = el.flipped ? -1 : 1;
+    const sy = el.flippedY ? -1 : 1;
+    flip = ` transform="translate(${fmt(el.flipped ? el.width : 0)} ${fmt(el.flippedY ? el.height : 0)}) scale(${sx} ${sy})"`;
+  }
+  const image = `<image href="${escapeXml(el.src)}" width="${fmt(el.width)}" height="${fmt(el.height)}" preserveAspectRatio="none"${flip}/>`;
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}${attrs.join("")}>${image}</g>`;
+}
+
+function serializeFocusLines(el: SvgFocusLinesElLike): string {
+  const count = el.lineCount ?? 80;
+  const innerR = el.innerRadius ?? 120;
+  const outerR = el.outerRadius ?? 600;
+  const noise = el.noise ?? 24;
+  const cx = el.width * (el.centerXRatio ?? 0.5);
+  const cy = el.height * (el.centerYRatio ?? 0.5);
+  const rand = seededRandom(el.id);
+  const segs: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (i * 2 * Math.PI) / count;
+    const nStart = (rand() - 0.5) * noise;
+    const nEnd = (rand() - 0.5) * noise;
+    const rStart = Math.max(1, innerR + nStart);
+    const rEnd = Math.max(rStart + 10, outerR + nEnd);
+    segs.push(
+      `M ${fmt(cx + rStart * Math.cos(angle))} ${fmt(cy + rStart * Math.sin(angle))} L ${fmt(cx + rEnd * Math.cos(angle))} ${fmt(cy + rEnd * Math.sin(angle))}`
+    );
+  }
+  const transform = nodeTransform(el.x, el.y, el.rotation ?? 0);
+  const opacity = el.opacity ?? 1;
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}><path d="${segs.join(" ")}" fill="none" stroke="${escapeXml(el.stroke ?? "#000000")}" stroke-width="${fmt(el.strokeWidth ?? 2.5)}"/></g>`;
+}
+
+function serializeSpeedLines(el: SvgSpeedLinesElLike): string {
+  const count = el.lineCount ?? 60;
+  const dir = el.direction ?? "horizontal";
+  const rand = seededRandom(el.id);
+  const segs: string[] = [];
+  if (dir === "horizontal") {
+    for (let i = 0; i < count; i++) {
+      const y = rand() * el.height;
+      const len = el.width * (0.2 + rand() * 0.8);
+      const xStart = rand() > 0.5 ? 0 : el.width - len;
+      segs.push(`M ${fmt(xStart)} ${fmt(y)} L ${fmt(xStart + len)} ${fmt(y)}`);
+    }
+  } else {
+    for (let i = 0; i < count; i++) {
+      const x = rand() * el.width;
+      const len = el.height * (0.2 + rand() * 0.8);
+      const yStart = rand() > 0.5 ? 0 : el.height - len;
+      segs.push(`M ${fmt(x)} ${fmt(yStart)} L ${fmt(x)} ${fmt(yStart + len)}`);
+    }
+  }
+  const transform = nodeTransform(el.x, el.y, el.rotation ?? 0);
+  const opacity = el.opacity ?? 1;
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}><path d="${segs.join(" ")}" fill="none" stroke="${escapeXml(el.stroke ?? "#000000")}" stroke-width="${fmt(el.strokeWidth ?? 2.5)}"/></g>`;
+}
+
+// ---------------------------------------------------------------------------
+// 패널 클리핑·혼합 모드 래핑 — StudioPage wrapClip 규약 포트
+// ---------------------------------------------------------------------------
+
+/** 요소 대략 bbox(StudioPage elBounds 포트) — 패널 소속 판정용. */
+function elBounds(el: SvgExportEl): { x: number; y: number; w: number; h: number } {
+  if (el.type === "draw") {
+    let minX = el.points[0] ?? 0;
+    let minY = el.points[1] ?? 0;
+    let maxX = minX;
+    let maxY = minY;
+    for (let i = 2; i + 1 < el.points.length; i += 2) {
+      const x = el.points[i];
+      const y = el.points[i + 1];
+      if (x < minX) minX = x;
+      else if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      else if (y > maxY) maxY = y;
+    }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+  if (el.type === "text") return { x: el.x, y: el.y, w: el.width, h: el.fontSize * 1.4 };
+  if (el.type === "sticker") return { x: el.x, y: el.y, w: el.fontSize, h: el.fontSize };
+  return { x: el.x, y: el.y, w: el.width, h: el.height };
+}
+
+/** 요소가 들어가야 할 패널(StudioPage containingPanel 포트) — 없으면 null. */
+function containingPanel(el: SvgExportEl, all: readonly SvgExportEl[]): SvgFrameElLike | null {
+  if (el.type === "frame") return null;
+  const b = elBounds(el);
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  let best: SvgFrameElLike | null = null;
+  let bestArea = Infinity;
+  for (const f of all) {
+    if (f.type !== "frame" || f.hidden) continue;
+    if (cx < f.x || cx > f.x + f.width || cy < f.y || cy > f.y + f.height) continue;
+    if (b.w > f.width * 1.4 || b.h > f.height * 1.4) continue;
+    const area = f.width * f.height;
+    if (area < bestArea) {
+      bestArea = area;
+      best = f;
+    }
+  }
+  return best;
+}
+
+// CSS mix-blend-mode 로 그대로 표현 가능한 합성 모드(레이어 인스펙터 선택지 전부 포함).
+const CSS_BLEND_MODES = new Set([
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "hard-light",
+  "soft-light",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+]);
+
+// ---------------------------------------------------------------------------
+// 메인 — 페이지 → SVG
+// ---------------------------------------------------------------------------
+
+export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
+  const ctx: ExportCtx = {
+    defs: [],
+    skips: [],
+    fonts: new Set<string>(),
+    theme: input.theme ?? "classic",
+    seq: 0,
+  };
+  const groups: LayerGroup[] = [...(input.groups ?? [])];
+  const body: string[] = [];
+
+  // 배경 — 캔버스 bg 레이어와 동일(그라데이션은 세로 2색).
+  if (!input.transparentBg) {
+    const grad = input.bgGrad;
+    if (grad && grad.length >= 2) {
+      const id = nextId(ctx, "sg");
+      ctx.defs.push(
+        `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${fmt(input.height)}"><stop offset="0%" stop-color="${escapeXml(grad[0])}"/><stop offset="100%" stop-color="${escapeXml(grad[1])}"/></linearGradient>`
+      );
+      body.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="url(#${id})"/>`);
+    } else {
+      body.push(`<rect width="${fmt(input.width)}" height="${fmt(input.height)}" fill="${escapeXml(input.bg ?? "#ffffff")}"/>`);
+    }
+  }
+
+  let elementCount = 0;
+  for (const el of input.elements) {
+    if (isEffectivelyHidden(el, groups)) continue; // 숨긴 레이어/그룹은 캔버스 내보내기와 동일하게 제외
+    elementCount += 1;
+
+    let markup = "";
+    switch (el.type) {
+      case "image":
+        markup = serializeImage(ctx, el);
+        break;
+      case "frame":
+        markup = serializeFrame(ctx, el);
+        break;
+      case "focusLines":
+        markup = serializeFocusLines(el);
+        break;
+      case "speedLines":
+        markup = serializeSpeedLines(el);
+        break;
+      case "draw":
+        markup = serializeDraw(ctx, el);
+        break;
+      case "text":
+        markup = serializeText(ctx, el);
+        break;
+      case "sticker":
+        markup = serializeSticker(ctx, el);
+        break;
+      case "bubble":
+        markup = serializeBubble(ctx, el);
+        break;
+    }
+    if (!markup) continue;
+
+    // 아래 레이어 클리핑(알파 마스크) — SVG 로 재현 불가, 자르지 않고 표시(근사 고지).
+    if (el.clipBelow) {
+      addSkip(ctx, el, "approximated", "아래 레이어로 자르기(클리핑 마스크)는 SVG에서 지원되지 않아 자르지 않고 표시돼요.");
+    }
+
+    // 패널 클리핑 + 혼합 모드 — 캔버스 wrapClip 과 동일 조건.
+    const panel = el.type !== "frame" && !el.noClip ? containingPanel(el, input.elements) : null;
+    const blend = el.blendMode && el.blendMode !== "source-over" ? el.blendMode : null;
+    let blendStyle = "";
+    if (blend) {
+      if (CSS_BLEND_MODES.has(blend)) {
+        blendStyle = ` style="mix-blend-mode:${blend}"`;
+      } else {
+        addSkip(ctx, el, "approximated", `혼합 모드(${blend})는 SVG에서 지원되지 않아 보통 합성으로 표시돼요.`);
+      }
+    }
+    if (panel) {
+      const clipId = nextId(ctx, "sc");
+      ctx.defs.push(
+        `<clipPath id="${clipId}"><rect x="${fmt(panel.x)}" y="${fmt(panel.y)}" width="${fmt(panel.width)}" height="${fmt(panel.height)}"/></clipPath>`
+      );
+      markup = `<g clip-path="url(#${clipId})"${blendStyle}>${markup}</g>`;
+    } else if (blendStyle) {
+      markup = `<g${blendStyle}>${markup}</g>`;
+    }
+    body.push(markup);
+  }
+
+  const caveats: string[] = [];
+  if (ctx.fonts.size > 0) {
+    caveats.push("글꼴은 SVG 파일에 임베드되지 않아요 — 보는 기기에 설치된 글꼴로 표시돼요.");
+  }
+
+  const defsMarkup = ctx.defs.length > 0 ? `<defs>${ctx.defs.join("")}</defs>` : "";
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(input.width)}" height="${fmt(input.height)}" viewBox="0 0 ${fmt(input.width)} ${fmt(input.height)}">` +
+    defsMarkup +
+    body.join("") +
+    `</svg>`;
+
+  return {
+    svg,
+    skipped: ctx.skips,
+    fontFamilies: [...ctx.fonts],
+    caveats,
+    elementCount,
+  };
+}
+
+/** 내보내기 결과 요약 한 줄(한글) — 내보내기 패널 상태 문구용. 정직하게 제외/근사 개수를 밝힌다. */
+export function svgExportResultMessage(result: SvgExportResult): string {
+  const droppedIds = new Set(result.skipped.filter((s) => s.mode === "skipped").map((s) => s.id));
+  const approxIds = new Set(result.skipped.filter((s) => s.mode === "approximated" && !droppedIds.has(s.id)).map((s) => s.id));
+  const parts = [`SVG 저장 완료 — 요소 ${result.elementCount}개 벡터 변환`];
+  if (droppedIds.size > 0) parts.push(`제외 ${droppedIds.size}개`);
+  if (approxIds.size > 0) parts.push(`근사 ${approxIds.size}개`);
+  if (droppedIds.size === 0 && approxIds.size === 0 && result.elementCount > 0) parts.push("전부 벡터 보존");
+  return parts.join(" · ");
+}

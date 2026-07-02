@@ -168,6 +168,17 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
+import {
+  MASTER_EDIT_GHOST_OPACITY,
+  composeMasterRenderElements,
+  composeThumbPage,
+  createEmptyDocumentMaster,
+  normalizeDocumentMaster,
+  serializeDocumentMaster,
+  togglePageHideMaster,
+  withMasterElements,
+  type DocumentMaster,
+} from "./studio-master-page";
 import { resizableNodeProps, textNodeProps } from "./studio-node-props";
 import {
   isDefaultPageGrade,
@@ -219,6 +230,7 @@ import {
 import {
   applySelectionAdjustToCanvas,
   beginSelectionDrag,
+  brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
   commitSelectionDrag,
@@ -229,6 +241,7 @@ import {
   planSelectionAdjust,
   rasterizeSelectionMask,
   removeLastSubpath,
+  SELECTION_BRUSH_RADIUS_DEFAULT,
   setSelectionFeather,
   subpathOutlinePoints,
   toggleSelectionInvert,
@@ -260,6 +273,7 @@ import {
   type ShapeParams,
   type StrokeStyle,
 } from "./studio-stroke-shapes";
+import { exportPageToSvg, type SvgExportEl, type SvgExportResult } from "./studio-svg-export";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   DEFAULT_WATERMARK,
@@ -337,6 +351,9 @@ const StudioDialogueBatchPanel = lazy(() =>
 );
 const StudioHistoryPanel = lazy(() =>
   import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel }))
+);
+const StudioMasterPagePanel = lazy(() =>
+  import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel }))
 );
 const StudioShortcutsHelp = lazy(() =>
   import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp }))
@@ -1852,12 +1869,33 @@ function StudioSelectionAntsOverlay({
 
   const passes = marchingAntsPasses(elapsedMs, scale);
   const size = { width: frame.width, height: frame.height };
+  // 브러시 드래그는 마칭앤츠 폴리곤이 아니라 반투명 라운드 획(미리보기=마스크 결과 일치)으로 그린다.
+  const brushDrag = drag?.tool === "brush" ? brushStrokePreview(drag.points, drag.brushRadius, size) : null;
   const dragPoints =
-    drag && drag.points.length >= 2 ? subpathOutlinePoints({ mode: drag.mode, points: drag.points }, size) : null;
+    drag && drag.tool !== "brush" && drag.points.length >= 2
+      ? subpathOutlinePoints({ mode: drag.mode, points: drag.points }, size)
+      : null;
+  const dragStroke = drag?.mode === "subtract" ? "rgba(244, 63, 94, 0.55)" : "rgba(124, 92, 252, 0.5)";
   const dragFill = drag?.mode === "subtract" ? "rgba(244, 63, 94, 0.12)" : "rgba(124, 92, 252, 0.10)";
   return (
     <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
       {selection?.subpaths.map((sp, i) => {
+        // 브러시 서브패스는 라운드 획으로(닫힌 폴리곤 앤츠는 궤적을 왜곡).
+        if (sp.kind === "brush") {
+          const stroke = brushStrokePreview(sp.points, sp.radius, size);
+          if (!stroke) return null;
+          return passes.map((pass, j) => (
+            <Line
+              key={`ants-brush-${i}-${j}`}
+              points={stroke.points}
+              stroke={pass.stroke}
+              strokeWidth={stroke.strokeWidth}
+              lineCap="round"
+              lineJoin="round"
+              opacity={j === 0 ? 0.9 : 0.5}
+            />
+          ));
+        }
         const pts = subpathOutlinePoints(sp, size);
         return passes.map((pass, j) => (
           <Line
@@ -1886,7 +1924,11 @@ function StudioSelectionAntsOverlay({
             dashOffset={pass.dashOffset}
           />
         ))}
-      {/* 진행 중 드래그 미리보기 — 합치기=보라, 빼기=적색 반투명 채움 + 앤츠 외곽선. */}
+      {/* 진행 중 브러시 드래그 — 반투명 라운드 획(결과 마스크와 동일 도형). */}
+      {brushDrag && (
+        <Line points={brushDrag.points} stroke={dragStroke} strokeWidth={brushDrag.strokeWidth} lineCap="round" lineJoin="round" />
+      )}
+      {/* 진행 중 폴리곤 드래그 미리보기 — 합치기=보라, 빼기=적색 반투명 채움 + 앤츠 외곽선. */}
       {dragPoints && (
         <>
           <Line points={dragPoints} closed fill={dragFill} />
@@ -2403,6 +2445,7 @@ interface PageState {
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
   name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
   note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.
+  hideMaster?: boolean; // 이 페이지에서 문서 마스터(공통 요소) 숨김 — studio-master-page. 미설정=표시(해제 시 키 제거).
 }
 
 export function StudioPage() {
@@ -2441,6 +2484,14 @@ function StudioCuttoonEditor() {
   const pages = pagesHistory[pagesHi];
 
   const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
+
+  // ── 문서 마스터(공통 요소 레이어) — 모든 페이지에 깔리는 로고/워터마크/코너 장식(studio-master-page) ──
+  // pagesHistory 와 분리된 문서 레벨 상태 — 마스터 편집은 페이지 실행취소 히스토리에 포함되지 않는다(패널 고지).
+  const [master, setMaster] = useState<DocumentMaster<El>>(() => createEmptyDocumentMaster<El>());
+  const [masterEditMode, setMasterEditMode] = useState(false);
+  const [masterPanelOpen, setMasterPanelOpen] = useState(false);
+  // 페이지 캔버스/썸네일에 깔 마스터 합성 목록(숨김 제외 · 잠금/노클립 강제 · 비상호작용).
+  const masterRenderEls = composeMasterRenderElements(master);
   const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
   const activePage = pages[activePageIndex] || pages[0] || {
     id: currentPageId,
@@ -2450,7 +2501,8 @@ function StudioCuttoonEditor() {
     canvasH: 1080,
   };
 
-  const elements = activePage.elements;
+  // 마스터 편집 모드에서는 편집 대상(선택·레이어 패널·속성·commit)이 문서 마스터 요소로 바뀐다(studio-master-page 규약).
+  const elements = masterEditMode ? master.elements : activePage.elements;
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
@@ -2485,6 +2537,8 @@ function StudioCuttoonEditor() {
   };
 
   function updateActivePage(patch: Partial<Omit<PageState, "id">>) {
+    // 마스터 편집 모드의 요소 배열 쓰기(그룹 지정 등)가 페이지 요소를 덮어쓰는 사고를 차단한다(마스터는 그룹 미지원).
+    if (masterEditMode && "elements" in patch) return;
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...patch } : p));
     commitPages(nextPages);
   }
@@ -2955,6 +3009,7 @@ function StudioCuttoonEditor() {
     // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
     const hasContent =
       pages.some((p) => p.elements.length > 0) ||
+      master.elements.length > 0 ||
       title.trim() !== "" ||
       description.trim() !== "" ||
       tagsText.trim() !== "";
@@ -2963,6 +3018,7 @@ function StudioCuttoonEditor() {
       try {
         const payload = {
           pagesList: pages,
+          master: serializeDocumentMaster(master),
           title,
           description,
           tagsText,
@@ -2975,7 +3031,7 @@ function StudioCuttoonEditor() {
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [pages, title, description, tagsText, webtoonTheme, panelGutter, workHydrated, autosaveChecked, hasAutosave]);
+  }, [pages, master, title, description, tagsText, webtoonTheme, panelGutter, workHydrated, autosaveChecked, hasAutosave]);
 
   // 복구 여부를 정하지 않은 채 캔버스 편집을 시작하면(undo 히스토리 누적) 배너를 닫고
   // 자동 저장을 재개한다 — 배너를 무시한 새 작업이 저장되지 않는 공백을 막는다.
@@ -2994,6 +3050,7 @@ function StudioCuttoonEditor() {
           if (saved) {
             const parsed: {
               pagesList?: { elements?: unknown[] }[];
+              master?: { elements?: unknown[] };
               title?: string;
               description?: string;
               tagsText?: string;
@@ -3002,6 +3059,7 @@ function StudioCuttoonEditor() {
               Array.isArray(parsed.pagesList) &&
               parsed.pagesList.length > 0 &&
               (parsed.pagesList.some((p) => (p?.elements?.length ?? 0) > 0) ||
+                (parsed.master?.elements?.length ?? 0) > 0 ||
                 (parsed.title ?? "").trim() !== "" ||
                 (parsed.description ?? "").trim() !== "" ||
                 (parsed.tagsText ?? "").trim() !== "");
@@ -3032,6 +3090,8 @@ function StudioCuttoonEditor() {
         if (parsed.tagsText) setTagsText(parsed.tagsText);
         if (parsed.webtoonTheme) setWebtoonTheme(parsed.webtoonTheme);
         if (parsed.panelGutter) setPanelGutter(parsed.panelGutter);
+        // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
+        setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
         setHasAutosave(false);
       }
     } catch {
@@ -3229,6 +3289,8 @@ function StudioCuttoonEditor() {
   const [pixelTool, setPixelTool] = useState<SelectionToolKind | null>(null);
   const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
   const [pixelBusy, setPixelBusy] = useState(false);
+  // 브러시 선택 반경(캔버스 표시 px) — 드래그 시작 시 요소 폭으로 나눠 정규화 반경으로 넘긴다.
+  const [pixelBrushRadius, setPixelBrushRadius] = useState(SELECTION_BRUSH_RADIUS_DEFAULT);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
   const pixelDragRef = useRef<{ elId: string; frame: SelectionFrame; drag: SelectionDragState } | null>(null);
@@ -3400,6 +3462,12 @@ function StudioCuttoonEditor() {
     }
   }, [elements]);
 
+  // 내보내기·게시 캡처가 시작되면 마스터 편집 모드를 자동 종료한다 — 캡처 화면은 항상
+  // "페이지 요소 + 마스터 합성"이어야 하고, 마스터 편집 화면(고스트 포함)이 찍히면 안 된다.
+  useEffect(() => {
+    if (isExporting) setMasterEditMode(false);
+  }, [isExporting]);
+
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
     const targetId = workId || remixId;
@@ -3435,6 +3503,7 @@ function StudioCuttoonEditor() {
           pagesList?: PageState[];
           currentPageId?: string;
           panelGutter?: number;
+          master?: unknown; // 문서 마스터(공통 요소) — studio-master-page 옵셔널 규약(과거 문서 미존재 허용).
         };
         if (doc?.pagesList && doc.pagesList.length > 0) {
           setPagesHistory([doc.pagesList]);
@@ -3452,6 +3521,8 @@ function StudioCuttoonEditor() {
           setPagesHi(0);
           setCurrentPageId(legacyPage.id);
         }
+        // 문서 마스터(공통 요소) — 과거 문서(master 미존재)는 빈 마스터로(하위호환). 리믹스도 마스터를 승계한다.
+        setMaster(normalizeDocumentMaster(doc?.master) as DocumentMaster<El>);
         if (doc?.webtoonTheme) setWebtoonTheme(doc.webtoonTheme);
         if (doc?.panelGutter) setPanelGutter(doc.panelGutter);
       })
@@ -3987,8 +4058,12 @@ function StudioCuttoonEditor() {
     tr.getLayer()?.batchDraw();
   }, [selectedId, marqueeIds, tool, elements]);
 
-  // 요소 변경을 히스토리에 커밋.
+  // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
   function commit(nextElements: El[]) {
+    if (masterEditMode) {
+      setMaster((m) => withMasterElements(m, nextElements));
+      return;
+    }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
     const h = pagesHistory.slice(0, pagesHi + 1);
@@ -3998,6 +4073,11 @@ function StudioCuttoonEditor() {
   }
   // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
   function commitCoalesced(nextElements: El[], key: string) {
+    if (masterEditMode) {
+      // 마스터 편집은 히스토리 밖이라 합치기(coalesce) 개념이 없다 — 마스터로 바로 커밋.
+      setMaster((m) => withMasterElements(m, nextElements));
+      return;
+    }
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
       setPagesHistory((h) => {
@@ -4687,10 +4767,20 @@ function StudioCuttoonEditor() {
     }
     commit(next);
   }
-  const undo = () => setPagesHi((i) => Math.max(0, i - 1));
-  const redo = () => setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
+  // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
+  const undo = () => {
+    if (masterEditMode) return;
+    setPagesHi((i) => Math.max(0, i - 1));
+  };
+  const redo = () => {
+    if (masterEditMode) return;
+    setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
+  };
   // 히스토리 목록 점프 — undo/redo 와 동일하게 pagesHi 인덱스만 이동(스냅샷 배열은 그대로 유지).
-  const jumpToHistoryIndex = (index: number) => setPagesHi(Math.max(0, Math.min(pagesHistory.length - 1, index)));
+  const jumpToHistoryIndex = (index: number) => {
+    if (masterEditMode) return;
+    setPagesHi(Math.max(0, Math.min(pagesHistory.length - 1, index)));
+  };
 
   // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
@@ -5497,7 +5587,9 @@ function StudioCuttoonEditor() {
         height: selected.height,
         rotation: selected.rotation,
       };
-      const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame));
+      // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
+      const brushRadiusNorm = pixelBrushRadius / Math.max(1, selected.width);
+      const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame), brushRadiusNorm);
       pixelDragRef.current = { elId: selected.id, frame, drag };
       schedulePixelDragPreview(drag);
       return;
@@ -5996,6 +6088,8 @@ function StudioCuttoonEditor() {
         doc: {
           width: CANVAS_W,
           pagesList: pages,
+          // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 JSON 에서 키가 떨어진다(하위호환).
+          master: serializeDocumentMaster(master),
           currentPageId,
           webtoonTheme,
           panelGutter,
@@ -6262,6 +6356,20 @@ function StudioCuttoonEditor() {
     return captured;
   }
 
+  // 현재 페이지 → 벡터 SVG 직렬화(요소 데이터 필요라 여기서 조립). 다운로드·고지는 내보내기 패널이 담당.
+  function exportCurrentPageToSvg(): SvgExportResult {
+    return exportPageToSvg({
+      width: CANVAS_W,
+      height: canvasH,
+      bg,
+      bgGrad,
+      transparentBg: exportTransparent,
+      elements: elements as unknown as readonly SvgExportEl[],
+      groups,
+      theme: webtoonTheme,
+    });
+  }
+
   // 스튜디오 프로젝트 내보내기 (.json)
   function handleExportProject() {
     const projectData = {
@@ -6269,6 +6377,8 @@ function StudioCuttoonEditor() {
       title: title,
       linkedTitleId: linkedTitleId,
       pages: pages,
+      // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 키가 떨어진다(과거 파일과 동일 형태).
+      master: serializeDocumentMaster(master),
     };
     const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -6306,6 +6416,8 @@ function StudioCuttoonEditor() {
         if (projectData.title) {
           setTitle(projectData.title);
         }
+        // 프로젝트 파일의 문서 마스터 복원(없으면 빈 마스터로 교체 — 문서 단위 일관성).
+        setMaster(normalizeDocumentMaster(projectData.master) as DocumentMaster<El>);
         alert("프로젝트 불러오기가 완료되었습니다!");
       } catch (err) {
         console.error(err);
@@ -6384,6 +6496,7 @@ function StudioCuttoonEditor() {
                   exportTitle={title}
                   pageCount={pages.length}
                   capturePagesForPreset={handleCapturePagesForPreset}
+                  exportCurrentPageToSvg={exportCurrentPageToSvg}
                   setExportScale={setExportScale}
                   setExportFormat={setExportFormat}
                   setExportTransparent={setExportTransparent}
@@ -7516,6 +7629,22 @@ function StudioCuttoonEditor() {
             >
               배경 전체
             </button>
+            <button
+              type="button"
+              onClick={() => setMasterPanelOpen((v) => !v)}
+              aria-pressed={masterPanelOpen}
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                masterEditMode
+                  ? "border-accent bg-accent-soft/50 text-accent"
+                  : masterPanelOpen
+                    ? "border-accent/60 text-fg-2 hover:bg-raised"
+                    : "border-line text-fg-3 hover:bg-raised"
+              )}
+              title="마스터 페이지(모든 페이지 공통 요소) 관리"
+            >
+              마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
+            </button>
           </div>
           <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[56vh] lg:max-h-[calc(100dvh-24rem)] pr-1">
             {pages.map((p, idx) => {
@@ -7623,8 +7752,9 @@ function StudioCuttoonEditor() {
                       </button>
                     </div>
                   </div>
-                  {/* 실내용 미니 썸네일 — 요소들을 경량 SVG 프록시로 축소 렌더(StudioPageThumbnails) */}
-                  <StudioPageThumbnail page={p} />
+                  {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
+                      마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
+                  <StudioPageThumbnail page={composeThumbPage(master, p)} />
                   {metaEditPageId === p.id ? (
                     <div className="flex flex-col gap-1 pt-1">
                       <input
@@ -8676,7 +8806,23 @@ function StudioCuttoonEditor() {
                   </Group>
                 );
                 };
-                return elements.map((el, idx) => {
+                // 문서 마스터 밑그림 — 일반 요소 "아래"(배경 위)에 비상호작용(asMask)으로 합성(studio-master-page).
+                // 같은 콘텐츠 레이어라 페이지 지우개(destination-out)에는 함께 지워진다(배경 레이어와 달리 의도된 동일 레이어 합성).
+                const masterUnderlay =
+                  !masterEditMode && !activePage.hideMaster && masterRenderEls.length > 0 ? (
+                    <Group listening={false}>
+                      {masterRenderEls.map((mel, mIdx) => renderEl(mel, mIdx, { asMask: true }))}
+                    </Group>
+                  ) : null;
+                // 마스터 편집 모드 — 현재 페이지의 일반 요소를 반투명 잠금 고스트로 위에 겹쳐 위치 참고용으로만 보여준다.
+                const pageGhost = masterEditMode ? (
+                  <Group listening={false} opacity={MASTER_EDIT_GHOST_OPACITY}>
+                    {activePage.elements
+                      .filter((pel) => !isEffectivelyHidden(pel, activePage.groups ?? []))
+                      .map((pel, pIdx) => renderEl(pel, pIdx, { asMask: true }))}
+                  </Group>
+                ) : null;
+                const mainEls = elements.map((el, idx) => {
                   if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
                   const base = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
                   if (base && !isEffectivelyHidden(base, groups)) {
@@ -8702,6 +8848,13 @@ function StudioCuttoonEditor() {
                   }
                   return renderEl(el, idx);
                 });
+                return (
+                  <>
+                    {masterUnderlay}
+                    {mainEls}
+                    {pageGhost}
+                  </>
+                );
               })()}
               {draft && <StudioDrawNode el={draft} />}
               <Transformer
@@ -9115,6 +9268,35 @@ function StudioCuttoonEditor() {
                 onSelectElement={selectDialogueElement}
                 onPatchText={patchDialogueText}
                 onApplyReplace={applyDialogueReplacePlan}
+              />
+            </Suspense>
+          )}
+          {masterPanelOpen && (
+            <Suspense fallback={null}>
+              <StudioMasterPagePanel
+                editMode={masterEditMode}
+                masterCount={master.elements.length}
+                pages={pages}
+                currentPageId={activePage.id}
+                onToggleEditMode={() => {
+                  // 모드 전환 시 선택을 비운다 — 이전 모드의 요소 id 가 남으면 좌표계가 어긋난다.
+                  setMasterEditMode((v) => !v);
+                  setSelectedId(null);
+                  setMarqueeIds([]);
+                }}
+                onToggleHideMaster={(pageId) => commitPages(togglePageHideMaster(pages, pageId))}
+                onClearMaster={() => {
+                  setMaster(createEmptyDocumentMaster<El>());
+                  setSelectedId(null);
+                  setMarqueeIds([]);
+                }}
+                onClose={() => {
+                  // 패널 규약: 닫으면 마스터 편집 모드도 함께 종료(모드만 남아 헤매는 상태 방지).
+                  setMasterPanelOpen(false);
+                  setMasterEditMode(false);
+                  setSelectedId(null);
+                  setMarqueeIds([]);
+                }}
               />
             </Suspense>
           )}
@@ -10991,12 +11173,14 @@ function StudioCuttoonEditor() {
                     onSetFilterClipboard={setFilterClipboard}
                     onPatch={(patch) => patchEl(selected.id, patch)}
                   />
-                  {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미로 선택해 부분 조정/삭제. */}
+                  {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미/브러시로 선택해 부분 조정/삭제. */}
                   <StudioSelectionToolsPanel
                     selection={pixelSel}
                     activeTool={pixelTool}
                     combineMode={pixelCombine}
                     busy={pixelBusy}
+                    brushRadius={pixelBrushRadius}
+                    onBrushRadiusChange={setPixelBrushRadius}
                     onPickTool={setPixelTool}
                     onCombineModeChange={setPixelCombine}
                     onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
