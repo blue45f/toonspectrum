@@ -21,6 +21,7 @@
     "catalog:update": "node scripts/crawl.mjs --json --no-file > /tmp/toonspectrum-catalog.json && node scripts/merge-catalog.mjs /tmp/toonspectrum-catalog.json && pnpm catalog:gen",
     "related:crawl": "node scripts/crawl-related-info.mjs",
     "related:update": "node scripts/crawl-related-info.mjs && pnpm catalog:gen",
+    "kmas:fetch": "node scripts/kmas-fetch.mjs",
     "predev": "pnpm catalog:gen",
     "prebuild": "pnpm catalog:gen",
     "build:all": "pnpm -r run build",
