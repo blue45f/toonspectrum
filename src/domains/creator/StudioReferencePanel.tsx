@@ -65,6 +65,7 @@ export function StudioReferencePanel({ open, onClose }: StudioReferencePanelProp
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const dragSessionRef = useRef<DragSession | null>(null);
+  const dragListenersRef = useRef<{ onMove: (ev: PointerEvent) => void; onEnd: () => void } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
@@ -171,15 +172,32 @@ export function StudioReferencePanel({ open, onClose }: StudioReferencePanelProp
           : resizeReferencePanelRect(session.startRect, session.startPointer, pointer, w, h);
       setSettings((prev) => ({ ...prev, ...nextRect }));
     };
-    const onUp = () => {
+    const onEnd = () => {
       dragSessionRef.current = null;
       setDragging(null);
       window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      dragListenersRef.current = null;
     };
+    dragListenersRef.current = { onMove, onEnd };
     window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointerup", onEnd);
+    // 탭 전환·터치 취소 등으로 pointerup 없이 제스처가 끊기는 경우도 정리한다 — 안 그러면
+    // 리스너가 영원히 남아 다음 드래그와 겹쳐 좌표가 튄다.
+    window.addEventListener("pointercancel", onEnd);
   }
+
+  // 언마운트 시(패널이 닫히는 등) 진행 중 드래그 리스너가 있으면 정리한다.
+  useEffect(() => {
+    return () => {
+      const listeners = dragListenersRef.current;
+      if (!listeners) return;
+      window.removeEventListener("pointermove", listeners.onMove);
+      window.removeEventListener("pointerup", listeners.onEnd);
+      window.removeEventListener("pointercancel", listeners.onEnd);
+    };
+  }, []);
 
   function resizeByKeyboard(e: React.KeyboardEvent) {
     const step = e.shiftKey ? 32 : 16;
@@ -192,7 +210,14 @@ export function StudioReferencePanel({ open, onClose }: StudioReferencePanelProp
     else if (e.key === "ArrowUp") dh = -step;
     else return;
     e.preventDefault();
-    setSettings((prev) => ({ ...prev, ...clampReferencePanelRect({ ...prev, width: prev.width + dw, height: prev.height + dh }, w, h) }));
+    // clampReferencePanelRect 로 width/height 만 바꾸면 x/y 도 함께 재클램프되어(뷰포트 중앙 기준)
+    // 크기를 조절할 때마다 패널 위치가 튄다 — resizeReferencePanelRect 는 앵커(x/y)를 고정한 채
+    // width/height 만 바꾸므로 그걸 재사용한다. 이 함수는 포인터 델타만 보므로 (0,0)→(dw,dh) 를
+    // "가짜 포인터 이동"으로 넘기면 키보드 리사이즈에도 그대로 쓸 수 있다.
+    setSettings((prev) => ({
+      ...prev,
+      ...resizeReferencePanelRect(prev, { x: 0, y: 0 }, { x: dw, y: dh }, w, h),
+    }));
   }
 
   function pickAsset(asset: StudioAsset) {

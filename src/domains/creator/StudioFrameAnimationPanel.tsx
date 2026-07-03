@@ -101,7 +101,13 @@ export function StudioFrameAnimationPanel({
 
   useEffect(() => {
     const activeFrames = element.frames ?? [];
-    if (!playing || activeFrames.length < 2) return;
+    if (!playing) return;
+    if (activeFrames.length < 2) {
+      // 재생 중 프레임이 삭제되어 1장 이하로 줄면 애니메이션을 재생할 수 없다 — playing state 를
+      // 정지로 되돌리지 않으면 재생 루프만 멈춘 채 버튼은 계속 "정지"(재생 중)로 표시된다.
+      setPlaying(false);
+      return;
+    }
     const durations = frameDurationsMs(activeFrames, fps);
     const total = durations.reduce((sum, d) => sum + d, 0);
     const start = performance.now();
@@ -277,7 +283,16 @@ export function StudioFrameAnimationPanel({
                       <button
                         type="button"
                         title="삭제"
-                        onClick={() => onFramesChange(removeFrame(frames, f.id))}
+                        onClick={() => {
+                          const next = removeFrame(frames, f.id);
+                          onFramesChange(next);
+                          // 삭제한 프레임이 탐색 위치(activeFrameId)였다면 인접 프레임으로 옮긴다 —
+                          // 그대로 두면 activeFrameId가 존재하지 않는 프레임을 계속 가리키게 된다.
+                          if (f.id === element.activeFrameId && next.length > 0) {
+                            const fallback = next[Math.min(i, next.length - 1)];
+                            if (fallback) onActiveFrameChange(fallback.id);
+                          }
+                        }}
                         disabled={frames.length <= 1}
                         className="grid size-4 place-items-center rounded bg-canvas/90 text-bad hover:text-bad disabled:opacity-30"
                       >
