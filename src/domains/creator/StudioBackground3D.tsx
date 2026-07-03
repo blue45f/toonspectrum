@@ -35,6 +35,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import {
+  COMPOSITE_CATEGORIES,
+  COMPOSITE_CATEGORY_LABELS,
+  COMPOSITE_PRESETS,
+  instantiateCompositePreset,
+  type BgCompositeCategory,
+} from "./studio-background-3d-composites";
+import {
   clonePrimitives,
   createPrimitive,
   duplicatePrimitive,
@@ -46,6 +53,7 @@ import {
   type BgPrimitive,
   type BgPrimitiveKind,
 } from "./studio-background-3d-primitives";
+import { BG_SKY_PRESETS, DEFAULT_SKY_PRESET_ID, getSkyPreset } from "./studio-background-3d-sky";
 
 export interface StudioBackground3DProps {
   open: boolean;
@@ -132,6 +140,17 @@ function CaptureBridge({ onCaptureUpdate }: { onCaptureUpdate: (state: CaptureSt
     };
   }, [camera, gl, scene, onCaptureUpdate]);
 
+  return null;
+}
+
+/* 뷰포트 하늘색 프리셋 적용 — clearColor는 캡처/내보내기에 무관한 순수 화면 장식이라
+   BgSceneState/undo 히스토리 밖 로컬 state로 관리하고, 여기서만 명령형으로 gl에 반영한다
+   (CaptureBridge와 동일하게 useThree 로 Canvas 내부 gl을 꺼내 쓰는 다리 컴포넌트). */
+function SkyClearColorController({ clearColor }: { clearColor: string }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.setClearColor(clearColor, 1);
+  }, [gl, clearColor]);
   return null;
 }
 
@@ -309,6 +328,10 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   const [viewportHinted, setViewportHinted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  // 뷰포트 전용 하늘색 — BgSceneState/undo 히스토리 밖(§SkyClearColorController 참고).
+  const [skyPresetId, setSkyPresetId] = useState(DEFAULT_SKY_PRESET_ID);
+  // 복합 오브젝트 프리셋 그리드 카테고리 필터. null=전체.
+  const [compositeCategory, setCompositeCategory] = useState<BgCompositeCategory | null>(null);
 
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
@@ -371,6 +394,16 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     const next = createPrimitive(kind, primitives.length);
     setPrimitives((prev) => [...prev, next]);
     setSelectedId(next.id);
+  };
+
+  // 복합 오브젝트 프리셋(건물/나무/차량/소품) 추가 — addPrimitive와 동일한 "추가 = 선택" UX,
+  // parts[0](앵커 파츠)이 새로 선택된다(instantiateCompositePreset 계약).
+  const addComposite = (presetId: string) => {
+    const preset = COMPOSITE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    const parts = instantiateCompositePreset(preset, primitives.length);
+    setPrimitives((prev) => [...prev, ...parts]);
+    setSelectedId(parts[0].id);
   };
 
   const deleteSelected = () => {
@@ -543,6 +576,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
                   <BgViewportController onReady={(api) => (viewportApiRef.current = api)} />
+                  <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
                   <ambientLight intensity={0.75} />
                   <directionalLight position={[4, 6, 4]} intensity={1.1} />
                   <directionalLight position={[-4, 3, -3]} intensity={0.35} />
@@ -760,6 +794,61 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
+                  <h3 className="mb-2 text-sm font-bold text-fg">복합 오브젝트 추가</h3>
+                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    건물·나무·차량·소품처럼 도형 여러 개가 조합된 배경 소재입니다. 추가 후에도 각 부품을 따로 선택해 다듬을 수 있어요.
+                  </p>
+                  <div className="mb-2.5 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      className={cx(
+                        "rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors",
+                        compositeCategory === null
+                          ? "border-accent/60 bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                      )}
+                      onClick={() => setCompositeCategory(null)}
+                    >
+                      전체
+                    </button>
+                    {COMPOSITE_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={cx(
+                          "rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors",
+                          compositeCategory === cat
+                            ? "border-accent/60 bg-accent-soft text-accent"
+                            : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                        )}
+                        onClick={() => setCompositeCategory(cat)}
+                      >
+                        {COMPOSITE_CATEGORY_LABELS[cat]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {COMPOSITE_PRESETS.filter((p) => compositeCategory === null || p.category === compositeCategory).map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className={cx(
+                          CONTROL_BUTTON,
+                          "flex-col items-start gap-1 border-line bg-card px-2.5 py-2 text-left text-fg-2 hover:bg-raised hover:text-fg"
+                        )}
+                        onClick={() => addComposite(preset.id)}
+                      >
+                        <span className="flex items-center gap-1.5 text-xs font-semibold">
+                          <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: preset.parts[0]?.color }} aria-hidden />
+                          {preset.label}
+                        </span>
+                        <span className="text-[0.65rem] font-normal leading-snug text-fg-3">{preset.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
                   {selected ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
@@ -958,6 +1047,30 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       </span>
                     </span>
                   </label>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <h3 className="mb-2 text-sm font-bold text-fg">뷰포트 하늘색</h3>
+                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    작업 화면의 분위기만 바꿉니다. 내보내기는 항상 흰 배경 선화로 고정돼요.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {BG_SKY_PRESETS.map((sky) => (
+                      <button
+                        key={sky.id}
+                        type="button"
+                        className={cx(
+                          CONTROL_BUTTON,
+                          "gap-1.5 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                          skyPresetId === sky.id && "border-accent/60 bg-accent-soft text-accent"
+                        )}
+                        onClick={() => setSkyPresetId(sky.id)}
+                      >
+                        <span className="inline-block size-3.5 rounded-full border border-line/50" style={{ backgroundColor: sky.clearColor }} aria-hidden />
+                        {sky.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </section>
             </div>

@@ -10,6 +10,7 @@ import {
   type LevelsRgbChannels,
 } from "./studio-levels";
 import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-looks";
+import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 import type { El, ImageEl } from "./StudioPage";
@@ -28,6 +29,9 @@ const StudioLevelsPanel = lazy(() =>
 );
 const StudioLooksPanel = lazy(() =>
   import("./StudioLooksPanel").then((mod) => ({ default: mod.StudioLooksPanel }))
+);
+const StudioPhotoWebtoonPresetPanel = lazy(() =>
+  import("./StudioPhotoWebtoonPresetPanel").then((mod) => ({ default: mod.StudioPhotoWebtoonPresetPanel }))
 );
 
 interface StudioImageAdjustmentsPanelProps {
@@ -568,6 +572,13 @@ export function StudioImageAdjustmentsPanel({
           }}
           onResetAll={() => onPatch(looksResetPatch() as Partial<El>)}
           canPaste={!!filterClipboard}
+        />
+      </AdjustmentSection>
+
+      <AdjustmentSection title="사진→웹툰 필터" defaultOpen>
+        <StudioPhotoWebtoonPresetPanel
+          onApplyPreset={(preset) => onPatch(applyPhotoWebtoonPreset(filterFields, preset.id) as Partial<El>)}
+          onReset={() => onPatch(resetPhotoWebtoonPreset(filterFields) as Partial<El>)}
         />
       </AdjustmentSection>
 
