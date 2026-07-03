@@ -11791,6 +11791,7 @@ function StudioCuttoonEditor() {
               ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              aria-label="게시 제목 (필수)"
               placeholder="제목 *"
               maxLength={80}
               className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
@@ -11798,6 +11799,7 @@ function StudioCuttoonEditor() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              aria-label="게시 설명 (선택)"
               placeholder="설명 (선택)"
               rows={2}
               className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
@@ -11805,6 +11807,7 @@ function StudioCuttoonEditor() {
             <input
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
+              aria-label="게시 태그 (쉼표로 구분, 선택)"
               placeholder="태그 (쉼표로 구분)"
               className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
             />
