@@ -643,6 +643,7 @@ export function FanCafePanel({
                   value={title}
                   onChange={(event) => setTitle(event.target.value.slice(0, FAN_CAFE_POST_TITLE_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TITLE_MAX_LENGTH}
+                  aria-label="팬카페 글 제목"
                   placeholder="팬카페 글 제목"
                   className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
@@ -654,6 +655,7 @@ export function FanCafePanel({
                   onChange={(event) => setText(event.target.value.slice(0, FAN_CAFE_POST_TEXT_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TEXT_MAX_LENGTH}
                   rows={5}
+                  aria-label="팬카페 글 본문"
                   placeholder="해석, 질문, 응원, 팬아트 메모를 남겨보세요."
                   className="resize-none rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
@@ -664,6 +666,7 @@ export function FanCafePanel({
                   value={tags}
                   onChange={(event) => setTags(event.target.value.slice(0, FAN_CAFE_POST_TAGS_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TAGS_MAX_LENGTH}
+                  aria-label="팬카페 글 태그 (선택)"
                   placeholder="#정주행 #해석 처럼 태그 추가"
                   className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
@@ -1240,6 +1243,7 @@ export function FanPostReplySection({
             onChange={(event) => setDraft("__root__", event.target.value)}
             maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
             rows={2}
+            aria-label="댓글 작성"
             placeholder="댓글 남기기"
             className="min-h-16 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
           />
@@ -1418,6 +1422,7 @@ function FanPostReplyItem({
                 onChange={(event) => onChangeDraft(replyKey, event.target.value)}
                 maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
                 rows={2}
+                aria-label={`${reply.author.name}에게 대댓글 작성`}
                 placeholder={`${reply.author.name}에게 대댓글`}
                 className="min-h-14 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
