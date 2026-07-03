@@ -19,6 +19,7 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   ArrowRight,
+  Boxes,
   Triangle,
   Hexagon,
   ChevronDown,
@@ -96,6 +97,7 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
+import { parseStudio3dTool } from "./studio-background-3d-primitives";
 import {
   BRUSH_PRESETS,
   gpenSegmentWidths,
@@ -397,6 +399,9 @@ const StudioCropPanel = lazy(() =>
   import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel }))
 );
 const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
+const StudioBackground3D = lazy(() =>
+  import("./StudioBackground3D").then((mod) => ({ default: mod.StudioBackground3D }))
+);
 
 type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
 let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
@@ -1642,6 +1647,17 @@ function PoserLoadingOverlay() {
   );
 }
 
+function Bg3DLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>3D 배경 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그(앱인토스 서비스 오픈 정책 필수).
  * 사용자가 처음 "생성"을 누를 때 1회 노출하고, 확인하면 곧바로 생성을 이어서 실행한다.
@@ -2809,6 +2825,9 @@ function StudioCuttoonEditor() {
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
+  const [bg3dOpen, setBg3dOpen] = useState(false);
+  const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
+  const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -6681,6 +6700,14 @@ function StudioCuttoonEditor() {
           title="3D 캐릭터 생성 및 포즈 설정"
         >
           <Sparkles size={14} /> 3D 캐릭터
+        </button>
+        <button
+          type="button"
+          onClick={() => setBg3dOpen(true)}
+          className={cn(toolBtn(bg3dOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          title="3D 배경 블록아웃 만들기"
+        >
+          <Boxes size={14} /> 3D 배경
         </button>
         <div ref={menu === "bgScene" ? menuRef : undefined} className="relative">
           <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} aria-haspopup="menu" aria-expanded={menu === "bgScene"} className={toolBtn(menu === "bgScene")}>
@@ -11281,7 +11308,7 @@ function StudioCuttoonEditor() {
                 )}
                 {selected.type === "image" && (
                   <>
-                    {selected.src?.includes("#") && (
+                    {parseStudio3dTool(selected.src) === "vrm-poser" && (
                       <button
                         type="button"
                         onClick={() => {
@@ -11293,6 +11320,20 @@ function StudioCuttoonEditor() {
                         title="3D 캐릭터 재편집"
                       >
                         <Sparkles size={14} /> 3D 재편집
+                      </button>
+                    )}
+                    {parseStudio3dTool(selected.src) === "bg3d" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBg3dInitialDataUrl(selected.src);
+                          setBg3dInitialElementId(selected.id);
+                          setBg3dOpen(true);
+                        }}
+                        className={buttonClass({ size: "sm", variant: "solid", className: "gap-1 font-semibold" })}
+                        title="3D 배경 재편집"
+                      >
+                        <Boxes size={14} /> 배경 재편집
                       </button>
                     )}
                     <button
@@ -12343,6 +12384,37 @@ function StudioCuttoonEditor() {
         ) : null}
       </Suspense>
 
+      <Suspense fallback={<Bg3DLoadingOverlay />}>
+        {bg3dOpen ? (
+          <StudioBackground3D
+            open
+            initialDataUrl={bg3dInitialDataUrl}
+            onClose={() => {
+              setBg3dOpen(false);
+              setBg3dInitialDataUrl(undefined);
+              setBg3dInitialElementId(undefined);
+            }}
+            onInsert={(src, w, h) => {
+              if (bg3dInitialElementId) {
+                const targetEl = elementById.get(bg3dInitialElementId);
+                if (targetEl && targetEl.type === "image") {
+                  const targetWidth = targetEl.width;
+                  const targetHeight = Math.round(targetWidth * (h / w));
+                  patchEl(bg3dInitialElementId, {
+                    src,
+                    height: targetHeight,
+                  });
+                } else {
+                  patchEl(bg3dInitialElementId, { src });
+                }
+              } else {
+                addRenderedImage(src, w, h);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
       {contextMenu.visible && (
         // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
@@ -12353,7 +12425,7 @@ function StudioCuttoonEditor() {
         >
           {contextMenu.elId ? (
             <>
-              {contextMenuEl?.type === "image" && contextMenuEl.src?.includes("#") && (
+              {contextMenuEl?.type === "image" && parseStudio3dTool(contextMenuEl.src) === "vrm-poser" && (
                 <>
                   <button
                     type="button"
@@ -12367,6 +12439,24 @@ function StudioCuttoonEditor() {
                   >
                     <Sparkles size={12} />
                     3D 캐릭터 편집
+                  </button>
+                  <div className="my-1 h-px bg-line" />
+                </>
+              )}
+              {contextMenuEl?.type === "image" && parseStudio3dTool(contextMenuEl.src) === "bg3d" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBg3dInitialDataUrl(contextMenuEl.src);
+                      setBg3dInitialElementId(contextMenuEl.id);
+                      setBg3dOpen(true);
+                      setContextMenu((prev) => ({ ...prev, visible: false }));
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
+                  >
+                    <Boxes size={12} />
+                    3D 배경 편집
                   </button>
                   <div className="my-1 h-px bg-line" />
                 </>

@@ -3490,6 +3490,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       const { width, height } = roundExportSize(gl.domElement);
 
       const poseMetadata = {
+        tool: "vrm-poser" as const,
         yOffset: customYOffset,
         bones: customBones,
         expressionWeights: expressionWeights,
@@ -4286,6 +4287,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setIsCapturing(false);
 
       const poseMetadata = {
+        // "3D 배경" 도구도 같은 #해시 방식으로 재편집 메타를 싣기 시작해, src만 보고는 어느 모달을
+        // 다시 열지 구분할 수 없다 — parseStudio3dTool()이 이 필드로 분기한다.
+        tool: "vrm-poser" as const,
         yOffset: customYOffset,
         bones: customBones,
         expressionWeights: expressionWeights,
