@@ -84,15 +84,28 @@ import {
   Palette,
   Hand,
   Film,
+  GanttChartSquare,
   History as HistoryIcon,
 } from "lucide-react";
-import { Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha } from "./studio-alpha-lock";
+import {
+  clampGlobalFrameIndex,
+  globalFrameIndexAtElapsed,
+  hasTrack,
+  moveKeyframe,
+  normalizeAnimationTimelineDoc,
+  removeKeyframe,
+  removeTrack,
+  resolveTimelineComposite,
+  setKeyframe,
+  type AnimationTimelineDoc,
+} from "./studio-anim-tracks";
 import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
@@ -474,6 +487,10 @@ const StudioHistoryPanel = lazyRetry(
 const StudioFrameAnimationPanel = lazyRetry(
   () => import("./StudioFrameAnimationPanel").then((mod) => ({ default: mod.StudioFrameAnimationPanel })),
   "StudioFrameAnimationPanel"
+);
+const StudioAnimTimelinePanel = lazyRetry(
+  () => import("./StudioAnimTimelinePanel").then((mod) => ({ default: mod.StudioAnimTimelinePanel })),
+  "StudioAnimTimelinePanel"
 );
 const StudioMasterPagePanel = lazyRetry(
   () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
@@ -2774,6 +2791,7 @@ interface PageState {
   canvasH: number;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
+  animTimeline?: AnimationTimelineDoc; // 다중 레이어 타임라인(studio-anim-tracks). 미설정=타임라인 없음(기존 문서 100% 호환).
   name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
   note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.
   hideMaster?: boolean; // 이 페이지에서 문서 마스터(공통 요소) 숨김 — studio-master-page. 미설정=표시(해제 시 키 제거).
@@ -2843,6 +2861,7 @@ function StudioCuttoonEditor() {
   const pageGradeActive = !isDefaultPageGrade(pageGrade);
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
   const groups = activePage.groups ?? [];
+  const animTimeline = normalizeAnimationTimelineDoc(activePage.animTimeline);
   const elementById = new Map<string, El>();
   for (const element of elements) elementById.set(element.id, element);
 
@@ -3169,6 +3188,37 @@ function StudioCuttoonEditor() {
       setFrameAnimTargetId(null);
     }
   }, [frameAnimOpen, frameAnimTargetId, frameAnimTarget]);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timelinePlayhead, setTimelinePlayhead] = useState(0);
+  const [timelinePlaying, setTimelinePlaying] = useState(false);
+  const [timelineFocusedTrackId, setTimelineFocusedTrackId] = useState<string | null>(null);
+  // 재생 중에만 의미 있는 ephemeral 미리보기 프레임 — 커밋되지 않는다(§3.10, 재생은 비파괴 미리보기).
+  const [timelinePreviewFrame, setTimelinePreviewFrame] = useState(0);
+  // 페이지 전환 시 재생헤드/재생상태 초기화 — frameAnimTarget 소멸 감시 이펙트와 같은 이유:
+  // 다른 페이지의 타임라인 좌표를 계속 들고 있으면 혼란스럽다.
+  useEffect(() => {
+    setTimelinePlayhead(0);
+    setTimelinePlaying(false);
+    setTimelineFocusedTrackId(null);
+  }, [activePage.id]);
+  // frameCount가 줄어들면(다른 세션/undo로) 재생헤드를 범위 안으로 당긴다.
+  useEffect(() => {
+    setTimelinePlayhead((p) => clampGlobalFrameIndex(animTimeline.frameCount, p));
+  }, [animTimeline.frameCount]);
+  // 재생 루프 — 커밋 없이 timelinePreviewFrame 만 rAF 로 갱신한다(undo 히스토리 오염 방지).
+  useEffect(() => {
+    if (!timelinePlaying) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      const idx = globalFrameIndexAtElapsed(animTimeline, elapsed, true);
+      setTimelinePreviewFrame(idx);
+      raf = globalThis.requestAnimationFrame(tick);
+    };
+    raf = globalThis.requestAnimationFrame(tick);
+    return () => globalThis.cancelAnimationFrame(raf);
+  }, [timelinePlaying, animTimeline]);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -4590,14 +4640,18 @@ function StudioCuttoonEditor() {
   }, [selectedId, marqueeIds, tool, elements]);
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
-  function commit(nextElements: El[]) {
+  // extraPatch — 레이어 삭제 시 elements 와 animTimeline(트랙 정리)을 원자적(단일 undo 스텝)으로
+  // 함께 커밋하기 위한 옵셔널 2번째 파라미터(하위호환 — 기존 15곳 이상의 commit(nextElements)
+  // 단일 인자 호출은 전부 그대로 동작한다). extraPatch 스프레드 뒤에 elements 를 마지막에 둬서
+  // extraPatch 에 실수로 elements 가 섞여도 항상 nextElements 가 이긴다.
+  function commit(nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>) {
     const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
-      setMaster((m) => withMasterElements(m, resolved));
+      setMaster((m) => withMasterElements(m, resolved)); // extraPatch는 마스터엔 개념 없음 — 무시
       return;
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p));
     const h = pagesHistory.slice(0, pagesHi + 1);
     h.push(nextPages);
     setPagesHistory(h);
@@ -4721,6 +4775,24 @@ function StudioCuttoonEditor() {
     );
     commit(next);
     capturedElementIdsRef.current = new Set(next.map((e) => e.id));
+  }
+  // 다중 레이어 타임라인 키프레임 캡처 — captureAnimFrame과 거의 동일하되, 겹치는 draw 스트로크
+  // "소거" 로직은 의도적으로 생략한다(어떤 draw 스트로크가 이 특정 트랙 소속인지 다중 트랙에서는
+  // 불명확 — 잘못 지우면 다른 레이어용 낙서를 날릴 위험). 순수하게 그 순간 그 bbox 스냅샷만 찍는다.
+  async function captureTimelineKeyframe(trackId: string, frameIndex: number) {
+    const el = elementById.get(trackId);
+    if (!el || el.type !== "image") return; // 패널이 이미 막지만 방어적으로 재확인
+    if (el.rotation) {
+      setError("회전이 0°인 레이어만 키프레임을 캡처할 수 있어요.");
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+    setSelectedId(null); // Transformer 핸들 캡처 방지(captureAnimFrame과 동일 관행)
+    await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(동일 관행)
+    const b = elBounds(el);
+    const src = stage.toDataURL({ x: b.x, y: b.y, width: b.w, height: b.h, pixelRatio: 2 / effScale });
+    updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
   function addEl(el: El) {
     commit([...elements, el]);
@@ -5229,13 +5301,22 @@ function StudioCuttoonEditor() {
     dismissQuickStart();
   }
   function removeById(id: string) {
-    commit(elements.filter((e) => e.id !== id));
+    commit(
+      elements.filter((e) => e.id !== id),
+      hasTrack(animTimeline, id) ? { animTimeline: removeTrack(animTimeline, id) } : undefined
+    );
     if (selectedId === id) setSelectedId(null);
   }
   function removeSelected() {
     if (marqueeIds.length > 0) {
       const dl = new Set(marqueeIds);
-      commit(elements.filter((e) => !(dl.has(e.id) && !e.locked)));
+      const trackedDeleted = [...dl].filter((id) => hasTrack(animTimeline, id));
+      commit(
+        elements.filter((e) => !(dl.has(e.id) && !e.locked)),
+        trackedDeleted.length > 0
+          ? { animTimeline: trackedDeleted.reduce((d, id) => removeTrack(d, id), animTimeline) }
+          : undefined
+      );
       setMarqueeIds([]);
       return;
     }
@@ -8818,6 +8899,17 @@ function StudioCuttoonEditor() {
         >
           <LayoutGrid size={14} />
         </button>
+        <button
+          type="button"
+          onClick={() => setTimelineOpen((v) => !v)}
+          disabled={masterEditMode}
+          aria-pressed={timelineOpen}
+          aria-label="다중 레이어 타임라인"
+          className={cn(toolBtn(timelineOpen), "disabled:opacity-40")}
+          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "다중 레이어 타임라인"}
+        >
+          <GanttChartSquare size={14} />
+        </button>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
         {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
         <div className="hidden items-center gap-1 lg:flex">
@@ -9524,6 +9616,11 @@ function StudioCuttoonEditor() {
                   );
                 })()}
               {(() => {
+                // 다중 레이어 타임라인 재생 미리보기 — 재생 중에만 계산(커밋 없이 렌더 시점 override).
+                // 정지 상태(timelinePlaying=false)면 항상 null이라 기존 렌더 경로와 100% 동일.
+                const timelineComposite = timelinePlaying
+                  ? resolveTimelineComposite(animTimeline, elements.map((e) => e.id), timelinePreviewFrame)
+                  : null;
                 // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
@@ -9587,21 +9684,26 @@ function StudioCuttoonEditor() {
                   const onion = isAnimTarget
                     ? onionSkinLayers(el.frames!, clampFrameIndex(el.frames!, frameIndexOf(el.frames!, el.activeFrameId ?? null)), onionSkin)
                     : [];
+                  // 단일-셀 온스킨(isAnimTarget)과 다중-트랙 재생 미리보기가 같은 요소를 동시에
+                  // 건드리면 두 오버레이가 정의되지 않은 방식으로 충돌한다 — 패널의 eligible 계산이
+                  // 이미 두 시스템을 UI 레벨에서 상호배제하지만(같은 요소는 frames.length>1 이면
+                  // 트랙 추가가 애초에 막힘), 여기서도 방어적으로 한 번 더 가드한다.
+                  const timelineOverride = isAnimTarget ? undefined : timelineComposite?.get(el.id);
+                  const effectiveEl = timelineOverride ? ({ ...el, src: timelineOverride.src } as ImageEl) : el;
                   return wrapClip(
-                    <>
+                    <Fragment key={el.id}>
                       {onion.map((layer) => (
                         <OnionSkinImage key={`onion-${el.id}-${layer.frame.id}`} el={el} layer={layer} />
                       ))}
                       <UrlImage
-                        key={el.id}
-                        el={el}
+                        el={effectiveEl}
                         draggable={draggable}
                         innerRef={setRef}
                         onSelect={onSelect}
                         onChange={(patch) => patchEl(el.id, patch)}
                         dragBoundFunc={snapBoundFunc}
                       />
-                    </>
+                    </Fragment>
                   );
                 }
                 if (el.type === "frame") {
@@ -10768,6 +10870,55 @@ function StudioCuttoonEditor() {
                 }}
                 onionSkin={onionSkin}
                 onOnionSkinChange={setOnionSkin}
+              />
+            </Suspense>
+          )}
+          {timelineOpen && (
+            <Suspense fallback={null}>
+              <StudioAnimTimelinePanel
+                doc={animTimeline}
+                rows={elements
+                  .slice()
+                  .reverse() // FRONT 먼저 — 레이어 패널과 동일 표시 순서
+                  .map((el) => ({
+                    id: el.id,
+                    label: elementLabel(el),
+                    eligible: el.type === "image" && !((el as ImageEl).frames && (el as ImageEl).frames!.length > 1),
+                    hidden: !!el.hidden,
+                    locked: isEffectivelyLocked(el, groups),
+                  }))}
+                playhead={timelinePlayhead}
+                playing={timelinePlaying}
+                focusedTrackId={timelineFocusedTrackId}
+                onionSkin={onionSkin}
+                onOnionSkinChange={setOnionSkin}
+                onClose={() => setTimelineOpen(false)}
+                onDocChange={(next) => updateActivePage({ animTimeline: next })}
+                onScrub={(frameIndex) => {
+                  setTimelinePlayhead(frameIndex);
+                  // 주의: zOrderIds는 반드시 "뒤집지 않은" elements(BACK→FRONT) — 렌더 루프의 실제
+                  // 페인트 순서와 일치해야 한다. rows 표시용으로 reverse()한 배열을 여기 넣으면 안 된다.
+                  const composite = resolveTimelineComposite(
+                    animTimeline,
+                    elements.map((e) => e.id),
+                    frameIndex
+                  );
+                  if (composite.size === 0) return;
+                  commitCoalesced(
+                    elements.map((e) => (composite.has(e.id) ? ({ ...e, src: composite.get(e.id)!.src } as El) : e)),
+                    "timeline-scrub"
+                  );
+                }}
+                onTogglePlay={() => setTimelinePlaying((v) => !v)}
+                onFocusTrack={setTimelineFocusedTrackId}
+                onAddKeyframe={(trackId) => void captureTimelineKeyframe(trackId, timelinePlayhead)}
+                onRemoveKeyframe={(trackId, frameIndex) =>
+                  updateActivePage({ animTimeline: removeKeyframe(animTimeline, trackId, frameIndex) })
+                }
+                onMoveKeyframe={(trackId, from, to) =>
+                  updateActivePage({ animTimeline: moveKeyframe(animTimeline, trackId, from, to) })
+                }
+                onRemoveTrack={(trackId) => updateActivePage({ animTimeline: removeTrack(animTimeline, trackId) })}
               />
             </Suspense>
           )}
