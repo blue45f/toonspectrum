@@ -1,6 +1,10 @@
 // 페인트 통(flood-fill) 채색 — 100% 브라우저(클라이언트) 실행, 서버·토큰 비용 0원.
 // 클릭 지점과 같은 색으로 이어진 영역을 스택 기반(비재귀) BFS/DFS 로 찾아 지정 색으로 칠한다.
 // 웹툰 컷의 셀 채색(flat color 영역 일괄 칠하기)에 특화 — 브러시로 한 픽셀씩 칠하는 것보다 빠르다.
+//
+// scanFloodRegionMask 는 이 BFS 의 핵심 스캔부만 떼어낸 순수 함수다(색을 칠하지 않고 매치된
+// 픽셀만 표시) — studio-magic-wand.ts 가 "칠하기" 대신 "선택 영역 윤곽 추출"에 재사용한다.
+// BFS 자체는 여기 한 곳에만 존재한다(중복 금지).
 import { hexToRgb } from "./studio-filters";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -13,13 +17,89 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** 페인트 통·마술봉이 공유하는 이미지 로더 — data: 가 아니어도 CORS 를 요청해 캔버스 오염을 피한다. */
+export { loadImage as loadFloodFillSourceImage };
+
+/**
+ * 시작 픽셀과 이어진(4방향 연결) 색상 매치 영역 스캔 — 스택 기반 BFS, 재귀 없음(대형 이미지 스택
+ * 오버플로 방지). "방문(visited)"과 "매치(matched)"는 다른 개념이다: 경계 밖 픽셀도 재방문 방지를
+ * 위해 visited=1 이 되지만, 색이 다르면(matches 실패) matched 에는 기록되지 않고 그 픽셀에서 더
+ * 확장하지도 않는다 — 반환되는 것은 matched 뿐이다(=원래 floodFillImage 가 실제로 칠했던 픽셀 집합).
+ * @returns w*h 크기의 0/1 마스크(1 = 이 픽셀이 시작 색과 tolerance 이내로 매치됨).
+ */
+export function scanFloodRegionMask(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  startX: number,
+  startY: number,
+  tolerance = 32,
+): Uint8Array {
+  const startIdx = (startY * w + startX) * 4;
+  const sr = data[startIdx] ?? 0;
+  const sg = data[startIdx + 1] ?? 0;
+  const sb = data[startIdx + 2] ?? 0;
+  const sa = data[startIdx + 3] ?? 0;
+  const tol2 = tolerance * tolerance * 3;
+  const matches = (i: number): boolean => {
+    const dr = data[i]! - sr;
+    const dg = data[i + 1]! - sg;
+    const db = data[i + 2]! - sb;
+    const da = data[i + 3]! - sa;
+    return dr * dr + dg * dg + db * db + da * da <= tol2;
+  };
+
+  const visited = new Uint8Array(w * h); // BFS 큐잉 방지용(내부 전용) — matched 와는 다르다.
+  const matched = new Uint8Array(w * h); // 반환값.
+  const stack: number[] = [startY * w + startX];
+  visited[startY * w + startX] = 1;
+
+  const maxPixels = w * h;
+  let processed = 0;
+  while (stack.length > 0) {
+    if (processed > maxPixels) break; // 방어적 상한(버그로도 무한루프 방지).
+    processed++;
+    const pos = stack.pop()!;
+    const px = pos % w;
+    const py = (pos / w) | 0;
+    const idx = pos * 4;
+    if (!matches(idx)) continue;
+    matched[pos] = 1;
+    if (px > 0) {
+      const n = pos - 1;
+      if (!visited[n]) {
+        visited[n] = 1;
+        stack.push(n);
+      }
+    }
+    if (px < w - 1) {
+      const n = pos + 1;
+      if (!visited[n]) {
+        visited[n] = 1;
+        stack.push(n);
+      }
+    }
+    if (py > 0) {
+      const n = pos - w;
+      if (!visited[n]) {
+        visited[n] = 1;
+        stack.push(n);
+      }
+    }
+    if (py < h - 1) {
+      const n = pos + w;
+      if (!visited[n]) {
+        visited[n] = 1;
+        stack.push(n);
+      }
+    }
+  }
+  return matched;
+}
+
 /**
  * 페인트 통 채색 — src(데이터 URL 등)에서 (startXRatio, startYRatio) 지점과 같은 색으로 이어진
  * 영역을 fillColorHex 로 칠한 PNG data URL 을 반환한다.
- * @param startXRatio 시작점 x 비율(0..1) — 호출부의 축소 미리보기 캔버스 좌표를 원본 해상도와
- *   무관하게 넘길 수 있도록 절대 픽셀이 아닌 비율로 받는다.
- * @param startYRatio 시작점 y 비율(0..1)
- * @param tolerance 시작 픽셀과의 색 허용 오차(0-255 채널 스케일). 클수록 더 넓게 번진다.
  */
 export async function floodFillImage(
   src: string,
@@ -50,79 +130,19 @@ export async function floodFillImage(
   const sr = data[startIdx]!;
   const sg = data[startIdx + 1]!;
   const sb = data[startIdx + 2]!;
-  const sa = data[startIdx + 3]!;
 
-  // 이미 채우려는 색과 사실상 동일하면(반올림 오차 수준) 전체 스캔·재인코딩을 생략한다.
-  // tolerance(사용자가 고른 "얼마나 비슷하면 같은 영역으로 볼지")가 아니라 훨씬 좁은 고정 임계값을
-  // 쓴다 — tolerance 를 그대로 쓰면 "비슷하지만 다른 색으로 다시 칠하기" 같은 유효한 요청까지
-  // no-op 으로 건너뛰게 된다.
-  const NEAR_IDENTICAL2 = 3; // 채널당 오차 1 이내(3채널 제곱합 ≤ 3)만 "사실상 동일"로 본다.
+  const NEAR_IDENTICAL2 = 3;
   if ((fr - sr) ** 2 + (fg - sg) ** 2 + (fb - sb) ** 2 <= NEAR_IDENTICAL2) {
-    return src; // 픽셀이 바뀌지 않으므로 putImageData/toDataURL 재인코딩도 필요 없다.
+    return src;
   }
 
-  const tol2 = tolerance * tolerance * 3; // 채널별 제곱합(=유클리드 거리 제곱)과 비교하는 임계값.
-  const matches = (i: number): boolean => {
-    const dr = data[i]! - sr;
-    const dg = data[i + 1]! - sg;
-    const db = data[i + 2]! - sb;
-    const da = data[i + 3]! - sa;
-    return dr * dr + dg * dg + db * db + da * da <= tol2;
-  };
-
-  // 방문 여부는 "x,y" 문자열 Set 대신 픽셀당 1바이트 typed array 로 — 큰 이미지에서도 빠르고 가볍다.
-  const visited = new Uint8Array(w * h);
-  // 재귀는 큰 이미지에서 스택 오버플로우가 나므로 배열을 스택처럼 쓰는 반복(iterative) 구현.
-  const stack: number[] = [startY * w + startX];
-  visited[startY * w + startX] = 1;
-
-  const maxPixels = w * h;
-  let processed = 0;
-  while (stack.length > 0) {
-    // 방어적 상한 — visited 비트맵이 자연히 이 한계를 보장하지만, 혹시 모를 버그로도
-    // 무한 루프/타임아웃이 나지 않도록 이중으로 막는다.
-    if (processed > maxPixels) break;
-    processed++;
-
-    const pos = stack.pop()!;
-    const px = pos % w;
-    const py = (pos / w) | 0;
+  const matched = scanFloodRegionMask(data, w, h, startX, startY, tolerance);
+  for (let pos = 0; pos < w * h; pos++) {
+    if (!matched[pos]) continue;
     const idx = pos * 4;
-    if (!matches(idx)) continue;
-
-    // 원본 알파는 유지하고 색만 바꾼다 — 배경 제거로 투명해진 이미지 위에 칠해도 자연스럽게.
     data[idx] = fr;
     data[idx + 1] = fg;
     data[idx + 2] = fb;
-
-    if (px > 0) {
-      const n = pos - 1;
-      if (!visited[n]) {
-        visited[n] = 1;
-        stack.push(n);
-      }
-    }
-    if (px < w - 1) {
-      const n = pos + 1;
-      if (!visited[n]) {
-        visited[n] = 1;
-        stack.push(n);
-      }
-    }
-    if (py > 0) {
-      const n = pos - w;
-      if (!visited[n]) {
-        visited[n] = 1;
-        stack.push(n);
-      }
-    }
-    if (py < h - 1) {
-      const n = pos + w;
-      if (!visited[n]) {
-        visited[n] = 1;
-        stack.push(n);
-      }
-    }
   }
 
   ctx.putImageData(imageData, 0, 0);
