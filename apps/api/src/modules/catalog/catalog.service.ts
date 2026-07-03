@@ -98,8 +98,6 @@ type RatingMap = Record<string, number>;
 export class CatalogService implements OnModuleInit {
   private readonly ingestConfig = normalizeCatalogIngestConfig();
   private ingestInProgress: Promise<CatalogIngestRunResult> | null = null;
-  private ingestTimer: ReturnType<typeof setTimeout> | null = null;
-  private nextCatalogIngestAt: number | null = null;
   private consecutiveIngestFailures = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -120,8 +118,8 @@ export class CatalogService implements OnModuleInit {
     } catch (error) {
       console.error("catalog load failed; runtime catalog is empty until a successful load", error);
     }
-    // 실시간(live) 랭킹 제거 — 스냅샷 기반 운영. 스케줄러 미가동(naver 실시간 페치 없음).
-    this.scheduleNextCatalogIngest();
+    // 자동 크롤 스케줄러 폐기 — 수집은 운영자가 필요할 때 수동으로만 수행한다(pnpm catalog:update
+    // 또는 인증된 /catalog/ingest API). 런타임에 외부 플랫폼을 주기 페치하지 않는다.
     // 갱신 감지 폴링: 파일 모드는 mtime/size 스탯 비교(무비용)라 항상 켠다.
     // 레거시 FORCE_DB 모드에서만 기존 DB 해시 폴링이 동작한다(refreshCatalogIfChanged 내부 분기).
     this.startCatalogRefreshPoll();
@@ -367,13 +365,12 @@ export class CatalogService implements OnModuleInit {
     const status = await getCatalogIngestStatus(this.ingestConfig);
     return {
       ...status,
+      // 자동 스케줄러 폐기 — 수동 수집만. 예약된 다음 실행이 없다.
       scheduler: {
-        running: this.ingestConfig.mode === "fixed",
+        running: false,
         inProgress: Boolean(this.ingestInProgress),
-        nextRunAt: this.nextCatalogIngestAt ? new Date(this.nextCatalogIngestAt).toISOString() : null,
-        nextRunInSeconds: this.nextCatalogIngestAt
-          ? Math.max(0, Math.round((this.nextCatalogIngestAt - Date.now()) / 1000))
-          : null,
+        nextRunAt: null,
+        nextRunInSeconds: null,
         consecutiveFailures: this.consecutiveIngestFailures,
       },
     };
@@ -436,25 +433,6 @@ export class CatalogService implements OnModuleInit {
     return job;
   }
 
-  private scheduleNextCatalogIngest() {
-    if (this.ingestConfig.mode !== "fixed") return;
-    if (this.ingestTimer) clearTimeout(this.ingestTimer);
-
-    const backoff = this.consecutiveIngestFailures ? Math.min(6, 2 ** this.consecutiveIngestFailures) : 1;
-    const delayMs = this.ingestConfig.intervalSeconds * 1000 * backoff;
-    this.nextCatalogIngestAt = Date.now() + delayMs;
-    this.ingestTimer = setTimeout(() => {
-      this.ingestTimer = null;
-      this.nextCatalogIngestAt = null;
-      if (this.ingestInProgress) {
-        this.scheduleNextCatalogIngest();
-        return;
-      }
-      void this.runCatalogIngestOnce({ requestedBy: "scheduler", triggeredBy: "scheduler" })
-        .catch(() => undefined)
-        .finally(() => this.scheduleNextCatalogIngest());
-    }, delayMs);
-  }
 }
 
 function createQueryReader(query: QueryRecord) {
