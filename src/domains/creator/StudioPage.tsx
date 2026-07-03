@@ -220,6 +220,7 @@ import {
   patternDataUrl,
   type StudioPatternSpec,
 } from "./studio-pattern-fill";
+import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
 import {
   computeAlignDeltas,
   computeDistributeDeltas,
@@ -6383,6 +6384,17 @@ function StudioCuttoonEditor() {
     });
   }
 
+  // 현재 페이지 → 요소별 레이어를 가진 PSD. exportPagePsd 는 숨김 요소를 스스로 거르지 않으므로
+  // (숨긴 요소는 렌더 시점에 Konva 노드 자체가 없어 캡처가 불가능 — 모듈 JSDoc 계약) 여기서
+  // isEffectivelyHidden 기준으로 미리 걸러 넘긴다.
+  function exportCurrentPageToPsd(): Promise<PsdExportResult> {
+    const visible = elements.filter((el) => !isEffectivelyHidden(el, groups));
+    return exportPagePsd(stageRef.current as unknown as Konva.Stage, visible as unknown as PsdExportEl[], CANVAS_W, canvasH, effScale, {
+      scale: exportScale,
+      background: { color: bg, gradient: bgGrad },
+    });
+  }
+
   // 스튜디오 프로젝트 내보내기 (.json)
   function handleExportProject() {
     const projectData = {
@@ -6510,6 +6522,7 @@ function StudioCuttoonEditor() {
                   pageCount={pages.length}
                   capturePagesForPreset={handleCapturePagesForPreset}
                   exportCurrentPageToSvg={exportCurrentPageToSvg}
+                  exportCurrentPageToPsd={exportCurrentPageToPsd}
                   setExportScale={setExportScale}
                   setExportFormat={setExportFormat}
                   setExportTransparent={setExportTransparent}

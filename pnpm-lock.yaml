@@ -34,7 +34,7 @@ importers:
         version: 0.1.0(socket.io-client@4.8.3)
       '@heejun/platform-bridge':
         specifier: ^0.1.0
-        version: 0.1.0(react@19.2.7)
+        version: 0.1.0(@apps-in-toss/web-framework@3.0.0-beta.b36d7b5(@types/node@24.13.2)(typanion@3.14.0)(typescript@5.7.3))(react@19.2.7)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.77.0(react@19.2.7))
@@ -68,6 +68,9 @@ importers:
       '@toonspectrum/play-core':
         specifier: workspace:*
         version: link:packages/play-core
+      ag-psd:
+        specifier: ^31.0.1
+        version: 31.0.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -2958,6 +2961,9 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  ag-psd@31.0.1:
+    resolution: {integrity: sha512-/byWVGIrKv0Jqq3lleaRji2QdrCsAhbG4Ansc9nWkH1ghOBbujnhdlRXMfK2A750mInXbPLsgpHhrtfq9lLWkA==}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -4786,6 +4792,9 @@ packages:
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
     engines: {node: '>=6'}
+
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -7055,10 +7064,6 @@ snapshots:
     optionalDependencies:
       '@apps-in-toss/web-framework': 3.0.0-beta.b36d7b5(@types/node@24.13.2)(typanion@3.14.0)(typescript@5.7.3)
 
-  '@heejun/platform-bridge@0.1.0(react@19.2.7)':
-    dependencies:
-      react: 19.2.7
-
   '@hookform/resolvers@5.4.0(react-hook-form@7.77.0(react@19.2.7))':
     dependencies:
       '@standard-schema/utils': 0.3.0
@@ -8374,6 +8379,11 @@ snapshots:
       acorn: 8.16.0
 
   acorn@8.16.0: {}
+
+  ag-psd@31.0.1:
+    dependencies:
+      base64-js: 1.5.1
+      pako: 2.1.0
 
   agent-base@7.1.4: {}
 
@@ -10333,6 +10343,8 @@ snapshots:
       p-limit: 3.1.0
 
   p-try@2.2.0: {}
+
+  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:

@@ -61,6 +61,7 @@
     "@react-three/fiber": "^9.6.1",
     "@toonspectrum/core": "workspace:*",
     "@toonspectrum/play-core": "workspace:*",
+    "ag-psd": "^31.0.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.2",
