@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, ChevronDown, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import * as THREE from "three";
 
@@ -5130,12 +5130,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section hidden={hideOnTab("pose")} className="rounded-xl border border-line bg-card/45 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <Sparkles size={15} className="text-accent" aria-hidden />
-                    서버 공유 포즈 라이브러리
-                  </h3>
+              <details hidden={hideOnTab("pose")} className="group rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
+                  <Sparkles size={15} className="text-accent" aria-hidden />
+                  서버 공유 포즈 라이브러리
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
+                <div className="mb-2 flex justify-end">
                   <button
                     type="button"
                     disabled={!vrm || isSharingPose}
@@ -5206,7 +5207,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     })}
                   </div>
                 )}
-              </section>
+              </details>
 
               <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-fg">
@@ -5431,11 +5432,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </button>
               </section>
 
-              <section hidden={hideOnTab("pose")} className="rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
+              <details hidden={hideOnTab("pose")} className="group rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2.5 flex cursor-pointer list-none items-center gap-1.5 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   관절 미세 조정 (Manual Pose)
-                </h3>
+                  <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 
                 <div className="mb-3 flex flex-wrap gap-1">
                   {BONE_CATEGORIES.map((cat) => (
@@ -5592,7 +5594,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     현재 프리셋 포즈로 재설정
                   </button>
                 </div>
-              </section>
+              </details>
 
               <section hidden={hideOnTab("scene")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -5668,11 +5670,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 고도화 컨트롤 (body scale, lighting+, env, full state) ── */}
-              <section hidden={hideOnTab("scene")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("scene")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-3 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={15} className="text-accent" aria-hidden />
                   세부 조정 · 상태 저장
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 <div className="space-y-3.5">
                   {/* 몸 비율 */}
                   <div className="space-y-1.5">
@@ -5774,14 +5777,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     )}
                   </div>
                 </div>
-              </section>
+              </details>
 
               {/* ── 자연스러운 애니메이션 효과 ─────────────────────────── */}
-              <section hidden={hideOnTab("pose")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("pose")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   생동감 연출 (대기 모션)
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
                   캐릭터가 정지해 있지 않고 자연스럽게 숨을 쉬고 눈을 깜빡이도록 설정하여 씬을 생생하게 연출합니다.
                 </p>
@@ -5801,7 +5805,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     ℹ️ 웹캠 실시간 페이스 트래킹이 활성화되어 대기 모션이 자동으로 일시 중지되었습니다.
                   </p>
                 )}
-              </section>
+              </details>
 
               {/* ── 본 부착 소품(손/머리/몸) ───────────────────────────── */}
               <section hidden={hideOnTab("props")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
@@ -5963,11 +5967,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 의상 분리 토글 / 리컬러 ─────────────────────────────── */}
-              <section hidden={hideOnTab("character")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("character")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={15} className="text-accent" aria-hidden />
                   의상 분리 · 부분 채색
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 {costumeMeshes.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     {vrm ? "이 모델은 의상 분리 정보가 없어요." : "모델을 먼저 불러오세요."}
@@ -6059,14 +6064,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </button>
                   </>
                 )}
-              </section>
+              </details>
 
               {/* ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────── */}
-              <section hidden={hideOnTab("character")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("character")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Paintbrush size={15} className="text-accent" aria-hidden />
                   재질 효과 (그림자 · 외곽선 · 림라이트)
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
                   베이스 색과 별개로 셀 셰이딩 스타일을 바꿔보세요. MToon 재질을 쓰는 모델에서만 보여요.
                 </p>
@@ -6143,14 +6149,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 >
                   재질 효과 초기화
                 </button>
-              </section>
+              </details>
 
               {/* ── 흔들림 물리(스프링본) ──────────────────────────────── */}
-              <section hidden={hideOnTab("scene")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("scene")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <WandSparkles size={15} className="text-accent" aria-hidden />
                   흔들림 물리 (머리카락·치마)
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 {springJointCount === 0 ? (
                   <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     {vrm ? "이 모델에는 흔들림 뼈 정보가 없어요." : "모델을 먼저 불러오세요."}
@@ -6233,14 +6240,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </button>
                   </>
                 )}
-              </section>
+              </details>
 
               {/* ── 웹캠 실시간 페이스 트래킹 ───────────────────────────── */}
-              <section hidden={hideOnTab("face")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("face")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Webcam size={15} className="text-accent" aria-hidden />
                   웹캠 실시간 페이스 트래킹
-                </h3>
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
                 {!vrm ? (
                   <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
                     모델을 먼저 불러오세요.
@@ -6578,7 +6586,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     )}
                   </>
                 )}
-              </section>
+              </details>
 
               <section hidden={hideOnTab("props")} className="mt-4">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
