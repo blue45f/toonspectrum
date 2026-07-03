@@ -283,6 +283,12 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import {
+  colorBlindFilterStyle,
+  StudioColorBlindFilterDefs,
+  StudioColorBlindPreviewToggle,
+  type CvdMode,
+} from "./StudioColorBlindPreview";
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
@@ -2556,6 +2562,9 @@ function StudioCuttoonEditor() {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ scrollLeft: 0, scrollTop: 0, clientX: 0, clientY: 0 });
+
+  // 색맹 시뮬레이션 미리보기 — Stage 에만 SVG feColorMatrix filter 로 라이브 근사(el 데이터 변경 없음).
+  const [colorBlindPreview, setColorBlindPreview] = useState<CvdMode>("none");
 
   // 그리드 스냅 상태
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -7544,6 +7553,8 @@ function StudioCuttoonEditor() {
           >
             {isFullscreen ? "창 모드" : "전체화면"}
           </button>
+          <span className="mx-0.5 h-5 w-px bg-line" />
+          <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
         </div>
       </div>
 
@@ -8039,6 +8050,8 @@ function StudioCuttoonEditor() {
             </div>
           )}
 
+          {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
+          <StudioColorBlindFilterDefs />
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
           <div
@@ -8062,8 +8075,9 @@ function StudioCuttoonEditor() {
             )}
           >
           {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
+          {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
           <div className="relative" style={{ width: CANVAS_W * effScale, height: canvasH * effScale }}>
-          <div style={pageGradeCss ? { filter: pageGradeCss } : undefined}>
+          <div style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}>
           <Stage
             ref={stageRef}
             width={CANVAS_W * effScale}
