@@ -1,15 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getRankingData,
-  normalizeRankingParams,
-  shouldFetchLiveSignals,
-  type LiveRankingFetcher,
-} from "../server/ranking-service";
+import { getRankingData, normalizeRankingParams } from "../server/ranking-service";
 
 import { makeTitle } from "./fixtures";
-
-import type { LiveRankingResult } from "../server/live";
 
 function query(values: Record<string, string | undefined>) {
   return {
@@ -20,45 +13,10 @@ function query(values: Record<string, string | undefined>) {
 }
 
 const now = () => new Date("2026-06-01T00:00:00.000Z");
-const emptyLive = async (): Promise<LiveRankingResult> => ({
-  items: [],
-  day: "mon",
-  fetchedAt: "2026-06-01T00:00:00.000Z",
-  ttlSeconds: 600,
-  timeoutMs: 3500,
-  sources: [],
-});
 
-// 휴재 신호 fetch 스텁(빈 결과) — 미주입 시 getRankingData가 실 네트워크로 새서 CI에서 타임아웃.
-const emptyStatus = async () => ({
-  items: [],
-  fetchedAt: "2026-06-01T00:00:00.000Z",
-  ttlSeconds: 600,
-  timeoutMs: 3500,
-  sources: [],
-});
-
-const naverStatusSource = { name: "네이버웹툰" as const, ok: true, fetched: 1, latencyMs: 3, message: "ok" };
-
-function statusFetch(status: "ongoing" | "completed" | "hiatus") {
-  return async () => ({
-    items: [
-      {
-        key: "nw-rest",
-        title: "휴재 확인 작품",
-        status,
-        platform: "네이버웹툰" as const,
-        reason: "rest",
-      },
-    ],
-    fetchedAt: "2026-06-01T00:00:00.000Z",
-    ttlSeconds: 600,
-    timeoutMs: 3500,
-    sources: [naverStatusSource],
-  });
-}
-
-describe("ranking service", () => {
+// 실시간(live) 소스·스케줄러는 폐기됨(스냅샷 산식 운영). 랭킹은 커밋된 카탈로그에 대한 투명 산식만
+// 사용하고, 외부 플랫폼을 런타임에 호출하지 않는다. 아래 테스트는 그 스냅샷 운영 계약을 고정한다.
+describe("ranking service (snapshot 산식 운영)", () => {
   it("쿼리 파라미터를 안전하게 정규화한다", () => {
     const params = normalizeRankingParams(
       query({ axis: "bad", period: "bad", limit: "9999", minRating: "9", rising: "true" })
@@ -72,9 +30,7 @@ describe("ranking service", () => {
   });
 
   it("limit 파라미터가 없으면 필터별 최대 노출 기준인 200건을 기본값으로 사용한다", () => {
-    const params = normalizeRankingParams(query({}));
-
-    expect(params.limit).toBe(200);
+    expect(normalizeRankingParams(query({})).limit).toBe(200);
   });
 
   it("플랫폼 필터는 전체 상위권 후처리가 아니라 필터 후보군에서 최대 200건을 반환한다", async () => {
@@ -102,183 +58,40 @@ describe("ranking service", () => {
 
     expect(data.items).toHaveLength(200);
     expect(data.meta.total).toBe(230);
-    expect(data.items.every((item) => item.title.availability.some((entry) => entry.platformId === "lezhin"))).toBe(true);
+    expect(data.items.every((item) => item.title.availability.some((entry) => entry.platformId === "lezhin"))).toBe(
+      true
+    );
   });
 
-  it("실시간 보정 대상 축만 라이브 소스를 사용한다", () => {
-    expect(shouldFetchLiveSignals({ axis: "popular", period: "daily", type: "all", platform: "all" })).toBe(true);
-    expect(shouldFetchLiveSignals({ axis: "rating", period: "daily", type: "all", platform: "all" })).toBe(false);
-    expect(shouldFetchLiveSignals({ axis: "popular", period: "monthly", type: "all", platform: "all" })).toBe(false);
-  });
-
-  it("라이브 매칭된 작품에 evidence와 신뢰도 메타를 붙인다", async () => {
-    const liveTitle = makeTitle({
-      id: "nw-live",
-      title: "라이브 작품",
-      stats: { views: 10_000 },
-      availability: [{ platformId: "naver-webtoon", pricing: "free" }],
-    });
-    const highViews = makeTitle({
-      id: "nw-static",
-      title: "정적 강자",
-      stats: { views: 500_000_000 },
-      availability: [{ platformId: "naver-webtoon", pricing: "free" }],
-    });
-    const fakeLive = async (): Promise<LiveRankingResult> => ({
-      items: [
-        {
-          key: "nw-live",
-          rank: 1,
-          title: "라이브 작품",
-          author: "작가",
-          rating: 4.8,
-          platform: "네이버웹툰",
-          platformColor: "#00DC64",
-          href: "/title/nw-live",
-          external: false,
-        },
+  it("항상 스냅샷 산식(formula-api)으로 응답하고 라이브는 비활성이다", async () => {
+    const data = await getRankingData(query({ axis: "popular", period: "daily", limit: "5" }), {
+      catalog: [
+        makeTitle({ id: "nw-a", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] }),
       ],
-      day: "mon",
-      fetchedAt: "2026-06-01T00:00:00.000Z",
-      ttlSeconds: 600,
-      timeoutMs: 3500,
-      sources: [{ name: "네이버웹툰", ok: true, fetched: 1, latencyMs: 3, message: "ok" }],
+      now,
     });
 
-    const data = await getRankingData(
-      query({ axis: "popular", period: "daily", limit: "2" }),
-      { catalog: [highViews, liveTitle], fetchLive: fakeLive, fetchStatus: emptyStatus, now }
-    );
-
-    expect(data.meta.source).toBe("live-api");
-    expect(data.meta.live.matched).toBe(1);
-    expect(data.meta.reliability.fallbackReason).toBeNull();
-    expect(data.items.some((item) => item.evidence?.source === "live")).toBe(true);
-  });
-
-  it("라이브 비대상 축은 formula-api와 폴백 이유를 반환한다", async () => {
-    const data = await getRankingData(
-      query({ axis: "rating", period: "monthly", limit: "1" }),
-      { catalog: [makeTitle({ id: "a" })], now }
-    );
-
     expect(data.meta.source).toBe("formula-api");
     expect(data.meta.live.enabled).toBe(false);
-    expect(data.meta.reliability.fallbackReason).toContain("실시간 소스 보정 대상이 아니어서");
-  });
-
-  it("스냅샷 운영 모드에서는 라이브 대상 축이어도 비대상 축으로 설명하지 않는다", async () => {
-    let liveCalls = 0;
-    const data = await getRankingData(
-      query({ axis: "popular", period: "daily", limit: "1", refresh: "true" }),
-      {
-        catalog: [
-          makeTitle({
-            id: "nw-static-mode",
-            type: "webtoon",
-            availability: [{ platformId: "naver-webtoon", pricing: "free" }],
-          }),
-        ],
-        fetchLive: async () => {
-          liveCalls += 1;
-          return emptyLive();
-        },
-        fetchStatus: emptyStatus,
-        disableLive: true,
-        now,
-      }
-    );
-
-    expect(liveCalls).toBe(0);
-    expect(data.meta.source).toBe("formula-api");
-    expect(data.meta.live.enabled).toBe(false);
+    expect(data.meta.live.fetched).toBe(0);
+    expect(data.meta.liveRefreshPlan).toBeNull();
+    expect(data.meta.statusSignals.enabled).toBe(false);
     expect(data.meta.reliability.fallbackReason).toContain("스냅샷");
-    expect(data.meta.reliability.fallbackReason).not.toContain("보정 대상이 아니어서");
     expect(data.meta.reliability.basis).toContain("스냅샷 산식 운영 모드");
+    expect(data.items.every((item) => item.evidence?.source === "formula")).toBe(true);
   });
 
-  it("완결축에서 외부 휴재 신호가 확인된 작품을 제외한다", async () => {
-    const staleCompleted = makeTitle({
-      id: "nw-rest",
-      title: "휴재 확인 작품",
-      status: "completed",
-      stats: { completionRate: 98, ratingAvg: 4.9, ratingCount: 100_000 },
+  it("로컬 상태 필터(status)는 카탈로그 status 기준으로 적용된다", async () => {
+    const data = await getRankingData(query({ axis: "popular", period: "weekly", status: "hiatus", limit: "5" }), {
+      catalog: [
+        makeTitle({ id: "nw-on", status: "ongoing", stats: { views: 50_000_000 } }),
+        makeTitle({ id: "nw-hi", status: "hiatus", stats: { views: 10_000_000 } }),
+      ],
+      now,
     });
-
-    const data = await getRankingData(
-      query({ axis: "completed", period: "weekly", limit: "5" }),
-      {
-        catalog: [staleCompleted],
-        fetchLive: emptyLive,
-        fetchStatus: statusFetch("hiatus"),
-        now,
-      } as Parameters<typeof getRankingData>[1] & { fetchStatus: ReturnType<typeof statusFetch> }
-    );
-
-    expect(data.items).toHaveLength(0);
-    expect(data.meta.statusSignals.enabled).toBe(true);
-    expect(data.meta.statusSignals.overridden).toBe(1);
-  });
-
-  it("상태 필터를 외부 휴재 신호 기준으로 적용한다", async () => {
-    const staleCompleted = makeTitle({
-      id: "nw-rest",
-      title: "휴재 확인 작품",
-      status: "completed",
-      stats: { views: 50_000_000 },
-    });
-
-    const data = await getRankingData(
-      query({ axis: "popular", period: "weekly", status: "hiatus", limit: "5" }),
-      {
-        catalog: [staleCompleted],
-        fetchLive: emptyLive,
-        fetchStatus: statusFetch("hiatus"),
-        now,
-      } as Parameters<typeof getRankingData>[1] & { fetchStatus: ReturnType<typeof statusFetch> }
-    );
 
     expect(data.items).toHaveLength(1);
-    expect(data.items[0]?.title.id).toBe("nw-rest");
-    expect(data.items[0]?.title.status).toBe("hiatus");
-  });
-
-  it("refresh=true는 라이브 수집을 강제 동기 갱신 모드로 요청한다", async () => {
-    const calls: Array<{
-      limit: number;
-      options: {
-        forceRefresh?: boolean;
-        allowStale?: boolean;
-      } | undefined;
-    }> = [];
-    const fixedTime = "2026-06-01T00:00:00.000Z";
-    const ttlSeconds = 90;
-    const live: LiveRankingFetcher = async (limit, _platformFilter, options) => {
-      calls.push({ limit: limit ?? 0, options });
-      return {
-        items: [],
-        day: "sat",
-        fetchedAt: fixedTime,
-        ttlSeconds,
-        timeoutMs: 3500,
-        sources: [{ name: "네이버웹툰" as const, ok: true, fetched: 0, latencyMs: 12, message: "test" }],
-      };
-    };
-
-    const data = await getRankingData(
-      query({ axis: "popular", period: "daily", refresh: "true", limit: "5" }),
-      {
-        catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
-        fetchLive: live,
-        fetchStatus: emptyStatus,
-        now: () => new Date("2026-06-01T00:00:10.000Z"),
-      }
-    );
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.options?.forceRefresh).toBe(true);
-    expect(calls[0]?.options?.allowStale).toBe(false);
-    expect(data.meta.live.nextRefreshAt).toBe(new Date(Date.parse(fixedTime) + ttlSeconds * 1000).toISOString());
+    expect(data.items[0]?.title.id).toBe("nw-hi");
   });
 
   it("스냅샷 산식 모드는 결정적이다 — 같은 카탈로그·쿼리 두 번 → 동일 순서·동일 점수", async () => {
@@ -288,8 +101,8 @@ describe("ranking service", () => {
       makeTitle({ id: "c", stats: { popularityPercentile: 40 } }),
     ];
     const q = query({ axis: "trending", period: "daily", limit: "10" });
-    const first = await getRankingData(q, { catalog: catalog(), disableLive: true, now });
-    const second = await getRankingData(q, { catalog: catalog(), disableLive: true, now });
+    const first = await getRankingData(q, { catalog: catalog(), now });
+    const second = await getRankingData(q, { catalog: catalog(), now });
 
     expect(first.items.map((item) => item.title.id)).toEqual(second.items.map((item) => item.title.id));
     expect(first.items.map((item) => item.score)).toEqual(second.items.map((item) => item.score));
@@ -301,37 +114,10 @@ describe("ranking service", () => {
         makeTitle({ id: "flat-a", stats: { rankDelta: 0 } }),
         makeTitle({ id: "flat-b", stats: { rankDelta: -3 } }),
       ],
-      disableLive: true,
       now,
     });
 
     expect(data.items.every((item) => item.delta === 0)).toBe(true);
     expect(data.insights.rising).toBeNull();
-  });
-
-  it("refresh가 없으면 라이브 수집은 stale 폴백용 옵션을 사용한다", async () => {
-    const calls: Array<{
-      options: {
-        forceRefresh?: boolean;
-        allowStale?: boolean;
-      } | undefined;
-    }> = [];
-    const live: LiveRankingFetcher = async (_limit, _platformFilter, options) => {
-      calls.push({ options });
-      return emptyLive();
-    };
-
-    await getRankingData(
-      query({ axis: "popular", period: "daily", limit: "5" }),
-      {
-        catalog: [makeTitle({ id: "nw-live", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] })],
-        fetchLive: live,
-        fetchStatus: emptyStatus,
-      }
-    );
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.options?.forceRefresh).toBe(false);
-    expect(calls[0]?.options?.allowStale).toBe(true);
   });
 });

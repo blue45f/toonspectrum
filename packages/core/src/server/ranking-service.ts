@@ -1,18 +1,10 @@
-// estimate·ranking·taxonomy 는 core 동급 모듈(브라우저-세이프)이라 sibling import. live 는
-// 서버 전용(process.env·network)이라 lib/server/ 에 남고, 웹은 기존처럼 disableLive 로 코드만 번들·실행 안 함.
-import {
-  getLiveRanking,
-  getLiveStatusSignals,
-  getLiveRankingPlatforms,
-  getLiveStatusPlatforms,
-  getLiveRefreshState,
-  markLiveRankingDemand,
-  type LiveItem,
-  type LiveRankingResult,
-  type LiveSourceStatus,
-  type LiveStatusResult,
-  type LiveStatusSignal,
-} from "../../../../lib/server/live";
+// 정적 스냅샷 운영 랭킹 — 외부 실시간 소스(네이버/카카오 등)를 호출하지 않는다. 랭킹은 커밋된
+// 카탈로그 스냅샷에 대한 투명 산식(rankBy)만으로 계산한다.
+//
+// 이전에는 lib/server/live.ts 가 런타임에 플랫폼을 직접 페치(리퍼러 포함)해 랭킹을 보정하고 스케줄러로
+// 주기 갱신했으나, 크롤/저작권·부정경쟁 리스크와 불필요성(모든 호출자가 disableLive)으로 **폐기**했다.
+// 응답 스키마는 프론트(components/ranking-board.tsx) 호환을 위해 유지하되 live 관련 필드는 항상
+// 비활성(enabled:false·빈 배열·null)으로 채운다.
 import { statsAreEstimated } from "../estimate";
 import { PLATFORM_LIST, PLATFORMS, PRICING_LABEL } from "../platforms";
 import {
@@ -42,11 +34,15 @@ const validGenres = new Set<string>(["all", ...GENRES]);
 const validPlatforms = new Set<PlatformId | "all">(["all", ...PLATFORM_LIST.map((p) => p.id)]);
 const validStatuses = new Set<SerialStatus | "all">(["all", "ongoing", "completed", "hiatus"]);
 const validPricing = new Set<Pricing | "all">(["all", "free", "wait-free", "paid", "subscription"]);
-const LIVE_RANKING_PLATFORMS = getLiveRankingPlatforms();
-const LIVE_STATUS_PLATFORMS = getLiveStatusPlatforms();
 
 interface QueryReader {
   get(name: string): string | null;
+}
+
+// 응답 스키마 호환용 최소 타입 — 실시간 소스 비활성이라 실제로는 항상 빈 배열이다.
+interface LiveSourceStatus {
+  name: string;
+  ok: boolean;
 }
 
 export interface RankingParams {
@@ -138,13 +134,6 @@ export interface RankingResponse {
   insights: RankingInsights;
 }
 
-export type LiveRankingFetcher = (
-  limit?: number,
-  platformFilter?: Set<PlatformId> | null,
-  options?: { forceRefresh?: boolean; allowStale?: boolean }
-) => Promise<LiveRankingResult>;
-export type LiveStatusFetcher = (knownKeys?: Set<string>) => Promise<LiveStatusResult>;
-
 function pick<T extends string>(raw: string | null, allowed: Set<T>, fallback: T): T {
   return raw && allowed.has(raw as T) ? (raw as T) : fallback;
 }
@@ -170,11 +159,6 @@ function uniquePlatforms(title: Title): PlatformId[] {
   return [...new Set(title.availability.map((a) => a.platformId))];
 }
 
-function liveBoost(item: LiveItem): number {
-  const sourceWeight = item.platform === "네이버웹툰" ? 1 : 0.92;
-  return Math.max(0, 130 - item.rank * 8) * sourceWeight;
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -195,97 +179,7 @@ export function normalizeRankingParams(q: QueryReader): RankingParams {
   };
 }
 
-export function shouldFetchLiveSignals(params: Pick<RankingParams, "axis" | "period" | "type" | "platform">): boolean {
-  return (
-    (params.axis === "popular" || params.axis === "trending") &&
-    (params.period === "daily" || params.period === "weekly") &&
-    (params.type === "all" || params.type === "webtoon") &&
-    (params.platform === "all" ? LIVE_RANKING_PLATFORMS.size > 0 : LIVE_RANKING_PLATFORMS.has(params.platform))
-  );
-}
-
-export function shouldFetchStatusSignals(
-  params: Pick<RankingParams, "axis" | "status" | "type" | "platform">
-): boolean {
-  return (
-    (params.type === "all" || params.type === "webtoon") &&
-    (params.platform === "all" ? LIVE_STATUS_PLATFORMS.size > 0 : LIVE_STATUS_PLATFORMS.has(params.platform)) &&
-    (params.status !== "all" || params.axis === "completed" || params.axis === "popular" || params.axis === "trending")
-  );
-}
-
-export function applyLiveStatusSignals(
-  catalog: Title[],
-  signals: LiveStatusSignal[]
-): { catalog: Title[]; matched: number; overridden: number } {
-  if (!signals.length) return { catalog, matched: 0, overridden: 0 };
-
-  const signalById = new Map(signals.map((signal) => [signal.key, signal]));
-  let matched = 0;
-  let overridden = 0;
-  const nextCatalog = catalog.map((title) => {
-    const signal = signalById.get(title.id);
-    if (!signal) return title;
-    matched += 1;
-    if (signal.status === title.status) return title;
-    overridden += 1;
-    return {
-      ...title,
-      status: signal.status,
-      tags: title.tags.includes("실시간상태확인") ? title.tags : [...title.tags, "실시간상태확인"],
-    };
-  });
-
-  return { catalog: nextCatalog, matched, overridden };
-}
-
-export function applyLiveSignals(
-  ranked: RankedTitle[],
-  liveItems: LiveItem[],
-  axis: RankAxis,
-  period: RankPeriod
-): { items: RankedTitle[]; matched: number } {
-  if ((axis !== "popular" && axis !== "trending") || (period !== "daily" && period !== "weekly")) {
-    return {
-      items: ranked.map((entry) => ({ ...entry, evidence: { source: "formula" } })),
-      matched: 0,
-    };
-  }
-
-  const liveById = new Map(liveItems.map((item) => [item.key, item]));
-  let matched = 0;
-  const reranked = ranked
-    .map((entry) => {
-      const live = liveById.get(entry.title.id);
-      if (!live) return { entry: { ...entry, evidence: { source: "formula" as const } }, score: entry.score };
-      matched += 1;
-      const boost = liveBoost(live);
-      return {
-        entry: {
-          ...entry,
-          delta: axis === "popular" || axis === "trending" ? Math.max(entry.delta, 12 - live.rank) : entry.delta,
-          evidence: {
-            source: "live" as const,
-            liveMatched: true,
-            liveRank: live.rank,
-            livePlatform: live.platform,
-            liveBoost: Math.round(boost * 10) / 10,
-          },
-        },
-        score: entry.score + boost,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map(({ entry, score }, index) => ({
-      ...entry,
-      rank: index + 1,
-      score,
-    }));
-
-  return { items: reranked, matched };
-}
-
-export function buildRankingInsights(items: RankedTitle[], liveItems: LiveItem[]): RankingInsights {
+export function buildRankingInsights(items: RankedTitle[]): RankingInsights {
   const genreCounts = new Map<string, number>();
   const platformCounts = new Map<PlatformId, number>();
   let scoreMin = Number.POSITIVE_INFINITY;
@@ -327,99 +221,51 @@ export function buildRankingInsights(items: RankedTitle[], liveItems: LiveItem[]
     topGenres,
     platformMix,
     scoreSpread,
-    leader: top
-      ? { title: top.title.title, rank: top.rank, score: Math.round(top.score * 10) / 10 }
-      : null,
+    leader: top ? { title: top.title.title, rank: top.rank, score: Math.round(top.score * 10) / 10 } : null,
     // delta 정직화: 양의 변동이 실제로 있을 때만 '상승' 인사이트를 노출(0·추정 0을 상승으로 과장 금지).
-    rising: strongestRise && strongestRise.delta > 0
-      ? { title: strongestRise.title.title, delta: strongestRise.delta, rank: strongestRise.rank }
-      : null,
-    liveCoverage:
-      liveItems.length && items.length
-        ? Math.round(
-            (items.filter((item) => liveItems.some((live) => live.key === item.title.id)).length / items.length) *
-              100
-          )
-        : 0,
+    rising:
+      strongestRise && strongestRise.delta > 0
+        ? { title: strongestRise.title.title, delta: strongestRise.delta, rank: strongestRise.rank }
+        : null,
+    // 실시간 소스 비활성 — 라이브 커버리지는 항상 0.
+    liveCoverage: 0,
   };
 }
 
 export function buildRankingReliability({
   items,
-  liveItems,
-  liveSources,
-  liveDisabled,
-  shouldFetchLive,
-  matched,
-  axis,
-  period,
-  liveTtlSeconds,
-  timeoutMs,
   statusSignalMeta,
 }: {
   items: RankedTitle[];
-  liveItems: LiveItem[];
-  liveSources: LiveSourceStatus[];
-  liveDisabled: boolean;
-  shouldFetchLive: boolean;
-  matched: number;
-  axis: RankAxis;
-  period: RankPeriod;
-  liveTtlSeconds: number | null;
-  timeoutMs: number | null;
   statusSignalMeta: Pick<RankingStatusSignalMeta, "enabled" | "matched" | "overridden">;
 }): RankingReliability {
   const estimatedCount = items.filter((item) => statsAreEstimated(item.title)).length;
   const estimatedShare = items.length ? Math.round((estimatedCount / items.length) * 100) : 0;
-  const liveCoverage =
-    liveItems.length && items.length
-      ? Math.round((items.filter((item) => liveItems.some((live) => live.key === item.title.id)).length / items.length) * 100)
-      : 0;
-  const okSources = liveSources.filter((source) => source.ok).length;
-  const sourceCount = liveSources.length;
 
-  let confidence = shouldFetchLive ? 64 : 82;
-  if (shouldFetchLive) {
-    confidence += okSources * 8;
-    confidence += Math.min(12, Math.round(liveCoverage * 0.12));
-    if (liveItems.length === 0) confidence -= 24;
-    else if (matched === 0) confidence -= 14;
-  }
+  // 실시간 보정 없음 — 스냅샷 산식 기준 신뢰도. 추정 지표 비중만큼 감산.
+  let confidence = 82;
   confidence -= Math.round(estimatedShare * 0.18);
   confidence = clamp(confidence, 18, 96);
 
   const level = confidence >= 80 ? "high" : confidence >= 60 ? "medium" : "low";
   const label = level === "high" ? "신뢰 높음" : level === "medium" ? "주의해서 해석" : "폴백 중심";
-  const fallbackReason = liveDisabled
-    ? "현재 랭킹 경로는 스냅샷 산식 운영 모드라 외부 실시간 보정을 호출하지 않습니다."
-    : !shouldFetchLive
-      ? `${axis}/${period} 조합은 공개 실시간 소스 보정 대상이 아니어서 산식만 사용합니다.`
-    : liveItems.length === 0
-      ? "실시간 소스 응답이 없어 서버 산식으로 즉시 폴백했습니다."
-      : matched === 0
-        ? "실시간 응답은 있었지만 로컬 작품 DB와 매칭된 항목이 없습니다."
-        : null;
 
   return {
     confidence,
     level,
     label,
-    fallbackReason,
+    fallbackReason: "현재 랭킹 경로는 스냅샷 산식 운영 모드라 외부 실시간 보정을 호출하지 않습니다.",
     estimatedCount,
     estimatedShare,
-    liveCoverage,
-    okSources,
-    sourceCount,
-    liveTtlSeconds,
-    timeoutMs,
+    liveCoverage: 0,
+    okSources: 0,
+    sourceCount: 0,
+    liveTtlSeconds: null,
+    timeoutMs: null,
     basis: [
       `${items.length}개 후보를 요청 시점에 재계산`,
-      liveDisabled
-        ? "스냅샷 산식 운영 모드"
-        : shouldFetchLive
-          ? `외부 소스 ${okSources}/${sourceCount}개 정상`
-          : "외부 실시간 보정 비대상 축",
-      shouldFetchLive ? `라이브 매칭 ${matched}/${liveItems.length}` : "투명 산식 기반 정렬",
+      "스냅샷 산식 운영 모드",
+      "투명 산식 기반 정렬",
       statusSignalMeta.enabled
         ? `연재 상태 확인 ${statusSignalMeta.matched}개, 보정 ${statusSignalMeta.overridden}개`
         : "로컬 연재 상태 기준",
@@ -431,68 +277,34 @@ export function buildRankingReliability({
 function filterRankingPool(catalog: Title[], params: RankingParams): Title[] {
   let pool = catalog;
   if (params.status !== "all") pool = pool.filter((title) => title.status === params.status);
-  if (params.pricing !== "all") pool = pool.filter((title) => title.availability.some((a) => a.pricing === params.pricing));
+  if (params.pricing !== "all")
+    pool = pool.filter((title) => title.availability.some((a) => a.pricing === params.pricing));
   if (params.minRating > 0) pool = pool.filter((title) => title.stats.ratingAvg >= params.minRating);
   return pool;
 }
 
 export async function getRankingData(
   q: QueryReader,
-  options: {
-    catalog?: Title[];
-    fetchLive?: LiveRankingFetcher;
-    fetchStatus?: LiveStatusFetcher;
-    now?: () => Date;
-    // 실시간(live) 신호 비활성 — 정적 스냅샷 운영(주기 크롤)에서 사용. 산식(formula)만으로 랭킹.
-    disableLive?: boolean;
-  } = {}
+  options: { catalog?: Title[]; now?: () => Date } = {}
 ): Promise<RankingResponse> {
   const params = normalizeRankingParams(q);
   const catalog = options.catalog ?? TITLES;
-  const fetchLive = options.fetchLive ?? getLiveRanking;
-  const fetchStatus = options.fetchStatus ?? getLiveStatusSignals;
   const now = options.now ?? (() => new Date());
-  const shouldFetchStatus = !options.disableLive && shouldFetchStatusSignals(params);
-  let statusSignals: LiveStatusSignal[] = [];
-  let statusSignalFetchedAt: string | null = null;
-  let statusSignalTtlSeconds: number | null = null;
-  let statusSignalTimeoutMs: number | null = null;
-  let statusSignalSources: LiveSourceStatus[] = [];
 
-  if (shouldFetchStatus) {
-    const knownKeys = new Set(
-      catalog
-        .filter((title) => title.type === "webtoon" && title.id.startsWith("nw-"))
-        .map((title) => title.id)
-    );
-    if (knownKeys.size > 0) {
-      const liveStatus = await fetchStatus(knownKeys);
-      statusSignals = liveStatus.items;
-      statusSignalFetchedAt = liveStatus.fetchedAt;
-      statusSignalTtlSeconds = liveStatus.ttlSeconds;
-      statusSignalTimeoutMs = liveStatus.timeoutMs;
-      statusSignalSources = liveStatus.sources;
-    }
-  }
-
-  const {
-    catalog: statusAdjustedCatalog,
-    matched: statusMatched,
-    overridden: statusOverridden,
-  } = applyLiveStatusSignals(catalog, statusSignals);
+  // 실시간 소스(연재상태·라이브 랭킹) 비활성 — 스냅샷 산식만. 상태 신호 메타는 비활성 값으로 채운다.
   const statusSignalMeta: RankingStatusSignalMeta = {
-    enabled: shouldFetchStatus,
-    fetchedAt: statusSignalFetchedAt,
-    ttlSeconds: statusSignalTtlSeconds,
-    timeoutMs: statusSignalTimeoutMs,
-    fetched: statusSignals.length,
-    matched: statusMatched,
-    overridden: statusOverridden,
-    sources: statusSignalSources.filter((source) => source.ok).map((source) => source.name),
-    sourceStatuses: statusSignalSources,
+    enabled: false,
+    fetchedAt: null,
+    ttlSeconds: null,
+    timeoutMs: null,
+    fetched: 0,
+    matched: 0,
+    overridden: 0,
+    sources: [],
+    sourceStatuses: [],
   };
 
-  const pool = filterRankingPool(statusAdjustedCatalog, params);
+  const pool = filterRankingPool(catalog, params);
   const ranked = rankBy(pool, params.axis, {
     period: params.period,
     type: params.type,
@@ -500,53 +312,11 @@ export async function getRankingData(
     platform: params.platform,
     limit: RANKING_CANDIDATE_LIMIT,
   });
-  const shouldFetchLive = !options.disableLive && shouldFetchLiveSignals(params);
-
-  let liveItems: LiveItem[] = [];
-  let liveRefreshState: ReturnType<typeof getLiveRefreshState> | null = null;
-  let liveDay: string | null = null;
-  let liveFetchedAt: string | null = null;
-  let liveNextRefreshAt: string | null = null;
-  let liveTtlSeconds: number | null = null;
-  let timeoutMs: number | null = null;
-  let liveSources: LiveSourceStatus[] = [];
-  if (shouldFetchLive) {
-    markLiveRankingDemand();
-    const platformFilter =
-      params.platform === "all" ? null : new Set<PlatformId>([params.platform]);
-    const live = await fetchLive(30, platformFilter, {
-      forceRefresh: params.refresh,
-      allowStale: !params.refresh,
-    });
-    liveItems = live.items;
-    liveDay = live.day;
-    liveFetchedAt = live.fetchedAt;
-    if (live.fetchedAt && live.ttlSeconds) {
-      const fetchedAtMs = Date.parse(live.fetchedAt);
-      if (Number.isFinite(fetchedAtMs)) {
-        liveNextRefreshAt = new Date(fetchedAtMs + live.ttlSeconds * 1000).toISOString();
-      }
-    }
-    liveTtlSeconds = live.ttlSeconds;
-    timeoutMs = live.timeoutMs;
-    liveSources = live.sources;
-    liveRefreshState = getLiveRefreshState();
-  }
-
-  const { items, matched } = applyLiveSignals(ranked, liveItems, params.axis, params.period);
+  const items = ranked.map((entry) => ({ ...entry, evidence: { source: "formula" as const } }));
   const filtered = params.onlyRising ? items.filter((item) => item.delta > 0) : items;
-  const insights = buildRankingInsights(filtered, liveItems);
+  const insights = buildRankingInsights(filtered);
   const reliability = buildRankingReliability({
     items: filtered,
-    liveItems,
-    liveSources,
-    liveDisabled: Boolean(options.disableLive),
-    shouldFetchLive,
-    matched,
-    axis: params.axis,
-    period: params.period,
-    liveTtlSeconds,
-    timeoutMs,
     statusSignalMeta,
   });
   const generatedAt = now().toISOString();
@@ -567,71 +337,24 @@ export async function getRankingData(
           }),
       generatedAt,
       refreshSeconds: RANKING_REFRESH_SECONDS,
-      availablePlatforms: [
-        ...new Set(catalog.flatMap((title) => title.availability.map((a) => a.platformId))),
-      ],
+      availablePlatforms: [...new Set(catalog.flatMap((title) => title.availability.map((a) => a.platformId)))],
       live: {
-        enabled: shouldFetchLive,
-        day: liveDay,
-        fetchedAt: liveFetchedAt,
-        nextRefreshAt: liveNextRefreshAt,
-        ttlSeconds: liveTtlSeconds,
-        timeoutMs,
-        fetched: liveItems.length,
-        matched,
-        sources: liveSources.filter((source) => source.ok).map((source) => source.name),
-        sourceStatuses: liveSources,
+        enabled: false,
+        day: null,
+        fetchedAt: null,
+        nextRefreshAt: null,
+        ttlSeconds: null,
+        timeoutMs: null,
+        fetched: 0,
+        matched: 0,
+        sources: [],
+        sourceStatuses: [],
       },
       statusSignals: statusSignalMeta,
       reliability,
-      liveRefreshPlan: liveRefreshState
-        ? {
-            mode: liveRefreshState.mode,
-            running: liveRefreshState.running,
-            nextRefreshAt: liveRefreshState.nextRefreshAt,
-            nextRefreshInSeconds: liveRefreshState.nextRefreshInSeconds,
-            lastRefreshAt: liveRefreshState.lastRefreshAt,
-            consecutiveFailures: liveRefreshState.consecutiveFailures,
-            demandSignals: liveRefreshState.demandSignals,
-          }
-        : null,
-      // 라이브가 실제로 매칭되어 순위에 반영됐을 때만 'live-api'로 표기(라벨 과장 방지).
-      source: shouldFetchLive && matched > 0 ? "live-api" : "formula-api",
+      liveRefreshPlan: null,
+      source: "formula-api",
     },
     insights,
-  };
-}
-
-export async function getRankingHealth(fetchLive: LiveRankingFetcher = getLiveRanking) {
-  const startedAt = performance.now();
-  const live = await fetchLive(30);
-  const liveRefreshPlan = getLiveRefreshState();
-  const okSources = live.sources.filter((source) => source.ok).length;
-  const sourceCount = live.sources.length;
-  const status = okSources === sourceCount && live.items.length > 0 ? "ok" : okSources > 0 ? "degraded" : "down";
-
-  return {
-    status,
-    generatedAt: new Date().toISOString(),
-    latencyMs: Math.round(performance.now() - startedAt),
-    live: {
-      day: live.day,
-      fetchedAt: live.fetchedAt,
-      ttlSeconds: live.ttlSeconds,
-      timeoutMs: live.timeoutMs,
-      fetched: live.items.length,
-      okSources,
-      sourceCount,
-      sources: live.sources,
-      refreshPlan: {
-        mode: liveRefreshPlan.mode,
-        running: liveRefreshPlan.running,
-        nextRefreshAt: liveRefreshPlan.nextRefreshAt,
-        nextRefreshInSeconds: liveRefreshPlan.nextRefreshInSeconds,
-        lastRefreshAt: liveRefreshPlan.lastRefreshAt,
-        consecutiveFailures: liveRefreshPlan.consecutiveFailures,
-        demandSignals: liveRefreshPlan.demandSignals,
-      },
-    },
   };
 }

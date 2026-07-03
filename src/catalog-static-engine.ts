@@ -298,7 +298,7 @@ function matchEngine(pathname: string, sp: URLSearchParams): null | ((init: Requ
   if (pathname === "/api/random") return () => randomData(sp);
   if (pathname === "/api/ranking")
     // 실시간(live) 제거 — 스냅샷 기반 산식 랭킹(naver 호출·CORS·서버리스 없음).
-    return async () => getRankingData({ get: (n: string) => sp.get(n) }, { disableLive: true });
+    return async () => getRankingData({ get: (n: string) => sp.get(n) });
   if (pathname === "/api/explore") return async () => getExploreData(Object.fromEntries(sp.entries()));
   if (pathname === "/api/recommend") return (init) => recommendData(parseBody(init));
   if (pathname === "/api/titles") return () => titlesData(sp);

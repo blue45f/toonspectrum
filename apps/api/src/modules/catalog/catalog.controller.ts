@@ -158,12 +158,6 @@ export class CatalogController {
     return this.catalogService.getRankingData(normalizeQueryMap(query));
   }
 
-  @Get("/ranking/health")
-  @Header("Cache-Control", "no-store, max-age=0")
-  async getRankingHealth() {
-    return this.catalogService.getRankingHealth();
-  }
-
   @Get("/catalog/ingest/status")
   @Header("Cache-Control", "no-store, max-age=0")
   async getCatalogIngestStatus() {

@@ -30,7 +30,6 @@ import {
   getHomeData,
   getInsightsData,
   getRankingData,
-  getRankingHealth,
   getTitle,
   TITLES,
 } from "../../../../../packages/core/src/server";
@@ -171,11 +170,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getRankingData(query: QueryRecord) {
-    return getRankingData(createQueryReader(query), { disableLive: true });
-  }
-
-  async getRankingHealth() {
-    return getRankingHealth();
+    return getRankingData(createQueryReader(query));
   }
 
   async getExploreData(query: QueryRecord) {
