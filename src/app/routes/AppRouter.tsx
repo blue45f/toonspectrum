@@ -1,8 +1,9 @@
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState, type AnimationEvent, type ReactNode } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 import { LoadingState } from "@/components/LoadingState";
 import { lazyRetry } from "@/lib/lazy-retry";
+import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
@@ -178,11 +179,27 @@ function RouteFallback() {
   );
 }
 
+// route-stage-in 애니메이션(560ms)이 끝나면 transform/filter를 완전히 끊는다 — animation-fill-mode:
+// both가 keyframe의 종료값을 계속 유지하는데, 그 값이 identity transform/filter라도 리터럴 none이
+// 아닌 한(Chrome은 이걸 matrix(1,0,0,1,0,0) 등으로 정규화해 반환) 이 요소가 새 containing block이
+// 되어 자손의 position: fixed를 뷰포트가 아닌 이 요소(라우트 전체 콘텐츠) 기준으로 배치해버린다.
+function RouteStage({ pathname, children }: { pathname: string; children: ReactNode }) {
+  const [settled, setSettled] = useState(false);
+  const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
+    if (e.animationName === "route-stage-in") setSettled(true);
+  };
+  return (
+    <div key={pathname} className={cn("route-stage", settled && "route-stage--settled")} onAnimationEnd={onAnimationEnd}>
+      {children}
+    </div>
+  );
+}
+
 export function AppRouter() {
   const { pathname } = useLocation();
   useRouteTitle(pathname);
   return (
-    <div key={pathname} className="route-stage">
+    <RouteStage pathname={pathname}>
       <ErrorBoundary resetKey={pathname}>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -236,6 +253,6 @@ export function AppRouter() {
           </Routes>
         </Suspense>
       </ErrorBoundary>
-    </div>
+    </RouteStage>
   );
 }

@@ -220,9 +220,14 @@
     filter: blur(4px) saturate(1.25);
   }
   to {
+    /* transform/filter를 identity 값(translateY(0) scale(1) 등)이 아니라 리터럴 none으로 끝내야 한다 —
+       animation-fill-mode: both가 이 최종 프레임을 애니메이션 종료 후에도 계속 유지하는데, transform이나
+       filter가 none이 아니면(설령 identity여도) 이 요소가 새로운 containing block이 되어 자손의 모든
+       position: fixed가 뷰포트가 아니라 이 요소(라우트 전체 콘텐츠, 뷰포트보다 훨씬 길 수 있음) 기준으로
+       배치된다 — 스튜디오의 모바일 바텀시트가 화면 밖 엉뚱한 위치(문서 하단)에 렌더되던 버그의 원인. */
     opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0) saturate(1);
+    transform: none;
+    filter: none;
   }
 }
 
@@ -380,6 +385,19 @@
   isolation: isolate;
   min-width: 0;
   animation: route-stage-in 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* route-stage-in의 fill-mode(both)가 애니메이션 종료 후에도 to 프레임의 계산된 transform/filter를
+   유지하는데(키프레임에 none이라 적어도 Chrome이 identity matrix로 정규화해 반환), transform/filter가
+   none이 아닌 한 이 요소는 계속 새 containing block이 되어 자손의 position: fixed를 뷰포트가 아니라
+   이 요소(라우트 전체 콘텐츠 — 뷰포트보다 훨씬 길 수 있음) 기준으로 밀어버린다. AppRouter가
+   route-stage-in의 animationend에서 이 클래스를 붙여 애니메이션 자체를 끊고 transform/filter를
+   확실히 none으로 되돌린다. ::before(스펙트럼 와이프)는 .route-stage 클래스 자체로 계속 붙어 있으니
+   영향 없음. */
+.route-stage--settled {
+  animation: none;
+  transform: none;
+  filter: none;
 }
 
 .route-stage::before {
