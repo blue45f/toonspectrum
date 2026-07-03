@@ -1,6 +1,6 @@
 import type { PlatformId, WorkType } from "../types";
 
-export type CatalogSourceImplementation = "crawler" | "live-only" | "partner-required" | "manual";
+export type CatalogSourceImplementation = "crawler" | "partner-required" | "manual";
 export type CatalogSourceRisk = "low" | "medium" | "high";
 
 export interface CatalogSourceMetadata {
