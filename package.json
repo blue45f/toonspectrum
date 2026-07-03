@@ -58,7 +58,6 @@
     "@radix-ui/react-select": "^2.3.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
-    "@tanstack/react-query": "^5.101.0",
     "@toonspectrum/core": "workspace:*",
     "@toonspectrum/play-core": "workspace:*",
     "clsx": "^2.1.1",
