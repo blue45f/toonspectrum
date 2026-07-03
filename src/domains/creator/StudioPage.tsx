@@ -283,6 +283,8 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
+import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioSkewPanel } from "./StudioSkewPanel";
@@ -11178,6 +11180,12 @@ function StudioCuttoonEditor() {
               {selected.type === "image" && (
                 <>
                   <StudioBgRemoveButton
+                    src={selected.src}
+                    onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                  />
+                  {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
+                  <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
+                  <StudioFloodFillPanel
                     src={selected.src}
                     onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                   />
