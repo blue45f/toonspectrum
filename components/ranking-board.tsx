@@ -10,7 +10,6 @@ import {
   Heart,
   LayoutGrid,
   LayoutList,
-  Radio,
   RefreshCw,
   Rows3,
   ShieldAlert,
@@ -268,19 +267,9 @@ function SignalWorkbench({
         </div>
         <div className="min-w-0">
           <p className="eyebrow text-[0.58rem] text-fg-3">SOURCE</p>
-          <p className="mt-1 truncate text-sm font-semibold text-fg">
-            {meta?.source === "live-api" ? "Live API" : "스냅샷 산식"}
-          </p>
-          <p className="mt-0.5 text-xs text-fg-3">
-            {meta?.source === "live-api"
-              ? `${meta.live.matched}개 실시간 매칭`
-              : reliability?.fallbackReason ?? "산식 기반 폴백"}
-          </p>
-          {meta?.statusSignals.enabled && (
-            <p className="mt-1 text-xs text-fg-3">
-              상태 확인 {meta.statusSignals.matched}개 · 보정 {meta.statusSignals.overridden}개
-            </p>
-          )}
+          {/* 스냅샷 산식 전용 운영 — 외부 실시간 소스는 폐기됨. */}
+          <p className="mt-1 truncate text-sm font-semibold text-fg">스냅샷 산식</p>
+          <p className="mt-0.5 text-xs text-fg-3">{reliability?.fallbackReason ?? "산식 기반 폴백"}</p>
         </div>
         <div className="min-w-0">
           <p className="eyebrow text-[0.58rem] text-fg-3">RISING</p>
@@ -298,56 +287,17 @@ function SignalWorkbench({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 border-t border-line pt-4 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div className="min-w-0">
-          <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">EVIDENCE</p>
-          <div className="flex flex-wrap gap-1.5">
-            {(reliability?.basis ?? ["랭킹 신호 계산 대기"]).map((item) => (
-              <span
-                key={item}
-                className="rounded-md border border-line/80 bg-canvas/55 px-2 py-1 text-[0.7rem] text-fg-2"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-start gap-1.5 lg:justify-end">
-          {(meta?.live.sourceStatuses ?? []).map((source) => (
+      <div className="mt-4 border-t border-line pt-4">
+        <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">EVIDENCE</p>
+        <div className="flex flex-wrap gap-1.5">
+          {(reliability?.basis ?? ["랭킹 신호 계산 대기"]).map((item) => (
             <span
-              key={source.name}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.7rem]",
-                source.ok
-                  ? "border-good/30 bg-[oklch(0.8_0.15_150/0.1)] text-good"
-                  : "border-bad/35 bg-[oklch(0.66_0.2_25/0.12)] text-bad"
-              )}
-              title={`${source.message} · ${source.latencyMs}ms`}
+              key={item}
+              className="rounded-md border border-line/80 bg-canvas/55 px-2 py-1 text-[0.7rem] text-fg-2"
             >
-              <span className="size-1.5 rounded-full bg-current" />
-              {source.name} {source.fetched}개 · {source.latencyMs}ms
+              {item}
             </span>
           ))}
-          {(meta?.statusSignals.sourceStatuses ?? []).map((source) => (
-            <span
-              key={`status-${source.name}`}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[0.7rem]",
-                source.ok
-                  ? "border-cool/35 bg-[oklch(0.8_0.11_232/0.1)] text-cool"
-                  : "border-warn/35 bg-[oklch(0.82_0.15_80/0.12)] text-warn"
-              )}
-              title={`연재 상태 ${source.message} · ${source.latencyMs}ms`}
-            >
-              <span className="size-1.5 rounded-full bg-current" />
-              상태 {source.name} {source.fetched}개
-            </span>
-          ))}
-          {meta?.live.ttlSeconds && (
-            <span className="rounded-md border border-line bg-canvas/45 px-2 py-1 text-[0.7rem] text-fg-3">
-              소스 TTL {Math.round(meta.live.ttlSeconds / 60)}분
-            </span>
-          )}
         </div>
       </div>
 
@@ -484,24 +434,10 @@ export function RankingBoard({
         setRanked(data.items);
         setRankingMeta(data.meta);
         setInsights(data.insights);
-        const ttlSeconds =
-          data.meta.live.ttlSeconds ??
-          (data.meta.live.enabled ? Math.max(30, data.meta.refreshSeconds) : data.meta.refreshSeconds);
-        setPollIntervalMs(Math.max(30_000, Math.min(300_000, ttlSeconds * 1000)));
-        if (data.meta.live.fetchedAt) {
-          if (data.meta.live.nextRefreshAt) {
-            const scheduled = new Date(data.meta.live.nextRefreshAt).getTime();
-            if (Number.isFinite(scheduled)) {
-              setNextRefreshAt(scheduled);
-            } else {
-              setNextRefreshAt(new Date(data.meta.live.fetchedAt).getTime() + ttlSeconds * 1000);
-            }
-          } else {
-            setNextRefreshAt(new Date(data.meta.live.fetchedAt).getTime() + ttlSeconds * 1000);
-          }
-        } else {
-          setNextRefreshAt(Date.now() + Math.max(30_000, Math.min(300_000, ttlSeconds * 1000)));
-        }
+        // 스냅샷 산식 운영 — 폴링 주기는 서버 refreshSeconds 기준(외부 실시간 TTL 없음).
+        const pollMs = Math.max(30_000, Math.min(300_000, data.meta.refreshSeconds * 1000));
+        setPollIntervalMs(pollMs);
+        setNextRefreshAt(Date.now() + pollMs);
         setState("ready");
       } catch (err) {
         if (!alive || controller.signal.aborted) return;
@@ -745,19 +681,13 @@ export function RankingBoard({
           >
             {state === "error" ? (
               <AlertCircle size={14} className="shrink-0" />
-            ) : rankingMeta?.source === "live-api" ? (
-              <Radio size={14} className={cn("shrink-0 text-bad", isRefreshing && "animate-pulse-soft")} />
             ) : (
               <Grid2X2 size={14} className="shrink-0 text-fg-2" />
             )}
             <span className="truncate">
               {state === "error"
                 ? error
-                : rankingMeta?.source === "live-api"
-                  ? `LIVE API · 신뢰 ${rankingMeta.reliability.confidence}/100 · ${rankingMeta.live.matched}/${rankingMeta.live.fetched} 매칭 · 업데이트 ${formatUpdatedAt(
-                      rankingMeta.live.fetchedAt ?? rankingMeta.generatedAt
-                    )}`
-                  : `스냅샷 산식 · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
+                : `스냅샷 산식 · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
             </span>
           </div>
           <button
