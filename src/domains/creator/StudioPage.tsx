@@ -200,6 +200,24 @@ import {
   withMasterElements,
   type DocumentMaster,
 } from "./studio-master-page";
+import {
+  beginNodeDrag,
+  decimateStrokeHandles,
+  hitTestNodeHandle,
+  isNodeEditableKind,
+  isPressureWidthBrush,
+  NODE_EDIT_DEFAULT_MAX_HANDLES,
+  NODE_EDIT_DEFAULT_MIN_SPACING_PX,
+  NODE_EDIT_WIDTH_DRAG_RANGE_PX,
+  pressureAt,
+  updateNodeDragMove,
+  updateNodeDragWidth,
+  withPointMoved,
+  withPressureEdited,
+  type NodeDragSession,
+  type NodeEditHandle,
+  type NodeEditTool,
+} from "./studio-node-edit";
 import { resizableNodeProps, textNodeProps } from "./studio-node-props";
 import {
   isDefaultPageGrade,
@@ -235,6 +253,13 @@ import {
   movePage as movePagePure,
   reorderPages,
 } from "./studio-pages";
+import {
+  beginPanelSplitDrag,
+  planPanelSplit,
+  previewPanelSplit,
+  type PanelSplitLine,
+  type PanelSplitPreview,
+} from "./studio-panel-split";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -325,8 +350,10 @@ import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
+import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioSkewPanel } from "./StudioSkewPanel";
@@ -2125,6 +2152,42 @@ function StudioCropOverlay({ rect, frame, scale }: { rect: CropRect; frame: Sele
   );
 }
 
+// 벡터 노드 편집 핸들 — 이동 모드는 흰 원, 굵기 모드는 필압에 비례해 커지는 보라 원(굵기를
+// 시각적으로 미리 보여준다). 드래그 중인 핸들은 항상 보라로 강조.
+function StudioNodeEditOverlay({
+  handles,
+  tool,
+  pressures,
+  scale,
+  activeHandleIndex,
+}: {
+  handles: NodeEditHandle[];
+  tool: NodeEditTool;
+  pressures: number[] | undefined;
+  scale: number;
+  activeHandleIndex: number | null;
+}) {
+  return (
+    <Group listening={false}>
+      {handles.map((h) => {
+        const isActive = activeHandleIndex === h.pointIndex;
+        const r = tool === "width" ? (4 + pressureAt(pressures, h.pointIndex) * 8) / scale : 5 / scale;
+        return (
+          <KCircle
+            key={h.pointIndex}
+            x={h.x}
+            y={h.y}
+            radius={r}
+            fill={tool === "width" || isActive ? "#7c5cfc" : "#ffffff"}
+            stroke="#18181b"
+            strokeWidth={1.25 / scale}
+          />
+        );
+      })}
+    </Group>
+  );
+}
+
 // 프레임 애니메이션 어니언스킨 — 이전/다음 프레임을 옅게 겹쳐 그린다. Transformer/포인터가 절대
 // 이걸 붙잡지 않도록 항상 listening=false, nodeRefs에도 등록하지 않는다(선택 불가능한 참고선).
 function OnionSkinImage({ el, layer }: { el: ImageEl; layer: OnionSkinLayer }) {
@@ -3579,6 +3642,66 @@ function StudioCuttoonEditor() {
     },
     []
   );
+  // ── 패널 손그림 컷(임의 각도 절단선) — studio-panel-split 통합 상태. 크롭과 동일한
+  // 드래그 세션+RAF 스로틀 패턴이지만, 대상은 이미지가 아니라 선택된 FrameEl.
+  const [panelSplitActive, setPanelSplitActive] = useState(false);
+  const [panelSplitHint, setPanelSplitHint] = useState<string | null>(null);
+  const [panelSplitPreview, setPanelSplitPreview] = useState<PanelSplitPreview | null>(null);
+  const panelSplitDragRef = useRef<{ targetFrameId: string; start: { x: number; y: number } } | null>(null);
+  // previewPanelSplit 의 반환값은 계산에 쓰인 line 을 보존하지 않으므로, pointerup 에서
+  // planPanelSplit 을 다시 부르려면 마지막 드래그 line 을 따로 기억해둬야 한다.
+  const panelSplitLastLineRef = useRef<PanelSplitLine | null>(null);
+  const panelSplitRafRef = useRef<number | null>(null);
+  const pendingPanelSplitPreviewRef = useRef<PanelSplitPreview | null>(null);
+  const schedulePanelSplitPreview = (next: PanelSplitPreview | null) => {
+    pendingPanelSplitPreviewRef.current = next;
+    if (panelSplitRafRef.current !== null) return;
+    panelSplitRafRef.current = globalThis.requestAnimationFrame(() => {
+      panelSplitRafRef.current = null;
+      setPanelSplitPreview(pendingPanelSplitPreviewRef.current);
+    });
+  };
+  const flushPanelSplitPreview = () => {
+    if (panelSplitRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(panelSplitRafRef.current);
+      panelSplitRafRef.current = null;
+    }
+    setPanelSplitPreview(pendingPanelSplitPreviewRef.current);
+  };
+  useEffect(
+    () => () => {
+      if (panelSplitRafRef.current !== null) globalThis.cancelAnimationFrame(panelSplitRafRef.current);
+    },
+    []
+  );
+  // ── 벡터 노드 편집(자유선 점 이동·굵기) — studio-node-edit 통합 상태 ──
+  const [nodeEditTool, setNodeEditTool] = useState<NodeEditTool | null>(null);
+  const nodeEditDragRef = useRef<{ elId: string; session: NodeDragSession } | null>(null);
+  const nodeEditRafRef = useRef<number | null>(null);
+  const pendingNodeEditDraftRef = useRef<{ elId: string; points: number[]; pressures: number[] } | null>(null);
+  const [nodeEditDraft, setNodeEditDraft] = useState<{ elId: string; points: number[]; pressures: number[] } | null>(null);
+  const scheduleNodeEditDraft = (next: { elId: string; points: number[]; pressures: number[] }) => {
+    pendingNodeEditDraftRef.current = next;
+    if (nodeEditRafRef.current !== null) return;
+    nodeEditRafRef.current = globalThis.requestAnimationFrame(() => {
+      nodeEditRafRef.current = null;
+      if (pendingNodeEditDraftRef.current) setNodeEditDraft(pendingNodeEditDraftRef.current);
+    });
+  };
+  useEffect(() => () => {
+    if (nodeEditRafRef.current !== null) globalThis.cancelAnimationFrame(nodeEditRafRef.current);
+  }, []);
+  useEffect(() => {
+    void selectedId;
+    nodeEditDragRef.current = null;
+    pendingNodeEditDraftRef.current = null;
+    if (nodeEditRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(nodeEditRafRef.current);
+      nodeEditRafRef.current = null;
+    }
+    setNodeEditDraft(null);
+    setNodeEditTool(null);
+  }, [selectedId]);
   // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
   useEffect(() => {
     void selectedId; // "바뀌면 초기화"를 위해 의존성으로 구독.
@@ -3663,6 +3786,17 @@ function StudioCuttoonEditor() {
   // 크롭 모드 무장(이미지 요소 선택 + 크롭 rect 존재) — 무장 중엔 스테이지 드래그를 크롭 rect
   // 조작으로 가로채고, 요소 드래그/클릭 선택 전환을 함께 잠근다(픽셀 선택 도구와 동일 정책).
   const cropArmed = cropRect !== null && selected?.type === "image";
+  // 패널 손그림 컷 무장(패널 선택 + 도구 on, 잠긴 패널은 제외) — 크롭·픽셀 선택과 동일한 정책.
+  const panelSplitArmed = panelSplitActive && selected?.type === "frame" && !selected.locked;
+  // 벡터 노드 편집 무장(자유선 요소 선택 + 도구 on) — crop/pixel-select 와 동일한 정책.
+  const nodeEditArmed = nodeEditTool !== null && selected?.type === "draw" && isNodeEditableKind(selected.kind);
+  const nodeEditHandles: NodeEditHandle[] =
+    nodeEditArmed && selected?.type === "draw"
+      ? decimateStrokeHandles(nodeEditDraft?.elId === selected.id ? nodeEditDraft.points : selected.points, {
+          minSpacingPx: NODE_EDIT_DEFAULT_MIN_SPACING_PX / effScale,
+          maxHandles: NODE_EDIT_DEFAULT_MAX_HANDLES,
+        })
+      : [];
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -5114,6 +5248,11 @@ function StudioCuttoonEditor() {
         } else if (cropRect) {
           // 크롭 모드를 먼저 종료(영역 폐기) — 다음 Esc 가 픽셀 선택/요소 선택을 해제한다.
           setCropRect(null);
+        } else if (panelSplitActive) {
+          setPanelSplitActive(false);
+          setPanelSplitHint(null);
+        } else if (nodeEditTool) {
+          setNodeEditTool(null);
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
@@ -5888,6 +6027,34 @@ function StudioCuttoonEditor() {
       }
       return; // 핸들 밖이어도 크롭 모드 중엔 마퀴·드로잉 등 다른 스테이지 제스처를 막는다.
     }
+    // 패널 손그림 컷 무장 중: 스테이지 드래그를 절단선 그리기로 가로챈다. FrameEl 은 회전이
+    // 없으므로(항상 캔버스 절대좌표) crop 처럼 정규화 좌표 변환이 필요 없다.
+    if (panelSplitArmed && !isSpacePressed && !(e.target.getParent() instanceof KonvaRuntime.Transformer)) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      panelSplitDragRef.current = beginPanelSplitDrag(selected.id, { x: pos.x, y: pos.y });
+      panelSplitLastLineRef.current = null;
+      setPanelSplitHint(null);
+      return; // 크롭/픽셀 선택과 동일하게 다른 스테이지 제스처(마퀴·드로잉 등)를 막는다.
+    }
+    // 벡터 노드 편집 무장 중: 핸들 히트테스트 후 드래그 세션을 연다. 무장 중엔 핸들 밖 클릭도
+    // 마퀴 등 다른 제스처를 막는다 — crop/pixel 과 동일 정책.
+    if (
+      nodeEditArmed &&
+      selected?.type === "draw" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const tolerance = 14 / effScale; // 화면 14px, crop 의 hitTolerance 관례와 동일
+      const hitIdx = hitTestNodeHandle(pos, nodeEditHandles, tolerance);
+      if (hitIdx !== null) {
+        const session = beginNodeDrag(selected.points, selected.pressures, hitIdx, nodeEditTool!, pos);
+        if (session) nodeEditDragRef.current = { elId: selected.id, session };
+      }
+      return;
+    }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
     // Space 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
@@ -5987,6 +6154,47 @@ function StudioCuttoonEditor() {
           frameAspect: session.frame.height > 0 ? session.frame.width / session.frame.height : 1,
         });
         scheduleCropRect(next);
+      }
+      return;
+    }
+    // 패널 손그림 컷 드래그 중이면 절단선 미리보기를 갱신한다.
+    if (panelSplitDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      const session = panelSplitDragRef.current;
+      const frame = elements.find((el) => el.id === session.targetFrameId);
+      if (pos && frame && frame.type === "frame") {
+        const line: PanelSplitLine = { a: session.start, b: { x: pos.x, y: pos.y } };
+        panelSplitLastLineRef.current = line;
+        const preview = previewPanelSplit({ frame, line, gutterPx: panelGutter });
+        schedulePanelSplitPreview(preview);
+      }
+      return;
+    }
+    // 벡터 노드 편집 드래그 중이면 점 위치/굵기 초안을 갱신한다. 매 틱마다 커밋된 el.points/
+    // pressures 기준으로 재계산한다(직전 draft 가 아니라) — updateNodeDragMove 의 "시작 스냅샷+델타"
+    // 설계와 일치, crop 의 updateCropDrag 와 동일한 무누적오차 패턴.
+    if (nodeEditDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const { elId, session } = nodeEditDragRef.current;
+        const el = elementById.get(elId);
+        if (el && el.type === "draw") {
+          if (session.tool === "move") {
+            const { x, y } = updateNodeDragMove(session, pos);
+            scheduleNodeEditDraft({
+              elId,
+              points: withPointMoved(el.points, session.pointIndex, x, y),
+              pressures: el.pressures ?? [],
+            });
+          } else {
+            const pressure = updateNodeDragWidth(session, pos, NODE_EDIT_WIDTH_DRAG_RANGE_PX / effScale);
+            scheduleNodeEditDraft({
+              elId,
+              points: el.points,
+              pressures: withPressureEdited(el.pressures, Math.floor(el.points.length / 2), session.pointIndex, pressure),
+            });
+          }
+        }
       }
       return;
     }
@@ -6122,6 +6330,53 @@ function StudioCuttoonEditor() {
     if (cropDragRef.current) {
       cropDragRef.current = null;
       flushCropRect();
+      return;
+    }
+    // 패널 손그림 컷 드래그 종료 — 마지막 절단선으로 실제 분할을 확정한다. 도구는 계속 무장된
+    // 채로 둔다(크롭과 달리 의도적 — 연속으로 여러 컷을 이어서 그릴 수 있게).
+    if (panelSplitDragRef.current) {
+      const session = panelSplitDragRef.current;
+      panelSplitDragRef.current = null;
+      flushPanelSplitPreview();
+      const line = panelSplitLastLineRef.current;
+      const frame = elements.find((el) => el.id === session.targetFrameId);
+      if (line && frame && frame.type === "frame") {
+        const plan = planPanelSplit({ frame, line, gutterPx: panelGutter });
+        if (plan) {
+          // frame 을 먼저 펼치고 plan.shape* 로 덮어써야 shapeA/B 의 항상-존재하는 points 키(뒤집힌
+          // 사각형일 때도 undefined 로 명시)가 원본 frame 의 남은 points 를 확실히 지운다.
+          const shapeA = { ...frame, ...plan.shapeA, id: uid() };
+          const shapeB = { ...frame, ...plan.shapeB, id: uid() };
+          commit([...elements.filter((e) => e.id !== frame.id), shapeA, shapeB]);
+          setSelectedId(shapeA.id);
+        } else {
+          setPanelSplitHint(
+            panelSplitPreview
+              ? "여백을 적용하면 한쪽 칸이 너무 작아져요. 여백을 줄이거나 더 넓게 갈라보세요."
+              : "선이 패널을 가로지르지 않았어요. 패널 양쪽 변을 관통하도록 다시 그어보세요."
+          );
+        }
+      }
+      panelSplitLastLineRef.current = null;
+      setPanelSplitPreview(null);
+      return;
+    }
+    // 벡터 노드 편집 드래그 종료 — 커밋은 이 pointerup 틱에서 바로 일어나므로(리렌더를 기다리는
+    // crop 의 "적용" 버튼과 다름) nodeEditDraft state 가 아니라 항상-최신인 ref 를 읽는다. state 를
+    // 읽으면 React 의 비동기 업데이트 때문에 드래그의 마지막 프레임을 놓칠 수 있다.
+    if (nodeEditDragRef.current) {
+      const { elId } = nodeEditDragRef.current;
+      nodeEditDragRef.current = null;
+      if (nodeEditRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(nodeEditRafRef.current);
+        nodeEditRafRef.current = null;
+      }
+      const finalDraft = pendingNodeEditDraftRef.current;
+      pendingNodeEditDraftRef.current = null;
+      setNodeEditDraft(null);
+      if (finalDraft && finalDraft.elId === elId && elementById.get(elId)?.type === "draw") {
+        patchEl(elId, { points: finalDraft.points, pressures: finalDraft.pressures } as Partial<El>);
+      }
       return;
     }
     // 픽셀 선택 드래그 종료: 의미 있는 면적이면 서브패스로 결합(찰나 클릭은 변화 없음 = null).
@@ -8625,14 +8880,15 @@ function StudioCuttoonEditor() {
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
-                // 픽셀 선택/크롭 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
-                const draggable = !opts.asMask && tool === "select" && !locked && !pixelToolArmed && !cropArmed;
+                // 픽셀 선택/크롭/패널 컷/노드 편집 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
+                const draggable =
+                  !opts.asMask && tool === "select" && !locked && !pixelToolArmed && !cropArmed && !panelSplitArmed && !nodeEditArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
                 const onSelect = opts.asMask
                   ? () => {}
-                  : () => tool === "select" && !pixelToolArmed && !cropArmed && setSelectedId(el.id);
+                  : () => tool === "select" && !pixelToolArmed && !cropArmed && !panelSplitArmed && !nodeEditArmed && setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -8722,8 +8978,14 @@ function StudioCuttoonEditor() {
                       dragBoundFunc={snapBoundFunc}
                     />
                   );
-                if (el.type === "draw")
-                  return wrapClip(<StudioDrawNode key={el.id} el={el} />);
+                if (el.type === "draw") {
+                  // 노드 편집 드래그 중엔 커밋 전 초안을 얕게 병합해 그대로 넘긴다 — StudioDrawNode
+                  // 는 points/pressures 로부터 매끈화·굵기를 재계산하므로 별도 로직 중복 없이
+                  // "라이브 리셰이프"가 커밋될 최종 결과와 픽셀 단위로 동일하게 미리보기된다.
+                  const liveEl =
+                    nodeEditDraft?.elId === el.id ? { ...el, points: nodeEditDraft.points, pressures: nodeEditDraft.pressures } : el;
+                  return wrapClip(<StudioDrawNode key={el.id} el={liveEl} />);
+                }
                 if (el.type === "text" && el.textPath && !isFlatTextPath(normalizeTextPath(el.textPath)))
                   return wrapClip(
                     <KTextPath
@@ -9415,6 +9677,24 @@ function StudioCuttoonEditor() {
             {!isExporting && cropRect && pixelOverlayFrame && (
               <Layer listening={false}>
                 <StudioCropOverlay rect={cropRect} frame={pixelOverlayFrame} scale={effScale} />
+              </Layer>
+            )}
+            {/* 패널 손그림 컷 오버레이 — 드래그 중 절단선 미리보기(유효/무효 색 구분). */}
+            {!isExporting && panelSplitPreview && (
+              <Layer listening={false}>
+                <StudioPanelSplitOverlay preview={panelSplitPreview} gutterPx={panelGutter} scale={effScale} />
+              </Layer>
+            )}
+            {/* 벡터 노드 편집 오버레이 — 자유선 점 핸들. */}
+            {!isExporting && nodeEditArmed && selected?.type === "draw" && (
+              <Layer listening={false}>
+                <StudioNodeEditOverlay
+                  handles={nodeEditHandles}
+                  tool={nodeEditTool!}
+                  pressures={nodeEditDraft?.elId === selected.id ? nodeEditDraft.pressures : selected.pressures}
+                  scale={effScale}
+                  activeHandleIndex={nodeEditDragRef.current?.session.pointIndex ?? null}
+                />
               </Layer>
             )}
             {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
@@ -10337,6 +10617,27 @@ function StudioCuttoonEditor() {
                           }
                         />
                       </Suspense>
+                    </div>
+                  )}
+
+                  {(selected.kind ?? "freehand") === "freehand" && (
+                    <div className="mt-2.5 border-t border-line/40 pt-2.5">
+                      <StudioNodeEditPanel
+                        active={nodeEditTool !== null}
+                        tool={nodeEditTool ?? "move"}
+                        handleCount={nodeEditHandles.length}
+                        widthModeSupported={isPressureWidthBrush(selected.brush, selected.mode)}
+                        onToggle={() => {
+                          if (nodeEditTool) {
+                            setNodeEditTool(null);
+                            return;
+                          }
+                          setCropRect(null); // 방어적 초기화(크롭/픽셀 도구는 image 전용이라 실제로 겹치진 않음)
+                          setPixelTool(null);
+                          setNodeEditTool("move");
+                        }}
+                        onToolChange={(t) => setNodeEditTool(t)}
+                      />
                     </div>
                   )}
                 </div>
@@ -11607,6 +11908,17 @@ function StudioCuttoonEditor() {
                       가로로 분할
                     </button>
                   </div>
+
+                  <StudioPanelSplitPanel
+                    active={panelSplitActive}
+                    gutterPx={panelGutter}
+                    hint={panelSplitHint}
+                    onToggle={() => {
+                      setPanelSplitActive((v) => !v);
+                      setPanelSplitHint(null);
+                    }}
+                    onGutterChange={setPanelGutter}
+                  />
 
                   <div className="mt-3.5 border-t border-line/40 pt-2.5 space-y-2.5">
                     <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 배경 및 테두리</p>
