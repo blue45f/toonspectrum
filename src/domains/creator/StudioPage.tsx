@@ -282,6 +282,7 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioSkewPanel } from "./StudioSkewPanel";
@@ -11176,6 +11177,10 @@ function StudioCuttoonEditor() {
 
               {selected.type === "image" && (
                 <>
+                  <StudioBgRemoveButton
+                    src={selected.src}
+                    onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                  />
                   <StudioImageAdjustmentsPanel
                     selected={selected}
                     filterClipboard={filterClipboard}
