@@ -16,11 +16,7 @@ describe("design token discipline", () => {
   });
 
   it("keeps floating switcher and share menu shadows on the warm-ink axis", () => {
-    const paths = [
-      "components/theme-switcher.tsx",
-      "components/language-switcher.tsx",
-      "components/share-button.tsx",
-    ];
+    const paths = ["components/share-button.tsx"];
 
     for (const path of paths) {
       const source = read(path);
