@@ -182,10 +182,10 @@ export function traceMaskContours(mask: Uint8Array, w: number, h: number, startX
     );
   if (!trueOuter) return { outer: [], holes: [] };
 
-  // 병적 입력(예: 스크린톤 전면 스캔) 방어 — 진짜 외곽은 항상 유지하고, 나머지는 |면적| 기준
-  // 상위 (MAGIC_WAND_MAX_LOOPS - 1)개만 남긴다. 선택되지 못한 여분의 "양수" 루프는 버린다
-  // (연결된 한 성분은 desaddle 이후 이론상 외곽이 하나뿐이어야 하므로 이례적 상황에 대한 안전망).
-  const rest = negatives.filter((l) => l !== trueOuter);
+  // 병적 입력(예: 스크린톤 전면 스캔) 방어 — 진짜 외곽은 항상 유지하고, 나머지(구멍 후보 = 음수
+  // 루프 전체, trueOuter 는 양수 루프에서 골랐으므로 애초에 여기 섞일 수 없다)는 |면적| 기준
+  // 상위 (MAGIC_WAND_MAX_LOOPS - 1)개만 남긴다.
+  const rest = negatives;
   const capped =
     rest.length > MAGIC_WAND_MAX_LOOPS - 1
       ? rest.slice().sort((a, b) => Math.abs(signedArea(b)) - Math.abs(signedArea(a))).slice(0, MAGIC_WAND_MAX_LOOPS - 1)
