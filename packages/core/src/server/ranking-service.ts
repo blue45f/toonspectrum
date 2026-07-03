@@ -39,12 +39,6 @@ interface QueryReader {
   get(name: string): string | null;
 }
 
-// 응답 스키마 호환용 최소 타입 — 실시간 소스 비활성이라 실제로는 항상 빈 배열이다.
-interface LiveSourceStatus {
-  name: string;
-  ok: boolean;
-}
-
 export interface RankingParams {
   axis: RankAxis;
   period: RankPeriod;
@@ -65,29 +59,6 @@ export interface RankingInsights {
   scoreSpread: number;
   leader: { title: string; rank: number; score: number } | null;
   rising: { title: string; delta: number; rank: number } | null;
-  liveCoverage: number;
-}
-
-export interface RankingStatusSignalMeta {
-  enabled: boolean;
-  fetchedAt: string | null;
-  ttlSeconds: number | null;
-  timeoutMs: number | null;
-  fetched: number;
-  matched: number;
-  overridden: number;
-  sources: string[];
-  sourceStatuses: LiveSourceStatus[];
-}
-
-export interface LiveRefreshPlan {
-  mode: "off" | "fixed" | "adaptive";
-  running: boolean;
-  nextRefreshAt: string | null;
-  nextRefreshInSeconds: number | null;
-  lastRefreshAt: string | null;
-  consecutiveFailures: number;
-  demandSignals: number;
 }
 
 export interface RankingReliability {
@@ -97,11 +68,6 @@ export interface RankingReliability {
   fallbackReason: string | null;
   estimatedCount: number;
   estimatedShare: number;
-  liveCoverage: number;
-  okSources: number;
-  sourceCount: number;
-  liveTtlSeconds: number | null;
-  timeoutMs: number | null;
   basis: string[];
 }
 
@@ -112,22 +78,7 @@ export interface RankingResponse {
     total: number;
     generatedAt: string;
     refreshSeconds: number;
-    live: {
-      enabled: boolean;
-      day: string | null;
-      fetchedAt: string | null;
-      nextRefreshAt: string | null;
-      ttlSeconds: number | null;
-      timeoutMs: number | null;
-      fetched: number;
-      matched: number;
-      sources: string[];
-      sourceStatuses: LiveSourceStatus[];
-    };
-    statusSignals: RankingStatusSignalMeta;
     reliability: RankingReliability;
-    liveRefreshPlan: LiveRefreshPlan | null;
-    source: "live-api" | "formula-api";
     // 카탈로그에 실제 존재하는 플랫폼(필터 UI가 빈 플랫폼을 노출하지 않도록).
     availablePlatforms: PlatformId[];
   };
@@ -227,18 +178,10 @@ export function buildRankingInsights(items: RankedTitle[]): RankingInsights {
       strongestRise && strongestRise.delta > 0
         ? { title: strongestRise.title.title, delta: strongestRise.delta, rank: strongestRise.rank }
         : null,
-    // 실시간 소스 비활성 — 라이브 커버리지는 항상 0.
-    liveCoverage: 0,
   };
 }
 
-export function buildRankingReliability({
-  items,
-  statusSignalMeta,
-}: {
-  items: RankedTitle[];
-  statusSignalMeta: Pick<RankingStatusSignalMeta, "enabled" | "matched" | "overridden">;
-}): RankingReliability {
+export function buildRankingReliability({ items }: { items: RankedTitle[] }): RankingReliability {
   const estimatedCount = items.filter((item) => statsAreEstimated(item.title)).length;
   const estimatedShare = items.length ? Math.round((estimatedCount / items.length) * 100) : 0;
 
@@ -257,18 +200,11 @@ export function buildRankingReliability({
     fallbackReason: "현재 랭킹 경로는 스냅샷 산식 운영 모드라 외부 실시간 보정을 호출하지 않습니다.",
     estimatedCount,
     estimatedShare,
-    liveCoverage: 0,
-    okSources: 0,
-    sourceCount: 0,
-    liveTtlSeconds: null,
-    timeoutMs: null,
     basis: [
       `${items.length}개 후보를 요청 시점에 재계산`,
       "스냅샷 산식 운영 모드",
       "투명 산식 기반 정렬",
-      statusSignalMeta.enabled
-        ? `연재 상태 확인 ${statusSignalMeta.matched}개, 보정 ${statusSignalMeta.overridden}개`
-        : "로컬 연재 상태 기준",
+      "로컬 연재 상태 기준",
       `추정 핵심 지표 ${estimatedShare}%`,
     ],
   };
@@ -291,19 +227,7 @@ export async function getRankingData(
   const catalog = options.catalog ?? TITLES;
   const now = options.now ?? (() => new Date());
 
-  // 실시간 소스(연재상태·라이브 랭킹) 비활성 — 스냅샷 산식만. 상태 신호 메타는 비활성 값으로 채운다.
-  const statusSignalMeta: RankingStatusSignalMeta = {
-    enabled: false,
-    fetchedAt: null,
-    ttlSeconds: null,
-    timeoutMs: null,
-    fetched: 0,
-    matched: 0,
-    overridden: 0,
-    sources: [],
-    sourceStatuses: [],
-  };
-
+  // 실시간 소스(연재상태·라이브 랭킹) 비활성 — 스냅샷 산식만.
   const pool = filterRankingPool(catalog, params);
   const ranked = rankBy(pool, params.axis, {
     period: params.period,
@@ -315,10 +239,7 @@ export async function getRankingData(
   const items = ranked.map((entry) => ({ ...entry, evidence: { source: "formula" as const } }));
   const filtered = params.onlyRising ? items.filter((item) => item.delta > 0) : items;
   const insights = buildRankingInsights(filtered);
-  const reliability = buildRankingReliability({
-    items: filtered,
-    statusSignalMeta,
-  });
+  const reliability = buildRankingReliability({ items: filtered });
   const generatedAt = now().toISOString();
 
   return {
@@ -338,22 +259,7 @@ export async function getRankingData(
       generatedAt,
       refreshSeconds: RANKING_REFRESH_SECONDS,
       availablePlatforms: [...new Set(catalog.flatMap((title) => title.availability.map((a) => a.platformId)))],
-      live: {
-        enabled: false,
-        day: null,
-        fetchedAt: null,
-        nextRefreshAt: null,
-        ttlSeconds: null,
-        timeoutMs: null,
-        fetched: 0,
-        matched: 0,
-        sources: [],
-        sourceStatuses: [],
-      },
-      statusSignals: statusSignalMeta,
       reliability,
-      liveRefreshPlan: null,
-      source: "formula-api",
     },
     insights,
   };

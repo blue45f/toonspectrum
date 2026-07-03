@@ -63,7 +63,7 @@ describe("ranking service (snapshot 산식 운영)", () => {
     );
   });
 
-  it("항상 스냅샷 산식(formula-api)으로 응답하고 라이브는 비활성이다", async () => {
+  it("스냅샷 산식으로 응답한다(외부 실시간 소스 없음)", async () => {
     const data = await getRankingData(query({ axis: "popular", period: "daily", limit: "5" }), {
       catalog: [
         makeTitle({ id: "nw-a", type: "webtoon", availability: [{ platformId: "naver-webtoon", pricing: "free" }] }),
@@ -71,11 +71,6 @@ describe("ranking service (snapshot 산식 운영)", () => {
       now,
     });
 
-    expect(data.meta.source).toBe("formula-api");
-    expect(data.meta.live.enabled).toBe(false);
-    expect(data.meta.live.fetched).toBe(0);
-    expect(data.meta.liveRefreshPlan).toBeNull();
-    expect(data.meta.statusSignals.enabled).toBe(false);
     expect(data.meta.reliability.fallbackReason).toContain("스냅샷");
     expect(data.meta.reliability.basis).toContain("스냅샷 산식 운영 모드");
     expect(data.items.every((item) => item.evidence?.source === "formula")).toBe(true);
