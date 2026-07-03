@@ -138,6 +138,7 @@ import {
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
+import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
 import {
   runStudioPageAddDialogueBubbles,
@@ -205,10 +206,32 @@ import {
 } from "./studio-heal-clone";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
+  clampIsometricAngleDeg,
+  clampIsometricCellSize,
+  defaultIsometricOrigin,
+  DEFAULT_ISOMETRIC_ANGLE_DEG,
+  DEFAULT_ISOMETRIC_CELL_SIZE,
+  resolveIsometricAxisRay,
+  snapStrokePointToIsometricGrid,
+  type IsometricAxisRay,
+} from "./studio-isometric-grid";
+import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
+import {
+  bakeLayerMaskStroke,
+  canLayerMask,
+  createLayerMaskCanvas,
+  hasLayerMask,
+  invertLayerMaskAlpha,
+  shouldApplyLayerMask,
+  LAYER_MASK_BRUSH_HARDNESS_DEFAULT,
+  LAYER_MASK_BRUSH_RADIUS_DEFAULT,
+  LAYER_MASK_BRUSH_STRENGTH_DEFAULT,
+  type LayerMaskPaintMode,
+} from "./studio-layer-mask";
 import {
   createLayerGroup,
   groupOfItem,
@@ -219,7 +242,19 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
-import { applyMagicWandRegionToSelection, MAGIC_WAND_TOLERANCE_DEFAULT, magicWandScanFromImage } from "./studio-magic-wand";
+import {
+  computeMagicResize,
+  presetCanvasSize,
+  MAGIC_RESIZE_DEFAULT_STRATEGY,
+  type MagicResizePreset,
+  type MagicResizeStrategy,
+} from "./studio-magic-resize";
+import {
+  applyMagicWandRegionToSelection,
+  flipNormalizedPoint,
+  MAGIC_WAND_TOLERANCE_DEFAULT,
+  magicWandScanFromImage,
+} from "./studio-magic-wand";
 import {
   MASTER_EDIT_GHOST_OPACITY,
   composeMasterRenderElements,
@@ -284,6 +319,7 @@ import {
   movePage as movePagePure,
   reorderPages,
 } from "./studio-pages";
+import { shotTagBadgeText, shotTagBadgeTitle, withShotTag } from "./studio-panel-shot-tags";
 import {
   beginPanelSplitDrag,
   planPanelSplit,
@@ -393,7 +429,10 @@ import {
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
+import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
+import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
+import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
@@ -540,6 +579,10 @@ const StudioPerspectivePanel = lazyRetry(
   () => import("./StudioPerspectivePanel").then((mod) => ({ default: mod.StudioPerspectivePanel })),
   "StudioPerspectivePanel"
 );
+const StudioIsometricGridPanel = lazyRetry(
+  () => import("./StudioIsometricGridPanel").then((mod) => ({ default: mod.StudioIsometricGridPanel })),
+  "StudioIsometricGridPanel"
+);
 const StudioVrmPoser = lazyRetry(
   () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
   "StudioVrmPoser"
@@ -576,9 +619,17 @@ const StudioHealClonePanel = lazyRetry(
   () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
   "StudioHealClonePanel"
 );
+const StudioLayerMaskPanel = lazyRetry(
+  () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
+  "StudioLayerMaskPanel"
+);
 const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
   "StudioQuickShapePanel"
+);
+const StudioBrushLibraryPanel = lazyRetry(
+  () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
+  "StudioBrushLibraryPanel"
 );
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
@@ -587,6 +638,10 @@ const StudioReferencePanel = lazyRetry(loadStudioReferencePanel, "StudioReferenc
 function preloadStudioReferencePanel(): void {
   void loadStudioReferencePanel();
 }
+function loadStudioColorWheelOverlay() {
+  return import("./StudioColorWheelOverlay").then((mod) => ({ default: mod.StudioColorWheelOverlay }));
+}
+const StudioColorWheelOverlay = lazyRetry(loadStudioColorWheelOverlay, "StudioColorWheelOverlay");
 
 type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
 let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
@@ -989,7 +1044,7 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean };
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -2811,6 +2866,8 @@ interface PageState {
   name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
   note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.
   hideMaster?: boolean; // 이 페이지에서 문서 마스터(공통 요소) 숨김 — studio-master-page. 미설정=표시(해제 시 키 제거).
+  shotType?: string; // 샷 타입(클로즈업/와이드 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
+  cameraAngle?: string; // 카메라 앵글(로우/하이/더치 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
 }
 
 export function StudioPage() {
@@ -2937,6 +2994,10 @@ function StudioCuttoonEditor() {
         console.error("Failed to load studio webtoon guides:", err);
       });
   };
+  // 매직 리사이즈 — 선택한 재배치 전략(기본: 정규화 중심 유지). undo/redo 대상 아님(원근자
+  // 소실점과 같은 이유로, 이건 "다음 클릭에 어떤 전략을 쓸지"를 고르는 도구 설정일 뿐 —
+  // 실제 커밋 대상은 applyMagicResizePreset이 만드는 elements/canvasH 쪽이다).
+  const [magicResizeStrategy, setMagicResizeStrategy] = useState<MagicResizeStrategy>(MAGIC_RESIZE_DEFAULT_STRATEGY);
   // 대사 일괄 입력(말풍선 메뉴) — 여러 줄 스크립트를 화자별 말풍선으로 한 번에.
   const [dialogueScript, setDialogueScript] = useState("");
   // 배치된 대사 일괄 편집 패널(코미포식) — 목록 인라인 수정·찾아바꾸기·클릭 선택.
@@ -3139,6 +3200,11 @@ function StudioCuttoonEditor() {
   const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
   const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
   const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
+  const [isometricGridActive, setIsometricGridActive] = useState(false);
+  const [isometricAngleDeg, setIsometricAngleDeg] = useState<number>(DEFAULT_ISOMETRIC_ANGLE_DEG);
+  const [isometricCellSize, setIsometricCellSize] = useState<number>(DEFAULT_ISOMETRIC_CELL_SIZE);
+  const [isometricOriginX, setIsometricOriginX] = useState<number>(() => CANVAS_W / 2);
+  const [isometricOriginY, setIsometricOriginY] = useState<number>(() => canvasH / 2);
   const [eyedropperActive, setEyedropperActive] = useState(false);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
@@ -3671,6 +3737,7 @@ function StudioCuttoonEditor() {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
+  const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillSinceRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -3953,6 +4020,47 @@ function StudioCuttoonEditor() {
     healCloneOffsetRef.current = null;
     setHealCloneBusy(false);
   }, [selectedId]);
+  // ── 레이어 마스크 브러시 — studio-layer-mask 통합 상태 ──
+  // paintActive/paintMode/radius/hardness/strength는 pixelTool과 동일하게 요소가 바뀌어도 유지.
+  const [layerMaskPaintActive, setLayerMaskPaintActive] = useState(false);
+  const [layerMaskPaintMode, setLayerMaskPaintMode] = useState<LayerMaskPaintMode>("reveal");
+  const [layerMaskRadius, setLayerMaskRadius] = useState(LAYER_MASK_BRUSH_RADIUS_DEFAULT);
+  const [layerMaskHardness, setLayerMaskHardness] = useState(LAYER_MASK_BRUSH_HARDNESS_DEFAULT);
+  const [layerMaskStrength, setLayerMaskStrength] = useState(LAYER_MASK_BRUSH_STRENGTH_DEFAULT);
+  const [layerMaskBusy, setLayerMaskBusy] = useState(false);
+  // 진행 중 드래그 — healCloneDragRef와 동일 패턴(frame은 드래그 시작 스냅샷).
+  const layerMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const layerMaskRafRef = useRef<number | null>(null);
+  const pendingLayerMaskDragRef = useRef<{ points: SelPoint[] } | null>(null);
+  const [layerMaskDragPreview, setLayerMaskDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  // 브러시 반경 호버 커서 — smudgeCursorRef와 동일 기법(ref 직접 갱신, React 리렌더 없음).
+  const layerMaskCursorRef = useRef<Konva.Circle>(null);
+  const scheduleLayerMaskDragPreview = (next: { points: SelPoint[] } | null) => {
+    pendingLayerMaskDragRef.current = next;
+    if (layerMaskRafRef.current !== null) return;
+    layerMaskRafRef.current = globalThis.requestAnimationFrame(() => {
+      layerMaskRafRef.current = null;
+      setLayerMaskDragPreview(pendingLayerMaskDragRef.current);
+    });
+  };
+  const clearLayerMaskDragPreview = () => {
+    pendingLayerMaskDragRef.current = null;
+    if (layerMaskRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(layerMaskRafRef.current);
+      layerMaskRafRef.current = null;
+    }
+    setLayerMaskDragPreview(null);
+  };
+  useEffect(() => () => {
+    if (layerMaskRafRef.current !== null) globalThis.cancelAnimationFrame(layerMaskRafRef.current);
+  }, []);
+  // 선택 요소가 바뀌면 진행 중 드래그·busy를 해제(모드/브러시 설정은 유지 — heal-clone과 동일 정책).
+  useEffect(() => {
+    void selectedId;
+    layerMaskDragRef.current = null;
+    clearLayerMaskDragPreview();
+    setLayerMaskBusy(false);
+  }, [selectedId]);
   // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
   useEffect(() => {
     void selectedId; // "바뀌면 초기화"를 위해 의존성으로 구독.
@@ -3965,6 +4073,13 @@ function StudioCuttoonEditor() {
     setCropRect(null);
     setCropBusy(false);
   }, [selectedId]);
+  // 색상 휠(롱프레스 팝업 원형 퀵픽) — 10번째 armed 상태. center 는 뷰포트 clientX/clientY
+  // 기준(캔버스 정규화 좌표 아님 — StudioColorWheelOverlay 가 fixed 오버레이라서).
+  const [colorWheelOpen, setColorWheelOpen] = useState(false);
+  const [colorWheelCenter, setColorWheelCenter] = useState<{ x: number; y: number } | null>(null);
+  // 롱프레스 판정용 — pointerdown 지점(취소 임계값 비교)과 대기 중인 타이머 id.
+  const colorWheelPressRef = useRef<{ x: number; y: number } | null>(null);
+  const colorWheelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
@@ -4057,6 +4172,7 @@ function StudioCuttoonEditor() {
       : [];
   const smudgeArmed = smudgeActive && selected?.type === "image";
   const healCloneArmed = healCloneTool !== null && selected?.type === "image";
+  const layerMaskPaintArmed = layerMaskPaintActive && selected?.type === "image";
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -4720,8 +4836,20 @@ function StudioCuttoonEditor() {
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
   }
-  // 캔버스 제스처를 무장(armed)해 가로채는 도구 9종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
-  // 나머지 8개를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
+  // 매직 리사이즈 — 프리셋을 누르면 폭(CANVAS_W)은 그대로 두고 높이만 목표 비율로 바꾼 뒤,
+  // studio-magic-resize로 요소 배열을 재배치한다. commit()의 2번째 인자(extraPatch)로 canvasH를
+  // 함께 넘겨 "요소 갱신 + 캔버스 높이 변경"을 단일 undo 스텝으로 원자적 커밋한다(레이어 삭제 시
+  // elements+animTimeline을 함께 커밋하는 기존 관례와 동일 패턴).
+  function applyMagicResizePreset(preset: MagicResizePreset) {
+    if (masterEditMode) return; // 문서 마스터는 페이지별 canvasH 개념이 없어 대상 밖.
+    const from = { width: CANVAS_W, height: canvasH };
+    const to = presetCanvasSize(preset, CANVAS_W);
+    if (to.height === canvasH) return; // 이미 같은 높이 — 빈 undo 스텝을 만들지 않는다.
+    const nextElements = computeMagicResize(elements, from, to, magicResizeStrategy);
+    commit(nextElements as El[], { canvasH: to.height });
+  }
+  // 캔버스 제스처를 무장(armed)해 가로채는 도구 11종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
+  // 나머지 10개를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
   // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
@@ -4734,6 +4862,27 @@ function StudioCuttoonEditor() {
     setEyedropperActive(false);
     setBubbleAnchorPickActive(false);
     setQuickShapeActive(false);
+    setColorWheelOpen(false);
+    setLayerMaskPaintActive(false);
+  }
+  // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
+  // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
+  function getClientPointFromKonvaEvent(evt: MouseEvent | TouchEvent): { x: number; y: number } | null {
+    if ("clientX" in evt) return { x: evt.clientX, y: evt.clientY };
+    const touch = evt.touches[0] ?? evt.changedTouches[0];
+    return touch ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+  // 색상 휠 열기 — 롱프레스 타이머가 실제로 발화했을 때만 onStageDown 이 호출한다. 이 시점까지
+  // 다른 제스처가 조금이라도 진행됐을 수 있으니(예: 마퀴 시작 좌표) 되돌린다.
+  function openColorWheelAt(clientX: number, clientY: number) {
+    disarmAllPixelTools();
+    ensureRecentColorsLoaded();
+    marqueeStartRef.current = null;
+    clearMarqueePreview();
+    const vw = typeof window === "undefined" ? clientX : window.innerWidth;
+    const vh = typeof window === "undefined" ? clientY : window.innerHeight;
+    setColorWheelCenter(clampWheelCenter(clientX, clientY, vw, vh));
+    setColorWheelOpen(true);
   }
   function toggleBubbleAnchorPick() {
     setBubbleAnchorPickActive((v) => {
@@ -4762,6 +4911,27 @@ function StudioCuttoonEditor() {
   }
   function moveVanishingPointById(id: string, x: number, y: number) {
     setVanishingPoints((prev) => moveVanishingPoint(prev, id, x, y));
+  }
+  // 아이소메트릭 그리드 — 원근자와 마찬가지로 undo/redo 대상 아님(가이드 도구 상태).
+  // 원근자와 동시에 켜지면 펜/직선 스냅이 어느 쪽을 따를지 모호해지므로 상호 배타적으로 만든다
+  // (한쪽을 켜면 다른 쪽을 끈다).
+  function toggleIsometricGridActive() {
+    setIsometricGridActive((v) => {
+      const next = !v;
+      if (next) setPerspectiveRulerActive(false);
+      return next;
+    });
+  }
+  function setIsometricAngleDegClamped(next: number) {
+    setIsometricAngleDeg(clampIsometricAngleDeg(next));
+  }
+  function setIsometricCellSizeClamped(next: number) {
+    setIsometricCellSize(clampIsometricCellSize(next));
+  }
+  function resetIsometricOrigin() {
+    const origin = defaultIsometricOrigin(CANVAS_W, canvasH);
+    setIsometricOriginX(origin.x);
+    setIsometricOriginY(origin.y);
   }
 
   // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
@@ -4919,6 +5089,7 @@ function StudioCuttoonEditor() {
           title={el.locked ? `${elementLabel(el)} (잠김) · 더블클릭하여 이름 변경` : `${elementLabel(el)} · 더블클릭하여 이름 변경`}
         >
           {el.clipBelow ? "⤵ " : ""}
+          {canLayerMask(el) && hasLayerMask(el) ? (el.maskEnabled === false ? "▢ " : "▣ ") : ""}
           {elementLabel(el)}
         </button>
         <button
@@ -5614,6 +5785,10 @@ function StudioCuttoonEditor() {
           clearHealCloneDragPreview();
         } else if (smudgeActive) {
           setSmudgeActive(false);
+        } else if (layerMaskPaintActive) {
+          setLayerMaskPaintActive(false);
+          layerMaskDragRef.current = null;
+          clearLayerMaskDragPreview();
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
@@ -5645,6 +5820,12 @@ function StudioCuttoonEditor() {
   const [metaEditPageId, setMetaEditPageId] = useState<string | null>(null);
   function commitPageMeta(pageId: string, patch: { name?: string | null; note?: string | null }) {
     const next = withPageMeta(pages, pageId, patch);
+    if (next !== pages) commitPages(next);
+  }
+  // 샷 타입/카메라 앵글 태그 커밋 — commitPageMeta와 동일 계약(무변화 시 withShotTag가
+  // 원본 참조를 돌려주므로 그때만 undo 히스토리에 push한다).
+  function commitShotTag(pageId: string, patch: { shotType?: string | null; cameraAngle?: string | null }) {
+    const next = withShotTag(pages, pageId, patch);
     if (next !== pages) commitPages(next);
   }
   // 연속 붙여넣기 캐스케이드(PPT식 계단 배치) 카운터 — 페이로드·대상 페이지 조합별로 초기화.
@@ -6303,6 +6484,79 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 레이어 마스크 브러시 스트로크 굽기 — 스트로크 종료마다 자동 실행(붓처럼 즉시 반영).
+  // heal-clone과 동일하게 target은 elementById에서 다시 읽는다(await 사이 selected가 바뀌어도
+  // 정확한 요소에 적용된다). 기존 el.src는 절대 patchEl하지 않는다 — maskSrc만 바뀐다(비파괴).
+  async function bakeLayerMaskPaintStroke(session: { elId: string; frame: SelectionFrame; points: SelPoint[] }) {
+    const target = elementById.get(session.elId);
+    if (!target || target.type !== "image") return;
+    setLayerMaskBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const scale = target.width > 0 ? w / target.width : 1;
+      const flipX = target.flipped ?? false;
+      const flipY = target.flippedY ?? false;
+      const pixelPoints = session.points.map((p) => {
+        const unflipped = flipNormalizedPoint(p, flipX, flipY);
+        return { x: unflipped.x * w, y: unflipped.y * h };
+      });
+      const radiusPx = Math.max(1, layerMaskRadius * scale);
+      const existingMask = target.maskSrc ? await loadPixelEditImage(target.maskSrc) : null;
+      const out = bakeLayerMaskStroke(
+        existingMask,
+        w,
+        h,
+        { points: pixelPoints, radiusPx, hardness: layerMaskHardness, strength: layerMaskStrength, mode: layerMaskPaintMode },
+        createPixelEditCanvas
+      );
+      if (!out) throw new Error("마스크 결과를 만들지 못했습니다.");
+      const maskSrc = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { maskSrc, maskEnabled: true } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to bake layer mask stroke:", err);
+      setError(err instanceof Error ? err.message : "마스크 적용에 실패했습니다.");
+    } finally {
+      setLayerMaskBusy(false);
+    }
+  }
+  // ── 레이어 마스크 즉시 실행(굽기) 액션 4개 — 전부 patchEl 1회로 히스토리 1건. ──
+  function addLayerMask(fill: LayerMaskPaintMode) {
+    if (selected?.type !== "image" || !canLayerMask(selected)) return;
+    const target = selected;
+    void (async () => {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const out = createLayerMaskCanvas(w, h, fill, createPixelEditCanvas);
+      if (!out) return;
+      patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), maskEnabled: true } as Partial<El>);
+    })();
+  }
+  function deleteLayerMask() {
+    if (selected?.type !== "image") return;
+    patchEl(selected.id, { maskSrc: undefined, maskEnabled: undefined } as Partial<El>);
+  }
+  function toggleLayerMaskEnabled() {
+    if (selected?.type !== "image") return;
+    patchEl(selected.id, { maskEnabled: selected.maskEnabled === false } as Partial<El>);
+  }
+  function invertLayerMask() {
+    if (selected?.type !== "image" || !selected.maskSrc) return;
+    const target = selected;
+    void (async () => {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const maskImg = await loadPixelEditImage(target.maskSrc!);
+      const out = invertLayerMaskAlpha(maskImg, w, h, createPixelEditCanvas);
+      if (!out) return;
+      patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png") } as Partial<El>);
+    })();
+  }
+
   // ── 복구 브러시/도장 스트로크 굽기 — 스트로크 종료마다 자동 실행(별도 "적용" 버튼 없음, 붓처럼
   // 즉시 반영). 원본 자연 해상도로 dab 목록을 계산해 굽고, 결과를 data URL로 교체(patchEl)해
   // 히스토리 1건(⌘Z 1회)으로 남긴다. target은 elementById에서 다시 읽는다(session.elId 기준) —
@@ -6417,6 +6671,10 @@ function StudioCuttoonEditor() {
         y: plan.el.y,
         width: plan.el.width,
         height: plan.el.height,
+        // 크롭은 자연 해상도 자체를 바꾸므로 기존 maskSrc(구 해상도 기준)는 정렬이 깨진다 —
+        // 잘못 정렬된 채 남기는 것보다 지우는 편이 안전(재작업 필요, 알려진 한계).
+        maskSrc: target.maskSrc ? undefined : target.maskSrc,
+        maskEnabled: target.maskSrc ? undefined : target.maskEnabled,
       } as Partial<El>);
       setCropRect(null);
       setError(null);
@@ -6527,6 +6785,35 @@ function StudioCuttoonEditor() {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
       return;
     }
+    // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
+    // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
+    // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
+    // disarmAllPixelTools 로 그 사이 진행된 제스처(마퀴 시작 등)를 되돌린다.
+    if (
+      tool === "select" &&
+      !isSpacePressed &&
+      !cropRect &&
+      !panelSplitActive &&
+      !nodeEditTool &&
+      !smudgeActive &&
+      !healCloneTool &&
+      !eyedropperActive &&
+      !bubbleAnchorPickActive &&
+      !pixelTool &&
+      !quickShapeActive &&
+      !colorWheelOpen &&
+      recentColors.length > 0 &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const clientPoint = getClientPointFromKonvaEvent(e.evt);
+      if (clientPoint) {
+        colorWheelPressRef.current = clientPoint;
+        colorWheelTimerRef.current = setTimeout(() => {
+          colorWheelTimerRef.current = null;
+          openColorWheelAt(clientPoint.x, clientPoint.y);
+        }, COLOR_WHEEL_LONG_PRESS_MS);
+      }
+    }
     // 스포이드: 토글 버튼으로 무장했거나(한 번 뽑으면 자동 해제), 펜 도구 중 Alt 를 누른 momentary
     // 방식(CSP/Photoshop 관례) — 다른 어떤 캔버스 제스처보다 항상 최우선으로 가로챈다.
     if (eyedropperActive || (tool === "draw" && e.evt.altKey && !healCloneArmed)) {
@@ -6625,6 +6912,30 @@ function StudioCuttoonEditor() {
         rotation: selected.rotation,
       };
       smudgeDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      return;
+    }
+    // 레이어 마스크 브러시 무장 중: 스테이지 드래그를 마스크 스트로크 좌표 누적으로 가로챈다.
+    // maskSrc가 아직 없어도 드래그를 시작할 수 있다(bakeLayerMaskStroke가 없으면 "전체 보임"
+    // 흰 마스크를 자동으로 베이스 삼는다 — Photoshop이 마스크 없는 레이어에 처음 브러시를 대면
+    // 자동으로 흰 마스크를 추가하는 관례와 동일).
+    if (
+      layerMaskPaintArmed &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      layerMaskDragRef.current = { elId: selected.id, frame, points: [p] };
+      scheduleLayerMaskDragPreview({ points: [p] });
       return;
     }
     // 복구 브러시/도장 무장 중: Alt(Option)+클릭은 소스 앵커 지정, 일반 드래그는 페인트 스트로크.
@@ -6736,6 +7047,7 @@ function StudioCuttoonEditor() {
             };
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
+      isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       setDraft(next);
       if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
@@ -6776,6 +7088,20 @@ function StudioCuttoonEditor() {
     cursor.getLayer()?.batchDraw();
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // 색상 휠 롱프레스 타이머가 아직 대기 중인데 임계값(6px) 넘게 움직였으면 드래그/클릭으로
+    // 보고 취소한다. colorWheelOpen 이 이미 true 인 동안은 오버레이가 캔버스를 덮어 이 핸들러
+    // 자체가 더 안 불리므로 별도 가드가 필요 없다.
+    if (colorWheelTimerRef.current && colorWheelPressRef.current) {
+      const clientPoint = getClientPointFromKonvaEvent(e.evt);
+      if (clientPoint) {
+        const dx = clientPoint.x - colorWheelPressRef.current.x;
+        const dy = clientPoint.y - colorWheelPressRef.current.y;
+        if (shouldCancelLongPress(dx, dy)) {
+          clearTimeout(colorWheelTimerRef.current);
+          colorWheelTimerRef.current = null;
+        }
+      }
+    }
     // 크롭 드래그 중이면 rect 를 갱신한다(시작 시점 스냅샷 기준 — 증분 오차 없음, RAF 합침).
     if (cropDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -6855,6 +7181,22 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 레이어 마스크 브러시 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터 —
+    // heal-clone과 동일한 appendBrushPoint 재사용).
+    if (layerMaskDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = layerMaskDragRef.current;
+        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const radiusNorm = layerMaskRadius / Math.max(1, session.frame.width);
+        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
+        if (nextPoints !== session.points) {
+          session.points = nextPoints;
+          scheduleLayerMaskDragPreview({ points: nextPoints });
+        }
+      }
+      return;
+    }
     // 복구 브러시/도장 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터).
     if (healCloneDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -6887,6 +7229,14 @@ function StudioCuttoonEditor() {
     if (smudgeArmed) {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = smudgeCursorRef.current;
+      if (cursorPos && cursorNode) {
+        cursorNode.position(cursorPos);
+        if (!cursorNode.visible()) cursorNode.visible(true);
+        cursorNode.getLayer()?.batchDraw();
+      }
+    } else if (layerMaskPaintArmed) {
+      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
+      const cursorNode = layerMaskCursorRef.current;
       if (cursorPos && cursorNode) {
         cursorNode.position(cursorPos);
         if (!cursorNode.visible()) cursorNode.visible(true);
@@ -6959,6 +7309,13 @@ function StudioCuttoonEditor() {
         perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
       }
       [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
+    } else if (isometricGridActive && kind === "line" && !e.evt.shiftKey) {
+      // 아이소메트릭 그리드: 원근자와 동일한 우선순위 관례(Shift가 최우선). 축 방향은 원점과
+      // 무관하게 고정이라 원근자의 vanishingPoints.length > 0 같은 가드는 필요 없다.
+      if (!isometricAxisRayRef.current) {
+        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
+      }
+      [x1, y1] = snapStrokePointToIsometricGrid(x1, y1, isometricAxisRayRef.current);
     }
     // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
     if (e.evt.shiftKey) {
@@ -7021,6 +7378,13 @@ function StudioCuttoonEditor() {
         perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, startX, startY, pos.x, pos.y);
       }
       [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
+    } else if (isometricGridActive && current.mode !== "eraser") {
+      if (!isometricAxisRayRef.current) {
+        const startX = current.points[0] ?? pos.x;
+        const startY = current.points[1] ?? pos.y;
+        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, startX, startY, pos.x, pos.y);
+      }
+      [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     }
     if (stabilizer > 0 && current.points.length >= 2) {
       // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush) — 원근 투영 다음 단계.
@@ -7042,6 +7406,12 @@ function StudioCuttoonEditor() {
   }
   function onStageUp() {
     stopQuickShapeTracking(); // 무조건 실행 — 어느 분기로 빠지든 인터벌이 새지 않게 한다.
+    // 색상 휠 롱프레스 타이머가 아직 안 터졌는데 포인터를 뗐다 — 평범한 클릭/드래그였다는 뜻이니
+    // 타이머만 정리한다(이미 열려 있었다면 오버레이가 이벤트를 가로채서 애초에 여기까지 안 온다).
+    if (colorWheelTimerRef.current) {
+      clearTimeout(colorWheelTimerRef.current);
+      colorWheelTimerRef.current = null;
+    }
     // 크롭 드래그 종료 — 마지막 RAF 대기분을 반영하고 세션만 닫는다(rect 는 적용 전까지 유지).
     if (cropDragRef.current) {
       cropDragRef.current = null;
@@ -7110,6 +7480,14 @@ function StudioCuttoonEditor() {
       if (session.points.length >= 2) void applySmudgeStroke(session.elId, session.points);
       return;
     }
+    // 레이어 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
+    if (layerMaskDragRef.current) {
+      const session = layerMaskDragRef.current;
+      layerMaskDragRef.current = null;
+      clearLayerMaskDragPreview();
+      if (session.points.length > 0) void bakeLayerMaskPaintStroke(session);
+      return;
+    }
     // 복구 브러시/도장 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
     if (healCloneDragRef.current) {
       const session = healCloneDragRef.current;
@@ -7145,6 +7523,7 @@ function StudioCuttoonEditor() {
     }
     drawingRef.current = null;
     perspectiveRayRef.current = null;
+    isometricAxisRayRef.current = null;
     clearDraftPreview();
   }
   // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
@@ -7168,6 +7547,13 @@ function StudioCuttoonEditor() {
     if (cursor?.visible()) cursor.visible(false);
     if (srcCursor?.visible()) srcCursor.visible(false);
     cursor?.getLayer()?.batchDraw();
+  }
+  function hideLayerMaskCursor() {
+    const cursorNode = layerMaskCursorRef.current;
+    if (cursorNode && cursorNode.visible()) {
+      cursorNode.visible(false);
+      cursorNode.getLayer()?.batchDraw();
+    }
   }
 
   // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
@@ -9191,6 +9577,14 @@ function StudioCuttoonEditor() {
                     <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
                       {pageDisplayName(p, idx)}
                     </span>
+                    {shotTagBadgeText(p) ? (
+                      <span
+                        className="shrink-0 rounded bg-accent-soft px-1 py-0.5 text-[8px] font-semibold text-accent"
+                        title={shotTagBadgeTitle(p) ?? undefined}
+                      >
+                        {shotTagBadgeText(p)}
+                      </span>
+                    ) : null}
                     {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
                     <div className="relative z-20 flex items-center gap-0.5">
                       <button
@@ -9581,6 +9975,7 @@ function StudioCuttoonEditor() {
               hideBrushCursor();
               hideSmudgeCursor();
               hideHealCloneCursors();
+              hideLayerMaskCursor();
             }}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
@@ -9687,7 +10082,8 @@ function StudioCuttoonEditor() {
                   !panelSplitArmed &&
                   !nodeEditArmed &&
                   !smudgeArmed &&
-                  !healCloneArmed;
+                  !healCloneArmed &&
+                  !layerMaskPaintArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
@@ -9701,6 +10097,7 @@ function StudioCuttoonEditor() {
                       !nodeEditArmed &&
                       !smudgeArmed &&
                       !healCloneArmed &&
+                      !layerMaskPaintArmed &&
                       setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
@@ -10389,6 +10786,40 @@ function StudioCuttoonEditor() {
                 const mainEls = elements.map((el, idx) => {
                   if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
                   const base = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
+                  // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
+                  // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
+                  const maskOn = el.type === "image" && shouldApplyLayerMask(el as ImageEl);
+                  // renderEl(el, idx, opts)를 그대로 호출하되, 마스크가 있으면 그 결과를 "자기 자신의
+                  // maskSrc로 자른 ClipMaskGroup"으로 한 번 더 감싼다. opts는 clipBelow 분기
+                  // (source-in override)와 평범한 분기(opts={}) 양쪽에서 재사용된다.
+                  const renderWithOwnMask = (opts: { compositeOverride?: string } = {}) => {
+                    const content = renderEl(el, idx, opts);
+                    if (!maskOn) return content;
+                    const imgEl = el as ImageEl;
+                    const maskSrc = (el as El).maskSrc;
+                    // 마스크 노드는 최소 필드만 새로 구성한다(el 스프레드 후 필터 필드를 하나하나
+                    // undefined로 지우는 방식은 필드 하나만 빠뜨려도 마스크에 필터가 새어들어가는
+                    // 실수를 낳기 쉽다 — 순수 알파 스텐실 용도이므로 기하 정보만 필요).
+                    const maskEl = {
+                      id: `${el.id}__mask`,
+                      type: "image",
+                      src: maskSrc!,
+                      x: imgEl.x,
+                      y: imgEl.y,
+                      width: imgEl.width,
+                      height: imgEl.height,
+                      rotation: imgEl.rotation,
+                      flipped: imgEl.flipped,
+                      flippedY: imgEl.flippedY,
+                    } as ImageEl;
+                    const mck = [el.id, "mask", maskSrc, JSON.stringify(elBounds(el)), imgEl.rotation ?? 0].join("|");
+                    return (
+                      <ClipMaskGroup key={`${el.id}-mask`} cacheKey={mck}>
+                        {renderEl(maskEl, idx, { asMask: true })}
+                        {content}
+                      </ClipMaskGroup>
+                    );
+                  };
                   if (base && !isEffectivelyHidden(base, groups)) {
                     // 알파 정밀 클리핑: 베이스 사본(마스크) + 자식(source-in)을 캐시 그룹에 담아 베이스 알파로만 자른다.
                     const ck = [
@@ -10402,15 +10833,16 @@ function StudioCuttoonEditor() {
                       JSON.stringify(elBounds(base)),
                       (el as { rotation?: number }).rotation ?? 0,
                       (base as { rotation?: number }).rotation ?? 0,
+                      maskOn ? ((el as El).maskSrc ?? "") : "", // 마스크가 캐시 키에도 반영되게.
                     ].join("|");
                     return (
                       <ClipMaskGroup key={el.id} cacheKey={ck}>
                         {renderEl(base, idx - 1, { asMask: true })}
-                        {renderEl(el, idx, { compositeOverride: "source-in" })}
+                        {renderWithOwnMask({ compositeOverride: "source-in" })}
                       </ClipMaskGroup>
                     );
                   }
-                  return renderEl(el, idx);
+                  return renderWithOwnMask();
                 });
                 return (
                   <>
@@ -10473,6 +10905,19 @@ function StudioCuttoonEditor() {
                   visible={false}
                   radius={Math.max(1.5, smudgeRadius)}
                   stroke="#7c5cff"
+                  strokeWidth={1.25 / effScale}
+                  dash={[3 / effScale, 3 / effScale]}
+                  opacity={0.9}
+                />
+              </Layer>
+            )}
+            {!isExporting && layerMaskPaintArmed && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={layerMaskCursorRef}
+                  visible={false}
+                  radius={Math.max(1.5, layerMaskRadius)}
+                  stroke="#eab308"
                   strokeWidth={1.25 / effScale}
                   dash={[3 / effScale, 3 / effScale]}
                   opacity={0.9}
@@ -10552,6 +10997,17 @@ function StudioCuttoonEditor() {
                   drag={healCloneDragPreview}
                   radiusPx={healCloneRadius}
                   mode={healCloneTool ?? "clone"}
+                />
+              </Layer>
+            )}
+            {!isExporting && layerMaskPaintArmed && pixelOverlayFrame && (
+              <Layer listening={false}>
+                <StudioLayerMaskOverlay
+                  frame={pixelOverlayFrame}
+                  scale={effScale}
+                  drag={layerMaskDragPreview}
+                  radiusPx={layerMaskRadius}
+                  mode={layerMaskPaintMode}
                 />
               </Layer>
             )}
@@ -10827,6 +11283,25 @@ function StudioCuttoonEditor() {
                   canvasHeight={canvasH}
                   effScale={effScale}
                   onMovePoint={moveVanishingPointById}
+                />
+              </Layer>
+            )}
+            {!isExporting && tool === "draw" && isometricGridActive && (
+              <Layer>
+                <StudioIsometricGridOverlay
+                  config={{
+                    angleDeg: isometricAngleDeg,
+                    cellSize: isometricCellSize,
+                    originX: isometricOriginX,
+                    originY: isometricOriginY,
+                  }}
+                  canvasWidth={CANVAS_W}
+                  canvasHeight={canvasH}
+                  effScale={effScale}
+                  onMoveOrigin={(x, y) => {
+                    setIsometricOriginX(x);
+                    setIsometricOriginY(y);
+                  }}
                 />
               </Layer>
             )}
@@ -11199,6 +11674,16 @@ function StudioCuttoonEditor() {
                 </button>
               </span>
             </div>
+            {!masterEditMode && (
+              <div className="mt-3">
+                <StudioMagicResizePanel
+                  currentSize={{ width: CANVAS_W, height: canvasH }}
+                  strategy={magicResizeStrategy}
+                  onStrategyChange={setMagicResizeStrategy}
+                  onApplyPreset={applyMagicResizePreset}
+                />
+              </div>
+            )}
             <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               패널 여백 (Gutter)
               <span className="flex items-center gap-1.5">
@@ -13050,6 +13535,32 @@ function StudioCuttoonEditor() {
                       healCloneOffsetRef.current = null;
                     }}
                   />
+                  <StudioLayerMaskPanel
+                    hasMask={!!selected.maskSrc}
+                    enabled={selected.maskEnabled !== false}
+                    paintActive={layerMaskPaintActive}
+                    paintMode={layerMaskPaintMode}
+                    radiusPx={layerMaskRadius}
+                    hardness={layerMaskHardness}
+                    strength={layerMaskStrength}
+                    maskThumbnailSrc={selected.maskSrc ?? null}
+                    busy={layerMaskBusy}
+                    onAddMask={addLayerMask}
+                    onDeleteMask={deleteLayerMask}
+                    onToggleEnabled={toggleLayerMaskEnabled}
+                    onInvert={invertLayerMask}
+                    onTogglePaintActive={() =>
+                      setLayerMaskPaintActive((v) => {
+                        const next = !v;
+                        if (next) disarmAllPixelTools();
+                        return next;
+                      })
+                    }
+                    onPaintModeChange={setLayerMaskPaintMode}
+                    onRadiusChange={setLayerMaskRadius}
+                    onHardnessChange={setLayerMaskHardness}
+                    onStrengthChange={setLayerMaskStrength}
+                  />
                   {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
                   <StudioCropPanel
                     active={!!cropRect}
@@ -13233,6 +13744,35 @@ function StudioCuttoonEditor() {
                     })}
                   </div>
                 </div>
+              )}
+
+              {/* 저장된 브러시 라이브러리 — ibisPaint 브러시/머티리얼 라이브러리 대응.
+                  펜 모드 전용(저장 대상이 펜 설정 스냅샷이므로 drawMode==="pen"일 때만 노출). */}
+              {drawMode === "pen" && (
+                <Suspense fallback={null}>
+                  <StudioBrushLibraryPanel
+                    currentSnapshot={{
+                      brushId: brush,
+                      strokeWidth,
+                      brushOpacity,
+                      color,
+                      stabilizer,
+                      pressureCurve,
+                      useVelocityPressure,
+                      velocitySensitivity,
+                    }}
+                    onApplyBrush={(saved) => {
+                      setBrush(saved.brushId);
+                      setStrokeWidth(saved.strokeWidth);
+                      setBrushOpacity(saved.brushOpacity);
+                      setColor(saved.color);
+                      setStabilizer(saved.stabilizer);
+                      setPressureCurve(saved.pressureCurve);
+                      setUseVelocityPressure(saved.useVelocityPressure);
+                      setVelocitySensitivity(saved.velocitySensitivity);
+                    }}
+                  />
+                </Suspense>
               )}
 
               {/* 도형 모드일 때 도형 선택 */}
@@ -13528,10 +14068,32 @@ function StudioCuttoonEditor() {
                   <StudioPerspectivePanel
                     active={perspectiveRulerActive}
                     points={vanishingPoints}
-                    onToggleActive={() => setPerspectiveRulerActive((v) => !v)}
+                    onToggleActive={() => {
+                      // 아이소메트릭 그리드와 상호 배타(toggleIsometricGridActive와 대칭).
+                      setPerspectiveRulerActive((v) => {
+                        const next = !v;
+                        if (next) setIsometricGridActive(false);
+                        return next;
+                      });
+                    }}
                     onAddPoint={addVanishingPointHandler}
                     onRemovePoint={removeVanishingPointHandler}
                     onMovePoint={moveVanishingPointById}
+                  />
+                </Suspense>
+                <Suspense fallback={null}>
+                  <StudioIsometricGridPanel
+                    active={isometricGridActive}
+                    config={{
+                      angleDeg: isometricAngleDeg,
+                      cellSize: isometricCellSize,
+                      originX: isometricOriginX,
+                      originY: isometricOriginY,
+                    }}
+                    onToggleActive={toggleIsometricGridActive}
+                    onChangeAngle={setIsometricAngleDegClamped}
+                    onChangeCellSize={setIsometricCellSizeClamped}
+                    onResetOrigin={resetIsometricOrigin}
                   />
                 </Suspense>
               </div>
@@ -14283,6 +14845,7 @@ function StudioCuttoonEditor() {
             onDuplicatePage={duplicatePage}
             onDeletePage={deletePage}
             canDelete={pages.length > 1}
+            onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
           />
         ) : null}
       </Suspense>
@@ -14318,6 +14881,21 @@ function StudioCuttoonEditor() {
 
       <Suspense fallback={null}>
         {referencePanelOpen ? <StudioReferencePanel open onClose={() => setReferencePanelOpen(false)} /> : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {colorWheelOpen ? (
+          <StudioColorWheelOverlay
+            open={colorWheelOpen}
+            center={colorWheelCenter}
+            colors={selectWheelColors(recentColors)}
+            onSelect={(c) => {
+              setColor(c);
+              rememberColor(c);
+            }}
+            onClose={() => setColorWheelOpen(false)}
+          />
+        ) : null}
       </Suspense>
 
       {contextMenu.visible && (
