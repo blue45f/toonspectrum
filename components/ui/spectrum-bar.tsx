@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useInView } from "@/components/use-in-view";
-import { spectrumGradient, genreColor, genreTextColor } from "@/lib/genre-color";
+import { spectrumGradient, genreTextColor } from "@/lib/genre-color";
 import { cn } from "@/lib/utils";
 
 // 장르 믹스 스펙트럼 — 작품의 장르들을 가로 그라디언트로.
@@ -190,11 +190,3 @@ export function MeterBar({
 }
 
 // 장르 도트 (범례용)
-export function GenreDot({ genre, className }: { genre: string; className?: string }) {
-  return (
-    <span
-      className={cn("inline-block size-2 rounded-full", className)}
-      style={{ backgroundColor: genreColor(genre, 0.7) }}
-    />
-  );
-}

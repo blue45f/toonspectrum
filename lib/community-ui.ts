@@ -1,13 +1,5 @@
 import type { FanCafeScopeFilter } from "./types";
 
-export const COMMUNITY_SCOPE_SET = new Set<Exclude<FanCafeScopeFilter, "all">>([
-  "title",
-  "author",
-  "pencafe",
-  "cafe",
-]);
-export const COMMUNITY_SCOPE_ALL_SET = new Set<FanCafeScopeFilter>(["title", "author", "pencafe", "cafe", "all"]);
-
 export const COMMUNITY_SCOPE_TABS: {
   value: FanCafeScopeFilter;
   label: string;
@@ -54,12 +46,6 @@ export const FAN_CAFE_SCOPE_COPY: Record<FanCafeScopeFilter, string> = {
   cafe: "같은 장르를 파는 독자들이 모이는 소모임. 가입하면 글을 쓸 수 있습니다.",
 };
 
-export const COMMUNITY_SCOPE_ROUTES = COMMUNITY_SCOPE_TABS.filter((entry) => entry.value !== "all").map((entry) => ({
-  value: entry.value,
-  label: `${entry.label} 커뮤니티`,
-  icon: entry.icon,
-  href: `/community/${entry.value}`,
-}));
 
 export function getCommunityScopeTargetLink(
   scope: Exclude<FanCafeScopeFilter, "all">,

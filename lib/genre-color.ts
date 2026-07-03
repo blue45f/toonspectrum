@@ -30,10 +30,6 @@ const GENRE_HUE: Record<string, GenreHue> = {
 
 const FALLBACK: GenreHue = { h: 70, c: 0.04 };
 
-export function genreHue(genre: string): number {
-  return (GENRE_HUE[genre] ?? FALLBACK).h;
-}
-
 // 칩/뱃지 텍스트용 (밝고 채도 있는)
 export function genreColor(genre: string, l = 0.78): string {
   const g = GENRE_HUE[genre] ?? FALLBACK;
@@ -75,11 +71,4 @@ export function spectrumGradient(genres: readonly string[], angle = 90): string 
     return `${genreColor(g, 0.72)} ${pct}%`;
   });
   return `linear-gradient(${angle}deg, ${stops.join(", ")})`;
-}
-
-// 작품 표지 그라디언트가 없을 때 장르 기반 폴백
-export function genreCover(genres: string[]): [string, string] {
-  const a = genres[0] ?? "판타지";
-  const b = genres[1] ?? genres[0] ?? "로맨스";
-  return [genreColor(a, 0.45), genreColor(b, 0.32)];
 }

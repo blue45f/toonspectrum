@@ -31,11 +31,6 @@ export function formatFull(n: number): string {
   return n.toLocaleString("ko-KR");
 }
 
-// 별점 표기 4.7
-export function formatRating(n: number): string {
-  return n.toFixed(1);
-}
-
 // ISO 날짜 -> "3일 전" / "2024.03.11"
 export function relativeDate(iso: string, now = new Date("2025-05-29T00:00:00Z")): string {
   const then = new Date(iso);
