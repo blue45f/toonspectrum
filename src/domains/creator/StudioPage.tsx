@@ -179,6 +179,16 @@ import {
   type StudioGradientSpec,
 } from "./studio-gradient-engine";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
+import {
+  bakeHealCloneStrokeToCanvas,
+  computeHealCloneSourceOffset,
+  healCloneSourcePoint,
+  planHealCloneDabs,
+  HEAL_CLONE_HARDNESS_DEFAULT,
+  HEAL_CLONE_OPACITY_DEFAULT,
+  HEAL_CLONE_RADIUS_DEFAULT,
+  type HealCloneMode,
+} from "./studio-heal-clone";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   hasActiveImageFilters,
@@ -300,6 +310,7 @@ import {
   unionBounds,
 } from "./studio-selection";
 import {
+  appendBrushPoint,
   applySelectionAdjustToCanvas,
   beginSelectionDrag,
   brushStrokePreview,
@@ -310,6 +321,7 @@ import {
   isSelectionAdjustNoop,
   isSelectionUsable,
   marchingAntsPasses,
+  normalizedPointToCanvas,
   planSelectionAdjust,
   rasterizeSelectionMask,
   removeLastSubpath,
@@ -324,6 +336,7 @@ import {
   type SelectionDragState,
   type SelectionFrame,
   type SelectionToolKind,
+  type SelPoint,
 } from "./studio-selection-tools";
 import { normalizeSkewPatch, toKonvaSkewAttrs } from "./studio-skew";
 import {
@@ -336,6 +349,7 @@ import {
   type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
+import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT, smudgeStrokeImage } from "./studio-smudge";
 import {
   DEFAULT_SHAPE_PARAMS,
   effectiveCornerRadius,
@@ -366,6 +380,8 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
+import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
+import { StudioHealClonePanel } from "./StudioHealClonePanel";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -376,6 +392,7 @@ import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioQuickShapePanel } from "./StudioQuickShapePanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
+import { StudioSmudgePanel } from "./StudioSmudgePanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
 import type { StudioAsset } from "./studio-asset-library";
@@ -3658,6 +3675,12 @@ function StudioCuttoonEditor() {
   const [pixelBrushRadius, setPixelBrushRadius] = useState(SELECTION_BRUSH_RADIUS_DEFAULT);
   const [wandTolerance, setWandTolerance] = useState(MAGIC_WAND_TOLERANCE_DEFAULT);
   const pixelWandRunIdRef = useRef(0);
+  const [smudgeActive, setSmudgeActive] = useState(false);
+  const [smudgeRadius, setSmudgeRadius] = useState(SMUDGE_RADIUS_DEFAULT);
+  const [smudgeStrength, setSmudgeStrength] = useState(SMUDGE_STRENGTH_DEFAULT); // %
+  const [smudgeBusy, setSmudgeBusy] = useState(false);
+  const smudgeDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const smudgeCursorRef = useRef<Konva.Circle>(null);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
   const pixelDragRef = useRef<{ elId: string; frame: SelectionFrame; drag: SelectionDragState } | null>(null);
@@ -3795,6 +3818,62 @@ function StudioCuttoonEditor() {
     setNodeEditDraft(null);
     setNodeEditTool(null);
   }, [selectedId]);
+  // ── 복구 브러시/도장(heal/clone) — studio-heal-clone 통합 상태 ──
+  // 모드(healCloneTool)는 pixelTool과 동일하게 요소가 바뀌어도 유지(사용자 선호), 소스 앵커/
+  // 오프셋은 pixelSel과 동일하게 "이미지 요소 1개 귀속"이라 요소가 바뀌면 해제한다.
+  const [healCloneTool, setHealCloneTool] = useState<HealCloneMode | null>(null);
+  const [healCloneRadius, setHealCloneRadius] = useState(HEAL_CLONE_RADIUS_DEFAULT);
+  const [healCloneHardness, setHealCloneHardness] = useState(HEAL_CLONE_HARDNESS_DEFAULT);
+  const [healCloneOpacity, setHealCloneOpacity] = useState(HEAL_CLONE_OPACITY_DEFAULT);
+  const [healCloneAligned, setHealCloneAligned] = useState(true);
+  const [healCloneSourceAnchor, setHealCloneSourceAnchor] = useState<SelPoint | null>(null);
+  const [healCloneBusy, setHealCloneBusy] = useState(false);
+  // aligned 모드에서 스트로크를 넘어 유지되는 오프셋(정규화). React 상태가 아님 — 표시에 안 쓰인다.
+  const healCloneOffsetRef = useRef<SelPoint | null>(null);
+  // 진행 중 드래그 — pixelDragRef와 동일 패턴(frame은 드래그 시작 스냅샷, radiusNorm도 함께 스냅샷
+  // 해서 move 중 selected를 다시 읽지 않는다).
+  const healCloneDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    offset: SelPoint;
+    radiusNorm: number;
+    points: SelPoint[];
+  } | null>(null);
+  const healCloneRafRef = useRef<number | null>(null);
+  const pendingHealCloneDragRef = useRef<{ points: SelPoint[] } | null>(null);
+  const [healCloneDragPreview, setHealCloneDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  // 브러시 원/소스 크로스헤어 호버 커서 — brushCursorRef(펜 도구)와 동일 기법: ref 직접 갱신,
+  // React 리렌더 없음. 드래그 중에도(스트로크 반경 원이 그대로 따라오게) 계속 갱신한다.
+  const healCloneCursorRef = useRef<Konva.Circle>(null);
+  const healCloneSourceCursorRef = useRef<Konva.Circle>(null);
+  const scheduleHealCloneDragPreview = (next: { points: SelPoint[] } | null) => {
+    pendingHealCloneDragRef.current = next;
+    if (healCloneRafRef.current !== null) return;
+    healCloneRafRef.current = globalThis.requestAnimationFrame(() => {
+      healCloneRafRef.current = null;
+      setHealCloneDragPreview(pendingHealCloneDragRef.current);
+    });
+  };
+  const clearHealCloneDragPreview = () => {
+    pendingHealCloneDragRef.current = null;
+    if (healCloneRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(healCloneRafRef.current);
+      healCloneRafRef.current = null;
+    }
+    setHealCloneDragPreview(null);
+  };
+  useEffect(() => () => {
+    if (healCloneRafRef.current !== null) globalThis.cancelAnimationFrame(healCloneRafRef.current);
+  }, []);
+  // 선택 요소가 바뀌면 소스 앵커·진행 중 드래그·busy를 해제(모드는 유지 — pixelTool과 동일 정책).
+  useEffect(() => {
+    void selectedId;
+    healCloneDragRef.current = null;
+    clearHealCloneDragPreview();
+    setHealCloneSourceAnchor(null);
+    healCloneOffsetRef.current = null;
+    setHealCloneBusy(false);
+  }, [selectedId]);
   // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
   useEffect(() => {
     void selectedId; // "바뀌면 초기화"를 위해 의존성으로 구독.
@@ -3897,6 +3976,8 @@ function StudioCuttoonEditor() {
           maxHandles: NODE_EDIT_DEFAULT_MAX_HANDLES,
         })
       : [];
+  const smudgeArmed = smudgeActive && selected?.type === "image";
+  const healCloneArmed = healCloneTool !== null && selected?.type === "image";
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -5395,6 +5476,12 @@ function StudioCuttoonEditor() {
           setPanelSplitHint(null);
         } else if (nodeEditTool) {
           setNodeEditTool(null);
+        } else if (healCloneTool) {
+          setHealCloneTool(null);
+          healCloneDragRef.current = null;
+          clearHealCloneDragPreview();
+        } else if (smudgeActive) {
+          setSmudgeActive(false);
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
@@ -6062,6 +6149,73 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // 문지르기 브러시 — 누적된 정규화 좌표 스트로크로 픽셀을 재인코딩한다.
+  async function applySmudgeStroke(elId: string, points: SelPoint[]) {
+    if (smudgeBusy) return;
+    const target = elementById.get(elId);
+    if (!target || target.type !== "image") return;
+    setSmudgeBusy(true);
+    try {
+      const radiusNorm = smudgeRadius / Math.max(1, target.width);
+      const src = await smudgeStrokeImage(target.src, points, radiusNorm, smudgeStrength / 100, {
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (src !== target.src) patchEl(target.id, { src } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply smudge stroke:", err);
+      setError(err instanceof Error ? err.message : "문지르기를 적용하지 못했습니다.");
+    } finally {
+      setSmudgeBusy(false);
+    }
+  }
+
+  // ── 복구 브러시/도장 스트로크 굽기 — 스트로크 종료마다 자동 실행(별도 "적용" 버튼 없음, 붓처럼
+  // 즉시 반영). 원본 자연 해상도로 dab 목록을 계산해 굽고, 결과를 data URL로 교체(patchEl)해
+  // 히스토리 1건(⌘Z 1회)으로 남긴다. target은 elementById에서 다시 읽는다(session.elId 기준) —
+  // await 사이 selected가 바뀌어도 정확한 요소에 적용된다.
+  async function bakeHealCloneDragStroke(session: {
+    elId: string;
+    frame: SelectionFrame;
+    offset: SelPoint;
+    radiusNorm: number;
+    points: SelPoint[];
+  }) {
+    const target = elementById.get(session.elId);
+    if (!target || target.type !== "image") return;
+    setHealCloneBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const dabs = planHealCloneDabs(session.points, session.offset, w, h, {
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (dabs.length === 0) return;
+      const radiusPxDevice = healCloneRadius * (target.width > 0 ? w / target.width : 1);
+      const out = bakeHealCloneStrokeToCanvas(
+        img,
+        w,
+        h,
+        dabs,
+        { radiusPx: radiusPxDevice, hardness: healCloneHardness, opacity: healCloneOpacity },
+        healCloneTool ?? "clone",
+        createPixelEditCanvas
+      );
+      if (!out) throw new Error("복구 브러시 결과를 만들지 못했습니다.");
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { src } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to bake heal/clone stroke:", err);
+      setError(err instanceof Error ? err.message : "복구 브러시 적용에 실패했습니다.");
+    } finally {
+      setHealCloneBusy(false);
+    }
+  }
+
   // ── 페인트 통 결과 커밋 — 알파 락이면 편집 전 알파 모양 밖으로 못 나가게 오려낸 뒤 반영 ──
   // floodFillImage 자체는 알파를 안 건드리지만(색만 칠함) 반투명 안티앨리어싱 가장자리로 색이
   // 스며나가는 걸 막아 "이 레이어의 지금 모양 밖으로는 절대 안 나간다"를 보장한다. 잠금이 아니면
@@ -6243,7 +6397,7 @@ function StudioCuttoonEditor() {
     }
     // 스포이드: 토글 버튼으로 무장했거나(한 번 뽑으면 자동 해제), 펜 도구 중 Alt 를 누른 momentary
     // 방식(CSP/Photoshop 관례) — 다른 어떤 캔버스 제스처보다 항상 최우선으로 가로챈다.
-    if (eyedropperActive || (tool === "draw" && e.evt.altKey)) {
+    if (eyedropperActive || (tool === "draw" && e.evt.altKey && !healCloneArmed)) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const hex = pickCanvasColorAt(pos);
@@ -6320,6 +6474,62 @@ function StudioCuttoonEditor() {
         const session = beginNodeDrag(selected.points, selected.pressures, hitIdx, nodeEditTool!, pos);
         if (session) nodeEditDragRef.current = { elId: selected.id, session };
       }
+      return;
+    }
+    // 문지르기 브러시 무장 중: 스테이지 드래그를 문지르기 스트로크 좌표 누적으로 가로챈다.
+    if (
+      smudgeArmed &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      smudgeDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      return;
+    }
+    // 복구 브러시/도장 무장 중: Alt(Option)+클릭은 소스 앵커 지정, 일반 드래그는 페인트 스트로크.
+    // crop/픽셀 선택과 동일한 정책 — 무장 중엔 다른 캔버스 제스처를 막는다. healCloneBusy 가드는
+    // 직전 스트로크의 비동기 굽기가 끝나기 전에 새 스트로크를 시작해 patchEl 갱신이 서로를 덮어쓰는
+    // (lost-update) 경쟁을 막는다.
+    if (
+      healCloneArmed &&
+      !healCloneBusy &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      if (e.evt.altKey) {
+        setHealCloneSourceAnchor(p);
+        healCloneOffsetRef.current = null; // 새 앵커 지정 시 정렬 오프셋을 다음 스트로크에서 재계산.
+        return;
+      }
+      if (!healCloneSourceAnchor) return; // 패널 상태 문구가 이미 "Alt+클릭으로 지정" 안내 중.
+      const offset =
+        healCloneAligned && healCloneOffsetRef.current
+          ? healCloneOffsetRef.current
+          : computeHealCloneSourceOffset(healCloneSourceAnchor, p);
+      healCloneOffsetRef.current = offset;
+      const radiusNorm = healCloneRadius / Math.max(1, selected.width);
+      healCloneDragRef.current = { elId: selected.id, frame, offset, radiusNorm, points: [p] };
+      scheduleHealCloneDragPreview({ points: [p] });
       return;
     }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
@@ -6412,6 +6622,27 @@ function StudioCuttoonEditor() {
       }
     }
   }
+  // 복구 브러시/도장 호버 커서(브러시 원 + 소스 크로스헤어) — brushCursorRef 와 동일하게
+  // ref 를 직접 갱신해 리렌더 없이 따라오게 한다. 드래그 중에도 계속 호출된다.
+  function updateHealCloneCursorNodes(destNorm: SelPoint, frame: SelectionFrame) {
+    const cursor = healCloneCursorRef.current;
+    const srcCursor = healCloneSourceCursorRef.current;
+    if (!cursor) return;
+    const destCanvas = normalizedPointToCanvas(destNorm, frame);
+    cursor.position(destCanvas);
+    cursor.radius(healCloneRadius / effScale);
+    if (!cursor.visible()) cursor.visible(true);
+    if (srcCursor) {
+      if (healCloneOffsetRef.current) {
+        const srcNorm = healCloneSourcePoint(healCloneOffsetRef.current, destNorm);
+        srcCursor.position(normalizedPointToCanvas(srcNorm, frame));
+        if (!srcCursor.visible()) srcCursor.visible(true);
+      } else {
+        srcCursor.visible(false);
+      }
+    }
+    cursor.getLayer()?.batchDraw();
+  }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     // 크롭 드래그 중이면 rect 를 갱신한다(시작 시점 스냅샷 기준 — 증분 오차 없음, RAF 합침).
     if (cropDragRef.current) {
@@ -6481,6 +6712,32 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 문지르기 드래그 중이면 좌표를 누적한다(최소 간격 미만은 스킵 — 과밀 포인트 방지).
+    if (smudgeDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = smudgeDragRef.current;
+        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const last = session.points[session.points.length - 1];
+        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+      }
+      return;
+    }
+    // 복구 브러시/도장 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터).
+    if (healCloneDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = healCloneDragRef.current;
+        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        updateHealCloneCursorNodes(p, session.frame);
+        const nextPoints = appendBrushPoint(session.points, p, session.radiusNorm);
+        if (nextPoints !== session.points) {
+          session.points = nextPoints;
+          scheduleHealCloneDragPreview({ points: nextPoints });
+        }
+      }
+      return;
+    }
     // 마퀴 드래그 중이면 선택 박스를 갱신한다.
     if (marqueeStartRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -6499,6 +6756,30 @@ function StudioCuttoonEditor() {
         cursorNode.position(cursorPos);
         if (!cursorNode.visible()) cursorNode.visible(true);
         cursorNode.getLayer()?.batchDraw();
+      }
+    }
+    // 문지르기 브러시 커서 프리뷰 — 위 브러시 커서와 동일한 imperative-Konva 기법.
+    if (smudgeArmed) {
+      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
+      const cursorNode = smudgeCursorRef.current;
+      if (cursorPos && cursorNode) {
+        cursorNode.position(cursorPos);
+        if (!cursorNode.visible()) cursorNode.visible(true);
+        cursorNode.getLayer()?.batchDraw();
+      }
+    }
+    // 복구 브러시/도장 호버 커서 — 드래그 중이 아닐 때도(단순 호버) 계속 갱신한다.
+    if (healCloneArmed && selected?.type === "image") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const frame: SelectionFrame = {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+        };
+        updateHealCloneCursorNodes(canvasPointToNormalized(pos.x, pos.y, frame), frame);
       }
     }
     if (tool !== "draw" || !drawingRef.current) return;
@@ -6691,6 +6972,21 @@ function StudioCuttoonEditor() {
       setPixelSel((prev) => commitSelectionDrag(prev, session.drag) ?? prev);
       return;
     }
+    // 문지르기 드래그 종료 — 누적된 좌표로 실제 픽셀 스트로크를 적용한다.
+    if (smudgeDragRef.current) {
+      const session = smudgeDragRef.current;
+      smudgeDragRef.current = null;
+      if (session.points.length >= 2) void applySmudgeStroke(session.elId, session.points);
+      return;
+    }
+    // 복구 브러시/도장 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
+    if (healCloneDragRef.current) {
+      const session = healCloneDragRef.current;
+      healCloneDragRef.current = null;
+      clearHealCloneDragPreview();
+      if (session.points.length > 0) void bakeHealCloneDragStroke(session);
+      return;
+    }
     // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
     if (marqueeStartRef.current) {
       const rect = pendingMarqueeRectRef.current ?? marqueeRect;
@@ -6727,6 +7023,20 @@ function StudioCuttoonEditor() {
       cursorNode.visible(false);
       cursorNode.getLayer()?.batchDraw();
     }
+  }
+  function hideSmudgeCursor() {
+    const cursorNode = smudgeCursorRef.current;
+    if (cursorNode && cursorNode.visible()) {
+      cursorNode.visible(false);
+      cursorNode.getLayer()?.batchDraw();
+    }
+  }
+  function hideHealCloneCursors() {
+    const cursor = healCloneCursorRef.current;
+    const srcCursor = healCloneSourceCursorRef.current;
+    if (cursor?.visible()) cursor.visible(false);
+    if (srcCursor?.visible()) srcCursor.visible(false);
+    cursor?.getLayer()?.batchDraw();
   }
 
   // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
@@ -9123,7 +9433,11 @@ function StudioCuttoonEditor() {
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
-            onMouseLeave={hideBrushCursor}
+            onMouseLeave={() => {
+              hideBrushCursor();
+              hideSmudgeCursor();
+              hideHealCloneCursors();
+            }}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
             onContextMenu={(e) => {
@@ -9214,15 +9528,31 @@ function StudioCuttoonEditor() {
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const locked = isEffectivelyLocked(el, groups);
-                // 픽셀 선택/크롭/패널 컷/노드 편집 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
+                // 픽셀 선택/크롭/패널 컷/노드 편집/문지르기/복구브러시 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
                 const draggable =
-                  !opts.asMask && tool === "select" && !locked && !pixelToolArmed && !cropArmed && !panelSplitArmed && !nodeEditArmed;
+                  !opts.asMask &&
+                  tool === "select" &&
+                  !locked &&
+                  !pixelToolArmed &&
+                  !cropArmed &&
+                  !panelSplitArmed &&
+                  !nodeEditArmed &&
+                  !smudgeArmed &&
+                  !healCloneArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
                 const onSelect = opts.asMask
                   ? () => {}
-                  : () => tool === "select" && !pixelToolArmed && !cropArmed && !panelSplitArmed && !nodeEditArmed && setSelectedId(el.id);
+                  : () =>
+                      tool === "select" &&
+                      !pixelToolArmed &&
+                      !cropArmed &&
+                      !panelSplitArmed &&
+                      !nodeEditArmed &&
+                      !smudgeArmed &&
+                      !healCloneArmed &&
+                      setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -9982,6 +10312,34 @@ function StudioCuttoonEditor() {
                 />
               </Layer>
             )}
+            {!isExporting && smudgeArmed && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={smudgeCursorRef}
+                  visible={false}
+                  radius={Math.max(1.5, smudgeRadius)}
+                  stroke="#7c5cff"
+                  strokeWidth={1.25 / effScale}
+                  dash={[3 / effScale, 3 / effScale]}
+                  opacity={0.9}
+                />
+              </Layer>
+            )}
+            {/* healCloneArmed 는 tool 과 무관하게 참일 수 있어(select 모드에서도 무장 가능) 기존
+                brushCursorRef Layer(tool==="draw" 로 게이팅됨)에 얹으면 select 모드에서 커서가
+                아예 안 그려진다 — smudge 커서와 동일하게 독립 게이팅 Layer로 둔다. */}
+            {!isExporting && healCloneArmed && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={healCloneCursorRef}
+                  visible={false}
+                  stroke={healCloneTool === "heal" ? "#22c55e" : "#38bdf8"}
+                  strokeWidth={1.5 / effScale}
+                  dash={[3 / effScale, 2 / effScale]}
+                />
+                <KCircle ref={healCloneSourceCursorRef} visible={false} radius={5 / effScale} stroke="#f59e0b" strokeWidth={1.5 / effScale} />
+              </Layer>
+            )}
             {!isExporting && marqueeRect && (
               <Layer listening={false}>
                 <Rect
@@ -10028,6 +10386,18 @@ function StudioCuttoonEditor() {
                   pressures={nodeEditDraft?.elId === selected.id ? nodeEditDraft.pressures : selected.pressures}
                   scale={effScale}
                   activeHandleIndex={nodeEditDragRef.current?.session.pointIndex ?? null}
+                />
+              </Layer>
+            )}
+            {!isExporting && healCloneArmed && pixelOverlayFrame && (healCloneSourceAnchor || healCloneDragPreview) && (
+              <Layer listening={false}>
+                <StudioHealCloneOverlay
+                  frame={pixelOverlayFrame}
+                  scale={effScale}
+                  sourceAnchor={healCloneSourceAnchor}
+                  drag={healCloneDragPreview}
+                  radiusPx={healCloneRadius}
+                  mode={healCloneTool ?? "clone"}
                 />
               </Layer>
             )}
@@ -12404,7 +12774,10 @@ function StudioCuttoonEditor() {
                     busy={pixelBusy}
                     brushRadius={pixelBrushRadius}
                     onBrushRadiusChange={setPixelBrushRadius}
-                    onPickTool={setPixelTool}
+                    onPickTool={(t) => {
+                      setPixelTool(t);
+                      setHealCloneTool(null);
+                    }}
                     onCombineModeChange={setPixelCombine}
                     onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
                     onToggleInvert={() => setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()))}
@@ -12416,8 +12789,56 @@ function StudioCuttoonEditor() {
                     active={pixelTool === "wand"}
                     tolerance={wandTolerance}
                     busy={pixelBusy}
-                    onToggleActive={() => setPixelTool((t) => (t === "wand" ? null : "wand"))}
+                    onToggleActive={() => {
+                      setPixelTool((t) => (t === "wand" ? null : "wand"));
+                      setHealCloneTool(null);
+                    }}
                     onToleranceChange={setWandTolerance}
+                  />
+                  <StudioSmudgePanel
+                    active={smudgeActive}
+                    radius={smudgeRadius}
+                    strength={smudgeStrength}
+                    busy={smudgeBusy}
+                    onToggleActive={() =>
+                      setSmudgeActive((v) => {
+                        const next = !v;
+                        if (next) {
+                          setPixelTool(null);
+                          setCropRect(null);
+                          setNodeEditTool(null);
+                          setPanelSplitActive(false);
+                          setHealCloneTool(null);
+                        }
+                        return next;
+                      })
+                    }
+                    onRadiusChange={setSmudgeRadius}
+                    onStrengthChange={setSmudgeStrength}
+                  />
+                  <StudioHealClonePanel
+                    mode={healCloneTool}
+                    radiusPx={healCloneRadius}
+                    hardness={healCloneHardness}
+                    opacity={healCloneOpacity}
+                    aligned={healCloneAligned}
+                    hasSource={healCloneSourceAnchor !== null}
+                    busy={healCloneBusy}
+                    onPickMode={(mode) => {
+                      setHealCloneTool((t) => (t === mode ? null : mode));
+                      setPixelTool(null);
+                      setPixelSel(null);
+                      setCropRect(null);
+                      setSmudgeActive(false);
+                    }}
+                    onRadiusChange={setHealCloneRadius}
+                    onHardnessChange={setHealCloneHardness}
+                    onOpacityChange={setHealCloneOpacity}
+                    onAlignedChange={setHealCloneAligned}
+                    onClearSource={() => {
+                      setHealCloneSourceAnchor(null);
+                      healCloneOffsetRef.current = null;
+                    }}
                   />
                   {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
                   <StudioCropPanel
@@ -12433,6 +12854,8 @@ function StudioCuttoonEditor() {
                       // 크롭 진입 — 스테이지 제스처가 겹치지 않게 픽셀 선택 도구를 함께 끈다.
                       setPixelTool(null);
                       setPixelSel(null);
+                      setSmudgeActive(false);
+                      setHealCloneTool(null);
                       setCropRect(initialCropRect());
                     }}
                     onAspectChange={(id) => {
