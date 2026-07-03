@@ -6233,95 +6233,122 @@ function StudioCuttoonEditor() {
       }
     }
     if (tool !== "draw" || !drawingRef.current) return;
+    const kind = drawingRef.current.kind ?? "freehand";
+    if (kind === "freehand") {
+      const stage = e.target.getStage();
+      if (!stage) return;
+      // getCoalescedEvents 로 브라우저가 병합해 버렸던 실제 하드웨어 포인터 이벤트들을 복원한다.
+      // 빠르게 움직일수록 pointermove 는 한 프레임에 하나만 오지만, 그사이 실제로는 펜/마우스가
+      // 여러 지점을 지나쳤다 — 그 중간점들을 다시 스트로크에 반영하면 빠른 스트로크가 각지지
+      // 않고 매끈해진다(네이티브 저지연 엔진과의 격차를 좁히는 유의미한 최적화). 미지원 브라우저
+      // (Safari 등)는 getCoalescedEvents 자체가 없으므로 현재 이벤트 하나만 처리해 기존과 동일.
+      const nativeEvt = e.evt as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+      const coalesced = typeof nativeEvt.getCoalescedEvents === "function" ? nativeEvt.getCoalescedEvents() : [];
+      const events = coalesced.length > 0 ? coalesced : [nativeEvt];
+      for (const ev of events) {
+        // Konva 는 Stage 컨테이너 rect 기준 clientX/clientY 로 좌표를 계산한다 — coalesced 이벤트도
+        // 같은 브라우저 좌표계이므로 이 공개 API로 임시 포인터 위치를 갱신해 재사용할 수 있다.
+        stage.setPointersPositions(ev);
+        const p = stage.getRelativePointerPosition();
+        if (p) appendFreehandStrokePoint(p, (ev as { pressure?: number }).pressure);
+      }
+      // 마지막으로 실제(최신) 이벤트 기준 포인터 위치로 stage 를 복원 — 브러시 커서 등 다른 로직이
+      // 이 틱 이후 stage.getPointerPosition() 을 참조해도 어긋나지 않는다.
+      stage.setPointersPositions(nativeEvt);
+      return;
+    }
     const pos = e.target.getStage()?.getRelativePointerPosition();
     if (!pos) return;
     const current = drawingRef.current;
-    const kind = current.kind ?? "freehand";
-    let next: DrawEl;
-    if (kind === "freehand") {
-      const rawPressure = (e.evt as { pressure?: number }).pressure;
-      const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
-
-      let pressure: number;
-      if (hasHardwarePressure && !useVelocityPressure) {
-        pressure = Math.pow(rawPressure, pressureCurve);
-      } else if (useVelocityPressure && current.points.length >= 2) {
-        const lastX = current.points[current.points.length - 2]!;
-        const lastY = current.points[current.points.length - 1]!;
-        const dx = pos.x - lastX;
-        const dy = pos.y - lastY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        const maxDist = 28;
-        const speedRatio = Math.min(1, dist / maxDist);
-        const factor = velocitySensitivity * 0.75;
-        const base = 1.0 - speedRatio * factor;
-        pressure = Math.pow(base, pressureCurve);
-      } else {
-        const base = typeof rawPressure === "number" && rawPressure > 0 ? rawPressure : 0.5;
-        pressure = Math.pow(base, pressureCurve);
+    const x0 = current.points[0] ?? pos.x;
+    const y0 = current.points[1] ?? pos.y;
+    let x1 = pos.x;
+    let y1 = pos.y;
+    // 원근자: 직선 도구에서만, Shift 스냅과는 배타적(Shift가 우선 — 수평/수직/45°는 사용자의
+    // 명시적 의도이므로 원근 락보다 존중한다).
+    if (perspectiveRulerActive && kind === "line" && !e.evt.shiftKey && vanishingPoints.length > 0) {
+      if (!perspectiveRayRef.current) {
+        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
       }
-
-      let targetX = pos.x;
-      let targetY = pos.y;
-      if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
-        // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
-        // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
-        if (!perspectiveRayRef.current) {
-          const startX = current.points[0] ?? pos.x;
-          const startY = current.points[1] ?? pos.y;
-          perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, startX, startY, pos.x, pos.y);
-        }
-        [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
-      }
-      if (stabilizer > 0 && current.points.length >= 2) {
-        // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush) — 원근 투영 다음 단계.
-        const lastX = current.points[current.points.length - 2]!;
-        const lastY = current.points[current.points.length - 1]!;
-        [targetX, targetY] = stabilizePoint(lastX, lastY, targetX, targetY, stabilizer);
-      }
-
-      const lastX = current.points[current.points.length - 2] ?? targetX;
-      const lastY = current.points[current.points.length - 1] ?? targetY;
-      if (!shouldAppendStrokePoint(lastX, lastY, targetX, targetY)) return;
-      next = {
-        ...current,
-        points: [...current.points, targetX, targetY],
-        pressures: current.pressures ? [...current.pressures, pressure] : [pressure],
-      };
-    } else {
-      const x0 = current.points[0] ?? pos.x;
-      const y0 = current.points[1] ?? pos.y;
-      let x1 = pos.x;
-      let y1 = pos.y;
-      // 원근자: 직선 도구에서만, Shift 스냅과는 배타적(Shift가 우선 — 수평/수직/45°는 사용자의
-      // 명시적 의도이므로 원근 락보다 존중한다).
-      if (perspectiveRulerActive && kind === "line" && !e.evt.shiftKey && vanishingPoints.length > 0) {
-        if (!perspectiveRayRef.current) {
-          perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
-        }
-        [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
-      }
-      // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
-      if (e.evt.shiftKey) {
-        const dx = x1 - x0;
-        const dy = y1 - y0;
-        if (kind === "line") {
-          if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
-          else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
-          else {
-            const s = Math.max(Math.abs(dx), Math.abs(dy));
-            x1 = x0 + Math.sign(dx || 1) * s;
-            y1 = y0 + Math.sign(dy || 1) * s;
-          }
-        } else {
+      [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
+    }
+    // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
+    if (e.evt.shiftKey) {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      if (kind === "line") {
+        if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
+        else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
+        else {
           const s = Math.max(Math.abs(dx), Math.abs(dy));
           x1 = x0 + Math.sign(dx || 1) * s;
           y1 = y0 + Math.sign(dy || 1) * s;
         }
+      } else {
+        const s = Math.max(Math.abs(dx), Math.abs(dy));
+        x1 = x0 + Math.sign(dx || 1) * s;
+        y1 = y0 + Math.sign(dy || 1) * s;
       }
-      next = { ...current, points: [x0, y0, x1, y1] };
     }
+    const next = { ...current, points: [x0, y0, x1, y1] };
+    drawingRef.current = next;
+    scheduleDraft(next);
+  }
+  // 자유선 스트로크에 점 하나를 추가한다(압력 계산 + 원근 스냅 + 손떨림 보정 + 최소간격 필터) —
+  // onStageMove 에서 getCoalescedEvents 로 얻은 이벤트마다 이 함수를 반복 호출해 여러 점을
+  // 한 번에 누적한다(단일 pointermove 당 한 번 호출해도 기존과 동일하게 동작).
+  function appendFreehandStrokePoint(pos: { x: number; y: number }, rawPressure: number | undefined) {
+    const current = drawingRef.current;
+    if (!current) return;
+    const hasHardwarePressure = typeof rawPressure === "number" && rawPressure > 0 && rawPressure !== 0.5;
+
+    let pressure: number;
+    if (hasHardwarePressure && !useVelocityPressure) {
+      pressure = Math.pow(rawPressure, pressureCurve);
+    } else if (useVelocityPressure && current.points.length >= 2) {
+      const lastX = current.points[current.points.length - 2]!;
+      const lastY = current.points[current.points.length - 1]!;
+      const dx = pos.x - lastX;
+      const dy = pos.y - lastY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      const maxDist = 28;
+      const speedRatio = Math.min(1, dist / maxDist);
+      const factor = velocitySensitivity * 0.75;
+      const base = 1.0 - speedRatio * factor;
+      pressure = Math.pow(base, pressureCurve);
+    } else {
+      const base = typeof rawPressure === "number" && rawPressure > 0 ? rawPressure : 0.5;
+      pressure = Math.pow(base, pressureCurve);
+    }
+
+    let targetX = pos.x;
+    let targetY = pos.y;
+    if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
+      // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
+      // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
+      if (!perspectiveRayRef.current) {
+        const startX = current.points[0] ?? pos.x;
+        const startY = current.points[1] ?? pos.y;
+        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, startX, startY, pos.x, pos.y);
+      }
+      [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
+    }
+    if (stabilizer > 0 && current.points.length >= 2) {
+      // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush) — 원근 투영 다음 단계.
+      const lastX = current.points[current.points.length - 2]!;
+      const lastY = current.points[current.points.length - 1]!;
+      [targetX, targetY] = stabilizePoint(lastX, lastY, targetX, targetY, stabilizer);
+    }
+
+    const lastX = current.points[current.points.length - 2] ?? targetX;
+    const lastY = current.points[current.points.length - 1] ?? targetY;
+    if (!shouldAppendStrokePoint(lastX, lastY, targetX, targetY)) return;
+    const next: DrawEl = {
+      ...current,
+      points: [...current.points, targetX, targetY],
+      pressures: current.pressures ? [...current.pressures, pressure] : [pressure],
+    };
     drawingRef.current = next;
     scheduleDraft(next);
   }
