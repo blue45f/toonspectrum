@@ -1,4 +1,4 @@
-import { AlertTriangle, Film, Loader2, Play, Square, X } from "lucide-react";
+import { AlertTriangle, Loader2, Play, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { downloadBlob } from "./studio-export";
@@ -161,7 +161,7 @@ export function StudioTimelapsePanel({
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Film size={14} aria-hidden /> 타임랩스
+              <Video size={14} aria-hidden /> 타임랩스
             </p>
             <h2 className="mt-1 text-lg font-bold tracking-tight text-fg">그리기 과정 타임랩스</h2>
           </div>

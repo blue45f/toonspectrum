@@ -146,7 +146,15 @@ export function StudioContactSheetPanel({
         onClick={onExport}
         disabled={busy || disabled || pageCount < 1}
         className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-        title={`전체 ${pageCount}페이지를 ${columns}×${rows} 격자로 모은 인쇄용 PDF로 저장`}
+        title={
+          busy
+            ? "콘택트시트를 만드는 중이에요"
+            : disabled
+              ? "다른 내보내기가 끝난 뒤 이용할 수 있어요"
+              : pageCount < 1
+                ? "내보낼 페이지가 없어요"
+                : `전체 ${pageCount}페이지를 ${columns}×${rows} 격자로 모은 인쇄용 PDF로 저장`
+        }
       >
         <LayoutGrid size={13} /> 콘택트시트 PDF로 저장
       </button>

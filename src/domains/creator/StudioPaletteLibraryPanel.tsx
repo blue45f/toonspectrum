@@ -137,8 +137,16 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
     <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
       <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 팔레트 — 저장·가져오기(.gpl)·내보내기</p>
 
-      {error && <p className="mb-1.5 text-[0.66rem] text-bad">{error}</p>}
-      {doneMsg && !error && <p className="mb-1.5 text-[0.66rem] text-good">{doneMsg}</p>}
+      {error && (
+        <p className="mb-1.5 text-[0.66rem] text-bad" role="alert">
+          {error}
+        </p>
+      )}
+      {doneMsg && !error && (
+        <p className="mb-1.5 text-[0.66rem] text-good" role="status">
+          {doneMsg}
+        </p>
+      )}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">
         <label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-line bg-card py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised">

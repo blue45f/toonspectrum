@@ -25,6 +25,7 @@ import {
   Pipette,
   PictureInPicture2,
   UserRound,
+  Video,
   Triangle,
   Hexagon,
   ChevronDown,
@@ -383,8 +384,6 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
-import { StudioBrandKitPanel } from "./StudioBrandKitPanel";
-import { StudioBubbleAnchorPanel } from "./StudioBubbleAnchorPanel";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -394,7 +393,6 @@ import {
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
-import { StudioHealClonePanel } from "./StudioHealClonePanel";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -403,9 +401,7 @@ import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
-import { StudioQuickShapePanel } from "./StudioQuickShapePanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
-import { StudioSmudgePanel } from "./StudioSmudgePanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
 import type { StudioAsset } from "./studio-asset-library";
@@ -563,6 +559,26 @@ const StudioTimelapsePanel = lazyRetry(
 const WorkFxPanel = lazyRetry(
   () => import("./WorkFxPanel").then((mod) => ({ default: mod.WorkFxPanel })),
   "WorkFxPanel"
+);
+const StudioBrandKitPanel = lazyRetry(
+  () => import("./StudioBrandKitPanel").then((mod) => ({ default: mod.StudioBrandKitPanel })),
+  "StudioBrandKitPanel"
+);
+const StudioBubbleAnchorPanel = lazyRetry(
+  () => import("./StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
+  "StudioBubbleAnchorPanel"
+);
+const StudioSmudgePanel = lazyRetry(
+  () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
+  "StudioSmudgePanel"
+);
+const StudioHealClonePanel = lazyRetry(
+  () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
+  "StudioHealClonePanel"
+);
+const StudioQuickShapePanel = lazyRetry(
+  () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
+  "StudioQuickShapePanel"
 );
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
@@ -3205,15 +3221,28 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     setTimelinePlayhead((p) => clampGlobalFrameIndex(animTimeline.frameCount, p));
   }, [animTimeline.frameCount]);
+  // 패널을 닫아도(토글 버튼 재클릭·Escape 등 모든 닫기 경로 공통) 재생 중이던 상태가 rAF 루프와
+  // 함께 백그라운드에 계속 남지 않도록 강제 정지한다 — 개별 onClose/토글 콜백마다 정지를 챙기면
+  // 새 닫기 경로가 추가될 때 빠뜨리기 쉬우므로, "닫힘"이라는 단일 상태 변화 지점에서 일괄 처리한다.
+  useEffect(() => {
+    if (!timelineOpen) setTimelinePlaying(false);
+  }, [timelineOpen]);
   // 재생 루프 — 커밋 없이 timelinePreviewFrame 만 rAF 로 갱신한다(undo 히스토리 오염 방지).
+  // idx가 직전 틱과 같으면 setState를 스킵 — 프레임 슬롯이 넓거나(저-fps 애니메이션) 디스플레이
+  // 주사율이 애니메이션 fps보다 훨씬 높을 때 매 rAF 틱마다 불필요하게 StudioPage 전체를 리렌더하는
+  // 것을 막는다(idx가 안 바뀌면 timelineComposite/renderEl 결과도 안 바뀌므로 리렌더가 무의미하다).
   useEffect(() => {
     if (!timelinePlaying) return;
     const start = performance.now();
     let raf = 0;
+    let lastIdx = -1;
     const tick = () => {
       const elapsed = performance.now() - start;
       const idx = globalFrameIndexAtElapsed(animTimeline, elapsed, true);
-      setTimelinePreviewFrame(idx);
+      if (idx !== lastIdx) {
+        lastIdx = idx;
+        setTimelinePreviewFrame(idx);
+      }
       raf = globalThis.requestAnimationFrame(tick);
     };
     raf = globalThis.requestAnimationFrame(tick);
@@ -4691,8 +4720,30 @@ function StudioCuttoonEditor() {
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
   }
+  // 캔버스 제스처를 무장(armed)해 가로채는 도구 9종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
+  // 나머지 8개를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
+  // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
+  // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
+  function disarmAllPixelTools() {
+    setCropRect(null);
+    setPixelTool(null);
+    setPanelSplitActive(false);
+    setNodeEditTool(null);
+    setSmudgeActive(false);
+    setHealCloneTool(null);
+    setEyedropperActive(false);
+    setBubbleAnchorPickActive(false);
+    setQuickShapeActive(false);
+  }
   function toggleBubbleAnchorPick() {
-    setBubbleAnchorPickActive((v) => !v);
+    setBubbleAnchorPickActive((v) => {
+      const next = !v;
+      if (next) {
+        disarmAllPixelTools();
+        return true;
+      }
+      return false;
+    });
   }
   function detachBubbleAnchor() {
     if (!selected || selected.type !== "bubble") return;
@@ -6828,18 +6879,11 @@ function StudioCuttoonEditor() {
       }
       return;
     }
-    // 브러시 커서 프리뷰: 드로잉 모드에선 포인터 위치에 브러시 크기 원을 따라 그린다.
-    // (React 상태를 거치지 않고 Konva 노드를 직접 갱신 — hover 중 리렌더 없음)
-    if (tool === "draw") {
-      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
-      const cursorNode = brushCursorRef.current;
-      if (cursorPos && cursorNode) {
-        cursorNode.position(cursorPos);
-        if (!cursorNode.visible()) cursorNode.visible(true);
-        cursorNode.getLayer()?.batchDraw();
-      }
-    }
-    // 문지르기 브러시 커서 프리뷰 — 위 브러시 커서와 동일한 imperative-Konva 기법.
+    // 커서 프리뷰: 드로잉/문지르기/복구브러시 세 무장 상태는 disarmAllPixelTools로 서로
+    // 상호배제되지만 tool("select"|"draw")은 독립된 축이라(이미지 선택 + 스머지 켬 + tool="draw"가
+    // 동시에 성립 가능), 셋 다 조건이 참일 수 있는 경우를 else if 로 묶어 한 프레임에 커서 하나만
+    // (그리고 batchDraw 한 번만) 갱신되게 한다 — onStageDown 의 armed 우선순위(smudge/healClone이
+    // draw 브러시보다 우선)와 동일 순서.
     if (smudgeArmed) {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = smudgeCursorRef.current;
@@ -6848,9 +6892,7 @@ function StudioCuttoonEditor() {
         if (!cursorNode.visible()) cursorNode.visible(true);
         cursorNode.getLayer()?.batchDraw();
       }
-    }
-    // 복구 브러시/도장 호버 커서 — 드래그 중이 아닐 때도(단순 호버) 계속 갱신한다.
-    if (healCloneArmed && selected?.type === "image") {
+    } else if (healCloneArmed && selected?.type === "image") {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const frame: SelectionFrame = {
@@ -6861,6 +6903,14 @@ function StudioCuttoonEditor() {
           rotation: selected.rotation,
         };
         updateHealCloneCursorNodes(canvasPointToNormalized(pos.x, pos.y, frame), frame);
+      }
+    } else if (tool === "draw") {
+      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
+      const cursorNode = brushCursorRef.current;
+      if (cursorPos && cursorNode) {
+        cursorNode.position(cursorPos);
+        if (!cursorNode.visible()) cursorNode.visible(true);
+        cursorNode.getLayer()?.batchDraw();
       }
     }
     if (tool !== "draw" || !drawingRef.current) return;
@@ -8004,7 +8054,7 @@ function StudioCuttoonEditor() {
           }}
           disabled={selected?.type !== "image"}
           className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
-          title="선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"
+          title={selected?.type !== "image" ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요" : "선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"}
         >
           <Film size={14} /> 프레임 애니메이션
         </button>
@@ -8372,12 +8422,14 @@ function StudioCuttoonEditor() {
             <Package size={14} /> 브랜드 킷
           </button>
           {menu === "brandKit" && (
-            <StudioBrandKitPanel
-              onPickColor={(hex) => setColor(hex)}
-              canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
-              onApplyFont={applyBrandKitFont}
-              onApplyLogo={applyBrandKitLogo}
-            />
+            <Suspense fallback={null}>
+              <StudioBrandKitPanel
+                onPickColor={(hex) => setColor(hex)}
+                canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
+                onApplyFont={applyBrandKitFont}
+                onApplyLogo={applyBrandKitLogo}
+              />
+            </Suspense>
           )}
         </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
@@ -8888,7 +8940,7 @@ function StudioCuttoonEditor() {
           className={cn(toolBtn(false), "disabled:opacity-40")}
           title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "타임랩스 녹화 (그리기 과정 영상화)"}
         >
-          <Film size={14} />
+          <Video size={14} />
         </button>
         <button
           type="button"
@@ -11487,8 +11539,7 @@ function StudioCuttoonEditor() {
                             setNodeEditTool(null);
                             return;
                           }
-                          setCropRect(null); // 방어적 초기화(크롭/픽셀 도구는 image 전용이라 실제로 겹치진 않음)
-                          setPixelTool(null);
+                          disarmAllPixelTools();
                           setNodeEditTool("move");
                         }}
                         onToolChange={(t) => setNodeEditTool(t)}
@@ -11799,21 +11850,23 @@ function StudioCuttoonEditor() {
                 </div>
               )}
               {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
-                <StudioBubbleAnchorPanel
-                  anchorId={selected.tailAnchorId ?? null}
-                  anchorPoint={selected.tailAnchorPoint ?? null}
-                  anchorTargetLabel={
-                    selected.tailAnchorId
-                      ? (() => {
-                          const t = elementById.get(selected.tailAnchorId);
-                          return t ? elementLabel(t) : null;
-                        })()
-                      : null
-                  }
-                  pickActive={bubbleAnchorPickActive}
-                  onTogglePick={toggleBubbleAnchorPick}
-                  onDetach={detachBubbleAnchor}
-                />
+                <Suspense fallback={null}>
+                  <StudioBubbleAnchorPanel
+                    anchorId={selected.tailAnchorId ?? null}
+                    anchorPoint={selected.tailAnchorPoint ?? null}
+                    anchorTargetLabel={
+                      selected.tailAnchorId
+                        ? (() => {
+                            const t = elementById.get(selected.tailAnchorId);
+                            return t ? elementLabel(t) : null;
+                          })()
+                        : null
+                    }
+                    pickActive={bubbleAnchorPickActive}
+                    onTogglePick={toggleBubbleAnchorPick}
+                    onDetach={detachBubbleAnchor}
+                  />
+                </Suspense>
               )}
               {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
                 <div className="mt-3 space-y-2 border-t border-line/40 pt-2.5">
@@ -12803,8 +12856,15 @@ function StudioCuttoonEditor() {
                     gutterPx={panelGutter}
                     hint={panelSplitHint}
                     onToggle={() => {
-                      setPanelSplitActive((v) => !v);
                       setPanelSplitHint(null);
+                      setPanelSplitActive((v) => {
+                        const next = !v;
+                        if (next) {
+                          disarmAllPixelTools();
+                          return true;
+                        }
+                        return false;
+                      });
                     }}
                     onGutterChange={setPanelGutter}
                   />
@@ -12926,8 +12986,8 @@ function StudioCuttoonEditor() {
                     brushRadius={pixelBrushRadius}
                     onBrushRadiusChange={setPixelBrushRadius}
                     onPickTool={(t) => {
+                      if (t) disarmAllPixelTools();
                       setPixelTool(t);
-                      setHealCloneTool(null);
                     }}
                     onCombineModeChange={setPixelCombine}
                     onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
@@ -12941,8 +13001,9 @@ function StudioCuttoonEditor() {
                     tolerance={wandTolerance}
                     busy={pixelBusy}
                     onToggleActive={() => {
-                      setPixelTool((t) => (t === "wand" ? null : "wand"));
-                      setHealCloneTool(null);
+                      const next = pixelTool === "wand" ? null : "wand";
+                      if (next) disarmAllPixelTools();
+                      setPixelTool(next);
                     }}
                     onToleranceChange={setWandTolerance}
                   />
@@ -12955,13 +13016,10 @@ function StudioCuttoonEditor() {
                       setSmudgeActive((v) => {
                         const next = !v;
                         if (next) {
-                          setPixelTool(null);
-                          setCropRect(null);
-                          setNodeEditTool(null);
-                          setPanelSplitActive(false);
-                          setHealCloneTool(null);
+                          disarmAllPixelTools();
+                          return true;
                         }
-                        return next;
+                        return false;
                       })
                     }
                     onRadiusChange={setSmudgeRadius}
@@ -12976,11 +13034,12 @@ function StudioCuttoonEditor() {
                     hasSource={healCloneSourceAnchor !== null}
                     busy={healCloneBusy}
                     onPickMode={(mode) => {
-                      setHealCloneTool((t) => (t === mode ? null : mode));
-                      setPixelTool(null);
-                      setPixelSel(null);
-                      setCropRect(null);
-                      setSmudgeActive(false);
+                      const next = healCloneTool === mode ? null : mode;
+                      if (next) {
+                        disarmAllPixelTools();
+                        setPixelSel(null); // 픽셀 선택 영역이 남아있으면 heal/clone 오버레이와 시각적으로 겹쳐 헷갈린다.
+                      }
+                      setHealCloneTool(next);
                     }}
                     onRadiusChange={setHealCloneRadius}
                     onHardnessChange={setHealCloneHardness}
@@ -13002,11 +13061,9 @@ function StudioCuttoonEditor() {
                         setCropRect(null);
                         return;
                       }
-                      // 크롭 진입 — 스테이지 제스처가 겹치지 않게 픽셀 선택 도구를 함께 끈다.
-                      setPixelTool(null);
+                      // 크롭 진입 — 스테이지 제스처가 겹치지 않게 다른 무장 도구를 함께 끈다.
+                      disarmAllPixelTools();
                       setPixelSel(null);
-                      setSmudgeActive(false);
-                      setHealCloneTool(null);
                       setCropRect(initialCropRect());
                     }}
                     onAspectChange={(id) => {
@@ -13220,7 +13277,11 @@ function StudioCuttoonEditor() {
                     <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
                     <button
                       type="button"
-                      onClick={() => setEyedropperActive((v) => !v)}
+                      onClick={() => {
+                        const next = !eyedropperActive;
+                        if (next) disarmAllPixelTools();
+                        setEyedropperActive(next);
+                      }}
                       aria-pressed={eyedropperActive}
                       title="스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)"
                       className={cn(
@@ -13315,15 +13376,21 @@ function StudioCuttoonEditor() {
                 </label>
 
                 {drawMode === "pen" && (
-                  <StudioQuickShapePanel
-                    active={quickShapeActive}
-                    matchedKindLabel={
-                      tool === "draw" && draft && draft.kind && draft.kind !== "freehand"
-                        ? (QUICKSHAPE_KIND_LABELS[draft.kind] ?? null)
-                        : null
-                    }
-                    onToggleActive={() => setQuickShapeActive((v) => !v)}
-                  />
+                  <Suspense fallback={null}>
+                    <StudioQuickShapePanel
+                      active={quickShapeActive}
+                      matchedKindLabel={
+                        tool === "draw" && draft && draft.kind && draft.kind !== "freehand"
+                          ? (QUICKSHAPE_KIND_LABELS[draft.kind] ?? null)
+                          : null
+                      }
+                      onToggleActive={() => {
+                        const next = !quickShapeActive;
+                        if (next) disarmAllPixelTools();
+                        setQuickShapeActive(next);
+                      }}
+                    />
+                  </Suspense>
                 )}
 
                 {/* 속도 기반 필압 (Velocity Pressure) */}

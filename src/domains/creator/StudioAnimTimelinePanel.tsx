@@ -208,7 +208,9 @@ export function StudioAnimTimelinePanel({
                     <button
                       type="button"
                       onClick={() => onFocusTrack(isFocused ? null : row.id)}
-                      title={row.eligible ? row.label : `${row.label} (이미지 레이어만 트랙을 만들 수 있어요)`}
+                      title={`${row.hidden ? "(숨김) " : ""}${row.locked ? "(잠김) " : ""}${row.label}${
+                        row.eligible ? "" : " (이미지 레이어만 트랙을 만들 수 있어요)"
+                      }`}
                       className={cn(
                         "sticky left-0 z-10 flex items-center gap-1.5 truncate border-b border-r border-line bg-panel px-2 text-left text-[0.72rem] transition-colors",
                         isFocused ? "bg-accent-soft/50 font-semibold text-fg" : "text-fg-2 hover:bg-raised",
@@ -395,6 +397,7 @@ export function StudioAnimTimelinePanel({
                 }
               }}
               disabled={!hasTrack(doc, focusedRow.id)}
+              title={hasTrack(doc, focusedRow.id) ? undefined : "삭제할 키프레임이 없어요"}
               className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-bad hover:text-bad" }), "w-full")}
             >
               <Trash2 size={13} />

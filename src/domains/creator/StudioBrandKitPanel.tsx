@@ -135,8 +135,16 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
     <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
       <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 브랜드 킷 — 팔레트·글꼴·로고 묶음</p>
 
-      {error && <p className="mb-1.5 text-[0.66rem] text-bad">{error}</p>}
-      {doneMsg && !error && <p className="mb-1.5 text-[0.66rem] text-good">{doneMsg}</p>}
+      {error && (
+        <p className="mb-1.5 text-[0.66rem] text-bad" role="alert">
+          {error}
+        </p>
+      )}
+      {doneMsg && !error && (
+        <p className="mb-1.5 text-[0.66rem] text-good" role="status">
+          {doneMsg}
+        </p>
+      )}
 
       <button
         type="button"
