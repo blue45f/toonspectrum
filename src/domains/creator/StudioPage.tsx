@@ -80,6 +80,7 @@ import {
   Search,
   X,
   Layers,
+  LayoutGrid,
   Palette,
   Hand,
   Film,
@@ -284,6 +285,14 @@ import {
 } from "./studio-perspective-guide";
 import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
 import {
+  anchorQuickShapePoints,
+  classifyQuickShape,
+  regularizeQuickShapePoints,
+  QUICKSHAPE_LOCK_HOLD_MS,
+  QUICKSHAPE_STILL_RADIUS_PX,
+  type QuickShapeKind,
+} from "./studio-quickshape";
+import {
   computeAlignDeltas,
   computeDistributeDeltas,
   normalizeMarqueeRect,
@@ -328,6 +337,7 @@ import {
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
 import {
+  DEFAULT_SHAPE_PARAMS,
   effectiveCornerRadius,
   lineArrowHeadGeoms,
   normalizeShapeParams,
@@ -364,6 +374,7 @@ import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
+import { StudioQuickShapePanel } from "./StudioQuickShapePanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
@@ -450,6 +461,10 @@ const StudioFrameAnimationPanel = lazyRetry(
 const StudioMasterPagePanel = lazyRetry(
   () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
   "StudioMasterPagePanel"
+);
+const StudioStoryboardGridPanel = lazyRetry(
+  () => import("./StudioStoryboardGridPanel").then((mod) => ({ default: mod.StudioStoryboardGridPanel })),
+  "StudioStoryboardGridPanel"
 );
 const StudioShortcutsHelp = lazyRetry(
   () => import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp })),
@@ -681,6 +696,13 @@ function PanelResizeHandle({
 type Tool = "select" | "draw";
 type DrawMode = "pen" | "eraser" | "shape";
 type DrawShapeKind = "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
+const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
+  line: "선",
+  rect: "사각형",
+  ellipse: "타원",
+  triangle: "삼각형",
+  polygon: "다각형",
+};
 
 export interface ImageEl {
   id: string;
@@ -1839,6 +1861,17 @@ function TimelapseLoadingOverlay() {
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
         <span>타임랩스 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function StoryboardGridLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>스토리보드 그리드를 여는 중</span>
       </div>
     </div>
   );
@@ -3052,6 +3085,7 @@ function StudioCuttoonEditor() {
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
+  const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
   const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
   const [eyedropperActive, setEyedropperActive] = useState(false);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
@@ -3099,6 +3133,7 @@ function StudioCuttoonEditor() {
   const [fxPanelOpen, setFxPanelOpen] = useState(false);
   const [referencePanelOpen, setReferencePanelOpen] = useState(false);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
+  const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [timelapseCapturing, setTimelapseCapturing] = useState(false);
   const timelapseOriginalHiRef = useRef(0);
   // frameAnimTargetId는 selectedId와 별개로 추적한다(bg3dInitialElementId/poserInitialElementId와
@@ -3540,6 +3575,11 @@ function StudioCuttoonEditor() {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
+  const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const quickShapeStillSinceRef = useRef<number>(0);
+  const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const quickShapeConvertedRef = useRef<boolean>(false); // 이 스트로크가 QuickShape 로 변환됐는지
+  const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
@@ -3813,6 +3853,13 @@ function StudioCuttoonEditor() {
     globalThis.addEventListener("pointerdown", handlePointerDown);
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [exportMenuOpen]);
+
+  // QuickShape 정지-감지 인터벌 — 언마운트 시(다른 페이지 이동 등) 타이머 잔존 방지.
+  useEffect(() => {
+    return () => {
+      if (quickShapeTimerRef.current !== null) globalThis.clearInterval(quickShapeTimerRef.current);
+    };
+  }, []);
 
   // 툴바 드롭다운(템플릿·배경 씬·말풍선·효과·내 에셋) 바깥 클릭시 닫기.
   // ref는 열린 메뉴의 래퍼(트리거+드롭다운)에만 붙는다 — 한 번에 하나만 열리므로 ref 하나로 충분.
@@ -6107,6 +6154,89 @@ function StudioCuttoonEditor() {
     const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return pickColorFromImageData(data, width, height, pos.x, pos.y);
   }
+  // QuickShape — 손그림 스트로크가 잠시 멈추면(1단계) 완벽한 도형으로 자동 인식하고, 계속 멈춰
+  // 있으면(2단계) 정비율(정사각형/정원 등)로 고정한다. setInterval 콜백은 스트로크 시작 시점의
+  // tool/drawMode 클로저를 그대로 쓴다(짧은 제스처 도중 도구 전환은 드물어 v1에서는 감내).
+  function startQuickShapeTracking(pos: { x: number; y: number }) {
+    quickShapeConvertedRef.current = false;
+    quickShapeLockedRef.current = false;
+    quickShapeStillAnchorRef.current = pos;
+    // 이 함수는 onStageDown(포인터 이벤트 핸들러) 안에서만 호출된다 — 렌더 경로가 아니다.
+    // react-hooks/purity 는 setInterval 콜백(runQuickShapeTick)으로 전달되는 함수를 보수적으로
+    // "렌더 중 호출 가능"으로 오판하는데, 실제로는 아래 setInterval 자체가 이 함수 호출 시점
+    // 이후에만 등록되는 진짜 타이머 콜백이라 안전하다.
+    // eslint-disable-next-line react-hooks/purity
+    quickShapeStillSinceRef.current = performance.now();
+    if (quickShapeTimerRef.current !== null) globalThis.clearInterval(quickShapeTimerRef.current);
+    quickShapeTimerRef.current = globalThis.setInterval(runQuickShapeTick, 80);
+  }
+  function stopQuickShapeTracking() {
+    if (quickShapeTimerRef.current !== null) {
+      globalThis.clearInterval(quickShapeTimerRef.current);
+      quickShapeTimerRef.current = null;
+    }
+    quickShapeStillAnchorRef.current = null;
+    quickShapeConvertedRef.current = false;
+    quickShapeLockedRef.current = false;
+  }
+  function noteQuickShapePointerMoved(pos: { x: number; y: number }) {
+    const anchor = quickShapeStillAnchorRef.current;
+    if (!anchor) return; // 무장 안 됨 — 저비용 no-op
+    const radius = QUICKSHAPE_STILL_RADIUS_PX / effScale;
+    if (Math.hypot(pos.x - anchor.x, pos.y - anchor.y) > radius) {
+      quickShapeStillAnchorRef.current = pos;
+      // onStageMove(포인터 이벤트 핸들러) 안에서만 호출된다 — 위 startQuickShapeTracking 과 동일 근거.
+      // eslint-disable-next-line react-hooks/purity
+      quickShapeStillSinceRef.current = performance.now();
+    }
+  }
+  // globalThis.setInterval 콜백으로만 등록된다(startQuickShapeTracking 참고) — 렌더 경로가 아니다.
+  function runQuickShapeTick() {
+    const current = drawingRef.current;
+    const anchor = quickShapeStillAnchorRef.current;
+    if (!current || !anchor || tool !== "draw" || drawMode !== "pen") {
+      stopQuickShapeTracking();
+      return;
+    }
+    // eslint-disable-next-line react-hooks/purity
+    const elapsed = performance.now() - quickShapeStillSinceRef.current;
+
+    if (!quickShapeConvertedRef.current) {
+      if ((current.kind ?? "freehand") !== "freehand") return; // 방어적
+      const match = classifyQuickShape(current.points, elapsed);
+      if (!match) return;
+      const anchored = anchorQuickShapePoints(match.kind, match.points, anchor);
+      let next: DrawEl = {
+        ...current,
+        kind: match.kind,
+        brush: undefined,
+        pressures: undefined,
+        fill: undefined,
+        points: anchored,
+        shapeParams:
+          match.polygonSides !== undefined
+            ? { ...DEFAULT_SHAPE_PARAMS, polygonSides: match.polygonSides }
+            : undefined,
+      };
+      quickShapeConvertedRef.current = true;
+      if (elapsed >= QUICKSHAPE_LOCK_HOLD_MS) {
+        next = { ...next, points: regularizeQuickShapePoints(match.kind, anchored) };
+        quickShapeLockedRef.current = true;
+      }
+      drawingRef.current = next;
+      scheduleDraft(next);
+      return;
+    }
+
+    if (!quickShapeLockedRef.current && elapsed >= QUICKSHAPE_LOCK_HOLD_MS) {
+      const kind = current.kind as QuickShapeKind;
+      const locked = regularizeQuickShapePoints(kind, current.points as [number, number, number, number]);
+      const next = { ...current, points: locked };
+      drawingRef.current = next;
+      quickShapeLockedRef.current = true;
+      scheduleDraft(next);
+    }
+  }
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
       return;
@@ -6265,6 +6395,8 @@ function StudioCuttoonEditor() {
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       setDraft(next);
+      if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
+      else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
       return;
     }
     // 선택 모드: 빈 영역에서 드래그하면 마퀴(PPT식 박스) 다중선택, 그냥 클릭이면 선택 해제.
@@ -6371,6 +6503,13 @@ function StudioCuttoonEditor() {
     }
     if (tool !== "draw" || !drawingRef.current) return;
     const kind = drawingRef.current.kind ?? "freehand";
+    if (drawMode === "pen") {
+      // QuickShape 정지-감지용 포인터 위치 — freehand 누적 경로와 도형-드래그 경로 둘 다에서
+      // 실행돼야 하므로 kind 분기 이전에 넣는다(각 분기가 이후 자체적으로 위치를 다시 얻는 것과
+      // 별개 — getRelativePointerPosition 은 가벼운 조회라 중복 호출 비용은 무시할 만하다).
+      const qsPos = e.target.getStage()?.getRelativePointerPosition();
+      if (qsPos) noteQuickShapePointerMoved(qsPos);
+    }
     if (kind === "freehand") {
       const stage = e.target.getStage();
       if (!stage) return;
@@ -6490,6 +6629,7 @@ function StudioCuttoonEditor() {
     scheduleDraft(next);
   }
   function onStageUp() {
+    stopQuickShapeTracking(); // 무조건 실행 — 어느 분기로 빠지든 인터벌이 새지 않게 한다.
     // 크롭 드래그 종료 — 마지막 RAF 대기분을 반영하고 세션만 닫는다(rect 는 적용 전까지 유지).
     if (cropDragRef.current) {
       cropDragRef.current = null;
@@ -8358,6 +8498,15 @@ function StudioCuttoonEditor() {
           title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "타임랩스 녹화 (그리기 과정 영상화)"}
         >
           <Film size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setStoryboardGridOpen(true)}
+          aria-label="스토리보드 그리드 보기 (전체 페이지 한눈에 비교)"
+          className={toolBtn(false)}
+          title="스토리보드 그리드 보기 — 전체 페이지를 격자로 한눈에 비교"
+        >
+          <LayoutGrid size={14} />
         </button>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
         {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
@@ -12591,6 +12740,18 @@ function StudioCuttoonEditor() {
                   </span>
                 </label>
 
+                {drawMode === "pen" && (
+                  <StudioQuickShapePanel
+                    active={quickShapeActive}
+                    matchedKindLabel={
+                      tool === "draw" && draft && draft.kind && draft.kind !== "freehand"
+                        ? (QUICKSHAPE_KIND_LABELS[draft.kind] ?? null)
+                        : null
+                    }
+                    onToggleActive={() => setQuickShapeActive((v) => !v)}
+                  />
+                )}
+
                 {/* 속도 기반 필압 (Velocity Pressure) */}
                 <div className="pt-1.5 border-t border-line/35 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -13461,6 +13622,26 @@ function StudioCuttoonEditor() {
             captureStep={captureTimelapseStep}
             onRecordingStart={handleTimelapseRecordingStart}
             onRecordingEnd={handleTimelapseRecordingEnd}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<StoryboardGridLoadingOverlay />}>
+        {storyboardGridOpen ? (
+          <StudioStoryboardGridPanel
+            open
+            onClose={() => setStoryboardGridOpen(false)}
+            pages={pages.map((p) => composeThumbPage(master, p))}
+            currentPageId={currentPageId}
+            dnd={pageDnd}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setStoryboardGridOpen(false);
+            }}
+            onAddPage={addPage}
+            onDuplicatePage={duplicatePage}
+            onDeletePage={deletePage}
+            canDelete={pages.length > 1}
           />
         ) : null}
       </Suspense>
