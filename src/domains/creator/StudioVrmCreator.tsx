@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, Loader2, Sparkles, UserRound, WandSparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, Search, Sparkles, UserRound, WandSparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { StudioVrmPoser } from "./StudioVrmPoser";
@@ -54,6 +54,9 @@ export function StudioVrmCreator({ open, initialDataUrl, onClose, onInsert }: St
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>([]);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  // 87개 베이스 캐릭터를 카테고리 메타데이터 없이 한 그리드로 늘어놓으면 스크롤이 매우 길어져,
+  // 이름 검색만으로 빠르게 좁힐 수 있게 한다(클라이언트 사이드 부분일치, 대소문자 무시).
+  const [query, setQuery] = useState("");
 
   // 모달이 (다시) 열릴 때마다 진입 상태를 리셋한다 — 재편집용 initialDataUrl이 있으면 바로 커스터마이즈로,
   // 없으면 항상 고르기부터. (호출부가 매번 새로 마운트하는 패턴이라도, open 토글만으로 재사용될 경우도 방어.)
@@ -61,6 +64,7 @@ export function StudioVrmCreator({ open, initialDataUrl, onClose, onInsert }: St
     if (!open) return;
     setStep(initialDataUrl ? "customize" : "pick");
     setPickedModelId(undefined);
+    setQuery("");
   }, [open, initialDataUrl]);
 
   useEffect(() => {
@@ -100,6 +104,11 @@ export function StudioVrmCreator({ open, initialDataUrl, onClose, onInsert }: St
     setPickedModelId(entry.id);
     setStep("customize");
   }
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const filteredEntries = trimmedQuery
+    ? libraryEntries.filter((entry) => entry.name.toLowerCase().includes(trimmedQuery))
+    : libraryEntries;
 
   if (!open) return null;
 
@@ -181,8 +190,25 @@ export function StudioVrmCreator({ open, initialDataUrl, onClose, onInsert }: St
               <p className="mt-3 text-sm font-semibold text-fg">베이스 캐릭터를 불러오는 중입니다.</p>
             </div>
           ) : (
+            <>
+              <label className="relative mb-3 block">
+                <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={`이름으로 찾기 (${libraryEntries.length}명)`}
+                  aria-label="베이스 캐릭터 이름 검색"
+                  className="h-10 w-full rounded-xl border border-line bg-card pl-8 pr-3 text-sm text-fg outline-none focus:border-accent/50"
+                />
+              </label>
+              {filteredEntries.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line/70 bg-card/40 px-3 py-6 text-center text-xs text-fg-3">
+                  &ldquo;{query}&rdquo;와(과) 일치하는 캐릭터가 없어요. 다른 이름으로 찾아보세요.
+                </p>
+              ) : (
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {libraryEntries.map((entry) => (
+              {filteredEntries.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
@@ -209,6 +235,8 @@ export function StudioVrmCreator({ open, initialDataUrl, onClose, onInsert }: St
                 </button>
               ))}
             </div>
+              )}
+            </>
           )}
         </div>
 
