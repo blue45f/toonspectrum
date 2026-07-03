@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Boxes,
   Music4,
+  PictureInPicture2,
   UserRound,
   Triangle,
   Hexagon,
@@ -77,6 +78,7 @@ import {
   Layers,
   Palette,
   Hand,
+  Film,
   History as HistoryIcon,
 } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
@@ -172,6 +174,7 @@ import {
   buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
+import { applyMagicWandRegionToSelection, MAGIC_WAND_TOLERANCE_DEFAULT, magicWandScanFromImage } from "./studio-magic-wand";
 import {
   MASTER_EDIT_GHOST_OPACITY,
   composeMasterRenderElements,
@@ -297,7 +300,9 @@ import {
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
+import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
+import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
@@ -317,6 +322,7 @@ import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
 import type { Light } from "./studio-light";
+import type { MotionCutImage } from "./studio-motion-export";
 import type { Outline } from "./studio-outline";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PhotoFilter } from "./studio-photo-filter";
@@ -432,10 +438,21 @@ const StudioVrmCreator = lazyRetry(
   () => import("./StudioVrmCreator").then((mod) => ({ default: mod.StudioVrmCreator })),
   "StudioVrmCreator"
 );
+const StudioTimelapsePanel = lazyRetry(
+  () => import("./StudioTimelapsePanel").then((mod) => ({ default: mod.StudioTimelapsePanel })),
+  "StudioTimelapsePanel"
+);
 const WorkFxPanel = lazyRetry(
   () => import("./WorkFxPanel").then((mod) => ({ default: mod.WorkFxPanel })),
   "WorkFxPanel"
 );
+function loadStudioReferencePanel() {
+  return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
+}
+const StudioReferencePanel = lazyRetry(loadStudioReferencePanel, "StudioReferencePanel");
+function preloadStudioReferencePanel(): void {
+  void loadStudioReferencePanel();
+}
 
 type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
 let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
@@ -816,7 +833,7 @@ interface SpeedLinesEl {
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
 export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -1687,6 +1704,17 @@ function Bg3DLoadingOverlay() {
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
         <span>3D 배경 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function TimelapseLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>타임랩스 도구를 여는 중</span>
       </div>
     </div>
   );
@@ -2674,8 +2702,8 @@ function StudioCuttoonEditor() {
     return () => cancelAnimationFrame(id);
   }, [mobileSheet, isMobile]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
-  const leftResize = useResizable({ initial: 176, min: 132, max: 320, edge: "right", storageKey: "studio:leftW" });
-  const rightResize = useResizable({ initial: 304, min: 248, max: 560, edge: "left", storageKey: "studio:rightW" });
+  const leftResize = useResizable({ initial: 176, min: 132, max: 360, edge: "right", storageKey: "studio:leftW" });
+  const rightResize = useResizable({ initial: 304, min: 248, max: 720, edge: "left", storageKey: "studio:rightW" });
   const [pageGradePanelOpen, setPageGradePanelOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
@@ -2873,6 +2901,10 @@ function StudioCuttoonEditor() {
   // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
   const [loadedWork, setLoadedWork] = useState<WorkDetail | null>(null);
   const [fxPanelOpen, setFxPanelOpen] = useState(false);
+  const [referencePanelOpen, setReferencePanelOpen] = useState(false);
+  const [timelapseOpen, setTimelapseOpen] = useState(false);
+  const [timelapseCapturing, setTimelapseCapturing] = useState(false);
+  const timelapseOriginalHiRef = useRef(0);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -3364,11 +3396,15 @@ function StudioCuttoonEditor() {
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [pixelSel, setPixelSel] = useState<PixelSelection | null>(null);
-  const [pixelTool, setPixelTool] = useState<SelectionToolKind | null>(null);
+  // "wand"는 이 파일에서만 쓰는 로컬 확장 — StudioSelectionToolsPanel의 activeTool prop은 여전히
+  // SelectionToolKind만 받으므로(export 자체는 안 건드림), 그 패널에 넘길 때는 wand를 null로 좁힌다.
+  const [pixelTool, setPixelTool] = useState<SelectionToolKind | "wand" | null>(null);
   const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
   const [pixelBusy, setPixelBusy] = useState(false);
   // 브러시 선택 반경(캔버스 표시 px) — 드래그 시작 시 요소 폭으로 나눠 정규화 반경으로 넘긴다.
   const [pixelBrushRadius, setPixelBrushRadius] = useState(SELECTION_BRUSH_RADIUS_DEFAULT);
+  const [wandTolerance, setWandTolerance] = useState(MAGIC_WAND_TOLERANCE_DEFAULT);
+  const pixelWandRunIdRef = useRef(0);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
   const pixelDragRef = useRef<{ elId: string; frame: SelectionFrame; drag: SelectionDragState } | null>(null);
@@ -3409,6 +3445,7 @@ function StudioCuttoonEditor() {
     setPixelDragPreview(null);
     setPixelSel(null);
     setPixelBusy(false);
+    pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
   }, [selectedId]);
   // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
   // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
@@ -4870,6 +4907,7 @@ function StudioCuttoonEditor() {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing || editing) return;
+      if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
       const mod = e.metaKey || e.ctrlKey;
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
@@ -5526,6 +5564,30 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // 매직완드 — 클릭 지점과 이어진(허용오차 이내) 영역을 윤곽 추적해 PixelSelection으로 변환한다.
+  // studio-flood-fill의 BFS 스캔을 studio-magic-wand가 재사용하되 "칠하기" 대신 "선택"을 만든다.
+  async function runMagicWandSelect(pos: { x: number; y: number }, frame: SelectionFrame) {
+    if (pixelBusy || selected?.type !== "image") return;
+    const target = selected;
+    const p = { x: (pos.x - frame.x) / frame.width, y: (pos.y - frame.y) / frame.height };
+    const runId = ++pixelWandRunIdRef.current;
+    setPixelBusy(true);
+    try {
+      const region = await magicWandScanFromImage(target.src, p.x, p.y, wandTolerance, {
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (runId !== pixelWandRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
+      setPixelSel((prev) => applyMagicWandRegionToSelection(prev, region, pixelCombine));
+    } catch (err) {
+      if (runId === pixelWandRunIdRef.current) {
+        setError(err instanceof Error ? err.message : "이 지점에서 선택할 영역을 찾지 못했어요.");
+      }
+    } finally {
+      if (runId === pixelWandRunIdRef.current) setPixelBusy(false);
+    }
+  }
+
   // ── 픽셀 선택 한정 조정 적용(밝기/색조/삭제) — 원본 픽셀에 굽는 파괴적 작업 ──
   // 원본 자연 해상도로 마스크를 래스터해 합성하고, 결과를 data URL 로 교체(patchEl)해
   // 일반 요소 편집과 같은 히스토리 1항목(⌘Z 복구 가능)으로 남긴다. 선택 영역은 유지되어
@@ -5667,6 +5729,10 @@ function StudioCuttoonEditor() {
         height: selected.height,
         rotation: selected.rotation,
       };
+      if (pixelTool === "wand") {
+        void runMagicWandSelect(pos, frame);
+        return;
+      }
       // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
       const brushRadiusNorm = pixelBrushRadius / Math.max(1, selected.width);
       const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame), brushRadiusNorm);
@@ -6436,6 +6502,28 @@ function StudioCuttoonEditor() {
     return captured;
   }
 
+  // 타임랩스 — pagesHi를 히스토리 인덱스로 스크러빙하며 각 단계를 캡처(handleSave와 동일한 렌더
+  // 대기 리듬). 녹화가 끝나면 원래 보고 있던 히스토리 위치로 되돌린다.
+  async function captureTimelapseStep(historyIndex: number, targetWidth: number): Promise<MotionCutImage> {
+    setPagesHi(historyIndex);
+    await new Promise((r) => setTimeout(r, 120));
+    const stage = stageRef.current;
+    if (!stage) throw new Error("캔버스를 찾을 수 없어요.");
+    const pixelRatio = targetWidth / CANVAS_W / effScale;
+    const canvas = stage.toCanvas({ pixelRatio });
+    return { source: canvas, width: canvas.width, height: canvas.height };
+  }
+
+  function handleTimelapseRecordingStart() {
+    timelapseOriginalHiRef.current = pagesHi;
+    setTimelapseCapturing(true);
+  }
+
+  function handleTimelapseRecordingEnd() {
+    setPagesHi(timelapseOriginalHiRef.current);
+    setTimelapseCapturing(false);
+  }
+
   // 현재 페이지 → 벡터 SVG 직렬화(요소 데이터 필요라 여기서 조립). 다운로드·고지는 내보내기 패널이 담당.
   function exportCurrentPageToSvg(): SvgExportResult {
     return exportPageToSvg({
@@ -6527,7 +6615,7 @@ function StudioCuttoonEditor() {
         maximized && "fixed inset-0 z-[60] overflow-y-auto bg-canvas"
       )}
     >
-    <Container size="wide" className={cn("py-3 lg:py-6", !(isFullscreen || maximized) && "xl:max-w-[1600px] 2xl:max-w-[1880px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
+    <Container size="wide" className={cn("py-3 lg:py-6", !(isFullscreen || maximized) && "xl:max-w-[1700px] 2xl:max-w-[2200px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
       <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4">
         <div>
           {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
@@ -6773,6 +6861,17 @@ function StudioCuttoonEditor() {
           title="3D 배경 블록아웃 만들기"
         >
           <Boxes size={14} /> 3D 배경
+        </button>
+        <button
+          type="button"
+          onClick={() => setReferencePanelOpen((v) => !v)}
+          onMouseEnter={preloadStudioReferencePanel}
+          onFocus={preloadStudioReferencePanel}
+          className={cn(toolBtn(referencePanelOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          aria-pressed={referencePanelOpen}
+          title="참고 이미지 패널 — 그리는 동안 옆에 이미지를 띄워두기"
+        >
+          <PictureInPicture2 size={14} /> 참고 이미지
         </button>
         <div ref={menu === "bgScene" ? menuRef : undefined} className="relative">
           <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} aria-haspopup="menu" aria-expanded={menu === "bgScene"} className={toolBtn(menu === "bgScene")}>
@@ -7076,6 +7175,19 @@ function StudioCuttoonEditor() {
               )}
             </div>
           )}
+        </div>
+        <div ref={menu === "palette" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "palette" ? null : "palette")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "palette"}
+            className={toolBtn(menu === "palette")}
+            title="색상 팔레트 저장·가져오기(.gpl)·내보내기"
+          >
+            <Palette size={14} /> 팔레트
+          </button>
+          {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
         </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
@@ -7576,6 +7688,16 @@ function StudioCuttoonEditor() {
           title="작업 내역 (히스토리)"
         >
           <HistoryIcon size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setTimelapseOpen(true)}
+          disabled={masterEditMode}
+          aria-label="타임랩스 녹화 (그리기 과정 영상화)"
+          className={cn(toolBtn(false), "disabled:opacity-40")}
+          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "타임랩스 녹화 (그리기 과정 영상화)"}
+        >
+          <Film size={14} />
         </button>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
         {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
@@ -11322,7 +11444,7 @@ function StudioCuttoonEditor() {
                   {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미/브러시로 선택해 부분 조정/삭제. */}
                   <StudioSelectionToolsPanel
                     selection={pixelSel}
-                    activeTool={pixelTool}
+                    activeTool={pixelTool === "wand" ? null : pixelTool}
                     combineMode={pixelCombine}
                     busy={pixelBusy}
                     brushRadius={pixelBrushRadius}
@@ -11334,6 +11456,13 @@ function StudioCuttoonEditor() {
                     onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
                     onClearSelection={() => setPixelSel(null)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
+                  />
+                  <StudioMagicWandPanel
+                    active={pixelTool === "wand"}
+                    tolerance={wandTolerance}
+                    busy={pixelBusy}
+                    onToggleActive={() => setPixelTool((t) => (t === "wand" ? null : "wand"))}
+                    onToleranceChange={setWandTolerance}
                   />
                   {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
                   <StudioCropPanel
@@ -12490,6 +12619,22 @@ function StudioCuttoonEditor() {
         ) : null}
       </Suspense>
 
+      <Suspense fallback={<TimelapseLoadingOverlay />}>
+        {timelapseOpen ? (
+          <StudioTimelapsePanel
+            open
+            onClose={() => setTimelapseOpen(false)}
+            pageId={activePage.id}
+            history={pagesHistory.slice(0, pagesHi + 1)}
+            title={title}
+            masterEditMode={masterEditMode}
+            captureStep={captureTimelapseStep}
+            onRecordingStart={handleTimelapseRecordingStart}
+            onRecordingEnd={handleTimelapseRecordingEnd}
+          />
+        ) : null}
+      </Suspense>
+
       {fxPanelOpen && loadedWork ? (
         <div
           aria-modal="true"
@@ -12518,6 +12663,10 @@ function StudioCuttoonEditor() {
           </div>
         </div>
       ) : null}
+
+      <Suspense fallback={null}>
+        {referencePanelOpen ? <StudioReferencePanel open onClose={() => setReferencePanelOpen(false)} /> : null}
+      </Suspense>
 
       {contextMenu.visible && (
         // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
