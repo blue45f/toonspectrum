@@ -120,6 +120,7 @@ import {
   stabilizePoint,
   STABILIZER_MAX,
 } from "./studio-brush";
+import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
@@ -346,6 +347,7 @@ import {
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBrandKitPanel } from "./StudioBrandKitPanel";
+import { StudioBubbleAnchorPanel } from "./StudioBubbleAnchorPanel";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -811,6 +813,15 @@ interface BubbleEl {
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   tailXRatio?: number;
   tailHeight?: number;
+  /** 꼬리 자동 부착 대상 요소 id. 설정되면 매 커밋마다 대상의 중심점을 향해 tailDirection/
+   *  tailXRatio/tailHeight 가 자동 재계산된다(studio-bubble-anchor.ts). 대상이 삭제되면
+   *  자동으로 지워진다(마지막 tail 값은 그대로 남아 수동 모드로 복귀). tailAnchorPoint 와
+   *  상호배타 — 패널이 하나를 설정할 때 다른 하나를 undefined 로 같이 patch 한다. */
+  tailAnchorId?: string;
+  /** 꼬리 자동 부착 대상 고정 좌표(페이지/캔버스 좌표, el.x/y 와 동일 원점). tailAnchorId 가
+   *  없을 때만 의미가 있다 — 말풍선이 움직이면 이 좌표를 향한 각도가 재계산된다(좌표 자체는
+   *  고정, 저절로 움직이지 않는다). */
+  tailAnchorPoint?: { x: number; y: number };
   stroke?: string;
   strokeWidth?: number;
   shadowColor?: string;
@@ -1017,6 +1028,39 @@ function elBounds(el: El): { x: number; y: number; w: number; h: number } {
   if (el.type === "text") return { x: el.x, y: el.y, w: el.width, h: el.fontSize * 1.4 };
   if (el.type === "sticker") return { x: el.x, y: el.y, w: el.fontSize, h: el.fontSize };
   return { x: el.x, y: el.y, w: el.width, h: el.height }; // image · bubble · frame
+}
+
+// 부착된 말풍선(tailAnchorId/tailAnchorPoint)의 꼬리 방향/비율/길이를 매 커밋마다 다시
+// 계산한다. commit()/commitCoalesced() 가 pagesHistory 에 넣기 직전(+ masterEditMode 분기
+// 이전)의 nextElements 에 적용한다 — patchEl 뿐 아니라 정렬/분배/넛지/복제/클립삽입처럼
+// commit()/commitCoalesced() 를 직접 호출하는 모든 경로를 한 곳에서 커버한다(따로따로
+// 훅을 심을 필요 없음).
+//
+// "대상 삭제됨"과 "말풍선 bounds 일시적 비정상(리사이즈 중 등)"을 구분해야 하므로
+// resolveAnchorTargetPoint 와 computeBubbleAnchorTail 을 따로 호출한다(전자가 null이면
+// tailAnchorId 를 지우고 마지막 tail 값은 보존, 후자가 null이면 이번 커밋은 건드리지
+// 않고 다음 커밋에 재시도).
+function applyBubbleAnchors(nextElements: El[]): El[] {
+  const boundsById = new Map<string, AnchorTargetBounds>();
+  for (const e of nextElements) boundsById.set(e.id, elBounds(e));
+
+  let changed = false;
+  const out = nextElements.map((e) => {
+    if (e.type !== "bubble" || (!e.tailAnchorId && !e.tailAnchorPoint)) return e;
+
+    const point = resolveAnchorTargetPoint(e, (id) => (id === e.id ? null : (boundsById.get(id) ?? null)));
+    if (!point) {
+      // tailAnchorId 가 가리키는 대상이 사라짐(또는 자기 자신을 가리키는 방어 케이스) — 해제.
+      if (!e.tailAnchorId) return e; // tailAnchorPoint 만 있으면 point 는 항상 성공하므로 여기 안 옴.
+      changed = true;
+      return { ...e, tailAnchorId: undefined } as El;
+    }
+    const patch = computeBubbleAnchorTail(e, point);
+    if (!patch) return e; // 말풍선 bounds 일시 비정상 — 건드리지 않고 다음 커밋 재시도.
+    changed = true;
+    return { ...e, ...patch } as El;
+  });
+  return changed ? out : nextElements;
 }
 
 function studioElementIdOf(node: Konva.Node | null): string | null {
@@ -3010,6 +3054,7 @@ function StudioCuttoonEditor() {
   const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
   const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
   const [eyedropperActive, setEyedropperActive] = useState(false);
+  const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -4418,12 +4463,13 @@ function StudioCuttoonEditor() {
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
   function commit(nextElements: El[]) {
+    const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
-      setMaster((m) => withMasterElements(m, nextElements));
+      setMaster((m) => withMasterElements(m, resolved));
       return;
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
     const h = pagesHistory.slice(0, pagesHi + 1);
     h.push(nextPages);
     setPagesHistory(h);
@@ -4431,12 +4477,13 @@ function StudioCuttoonEditor() {
   }
   // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
   function commitCoalesced(nextElements: El[], key: string) {
+    const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       // 마스터 편집은 히스토리 밖이라 합치기(coalesce) 개념이 없다 — 마스터로 바로 커밋.
-      setMaster((m) => withMasterElements(m, nextElements));
+      setMaster((m) => withMasterElements(m, resolved));
       return;
     }
-    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: nextElements } : p));
+    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
       setPagesHistory((h) => {
         const c = h.slice();
@@ -4461,6 +4508,14 @@ function StudioCuttoonEditor() {
   }
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+  }
+  function toggleBubbleAnchorPick() {
+    setBubbleAnchorPickActive((v) => !v);
+  }
+  function detachBubbleAnchor() {
+    if (!selected || selected.type !== "bubble") return;
+    setBubbleAnchorPickActive(false);
+    patchEl(selected.id, { tailAnchorId: undefined, tailAnchorPoint: undefined } as Partial<El>);
   }
   // 원근자 — 소실점은 undo/redo(commit) 대상이 아니다(가이드 도구 상태, 그리기 결과물이 아님).
   function addVanishingPointHandler() {
@@ -6065,6 +6120,23 @@ function StudioCuttoonEditor() {
         if (hex) setColor(hex);
       }
       if (eyedropperActive) setEyedropperActive(false);
+      return;
+    }
+    // 말풍선 꼬리 자동 부착 — 대상 픽커 무장 중: 다음 클릭으로 부착 대상(요소 또는 빈 좌표)을
+    // 고른다. 스포이드와 동일하게 항상 1회성으로 해제.
+    if (bubbleAnchorPickActive) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      setBubbleAnchorPickActive(false);
+      if (pos && selected?.type === "bubble") {
+        const clickedId = studioElementIdOf(e.target);
+        if (clickedId && clickedId === selected.id) {
+          setError("말풍선 자기 자신은 부착 대상으로 고를 수 없어요.");
+        } else if (clickedId) {
+          patchEl(selected.id, { tailAnchorId: clickedId, tailAnchorPoint: undefined } as Partial<El>);
+        } else {
+          patchEl(selected.id, { tailAnchorPoint: { x: pos.x, y: pos.y }, tailAnchorId: undefined } as Partial<El>);
+        }
+      }
       return;
     }
     // 크롭 모드 무장 중: 스테이지 드래그를 크롭 rect 조작(핸들 리사이즈/이동)으로 가로챈다.
@@ -11057,8 +11129,35 @@ function StudioCuttoonEditor() {
                 </div>
               )}
               {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
+                <StudioBubbleAnchorPanel
+                  anchorId={selected.tailAnchorId ?? null}
+                  anchorPoint={selected.tailAnchorPoint ?? null}
+                  anchorTargetLabel={
+                    selected.tailAnchorId
+                      ? (() => {
+                          const t = elementById.get(selected.tailAnchorId);
+                          return t ? elementLabel(t) : null;
+                        })()
+                      : null
+                  }
+                  pickActive={bubbleAnchorPickActive}
+                  onTogglePick={toggleBubbleAnchorPick}
+                  onDetach={detachBubbleAnchor}
+                />
+              )}
+              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
                 <div className="mt-3 space-y-2 border-t border-line/40 pt-2.5">
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  {!!(selected.tailAnchorId || selected.tailAnchorPoint) && (
+                    <p className="text-[0.68rem] text-fg-3">
+                      자동 부착 중에는 위 '꼬리 자동 부착' 패널에서 해제해야 조절할 수 있어요.
+                    </p>
+                  )}
+                  <label
+                    className={cn(
+                      "flex items-center justify-between gap-2 text-sm text-fg-2",
+                      !!(selected.tailAnchorId || selected.tailAnchorPoint) && "pointer-events-none opacity-40"
+                    )}
+                  >
                     {(selected.tailDirection === "left" || selected.tailDirection === "right") ? "꼬리 세로 위치" : "꼬리 가로 위치"}
                     <span className="flex items-center gap-1.5">
                       <input
@@ -11067,13 +11166,19 @@ function StudioCuttoonEditor() {
                         max={0.9}
                         step={0.05}
                         value={selected.tailXRatio ?? 0.35}
+                        disabled={!!(selected.tailAnchorId || selected.tailAnchorPoint)}
                         onChange={(e) => patchEl(selected.id, { tailXRatio: Number(e.target.value) } as Partial<El>)}
                         className="w-24 accent-accent cursor-pointer"
                       />
                       <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.tailXRatio ?? 0.35) * 100)}%</span>
                     </span>
                   </label>
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  <label
+                    className={cn(
+                      "flex items-center justify-between gap-2 text-sm text-fg-2",
+                      !!(selected.tailAnchorId || selected.tailAnchorPoint) && "pointer-events-none opacity-40"
+                    )}
+                  >
                     꼬리 길이
                     <span className="flex items-center gap-1.5">
                       <input
@@ -11082,6 +11187,7 @@ function StudioCuttoonEditor() {
                         max={80}
                         step={2}
                         value={selected.tailHeight ?? 30}
+                        disabled={!!(selected.tailAnchorId || selected.tailAnchorPoint)}
                         onChange={(e) => patchEl(selected.id, { tailHeight: Number(e.target.value) } as Partial<El>)}
                         className="w-24 accent-accent cursor-pointer"
                       />
