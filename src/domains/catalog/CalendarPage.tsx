@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, Database, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, CalendarPlus, Database, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 
@@ -191,14 +191,9 @@ export function CalendarPage() {
                 </span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={reload}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
-            >
-              <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-              갱신
-            </button>
+            {/* 연재 캘린더는 커밋된 카탈로그 스냅샷(정적 calendar.json)에서 파생된다 — 런타임 재수집이
+                없어 수동 "갱신"은 동일 데이터를 다시 읽을 뿐이라 오해를 줘 제거했다. 로드 실패 시
+                재시도는 아래 ErrorState 의 onRetry(reload) 로 제공한다. */}
           </div>
         </div>
 
