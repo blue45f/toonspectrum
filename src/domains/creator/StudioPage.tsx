@@ -20,6 +20,7 @@ import {
   ArrowUpToLine,
   ArrowRight,
   Boxes,
+  UserRound,
   Triangle,
   Hexagon,
   ChevronDown,
@@ -77,7 +78,7 @@ import {
   Hand,
   History as HistoryIcon,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -343,6 +344,7 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
+import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
@@ -350,57 +352,83 @@ import { useSession } from "@/src/compat/auth-session-store";
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
 
-const StudioImageAdjustmentsPanel = lazy(() =>
-  import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel }))
+// lazyRetry: 이 세션 안에 배포가 잦으면 이미 열린 스튜디오 탭의 lazy import가 옛 청크 해시로
+// 404 나기 쉽다(예: "3D 배경 삽입 시 오류") — 1회 자동 새로고침으로 복구한다(lib/lazy-retry.ts).
+const StudioImageAdjustmentsPanel = lazyRetry(
+  () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
+  "StudioImageAdjustmentsPanel"
 );
-const StudioPageGradePanel = lazy(() =>
-  import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel }))
+const StudioPageGradePanel = lazyRetry(
+  () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
+  "StudioPageGradePanel"
 );
-const StudioBubbleStylePresetPanel = lazy(() =>
-  import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel }))
+const StudioBubbleStylePresetPanel = lazyRetry(
+  () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
+  "StudioBubbleStylePresetPanel"
 );
-const StudioDialogueBatchPanel = lazy(() =>
-  import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel }))
+const StudioDialogueBatchPanel = lazyRetry(
+  () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
+  "StudioDialogueBatchPanel"
 );
-const StudioHistoryPanel = lazy(() =>
-  import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel }))
+const StudioHistoryPanel = lazyRetry(
+  () => import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel })),
+  "StudioHistoryPanel"
 );
-const StudioMasterPagePanel = lazy(() =>
-  import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel }))
+const StudioMasterPagePanel = lazyRetry(
+  () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
+  "StudioMasterPagePanel"
 );
-const StudioShortcutsHelp = lazy(() =>
-  import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp }))
+const StudioShortcutsHelp = lazyRetry(
+  () => import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp })),
+  "StudioShortcutsHelp"
 );
-const StudioStickerGrid = lazy(() =>
-  import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid }))
+const StudioStickerGrid = lazyRetry(
+  () => import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid })),
+  "StudioStickerGrid"
 );
-const StudioTextEffectPanel = lazy(() =>
-  import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel }))
+const StudioTextEffectPanel = lazyRetry(
+  () => import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
+  "StudioTextEffectPanel"
 );
-const StudioGradientEnginePanel = lazy(() =>
-  import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel }))
+const StudioGradientEnginePanel = lazyRetry(
+  () => import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel })),
+  "StudioGradientEnginePanel"
 );
-const StudioPatternFillPanel = lazy(() =>
-  import("./StudioPatternFillPanel").then((mod) => ({ default: mod.StudioPatternFillPanel }))
+const StudioPatternFillPanel = lazyRetry(
+  () => import("./StudioPatternFillPanel").then((mod) => ({ default: mod.StudioPatternFillPanel })),
+  "StudioPatternFillPanel"
 );
-const StudioTextPathPanel = lazy(() =>
-  import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel }))
+const StudioTextPathPanel = lazyRetry(
+  () => import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel })),
+  "StudioTextPathPanel"
 );
-const StudioTonePanel = lazy(() =>
-  import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel }))
+const StudioTonePanel = lazyRetry(
+  () => import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel })),
+  "StudioTonePanel"
 );
-const StudioStrokeShapePanel = lazy(() =>
-  import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel }))
+const StudioStrokeShapePanel = lazyRetry(
+  () => import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel })),
+  "StudioStrokeShapePanel"
 );
-const StudioSelectionToolsPanel = lazy(() =>
-  import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel }))
+const StudioSelectionToolsPanel = lazyRetry(
+  () => import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel })),
+  "StudioSelectionToolsPanel"
 );
-const StudioCropPanel = lazy(() =>
-  import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel }))
+const StudioCropPanel = lazyRetry(
+  () => import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel })),
+  "StudioCropPanel"
 );
-const StudioVrmPoser = lazy(() => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })));
-const StudioBackground3D = lazy(() =>
-  import("./StudioBackground3D").then((mod) => ({ default: mod.StudioBackground3D }))
+const StudioVrmPoser = lazyRetry(
+  () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
+  "StudioVrmPoser"
+);
+const StudioBackground3D = lazyRetry(
+  () => import("./StudioBackground3D").then((mod) => ({ default: mod.StudioBackground3D })),
+  "StudioBackground3D"
+);
+const StudioVrmCreator = lazyRetry(
+  () => import("./StudioVrmCreator").then((mod) => ({ default: mod.StudioVrmCreator })),
+  "StudioVrmCreator"
 );
 
 type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
@@ -413,7 +441,7 @@ function loadStudioAssetMenuPanel(): Promise<StudioAssetMenuPanelModule> {
   return studioAssetMenuPanelPromise;
 }
 
-const StudioAssetMenuPanel = lazy(loadStudioAssetMenuPanel);
+const StudioAssetMenuPanel = lazyRetry(loadStudioAssetMenuPanel, "StudioAssetMenuPanel");
 
 function preloadStudioAssetMenuPanel(): void {
   void loadStudioAssetMenuPanel();
@@ -429,7 +457,7 @@ function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
   return studioExportMenuPanelPromise;
 }
 
-const StudioExportMenuPanel = lazy(loadStudioExportMenuPanel);
+const StudioExportMenuPanel = lazyRetry(loadStudioExportMenuPanel, "StudioExportMenuPanel");
 
 function preloadStudioExportMenuPanel(): void {
   void loadStudioExportMenuPanel();
@@ -460,7 +488,7 @@ function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
   return studioColorPopoverPromise;
 }
 
-const StudioColorPopoverContent = lazy(loadStudioColorPopover);
+const StudioColorPopoverContent = lazyRetry(loadStudioColorPopover, "StudioColorPopover");
 
 function preloadStudioColorPopover(): void {
   void loadStudioColorPopover();
@@ -2828,6 +2856,7 @@ function StudioCuttoonEditor() {
   const [bg3dOpen, setBg3dOpen] = useState(false);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
+  const [vrmCreatorOpen, setVrmCreatorOpen] = useState(false);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -6700,6 +6729,14 @@ function StudioCuttoonEditor() {
           title="3D 캐릭터 생성 및 포즈 설정"
         >
           <Sparkles size={14} /> 3D 캐릭터
+        </button>
+        <button
+          type="button"
+          onClick={() => setVrmCreatorOpen(true)}
+          className={cn(toolBtn(vrmCreatorOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          title="무료 베이스 캐릭터를 골라 색상·의상·체형을 커스터마이즈해 내 캐릭터 만들기"
+        >
+          <UserRound size={14} /> 캐릭터 만들기
         </button>
         <button
           type="button"
@@ -12411,6 +12448,16 @@ function StudioCuttoonEditor() {
                 addRenderedImage(src, w, h);
               }
             }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<PoserLoadingOverlay />}>
+        {vrmCreatorOpen ? (
+          <StudioVrmCreator
+            open
+            onClose={() => setVrmCreatorOpen(false)}
+            onInsert={(src, w, h) => addRenderedImage(src, w, h)}
           />
         ) : null}
       </Suspense>
