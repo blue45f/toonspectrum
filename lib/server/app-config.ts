@@ -56,16 +56,38 @@ export interface AppConfig {
   // 카카오/네이버 로그인 노출. 기본 false(off) — 관리자가 켜야 로그인 모달에 표시된다.
   authKakao: boolean;
   authNaver: boolean;
+  // 콘텐츠 노출 킬스위치 — 법적 리스크(저작권·크롤 성과도용) 있는 정보/기능을 관리자가 즉시 끈다.
+  // 기본 true(노출) — 현재 동작 보존. 권리자 신고·정책 변화 시 콘솔에서 끄면 클라이언트가 즉시 숨긴다.
+  // (표지는 COVER_IMAGE_POLICY 환경변수가 빌드·프록시 단의 하드 킬로 병행 존재한다.)
+  showCovers: boolean; // 표지 이미지
+  showPricing: boolean; // 플랫폼별 가격 비교(추정)
+  showAvailability: boolean; // 플랫폼 유통·유료무료 "어디서 봐"
+  showSynopsis: boolean; // 시놉시스 원문
+  showRelatedInfo: boolean; // 관련 정보(크롤 링크: 유튜브·뉴스·위키)
 }
 
-const DEFAULTS: AppConfig = { monetizationEnabled: false, authKakao: false, authNaver: false };
+const DEFAULTS: AppConfig = {
+  monetizationEnabled: false,
+  authKakao: false,
+  authNaver: false,
+  showCovers: true,
+  showPricing: true,
+  showAvailability: true,
+  showSynopsis: true,
+  showRelatedInfo: true,
+};
 const CONFIG_KEY = "config";
+
+const CONTENT_FLAGS = ["showCovers", "showPricing", "showAvailability", "showSynopsis", "showRelatedInfo"] as const;
 
 function sanitize(patch: Partial<AppConfig>): Partial<AppConfig> {
   const out: Partial<AppConfig> = {};
   if (typeof patch.monetizationEnabled === "boolean") out.monetizationEnabled = patch.monetizationEnabled;
   if (typeof patch.authKakao === "boolean") out.authKakao = patch.authKakao;
   if (typeof patch.authNaver === "boolean") out.authNaver = patch.authNaver;
+  for (const key of CONTENT_FLAGS) {
+    if (typeof patch[key] === "boolean") out[key] = patch[key];
+  }
   return out;
 }
 

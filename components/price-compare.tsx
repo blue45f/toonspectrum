@@ -6,6 +6,7 @@ import type { Availability } from "@/lib/types";
 
 import { comparePlatformCosts, formatWon, type PlatformCost } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
+import { useAppConfig } from "@/src/hooks/use-app-config";
 
 
 // 플랫폼간 가격 비교 — 같은 작품의 보기/소장 비용을 플랫폼별로 비교(추정·예시).
@@ -13,6 +14,9 @@ import { cn } from "@/lib/utils";
 // 반응형은 구조적(DESIGN.md): 좁은 폭(<sm)에선 다열 표가 글자단위로 붕괴하므로 표를 버리고
 // "플랫폼당 한 카드"(브랜드 도트+이름 한 줄 + 보기/소장 칩)로 재구성한다. sm+ 에선 표 레이아웃.
 export function PriceCompare({ availability }: { availability: Availability[] }) {
+  // 가격 추정은 크롤 유통 데이터 기반이라 법적 리스크가 있어 관리자 킬스위치로 끌 수 있다.
+  const { showPricing } = useAppConfig();
+  if (!showPricing) return null;
   if (!availability || availability.length < 1) return null;
   const rows = comparePlatformCosts(availability);
   const multi = rows.length > 1;

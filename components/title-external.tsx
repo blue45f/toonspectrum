@@ -21,6 +21,7 @@ import {
   type RelatedInfoItem,
 } from "@/lib/title-related-info";
 import { cn } from "@/lib/utils";
+import { useAppConfig } from "@/src/hooks/use-app-config";
 
 const CATEGORIES: RelatedCategory[] = ["all", "youtube", "blog", "news", "wiki", "interview"];
 
@@ -165,6 +166,8 @@ const RelatedInfoCard = memo(function RelatedInfoCard({ item }: RelatedInfoCardP
 });
 
 export function TitleExternal({ title }: { title: Title }) {
+  // 관련 정보는 크롤 링크(유튜브·뉴스·위키) 기반이라 관리자 킬스위치로 끌 수 있다.
+  const { showRelatedInfo } = useAppConfig();
   const [activeCategory, setActiveCategory] = useState<RelatedCategory>("all");
 
   const items = useMemo(() => getRelatedInfoForTitle(title), [title]);
@@ -181,6 +184,8 @@ export function TitleExternal({ title }: { title: Title }) {
     if (activeCategory === "all") return items;
     return items.filter((it) => it.category === activeCategory);
   }, [items, activeCategory]);
+
+  if (!showRelatedInfo) return null;
 
   return (
     <Section

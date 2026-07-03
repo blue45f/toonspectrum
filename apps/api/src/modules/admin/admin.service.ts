@@ -154,6 +154,12 @@ interface AppConfigPayload {
   monetizationEnabled?: unknown;
   authKakao?: unknown;
   authNaver?: unknown;
+  // 콘텐츠 킬스위치(법적 리스크 기능 on/off).
+  showCovers?: unknown;
+  showPricing?: unknown;
+  showAvailability?: unknown;
+  showSynopsis?: unknown;
+  showRelatedInfo?: unknown;
 }
 
 interface PlanPayload {
@@ -323,10 +329,20 @@ export class AdminService {
 
   async setConfig(userId: string, body: AppConfigPayload) {
     await requireAdminUser(userId);
-    const patch: { monetizationEnabled?: boolean; authKakao?: boolean; authNaver?: boolean } = {};
-    if ("monetizationEnabled" in body) patch.monetizationEnabled = !!body.monetizationEnabled;
-    if ("authKakao" in body) patch.authKakao = !!body.authKakao;
-    if ("authNaver" in body) patch.authNaver = !!body.authNaver;
+    const BOOL_KEYS = [
+      "monetizationEnabled",
+      "authKakao",
+      "authNaver",
+      "showCovers",
+      "showPricing",
+      "showAvailability",
+      "showSynopsis",
+      "showRelatedInfo",
+    ] as const;
+    const patch: Partial<Record<(typeof BOOL_KEYS)[number], boolean>> = {};
+    for (const key of BOOL_KEYS) {
+      if (key in body) patch[key] = !!body[key];
+    }
     return setAppConfig(patch);
   }
 

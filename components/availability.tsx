@@ -8,6 +8,7 @@ import type { Availability } from "@/lib/types";
 
 import { cx } from "@/lib/cx";
 import { PLATFORMS, PRICING_FULL } from "@/lib/platforms";
+import { useAppConfig } from "@/src/hooks/use-app-config";
 
 const PRICING_ICON = {
   free: Gift,
@@ -26,6 +27,8 @@ export function AvailabilityDots({
   className?: string;
   max?: number;
 }) {
+  const { showAvailability } = useAppConfig();
+  if (!showAvailability) return null;
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
@@ -60,6 +63,8 @@ export function PlatformTags({
   max?: number;
   className?: string;
 }) {
+  const { showAvailability } = useAppConfig();
+  if (!showAvailability) return null;
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
@@ -95,6 +100,8 @@ export function AvailabilityRouter({
   availability: Availability[];
   className?: string;
 }) {
+  const { showAvailability } = useAppConfig();
+  if (!showAvailability) return null;
   // 무료/기다무 우선 정렬
   const order: Record<string, number> = { free: 0, "wait-free": 1, subscription: 2, paid: 3 };
   const sorted = [...availability].sort((a, b) => order[a.pricing] - order[b.pricing]);

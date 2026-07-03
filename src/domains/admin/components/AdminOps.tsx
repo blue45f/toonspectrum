@@ -1,4 +1,4 @@
-import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle } from "lucide-react";
+import { DollarSign, RefreshCw, Database, Play, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { adminFetch, formatNum, type AdminApiError } from "./admin-client";
@@ -10,7 +10,21 @@ import { api, getApiErrorMessage, httpStatus } from "@/src/infrastructure/api";
 
 interface AppConfig {
   monetizationEnabled: boolean;
+  showCovers: boolean;
+  showPricing: boolean;
+  showAvailability: boolean;
+  showSynopsis: boolean;
+  showRelatedInfo: boolean;
 }
+
+// 콘텐츠 노출 킬스위치 — 법적 리스크(저작권·크롤 성과도용) 있는 기능을 즉시 끈다. 기본 ON(노출).
+const CONTENT_KILL_SWITCHES = [
+  { key: "showCovers", label: "표지 이미지", desc: "저작권 · 끄면 자체 타이포 커버만 노출" },
+  { key: "showPricing", label: "가격 비교(추정)", desc: "크롤 유통 기반 · 끄면 숨김" },
+  { key: "showAvailability", label: "플랫폼 유통 '어디서 봐'", desc: "크롤 유통·유료무료 · 끄면 숨김" },
+  { key: "showSynopsis", label: "시놉시스 원문", desc: "저작권(창작표현) · 끄면 숨김" },
+  { key: "showRelatedInfo", label: "관련 정보(크롤 링크)", desc: "유튜브·뉴스·위키 · 끄면 숨김" },
+] as const satisfies ReadonlyArray<{ key: keyof AppConfig; label: string; desc: string }>;
 
 interface IngestRunResult {
   runId: string;
@@ -183,6 +197,90 @@ function MonetizationToggle({ uid }: { uid: string }) {
         </button>
       </div>
       <p className="text-xs leading-relaxed text-fg-3">OFF = 전 기능 무료·광고 없음 (초기 단계 권장)</p>
+    </div>
+  );
+}
+
+// 콘텐츠 킬스위치 — 법적 리스크 있는 기능을 항목별로 즉시 on/off. 끄면 클라이언트가 바로 숨긴다(재배포 X).
+function ContentKillSwitches({ uid }: { uid: string }) {
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    setConfig(null);
+    adminFetch<AppConfig>("/config", uid)
+      .then((c) => alive && setConfig(c))
+      .catch((e: AdminApiError) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [uid]);
+
+  const toggle = async (key: keyof AppConfig) => {
+    if (!config || savingKey) return;
+    const next = !config[key];
+    setSavingKey(key);
+    setError(null);
+    try {
+      const updated = await adminFetch<AppConfig>("/config", uid, {
+        method: "POST",
+        body: JSON.stringify({ [key]: next }),
+      });
+      setConfig(updated ?? { ...config, [key]: next });
+    } catch (e) {
+      setError((e as AdminApiError).message);
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  if (error) return <AdminNotice title="설정을 불러오지 못했어요" body={error} />;
+  if (!config) return <AdminSpinner />;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {CONTENT_KILL_SWITCHES.map(({ key, label, desc }) => {
+        const on = config[key] !== false;
+        return (
+          <div
+            key={key}
+            className="flex items-center justify-between gap-4 rounded-xl border border-line bg-panel px-4 py-3"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-fg">{label}</p>
+              <p className="mt-0.5 text-xs text-fg-3">
+                {on ? "노출 중" : "숨김"} · {desc}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={on}
+              aria-label={`${label} 노출 토글`}
+              onClick={() => void toggle(key)}
+              disabled={savingKey !== null}
+              className={[
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
+                on ? "bg-accent" : "bg-raised",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "inline-block size-5 rounded-full bg-canvas shadow transition-transform",
+                  on ? "translate-x-[1.375rem]" : "translate-x-0.5",
+                ].join(" ")}
+              />
+            </button>
+          </div>
+        );
+      })}
+      <p className="mt-1 text-xs leading-relaxed text-fg-3">
+        끄면 사이트에서 즉시 숨겨집니다(재배포 불필요). 권리자 신고·정책 변화 시 대응용입니다. 표지는
+        환경변수 <code className="text-fg-2">COVER_IMAGE_POLICY=off</code> 가 빌드·프록시 단의 하드 킬로 병행합니다.
+      </p>
     </div>
   );
 }
@@ -442,6 +540,14 @@ export function AdminOps({ uid }: { uid: string }) {
         description="앱 전역의 수익화(광고·유료 기능) 노출 여부를 켜고 끕니다."
       >
         <MonetizationToggle uid={uid} />
+      </Section>
+
+      <Section
+        icon={<ShieldAlert size={15} />}
+        title="콘텐츠 킬스위치 (법적 리스크)"
+        description="저작권·크롤(성과도용) 리스크가 있는 정보/기능을 항목별로 즉시 켜고 끕니다. 끄면 재배포 없이 바로 숨겨집니다."
+      >
+        <ContentKillSwitches uid={uid} />
       </Section>
 
       <Section

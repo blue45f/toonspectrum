@@ -35,6 +35,7 @@ import { formatCount } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
 import { NotFoundPage } from "@/src/components/NotFoundPage";
+import { useAppConfig } from "@/src/hooks/use-app-config";
 import { useDocumentTitle, useMetaDescription } from "@/src/hooks/use-document-title";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 
@@ -60,6 +61,8 @@ export function TitleDetailPage() {
     "작품 상세 데이터를 불러오지 못했습니다."
   );
   useDocumentTitle(data?.title?.title);
+  // 시놉시스 원문은 저작권 리스크가 있어 관리자 킬스위치로 끌 수 있다(끄면 문단 자체를 숨김).
+  const { showSynopsis } = useAppConfig();
 
   const t = data?.title;
   const metaDesc = t
@@ -211,7 +214,9 @@ export function TitleDetailPage() {
             </div>
           </div>
 
-          <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+          {showSynopsis && title.synopsis && (
+            <p className="text-pretty text-[0.95rem] leading-relaxed text-fg-2">{title.synopsis}</p>
+          )}
 
           {title.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
