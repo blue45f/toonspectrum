@@ -7654,26 +7654,24 @@ function StudioCuttoonEditor() {
                 <div
                   key={p.id}
                   data-testid="studio-page-item"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${pageDisplayName(p, idx)} 선택`}
-                  aria-pressed={isActive}
-                  onClick={() => setCurrentPageId(p.id)}
-                  onKeyDown={(e) => {
-                    // 카드 자체에 포커스가 있을 때만 활성화(중첩 버튼의 키 입력은 방해하지 않음).
-                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-                      e.preventDefault();
-                      setCurrentPageId(p.id);
-                    }
-                  }}
                   {...pageDnd.itemProps(idx)}
                   title="드래그하여 순서 변경"
                   className={cn(
-                    "relative flex w-full cursor-pointer flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
+                    "relative flex w-full flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
                     isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
                     pageDnd.dragIndex === idx && "opacity-50"
                   )}
                 >
+                  {/* 페이지 선택 — 접근성: 카드를 role=button 으로 만들면 내부 액션 버튼(편집·이동)이
+                      중첩 인터랙티브가 되어 위반이므로, 카드 전체를 덮는 "늘린 버튼"으로 선택을 처리하고
+                      액션 버튼은 z-index 로 그 위에 띄운다. 카드 div 는 드래그 정렬(draggable) 컨테이너로 유지. */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPageId(p.id)}
+                    aria-label={`${pageDisplayName(p, idx)} 선택`}
+                    aria-pressed={isActive}
+                    className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  />
                   {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
                   {dropIndicator && (
                     <span
@@ -7688,7 +7686,8 @@ function StudioCuttoonEditor() {
                     <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
                       {pageDisplayName(p, idx)}
                     </span>
-                    <div className="flex items-center gap-0.5">
+                    {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
+                    <div className="relative z-20 flex items-center gap-0.5">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -7711,6 +7710,7 @@ function StudioCuttoonEditor() {
                         disabled={idx === 0}
                         className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                         title="위로 이동"
+                        aria-label="위로 이동"
                       >
                         <ChevronUp size={10} />
                       </button>
@@ -7723,6 +7723,7 @@ function StudioCuttoonEditor() {
                         disabled={idx === pages.length - 1}
                         className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                         title="아래로 이동"
+                        aria-label="아래로 이동"
                       >
                         <ChevronDown size={10} />
                       </button>
@@ -7735,8 +7736,9 @@ function StudioCuttoonEditor() {
                         disabled={idx === 0}
                         className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                         title="맨 위로"
+                        aria-label="맨 위로 이동"
                       >
-                        ⇧
+                        <span aria-hidden="true">⇧</span>
                       </button>
                       <button
                         type="button"
@@ -7747,8 +7749,9 @@ function StudioCuttoonEditor() {
                         disabled={idx === pages.length - 1}
                         className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                         title="맨 아래로"
+                        aria-label="맨 아래로 이동"
                       >
-                        ⇩
+                        <span aria-hidden="true">⇩</span>
                       </button>
                     </div>
                   </div>
@@ -7756,7 +7759,8 @@ function StudioCuttoonEditor() {
                       마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
                   <StudioPageThumbnail page={composeThumbPage(master, p)} />
                   {metaEditPageId === p.id ? (
-                    <div className="flex flex-col gap-1 pt-1">
+                    // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
+                    <div className="relative z-20 flex flex-col gap-1 pt-1">
                       <input
                         // eslint-disable-next-line jsx-a11y/no-autofocus -- 연필 버튼 클릭으로만 열리는 인라인 편집 — 열릴 때 이름란 포커스가 올바른 패턴(기존 텍스트 편집 모달과 동일)
                         autoFocus
@@ -8032,9 +8036,14 @@ function StudioCuttoonEditor() {
           )}
 
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
-          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며, 실제 상호작용은 내부 Konva Stage가 담당하고 키보드 패닝은 document keydown(Space)에서 처리한다 */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
           <div
             ref={wrapRef}
+            // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+            tabIndex={0}
+            role="group"
+            aria-label="작업 캔버스 — 포커스 후 방향키로 스크롤"
             onMouseDown={onWrapMouseDown}
             onMouseMove={onWrapMouseMove}
             onMouseUp={onWrapMouseUp}
@@ -8044,7 +8053,7 @@ function StudioCuttoonEditor() {
             className={cn(
               // 모바일: 상단 도구막대 1줄 + 하단 도구막대만 차감해 캔버스를 최대한 키운다(작은 폰에서 '그릴 면적' 우선).
               // 데스크톱(lg): 좌/우 패널·줌 컨트롤이 있는 기존 레이아웃이라 21rem 차감 유지.
-              "max-h-[calc(100dvh-13rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] transition-all lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              "max-h-[calc(100dvh-13rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
