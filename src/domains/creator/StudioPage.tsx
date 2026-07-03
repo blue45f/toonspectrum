@@ -20,6 +20,7 @@ import {
   ArrowUpToLine,
   ArrowRight,
   Boxes,
+  Music4,
   UserRound,
   Triangle,
   Hexagon,
@@ -336,6 +337,7 @@ import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
   SharedAsset,
+  WorkDetail,
 } from "@/src/infrastructure/creator-client";
 import type Konva from "konva";
 
@@ -429,6 +431,10 @@ const StudioBackground3D = lazyRetry(
 const StudioVrmCreator = lazyRetry(
   () => import("./StudioVrmCreator").then((mod) => ({ default: mod.StudioVrmCreator })),
   "StudioVrmCreator"
+);
+const WorkFxPanel = lazyRetry(
+  () => import("./WorkFxPanel").then((mod) => ({ default: mod.WorkFxPanel })),
+  "WorkFxPanel"
 );
 
 type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
@@ -2783,11 +2789,16 @@ function StudioCuttoonEditor() {
     setLeftPanelOpen(!next);
     setRightPanelOpen(!next);
   }
-  // 최대화 상태에서 ESC로 빠져나오기.
+  // 최대화 상태에서 ESC로 빠져나오기 — 버튼으로 끌 때(toggleMaximize)와 동일하게 접어둔 좌우
+  // 패널도 함께 복원해야 한다. 이걸 빠뜨리면 ESC로 나온 뒤 패널이 계속 접힌 채로 남는다.
   useEffect(() => {
     if (!maximized || typeof window === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMaximized(false);
+      if (e.key === "Escape") {
+        setMaximized(false);
+        setLeftPanelOpen(true);
+        setRightPanelOpen(true);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -2857,6 +2868,11 @@ function StudioCuttoonEditor() {
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
   const [vrmCreatorOpen, setVrmCreatorOpen] = useState(false);
+  // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때만 채워진다 — WorkDetail.pages(렌더링된
+  // 컷 이미지)가 있어야 컷별 연출(WorkFxPanel)의 "컷 이미지 클릭해 마크 찍기" UI가 성립하므로,
+  // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
+  const [loadedWork, setLoadedWork] = useState<WorkDetail | null>(null);
+  const [fxPanelOpen, setFxPanelOpen] = useState(false);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -3543,6 +3559,8 @@ function StudioCuttoonEditor() {
       .then(({ getWork }) => getWork(targetId))
       .then((w) => {
         if (!alive) return;
+        // 리믹스는 새 작품으로 저장되는 별개 문서라 원본의 컷별 연출(fx) 설정을 승계하지 않는다.
+        if (!remixId) setLoadedWork(w);
         if (remixId) {
           setTitle(w.title + " (리믹스)");
           setDescription(
@@ -6602,6 +6620,16 @@ function StudioCuttoonEditor() {
             <Upload size={14} /> 복구 (.json)
             <input type="file" accept=".json" className="hidden" onChange={handleImportProject} />
           </label>
+          {loadedWork ? (
+            <button
+              type="button"
+              onClick={() => setFxPanelOpen(true)}
+              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })}
+              title="이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다"
+            >
+              <Music4 size={14} /> 애니메이션 연출
+            </button>
+          ) : null}
           <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap" })}>
             임시저장
           </button>
@@ -12461,6 +12489,35 @@ function StudioCuttoonEditor() {
           />
         ) : null}
       </Suspense>
+
+      {fxPanelOpen && loadedWork ? (
+        <div
+          aria-modal="true"
+          role="dialog"
+          className="fixed inset-0 z-[80] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-3 backdrop-blur-sm"
+          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <h2 className="text-sm font-bold text-fg">애니메이션 연출</h2>
+              <button
+                type="button"
+                aria-label="닫기"
+                title="닫기"
+                className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
+                onClick={() => setFxPanelOpen(false)}
+              >
+                <X size={15} aria-hidden />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">불러오는 중…</div>}>
+                <WorkFxPanel work={loadedWork} onUpdated={(doc) => setLoadedWork((prev) => (prev ? { ...prev, doc } : prev))} />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {contextMenu.visible && (
         // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
