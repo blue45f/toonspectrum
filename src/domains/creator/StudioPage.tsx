@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Boxes,
   Music4,
+  Pipette,
   PictureInPicture2,
   UserRound,
   Triangle,
@@ -151,6 +152,7 @@ import {
 import {
   type ExportFormat,
 } from "./studio-export";
+import { pickColorFromImageData } from "./studio-eyedropper";
 import {
   clampFrameIndex,
   DEFAULT_FRAME_FPS,
@@ -877,6 +879,11 @@ type StudioFxAsset = { id: string; label: string; svg: string; width: number; he
 type StudioEmeresTemplate = { id: string; label: string; category: string; svg: string; width: number; height: number; tip: string };
 type StudioOptionalAssetPacks = {
   bgSceneSections: Array<{ genre: string; scenes: StudioBgScene[] }>;
+  // 장르 필터 전용 — bgSceneSections는 imgSrc(고품질 일러스트) 씬을 전부 "추천"으로 묶어내서
+  // 특정 장르로 필터링하면 그 장르의 일러스트가 안 보이는 문제가 있었다(전체 보기에서만 노출).
+  // 이 목록은 장르별로 실제 genre 기준 그룹핑해(일러스트 포함, groupBgScenes가 각 그룹 내 imgSrc 우선 정렬)
+  // 장르 칩을 눌러도 해당 장르의 AI/일러스트 배경이 정상적으로 보이게 한다.
+  bgSceneGenreGroups: Array<{ genre: string; scenes: StudioBgScene[] }>;
   comicVectorStickers: StudioFxAsset[];
   creatureStickers: StudioFxAsset[];
   propStickers: StudioFxAsset[];
@@ -896,6 +903,7 @@ type StudioSfxPacks = {
 const uid = () => crypto.randomUUID();
 const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   bgSceneSections: [],
+  bgSceneGenreGroups: [],
   comicVectorStickers: [],
   creatureStickers: [],
   propStickers: [],
@@ -2930,6 +2938,7 @@ function StudioCuttoonEditor() {
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
   const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
+  const [eyedropperActive, setEyedropperActive] = useState(false);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -3891,9 +3900,11 @@ function StudioCuttoonEditor() {
     ])
       .then(([bgScenes, bgScenesExtra]) => {
         if (!studioOptionalAssetsMountedRef.current) return;
+        const allScenes = [...bgScenes.BG_SCENES, ...bgScenesExtra.BG_SCENES_EXTRA];
         setStudioOptionalAssets((prev) => ({
           ...prev,
-          bgSceneSections: bgScenes.bgSceneSections([...bgScenes.BG_SCENES, ...bgScenesExtra.BG_SCENES_EXTRA]),
+          bgSceneSections: bgScenes.bgSceneSections(allScenes),
+          bgSceneGenreGroups: bgScenes.groupBgScenes(allScenes),
         }));
         setStudioBgSceneAssetsLoaded(true);
       })
@@ -4171,7 +4182,7 @@ function StudioCuttoonEditor() {
     ? filterBgSceneSections(
         bgSceneGenreFilter === "all"
           ? studioOptionalAssets.bgSceneSections
-          : studioOptionalAssets.bgSceneSections.filter((group) => group.genre === bgSceneGenreFilter),
+          : studioOptionalAssets.bgSceneGenreGroups.filter((group) => group.genre === bgSceneGenreFilter),
         bgSceneSearchQuery
       )
     : EMPTY_STUDIO_OPTIONAL_ASSETS.bgSceneSections;
@@ -5826,8 +5837,30 @@ function StudioCuttoonEditor() {
   }
 
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
+  // 스테이지를 실제 합성 픽셀 그대로 렌더해 클릭 지점 색을 뽑는다(이미지 요소 하나의 "주요 색상"이
+  // 아니라, 여러 레이어가 겹친 화면 그대로의 정확한 색 — CSP/Photoshop 스포이드와 동일한 개념).
+  function pickCanvasColorAt(pos: { x: number; y: number }): string | null {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const canvas = stage.toCanvas({ pixelRatio: 1 / effScale });
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return pickColorFromImageData(data, width, height, pos.x, pos.y);
+  }
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
+      return;
+    }
+    // 스포이드: 토글 버튼으로 무장했거나(한 번 뽑으면 자동 해제), 펜 도구 중 Alt 를 누른 momentary
+    // 방식(CSP/Photoshop 관례) — 다른 어떤 캔버스 제스처보다 항상 최우선으로 가로챈다.
+    if (eyedropperActive || (tool === "draw" && e.evt.altKey)) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const hex = pickCanvasColorAt(pos);
+        if (hex) setColor(hex);
+      }
+      if (eyedropperActive) setEyedropperActive(false);
       return;
     }
     // 크롭 모드 무장 중: 스테이지 드래그를 크롭 rect 조작(핸들 리사이즈/이동)으로 가로챈다.
@@ -11929,7 +11962,21 @@ function StudioCuttoonEditor() {
               {/* 색상 선택 (지우개 아닐 때) */}
               {drawMode !== "eraser" && (
                 <div className="space-y-1.5 pt-1.5 border-t border-line/35">
-                  <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
+                    <button
+                      type="button"
+                      onClick={() => setEyedropperActive((v) => !v)}
+                      aria-pressed={eyedropperActive}
+                      title="스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)"
+                      className={cn(
+                        "grid size-5 place-items-center rounded border transition-colors",
+                        eyedropperActive ? "border-accent bg-accent/15 text-accent" : "border-line text-fg-3 hover:bg-raised"
+                      )}
+                    >
+                      <Pipette className="size-3" aria-hidden />
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {DRAW_COLOR_SWATCHES.map((swatch) => (
                       <button
