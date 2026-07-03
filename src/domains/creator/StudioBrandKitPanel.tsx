@@ -1,0 +1,401 @@
+// 브랜드 킷 패널 — 툴바 드롭다운으로 열리는 자기완결형(self-contained) 컴포넌트.
+// 팔레트(참조)·제목/본문 글꼴·로고를 하나의 이름 붙은 킷으로 저장·이름변경·삭제하고,
+// 스와치/글꼴/로고를 각각 개별적으로 적용한다. StudioPaletteLibraryPanel과 동일한
+// "라이브러리 매니저" 컨벤션 — 자체 useState로 목록을 소유하고 localStorage를 직접
+// 읽고/쓴다(캔버스 도구 패널처럼 모든 값을 prop으로 받는 얇은 패널과는 다른 컨벤션).
+import { ImagePlus, Pencil, Plus, X } from "lucide-react";
+import { useState, type ChangeEvent, type KeyboardEvent } from "react";
+
+import {
+  BRAND_KIT_FONTS,
+  createBrandKit,
+  DEFAULT_BRAND_KIT_FONT,
+  deleteBrandKit,
+  listBrandKits,
+  renameBrandKit,
+  resolveBrandKitPalette,
+  saveBrandKit,
+  type BrandKit,
+  type BrandKitLogo,
+} from "./studio-brand-kit";
+import { downscaleImageFile } from "./studio-image-utils";
+import { listPalettes, type StudioNamedPalette } from "./studio-palette-library";
+
+import { cx } from "@/lib/cx";
+
+const MAX_LOGO_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB — 다운스케일 전 원본 파일에 대한 저비용 가드(메인스레드 디코딩 지연 방지).
+const LOGO_MAX_DIM = 320; // downscaleImageFile 최대 픽셀 변 — 로고는 작은 코너 장식이라 320px면 충분하고 localStorage 예산도 지킨다.
+const LOGO_QUALITY = 0.92;
+const SWATCH_PREVIEW_COUNT = 8;
+
+export interface StudioBrandKitPanelProps {
+  /** 스와치 클릭 시 호출 — 전역 브러시/도형 색(StudioPage의 `color`)을 갱신.
+   *  StudioPaletteLibraryPanel.onPickColor와 완전히 동일한 규약. */
+  onPickColor: (hex: string) => void;
+  /** 현재 텍스트/말풍선 요소가 선택되어 있어 글꼴을 적용할 수 있는지. false면 글꼴
+   *  적용 버튼을 비활성화하고 안내 문구를 보여준다. */
+  canApplyFont: boolean;
+  /** 킷의 제목/본문 글꼴 중 하나를 현재 선택 요소에 적용 — 실제 patchEl(selected.id,{font})
+   *  수행은 호출측(StudioPage.tsx) 책임. */
+  onApplyFont: (font: string) => void;
+  /** 킷의 로고를 문서 마스터 로고 슬롯에 적용(추가 또는 같은 자리 교체) — 실제
+   *  ImageEl 구성 + setMaster(withMasterElements(...)) 수행은 호출측 책임. */
+  onApplyLogo: (kit: BrandKit) => void;
+}
+
+export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, onApplyLogo }: StudioBrandKitPanelProps) {
+  // lazy 초기화 — 이 패널 자체가 menu === "brandKit"일 때만 마운트되므로 마운트 시점이 곧
+  // "필요할 때"라 useEffect/구독 없이 동기 로드로 충분하다(StudioPaletteLibraryPanel과 동일 논리).
+  const [kits, setKits] = useState<BrandKit[]>(() => listBrandKits(globalThis.localStorage));
+  // 생성 폼의 팔레트 <select>와 각 킷 카드의 스와치 해석용 읽기 전용 스냅샷 — 패널이 열려
+  // 있는 동안 팔레트 라이브러리를 직접 편집할 방법이 이 패널엔 없으므로 재조회가 불필요하다.
+  const [palettes] = useState<StudioNamedPalette[]>(() => listPalettes(globalThis.localStorage));
+  const [error, setError] = useState<string | null>(null);
+  const [doneMsg, setDoneMsg] = useState<string | null>(null);
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftPaletteId, setDraftPaletteId] = useState("");
+  const [draftHeadingFont, setDraftHeadingFont] = useState(DEFAULT_BRAND_KIT_FONT);
+  const [draftBodyFont, setDraftBodyFont] = useState(DEFAULT_BRAND_KIT_FONT);
+  const [draftLogo, setDraftLogo] = useState<BrandKitLogo | null>(null);
+  const [draftLogoBusy, setDraftLogoBusy] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renamingName, setRenamingName] = useState("");
+
+  function handleDelete(id: string) {
+    setKits(deleteBrandKit(globalThis.localStorage, id));
+  }
+
+  function startRename(k: BrandKit) {
+    setRenamingId(k.id);
+    setRenamingName(k.name);
+  }
+
+  function commitRename() {
+    if (!renamingId) return;
+    setKits(renameBrandKit(globalThis.localStorage, renamingId, renamingName));
+    setRenamingId(null);
+  }
+
+  function handleRenameKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") commitRename();
+    else if (e.key === "Escape") setRenamingId(null);
+  }
+
+  async function handleLogoFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일 재선택 시에도 onChange가 다시 발생하도록 즉시 리셋(StudioPaletteLibraryPanel과 동일한 file input 함정).
+    if (!file) return;
+    setError(null);
+    if (file.size > MAX_LOGO_UPLOAD_BYTES) {
+      setError("파일이 너무 커요. 8MB 이하 이미지만 로고로 쓸 수 있어요.");
+      return;
+    }
+    setDraftLogoBusy(true);
+    try {
+      const scaled = await downscaleImageFile(file, LOGO_MAX_DIM, LOGO_QUALITY);
+      setDraftLogo({ dataUrl: scaled.src, width: scaled.width, height: scaled.height });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로고 이미지를 불러오지 못했어요.");
+    } finally {
+      setDraftLogoBusy(false);
+    }
+  }
+
+  function handleCreate() {
+    // createBrandKit은 절대 던지지 않으므로(§ 설계 의도) try/catch가 필요 없다 — createPalette류의
+    // "직접 입력" 흐름과 달리 호출 자체는 항상 성공한다. 단, 버튼은 draftLogoBusy(로고
+    // downscaleImageFile 진행 중)일 때는 비활성화된다 — 아니면 업로드 완료 전에 제출해
+    // draftLogo가 아직 null인 채로 킷이 만들어져 로고가 조용히 누락되는 레이스가 있었다.
+    const kit = createBrandKit({
+      name: draftName,
+      paletteId: draftPaletteId || null,
+      headingFont: draftHeadingFont,
+      bodyFont: draftBodyFont,
+      logo: draftLogo,
+    });
+    setKits(saveBrandKit(globalThis.localStorage, kit));
+    setError(null);
+    setDoneMsg(`"${kit.name}" 브랜드 킷을 만들었어요.`);
+    setDraftName("");
+    setDraftPaletteId("");
+    setDraftHeadingFont(DEFAULT_BRAND_KIT_FONT);
+    setDraftBodyFont(DEFAULT_BRAND_KIT_FONT);
+    setDraftLogo(null);
+    setCreatorOpen(false);
+  }
+
+  function handleApplyLogo(k: BrandKit) {
+    onApplyLogo(k);
+    setError(null);
+    setDoneMsg(`"${k.name}" 로고를 마스터에 적용했어요.`);
+  }
+
+  return (
+    <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
+      <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 브랜드 킷 — 팔레트·글꼴·로고 묶음</p>
+
+      {error && <p className="mb-1.5 text-[0.66rem] text-bad">{error}</p>}
+      {doneMsg && !error && <p className="mb-1.5 text-[0.66rem] text-good">{doneMsg}</p>}
+
+      <button
+        type="button"
+        onClick={() => setCreatorOpen((v) => !v)}
+        aria-expanded={creatorOpen}
+        className={cx(
+          "mb-2 flex w-full items-center justify-center gap-1 rounded-lg py-1.5 text-[0.66rem] font-semibold transition-colors hover:bg-raised",
+          creatorOpen ? "bg-raised text-fg-2" : "text-fg-3 hover:text-fg-2"
+        )}
+      >
+        <Plus size={11} /> 새 브랜드 킷
+      </button>
+
+      {creatorOpen && (
+        <div className="mb-2 flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
+          <input
+            type="text"
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            placeholder="브랜드 킷 이름"
+            className="h-7 rounded border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent"
+          />
+
+          <div>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">팔레트</p>
+            <select
+              value={draftPaletteId}
+              onChange={(e) => setDraftPaletteId(e.target.value)}
+              aria-label="팔레트"
+              className="h-7 w-full rounded border border-line bg-panel px-1.5 text-xs text-fg outline-none focus:border-accent"
+            >
+              <option value="">없음</option>
+              {palettes.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.colors.length}색)
+                </option>
+              ))}
+            </select>
+            {palettes.length === 0 && (
+              <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-3">
+                저장된 팔레트가 없어요. 먼저 팔레트 탭에서 만들어보세요.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">제목 글꼴</p>
+            <div className="grid grid-cols-3 gap-1">
+              {BRAND_KIT_FONTS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setDraftHeadingFont(f.value)}
+                  style={{ fontFamily: f.value }}
+                  className={cx(
+                    "truncate rounded border px-1 py-1 text-[0.6rem] transition-colors",
+                    draftHeadingFont === f.value
+                      ? "border-accent bg-accent-soft/30 text-accent"
+                      : "border-line bg-panel text-fg-2 hover:bg-raised"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">본문 글꼴</p>
+            <div className="grid grid-cols-3 gap-1">
+              {BRAND_KIT_FONTS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setDraftBodyFont(f.value)}
+                  style={{ fontFamily: f.value }}
+                  className={cx(
+                    "truncate rounded border px-1 py-1 text-[0.6rem] transition-colors",
+                    draftBodyFont === f.value
+                      ? "border-accent bg-accent-soft/30 text-accent"
+                      : "border-line bg-panel text-fg-2 hover:bg-raised"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">로고</p>
+            {draftLogo ? (
+              <div className="flex items-center gap-2">
+                <img
+                  src={draftLogo.dataUrl}
+                  alt="로고 미리보기"
+                  className="h-10 w-10 rounded border border-line bg-panel object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() => setDraftLogo(null)}
+                  className="text-[0.66rem] font-medium text-fg-3 transition-colors hover:text-bad"
+                >
+                  제거
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-line bg-panel py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised">
+                <ImagePlus size={11} /> {draftLogoBusy ? "불러오는 중…" : "로고 이미지 선택"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoFile}
+                  disabled={draftLogoBusy}
+                />
+              </label>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={draftLogoBusy}
+            title={draftLogoBusy ? "로고를 불러오는 중이에요. 잠시만 기다려주세요." : undefined}
+            className="rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {draftLogoBusy ? "로고 불러오는 중…" : "브랜드 킷 만들기"}
+          </button>
+        </div>
+      )}
+
+      {kits.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
+          저장된 브랜드 킷이 없어요. 이름과 팔레트·글꼴·로고를 골라 새로 만들어보세요.
+        </p>
+      ) : (
+        <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+          {kits.map((k) => {
+            const resolvedPalette = resolveBrandKitPalette(k, palettes);
+            return (
+              <div key={k.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
+                <div className="flex items-center gap-1">
+                  {renamingId === k.id ? (
+                    <input
+                      type="text"
+                      value={renamingName}
+                      onChange={(e) => setRenamingName(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={handleRenameKeyDown}
+                      // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opens only on user action; focusing it immediately is correct edit-on-demand UX
+                      autoFocus
+                      className="min-w-0 flex-1 rounded border border-accent bg-panel px-1 py-0.5 text-xs text-fg outline-none"
+                    />
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={k.name}>
+                      {k.name}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => startRename(k)}
+                    aria-label={`${k.name} 이름 변경`}
+                    title="이름 변경"
+                    className="shrink-0 text-fg-3 transition-colors hover:text-accent"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(k.id)}
+                    aria-label={`${k.name} 브랜드 킷 삭제`}
+                    title="삭제"
+                    className="shrink-0 text-fg-3 transition-colors hover:text-bad"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                  {k.paletteId === null ? (
+                    <span className="text-[0.6rem] text-fg-3">팔레트 없음</span>
+                  ) : resolvedPalette ? (
+                    <>
+                      {resolvedPalette.colors.slice(0, SWATCH_PREVIEW_COUNT).map((hex, idx) => (
+                        <button
+                          key={`${hex}-${idx}`}
+                          type="button"
+                          onClick={() => onPickColor(hex)}
+                          title={hex}
+                          className="h-5 w-5 rounded border border-line"
+                          style={{ background: hex }}
+                        />
+                      ))}
+                      {resolvedPalette.colors.length > SWATCH_PREVIEW_COUNT && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded border border-line px-0.5 text-[0.55rem] font-medium text-fg-3">
+                          +{resolvedPalette.colors.length - SWATCH_PREVIEW_COUNT}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[0.6rem] text-fg-3">삭제된 팔레트</span>
+                  )}
+                </div>
+
+                <div className="mt-1.5 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onApplyFont(k.headingFont)}
+                    disabled={!canApplyFont}
+                    title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
+                    style={{ fontFamily: k.headingFont }}
+                    className="flex-1 truncate rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    제목 글꼴 적용
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onApplyFont(k.bodyFont)}
+                    disabled={!canApplyFont}
+                    title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
+                    style={{ fontFamily: k.bodyFont }}
+                    className="flex-1 truncate rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    본문 글꼴 적용
+                  </button>
+                </div>
+
+                <div className="mt-1.5 flex items-center gap-2">
+                  {k.logo ? (
+                    <>
+                      <img
+                        src={k.logo.dataUrl}
+                        alt=""
+                        className="h-6 w-6 shrink-0 rounded border border-line bg-panel object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyLogo(k)}
+                        className="flex-1 rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                      >
+                        로고를 마스터에 적용
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[0.6rem] text-fg-3">로고 없음</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-2 space-y-0.5 border-t border-line/60 pt-1.5 text-[0.6rem] leading-snug text-fg-3">
+        <p>브랜드 킷은 이 브라우저에만 저장돼요(다른 기기·계정과 공유되지 않아요).</p>
+        <p>로고 적용은 문서 마스터에 저장되고, 실행취소(⌘Z)가 지원되지 않아요.</p>
+        <p>팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).</p>
+      </div>
+    </div>
+  );
+}
