@@ -88,9 +88,6 @@ export interface VrmTrackingData {
 
 /* ── Constants ────────────────────────────────────────────────────────── */
 
-/** EMA 스무딩 계수. 0에 가까울수록 부드럽고 반응 느림, 1이면 즉시 반영. */
-export const SMOOTHING_ALPHA = 0.35;
-
 /** 기본 트래킹 옵션. */
 export const DEFAULT_TRACKING_OPTIONS: Readonly<TrackingOptions> = {
   gazeLock: false,

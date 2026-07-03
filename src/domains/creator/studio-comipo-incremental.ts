@@ -107,14 +107,6 @@ export function incrementalPlaceInFrame(
   return { composable: true, refs: surviving, removedIds, addedSeeds };
 }
 
-/** 프레임 안 기존 장식 ref 목록(테스트·StudioPage 공용 최소 계약). */
-export function collectDecorRefsInFrame(
-  frame: PanelLayoutFrame,
-  items: readonly DecorRef[]
-): DecorRef[] {
-  return items.filter((item) => seedCenterInFrame(item.seed, frame));
-}
-
 /** StudioPage 요소 → DecorRef (프레임 밖이면 null). */
 export type StudioDecorElement =
   | {

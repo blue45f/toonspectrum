@@ -1038,26 +1038,6 @@ export function planFullStateRestore(state: FullVrmState): {
  * Pure helpers so component handlers can delegate.
  * Tests import and call these (aliased as handle*) to drive the exact shipped restore logic.
  */
-export function performLoadFullLocal(
-  name: string,
-  savedFullStates: Record<string, FullVrmState>,
-  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
-  vrm: VRM | null
-) {
-  const s = savedFullStates[name];
-  if (!s) return;
-  commitFullStateRestore(s, vrm);
-}
-
-export function performPasteFullState(
-  s: FullVrmState | null | undefined,
-  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
-  vrm: VRM | null
-) {
-  if (!s || s.version !== 2) return;
-  commitFullStateRestore(s, vrm);
-}
-
 export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmState | null {
   try {
     const hashIndex = dataUrl.indexOf("#");
@@ -1081,39 +1061,6 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
   } catch {
     return null;
   }
-}
-
-export function performSelectSharedPose(
-  asset: { dataUrl: string },
-  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void,
-  vrm: VRM | null,
-  sideEffects?: {
-    setActivePoseId?: (id: string) => void;
-    setCustomColors?: (c: Record<string, string>) => void;
-    alertFn?: (msg: string) => void;
-  }
-) {
-  const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);
-  if (!full) {
-    sideEffects?.alertFn?.("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
-    return;
-  }
-  commitFullStateRestore(full, vrm);
-
-  // legacy customColors support (not in FullVrmState)
-  try {
-    const hashIndex = asset.dataUrl.indexOf("#");
-    if (hashIndex !== -1) {
-      const hashStr = asset.dataUrl.substring(hashIndex + 1);
-      const poseData = JSON.parse(decodeURIComponent(hashStr));
-      if (poseData.customColors && sideEffects?.setCustomColors) {
-        sideEffects.setCustomColors(poseData.customColors);
-      }
-      if (sideEffects?.setActivePoseId) {
-        // caller will usually set a better id; here we just signal
-      }
-    }
-  } catch {}
 }
 
 /**
