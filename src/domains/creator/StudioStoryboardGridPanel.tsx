@@ -24,19 +24,25 @@ import { useEffect, useState, type ReactElement } from "react";
 import { hasCustomPageName, pageDisplayName } from "./studio-page-meta";
 import { StudioPanelChip } from "./studio-panel-ui";
 import { StudioPageThumbnail, type StudioPageDnd } from "./StudioPageThumbnails";
+import { StudioPanelShotTagFields } from "./StudioPanelShotTagFields";
 
 import type { ThumbPageLike } from "./studio-page-thumbs";
+import type { ShotTagPatch } from "./studio-panel-shot-tags";
 
 import { cn } from "@/lib/utils";
 
 /** 그리드 패널이 받는 페이지 최소 형태 — StudioPageThumbnail과 동일 계약(ThumbPageLike) +
  * 이름/메모(스트립과 동일하게 표시용으로만 사용, 여기서는 편집하지 않는다 — 이름 편집은 목록 뷰의
  * 기존 인라인 편집(연필 버튼)을 그대로 쓰도록 의도적으로 남겨둔다: 작은 그리드 칸에 이름+메모
- * 편집 UI까지 넣으면 밀도가 무너지고, 목록 뷰 기능을 중복 구현하게 된다). */
+ * 편집 UI까지 넣으면 밀도가 무너지고, 목록 뷰 기능을 중복 구현하게 된다).
+ * shotType/cameraAngle은 studio-panel-shot-tags가 관리 — 이름/메모와 달리 그리드에서 직접
+ * 편집 가능하다(칩형 네이티브 select 상시 노출, onShotTagChange 참고). */
 export type StoryboardGridPage = ThumbPageLike & {
   id: string;
   name?: string;
   note?: string;
+  shotType?: string;
+  cameraAngle?: string;
 };
 
 const CELL_SIZE_PRESETS = {
@@ -63,6 +69,10 @@ export interface StudioStoryboardGridPanelProps {
   onDeletePage: (pageId: string) => void;
   /** pages.length > 1 — 목록 뷰의 삭제 버튼과 동일한 가드를 호출측이 계산해 넘긴다. */
   canDelete: boolean;
+  /** 샷 타입/카메라 앵글 태그 커밋 — studio-panel-shot-tags.withShotTag의 결과로 pages를
+   * 갱신하는 건 호출측(StudioPage) 책임이다. 전달하지 않으면 태그 셀렉트 UI 자체를
+   * 렌더링하지 않는다(옵트인 — 미전달 시 기존 카드 레이아웃과 완전히 동일하게 유지). */
+  onShotTagChange?: (pageId: string, patch: ShotTagPatch) => void;
 }
 
 export function StudioStoryboardGridPanel({
@@ -76,6 +86,7 @@ export function StudioStoryboardGridPanel({
   onDuplicatePage,
   onDeletePage,
   canDelete,
+  onShotTagChange,
 }: StudioStoryboardGridPanelProps): ReactElement | null {
   const [cellSize, setCellSize] = useState<CellSize>("m");
 
@@ -186,6 +197,21 @@ export function StudioStoryboardGridPanel({
                     {hasCustomPageName(p) ? `${idx + 1}. ${displayName}` : displayName}
                     {p.note ? " 📝" : ""}
                   </span>
+
+                  {/* 샷 타입/카메라 앵글 — 콘티 검토 시 상시 표시(hover에 가두지 않음). 카드 전체를
+                      덮는 선택 버튼(z-10)보다 위(z-20 + relative)에 있어야 select 클릭이 카드 선택으로
+                      새지 않는다. 호출측이 onShotTagChange를 넘기지 않으면(통합 전) 렌더링 자체를
+                      건너뛴다 — 기존 카드 레이아웃과 완전히 동일하게 유지. */}
+                  {onShotTagChange && (
+                    <StudioPanelShotTagFields
+                      shotType={p.shotType}
+                      cameraAngle={p.cameraAngle}
+                      onShotTypeChange={(value) => onShotTagChange(p.id, { shotType: value })}
+                      onCameraAngleChange={(value) => onShotTagChange(p.id, { cameraAngle: value })}
+                      size="compact"
+                      className="relative z-20"
+                    />
+                  )}
 
                   {/* 데스크톱(마우스)에선 밀도를 위해 hover/focus에만 노출하지만, 터치 기기는 hover가
                       없고 이 레이어가 pointer-events-none이면 탭이 아래의 전체 선택 버튼으로 그대로
