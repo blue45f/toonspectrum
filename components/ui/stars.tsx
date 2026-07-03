@@ -18,6 +18,7 @@ export function Stars({
   const pct = Math.max(0, Math.min(100, (value / 5) * 100));
   return (
     <span
+      role="img"
       className={cx("relative inline-flex shrink-0", className)}
       style={{ gap: px * 0.12 }}
       aria-label={`별점 ${value.toFixed(1)} / 5`}

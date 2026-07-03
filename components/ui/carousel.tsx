@@ -80,7 +80,7 @@ export function Carousel({
           </button>
 
           {/* 닷 인디케이터 — 스냅(페이지)당 한 점. aria-current 로 현재 페이지 표시. */}
-          <div className="mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label="페이지">
+          <div className="mt-2 flex items-center justify-center" role="tablist" aria-label="페이지">
             {Array.from({ length: snapCount }).map((_, i) => (
               <button
                 key={i}
@@ -90,11 +90,17 @@ export function Carousel({
                 aria-current={i === selectedIndex}
                 aria-selected={i === selectedIndex}
                 onClick={() => scrollTo(i)}
-                className={cn(
-                  "h-1.5 rounded-full transition-all duration-200",
-                  i === selectedIndex ? "w-5 bg-accent" : "w-1.5 bg-line hover:bg-line-strong"
-                )}
-              />
+                // 탭 영역은 24px 이상(터치 타겟), 보이는 점은 내부 span 으로 작게 유지.
+                className="group/dot grid size-6 place-items-center"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "block h-1.5 rounded-full transition-all duration-200",
+                    i === selectedIndex ? "w-5 bg-accent" : "w-1.5 bg-line group-hover/dot:bg-line-strong"
+                  )}
+                />
+              </button>
             ))}
           </div>
         </>

@@ -29,7 +29,7 @@ export function AvailabilityDots({
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
-    <span className={cx("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
+    <span role="img" className={cx("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
       {shown.map((a) => {
         const p = PLATFORMS[a.platformId];
         return (
