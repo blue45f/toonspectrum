@@ -6,10 +6,14 @@ import {
   applyPoserVisualState,
   applyFullState,
   planFullStateRestore,
+  applyVrmMaterialFx,
+  hasVrmMToonMaterial,
+  DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
   type FingerRotationMap,
   type BodyScale,
   type FullVrmState,
+  type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -67,6 +71,33 @@ function createMinimalVrm() {
   } as unknown as VRM;
 
   return { vrm, bones };
+}
+
+/** MToonMaterial의 구조적 형태를 흉내 낸 재질(패키지 미의존 — applyVrmMaterialFx와 같은 방식). */
+type MToonLikeMaterial = THREE.MeshStandardMaterial & {
+  isMToonMaterial: boolean;
+  shadeColorFactor: THREE.Color;
+  outlineColorFactor: THREE.Color;
+  parametricRimColorFactor: THREE.Color;
+  rimLightingMixFactor: number;
+};
+
+function createMToonLikeMaterial(): MToonLikeMaterial {
+  const mat = new THREE.MeshStandardMaterial() as MToonLikeMaterial;
+  mat.isMToonMaterial = true;
+  mat.shadeColorFactor = new THREE.Color("#ffffff");
+  mat.outlineColorFactor = new THREE.Color("#000000");
+  mat.parametricRimColorFactor = new THREE.Color("#ffffff");
+  mat.rimLightingMixFactor = 0;
+  mat.emissiveIntensity = 0;
+  return mat;
+}
+
+function addMesh(parent: THREE.Object3D, name: string, material: THREE.Material) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), material);
+  mesh.name = name;
+  parent.add(mesh);
+  return mesh;
 }
 
 describe("studio-vrm-poser-utils unified pipeline", () => {
@@ -160,5 +191,74 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect((plan.costume as any)?.hidden).toContain("x");
     expect((plan.propsItems as any)?.[0]?.uid).toBe("p1");
     expect((plan.physics as any)?.stiffnessScale).toBe(1.1);
+  });
+});
+
+describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
+  it("hasVrmMToonMaterial is false with no meshes or only non-MToon meshes, true once an MToon mesh exists", () => {
+    const { vrm } = createMinimalVrm();
+    expect(hasVrmMToonMaterial(vrm)).toBe(false);
+
+    addMesh(vrm.scene, "Body", new THREE.MeshBasicMaterial());
+    expect(hasVrmMToonMaterial(vrm)).toBe(false);
+
+    addMesh(vrm.scene, "Tops", createMToonLikeMaterial());
+    expect(hasVrmMToonMaterial(vrm)).toBe(true);
+  });
+
+  it("applyVrmMaterialFx sets shade/outline/rim/emissive uniforms on MToon materials only", () => {
+    const { vrm } = createMinimalVrm();
+    const mtoonMat = createMToonLikeMaterial();
+    const standardMat = new THREE.MeshStandardMaterial();
+    addMesh(vrm.scene, "Tops", mtoonMat);
+    addMesh(vrm.scene, "Body", standardMat);
+
+    const fx: VrmMaterialFx = {
+      shadeColor: "#112233",
+      outlineColor: "#445566",
+      rimColor: "#778899",
+      rimIntensity: 0.6,
+      emissiveColor: "#ff00ff",
+      emissiveIntensity: 0.4,
+    };
+    applyVrmMaterialFx(vrm, fx);
+
+    expect(`#${mtoonMat.shadeColorFactor.getHexString()}`).toBe("#112233");
+    expect(`#${mtoonMat.outlineColorFactor.getHexString()}`).toBe("#445566");
+    expect(`#${mtoonMat.parametricRimColorFactor.getHexString()}`).toBe("#778899");
+    expect(mtoonMat.rimLightingMixFactor).toBeCloseTo(0.6);
+    expect(`#${mtoonMat.emissive.getHexString()}`).toBe("#ff00ff");
+    expect(mtoonMat.emissiveIntensity).toBeCloseTo(0.4);
+
+    // 표준 재질엔 isMToonMaterial 플래그가 없으므로 색 변경 없이 조용히 건너뛴다(에러 없음).
+    expect(standardMat.emissive.getHexString()).toBe("000000");
+  });
+
+  it("applyVrmMaterialFx leaves emissive untouched on protected (face/eye) meshes but still applies shade/outline/rim", () => {
+    const { vrm } = createMinimalVrm();
+    const faceMat = createMToonLikeMaterial();
+    addMesh(vrm.scene, "Face", faceMat);
+
+    const fx: VrmMaterialFx = {
+      ...DEFAULT_VRM_MATERIAL_FX,
+      shadeColor: "#123456",
+      emissiveColor: "#ff00ff",
+      emissiveIntensity: 0.9,
+    };
+    applyVrmMaterialFx(vrm, fx);
+
+    expect(`#${faceMat.shadeColorFactor.getHexString()}`).toBe("#123456");
+    // 보호 카테고리(얼굴)는 발광색 변경에서 제외된다.
+    expect(`#${faceMat.emissive.getHexString()}`).not.toBe("#ff00ff");
+  });
+
+  it("applyVrmMaterialFx is a no-op when every fx field is null/default", () => {
+    const { vrm } = createMinimalVrm();
+    const mat = createMToonLikeMaterial();
+    addMesh(vrm.scene, "Tops", mat);
+
+    expect(() => applyVrmMaterialFx(vrm, DEFAULT_VRM_MATERIAL_FX)).not.toThrow();
+    expect(`#${mat.shadeColorFactor.getHexString()}`).toBe("#ffffff");
+    expect(`#${mat.outlineColorFactor.getHexString()}`).toBe("#000000");
   });
 });

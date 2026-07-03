@@ -30,8 +30,10 @@ import {
   applyExpressionWeightsToVrm,
   applyPoseToVrm,
   applyVrmCustomColors,
+  applyVrmMaterialFx,
   d,
   getPoseBoneRotation,
+  hasVrmMToonMaterial,
   POSE_PRESETS,
   ZERO_ROTATION,
   computeLightingUniforms,
@@ -41,6 +43,7 @@ import {
   applyPoserVisualState,
   planFullStateRestore,
   createFullStateLoadHandlers,
+  DEFAULT_VRM_MATERIAL_FX,
   type PoseBone,
   type PoseBoneMap,
   type PosePreset,
@@ -50,6 +53,7 @@ import {
   type LightingParams,
   type EnvVariant,
   type FullVrmState,
+  type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
 import {
   PROP_ATTACH_BONES,
@@ -837,6 +841,7 @@ function getAvailableExpressionActions(vrm: VRM | null) {
   ];
 }
 
+// three-vrm의 VRMExpressionManager.customExpressionMap은 VRM1 expressions.custom과,
 function getExpressionCategory(action: ExpressionAction): "emotion" | "eye" | "mouth" | "custom" {
   const name = action.name;
   if (!name) return "emotion";
@@ -2181,6 +2186,7 @@ function VrmActor({
   expressionWeights,
   vrm,
   customColors,
+  materialFx,
   physicsPreview,
   webcamActive,
   trackingDataRef,
@@ -2194,6 +2200,7 @@ function VrmActor({
   expressionWeights: Record<string, number>;
   vrm: VRM;
   customColors: Record<string, string>;
+  materialFx: VrmMaterialFx;
   physicsPreview: boolean;
   webcamActive: boolean;
   trackingDataRef: React.RefObject<VrmTrackingData | null>;
@@ -2213,6 +2220,10 @@ function VrmActor({
   useEffect(() => {
     applyVrmCustomColors(vrm, customColors);
   }, [customColors, vrm]);
+
+  useEffect(() => {
+    applyVrmMaterialFx(vrm, materialFx);
+  }, [materialFx, vrm]);
 
   // 팔/다리 본 시간축 스무딩(프레임 간 상태 유지). 웹캠 토글마다 리셋해 stale 보간 방지.
   const boneSmootherRef = useRef<VrmBoneSmoother>(new VrmBoneSmoother());
@@ -2502,6 +2513,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     body: "#ffffff",
     face: "#ffffff",
   });
+  const [materialFx, setMaterialFx] = useState<VrmMaterialFx>(DEFAULT_VRM_MATERIAL_FX);
   const [isSharingPose, setIsSharingPose] = useState(false);
   const [sharedPoses, setSharedPoses] = useState<SharedAsset[]>([]);
   const [sharedPosesStatus, setSharedPosesStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -2734,6 +2746,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
   const availableExpressionActions = getAvailableExpressionActions(vrm);
+  const hasMToonMaterial = vrm ? hasVrmMToonMaterial(vrm) : false;
   const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
@@ -2742,6 +2755,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     yOffset?: number;
     expressionWeights?: Record<string, number>;
     customColors?: Record<string, string>;
+    materialFx?: VrmMaterialFx;
     modelId?: string;
     modelName?: string;
     vrmProps?: unknown;
@@ -3355,6 +3369,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setWardrobeState(parseWardrobe(plan.wardrobe)); // 워드로브는 무조건 반영 — undo/redo에서 장착 변화도 되돌린다.
     if (plan.propsItems) setVrmPropItems(plan.propsItems as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // materialFx 는 별도 저장/공유 payload에 담기지만(poseMetadata.materialFx), FullVrmState 경로
+    // (undo/redo·저장한 포즈 불러오기·공유 데이터URL 붙여넣기)에서 빠지면 재질 효과가 조용히
+    // 사라진다 — plan에 실려 왔으면 항상 state로 복원한다(없으면 기본값으로 되돌려 이전 값이
+    // 눌어붙지 않게 한다).
+    setMaterialFx(plan.materialFx ?? DEFAULT_VRM_MATERIAL_FX);
 
     if (vrm) {
       const meshes = collectCostumeMeshes(vrm);
@@ -3364,6 +3383,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         applyCostume: (c) => { setCostumeMeshes(meshes); applyCostumeState(meshes, c as any); }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyProps: (p: any) => { if (p?.items) { setVrmPropItems(p.items); } }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyPhysics: (p: any) => { if (p) { setVrmPhysics(p as any); if (countSpringBoneJoints(vrm)) { applyVrmSpringBonePhysics(vrm, p as any); settleVrmPhysics(vrm); } } }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        applyMaterialFx: (fx) => applyVrmMaterialFx(vrm, fx),
       });
     }
   }
@@ -3495,6 +3515,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         bones: customBones,
         expressionWeights: expressionWeights,
         customColors: customColors,
+        materialFx: materialFx,
         modelName: modelName,
         modelId: activeModelId,
         // full AC2 for uniform restore via commit
@@ -3709,6 +3730,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         wardrobe: pending.wardrobe,
         props: pending.vrmProps,
         physics: pending.physics,
+        materialFx: pending.materialFx,
       };
       commitFullStateRestore(pendingFull, nextVrm);
     } else {
@@ -3728,6 +3750,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         body: "#ffffff",
         face: "#ffffff",
       });
+      setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
       applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits, bodyScale });
       applyExpressionWeightsToVrm(nextVrm, {});
       applyVrmCustomColors(nextVrm, {
@@ -3737,6 +3760,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         body: "#ffffff",
         face: "#ffffff",
       });
+      applyVrmMaterialFx(nextVrm, DEFAULT_VRM_MATERIAL_FX);
       // 본 부착 소품·워드로브 초기화.
       setVrmPropItems([]);
       setSelectedVrmPropUid(null);
@@ -4294,6 +4318,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         bones: customBones,
         expressionWeights: expressionWeights,
         customColors: customColors,
+        materialFx: materialFx,
         modelName: modelName,
         modelId: activeModelId,
         vrmProps: serializeVrmProps(vrmPropItems),
@@ -4371,6 +4396,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       expressionWeights={expressionWeights}
                       vrm={vrm}
                       customColors={customColors}
+                      materialFx={materialFx}
                       physicsPreview={physicsPreview}
                       webcamActive={webcamActive}
                       trackingDataRef={trackingDataRef}
@@ -4839,21 +4865,38 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         {filteredActions.map((action) => {
                           const name = action.name!;
                           const weight = expressionWeights[name] ?? 0;
+                          // "기타/커스텀" 카테고리엔 제작자가 스냅(0/1)으로 표시해 둔 표정(isBinary)이
+                          // 섞여 있을 수 있어, 슬라이더 대신 켜기/끄기 토글로 보여준다.
+                          const isBinary = vrm?.expressionManager?.getExpression(name)?.isBinary ?? false;
                           return (
                             <div key={name} className="flex items-center gap-2 text-[0.65rem] text-fg-3">
                               <span className="w-20 shrink-0 truncate font-semibold text-fg-2" title={action.label}>
                                 {action.label}:
                               </span>
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={weight}
-                                disabled={!vrm}
-                                className="h-2 flex-1 accent-accent"
-                                onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
-                              />
+                              {isBinary ? (
+                                <button
+                                  type="button"
+                                  disabled={!vrm}
+                                  onClick={() => updateExpressionWeight(name, weight > 0 ? 0 : 1)}
+                                  className={cx(
+                                    "h-2 flex-1 rounded-full border transition-colors",
+                                    weight > 0 ? "border-accent bg-accent" : "border-line bg-card"
+                                  )}
+                                  aria-pressed={weight > 0}
+                                  aria-label={`${action.label} 켜기/끄기`}
+                                />
+                              ) : (
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.05"
+                                  value={weight}
+                                  disabled={!vrm}
+                                  className="h-2 flex-1 accent-accent"
+                                  onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
+                                />
+                              )}
                               <span className="w-8 text-right numeral">{Math.round(weight * 100)}%</span>
                             </div>
                           );
@@ -6016,6 +6059,90 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </button>
                   </>
                 )}
+              </section>
+
+              {/* ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────── */}
+              <section hidden={hideOnTab("character")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <Paintbrush size={15} className="text-accent" aria-hidden />
+                  재질 효과 (그림자 · 외곽선 · 림라이트)
+                </h3>
+                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
+                  베이스 색과 별개로 셀 셰이딩 스타일을 바꿔보세요. MToon 재질을 쓰는 모델에서만 보여요.
+                </p>
+                {!hasMToonMaterial ? (
+                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
+                    {vrm ? "이 모델은 MToon 재질이 아니라 재질 효과를 지원하지 않아요." : "모델을 먼저 불러오세요."}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {[
+                      { key: "shadeColor" as const, label: "그림자 색" },
+                      { key: "outlineColor" as const, label: "외곽선 색" },
+                      { key: "rimColor" as const, label: "림 라이트 색" },
+                      { key: "emissiveColor" as const, label: "발광 색" },
+                    ].map((row) => (
+                      <div key={row.key} className="flex items-center gap-2">
+                        <span className="w-16 shrink-0 text-[0.65rem] font-semibold text-fg-2">{row.label}</span>
+                        <input
+                          type="color"
+                          value={materialFx[row.key] ?? "#ffffff"}
+                          disabled={!vrm}
+                          onChange={(e) => {
+                            const hex = e.target.value;
+                            setMaterialFx((prev) => ({ ...prev, [row.key]: hex }));
+                          }}
+                          className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
+                        />
+                        <button
+                          type="button"
+                          disabled={!vrm || !materialFx[row.key]}
+                          onClick={() => setMaterialFx((prev) => ({ ...prev, [row.key]: null }))}
+                          className="rounded border border-line bg-card px-2 py-0.5 text-[0.64rem] text-fg-2 hover:bg-raised disabled:opacity-40"
+                        >
+                          끄기
+                        </button>
+                      </div>
+                    ))}
+                    <label className="flex items-center gap-2 text-[0.65rem] text-fg-3">
+                      <span className="w-16 shrink-0 font-semibold text-fg-2">림 강도</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={materialFx.rimIntensity}
+                        disabled={!vrm || !materialFx.rimColor}
+                        onChange={(e) => setMaterialFx((prev) => ({ ...prev, rimIntensity: Number(e.target.value) }))}
+                        className="h-2 flex-1 accent-accent"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-[0.65rem] text-fg-3">
+                      <span className="w-16 shrink-0 font-semibold text-fg-2">발광 강도</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={materialFx.emissiveIntensity}
+                        disabled={!vrm || !materialFx.emissiveColor}
+                        onChange={(e) => setMaterialFx((prev) => ({ ...prev, emissiveIntensity: Number(e.target.value) }))}
+                        className="h-2 flex-1 accent-accent"
+                      />
+                    </label>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
+                  disabled={!vrm}
+                  onClick={() => {
+                    setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
+                    if (vrmRef.current) applyVrmMaterialFx(vrmRef.current, DEFAULT_VRM_MATERIAL_FX);
+                  }}
+                >
+                  재질 효과 초기화
+                </button>
               </section>
 
               {/* ── 흔들림 물리(스프링본) ──────────────────────────────── */}

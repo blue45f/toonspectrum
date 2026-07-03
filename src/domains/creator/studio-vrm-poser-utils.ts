@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 import { POSER_FINGER_BONES } from "./studio-pose-presets";
+import { classifyMeshName } from "./studio-vrm-costume";
 import { parseVrmProps } from "./studio-vrm-props";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -872,6 +873,123 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
   });
 }
 
+// ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────────────────
+
+export type VrmMaterialFx = {
+  shadeColor: string | null; // shadeColorFactor — 그림자(셰이딩) 색, 베이스 색과 별개
+  outlineColor: string | null; // outlineColorFactor — 외곽선/선화 색
+  rimColor: string | null; // parametricRimColorFactor — 림 라이트(윤곽 발광) 색
+  rimIntensity: number; // rimLightingMixFactor 0-1 — rimColor 없이 세팅해도 안 보이므로 페어드 슬라이더 필수
+  emissiveColor: string | null; // emissive — 발광 색(야광/네온 연출)
+  emissiveIntensity: number; // emissiveIntensity 0-1
+};
+
+export const DEFAULT_VRM_MATERIAL_FX: VrmMaterialFx = {
+  shadeColor: null,
+  outlineColor: null,
+  rimColor: null,
+  rimIntensity: 0,
+  emissiveColor: null,
+  emissiveIntensity: 0,
+};
+
+// MToonMaterial은 트랜지티브 의존성(@pixiv/three-vrm-materials-mtoon이 package.json 직접 의존성이
+// 아님)이라 패키지를 import하지 않고 구조적으로 타이핑한다 — applyVrmCustomColors의
+// `mat as THREE.Material & { color?: THREE.Color }` 패턴과 동일.
+interface MToonUniformMaterial {
+  isMToonMaterial?: boolean;
+  shadeColorFactor?: THREE.Color;
+  outlineColorFactor?: THREE.Color;
+  parametricRimColorFactor?: THREE.Color;
+  rimLightingMixFactor?: number;
+  emissive?: THREE.Color;
+  emissiveIntensity?: number;
+}
+
+/** VRM 씬에 MToon 재질이 하나라도 있는지 — 재질 효과 섹션의 표시 가드에 쓰인다. */
+export function hasVrmMToonMaterial(vrm: VRM): boolean {
+  let found = false;
+  vrm.scene.traverse((obj) => {
+    if (found || !(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (materials.some((m) => (m as MToonUniformMaterial | undefined)?.isMToonMaterial)) found = true;
+  });
+  return found;
+}
+
+interface VrmMaterialFxOriginal {
+  shadeColor?: THREE.Color;
+  outlineColor?: THREE.Color;
+  rimColor?: THREE.Color;
+  rimIntensity?: number;
+  emissiveColor?: THREE.Color;
+  emissiveIntensity?: number;
+}
+
+/**
+ * MToon 재질의 그림자·외곽선·림라이트·발광 색/강도 유니폼을 적용한다.
+ * 표준 재질(MeshStandardMaterial 등)에는 해당 유니폼이 없어 자동으로 건너뛴다.
+ * 정점/지오메트리는 절대 건드리지 않는다 — 재질 색상 유니폼만 갱신.
+ *
+ * fx 필드가 꺼지면(falsy) 단순히 아무 일도 안 하면 이전에 적용해 둔 색이 그대로 남아 "끄기"/
+ * "초기화" 버튼이 시각적으로 무효과가 된다 — 그래서 재질(mat.userData)에 원본 유니폼 값을 최초
+ * 1회만 캐시해 두고, 필드가 꺼진 경우 그 원본으로 되돌린다.
+ */
+export function applyVrmMaterialFx(vrm: VRM, fx: VrmMaterialFx) {
+  vrm.scene.traverse((obj) => {
+    if (!(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    // 눈/얼굴 하이라이트 텍스처가 emissive를 쓰는 모델이 많아, 발광색만은 보호 카테고리를 피한다
+    // (studio-vrm-costume의 protected 판정 재사용 — 의상 보호 로직과 동일한 안전장치).
+    const { protected: guard } = classifyMeshName(mesh.name);
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+    materials.forEach((m) => {
+      const mat = m as THREE.Material & MToonUniformMaterial & { userData: Record<string, unknown> };
+      if (!mat.isMToonMaterial) return; // MToon 전용 유니폼 — 표준 재질(MeshStandardMaterial 등)엔 없음
+
+      let original = mat.userData.__vrmMaterialFxOriginal as VrmMaterialFxOriginal | undefined;
+      if (!original) {
+        original = {
+          shadeColor: mat.shadeColorFactor?.clone(),
+          outlineColor: mat.outlineColorFactor?.clone(),
+          rimColor: mat.parametricRimColorFactor?.clone(),
+          rimIntensity: mat.rimLightingMixFactor,
+          emissiveColor: mat.emissive?.clone(),
+          emissiveIntensity: mat.emissiveIntensity,
+        };
+        mat.userData.__vrmMaterialFxOriginal = original;
+      }
+
+      if (fx.shadeColor) mat.shadeColorFactor?.set(fx.shadeColor);
+      else if (original.shadeColor) mat.shadeColorFactor?.copy(original.shadeColor);
+
+      if (fx.outlineColor) mat.outlineColorFactor?.set(fx.outlineColor);
+      else if (original.outlineColor) mat.outlineColorFactor?.copy(original.outlineColor);
+
+      if (fx.rimColor) {
+        mat.parametricRimColorFactor?.set(fx.rimColor);
+        mat.rimLightingMixFactor = fx.rimIntensity;
+      } else {
+        if (original.rimColor) mat.parametricRimColorFactor?.copy(original.rimColor);
+        if (original.rimIntensity !== undefined) mat.rimLightingMixFactor = original.rimIntensity;
+      }
+
+      if (guard !== "eye" && guard !== "face") {
+        if (fx.emissiveColor) {
+          mat.emissive?.set(fx.emissiveColor);
+          mat.emissiveIntensity = fx.emissiveIntensity;
+        } else {
+          if (original.emissiveColor) mat.emissive?.copy(original.emissiveColor);
+          if (original.emissiveIntensity !== undefined) mat.emissiveIntensity = original.emissiveIntensity;
+        }
+      }
+      mat.needsUpdate = true;
+    });
+  });
+}
+
 // ── 신규 순수 헬퍼: finger / bodyScale / lighting / full state ─────────────
 
 export type FingerRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
@@ -938,6 +1056,7 @@ export type FullVrmState = {
   lighting?: LightingParams;
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
+  materialFx?: VrmMaterialFx;
 };
 
 export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
@@ -956,6 +1075,7 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
     lighting: state.lighting,
     env: state.env,
     fingerOverrides: state.fingerOverrides,
+    materialFx: state.materialFx,
   };
 }
 
@@ -966,6 +1086,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   applyWardrobe?: (w: unknown) => void;
   applyProps?: (p: unknown) => void;
   applyPhysics?: (p: unknown) => void;
+  applyMaterialFx?: (fx: VrmMaterialFx) => void;
 }) {
   if (state.bones) applyers.applyPose(stripFingerBones(state.bones), state.yOffset ?? 0);
   if (state.expressionWeights) applyers.applyExpr(state.expressionWeights);
@@ -975,6 +1096,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   if (state.wardrobe && applyers.applyWardrobe) applyers.applyWardrobe(state.wardrobe);
   if (state.props && applyers.applyProps) applyers.applyProps(state.props);
   if (state.physics && applyers.applyPhysics) applyers.applyPhysics(state.physics);
+  if (state.materialFx && applyers.applyMaterialFx) applyers.applyMaterialFx(state.materialFx);
   // lighting/env applied in scene setup (UI side)
 }
 
@@ -1018,6 +1140,7 @@ export function planFullStateRestore(state: FullVrmState): {
   wardrobe?: unknown;
   propsItems?: unknown;
   physics?: unknown;
+  materialFx?: VrmMaterialFx;
 } {
   return {
     strippedBones: stripFingerBones(state.bones || {}),
@@ -1031,6 +1154,7 @@ export function planFullStateRestore(state: FullVrmState): {
     wardrobe: state.wardrobe,
     propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
     physics: state.physics,
+    materialFx: state.materialFx,
   };
 }
 
