@@ -369,6 +369,7 @@ export const LOOK_FILTER_KEYS: (keyof ImageFilterFields)[] = [
   "light",
   "sketch",
   "detail",
+  "colorToAlpha",
 ];
 
 /**

@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Boxes,
   Music4,
+  Package,
   Pipette,
   PictureInPicture2,
   UserRound,
@@ -67,6 +68,8 @@ import {
   Send,
   SlidersHorizontal,
   Grid2x2,
+  Grid2x2Check,
+  Grid2x2X,
   Smile,
   Sparkles,
   Square,
@@ -88,6 +91,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
+import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
@@ -103,6 +107,7 @@ import {
   type FrameSpec,
 } from "./studio-assets";
 import { parseStudio3dTool } from "./studio-background-3d-primitives";
+import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
   BRUSH_PRESETS,
   gpenSegmentWidths,
@@ -340,6 +345,7 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioBrandKitPanel } from "./StudioBrandKitPanel";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -366,6 +372,7 @@ import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
+import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -726,6 +733,7 @@ export interface ImageEl {
   vibrance?: Vibrance;
   gradientMap?: GradientMap;
   photoFilter?: PhotoFilter;
+  colorToAlpha?: ColorToAlpha; // 색상 투명화 — 키 색상을 알파로 punching(studio-color-to-alpha)
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
   outline?: Outline;
@@ -898,8 +906,8 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette";
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean };
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -4472,6 +4480,27 @@ function StudioCuttoonEditor() {
   function patchElCoalesced(id: string, patch: Partial<El>, key: string) {
     commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
   }
+  // 브랜드 킷 — 제목/본문 글꼴을 현재 선택된 텍스트/말풍선 요소에 적용.
+  // selected가 없거나 text/bubble이 아니면 아무 것도 하지 않는다(패널의 canApplyFont로 사전 방지되지만 방어적으로 재확인).
+  function applyBrandKitFont(font: string) {
+    if (!selected || (selected.type !== "text" && selected.type !== "bubble")) return;
+    patchEl(selected.id, { font } as Partial<El>);
+  }
+  // 브랜드 킷 — 로고를 문서 마스터에 적용(추가 또는 같은 자리 교체).
+  // BRAND_KIT_LOGO_MASTER_ID 고정 id로 기존 브랜드 킷 로고 요소를 찾아 위치·크기를 그대로
+  // 재사용하고(사용자가 마스터 편집 모드에서 옮겨둔 걸 존중), 없으면 placeBrandKitLogo로
+  // 우하단에 새로 배치한다. locked/noClip은 여기서 설정하지 않는다 — composeMasterRenderElements가
+  // 페이지 렌더 시에만 강제하며, 여기서 미리 잠그면 마스터 편집 모드에서 이 요소를 옮길 수 없게 된다.
+  function applyBrandKitLogo(kit: BrandKit) {
+    if (!kit.logo) return;
+    const existing = master.elements.find((e) => e.id === BRAND_KIT_LOGO_MASTER_ID);
+    const box =
+      existing && existing.type === "image"
+        ? { x: existing.x, y: existing.y, width: existing.width, height: existing.height, rotation: existing.rotation }
+        : placeBrandKitLogo(CANVAS_W, canvasH, kit.logo.width, kit.logo.height);
+    const logoEl: El = { id: BRAND_KIT_LOGO_MASTER_ID, type: "image", src: kit.logo.dataUrl, ...box };
+    setMaster(withMasterElements(master, [...master.elements.filter((e) => e.id !== BRAND_KIT_LOGO_MASTER_ID), logoEl]));
+  }
   // 현재 캔버스 내용을 elId 이미지 요소의 새 프레임으로 캡처.
   async function captureAnimFrame(elId: string) {
     const el = elementById.get(elId);
@@ -4599,6 +4628,17 @@ function StudioCuttoonEditor() {
         >
           {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
         </button>
+        {canAlphaLock(el) && (
+          <button
+            type="button"
+            onClick={() => patchEl(el.id, { alphaLocked: !el.alphaLocked } as Partial<El>)}
+            className={cn("grid size-6 place-items-center rounded hover:bg-raised", el.alphaLocked ? "text-accent" : "text-fg-3")}
+            aria-label={el.alphaLocked ? "알파 락 해제" : "알파 락"}
+            title={el.alphaLocked ? "알파 락 해제 — 투명 영역도 다시 칠할 수 있어요" : "알파 락 — 켜면 이 레이어의 불투명한 부분에만 칠해져요"}
+          >
+            {el.alphaLocked ? <Grid2x2Check size={13} /> : <Grid2x2X size={13} />}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
@@ -5920,6 +5960,31 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 페인트 통 결과 커밋 — 알파 락이면 편집 전 알파 모양 밖으로 못 나가게 오려낸 뒤 반영 ──
+  // floodFillImage 자체는 알파를 안 건드리지만(색만 칠함) 반투명 안티앨리어싱 가장자리로 색이
+  // 스며나가는 걸 막아 "이 레이어의 지금 모양 밖으로는 절대 안 나간다"를 보장한다. 잠금이 아니면
+  // 기존과 완전히 동일하게(추가 로드/합성 없이) 그대로 커밋한다.
+  async function commitFloodFillResult(dataUrl: string) {
+    if (selected?.type !== "image") return; // 방어적 — 페인트 통 패널은 이미지 선택 시에만 렌더된다.
+    const target = selected;
+    if (!shouldClipToExistingAlpha(target)) {
+      patchEl(target.id, { src: dataUrl } as Partial<El>);
+      return;
+    }
+    const beforeSrc = target.src; // 이번 편집 전(잠긴 채 유지돼야 할) 알파 모양의 원본.
+    try {
+      const [original, edited] = await Promise.all([loadPixelEditImage(beforeSrc), loadPixelEditImage(dataUrl)]);
+      const w = original.naturalWidth || original.width;
+      const h = original.naturalHeight || original.height;
+      const out = compositeAlphaLocked(original, edited, w, h, createPixelEditCanvas);
+      const src = out ? (out as HTMLCanvasElement).toDataURL("image/png") : dataUrl;
+      patchEl(target.id, { src } as Partial<El>);
+    } catch (err) {
+      console.error("Failed to apply alpha-locked composite:", err);
+      patchEl(target.id, { src: dataUrl } as Partial<El>); // 합성 실패 시 잠금 없이 원래 결과라도 반영.
+    }
+  }
+
   // ── 이미지 크롭 적용 — 원본 자연 해상도로 잘라 data URL 교체(파괴적, 히스토리 1건) ──
   // 크롭 후에도 화면상 위치가 유지되도록 src 와 요소 프레임(x/y/width/height)을 한 번의
   // patchEl 로 함께 갱신한다(⌘Z 1회로 원복). 반전(flipX/flipY)·회전 보정은 planCropApply 가 담당.
@@ -7153,6 +7218,7 @@ function StudioCuttoonEditor() {
                   isExporting={isExporting}
                   exportTitle={title}
                   pageCount={pages.length}
+                  pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
                   capturePagesForPreset={handleCapturePagesForPreset}
                   exportCurrentPageToSvg={exportCurrentPageToSvg}
                   exportCurrentPageToPsd={exportCurrentPageToPsd}
@@ -7690,6 +7756,26 @@ function StudioCuttoonEditor() {
             <Palette size={14} /> 팔레트
           </button>
           {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
+        </div>
+        <div ref={menu === "brandKit" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "brandKit" ? null : "brandKit")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "brandKit"}
+            className={toolBtn(menu === "brandKit")}
+            title="팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용"
+          >
+            <Package size={14} /> 브랜드 킷
+          </button>
+          {menu === "brandKit" && (
+            <StudioBrandKitPanel
+              onPickColor={(hex) => setColor(hex)}
+              canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
+              onApplyFont={applyBrandKitFont}
+              onApplyLogo={applyBrandKitLogo}
+            />
+          )}
         </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
@@ -12043,7 +12129,7 @@ function StudioCuttoonEditor() {
                   <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
                   <StudioFloodFillPanel
                     src={selected.src}
-                    onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                    onResult={(dataUrl) => void commitFloodFillResult(dataUrl)}
                   />
                   <StudioLineCleanupPanel
                     src={selected.src}

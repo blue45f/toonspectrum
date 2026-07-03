@@ -21,6 +21,7 @@ import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-b
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
 import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "./studio-clarity";
 import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "./studio-color-balance";
+import { colorToAlphaKonvaFilter, normalizeColorToAlpha, isIdentityColorToAlpha } from "./studio-color-to-alpha";
 import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "./studio-curves";
 import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
@@ -73,6 +74,10 @@ function hasActiveSketch(el: ImageFilterFields): boolean {
 // 디테일/샤픈이 항등(amount0)이 아니면 활성.
 function hasActiveDetail(el: ImageFilterFields): boolean {
   return !!el.detail && !isIdentityDetail(normalizeDetail(el.detail));
+}
+// 색상 투명화가 항등(strength0)이 아니면 활성.
+function hasActiveColorToAlpha(el: ImageFilterFields): boolean {
+  return !!el.colorToAlpha && !isIdentityColorToAlpha(normalizeColorToAlpha(el.colorToAlpha));
 }
 
 // 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
@@ -365,6 +370,8 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.GradientMap = gradientMapKonvaFilter;
   // 포토 필터 — this.attrs.pfColor/pfDensity/pfPreserve 적용(studio-photo-filter).
   F.PhotoFilter = photoFilterKonvaFilter;
+  // 색상 투명화 — this.attrs.ctaColor/ctaStrength 적용(studio-color-to-alpha).
+  F.ColorToAlpha = colorToAlphaKonvaFilter;
   // 자동 보정 — this.attrs.autoMode/autoStrength 적용(studio-auto-adjust).
   F.AutoAdjust = autoAdjustKonvaFilter;
   // 선명도/디테일 — this.attrs.clarity/dehaze 적용(studio-clarity).
@@ -419,6 +426,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveLight(el) ||
     hasActiveSketch(el) ||
     hasActiveDetail(el) ||
+    hasActiveColorToAlpha(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -584,6 +592,16 @@ export function buildImageFilters(
   }
 
   // --- 스타일라이즈 ---
+  // 색상 투명화(Color to Alpha) — 알파를 새로 punching하므로 이 알파에 의존하는 이후 단계
+  // (특히 실루엣 경계를 읽는 Outline)보다 먼저 적용해야 한다. 색 보정(레벨/커브/컬러밸런스/
+  // 포토필터/그레이스케일/세피아/반전)은 이미 다 끝난 뒤라, 사용자가 라이브 프리뷰에서 스포이드로
+  // 뽑은 키 색상이 실제로 이 시점의 픽셀 값과 일치한다.
+  if (hasActiveColorToAlpha(el)) {
+    filters.push(F.ColorToAlpha!);
+    const cta = normalizeColorToAlpha(el.colorToAlpha);
+    attrs.ctaColor = cta.keyColor;
+    attrs.ctaStrength = cta.strength;
+  }
   if (isActiveNumber(el.inkThreshold)) {
     filters.push(F.InkThreshold!);
     attrs.inkThreshold = el.inkThreshold!;
@@ -729,6 +747,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.light ?? null,
     el.sketch ?? null,
     el.detail ?? null,
+    el.colorToAlpha ?? null,
     el.levelsCh ?? null,
     el.curveCh ?? null,
   ]);

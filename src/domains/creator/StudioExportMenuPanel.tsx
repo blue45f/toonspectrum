@@ -18,10 +18,18 @@ import {
   validateExport,
   type PresetExportScope,
 } from "./studio-export-presets";
+import {
+  CONTACT_SHEET_PAGE_PRESETS,
+  contactSheetResultMessage,
+  DEFAULT_CONTACT_SHEET_COLUMNS,
+  DEFAULT_CONTACT_SHEET_ROWS,
+  exportContactSheetPdf,
+} from "./studio-pdf-contact-sheet";
 import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
 import { psdExportFileName, psdExportResultMessage, type PsdExportResult } from "./studio-psd-export";
 import { SVG_EXPORT_MIME, svgExportFileName, svgExportResultMessage, type SvgExportResult } from "./studio-svg-export";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
+import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
 import type { Dispatch, SetStateAction } from "react";
 
@@ -46,6 +54,8 @@ export interface StudioExportMenuPanelProps {
   exportTitle: string;
   /** 전체 페이지 수 — 2 이상이면 "전체 페이지" 규격 내보내기 버튼을 보여준다. */
   pageCount: number;
+  /** 페이지별 표시 이름(pageDisplayName 결과) — 콘택트시트 라벨에 쓴다. pages와 같은 순서/길이. */
+  pageLabels: string[];
   setExportScale: Dispatch<SetStateAction<number>>;
   setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
   setExportTransparent: Dispatch<SetStateAction<boolean>>;
@@ -83,6 +93,7 @@ export function StudioExportMenuPanel({
   isExporting,
   exportTitle,
   pageCount,
+  pageLabels,
   setExportScale,
   setExportFormat,
   setExportTransparent,
@@ -104,6 +115,13 @@ export function StudioExportMenuPanel({
   // PSD(레이어별) 내보내기 실행 상태 — 요소별 캡처가 여러 번 돌아 비동기라 진행/결과를 안내한다.
   const [psdBusy, setPsdBusy] = useState(false);
   const [psdStatus, setPsdStatus] = useState<ExportRunStatus | null>(null);
+  // 콘택트시트(다중 페이지 축소판을 인쇄용 한 장에 타일링) 실행 상태 — 다른 내보내기와 독립.
+  const [contactColumns, setContactColumns] = useState<number>(DEFAULT_CONTACT_SHEET_COLUMNS);
+  const [contactRows, setContactRows] = useState<number>(DEFAULT_CONTACT_SHEET_ROWS);
+  const [contactPagePresetId, setContactPagePresetId] = useState<string>(CONTACT_SHEET_PAGE_PRESETS[0].id);
+  const [contactShowLabels, setContactShowLabels] = useState(true);
+  const [contactBusy, setContactBusy] = useState(false);
+  const [contactStatus, setContactStatus] = useState<ExportRunStatus | null>(null);
   // 페이지당 요소 수만큼 순차 캡처라 다른 내보내기보다 오래 걸린다 — 진행 중 패널이 닫히거나
   // 언마운트되면(다른 내보내기 형식으로 전환 등) 뒤늦게 도착한 결과가 상태를 덮어쓰지 않게 막는다.
   const mountedRef = useRef(true);
@@ -124,7 +142,7 @@ export function StudioExportMenuPanel({
 
   // 전체 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
   async function runPdfExport() {
-    if (pdfBusy || presetBusy || psdBusy || isExporting) return;
+    if (pdfBusy || presetBusy || psdBusy || isExporting || contactBusy) return;
     setPdfBusy(true);
     setPdfStatus({ tone: "info", text: pageCount > 1 ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
     try {
@@ -143,6 +161,36 @@ export function StudioExportMenuPanel({
       });
     } finally {
       setPdfBusy(false);
+    }
+  }
+
+  // 페이지 축소판 여러 장을 한 인쇄용 시트에 격자로 배치 → PDF 한 파일. PDF 바이트 조립은
+  // exportPagesToPdf와 동일한 buildPdfFromJpegPages를 재사용(studio-pdf-contact-sheet 내부).
+  async function runContactSheetExport() {
+    if (contactBusy || pdfBusy || presetBusy || psdBusy || isExporting) return;
+    const preset = CONTACT_SHEET_PAGE_PRESETS.find((p) => p.id === contactPagePresetId) ?? CONTACT_SHEET_PAGE_PRESETS[0];
+    setContactBusy(true);
+    setContactStatus({ tone: "info", text: pageCount > 1 ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
+    try {
+      const pages = await capturePagesForPreset("all");
+      const result = await exportContactSheetPdf({
+        pages,
+        pageLabels,
+        columns: contactColumns,
+        rows: contactRows,
+        sheetWidth: preset.widthPx,
+        sheetHeight: preset.heightPx,
+        showLabels: contactShowLabels,
+        title: exportTitle,
+        onProgress: (done, total) => setContactStatus({ tone: "info", text: `${done}/${total}장 합성 중…` }),
+      });
+      if (!mountedRef.current) return;
+      setContactStatus({ tone: "good", text: contactSheetResultMessage(result) });
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setContactStatus({ tone: "warn", text: err instanceof Error ? err.message : "콘택트시트 내보내기에 실패했어요." });
+    } finally {
+      if (mountedRef.current) setContactBusy(false);
     }
   }
 
@@ -170,7 +218,7 @@ export function StudioExportMenuPanel({
   // 현재 페이지 → 요소별 레이어를 가진 PSD 한 파일. 캡처(stage.toCanvas 여러 번)는
   // StudioPage(exportCurrentPageToPsd)가 하고, 여기선 Blob 다운로드 + 스킵 고지만 담당한다.
   async function runPsdExport() {
-    if (!exportCurrentPageToPsd || psdBusy || pdfBusy || presetBusy || isExporting) return;
+    if (!exportCurrentPageToPsd || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy) return;
     setPsdBusy(true);
     setPsdStatus({ tone: "info", text: "레이어별로 캡처하는 중…" });
     try {
@@ -195,7 +243,7 @@ export function StudioExportMenuPanel({
 
   // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
   async function runPresetSliceExport(scope: PresetExportScope) {
-    if (!selectedPreset || presetBusy || pdfBusy || psdBusy) return;
+    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || contactBusy) return;
     setPresetBusy(true);
     setPresetStatus({ tone: "info", text: scope === "all" ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
     try {
@@ -379,7 +427,7 @@ export function StudioExportMenuPanel({
       <button
         type="button"
         onClick={() => void runPdfExport()}
-        disabled={pdfBusy || presetBusy || psdBusy || isExporting}
+        disabled={pdfBusy || presetBusy || psdBusy || isExporting || contactBusy}
         className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         title={`전체 ${pageCount}페이지를 JPG로 담은 PDF 한 파일로 저장`}
       >
@@ -396,6 +444,22 @@ export function StudioExportMenuPanel({
       >
         {pdfStatus?.text}
       </p>
+
+      <StudioContactSheetPanel
+        columns={contactColumns}
+        rows={contactRows}
+        pagePresetId={contactPagePresetId}
+        showLabels={contactShowLabels}
+        pageCount={pageCount}
+        busy={contactBusy}
+        disabled={pdfBusy || presetBusy || psdBusy || isExporting}
+        status={contactStatus}
+        setColumns={setContactColumns}
+        setRows={setContactRows}
+        setPagePresetId={setContactPagePresetId}
+        setShowLabels={setContactShowLabels}
+        onExport={() => void runContactSheetExport()}
+      />
 
       {/* 현재 페이지 → 벡터 SVG — 도형·말풍선·텍스트를 벡터로 보존(픽셀 필터·톤 등 일부는 스킵 고지). */}
       {exportCurrentPageToSvg && (
@@ -429,7 +493,7 @@ export function StudioExportMenuPanel({
           <button
             type="button"
             onClick={() => void runPsdExport()}
-            disabled={psdBusy || pdfBusy || presetBusy || isExporting}
+            disabled={psdBusy || pdfBusy || presetBusy || isExporting || contactBusy}
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             title="현재 페이지를 요소별 레이어를 가진 PSD 파일로 저장 (포토샵에서 레이어별 편집 가능)"
           >
@@ -480,7 +544,7 @@ export function StudioExportMenuPanel({
             <button
               type="button"
               onClick={() => void runPresetSliceExport("current")}
-              disabled={presetBusy || pdfBusy || psdBusy || isExporting}
+              disabled={presetBusy || pdfBusy || psdBusy || isExporting || contactBusy}
               className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
               title={`현재 페이지를 ${selectedPreset.label} 규격(폭 리샘플·세로 분할)으로 저장`}
             >
@@ -490,7 +554,7 @@ export function StudioExportMenuPanel({
               <button
                 type="button"
                 onClick={() => void runPresetSliceExport("all")}
-                disabled={presetBusy || pdfBusy || psdBusy || isExporting}
+                disabled={presetBusy || pdfBusy || psdBusy || isExporting || contactBusy}
                 className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                 title={`${pageCount}페이지를 이어 붙여 ${selectedPreset.label} 규격으로 나눠 저장`}
               >

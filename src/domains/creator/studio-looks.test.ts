@@ -192,6 +192,7 @@ describe("LOOK_FILTER_KEYS", () => {
       "light",
       "sketch",
       "detail",
+      "colorToAlpha",
     ];
     // 순서 무관하게 같은 키 집합인지.
     expect(new Set(LOOK_FILTER_KEYS)).toEqual(new Set(expected));

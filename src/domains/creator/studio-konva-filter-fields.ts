@@ -3,6 +3,7 @@ import type { BlurFx } from "./studio-blur";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { ColorBalance } from "./studio-color-balance";
+import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -55,6 +56,7 @@ export type ImageFilterFields = {
   vibrance?: Vibrance;
   gradientMap?: GradientMap;
   photoFilter?: PhotoFilter;
+  colorToAlpha?: ColorToAlpha;
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
   outline?: Outline;
@@ -117,6 +119,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasObjectFilter(el.light) ||
     hasObjectFilter(el.sketch) ||
     hasObjectFilter(el.detail) ||
+    hasObjectFilter(el.colorToAlpha) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -182,6 +185,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.light ?? null,
     el.sketch ?? null,
     el.detail ?? null,
+    el.colorToAlpha ?? null,
     el.levelsCh ?? null,
     el.curveCh ?? null,
   ]);

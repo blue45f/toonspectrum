@@ -159,6 +159,30 @@ const StudioPhotoFilterSection = lazy(async () => {
   return { default: StudioPhotoFilterSection };
 });
 
+const StudioColorToAlphaSection = lazy(async () => {
+  const [panelMod, colorToAlpha] = await Promise.all([
+    import("./StudioColorToAlphaPanel"),
+    import("./studio-color-to-alpha"),
+  ]);
+  const Panel = panelMod.StudioColorToAlphaPanel;
+  function StudioColorToAlphaSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = colorToAlpha.normalizeColorToAlpha(selected.colorToAlpha);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            colorToAlpha: colorToAlpha.normalizeColorToAlpha({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ colorToAlpha: v } as Partial<El>)}
+        onReset={() => onPatch({ colorToAlpha: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioColorToAlphaSection };
+});
+
 const StudioGradientMapSection = lazy(async () => {
   const [panelMod, gradientMap] = await Promise.all([
     import("./StudioGradientMapPanel"),
@@ -650,6 +674,10 @@ export function StudioImageAdjustmentsPanel({
 
       <AdjustmentSection title="포토 필터" forceOpen={hasAdjustmentValue(selected.photoFilter)}>
         <StudioPhotoFilterSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+
+      <AdjustmentSection title="색상 투명화" forceOpen={hasAdjustmentValue(selected.colorToAlpha)}>
+        <StudioColorToAlphaSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
       <AdjustmentSection title="그라디언트 맵" forceOpen={hasAdjustmentValue(selected.gradientMap)}>
