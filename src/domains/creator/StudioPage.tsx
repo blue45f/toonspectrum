@@ -152,6 +152,18 @@ import {
   type ExportFormat,
 } from "./studio-export";
 import {
+  clampFrameIndex,
+  DEFAULT_FRAME_FPS,
+  DEFAULT_ONION_SKIN,
+  frameIndexOf,
+  insertFrame,
+  MAX_ANIM_FRAMES,
+  onionSkinLayers,
+  type OnionSkinLayer,
+  type OnionSkinSettings,
+  type StudioAnimFrame,
+} from "./studio-frame-animation";
+import {
   estimateTextGradientBBox,
   konvaGradientProps,
   legacyTextGradientToSpec,
@@ -227,6 +239,16 @@ import {
   patternDataUrl,
   type StudioPatternSpec,
 } from "./studio-pattern-fill";
+import {
+  addVanishingPoint,
+  defaultVanishingPointPosition,
+  moveVanishingPoint,
+  removeVanishingPoint,
+  resolvePerspectiveRay,
+  snapStrokePointToPerspective,
+  type PerspectiveRay,
+  type VanishingPoint,
+} from "./studio-perspective-guide";
 import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
 import {
   computeAlignDeltas,
@@ -303,6 +325,7 @@ import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
+import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
@@ -382,6 +405,10 @@ const StudioHistoryPanel = lazyRetry(
   () => import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel })),
   "StudioHistoryPanel"
 );
+const StudioFrameAnimationPanel = lazyRetry(
+  () => import("./StudioFrameAnimationPanel").then((mod) => ({ default: mod.StudioFrameAnimationPanel })),
+  "StudioFrameAnimationPanel"
+);
 const StudioMasterPagePanel = lazyRetry(
   () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
   "StudioMasterPagePanel"
@@ -425,6 +452,10 @@ const StudioSelectionToolsPanel = lazyRetry(
 const StudioCropPanel = lazyRetry(
   () => import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel })),
   "StudioCropPanel"
+);
+const StudioPerspectivePanel = lazyRetry(
+  () => import("./StudioPerspectivePanel").then((mod) => ({ default: mod.StudioPerspectivePanel })),
+  "StudioPerspectivePanel"
 );
 const StudioVrmPoser = lazyRetry(
   () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
@@ -681,6 +712,12 @@ export interface ImageEl {
   // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
   skewX?: number;
   skewY?: number;
+  // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.
+  // src는 항상 frames 중 현재 표시 프레임의 src와 동일하게 유지한다.
+  frames?: StudioAnimFrame[];
+  frameFps?: number; // 재생 속도(기본 12) — durationMs 미설정 프레임에 적용.
+  frameLoop?: boolean; // 반복 재생(기본 true).
+  activeFrameId?: string; // 현재 편집/표시 중인 프레임(패널이 열려 있을 때의 탐색 위치).
 }
 interface TextEl {
   id: string;
@@ -2080,6 +2117,38 @@ function StudioCropOverlay({ rect, frame, scale }: { rect: CropRect; frame: Sele
   );
 }
 
+// 프레임 애니메이션 어니언스킨 — 이전/다음 프레임을 옅게 겹쳐 그린다. Transformer/포인터가 절대
+// 이걸 붙잡지 않도록 항상 listening=false, nodeRefs에도 등록하지 않는다(선택 불가능한 참고선).
+function OnionSkinImage({ el, layer }: { el: ImageEl; layer: OnionSkinLayer }) {
+  const [img, setImg] = useState<HTMLImageElement>();
+  useEffect(() => {
+    const im = new globalThis.Image();
+    im.onload = () => setImg(im);
+    im.src = layer.frame.src;
+    return () => {
+      im.onload = null;
+    };
+  }, [layer.frame.src]);
+  if (!img) return null;
+  return (
+    <Group opacity={layer.opacity} listening={false}>
+      <KImage image={img} x={el.x} y={el.y} width={el.width} height={el.height} listening={false} />
+      {layer.tint !== "none" && (
+        <Rect
+          x={el.x}
+          y={el.y}
+          width={el.width}
+          height={el.height}
+          fill={layer.tint === "prev" ? "#ef4444" : "#3b82f6"}
+          opacity={0.55}
+          globalCompositeOperation="source-atop"
+          listening={false}
+        />
+      )}
+    </Group>
+  );
+}
+
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
 function UrlImage({
   el,
@@ -2859,6 +2928,8 @@ function StudioCuttoonEditor() {
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(400);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
+  const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
+  const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
   const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -2905,6 +2976,22 @@ function StudioCuttoonEditor() {
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [timelapseCapturing, setTimelapseCapturing] = useState(false);
   const timelapseOriginalHiRef = useRef(0);
+  // frameAnimTargetId는 selectedId와 별개로 추적한다(bg3dInitialElementId/poserInitialElementId와
+  // 동일한 이유) — 패널이 열린 채로 캔버스의 다른 요소를 클릭해도 패널이 사라지지 않는다.
+  const [frameAnimOpen, setFrameAnimOpen] = useState(false);
+  const [frameAnimTargetId, setFrameAnimTargetId] = useState<string | null>(null);
+  const [onionSkin, setOnionSkin] = useState<OnionSkinSettings>(DEFAULT_ONION_SKIN);
+  const capturedElementIdsRef = useRef<Set<string>>(new Set());
+  const frameAnimTarget = frameAnimTargetId ? elementById.get(frameAnimTargetId) : null;
+  const frameAnimEl = frameAnimTarget && frameAnimTarget.type === "image" ? (frameAnimTarget as ImageEl) : null;
+  // 대상 요소가 삭제되거나(다른 페이지 이동 포함, elementById가 활성 페이지 기준이라 자동 반영)
+  // 사라지면 패널을 자동으로 닫는다.
+  useEffect(() => {
+    if (frameAnimOpen && frameAnimTargetId && !frameAnimTarget) {
+      setFrameAnimOpen(false);
+      setFrameAnimTargetId(null);
+    }
+  }, [frameAnimOpen, frameAnimTargetId, frameAnimTarget]);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
@@ -3327,6 +3414,7 @@ function StudioCuttoonEditor() {
   const publishRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
+  const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
@@ -4220,6 +4308,62 @@ function StudioCuttoonEditor() {
   }
   function patchEl(id: string, patch: Partial<El>) {
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+  }
+  // 원근자 — 소실점은 undo/redo(commit) 대상이 아니다(가이드 도구 상태, 그리기 결과물이 아님).
+  function addVanishingPointHandler() {
+    setVanishingPoints((prev) => {
+      const pos = defaultVanishingPointPosition(prev, CANVAS_W, canvasH);
+      return addVanishingPoint(prev, { id: uid(), x: pos.x, y: pos.y });
+    });
+  }
+  function removeVanishingPointHandler(id: string) {
+    setVanishingPoints((prev) => removeVanishingPoint(prev, id));
+  }
+  function moveVanishingPointById(id: string, x: number, y: number) {
+    setVanishingPoints((prev) => moveVanishingPoint(prev, id, x, y));
+  }
+
+  // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
+  function patchElCoalesced(id: string, patch: Partial<El>, key: string) {
+    commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
+  }
+  // 현재 캔버스 내용을 elId 이미지 요소의 새 프레임으로 캡처.
+  async function captureAnimFrame(elId: string) {
+    const el = elementById.get(elId);
+    if (!el || el.type !== "image") return;
+    if (el.rotation) {
+      setError("회전이 0°인 셀만 프레임을 캡처할 수 있어요.");
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+    setSelectedId(null); // Transformer 핸들 캡처 방지(handleSave와 동일 관행)
+    await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(handleSave와 동일 관행)
+    const src = stage.toDataURL({ x: el.x, y: el.y, width: el.width, height: el.height, pixelRatio: 2 / effScale });
+    const newFrameId = uid();
+    // 마지막 캡처 이후 새로 추가된 "draw" 타입 요소 중 캡처 bbox와 겹치는 것만 스트로크로 간주해
+    // 소거한다(텍스트/말풍선/스티커 등 다른 새 요소는 건드리지 않는다 — flatten은 펜 스크래치만 소비).
+    const bbox = { x: el.x, y: el.y, w: el.width, h: el.height };
+    const overlaps = (b: { x: number; y: number; w: number; h: number }) =>
+      b.x < bbox.x + bbox.w && b.x + b.w > bbox.x && b.y < bbox.y + bbox.h && b.y + b.h > bbox.y;
+    const newStrokeIds = new Set(
+      elements
+        .filter((e) => e.type === "draw" && !capturedElementIdsRef.current.has(e.id) && overlaps(elBounds(e)))
+        .map((e) => e.id)
+    );
+    const kept = elements.filter((e) => !newStrokeIds.has(e.id));
+    const next = kept.map((e) =>
+      e.id === elId
+        ? ({
+            ...e,
+            frames: insertFrame((e as ImageEl).frames ?? [], { id: newFrameId, src }, (e as ImageEl).activeFrameId ?? null),
+            activeFrameId: newFrameId,
+            src,
+          } as El)
+        : e
+    );
+    commit(next);
+    capturedElementIdsRef.current = new Set(next.map((e) => e.id));
   }
   function addEl(el: El) {
     commit([...elements, el]);
@@ -5683,7 +5827,7 @@ function StudioCuttoonEditor() {
 
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle") {
+    if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
       return;
     }
     // 크롭 모드 무장 중: 스테이지 드래그를 크롭 rect 조작(핸들 리사이즈/이동)으로 가로챈다.
@@ -5782,6 +5926,7 @@ function StudioCuttoonEditor() {
               pressures: [pressure],
             };
       drawingRef.current = next;
+      perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       setDraft(next);
       return;
     }
@@ -5878,11 +6023,21 @@ function StudioCuttoonEditor() {
 
       let targetX = pos.x;
       let targetY = pos.y;
+      if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
+        // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
+        // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
+        if (!perspectiveRayRef.current) {
+          const startX = current.points[0] ?? pos.x;
+          const startY = current.points[1] ?? pos.y;
+          perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, startX, startY, pos.x, pos.y);
+        }
+        [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
+      }
       if (stabilizer > 0 && current.points.length >= 2) {
-        // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush).
+        // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush) — 원근 투영 다음 단계.
         const lastX = current.points[current.points.length - 2]!;
         const lastY = current.points[current.points.length - 1]!;
-        [targetX, targetY] = stabilizePoint(lastX, lastY, pos.x, pos.y, stabilizer);
+        [targetX, targetY] = stabilizePoint(lastX, lastY, targetX, targetY, stabilizer);
       }
 
       const lastX = current.points[current.points.length - 2] ?? targetX;
@@ -5898,6 +6053,14 @@ function StudioCuttoonEditor() {
       const y0 = current.points[1] ?? pos.y;
       let x1 = pos.x;
       let y1 = pos.y;
+      // 원근자: 직선 도구에서만, Shift 스냅과는 배타적(Shift가 우선 — 수평/수직/45°는 사용자의
+      // 명시적 의도이므로 원근 락보다 존중한다).
+      if (perspectiveRulerActive && kind === "line" && !e.evt.shiftKey && vanishingPoints.length > 0) {
+        if (!perspectiveRayRef.current) {
+          perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
+        }
+        [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
+      }
       // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
       if (e.evt.shiftKey) {
         const dx = x1 - x0;
@@ -5962,6 +6125,7 @@ function StudioCuttoonEditor() {
       commit([...elements, finished]);
     }
     drawingRef.current = null;
+    perspectiveRayRef.current = null;
     clearDraftPreview();
   }
   // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
@@ -6836,6 +7000,29 @@ function StudioCuttoonEditor() {
           aria-pressed={tool === "draw" && drawMode === "eraser"}
         >
           <Eraser size={14} /> 지우개
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!selected || selected.type !== "image") return;
+            if (!selected.frames || selected.frames.length === 0) {
+              const firstId = uid();
+              patchEl(selected.id, {
+                frames: [{ id: firstId, src: selected.src }],
+                frameFps: DEFAULT_FRAME_FPS,
+                frameLoop: true,
+                activeFrameId: firstId,
+              });
+            }
+            capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
+            setFrameAnimTargetId(selected.id);
+            setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
+          }}
+          disabled={selected?.type !== "image"}
+          className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
+          title="선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"
+        >
+          <Film size={14} /> 프레임 애니메이션
         </button>
         <span className="mx-0.5 h-5 w-px bg-line" />
         <button
@@ -8442,18 +8629,28 @@ function StudioCuttoonEditor() {
                     )
                   );
                 };
-                if (el.type === "image")
+                if (el.type === "image") {
+                  const isAnimTarget = frameAnimOpen && el.id === frameAnimTargetId && el.frames && el.frames.length > 1;
+                  const onion = isAnimTarget
+                    ? onionSkinLayers(el.frames!, clampFrameIndex(el.frames!, frameIndexOf(el.frames!, el.activeFrameId ?? null)), onionSkin)
+                    : [];
                   return wrapClip(
-                    <UrlImage
-                      key={el.id}
-                      el={el}
-                      draggable={draggable}
-                      innerRef={setRef}
-                      onSelect={onSelect}
-                      onChange={(patch) => patchEl(el.id, patch)}
-                      dragBoundFunc={snapBoundFunc}
-                    />
+                    <>
+                      {onion.map((layer) => (
+                        <OnionSkinImage key={`onion-${el.id}-${layer.frame.id}`} el={el} layer={layer} />
+                      ))}
+                      <UrlImage
+                        key={el.id}
+                        el={el}
+                        draggable={draggable}
+                        innerRef={setRef}
+                        onSelect={onSelect}
+                        onChange={(patch) => patchEl(el.id, patch)}
+                        dragBoundFunc={snapBoundFunc}
+                      />
+                    </>
                   );
+                }
                 if (el.type === "frame") {
                   return (
                     <FramePanel
@@ -9451,6 +9648,17 @@ function StudioCuttoonEditor() {
                 )}
               </Layer>
             )}
+            {!isExporting && tool === "draw" && perspectiveRulerActive && vanishingPoints.length > 0 && (
+              <Layer>
+                <StudioPerspectiveOverlay
+                  points={vanishingPoints}
+                  canvasWidth={CANVAS_W}
+                  canvasHeight={canvasH}
+                  effScale={effScale}
+                  onMovePoint={moveVanishingPointById}
+                />
+              </Layer>
+            )}
           </Stage>
           </div>
           {pageGrade.vignette > 0 && (
@@ -9509,6 +9717,40 @@ function StudioCuttoonEditor() {
                 currentIndex={pagesHi}
                 onJumpTo={jumpToHistoryIndex}
                 onClose={() => setHistoryPanelOpen(false)}
+              />
+            </Suspense>
+          )}
+          {frameAnimOpen && frameAnimEl && (
+            <Suspense fallback={null}>
+              <StudioFrameAnimationPanel
+                element={frameAnimEl}
+                title={title}
+                onClose={() => {
+                  setFrameAnimOpen(false);
+                  setFrameAnimTargetId(null);
+                }}
+                onFramesChange={(frames) => patchEl(frameAnimEl.id, { frames })}
+                onSettingsChange={(patch) => patchEl(frameAnimEl.id, patch)}
+                onActiveFrameChange={(frameId) => {
+                  const frame = frameAnimEl.frames?.find((f) => f.id === frameId);
+                  if (!frame) return;
+                  patchElCoalesced(frameAnimEl.id, { activeFrameId: frameId, src: frame.src }, `frame-nav-${frameAnimEl.id}`);
+                }}
+                onCaptureFrame={() => void captureAnimFrame(frameAnimEl.id)}
+                captureDisabledReason={
+                  frameAnimEl.rotation
+                    ? "회전이 0°인 셀만 프레임을 캡처할 수 있어요."
+                    : (frameAnimEl.frames?.length ?? 0) >= MAX_ANIM_FRAMES
+                      ? "프레임은 최대 60장까지 만들 수 있어요."
+                      : null
+                }
+                onRemoveAnimation={() => {
+                  patchEl(frameAnimEl.id, { frames: undefined, frameFps: undefined, frameLoop: undefined, activeFrameId: undefined });
+                  setFrameAnimOpen(false);
+                  setFrameAnimTargetId(null);
+                }}
+                onionSkin={onionSkin}
+                onOnionSkinChange={setOnionSkin}
               />
             </Suspense>
           )}
@@ -11902,6 +12144,16 @@ function StudioCuttoonEditor() {
                     </div>
                   )}
                 </div>
+                <Suspense fallback={null}>
+                  <StudioPerspectivePanel
+                    active={perspectiveRulerActive}
+                    points={vanishingPoints}
+                    onToggleActive={() => setPerspectiveRulerActive((v) => !v)}
+                    onAddPoint={addVanishingPointHandler}
+                    onRemovePoint={removeVanishingPointHandler}
+                    onMovePoint={moveVanishingPointById}
+                  />
+                </Suspense>
               </div>
             </div>
           )}
