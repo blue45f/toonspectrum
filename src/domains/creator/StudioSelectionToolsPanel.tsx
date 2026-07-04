@@ -12,7 +12,7 @@
  * StudioPage 가 브러시 드래그(반경 전달)를 배선하기 전에는 칩 자체를 숨겨서
  * "눌러도 아무 일 없는" 죽은 도구가 보이지 않게 한다(정직한 점진 통합).
  */
-import { Circle, Eraser, Lasso, Paintbrush, RotateCcw, Square, Undo2 } from "lucide-react";
+import { Circle, Eraser, Lasso, Paintbrush, RotateCcw, Square, Undo2, WandSparkles } from "lucide-react";
 import { useState } from "react";
 
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
@@ -72,6 +72,8 @@ export type StudioSelectionToolsPanelProps = {
   onClearSelection: () => void;
   /** 선택 영역 한정 조정 실행(밝기/색조/삭제) — 원본 픽셀을 변경하는 파괴적 작업. */
   onApplyAdjust: (plan: SelectionAdjustPlan) => void;
+  /** 선택 영역을 지우고 콘텐츠 인식(타일 기반 근사)으로 채운다 — delete와 동일한 파괴적 작업. */
+  onContentAwareFill: () => void;
 };
 
 export function StudioSelectionToolsPanel({
@@ -88,6 +90,7 @@ export function StudioSelectionToolsPanel({
   onUndoSubpath,
   onClearSelection,
   onApplyAdjust,
+  onContentAwareFill,
 }: StudioSelectionToolsPanelProps): ReactElement {
   // 적용 전 조정 양 — 파괴적 적용 버튼을 누르기 전까지는 문서에 반영되지 않는 로컬 값.
   const [brightness, setBrightness] = useState(0);
@@ -264,6 +267,16 @@ export function StudioSelectionToolsPanel({
         >
           <Eraser className="size-3.5" aria-hidden />
           {busy ? "적용 중..." : "선택 영역 삭제"}
+        </button>
+        <button
+          type="button"
+          onClick={onContentAwareFill}
+          disabled={!canAdjust}
+          className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
+          title="선택 영역을 지우고 주변 텍스처를 참고해 자연스럽게 채웁니다(타일 기반 근사라 복잡한 배경은 이음매가 살짝 보일 수 있어요)."
+        >
+          <WandSparkles className="size-3.5" aria-hidden />
+          {busy ? "채우는 중..." : "콘텐츠 인식으로 채우기"}
         </button>
       </div>
     </div>

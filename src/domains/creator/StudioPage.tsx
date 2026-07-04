@@ -176,6 +176,7 @@ import {
   type StudioPageInsertState,
   type StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
+import { bakeContentAwareFillToCanvas } from "./studio-content-aware-fill";
 import {
   applyCropAspect,
   beginCropDrag,
@@ -7205,6 +7206,40 @@ function StudioCuttoonEditor() {
     } catch (err) {
       console.error("Failed to apply pixel selection adjust:", err);
       setError(err instanceof Error ? err.message : "선택 영역 조정에 실패했습니다.");
+    } finally {
+      setPixelBusy(false);
+    }
+  }
+
+  // ── 콘텐츠 인식으로 채우기 — 선택 영역을 지우고 주변 텍스처 근사로 채워 원본 픽셀에 굽는다.
+  // applyPixelSelectionAdjust와 동일한 구조(원본 자연 해상도로 마스크 래스터 → 합성 → data URL 교체)
+  // 이되, studio-content-aware-fill.ts의 bakeContentAwareFillToCanvas를 호출한다. 선택 영역은
+  // 유지된다(delete/adjust와 동일한 관례 — 같은 자리에 다시 조정을 가할 수 있게).
+  async function applyContentAwareFill() {
+    if (pixelBusy) return;
+    if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
+    const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷.
+    const sel = pixelSel;
+    setPixelBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const maskPlan = buildSelectionMaskPlan(sel, w, h, {
+        featherScale: target.width > 0 ? w / target.width : 1,
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!maskPlan) return;
+      const mask = rasterizeSelectionMask(maskPlan, createPixelEditCanvas);
+      const out = mask && bakeContentAwareFillToCanvas(img, mask, w, h, undefined, createPixelEditCanvas);
+      if (!out) throw new Error("채우기 캔버스를 만들지 못했습니다.");
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { src } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply content-aware fill:", err);
+      setError(err instanceof Error ? err.message : "콘텐츠 인식 채우기에 실패했습니다.");
     } finally {
       setPixelBusy(false);
     }
@@ -15073,6 +15108,7 @@ function StudioCuttoonEditor() {
                     onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
                     onClearSelection={() => setPixelSel(null)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
+                    onContentAwareFill={() => void applyContentAwareFill()}
                   />
                   <StudioMagicWandPanel
                     active={pixelTool === "wand"}
