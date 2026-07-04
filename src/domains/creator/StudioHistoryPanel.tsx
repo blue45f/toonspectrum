@@ -2,7 +2,7 @@
 // 항목 클릭으로 그 시점으로 즉시 점프한다(실행취소/다시실행 반복과 동일한 인덱스 이동).
 // 라벨·점프 계산은 studio-history-labels(순수), 인덱스 반영(setPagesHi)은 StudioPage(메인 루프)가 담당.
 // 자체완결 플로팅 패널: 캔버스 컨테이너(relative) 우측 상단에 떠 있고 Esc 로 닫힌다.
-import { History as HistoryIcon, X } from "lucide-react";
+import { History as HistoryIcon, Paintbrush, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import {
@@ -22,9 +22,26 @@ export type StudioHistoryPanelProps = {
   /** 항목 클릭 → 해당 인덱스로 점프(setPagesHi 와 동일한 좌표계). */
   onJumpTo: (index: number) => void;
   onClose: () => void;
+  /** 히스토리 브러시 소스 지정 콜백 — StudioPage 가 선택된 요소가 이미지일 때만 전달한다(그 외엔
+   * undefined 로 넘겨 아래 붓 아이콘 열 자체를 숨긴다). */
+  onDesignateBrushSource?: (index: number) => void;
+  /** 지금 지정된 소스 행(하이라이트용) — onDesignateBrushSource 가 있을 때만 의미 있다. */
+  brushSourceIndex?: number | null;
+  /** index별 지정 가능 여부(studio-history-brush 의 computeHistoryBrushAvailability 결과를 그대로
+   * 받는다) — 배열 인덱스가 entry.index 와 같은 좌표계. 없으면(undefined) 전부 지정 가능으로
+   * 취급(disabled 없음). */
+  brushSourceAvailability?: readonly boolean[];
 };
 
-export function StudioHistoryPanel({ history, currentIndex, onJumpTo, onClose }: StudioHistoryPanelProps) {
+export function StudioHistoryPanel({
+  history,
+  currentIndex,
+  onJumpTo,
+  onClose,
+  onDesignateBrushSource,
+  brushSourceIndex,
+  brushSourceAvailability,
+}: StudioHistoryPanelProps) {
   // 표시 목록: 라벨 타임라인(오래된→최신) → 표시 상한 창 → 최신이 위로 오게 뒤집기.
   const timeline = buildHistoryTimeline(history);
   const { visible, hiddenCount } = sliceHistoryForDisplay(timeline);
@@ -87,7 +104,7 @@ export function StudioHistoryPanel({ history, currentIndex, onJumpTo, onClose }:
           const isCurrent = entry.index === currentIndex;
           const isRedoSide = entry.index > currentIndex;
           return (
-            <li key={entry.index}>
+            <li key={entry.index} className="flex items-center gap-1">
               <button
                 type="button"
                 ref={isCurrent ? currentItemRef : undefined}
@@ -95,7 +112,7 @@ export function StudioHistoryPanel({ history, currentIndex, onJumpTo, onClose }:
                 aria-current={isCurrent ? "step" : undefined}
                 title={isCurrent ? "현재 시점" : "이 시점으로 이동"}
                 className={cx(
-                  "flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-[0.72rem] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  "flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-[0.72rem] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                   isCurrent
                     ? "border-accent/70 bg-accent-soft/40 font-semibold text-fg"
                     : isRedoSide
@@ -111,6 +128,32 @@ export function StudioHistoryPanel({ history, currentIndex, onJumpTo, onClose }:
                   </span>
                 )}
               </button>
+              {onDesignateBrushSource && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDesignateBrushSource(entry.index);
+                  }}
+                  disabled={brushSourceAvailability ? !brushSourceAvailability[entry.index] : false}
+                  aria-pressed={brushSourceIndex === entry.index}
+                  title={
+                    brushSourceAvailability && !brushSourceAvailability[entry.index]
+                      ? "이 시점엔 같은 레이어가 없어 지정할 수 없어요."
+                      : brushSourceIndex === entry.index
+                        ? "히스토리 브러시 소스로 지정됨"
+                        : "이 시점을 히스토리 브러시 소스로 지정"
+                  }
+                  className={cx(
+                    "grid size-6 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                    brushSourceIndex === entry.index
+                      ? "border-accent bg-accent text-on-accent"
+                      : "border-line text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-fg-3"
+                  )}
+                >
+                  <Paintbrush size={12} aria-hidden />
+                </button>
+              )}
             </li>
           );
         })}
@@ -123,6 +166,7 @@ export function StudioHistoryPanel({ history, currentIndex, onJumpTo, onClose }:
 
       <p className="border-t border-line/60 px-3 py-1.5 text-[0.72rem] leading-snug text-fg-3">
         항목을 누르면 그 시점으로 즉시 이동해요 · ⌘Z 실행취소 · ⇧⌘Z 다시실행
+        {onDesignateBrushSource && " · 붓 아이콘으로 히스토리 브러시 소스 지정"}
       </p>
     </section>
   );

@@ -203,6 +203,15 @@ import {
   HEAL_CLONE_RADIUS_DEFAULT,
   type HealCloneMode,
 } from "./studio-heal-clone";
+import {
+  bakeHistoryBrushStrokeToCanvas,
+  planHistoryBrushDabs,
+  resolveHistoryBrushSource,
+  computeHistoryBrushAvailability,
+  HISTORY_BRUSH_HARDNESS_DEFAULT,
+  HISTORY_BRUSH_OPACITY_DEFAULT,
+  HISTORY_BRUSH_RADIUS_DEFAULT,
+} from "./studio-history-brush";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   clampIsometricAngleDeg,
@@ -433,6 +442,7 @@ import {
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
+import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
 import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
 import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
@@ -619,6 +629,10 @@ const StudioSmudgePanel = lazyRetry(
 const StudioHealClonePanel = lazyRetry(
   () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
   "StudioHealClonePanel"
+);
+const StudioHistoryBrushPanel = lazyRetry(
+  () => import("./StudioHistoryBrushPanel").then((mod) => ({ default: mod.StudioHistoryBrushPanel })),
+  "StudioHistoryBrushPanel"
 );
 const StudioLayerMaskPanel = lazyRetry(
   () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
@@ -4021,6 +4035,72 @@ function StudioCuttoonEditor() {
     healCloneOffsetRef.current = null;
     setHealCloneBusy(false);
   }, [selectedId]);
+  // ── 히스토리 브러시 — studio-history-brush 통합 상태 ──
+  // 모드 없음(항상 단일 "복원" 동작) — active 만 있으면 된다(heal-clone 의 mode 와 달리 heal/clone
+  // 두 갈래가 없다). 소스(sourceIndex/sourceSrc)는 pixelSel/cropRect 와 마찬가지로 "선택된 이미지
+  // 요소 1개 귀속"이라 요소가 바뀌면 해제한다(§3.7 useEffect 참고).
+  const [historyBrushActive, setHistoryBrushActive] = useState(false);
+  const [historyBrushRadius, setHistoryBrushRadius] = useState(HISTORY_BRUSH_RADIUS_DEFAULT);
+  const [historyBrushHardness, setHistoryBrushHardness] = useState(HISTORY_BRUSH_HARDNESS_DEFAULT);
+  const [historyBrushOpacity, setHistoryBrushOpacity] = useState(HISTORY_BRUSH_OPACITY_DEFAULT);
+  // 표시용(작업 내역 패널의 하이라이트 행) — 실제 굽기엔 안 쓰인다. pagesHistory 가 트렁케이트되면
+  // 가리키는 의미가 사라질 수 있어 별도 useEffect(§3.8)로 함께 정리한다.
+  const [historyBrushSourceIndex, setHistoryBrushSourceIndex] = useState<number | null>(null);
+  // 실제 굽기에 쓰이는 데이터 — 지정 시점에 resolveHistoryBrushSource 로 1회 해석해 둔 결과(그
+  // 이후 pagesHistory 가 어떻게 변하든 이 문자열 자체는 영향받지 않는다).
+  const [historyBrushSourceSrc, setHistoryBrushSourceSrc] = useState<string | null>(null);
+  const [historyBrushBusy, setHistoryBrushBusy] = useState(false);
+  // 진행 중 드래그 — healCloneDragRef 와 동일 패턴(frame 은 드래그 시작 스냅샷). offset 이 없어
+  // healCloneDragRef 보다 필드가 하나 적다.
+  const historyBrushDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  } | null>(null);
+  const historyBrushRafRef = useRef<number | null>(null);
+  const pendingHistoryBrushDragRef = useRef<{ points: SelPoint[] } | null>(null);
+  const [historyBrushDragPreview, setHistoryBrushDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  // 브러시 원 호버 커서 — healCloneCursorRef 와 동일 기법(ref 직접 갱신, React 리렌더 없음). 소스
+  // 크로스헤어가 없어 healCloneSourceCursorRef 에 대응하는 두 번째 ref 는 없다.
+  const historyBrushCursorRef = useRef<Konva.Circle>(null);
+  const scheduleHistoryBrushDragPreview = (next: { points: SelPoint[] } | null) => {
+    pendingHistoryBrushDragRef.current = next;
+    if (historyBrushRafRef.current !== null) return;
+    historyBrushRafRef.current = globalThis.requestAnimationFrame(() => {
+      historyBrushRafRef.current = null;
+      setHistoryBrushDragPreview(pendingHistoryBrushDragRef.current);
+    });
+  };
+  const clearHistoryBrushDragPreview = () => {
+    pendingHistoryBrushDragRef.current = null;
+    if (historyBrushRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(historyBrushRafRef.current);
+      historyBrushRafRef.current = null;
+    }
+    setHistoryBrushDragPreview(null);
+  };
+  useEffect(() => () => {
+    if (historyBrushRafRef.current !== null) globalThis.cancelAnimationFrame(historyBrushRafRef.current);
+  }, []);
+  // 선택 요소가 바뀌면 소스·진행 중 드래그·busy 를 해제(모드는 유지 — heal-clone 과 동일 정책).
+  useEffect(() => {
+    void selectedId;
+    historyBrushDragRef.current = null;
+    clearHistoryBrushDragPreview();
+    setHistoryBrushSourceIndex(null);
+    setHistoryBrushSourceSrc(null);
+    setHistoryBrushBusy(false);
+  }, [selectedId]);
+  // pagesHistory 가 트렁케이트/갱신되어 지정해 둔 인덱스가 더는 그 스냅샷을 가리키지 않게 되면
+  // 하이라이트만 조용히 해제한다(실제 굽기용 historyBrushSourceSrc 는 이미 해석 완료된 문자열이라
+  // 영향받지 않지만, "하이라이트된 행"이 엉뚱한 스냅샷을 가리키는 건 혼란스러우므로 인덱스만 함께
+  // 정리한다 — src 는 유지해 사용자가 계속 그 색으로 칠할 수 있게 둔다).
+  useEffect(() => {
+    if (historyBrushSourceIndex !== null && historyBrushSourceIndex >= pagesHistory.length) {
+      setHistoryBrushSourceIndex(null);
+    }
+  }, [pagesHistory.length, historyBrushSourceIndex]);
   // ── 레이어 마스크 브러시 — studio-layer-mask 통합 상태 ──
   // paintActive/paintMode/radius/hardness/strength는 pixelTool과 동일하게 요소가 바뀌어도 유지.
   const [layerMaskPaintActive, setLayerMaskPaintActive] = useState(false);
@@ -4174,6 +4254,7 @@ function StudioCuttoonEditor() {
   const smudgeArmed = smudgeActive && selected?.type === "image";
   const healCloneArmed = healCloneTool !== null && selected?.type === "image";
   const layerMaskPaintArmed = layerMaskPaintActive && selected?.type === "image";
+  const historyBrushArmed = historyBrushActive && selected?.type === "image";
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -4866,6 +4947,7 @@ function StudioCuttoonEditor() {
     setQuickShapeActive(false);
     setColorWheelOpen(false);
     setLayerMaskPaintActive(false);
+    setHistoryBrushActive(false); // ← 추가(소스 지정 상태는 그대로 둔다)
   }
   // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
   // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
@@ -5785,6 +5867,13 @@ function StudioCuttoonEditor() {
           setHealCloneTool(null);
           healCloneDragRef.current = null;
           clearHealCloneDragPreview();
+        } else if (historyBrushActive) {
+          // 소스 지정(historyBrushSourceIndex/Src)은 crop rect 와 달리 Esc 로 폐기하지 않는다 — 다시
+          // 켰을 때 같은 소스로 이어서 칠할 수 있어야 사용자가 반복 작업하기 편하다(heal-clone 의
+          // Alt+클릭 오프셋도 disarm 으로는 안 지워지고 요소 전환/명시적 해제로만 지워지는 것과 동일 정책).
+          setHistoryBrushActive(false);
+          historyBrushDragRef.current = null;
+          clearHistoryBrushDragPreview();
         } else if (smudgeActive) {
           setSmudgeActive(false);
         } else if (layerMaskPaintActive) {
@@ -6691,6 +6780,71 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 히스토리 브러시 소스 지정 — 작업 내역 패널에서 행의 붓 아이콘을 누르면 호출된다. ──
+  // resolveHistoryBrushSource 는 순수 함수라 아무것도 기억하지 않는다 — 이 함수가 결과를 즉시
+  // 상태로 저장한다(heal-clone 의 Alt+클릭 핸들러가 오프셋을 1회 계산해 두는 것과 동일한 정신).
+  function designateHistoryBrushSource(index: number) {
+    if (masterEditMode || selected?.type !== "image") return;
+    const snapshot = pagesHistory[index];
+    if (!snapshot) return;
+    const result = resolveHistoryBrushSource(snapshot, activePage.id, selected.id);
+    if (!result.ok) {
+      setError("이 시점엔 같은 레이어가 없어 히스토리 브러시 소스로 지정할 수 없습니다.");
+      return;
+    }
+    setHistoryBrushSourceIndex(index);
+    setHistoryBrushSourceSrc(result.src);
+    setError(null);
+  }
+
+  // ── 히스토리 브러시 스트로크 굽기 — 스트로크 종료마다 자동 실행(heal-clone 과 동일하게 별도
+  // "적용" 버튼 없음, 붓처럼 즉시 반영). historySource(지정해 둔 과거 이미지)와 currentSource(지금
+  // 이미지) 둘 다 로드해야 한다는 점이 heal-clone(같은 이미지 하나만 로드)과 다르다. ──
+  async function bakeHistoryBrushDragStroke(session: {
+    elId: string;
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  }) {
+    const target = elementById.get(session.elId);
+    if (!target || target.type !== "image") return;
+    const historySrc = historyBrushSourceSrc;
+    if (!historySrc) return; // 굽는 사이 소스가 해제됐으면(요소 전환 등) 조용히 무시 — 방어적.
+    setHistoryBrushBusy(true);
+    try {
+      const [historyImg, currentImg] = await Promise.all([
+        loadPixelEditImage(historySrc),
+        loadPixelEditImage(target.src),
+      ]);
+      const w = currentImg.naturalWidth || currentImg.width;
+      const h = currentImg.naturalHeight || currentImg.height;
+      const dabs = planHistoryBrushDabs(session.points, w, h, {
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (dabs.length === 0) return;
+      const radiusPxDevice = historyBrushRadius * (target.width > 0 ? w / target.width : 1);
+      const out = bakeHistoryBrushStrokeToCanvas(
+        historyImg,
+        currentImg,
+        w,
+        h,
+        dabs,
+        { radiusPx: radiusPxDevice, hardness: historyBrushHardness, opacity: historyBrushOpacity },
+        createPixelEditCanvas
+      );
+      if (!out) throw new Error("히스토리 브러시 결과를 만들지 못했습니다.");
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { src } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to bake history brush stroke:", err);
+      setError(err instanceof Error ? err.message : "히스토리 브러시 적용에 실패했습니다.");
+    } finally {
+      setHistoryBrushBusy(false);
+    }
+  }
+
   // ── 페인트 통 결과 커밋 — 알파 락이면 편집 전 알파 모양 밖으로 못 나가게 오려낸 뒤 반영 ──
   // floodFillImage 자체는 알파를 안 건드리지만(색만 칠함) 반투명 안티앨리어싱 가장자리로 색이
   // 스며나가는 걸 막아 "이 레이어의 지금 모양 밖으로는 절대 안 나간다"를 보장한다. 잠금이 아니면
@@ -7064,6 +7218,31 @@ function StudioCuttoonEditor() {
       scheduleHealCloneDragPreview({ points: [p] });
       return;
     }
+    // 히스토리 브러시 무장 중: 소스가 지정돼 있으면 일반 드래그로 스트로크 좌표를 누적한다(오프셋
+    // 없음 — heal-clone 과 달리 Alt+클릭 지정 단계가 없다, 소스는 작업 내역 패널에서 이미 골랐다).
+    if (
+      historyBrushArmed &&
+      !historyBrushBusy &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      if (!historyBrushSourceSrc) return; // 패널 상태 문구가 이미 "작업 내역에서 먼저 지정하세요" 안내 중.
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      const radiusNorm = historyBrushRadius / Math.max(1, selected.width);
+      historyBrushDragRef.current = { elId: selected.id, frame, radiusNorm, points: [p] };
+      scheduleHistoryBrushDragPreview({ points: [p] });
+      return;
+    }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
     // Space 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
@@ -7174,6 +7353,16 @@ function StudioCuttoonEditor() {
         srcCursor.visible(false);
       }
     }
+    cursor.getLayer()?.batchDraw();
+  }
+  // 히스토리 브러시 호버 커서(브러시 원) — healCloneCursorRef 와 동일하게 ref 를 직접 갱신해
+  // 리렌더 없이 따라오게 한다.
+  function updateHistoryBrushCursorNode(destNorm: SelPoint, frame: SelectionFrame) {
+    const cursor = historyBrushCursorRef.current;
+    if (!cursor) return;
+    cursor.position(normalizedPointToCanvas(destNorm, frame));
+    cursor.radius(historyBrushRadius / effScale);
+    if (!cursor.visible()) cursor.visible(true);
     cursor.getLayer()?.batchDraw();
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
@@ -7301,6 +7490,22 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 히스토리 브러시 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터 —
+    // appendBrushPoint 재사용, heal-clone과 동일 패턴).
+    if (historyBrushDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = historyBrushDragRef.current;
+        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        updateHistoryBrushCursorNode(p, session.frame);
+        const nextPoints = appendBrushPoint(session.points, p, session.radiusNorm);
+        if (nextPoints !== session.points) {
+          session.points = nextPoints;
+          scheduleHistoryBrushDragPreview({ points: nextPoints });
+        }
+      }
+      return;
+    }
     // 마퀴 드래그 중이면 선택 박스를 갱신한다.
     if (marqueeStartRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -7342,6 +7547,18 @@ function StudioCuttoonEditor() {
           rotation: selected.rotation,
         };
         updateHealCloneCursorNodes(canvasPointToNormalized(pos.x, pos.y, frame), frame);
+      }
+    } else if (historyBrushArmed && selected?.type === "image") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const frame: SelectionFrame = {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+        };
+        updateHistoryBrushCursorNode(canvasPointToNormalized(pos.x, pos.y, frame), frame);
       }
     } else if (tool === "draw") {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
@@ -7585,6 +7802,14 @@ function StudioCuttoonEditor() {
       if (session.points.length > 0) void bakeHealCloneDragStroke(session);
       return;
     }
+    // 히스토리 브러시 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
+    if (historyBrushDragRef.current) {
+      const session = historyBrushDragRef.current;
+      historyBrushDragRef.current = null;
+      clearHistoryBrushDragPreview();
+      if (session.points.length > 0) void bakeHistoryBrushDragStroke(session);
+      return;
+    }
     // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
     if (marqueeStartRef.current) {
       const rect = pendingMarqueeRectRef.current ?? marqueeRect;
@@ -7635,6 +7860,11 @@ function StudioCuttoonEditor() {
     const srcCursor = healCloneSourceCursorRef.current;
     if (cursor?.visible()) cursor.visible(false);
     if (srcCursor?.visible()) srcCursor.visible(false);
+    cursor?.getLayer()?.batchDraw();
+  }
+  function hideHistoryBrushCursor() {
+    const cursor = historyBrushCursorRef.current;
+    if (cursor?.visible()) cursor.visible(false);
     cursor?.getLayer()?.batchDraw();
   }
   function hideLayerMaskCursor() {
@@ -10091,6 +10321,7 @@ function StudioCuttoonEditor() {
               hideBrushCursor();
               hideSmudgeCursor();
               hideHealCloneCursors();
+              hideHistoryBrushCursor();
               hideLayerMaskCursor();
             }}
             onDragMove={onStageDragMove}
@@ -10199,7 +10430,8 @@ function StudioCuttoonEditor() {
                   !nodeEditArmed &&
                   !smudgeArmed &&
                   !healCloneArmed &&
-                  !layerMaskPaintArmed;
+                  !layerMaskPaintArmed &&
+                  !historyBrushArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
@@ -10214,6 +10446,7 @@ function StudioCuttoonEditor() {
                       !smudgeArmed &&
                       !healCloneArmed &&
                       !layerMaskPaintArmed &&
+                      !historyBrushArmed &&
                       setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
@@ -11055,6 +11288,18 @@ function StudioCuttoonEditor() {
                 <KCircle ref={healCloneSourceCursorRef} visible={false} radius={5 / effScale} stroke="#f59e0b" strokeWidth={1.5 / effScale} />
               </Layer>
             )}
+            {!isExporting && historyBrushArmed && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={historyBrushCursorRef}
+                  visible={false}
+                  radius={Math.max(1.5, historyBrushRadius)}
+                  stroke="#ec4899"
+                  strokeWidth={1.5 / effScale}
+                  dash={[3 / effScale, 2 / effScale]}
+                />
+              </Layer>
+            )}
             {!isExporting && marqueeRect && (
               <Layer listening={false}>
                 <Rect
@@ -11113,6 +11358,15 @@ function StudioCuttoonEditor() {
                   drag={healCloneDragPreview}
                   radiusPx={healCloneRadius}
                   mode={healCloneTool ?? "clone"}
+                />
+              </Layer>
+            )}
+            {!isExporting && historyBrushArmed && pixelOverlayFrame && historyBrushDragPreview && (
+              <Layer listening={false}>
+                <StudioHistoryBrushOverlay
+                  frame={pixelOverlayFrame}
+                  drag={historyBrushDragPreview}
+                  radiusPx={historyBrushRadius}
                 />
               </Layer>
             )}
@@ -11563,6 +11817,15 @@ function StudioCuttoonEditor() {
                 currentIndex={pagesHi}
                 onJumpTo={jumpToHistoryIndex}
                 onClose={() => setHistoryPanelOpen(false)}
+                onDesignateBrushSource={
+                  !masterEditMode && selected?.type === "image" ? designateHistoryBrushSource : undefined
+                }
+                brushSourceIndex={historyBrushSourceIndex}
+                brushSourceAvailability={
+                  !masterEditMode && selected?.type === "image"
+                    ? computeHistoryBrushAvailability(pagesHistory, activePage.id, selected.id)
+                    : undefined
+                }
               />
             </Suspense>
           )}
@@ -13735,6 +13998,32 @@ function StudioCuttoonEditor() {
                       setHealCloneSourceAnchor(null);
                       healCloneOffsetRef.current = null;
                     }}
+                  />
+                  <StudioHistoryBrushPanel
+                    active={historyBrushActive}
+                    radiusPx={historyBrushRadius}
+                    hardness={historyBrushHardness}
+                    opacity={historyBrushOpacity}
+                    hasSource={historyBrushSourceSrc !== null}
+                    busy={historyBrushBusy}
+                    onToggleActive={() =>
+                      setHistoryBrushActive((v) => {
+                        const next = !v;
+                        if (next) {
+                          disarmAllPixelTools();
+                          return true;
+                        }
+                        return false;
+                      })
+                    }
+                    onRadiusChange={setHistoryBrushRadius}
+                    onHardnessChange={setHistoryBrushHardness}
+                    onOpacityChange={setHistoryBrushOpacity}
+                    onClearSource={() => {
+                      setHistoryBrushSourceIndex(null);
+                      setHistoryBrushSourceSrc(null);
+                    }}
+                    onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
                   />
                   <StudioLayerMaskPanel
                     hasMask={!!selected.maskSrc}
