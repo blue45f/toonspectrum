@@ -36,6 +36,7 @@ import {
   type GradientBBox,
   type StudioGradientSpec,
 } from "./studio-gradient-engine";
+import { getKaleidoscopePoints } from "./studio-kaleidoscope";
 import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
@@ -196,7 +197,7 @@ export interface SvgDrawElLike extends SvgElMeta {
   strokeStyle?: StrokeStyle;
   shapeParams?: ShapeParams;
   symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial";
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
     centerX: number;
     centerY: number;
     radialCount?: number;
@@ -401,20 +402,14 @@ function getSymmetricPoints(points: number[], symmetry: SvgDrawElLike["symmetry"
     const mirrored: number[] = [];
     for (let i = 0; i + 1 < points.length; i += 2) mirrored.push(points[i], cy * 2 - points[i + 1]);
     result.push(mirrored);
-  } else if (symmetry.type === "radial") {
-    const count = symmetry.radialCount ?? 4;
-    for (let s = 1; s < count; s++) {
-      const angle = (s * 2 * Math.PI) / count;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const rotated: number[] = [];
-      for (let i = 0; i + 1 < points.length; i += 2) {
-        const dx = points[i] - cx;
-        const dy = points[i + 1] - cy;
-        rotated.push(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
-      }
-      result.push(rotated);
-    }
+  } else if (symmetry.type === "radial" || symmetry.type === "kaleidoscope") {
+    const variations = getKaleidoscopePoints(points, {
+      centerX: cx,
+      centerY: cy,
+      radialCount: symmetry.radialCount,
+      mirror: symmetry.type === "kaleidoscope",
+    });
+    result.push(...variations.slice(1));
   }
   return result;
 }

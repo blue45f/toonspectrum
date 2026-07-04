@@ -215,6 +215,11 @@ import {
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
+  getKaleidoscopePoints,
+  mirrorAxisAngle,
+  wedgeBoundaryAngle,
+} from "./studio-kaleidoscope";
+import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
@@ -1004,7 +1009,7 @@ interface DrawEl {
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
   shapeParams?: ShapeParams;
   symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial";
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
     centerX: number;
     centerY: number;
     radialCount?: number;
@@ -1472,7 +1477,7 @@ function isCompleteDrawOp(el: DrawEl) {
 
 function getSymmetricPoints(
   points: number[],
-  symmetry: { type: "none" | "vertical" | "horizontal" | "radial"; centerX: number; centerY: number; radialCount?: number } | undefined
+  symmetry: { type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope"; centerX: number; centerY: number; radialCount?: number } | undefined
 ): number[][] {
   if (!symmetry || symmetry.type === "none" || points.length === 0) {
     return [points];
@@ -1502,26 +1507,18 @@ function getSymmetricPoints(
       }
     }
     result.push(mirrored);
-  } else if (symmetry.type === "radial") {
-    const count = symmetry.radialCount ?? 4;
-    for (let s = 1; s < count; s++) {
-      const angle = (s * 2 * Math.PI) / count;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const rotated: number[] = [];
-      for (let i = 0; i < points.length; i += 2) {
-        const x = points[i];
-        const y = points[i + 1];
-        if (x !== undefined && y !== undefined) {
-          const dx = x - cx;
-          const dy = y - cy;
-          rotated.push(cx + dx * cos - dy * sin, cy + dx * sin + dy * cos);
-        }
-      }
-      result.push(rotated);
-    }
+  } else if (symmetry.type === "radial" || symmetry.type === "kaleidoscope") {
+    const variations = getKaleidoscopePoints(points, {
+      centerX: cx,
+      centerY: cy,
+      radialCount: symmetry.radialCount,
+      mirror: symmetry.type === "kaleidoscope",
+    });
+    // variations[0]은 항상 원본 그대로(getKaleidoscopePoints 계약) — result에 이미 원본이 있으니
+    // 중복을 피하려면 나머지만 이어붙인다.
+    result.push(...variations.slice(1));
   }
-  
+
   return result;
 }
 
@@ -3198,7 +3195,7 @@ function StudioCuttoonEditor() {
   const [pressureCurve, setPressureCurve] = useState<number>(1.0);
   const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(true);
   const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
-  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial">("none");
+  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(400);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
@@ -11392,6 +11389,90 @@ function StudioCuttoonEditor() {
                     />
                   </>
                 )}
+                {symmetryType === "kaleidoscope" && (
+                  <>
+                    {/* 쐐기 경계선(N개) — 기존 radial 가이드와 동일한 각도 공식(wedgeBoundaryAngle)을
+                        재사용해, 그리기 시점 변환과 화면 가이드가 어긋나지 않게 한다. */}
+                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
+                      const angle = wedgeBoundaryAngle(idx, symmetryRadialCount);
+                      const len = Math.max(CANVAS_W, canvasH) * 1.5;
+                      return (
+                        <Line
+                          key={`kaleido-wedge-${idx}`}
+                          points={[
+                            symmetryCenterX,
+                            symmetryCenterY,
+                            symmetryCenterX + len * Math.cos(angle),
+                            symmetryCenterY + len * Math.sin(angle),
+                          ]}
+                          stroke="#0ea5e9"
+                          strokeWidth={1 / effScale}
+                          dash={[4 / effScale, 4 / effScale]}
+                          opacity={0.7}
+                          listening={false}
+                        />
+                      );
+                    })}
+                    {/* 거울축(N개) — mirrorAxisAngle로 구한 각도를 중심 양쪽으로 뻗은 실선(온전한
+                        지름선)으로 그려, 위 쐐기 경계선(한쪽으로만 뻗은 점선 ray)과 시각적으로
+                        구분한다. */}
+                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
+                      const angle = mirrorAxisAngle(idx, symmetryRadialCount);
+                      const len = Math.max(CANVAS_W, canvasH) * 0.75;
+                      const cos = Math.cos(angle);
+                      const sin = Math.sin(angle);
+                      return (
+                        <Line
+                          key={`kaleido-mirror-${idx}`}
+                          points={[
+                            symmetryCenterX - len * cos,
+                            symmetryCenterY - len * sin,
+                            symmetryCenterX + len * cos,
+                            symmetryCenterY + len * sin,
+                          ]}
+                          stroke="#a855f7"
+                          strokeWidth={1 / effScale}
+                          opacity={0.55}
+                          listening={false}
+                        />
+                      );
+                    })}
+                    <Ellipse
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radiusX={6 / effScale}
+                      radiusY={6 / effScale}
+                      stroke="#0ea5e9"
+                      strokeWidth={1.5 / effScale}
+                      listening={false}
+                    />
+                    <KCircle
+                      x={symmetryCenterX}
+                      y={symmetryCenterY}
+                      radius={8 / effScale}
+                      fill="#0ea5e9"
+                      stroke="#ffffff"
+                      strokeWidth={2 / effScale}
+                      draggable={true}
+                      name="symmetry-handle"
+                      onMouseEnter={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "move";
+                      }}
+                      onMouseLeave={(e) => {
+                        const stage = e.target.getStage();
+                        if (stage) stage.container().style.cursor = "default";
+                      }}
+                      onDragMove={(e) => {
+                        const node = e.target;
+                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
+                        const newY = Math.max(0, Math.min(canvasH, node.y()));
+                        setSymmetryCenterX(newX);
+                        setSymmetryCenterY(newY);
+                      }}
+                    />
+                  </>
+                )}
               </Layer>
             )}
             {!isExporting && tool === "draw" && perspectiveRulerActive && vanishingPoints.length > 0 && (
@@ -14108,12 +14189,13 @@ function StudioCuttoonEditor() {
                 <div className="pt-2.5 border-t border-line/35 space-y-2">
                   <p className="text-xs font-semibold text-fg-3">대칭 자 (Symmetry)</p>
                   
-                  <div className="grid grid-cols-4 gap-1">
+                  <div className="grid grid-cols-5 gap-1">
                     {([
                       { id: "none", label: "없음" },
                       { id: "vertical", label: "세로" },
                       { id: "horizontal", label: "가로" },
                       { id: "radial", label: "방사" },
+                      { id: "kaleidoscope", label: "만화경" },
                     ] as const).map((type) => (
                       <button
                         key={type.id}
@@ -14133,7 +14215,7 @@ function StudioCuttoonEditor() {
 
                   {symmetryType !== "none" && (
                     <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1 animate-fade-in">
-                      {symmetryType === "radial" && (
+                      {(symmetryType === "radial" || symmetryType === "kaleidoscope") && (
                         <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
                           <span>갈래 수</span>
                           <select
