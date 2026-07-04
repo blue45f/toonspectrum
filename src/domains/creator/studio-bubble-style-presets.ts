@@ -1,3 +1,6 @@
+import type { BubbleVariant } from "./studio-assets";
+import type { StrokeStyle } from "./studio-stroke-shapes";
+
 export interface BubbleStylePreset {
   id: string;
   label: string;
@@ -6,6 +9,9 @@ export interface BubbleStylePreset {
   textFill: string;
   stroke?: string;
   strokeWidth?: number;
+  strokeStyle?: StrokeStyle; // 점선 등(studio-stroke-shapes) — 지정하면 프리셋 적용 시 함께 바뀐다.
+  variant?: BubbleVariant; // 지정하면 프리셋 적용 시 말풍선 모양(variant) 자체도 바뀐다(기존 8종은 전부 미지정=모양 유지).
+  starAmplitude?: number; // shout/angry 등 Star 기반 variant의 안쪽 반경 비율(0..1) 오버라이드.
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
@@ -169,5 +175,43 @@ export const BUBBLE_STYLE_PRESETS: BubbleStylePreset[] = [
     shadowOffsetY: 2,
     shadowOpacity: 0.15,
     font: "Nanum Pen Script",
+  },
+  {
+    id: "hushed_whisper",
+    label: "속삭임",
+    description: "조용히 소곤대는 귓속말, ASMR 대사",
+    fill: "#fbfbfe",
+    textFill: "#5b5f6b",
+    stroke: "#b9bdc7",
+    strokeWidth: 1.25,
+    strokeStyle: { dash: "dot", lineCap: "round", arrowStart: "none", arrowEnd: "none" },
+  },
+  {
+    id: "mecha_transmission",
+    label: "전화/기계음",
+    description: "무전기·전화·안내음성 등 딱딱한 기계 대사",
+    variant: "box",
+    fill: "#202832",
+    textFill: "#d7dde3",
+    stroke: "#5b6472",
+    strokeWidth: 2.5,
+    strokeStyle: { dash: "solid", lineCap: "square", arrowStart: "none", arrowEnd: "none" },
+    shadowColor: "#5b6472",
+    shadowBlur: 4,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    shadowOpacity: 0.3,
+  },
+  {
+    id: "trembling_fear",
+    label: "다급함/공포",
+    description: "겁에 질려 떨리는 다급한 대사",
+    variant: "shout",
+    starAmplitude: 0.78,
+    fill: "#eef0f5",
+    textFill: "#2a2f3a",
+    stroke: "#4b4f5c",
+    strokeWidth: 2,
+    strokeStyle: { dash: "dash", lineCap: "round", arrowStart: "none", arrowEnd: "none" },
   },
 ];

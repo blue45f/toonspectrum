@@ -1,4 +1,7 @@
 import { BUBBLE_STYLE_PRESETS, type BubbleStylePreset } from "./studio-bubble-style-presets";
+import { normalizeStrokeStyle, type StrokeStyle } from "./studio-stroke-shapes";
+
+import type { BubbleVariant } from "./studio-assets";
 
 import { cx } from "@/lib/cx";
 
@@ -8,6 +11,8 @@ export type BubbleStylePresetTarget = {
   stroke?: string;
   strokeWidth?: number;
   font?: string;
+  strokeStyle?: StrokeStyle;
+  variant: BubbleVariant; // 항상 존재(BubbleEl.variant는 필수 필드) — 프리셋이 모양을 안 바꿀 때 되돌릴 기본값으로 쓴다.
 };
 
 export type BubbleStylePresetPatch = Pick<
@@ -16,6 +21,9 @@ export type BubbleStylePresetPatch = Pick<
   | "textFill"
   | "stroke"
   | "strokeWidth"
+  | "strokeStyle"
+  | "variant"
+  | "starAmplitude"
   | "shadowColor"
   | "shadowBlur"
   | "shadowOffsetX"
@@ -40,7 +48,11 @@ export function StudioBubbleStylePresetPanel({
             selected.fill === preset.fill &&
             selected.textFill === preset.textFill &&
             (preset.stroke ? selected.stroke === preset.stroke : !selected.stroke) &&
-            (preset.strokeWidth ? selected.strokeWidth === preset.strokeWidth : true);
+            (preset.strokeWidth ? selected.strokeWidth === preset.strokeWidth : true) &&
+            (preset.variant ? selected.variant === preset.variant : true) &&
+            (preset.strokeStyle
+              ? normalizeStrokeStyle(selected.strokeStyle).dash === preset.strokeStyle.dash
+              : true);
 
           return (
             <button
@@ -52,6 +64,9 @@ export function StudioBubbleStylePresetPanel({
                   textFill: preset.textFill,
                   stroke: preset.stroke,
                   strokeWidth: preset.strokeWidth,
+                  strokeStyle: preset.strokeStyle,
+                  variant: preset.variant ?? selected.variant,
+                  starAmplitude: preset.starAmplitude,
                   shadowColor: preset.shadowColor,
                   shadowBlur: preset.shadowBlur,
                   shadowOffsetX: preset.shadowOffsetX,

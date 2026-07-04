@@ -158,6 +158,13 @@ import {
   type BubbleShapeGeometryInput,
 } from "./studio-bubble-custom-shape";
 import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
+  bubbleHorizontalPadding,
+  bubbleVerticalPadding,
+  createCanvasBubbleTextMeasurer,
+  fitBubbleFontSize,
+} from "./studio-bubble-text-fit";
 import { svgToDataUrl } from "./studio-characters";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import { assembleComipoPage, type ComipoAssemblySeed } from "./studio-comipo-assembly";
@@ -553,6 +560,10 @@ import { useSession } from "@/src/compat/auth-session-store";
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
 
+// 말풍선 자동 축소(studio-bubble-text-fit) 실측 캔버스 측정기 — 모듈 스코프에 1회만 생성한다
+// (내부 공유 <canvas>를 감싸는 얇은 래퍼라 element/렌더별로 새로 만들 이유가 없다).
+const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
+
 // lazyRetry: 이 세션 안에 배포가 잦으면 이미 열린 스튜디오 탭의 lazy import가 옛 청크 해시로
 // 404 나기 쉽다(예: "3D 배경 삽입 시 오류") — 1회 자동 새로고침으로 복구한다(lib/lazy-retry.ts).
 const StudioImageAdjustmentsPanel = lazyRetry(
@@ -566,6 +577,10 @@ const StudioPageGradePanel = lazyRetry(
 const StudioBubbleStylePresetPanel = lazyRetry(
   () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
   "StudioBubbleStylePresetPanel"
+);
+const StudioBubbleAutoShrinkPanel = lazyRetry(
+  () => import("./StudioBubbleAutoShrinkPanel").then((mod) => ({ default: mod.StudioBubbleAutoShrinkPanel })),
+  "StudioBubbleAutoShrinkPanel"
 );
 const StudioDialogueBatchPanel = lazyRetry(
   () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
@@ -1061,6 +1076,11 @@ interface BubbleEl {
   tailAnchorPoint?: { x: number; y: number };
   stroke?: string;
   strokeWidth?: number;
+  strokeStyle?: StrokeStyle; // 점선 등(studio-stroke-shapes 규약) — 화살촉 필드는 말풍선엔 의미 없어 무시.
+  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션 채우기 — 있으면 fill(단색)보다 우선(studio-gradient-engine).
+  autoShrinkText?: boolean; // true면 텍스트가 넘칠 때 높이 대신 폰트 크기를 자동 축소(studio-bubble-text-fit).
+  autoShrinkMinFontSize?: number; // 자동 축소 하한(px). 미설정 시 BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT.
+  starAmplitude?: number; // shout/angry variant(Star)의 안쪽 반경 비율(0..1). 미설정 시 각 variant의 기존 비율(36/68, 28/64).
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;
@@ -1369,6 +1389,31 @@ function elementLabel(el: El): string {
     default:
       return "요소";
   }
+}
+// 말풍선 "크기 고정" 미리보기 — 인스펙터가 StudioBubbleAutoShrinkPanel에 넘길 계산된 폰트 크기/
+// 오버플로 여부. autoShrinkText가 꺼져 있으면 계산 자체를 하지 않는다(null).
+//
+// lineHeight를 인자로 받는 이유: 이 함수는 elementLabel(...) 근처의 모듈 스코프(StudioPage
+// 컴포넌트 함수 바깥)에 있어 webtoonTheme(컴포넌트 useState)에 접근할 수 없다 — 실제 렌더가 쓰는
+// bubbleLineHeight와 정확히 같은 값을 호출부(컴포넌트 스코프)가 계산해 넘겨야 한다.
+function bubbleAutoShrinkPreview(
+  el: BubbleEl,
+  lineHeight: number
+): { fontSize: number; overflow: boolean } | null {
+  if (!el.autoShrinkText) return null;
+  return fitBubbleFontSize(
+    {
+      text: el.vertical ? formatVerticalText(el.text) : el.text,
+      boxWidth: el.width,
+      boxHeight: el.height,
+      maxFontSize: el.fontSize ?? 24,
+      minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
+      fontFamily: el.font ?? "Pretendard, sans-serif",
+      fontStyle: el.fontStyle ?? "bold",
+      lineHeight,
+    },
+    BUBBLE_TEXT_MEASURER
+  );
 }
 const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -8648,9 +8693,11 @@ function StudioCuttoonEditor() {
   function commitEditText() {
     if (editing) {
       const el = elementById.get(editing.id);
-      // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존).
+      // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존) — 단,
+      // autoShrinkText(크기 고정 모드)가 켜져 있으면 높이는 건드리지 않는다(렌더 시점에
+      // fitBubbleFontSize가 폰트 크기를 알아서 줄인다).
       let height: number | undefined;
-      if (el && el.type === "bubble") {
+      if (el && el.type === "bubble" && !el.autoShrinkText) {
         const measure = new KonvaRuntime.Text({
           text: editing.value || " ",
           width: el.width - 36,
@@ -11592,6 +11639,17 @@ function StudioCuttoonEditor() {
                   }
                 }
 
+                // 점선 등 스트로크 스타일 — strokeStyle을 지정하면 그걸 우선 적용한다. whisper는
+                // strokeStyle 미지정 시 기존 하드코딩 dash([8,5])를 그대로 유지한다(하위호환).
+                // scared/system/angry는 스트로크 색(및 system은 두께)이 이미 하드코딩이라 점선도
+                // 적용하지 않는다(사용자가 지정 안 한 색 위에 점선만 얹히는 어색함 방지 — 기존 갭,
+                // 이 배치의 책임 밖).
+                const bDash = el.strokeStyle
+                  ? strokeDashArray(normalizeStrokeStyle(el.strokeStyle).dash, bStrokeW)
+                  : el.variant === "whisper"
+                    ? [8, 5]
+                    : undefined;
+
                 const flipTailX = (pts: number[]) => {
                   if (tailDir !== "right") return pts;
                   if (tailDirection === "bottom" || tailDirection === "top") {
@@ -11636,10 +11694,26 @@ function StudioCuttoonEditor() {
                   el.lineHeight ?? (el.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
                 const bubbleLetterSpacing = webtoonTheme === "vivid" ? 0 : 0.3;
                 // 안쪽 여백: 글자 크기 비례(좌우 대칭, 상<하로 시각 중심 보정).
-                const bFs = el.fontSize ?? 24;
-                const bHPad = Math.max(12, Math.round(bFs * 0.6));
-                const bVPadTop = Math.max(8, Math.round(bFs * 0.48));
-                const bVPadBot = Math.max(10, Math.round(bFs * 0.64));
+                const bubbleMaxFontSize = el.fontSize ?? 24;
+                const bFs = el.autoShrinkText
+                  ? fitBubbleFontSize(
+                      {
+                        text: el.vertical ? formatVerticalText(el.text) : el.text,
+                        boxWidth: el.width,
+                        boxHeight: el.height,
+                        maxFontSize: bubbleMaxFontSize,
+                        minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
+                        fontFamily: el.font ?? "Pretendard, sans-serif",
+                        fontStyle: el.fontStyle ?? "bold",
+                        lineHeight: bubbleLineHeight,
+                      },
+                      BUBBLE_TEXT_MEASURER
+                    ).fontSize
+                  : bubbleMaxFontSize;
+                // bHPad/bVPadTop/bVPadBot 공식을 studio-bubble-text-fit.ts와 공유(§1.1) — fitBubbleFontSize의
+                // 내부 탐색이 가정한 패딩과 실제 렌더 패딩이 정확히 일치해야 한다.
+                const bHPad = bubbleHorizontalPadding(bFs);
+                const { top: bVPadTop, bottom: bVPadBot } = bubbleVerticalPadding(bFs);
 
                 let baseScaredTailPts: number[] = [];
                 if (tailDirection === "bottom") {
@@ -11851,13 +11925,15 @@ function StudioCuttoonEditor() {
                         x={el.width / 2}
                         y={el.height / 2}
                         numPoints={20}
-                        innerRadius={36}
+                        innerRadius={68 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 36 / 68))}
                         outerRadius={68}
                         scaleX={el.width / 136}
                         scaleY={el.height / 136}
                         fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: -68, y: -68, width: 136, height: 136 })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
+                        dash={bDash}
                         lineJoin="round"
                       />
                     ) : el.variant === "thought" ? (
@@ -11866,9 +11942,11 @@ function StudioCuttoonEditor() {
                           width={el.width}
                           height={el.height}
                           fill={el.fill}
+                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                           cornerRadius={Math.min(el.width, el.height) / 2}
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
+                          dash={bDash}
                         />
                         {thoughtEllipses}
                       </>
@@ -11876,11 +11954,12 @@ function StudioCuttoonEditor() {
                       <Path
                         data={speechPathData}
                         fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
                         lineJoin="round"
                         lineCap="round"
-                        dash={[8, 5]}
+                        dash={bDash}
                       />
                     ) : el.variant === "scared" ? (
                       <>
@@ -11888,6 +11967,7 @@ function StudioCuttoonEditor() {
                           width={el.width}
                           height={el.height}
                           fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
+                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                           cornerRadius={14}
                           stroke="#7c3aed"
                           strokeWidth={2}
@@ -11936,11 +12016,12 @@ function StudioCuttoonEditor() {
                         x={el.width / 2}
                         y={el.height / 2}
                         numPoints={22}
-                        innerRadius={28}
+                        innerRadius={64 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 28 / 64))}
                         outerRadius={64}
                         scaleX={el.width / 160}
                         scaleY={el.height / 160}
                         fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: -64, y: -64, width: 128, height: 128 })}
                         stroke={webtoonTheme === "soft" ? "#dc2626" : webtoonTheme === "vivid" ? "#7f1d1d" : "#991b1b"}
                         strokeWidth={Math.max(bStrokeW, 3.5)}
                         lineJoin="round"
@@ -11951,9 +12032,11 @@ function StudioCuttoonEditor() {
                           width={el.width}
                           height={el.height}
                           fill={el.fill}
+                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                           cornerRadius={webtoonTheme === "soft" ? 10 : webtoonTheme === "vivid" ? 6 : 8}
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
+                          dash={bDash}
                         />
                         {showTail && (
                           <Line
@@ -11969,19 +12052,32 @@ function StudioCuttoonEditor() {
                       <Path
                         data="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
                         fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: 24, height: 24 })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
+                        dash={bDash}
                         scaleX={el.width / 24}
                         scaleY={el.height / 24}
                       />
                     ) : el.variant === "box" ? (
-                      <Rect width={el.width} height={el.height} fill={el.fill} cornerRadius={webtoonTheme === "soft" ? 6 : webtoonTheme === "vivid" ? 3 : 4} stroke={bStroke} strokeWidth={bStrokeW} />
+                      <Rect
+                        width={el.width}
+                        height={el.height}
+                        fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
+                        cornerRadius={webtoonTheme === "soft" ? 6 : webtoonTheme === "vivid" ? 3 : 4}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        dash={bDash}
+                      />
                     ) : (
                       <Path
                         data={speechPathData}
                         fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
+                        dash={bDash}
                         lineJoin="round"
                         lineCap="round"
                       />
@@ -13511,6 +13607,19 @@ function StudioCuttoonEditor() {
                     </span>
                   )}
 
+                  {selected.fill !== "transparent" && (
+                    <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
+                      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">그라데이션 채우기</p>
+                      <Suspense fallback={<StudioPanelLoading label="그라데이션 패널을 여는 중..." />}>
+                        <StudioGradientEnginePanel
+                          value={selected.gradient ?? null}
+                          onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
+                          title="말풍선 그라데이션"
+                        />
+                      </Suspense>
+                    </div>
+                  )}
+
                   <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
                     <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">테두리 설정</p>
 
@@ -13560,6 +13669,27 @@ function StudioCuttoonEditor() {
                       </>
                     )}
                   </div>
+
+                  {(() => {
+                    // bubbleLineHeight와 정확히 같은 공식(렌더 루프와 동일) — 이 인스펙터 블록도
+                    // StudioPage 컴포넌트 스코프 안이라 webtoonTheme에 접근 가능하다.
+                    const previewLineHeight =
+                      selected.lineHeight ??
+                      (selected.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
+                    const fit = bubbleAutoShrinkPreview(selected, previewLineHeight);
+                    return (
+                      <Suspense fallback={<StudioPanelLoading label="텍스트 크기 고정 패널을 여는 중..." />}>
+                        <StudioBubbleAutoShrinkPanel
+                          enabled={!!selected.autoShrinkText}
+                          minFontSize={selected.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT}
+                          effectiveFontSize={fit ? Math.round(fit.fontSize) : null}
+                          overflow={fit?.overflow ?? false}
+                          onToggleEnabled={(v) => patchEl(selected.id, { autoShrinkText: v } as Partial<El>)}
+                          onMinFontSizeChange={(v) => patchEl(selected.id, { autoShrinkMinFontSize: v } as Partial<El>)}
+                        />
+                      </Suspense>
+                    );
+                  })()}
 
                   <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
                     <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">말풍선 그림자 (Shadow)</p>
