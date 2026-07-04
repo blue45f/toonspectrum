@@ -187,6 +187,7 @@ import {
   type OnionSkinSettings,
   type StudioAnimFrame,
 } from "./studio-frame-animation";
+import { isAnimatedGifDataUrl, isGifFile } from "./studio-gif-element";
 import {
   estimateTextGradientBBox,
   konvaGradientProps,
@@ -910,6 +911,12 @@ export interface ImageEl {
   frameFps?: number; // 재생 속도(기본 12) — durationMs 미설정 프레임에 적용.
   frameLoop?: boolean; // 반복 재생(기본 true).
   activeFrameId?: string; // 현재 편집/표시 중인 프레임(패널이 열려 있을 때의 탐색 위치).
+  // 애니메이션 GIF 업로드 — 있으면 src 자체가 data:image/gif인 다중 프레임 GIF이고, 브라우저가
+  // <img> 소스를 내부적으로 계속 재생한다(디코딩은 이 앱이 하지 않는다 — studio-gif-element.ts
+  // 참고). 위 frames(셀 애니메이션)와는 서로 다른 축이다: frames는 이 앱이 여러 장의 정적 src를
+  // 프레임으로 넘겨가며 재생하는 것이고, isAnimatedGif는 단일 src 하나를 브라우저가 자체
+  // 재생하는 것 — 실질적으로 상호배타적으로 취급한다(UrlImage 리렌더 루프의 가드 참고).
+  isAnimatedGif?: boolean;
 }
 interface TextEl {
   id: string;
@@ -2117,6 +2124,47 @@ function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
   });
 }
 
+// GIF 파일 전용 읽기 — downscaleImageFile과 달리 캔버스에 그려 재인코딩하지 않는다(애니메이션
+// GIF를 캔버스에 한 번 그리면 그 순간의 프레임 하나만 캡처되어 애니메이션이 사라진다).
+function readGifFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("GIF 파일을 읽지 못했습니다."));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(file);
+  });
+}
+
+// 이미지 업로드 통합 진입점 — GIF가 아니면 기존 downscaleImageFile 그대로, GIF인데 정적(GCE
+// 없음)이어도 손실이 없으므로 마찬가지로 downscaleImageFile(용량 최적화 혜택을 그대로 받는다).
+// 진짜 애니메이션 GIF일 때만 캔버스 왕복 없이 원본 바이트를 그대로 보존한다. onPickImage가
+// 우선 사용한다.
+async function loadImageFileForCanvas(
+  file: File
+): Promise<{ src: string; width: number; height: number; isAnimatedGif: boolean }> {
+  if (!isGifFile(file)) {
+    const r = await downscaleImageFile(file);
+    return { ...r, isAnimatedGif: false };
+  }
+  const rawDataUrl = await readGifFileAsDataUrl(file);
+  if (!isAnimatedGifDataUrl(rawDataUrl)) {
+    // 정적 GIF(애니메이션 없음) — 잃을 게 없으므로 기존 최적화 경로로 되돌아간다.
+    const r = await downscaleImageFile(file);
+    return { ...r, isAnimatedGif: false };
+  }
+  // 진짜 애니메이션 GIF — 원본 바이트를 그대로 src로 사용(재생 보존이 용량 최적화보다 우선).
+  const { naturalWidth, naturalHeight } = await new Promise<{ naturalWidth: number; naturalHeight: number }>(
+    (resolve, reject) => {
+      const img = new globalThis.Image();
+      img.onload = () =>
+        resolve({ naturalWidth: img.naturalWidth || img.width, naturalHeight: img.naturalHeight || img.height });
+      img.onerror = () => reject(new Error("GIF 크기를 확인하지 못했습니다."));
+      img.src = rawDataUrl;
+    }
+  );
+  return { src: rawDataUrl, width: naturalWidth, height: naturalHeight, isAnimatedGif: true };
+}
+
 function downscaleDataUrl(dataUrl: string, maxW: number, quality = 0.72) {
   return new Promise<string>((resolve) => {
     const img = new globalThis.Image();
@@ -2482,6 +2530,13 @@ function UrlImage({
       setDisplayImg(undefined);
       return;
     }
+    if (el.isAnimatedGif) {
+      // 반전은 캔버스에 한 프레임을 구워야만 가능한데, 그러면 애니메이션이 멈춘다 — 재생 보존이
+      // 우선이므로 이 경로를 건너뛰고 항상 라이브 img를 그대로 쓴다(알려진 한계: 애니메이션 GIF는
+      // 좌우/상하 반전이 적용되지 않는다).
+      setDisplayImg(img);
+      return;
+    }
     const scaleX = el.flipped ? -1 : 1;
     const scaleY = el.flippedY ? -1 : 1;
     if (scaleX === 1 && scaleY === 1) {
@@ -2502,7 +2557,7 @@ function UrlImage({
     } else {
       setDisplayImg(img);
     }
-  }, [img, el.flipped, el.flippedY]);
+  }, [img, el.flipped, el.flippedY, el.isAnimatedGif]);
 
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
@@ -2536,13 +2591,47 @@ function UrlImage({
     if (!node) return;
     if (displayImg) {
       node.clearCache();
-      if (hasFilters && filterModule) {
+      if (hasFilters && filterModule && !el.isAnimatedGif) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
+        // isAnimatedGif는 캐시를 만들지 않는다 — Konva 캐시는 "그 순간의 정적 스냅샷"이라
+        // 애니메이션 GIF에 캐시를 씌우면 그 프레임에 멈춘다(필터는 조용히 미적용, 알려진 한계).
         node.cache(cachePad > 0 ? { offset: cachePad } : undefined);
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif]);
+
+  // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
+  // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
+  // 굽는다. displayImg가 라이브 img 그 자체를 가리키는 동안(위 플립-굽기 effect: 플립 없음, 또는
+  // isAnimatedGif라 플립 우회) 주기적으로 getLayer().batchDraw()를 호출해 "그 순간 브라우저가
+  // 디코딩해 둔 프레임"을 다시 그리게 한다.
+  // el.frames(다중 프레임 셀 애니메이션)와는 상호배타적으로 취급한다 — 온스킨/타임라인 재생
+  // 미리보기가 이미 같은 KImage 노드를 건드리는 상황과 겹치면 정의되지 않은 방식으로 충돌하므로,
+  // frames가 실질적으로 여러 장(2장 이상)이면 이 루프를 아예 돌리지 않는다(그 경우 frames 쪽
+  // 렌더링이 이 요소를 담당 — isAnimTarget과 동일한 조건식).
+  useEffect(() => {
+    if (!el.isAnimatedGif || !displayImg) return;
+    if (el.frames && el.frames.length > 1) return;
+    const node = imageRef.current;
+    if (!node) return;
+    // ≈12fps 스로틀 — 대다수 GIF 인코더의 실제 프레임 속도 근방이라 시각적으로 놓치는 프레임이
+    // 사실상 없으면서, 60fps rAF 그대로 부르는 것 대비 풀 레이어 batchDraw 호출을 약 80% 줄인다
+    // (이 KImage가 속한 Layer는 페이지의 모든 요소를 함께 담는 단일 메인 레이어라 배치 하나당
+    // 비용이 작지 않다).
+    const FRAME_INTERVAL_MS = 80;
+    let raf = 0;
+    let lastDrawAt = 0;
+    const tick = (now: number) => {
+      if (now - lastDrawAt >= FRAME_INTERVAL_MS) {
+        lastDrawAt = now;
+        node.getLayer()?.batchDraw();
+      }
+      raf = globalThis.requestAnimationFrame(tick);
+    };
+    raf = globalThis.requestAnimationFrame(tick);
+    return () => globalThis.cancelAnimationFrame(raf);
+  }, [el.isAnimatedGif, el.frames, displayImg]);
 
   if (!displayImg) return null;
 
@@ -6616,7 +6705,7 @@ function StudioCuttoonEditor() {
     e.target.value = "";
     if (!file) return;
     try {
-      const { src, width, height } = await downscaleImageFile(file);
+      const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(file);
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       setError(null);
       addEl({
@@ -6628,6 +6717,7 @@ function StudioCuttoonEditor() {
         width: Math.round(width * fit),
         height: Math.round(height * fit),
         rotation: 0,
+        ...(isAnimatedGif ? { isAnimatedGif: true } : {}), // studio-skew.ts와 동일한 관례: 항등값(false)은 저장하지 않는다.
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이미지 추가 실패");
