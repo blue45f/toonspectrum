@@ -4,6 +4,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { classifyError, type ErrorAnalysis } from "../compat/browser-check";
 
 import { BrowserCompatModal } from "./browser-compat-modal";
+import { hasAttemptedChunkReload, markChunkReloadAttempted } from "./chunk-reload-guard";
 
 interface Props {
   children: ReactNode;
@@ -15,11 +16,12 @@ interface State {
   error: Error | null;
   analysis: ErrorAnalysis | null;
   showModal: boolean;
+  autoReloading: boolean;
 }
 
 // 라우트 렌더 중 예외를 잡아 레이아웃(헤더·푸터)을 유지한 채 폴백을 보여준다.
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, analysis: null, showModal: false };
+  state: State = { error: null, analysis: null, showModal: false, autoReloading: false };
 
   static getDerivedStateFromError(error: Error): State {
     const analysis = classifyError(error);
@@ -27,12 +29,13 @@ export class ErrorBoundary extends Component<Props, State> {
       error,
       analysis,
       showModal: analysis.type === "compatibility",
+      autoReloading: false,
     };
   }
 
   componentDidUpdate(prev: Props) {
     if (this.state.error && prev.resetKey !== this.props.resetKey) {
-      this.setState({ error: null, analysis: null, showModal: false });
+      this.setState({ error: null, analysis: null, showModal: false, autoReloading: false });
     }
   }
 
@@ -40,7 +43,19 @@ export class ErrorBoundary extends Component<Props, State> {
     if (import.meta.env.DEV) {
       console.error("화면 렌더 중 오류:", error, info.componentStack);
     }
+
+    if (this.state.analysis?.type === "chunk_load" && !hasAttemptedChunkReload()) {
+      markChunkReloadAttempted();
+      this.setState({ autoReloading: true });
+      window.location.reload();
+    }
   }
+
+  reloadPage = () => {
+    // 사용자가 직접 누르는 재시도는 항상 캐시 문제를 실제로 해결하는 전체 새로고침이어야 한다
+    // (setState로 컴포넌트만 리셋하면 오래된 index.html을 계속 붙들고 있어 같은 실패가 반복된다).
+    window.location.reload();
+  };
 
   render() {
     const { error, analysis, showModal } = this.state;
@@ -122,7 +137,54 @@ export class ErrorBoundary extends Component<Props, State> {
         );
       }
 
-      // C. 일반 오류 또는 청크 오류
+      // C. 동적 청크 로딩 오류 — 자동 새로고침을 이미 한 번 시도했다(componentDidCatch).
+      // 여기까지 왔다는 건 새로고침 후에도 같은 문제가 재현됐다는 뜻(진짜 네트워크 단절 등) —
+      // 이제는 자동 재시도 없이 사용자가 직접 판단하게 한다. "다시 시도"는 반드시 전체
+      // 새로고침이어야 한다(setState로 컴포넌트만 리셋하면 여전히 같은 오래된 index.html을
+      // 붙들고 있어 같은 청크 요청이 또 실패한다).
+      if (analysis.type === "chunk_load") {
+        if (this.state.autoReloading) {
+          return (
+            <div className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6">
+              <div className="mx-auto max-w-md rounded-2xl border border-line bg-panel/70 p-12 text-center" role="status">
+                <RefreshCw size={24} className="mx-auto mb-3 animate-spin text-accent" />
+                <p className="text-sm font-medium text-fg">최신 버전으로 새로고침하는 중이에요…</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6">
+            <div
+              className="mx-auto max-w-md rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center"
+              role="alert"
+            >
+              <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
+              <p className="text-sm font-medium text-fg">{analysis.message}</p>
+              <p className="mt-1 text-sm text-fg-2">새로고침을 한 번 시도했지만 문제가 이어지고 있어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
+              <div className="mt-5 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={this.reloadPage}
+                  className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.7rem] border border-line-strong/90 px-3 text-[0.8125rem] font-medium text-fg transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:border-accent/70 hover:bg-accent-soft/80 hover:text-accent active:scale-[0.985] active:bg-accent active:text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  <RefreshCw size={14} />
+                  새로고침
+                </button>
+                <a
+                  href="/"
+                  className="inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-[0.7rem] bg-accent px-3 text-[0.8125rem] font-medium text-on-accent shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset] transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:bg-accent-2 hover:shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset,0_8px_24px_-8px_oklch(0.72_0.185_42/0.55)] active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  홈으로
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // D. 일반 애플리케이션 오류
       return (
         <div className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6">
           <div
