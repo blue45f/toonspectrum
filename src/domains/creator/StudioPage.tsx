@@ -81,6 +81,7 @@ import {
   X,
   Layers,
   LayoutGrid,
+  Smartphone,
   Palette,
   Hand,
   Film,
@@ -646,6 +647,10 @@ const StudioQuickShapePanel = lazyRetry(
 const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
+);
+const StudioScrollPreviewPanel = lazyRetry(
+  () => import("./StudioScrollPreviewPanel").then((mod) => ({ default: mod.StudioScrollPreviewPanel })),
+  "StudioScrollPreviewPanel"
 );
 const StudioEmeresLibraryPanel = lazyRetry(
   () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
@@ -1999,6 +2004,17 @@ function StoryboardGridLoadingOverlay() {
   );
 }
 
+function ScrollPreviewLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>스크롤 미리보기를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그(앱인토스 서비스 오픈 정책 필수).
  * 사용자가 처음 "생성"을 누를 때 1회 노출하고, 확인하면 곧바로 생성을 이어서 실행한다.
@@ -3286,6 +3302,7 @@ function StudioCuttoonEditor() {
   const [referencePanelOpen, setReferencePanelOpen] = useState(false);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
+  const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [timelapseCapturing, setTimelapseCapturing] = useState(false);
   const timelapseOriginalHiRef = useRef(0);
   // frameAnimTargetId는 selectedId와 별개로 추적한다(bg3dInitialElementId/poserInitialElementId와
@@ -9703,6 +9720,15 @@ function StudioCuttoonEditor() {
         </button>
         <button
           type="button"
+          onClick={() => setScrollPreviewOpen(true)}
+          aria-label="세로 스크롤 미리보기 (모바일 폭으로 이어서 확인)"
+          className={toolBtn(false)}
+          title="세로 스크롤 미리보기 — 실제 독자처럼 좁은 폭에서 이어서 확인"
+        >
+          <Smartphone size={14} />
+        </button>
+        <button
+          type="button"
           onClick={() => setTimelineOpen((v) => !v)}
           disabled={masterEditMode}
           aria-pressed={timelineOpen}
@@ -15388,6 +15414,21 @@ function StudioCuttoonEditor() {
             onDeletePage={deletePage}
             canDelete={pages.length > 1}
             onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
+        {scrollPreviewOpen ? (
+          <StudioScrollPreviewPanel
+            open
+            onClose={() => setScrollPreviewOpen(false)}
+            pages={pages.map((p) => composeThumbPage(master, p))}
+            currentPageId={currentPageId}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setScrollPreviewOpen(false);
+            }}
           />
         ) : null}
       </Suspense>
