@@ -403,6 +403,15 @@ import {
 import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
 import { importPsdFile, psdImportResultMessage } from "./studio-psd-import";
 import {
+  addPuppetPin,
+  bakePuppetWarpToCanvas,
+  isPuppetWarpNoop,
+  movePuppetPin,
+  removePuppetPin,
+  resetPuppetPinPositions,
+  type PuppetPin,
+} from "./studio-puppet-warp";
+import {
   anchorQuickShapePoints,
   classifyQuickShape,
   regularizeQuickShapePoints,
@@ -501,6 +510,7 @@ import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
+import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
@@ -694,6 +704,10 @@ const StudioHistoryBrushPanel = lazyRetry(
 const StudioLayerMaskPanel = lazyRetry(
   () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
   "StudioLayerMaskPanel"
+);
+const StudioPuppetWarpPanel = lazyRetry(
+  () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
+  "StudioPuppetWarpPanel"
 );
 const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
@@ -4191,6 +4205,11 @@ function StudioCuttoonEditor() {
   // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
   // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  // 퍼펫 워프 — 핀 배열은 이미지 요소 1개에 귀속되지만 crop과 동일하게 elId를 별도로 추적하지
+  // 않는다(적용 시점의 selected를 그대로 대상으로 삼는다).
+  const [puppetWarpActive, setPuppetWarpActive] = useState(false);
+  const [puppetWarpPins, setPuppetWarpPins] = useState<PuppetPin[]>([]);
+  const [puppetWarpBusy, setPuppetWarpBusy] = useState(false);
   const [cropAspect, setCropAspect] = useState<CropAspectId>("free");
   const [cropBusy, setCropBusy] = useState(false);
   // 진행 중 크롭 드래그 — ref 가 원본(포인터마다 갱신), rect 상태 반영은 RAF 로 합친다
@@ -4598,6 +4617,9 @@ function StudioCuttoonEditor() {
   const healCloneArmed = healCloneTool !== null && selected?.type === "image";
   const layerMaskPaintArmed = layerMaskPaintActive && selected?.type === "image";
   const historyBrushArmed = historyBrushActive && selected?.type === "image";
+  // 퍼펫 워프 무장(이미지 요소 선택 + 모드 on) — crop과 동일한 정책(무장 중 다른 스테이지
+  // 제스처·요소 드래그/선택 전환을 막는다).
+  const puppetWarpArmed = puppetWarpActive && selected?.type === "image";
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (quickStartOpen || (workHydrated && elements.length === 0 && !quickStartDismissed));
 
@@ -5344,6 +5366,8 @@ function StudioCuttoonEditor() {
     setLayerMaskPaintActive(false);
     setHistoryBrushActive(false); // ← 추가(소스 지정 상태는 그대로 둔다)
     setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
+    setPuppetWarpActive(false); // ← 추가
+    setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
   }
   // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
   // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
@@ -6270,6 +6294,10 @@ function StudioCuttoonEditor() {
         } else if (cropRect) {
           // 크롭 모드를 먼저 종료(영역 폐기) — 다음 Esc 가 픽셀 선택/요소 선택을 해제한다.
           setCropRect(null);
+        } else if (puppetWarpActive) {
+          // 퍼펫 워프도 crop과 동일하게 Esc 로 먼저 종료(핀 전부 폐기) — 다음 Esc 가 그 다음 레이어를 닫는다.
+          setPuppetWarpActive(false);
+          setPuppetWarpPins([]);
         } else if (panelSplitActive) {
           setPanelSplitActive(false);
           setPanelSplitHint(null);
@@ -7533,6 +7561,37 @@ function StudioCuttoonEditor() {
       setCropBusy(false);
     }
   }
+  // ── 퍼펫 워프 적용 — "적용" 버튼을 눌러야 실행되는 파괴적 편집(crop과 동일 패턴, heal-clone처럼
+  // 스트로크 종료마다 자동으로 굽지 않는다 — 핀을 여러 번 조정해보고 마음에 들 때 확정한다).
+  // 원본 자연 해상도로 삼각형 메쉬를 워프해 굽고, 결과를 data URL로 교체(patchEl)해 히스토리
+  // 1건(⌘Z 1회)으로 남긴다.
+  async function applyPuppetWarpToSelectedImage() {
+    if (puppetWarpBusy || isPuppetWarpNoop(puppetWarpPins)) return;
+    if (selected?.type !== "image") return;
+    const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷(crop/heal-clone과 동일).
+    const pins = puppetWarpPins;
+    setPuppetWarpBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const out = bakePuppetWarpToCanvas(img, w, h, pins, createPixelEditCanvas, {
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!out) throw new Error("퍼펫 워프 결과를 만들지 못했습니다.");
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      patchEl(target.id, { src } as Partial<El>);
+      setPuppetWarpActive(false);
+      setPuppetWarpPins([]);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply puppet warp:", err);
+      setError(err instanceof Error ? err.message : "퍼펫 워프 적용에 실패했습니다.");
+    } finally {
+      setPuppetWarpBusy(false);
+    }
+  }
 
   // 그림판 — 진행 중 선/도형은 draft 로만 렌더, 끝나면 히스토리에 커밋.
   // 스테이지를 실제 합성 픽셀 그대로 렌더해 클릭 지점 색을 뽑는다(이미지 요소 하나의 "주요 색상"이
@@ -7871,6 +7930,31 @@ function StudioCuttoonEditor() {
       historyBrushDragRef.current = { elId: selected.id, frame, radiusNorm, points: [p] };
       scheduleHistoryBrushDragPreview({ points: [p] });
       return;
+    }
+    // 퍼펫 워프 무장 중: 빈 자리 클릭 = 새 핀 추가(그 자리에서 세션 없이 즉시 커밋). 기존 핀
+    // 위 클릭은 오버레이의 Konva 네이티브 draggable(onDragMove)이 처리하므로 여기서는
+    // "puppet-pin-handle" 이름으로 걸러 무시한다 — 안 걸러내면 핀을 클릭할 때마다 그 자리에 또
+    // 새 핀이 추가돼 버린다(Konva 이벤트가 핀 Circle → Stage 로 버블링되기 때문).
+    if (
+      puppetWarpArmed &&
+      !puppetWarpBusy &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer) &&
+      e.target.name() !== "puppet-pin-handle"
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      setPuppetWarpPins((pins) => addPuppetPin(pins, { id: uid(), x: p.x, y: p.y }));
+      return; // 무장 중엔 다른 스테이지 제스처(마퀴 등)를 막는다 — crop/heal-clone과 동일 정책.
     }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
@@ -11354,7 +11438,8 @@ function StudioCuttoonEditor() {
                   !healCloneArmed &&
                   !layerMaskPaintArmed &&
                   !historyBrushArmed &&
-                  !bubbleShapeArmed;
+                  !bubbleShapeArmed &&
+                  !puppetWarpArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
@@ -11371,6 +11456,7 @@ function StudioCuttoonEditor() {
                       !layerMaskPaintArmed &&
                       !historyBrushArmed &&
                       !bubbleShapeArmed &&
+                      !puppetWarpArmed &&
                       setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
@@ -12398,6 +12484,20 @@ function StudioCuttoonEditor() {
                   frame={pixelOverlayFrame}
                   drag={historyBrushDragPreview}
                   radiusPx={historyBrushRadius}
+                />
+              </Layer>
+            )}
+            {/* 퍼펫 워프 오버레이 — 핀 마커(드래그 가능) + 변형된 메쉬 그물선. 다른 픽셀 도구 오버레이와
+                달리 이 Layer는 listening=false 를 주지 않는다 — 핀 Circle 이 Konva 네이티브 드래그를 받아야
+                하기 때문(오버레이 파일 헤더 주석 참고). */}
+            {!isExporting && puppetWarpArmed && pixelOverlayFrame && (
+              <Layer>
+                <StudioPuppetWarpOverlay
+                  frame={pixelOverlayFrame}
+                  scale={effScale}
+                  pins={puppetWarpPins}
+                  busy={puppetWarpBusy}
+                  onMovePin={(id, x, y) => setPuppetWarpPins((pins) => movePuppetPin(pins, id, x, y))}
                 />
               </Layer>
             )}
@@ -15242,6 +15342,30 @@ function StudioCuttoonEditor() {
                     onReset={() => setCropRect(initialCropRect())}
                     onApply={() => void applyCropToSelectedImage()}
                     onCancel={() => setCropRect(null)}
+                  />
+                  {/* 퍼펫 워프 — 핀을 놓고 드래그해 이미지를 관절 인형처럼 변형. 적용 전까지는 오버레이
+                      미리보기만 갱신되고 원본 픽셀은 그대로다. */}
+                  <StudioPuppetWarpPanel
+                    active={puppetWarpActive}
+                    pins={puppetWarpPins}
+                    busy={puppetWarpBusy}
+                    canApply={!isPuppetWarpNoop(puppetWarpPins)}
+                    onToggle={() => {
+                      if (puppetWarpActive) {
+                        setPuppetWarpActive(false);
+                        setPuppetWarpPins([]);
+                        return;
+                      }
+                      disarmAllPixelTools();
+                      setPuppetWarpActive(true);
+                    }}
+                    onRemovePin={(id) => setPuppetWarpPins((pins) => removePuppetPin(pins, id))}
+                    onResetPositions={() => setPuppetWarpPins((pins) => resetPuppetPinPositions(pins))}
+                    onApply={() => void applyPuppetWarpToSelectedImage()}
+                    onCancel={() => {
+                      setPuppetWarpActive(false);
+                      setPuppetWarpPins([]);
+                    }}
                   />
                 </>
               )}
