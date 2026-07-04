@@ -154,6 +154,7 @@ export interface SvgBubbleElLike extends SvgElMeta {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  customShapePoints?: number[];
 }
 
 export interface SvgFrameElLike extends SvgElMeta {
@@ -976,7 +977,11 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
   const body: string[] = [];
   const strokeAttrs = `${att("stroke", bStroke)}${att("stroke-width", bStrokeW)}`;
 
-  if (el.variant === "shout" || el.variant === "angry") {
+  if (el.customShapePoints && el.customShapePoints.length >= 6) {
+    body.push(
+      `<path d="${pointsToPathD(el.customShapePoints, true)}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
+    );
+  } else if (el.variant === "shout" || el.variant === "angry") {
     const isShout = el.variant === "shout";
     const base = isShout ? 136 : 160;
     const pts = isShout ? rawStarPoints(0, 0, 20, 36, 68) : rawStarPoints(0, 0, 22, 28, 64);

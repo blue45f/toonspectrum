@@ -149,6 +149,14 @@ import {
   STABILIZER_MAX,
 } from "./studio-brush";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
+import {
+  bubbleShapeCanvasPointToLocal,
+  bubbleShapePointHandles,
+  computeCustomShapePointsForBubble,
+  hasCustomBubbleShape,
+  normalizeCustomShapePoints,
+  type BubbleShapeGeometryInput,
+} from "./studio-bubble-custom-shape";
 import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
 import { svgToDataUrl } from "./studio-characters";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
@@ -463,6 +471,7 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -1057,6 +1066,13 @@ interface BubbleEl {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  /** 커스텀 폐곡선 점 배열(요소 로컬 0,0~width,height — bubblePathData 와 동일 좌표계, 짝수 길이
+   *  [x0,y0,x1,y1,...], 최소 3점/6칸). 있으면 렌더는 variant별 모양(둥근사각형·별·하트·구름 등)
+   *  대신 이 폴리곤을 그린다(studio-bubble-custom-shape.ts). "커스텀 모양으로 전환" 버튼이
+   *  bubblePathData/Multi 결과를 샘플링해 채운다 — tailDirection/tailXRatio/tailHeight/extraTails
+   *  값 자체는 보존되지만(되돌리기용) 이 필드가 있는 동안은 렌더에 반영되지 않는다(꼬리가 이미
+   *  폴리곤에 구워져 있다). */
+  customShapePoints?: number[];
 }
 interface FrameEl {
   id: string;
@@ -1279,7 +1295,7 @@ function applyBubbleAnchors(nextElements: El[]): El[] {
 
   let changed = false;
   const out = nextElements.map((e) => {
-    if (e.type !== "bubble" || (!e.tailAnchorId && !e.tailAnchorPoint)) return e;
+    if (e.type !== "bubble" || (!e.tailAnchorId && !e.tailAnchorPoint) || hasCustomBubbleShape(e.customShapePoints)) return e;
 
     const point = resolveAnchorTargetPoint(e, (id) => (id === e.id ? null : (boundsById.get(id) ?? null)));
     if (!point) {
@@ -2524,6 +2540,38 @@ function StudioNodeEditOverlay({
           />
         );
       })}
+    </Group>
+  );
+}
+
+// 말풍선 커스텀 모양 오버레이 — 폴리곤 점 핸들. DrawEl(페이지 절대좌표) 용인 StudioNodeEditOverlay와
+// 달리 BubbleEl은 x/y/rotation 요소라, 점은 로컬(비스케일) 좌표 그대로 두고 Group에 x/y/rotation을
+// 줘서 Konva가 회전·이동을 자동 적용하게 한다(호출부에서 좌표를 캔버스로 미리 변환할 필요 없음 —
+// 히트테스트/드래그 쪽만 bubbleShapeCanvasPointToLocal로 역변환한다, §8 참고).
+function StudioBubbleShapeOverlay({
+  frame,
+  handles,
+  scale,
+  activeHandleIndex,
+}: {
+  frame: { x: number; y: number; rotation: number };
+  handles: NodeEditHandle[];
+  scale: number;
+  activeHandleIndex: number | null;
+}) {
+  return (
+    <Group x={frame.x} y={frame.y} rotation={frame.rotation} listening={false}>
+      {handles.map((h) => (
+        <KCircle
+          key={h.pointIndex}
+          x={h.x}
+          y={h.y}
+          radius={5 / scale}
+          fill={activeHandleIndex === h.pointIndex ? "#7c5cfc" : "#ffffff"}
+          stroke="#18181b"
+          strokeWidth={1.25 / scale}
+        />
+      ))}
     </Group>
   );
 }
@@ -4189,6 +4237,35 @@ function StudioCuttoonEditor() {
     setNodeEditDraft(null);
     setNodeEditTool(null);
   }, [selectedId]);
+  // ── 말풍선 커스텀 모양(폴리곤 점 편집) — studio-bubble-custom-shape 통합 상태. nodeEditDraft와
+  // 동일한 구조(드래그 세션 ref + rAF 배칭 draft) — 좌표계만 다르다(말풍선 로컬, 회전 포함).
+  const [bubbleShapeEditActive, setBubbleShapeEditActive] = useState(false);
+  const bubbleShapeDragRef = useRef<{ elId: string; session: NodeDragSession } | null>(null);
+  const bubbleShapeRafRef = useRef<number | null>(null);
+  const pendingBubbleShapeDraftRef = useRef<{ elId: string; points: number[] } | null>(null);
+  const [bubbleShapeDraft, setBubbleShapeDraft] = useState<{ elId: string; points: number[] } | null>(null);
+  const scheduleBubbleShapeDraft = (next: { elId: string; points: number[] }) => {
+    pendingBubbleShapeDraftRef.current = next;
+    if (bubbleShapeRafRef.current !== null) return;
+    bubbleShapeRafRef.current = globalThis.requestAnimationFrame(() => {
+      bubbleShapeRafRef.current = null;
+      if (pendingBubbleShapeDraftRef.current) setBubbleShapeDraft(pendingBubbleShapeDraftRef.current);
+    });
+  };
+  useEffect(() => () => {
+    if (bubbleShapeRafRef.current !== null) globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+  }, []);
+  useEffect(() => {
+    void selectedId;
+    bubbleShapeDragRef.current = null;
+    pendingBubbleShapeDraftRef.current = null;
+    if (bubbleShapeRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+      bubbleShapeRafRef.current = null;
+    }
+    setBubbleShapeDraft(null);
+    setBubbleShapeEditActive(false);
+  }, [selectedId]);
   // ── 복구 브러시/도장(heal/clone) — studio-heal-clone 통합 상태 ──
   // 모드(healCloneTool)는 pixelTool과 동일하게 요소가 바뀌어도 유지(사용자 선호), 소스 앵커/
   // 오프셋은 pixelSel과 동일하게 "이미지 요소 1개 귀속"이라 요소가 바뀌면 해제한다.
@@ -4460,6 +4537,16 @@ function StudioCuttoonEditor() {
           minSpacingPx: NODE_EDIT_DEFAULT_MIN_SPACING_PX / effScale,
           maxHandles: NODE_EDIT_DEFAULT_MAX_HANDLES,
         })
+      : [];
+  // 말풍선 커스텀 모양 점 편집 무장(bubble 선택 + customShapePoints 존재 + 편집 토글 on) — crop/
+  // node-edit 과 동일한 정책. decimateStrokeHandles 대신 전부를 핸들로(폴리곤은 이미 성글다).
+  const bubbleShapeArmed =
+    bubbleShapeEditActive && selected?.type === "bubble" && hasCustomBubbleShape(selected.customShapePoints);
+  const bubbleShapeHandles: NodeEditHandle[] =
+    bubbleShapeArmed && selected?.type === "bubble"
+      ? bubbleShapePointHandles(
+          bubbleShapeDraft?.elId === selected.id ? bubbleShapeDraft.points : (selected.customShapePoints ?? [])
+        )
       : [];
   const smudgeArmed = smudgeActive && selected?.type === "image";
   const healCloneArmed = healCloneTool !== null && selected?.type === "image";
@@ -5193,8 +5280,8 @@ function StudioCuttoonEditor() {
     const nextElements = computeMagicResize(elements, from, to, magicResizeStrategy);
     commit(nextElements as El[], { canvasH: to.height });
   }
-  // 캔버스 제스처를 무장(armed)해 가로채는 도구 11종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
-  // 나머지 10개를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
+  // 캔버스 제스처를 무장(armed)해 가로채는 도구 13종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
+  // 나머지를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
   // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
@@ -5210,6 +5297,7 @@ function StudioCuttoonEditor() {
     setColorWheelOpen(false);
     setLayerMaskPaintActive(false);
     setHistoryBrushActive(false); // ← 추가(소스 지정 상태는 그대로 둔다)
+    setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
   }
   // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
   // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
@@ -6141,6 +6229,9 @@ function StudioCuttoonEditor() {
           setPanelSplitHint(null);
         } else if (nodeEditTool) {
           setNodeEditTool(null);
+        } else if (bubbleShapeEditActive) {
+          setBubbleShapeEditActive(false);
+          bubbleShapeDragRef.current = null;
         } else if (healCloneTool) {
           setHealCloneTool(null);
           healCloneDragRef.current = null;
@@ -7572,6 +7663,30 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 말풍선 커스텀 모양 점 편집 무장 중: 포인터를 말풍선 로컬좌표로 변환해(회전 포함)
+    // 노드 편집과 동일한 히트테스트/드래그 개시 로직을 재사용한다. 무장 중엔 핸들 밖 클릭도
+    // 다른 제스처를 막는다 — crop/node-edit과 동일 정책.
+    if (
+      bubbleShapeArmed &&
+      selected?.type === "bubble" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const local = bubbleShapeCanvasPointToLocal(pos.x, pos.y, {
+        x: selected.x,
+        y: selected.y,
+        rotation: selected.rotation,
+      });
+      const tolerance = 14 / effScale; // crop/node-edit과 동일한 화면 14px 히트 여유
+      const hitIdx = hitTestNodeHandle(local, bubbleShapeHandles, tolerance);
+      if (hitIdx !== null) {
+        const session = beginNodeDrag(selected.customShapePoints ?? [], undefined, hitIdx, "move", local);
+        if (session) bubbleShapeDragRef.current = { elId: selected.id, session };
+      }
+      return;
+    }
     // 문지르기 브러시 무장 중: 스테이지 드래그를 문지르기 스트로크 좌표 누적으로 가로챈다.
     if (
       smudgeArmed &&
@@ -7864,6 +7979,22 @@ function StudioCuttoonEditor() {
               pressures: withPressureEdited(el.pressures, Math.floor(el.points.length / 2), session.pointIndex, pressure),
             });
           }
+        }
+      }
+      return;
+    }
+    // 말풍선 커스텀 모양 점 드래그 중이면 위치 초안을 갱신한다. nodeEdit과 동일하게 "커밋된
+    // el.customShapePoints 기준 매 틱 재계산"(직전 draft 아님) — updateNodeDragMove의 시작
+    // 스냅샷+델타 설계와 일치, 무누적오차.
+    if (bubbleShapeDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const { elId, session } = bubbleShapeDragRef.current;
+        const el = elementById.get(elId);
+        if (el && el.type === "bubble" && hasCustomBubbleShape(el.customShapePoints)) {
+          const local = bubbleShapeCanvasPointToLocal(pos.x, pos.y, { x: el.x, y: el.y, rotation: el.rotation });
+          const { x, y } = updateNodeDragMove(session, local);
+          scheduleBubbleShapeDraft({ elId, points: withPointMoved(el.customShapePoints, session.pointIndex, x, y) });
         }
       }
       return;
@@ -8202,6 +8333,23 @@ function StudioCuttoonEditor() {
       setNodeEditDraft(null);
       if (finalDraft && finalDraft.elId === elId && elementById.get(elId)?.type === "draw") {
         patchEl(elId, { points: finalDraft.points, pressures: finalDraft.pressures } as Partial<El>);
+      }
+      return;
+    }
+    // 말풍선 커스텀 모양 점 드래그 종료 — nodeEdit과 동일하게 이 pointerup 틱에서 ref로 바로
+    // 커밋한다(state는 비동기라 마지막 프레임을 놓칠 수 있다).
+    if (bubbleShapeDragRef.current) {
+      const { elId } = bubbleShapeDragRef.current;
+      bubbleShapeDragRef.current = null;
+      if (bubbleShapeRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+        bubbleShapeRafRef.current = null;
+      }
+      const finalDraft = pendingBubbleShapeDraftRef.current;
+      pendingBubbleShapeDraftRef.current = null;
+      setBubbleShapeDraft(null);
+      if (finalDraft && finalDraft.elId === elId && elementById.get(elId)?.type === "bubble") {
+        patchEl(elId, { customShapePoints: finalDraft.points } as Partial<El>);
       }
       return;
     }
@@ -11123,7 +11271,8 @@ function StudioCuttoonEditor() {
                   !smudgeArmed &&
                   !healCloneArmed &&
                   !layerMaskPaintArmed &&
-                  !historyBrushArmed;
+                  !historyBrushArmed &&
+                  !bubbleShapeArmed;
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
@@ -11139,6 +11288,7 @@ function StudioCuttoonEditor() {
                       !healCloneArmed &&
                       !layerMaskPaintArmed &&
                       !historyBrushArmed &&
+                      !bubbleShapeArmed &&
                       setSelectedId(el.id);
                 const setRef = opts.asMask
                   ? () => {}
@@ -11467,6 +11617,13 @@ function StudioCuttoonEditor() {
                   : null;
                 // 추가 꼬리(두 화자 동시 대사)가 있으면 다중 꼬리 워커로 — 없으면 기존 단일 경로 바이트 동일 유지.
                 const bubbleExtraTails = normalizeExtraTails(el.extraTails);
+                // 드래그 중이면 미확정 draft를(커밋 전 실시간 미리보기), 아니면 저장된 값을 정규화해 쓴다 —
+                // StudioDrawNode의 nodeEditDraft 병합과 동일한 관례. normalizeCustomShapePoints는 위
+                // normalizeExtraTails(el.extraTails)와 동일하게, 저장 문서에서 불러온 값을 매 렌더 방어적으로
+                // 정규화한다(짝수 길이·유한수 아니면 undefined로 폴백 — 커스텀 모양 미적용 취급).
+                const liveCustomShapePoints =
+                  bubbleShapeDraft?.elId === el.id ? bubbleShapeDraft.points : normalizeCustomShapePoints(el.customShapePoints);
+                const showCustomShape = hasCustomBubbleShape(liveCustomShapePoints);
                 const speechPathData =
                   bubbleExtraTails.length > 0
                     ? bubblePathDataMulti(el.width, el.height, bRadius, [
@@ -11584,7 +11741,7 @@ function StudioCuttoonEditor() {
                   ly = el.height * tXRatio;
                 }
 
-                const tailHandle = selectedId === el.id && showTail && !isExporting && (
+                const tailHandle = selectedId === el.id && showTail && !isExporting && !showCustomShape && (
                   <KCircle
                     x={lx}
                     y={ly}
@@ -11679,7 +11836,17 @@ function StudioCuttoonEditor() {
                       patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
                     }}
                   >
-                    {el.variant === "shout" ? (
+                    {showCustomShape ? (
+                      <Line
+                        points={liveCustomShapePoints}
+                        closed
+                        fill={el.fill}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        lineJoin="round"
+                        lineCap="round"
+                      />
+                    ) : el.variant === "shout" ? (
                       <Star
                         x={el.width / 2}
                         y={el.height / 2}
@@ -12068,6 +12235,17 @@ function StudioCuttoonEditor() {
                   pressures={nodeEditDraft?.elId === selected.id ? nodeEditDraft.pressures : selected.pressures}
                   scale={effScale}
                   activeHandleIndex={nodeEditDragRef.current?.session.pointIndex ?? null}
+                />
+              </Layer>
+            )}
+            {/* 말풍선 커스텀 모양 오버레이 — 폴리곤 점 핸들(로컬좌표, Group이 x/y/rotation 자동 적용). */}
+            {!isExporting && bubbleShapeArmed && selected?.type === "bubble" && (
+              <Layer listening={false}>
+                <StudioBubbleShapeOverlay
+                  frame={{ x: selected.x, y: selected.y, rotation: selected.rotation }}
+                  handles={bubbleShapeHandles}
+                  scale={effScale}
+                  activeHandleIndex={bubbleShapeDragRef.current?.session.pointIndex ?? null}
                 />
               </Layer>
             )}
@@ -13485,7 +13663,43 @@ function StudioCuttoonEditor() {
                   </div>
                 </>
               )}
-              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (
+              {selected.type === "bubble" && (
+                <StudioBubbleShapePanel
+                  hasCustomShape={hasCustomBubbleShape(selected.customShapePoints)}
+                  active={bubbleShapeArmed}
+                  pointCount={bubbleShapeHandles.length || Math.floor((selected.customShapePoints?.length ?? 0) / 2)}
+                  onConvert={() => {
+                    const input: BubbleShapeGeometryInput = {
+                      width: selected.width,
+                      height: selected.height,
+                      theme: webtoonTheme,
+                      tail: selected.tail,
+                      tailDirection: selected.tailDirection,
+                      tailXRatio: selected.tailXRatio,
+                      tailHeight: selected.tailHeight,
+                      extraTails: normalizeExtraTails(selected.extraTails),
+                    };
+                    const points = computeCustomShapePointsForBubble(input);
+                    patchEl(selected.id, { customShapePoints: points } as Partial<El>);
+                  }}
+                  onToggleEdit={() => {
+                    if (bubbleShapeEditActive) {
+                      setBubbleShapeEditActive(false);
+                      return;
+                    }
+                    disarmAllPixelTools();
+                    setBubbleShapeEditActive(true);
+                  }}
+                  onRevert={() => {
+                    setBubbleShapeEditActive(false);
+                    patchEl(selected.id, { customShapePoints: undefined } as Partial<El>);
+                  }}
+                />
+              )}
+              {selected.type === "bubble" &&
+                selected.variant !== "shout" &&
+                selected.variant !== "box" &&
+                !hasCustomBubbleShape(selected.customShapePoints) && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5">
                   <p className="mb-1 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">꼬리 위치 & 방향</p>
                   
@@ -13545,7 +13759,11 @@ function StudioCuttoonEditor() {
                   </div>
                 </div>
               )}
-              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
+              {selected.type === "bubble" &&
+                selected.variant !== "shout" &&
+                selected.variant !== "box" &&
+                !hasCustomBubbleShape(selected.customShapePoints) &&
+                (selected.tail ?? "left") !== "none" && (
                 <Suspense fallback={null}>
                   <StudioBubbleAnchorPanel
                     anchorId={selected.tailAnchorId ?? null}
@@ -13564,7 +13782,11 @@ function StudioCuttoonEditor() {
                   />
                 </Suspense>
               )}
-              {selected.type === "bubble" && selected.variant !== "shout" && selected.variant !== "box" && (selected.tail ?? "left") !== "none" && (
+              {selected.type === "bubble" &&
+                selected.variant !== "shout" &&
+                selected.variant !== "box" &&
+                !hasCustomBubbleShape(selected.customShapePoints) &&
+                (selected.tail ?? "left") !== "none" && (
                 <div className="mt-3 space-y-2 border-t border-line/40 pt-2.5">
                   {!!(selected.tailAnchorId || selected.tailAnchorPoint) && (
                     <p className="text-[0.68rem] text-fg-3">
