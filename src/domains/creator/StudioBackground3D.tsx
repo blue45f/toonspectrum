@@ -16,6 +16,7 @@ import {
   Loader2,
   Maximize2,
   Move,
+  PackageOpen,
   Pill,
   Pyramid,
   Redo2,
@@ -27,13 +28,21 @@ import {
   Torus as TorusIcon,
   Umbrella,
   Undo2,
+  Upload,
   X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import * as THREE from "three";
 
+import {
+  deleteStoredBg3dModel,
+  getStoredBg3dModel,
+  listBg3dModelLibraryEntries,
+  saveUploadedBg3dModel,
+  type Bg3dModelLibraryEntry,
+} from "./bg3d-model-library";
 import {
   COMPOSITE_CATEGORIES,
   COMPOSITE_CATEGORY_LABELS,
@@ -42,12 +51,21 @@ import {
   type BgCompositeCategory,
 } from "./studio-background-3d-composites";
 import {
+  cloneBgCustomModelInstances,
+  computeAutoFitScale,
+  createBgCustomModelInstance,
+  duplicateBgCustomModelInstance,
+  encodeBg3dSceneWithModelsHash,
+  loadBg3dCustomModelFromBlob,
+  measureBg3dObjectSize,
+  parseBg3dSceneWithModelsFromDataUrl,
+  type BgCustomModelInstance,
+} from "./studio-background-3d-model";
+import {
   clonePrimitives,
   createPrimitive,
   duplicatePrimitive,
-  encodeBg3dSceneHash,
   makeGeometry,
-  parseBg3dSceneFromDataUrl,
   PRIMITIVE_DEFS,
   roundExportSize,
   type BgPrimitive,
@@ -63,7 +81,7 @@ export interface StudioBackground3DProps {
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
-type BgPanelTab = "shapes" | "layers" | "view";
+type BgPanelTab = "shapes" | "layers" | "view" | "models";
 type CaptureState = { gl: THREE.WebGLRenderer | null; scene: THREE.Scene | null; camera: THREE.Camera | null };
 
 const CONTROL_BUTTON =
@@ -81,6 +99,7 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "shapes", label: "도형", icon: Boxes, hint: "추가 · 선택한 도형 수치 편집" },
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
+  { id: "models", label: "모델", icon: PackageOpen, hint: "업로드 · 배치 · 삭제" },
 ];
 
 const TRANSFORM_MODES: Array<{ id: TransformModeId; label: string; icon: typeof Move; title: string }> = [
@@ -275,6 +294,47 @@ function BgPrimitiveMesh({ prim, lineArt, onSelect, registerRef }: BgPrimitiveMe
   );
 }
 
+interface BgCustomModelMeshProps {
+  instance: BgCustomModelInstance;
+  cachedRoot: THREE.Object3D | undefined;
+  onSelect: (id: string) => void;
+  registerRef: (id: string, obj: THREE.Group | null) => void;
+}
+
+function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef }: BgCustomModelMeshProps) {
+  // cachedRoot(모델 하나당 1개, modelRootCacheRef가 소유)를 인스턴스마다 clone()한다. clone()은
+  // 씬그래프(트랜스폼 계층)는 깊은 복제하지만 geometry/material은 얕게(참조로) 공유한다 — 즉
+  // 같은 모델을 3개 배치하면 3개의 Object3D가 생기되 그 안의 BufferGeometry/Material 인스턴스는
+  // 단 1세트를 공유한다. 따라서 이 컴포넌트의 언마운트(unmount)에서 geometry/material을
+  // dispose()하면 안 된다 — 그 순간 씬에 남아있는 다른 두 인스턴스가 참조하는 GPU 리소스까지
+  // 함께 파괴돼 렌더링이 깨진다(BgPrimitiveMesh의 useEffect cleanup 패턴을 그대로 복붙하면 안
+  // 되는 지점). 공유 리소스의 dispose는 오직 §11(모달 닫힘)에서 캐시 전체를 한 번에 처리한다.
+  const cloned = useMemo(() => cachedRoot?.clone(), [cachedRoot]);
+
+  const groupRef = useRef<THREE.Group>(null);
+  useEffect(() => {
+    registerRef(instance.id, groupRef.current);
+    return () => registerRef(instance.id, null);
+  }, [instance.id, registerRef]);
+
+  if (!cloned) return null;
+
+  return (
+    <group
+      ref={groupRef}
+      position={instance.position}
+      rotation={instance.rotation}
+      scale={instance.scale}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(instance.id);
+      }}
+    >
+      <primitive object={cloned} />
+    </group>
+  );
+}
+
 function Vec3Field({
   label,
   values,
@@ -338,33 +398,135 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   // 하늘색 배경을 보면서 구도를 잡을 수 있게).
   const [transparentInsert, setTransparentInsert] = useState(false);
 
+  // 업로드된 커스텀 3D 모델(§bg3d-model-library.ts)의 씬 배치 인스턴스 + 라이브러리 목록/상태.
+  const [customModels, setCustomModels] = useState<BgCustomModelInstance[]>([]);
+  const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>([]);
+  const [modelLibraryStatus, setModelLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [isUploadingModel, setIsUploadingModel] = useState(false);
+  const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
+
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
   const primitiveObjectsRef = useRef<Map<string, THREE.Group>>(new Map());
   const [, setRefTick] = useState(0);
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  // modelId -> 로드+오토핏 스케일까지 끝난 원본 루트(clone()의 소스). 같은 모델을 두 번째
+  // 배치할 때부터는 blob을 다시 파싱하지 않고 이 캐시에서 clone()만 한다.
+  const modelRootCacheRef = useRef<Map<string, THREE.Object3D>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const historyRef = useRef<BgPrimitive[][]>([]);
+  const historyRef = useRef<{ primitives: BgPrimitive[]; customModels: BgCustomModelInstance[] }[]>([]);
   const historyIndexRef = useRef(-1);
   const isRestoringRef = useRef(false);
 
-  // 재편집 진입: initialDataUrl의 해시 프래그먼트에서 이전 장면을 복원한다(VRM 포저의 round-trip과 동일 계약).
+  // 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다(VRM 포저의 listVrmLibraryEntries() 패턴과 동일).
   useEffect(() => {
     if (!open) return;
-    const parsed = parseBg3dSceneFromDataUrl(initialDataUrl);
-    if (parsed && parsed.length > 0) {
-      setPrimitives(parsed);
-    }
+    setModelLibraryStatus("loading");
+    listBg3dModelLibraryEntries()
+      .then((entries) => {
+        setModelLibrary(entries);
+        setModelLibraryStatus("ready");
+      })
+      .catch(() => setModelLibraryStatus("error"));
+  }, [open]);
+
+  // 재편집 진입: initialDataUrl의 해시 프래그먼트에서 이전 장면(도형 + 커스텀 모델)을 복원한다
+  // (VRM 포저의 round-trip과 동일 계약). customModels 필드가 없는 레거시 해시(도형만 있던 과거
+  // 캡처)는 parseBg3dSceneWithModelsFromDataUrl이 customModels: []로 파싱해 하위 호환을 지킨다.
+  useEffect(() => {
+    if (!open) return;
+    const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);
+    if (!parsed || (parsed.primitives.length === 0 && parsed.customModels.length === 0)) return;
+    setPrimitives(parsed.primitives);
+    setCustomModels(parsed.customModels);
+    if (parsed.customModels.length === 0) return;
+
+    // 복원된 각 modelId가 가리키는 레코드가 IndexedDB에 아직 있는지는 보장되지 않는다(사용자가 그
+    // 사이 라이브러리에서 삭제했을 수 있음) — ensureModelRootCached와 동일한 로드+오토핏+캐시 절차를
+    // 여기서도 거쳐야 복원된 인스턴스가 Canvas에 곧바로 렌더링된다. 다만 이 절차를 ensureModelRootCached
+    // 호출로 재사용하지 않고 아래에 인라인한 이유: ensureModelRootCached는 컴포넌트 스코프 함수라
+    // useEffect 의존성 배열에 넣으면(react-hooks/exhaustive-deps 요구) 매 렌더 재생성되는 참조라
+    // 이 effect가 무한 재실행될 위험이 있다 — getStoredBg3dModel/loadBg3dCustomModelFromBlob 등
+    // 모듈 수준 함수 + 안정적인 ref만 사용해 그 위험을 피한다. 못 찾거나 로드에 실패하면 조용히
+    // 씬에서 제거하고 에러 배너로 알린다(addCustomModelToScene과 동일한 원칙).
+    let cancelled = false;
+    void (async () => {
+      const missingModelIds = new Set<string>();
+      await Promise.all(
+        parsed.customModels.map(async (inst) => {
+          if (modelRootCacheRef.current.has(inst.modelId)) return;
+          try {
+            const record = await getStoredBg3dModel(inst.modelId);
+            if (!record) {
+              missingModelIds.add(inst.modelId);
+              return;
+            }
+            const root = await loadBg3dCustomModelFromBlob(record.blob, record.format);
+            root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(root)));
+            modelRootCacheRef.current.set(inst.modelId, root);
+          } catch {
+            missingModelIds.add(inst.modelId);
+          }
+        })
+      );
+      if (cancelled) return;
+      if (missingModelIds.size > 0) {
+        setCustomModels((prev) => prev.filter((inst) => !missingModelIds.has(inst.modelId)));
+        setError("저장된 3D 모델을 찾지 못해 일부 배치를 씬에서 제거했습니다.");
+      } else {
+        // customModels 상태 자체는 이미 위에서 set 됐으므로, 여기서는 modelRootCacheRef(일반 ref라
+        // 갱신해도 리렌더를 유발하지 않음)가 새로 채워졌다는 사실만 리렌더로 반영한다.
+        setRefTick((n) => n + 1);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, initialDataUrl]);
 
+  // modelRootCacheRef가 소유한 로드된 루트들의 geometry/material은 §7(BgCustomModelMesh)에서 설명한
+  // 대로 인스턴스별로 dispose하면 안 되고, 모달이 닫힐 때 캐시 전체를 한 번에 해제해야 한다.
+  // 실제 호출부(StudioPage.tsx)는 `{bg3dOpen ? <StudioBackground3D open .../> : null}`로 열려있는
+  // 동안만 이 컴포넌트를 마운트하므로 — "open prop이 true→false로 바뀌는" 경로가 아니라 "컴포넌트가
+  // 통째로 언마운트되는" 경로가 실제 경로다. 그래서 이펙트 본문에서 곧바로 dispose하지 않고 cleanup
+  // 함수로 등록한다 — 언마운트 시 React가 cleanup을 호출해 주므로 이 실제 경로에서도 정확히
+  // 한 번 해제되고, 혹시 다른 호출부가 마운트 상태에서 open만 false로 바꾸는 경우에도(동일 cleanup
+  // 메커니즘이 effect 재실행 직전에도 호출되므로) 이중 dispose 없이 동일하게 처리된다.
+  useEffect(() => {
+    if (!open) return;
+    // cleanup 시점에 modelRootCacheRef.current를 다시 읽지 않고 지금 시점의 Map 참조를 클로저에
+    // 담아 둔다(react-hooks/exhaustive-deps가 "cleanup에서 ref.current를 다시 읽지 말라"고 요구함) —
+    // 이 ref는 컴포넌트 생애주기 동안 늘 같은 Map 인스턴스를 담고 있어(재할당 없이 mutate만 함)
+    // 동작 차이는 없다.
+    const cache = modelRootCacheRef.current;
+    return () => {
+      for (const root of cache.values()) {
+        root.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.geometry.dispose();
+          for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+            mat.dispose();
+          }
+        });
+      }
+      cache.clear();
+    };
+  }, [open]);
+
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재 — VRM 포저의 undo 스택과 동일한 패턴.
+  // 도형(primitives)과 커스텀 모델(customModels)을 하나의 타임라인 튜플로 묶어 "실행 취소 한 번 =
+  // 도형이든 모델이든 씬 전체가 한 스텝 되돌아간다"는 사용자 기대를 지킨다 — 독립된 undo 스택 두 개를
+  // 두지 않는다. customModels가 항상 빈 배열인(모델을 한 번도 추가하지 않은) 씬에서는 이 필드가
+  // 매 스냅샷 [] 로만 남아 기존 도형 전용 undo/redo 동작과 동일하게 작동한다.
   useEffect(() => {
     if (isRestoringRef.current) {
       isRestoringRef.current = false;
       return;
     }
     const timer = setTimeout(() => {
-      const snap = clonePrimitives(primitives);
+      const snap = { primitives: clonePrimitives(primitives), customModels: cloneBgCustomModelInstances(customModels) };
       const base = historyRef.current.slice(0, historyIndexRef.current + 1);
       const last = base[base.length - 1];
       if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
@@ -376,13 +538,15 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
       setCanRedo(false);
     }, 400);
     return () => clearTimeout(timer);
-  }, [primitives]);
+  }, [primitives, customModels]);
 
   const doUndo = () => {
     if (historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
     isRestoringRef.current = true;
-    setPrimitives(clonePrimitives(historyRef.current[historyIndexRef.current]));
+    const snap = historyRef.current[historyIndexRef.current];
+    setPrimitives(clonePrimitives(snap.primitives));
+    setCustomModels(cloneBgCustomModelInstances(snap.customModels));
     setCanUndo(historyIndexRef.current > 0);
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
@@ -390,7 +554,9 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
     isRestoringRef.current = true;
-    setPrimitives(clonePrimitives(historyRef.current[historyIndexRef.current]));
+    const snap = historyRef.current[historyIndexRef.current];
+    setPrimitives(clonePrimitives(snap.primitives));
+    setCustomModels(cloneBgCustomModelInstances(snap.customModels));
     setCanUndo(historyIndexRef.current > 0);
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
@@ -421,6 +587,22 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     setIsTransforming(false);
   };
 
+  const deleteSelectedCustomModel = () => {
+    if (!selectedId) return;
+    setCustomModels((prev) => prev.filter((m) => m.id !== selectedId));
+    setSelectedId(null);
+    // deleteSelected(도형)와 동일한 이유(§4: 도형·커스텀 모델이 TransformControls를 공유) —
+    // 드래그 도중 삭제해도 OrbitControls가 영영 비활성으로 고착되지 않도록 방어적으로 되돌린다.
+    setIsTransforming(false);
+  };
+
+  // 키보드 Delete/Backspace 전용 — 선택된 것이 도형인지 커스텀 모델인지 몰라도 되는 단일 진입점
+  // (§8: primitives에 있으면 도형, 아니면 커스텀 모델로 분기하는 것과 동일한 원칙).
+  function deleteSelectedEntity() {
+    if (primitives.some((p) => p.id === selectedId)) deleteSelected();
+    else deleteSelectedCustomModel();
+  }
+
   const duplicateSelected = () => {
     if (!selectedId) return;
     const original = primitives.find((p) => p.id === selectedId);
@@ -430,9 +612,22 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     setSelectedId(clone.id);
   };
 
+  const duplicateSelectedCustomModel = () => {
+    if (!selectedId) return;
+    const original = customModels.find((m) => m.id === selectedId);
+    if (!original) return;
+    const clone = duplicateBgCustomModelInstance(original);
+    setCustomModels((prev) => [...prev, clone]);
+    setSelectedId(clone.id);
+  };
+
   const updateTransform = (id: string, patch: Partial<Pick<BgPrimitive, "position" | "rotation" | "scale">>) => {
     setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   };
+
+  function updateCustomModelTransform(id: string, patch: Partial<Pick<BgCustomModelInstance, "position" | "rotation" | "scale">>) {
+    setCustomModels((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
 
   const updateColor = (id: string, color: string) => {
     setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, color } : p)));
@@ -444,6 +639,75 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     setRefTick((n) => n + 1);
   };
 
+  // ── §6 커스텀 3D 모델 추가/업로드/삭제 핸들러 ─────────────────────────────────────────
+  async function ensureModelRootCached(modelId: string): Promise<THREE.Object3D | null> {
+    const cached = modelRootCacheRef.current.get(modelId);
+    if (cached) return cached;
+
+    const record = await getStoredBg3dModel(modelId);
+    if (!record) return null;
+
+    const root = await loadBg3dCustomModelFromBlob(record.blob, record.format);
+    const autoFit = computeAutoFitScale(measureBg3dObjectSize(root));
+    root.scale.setScalar(autoFit); // 캐시에 이미 오토핏이 반영된 "기준 크기"로 저장
+    modelRootCacheRef.current.set(modelId, root);
+    return root;
+  }
+
+  async function addCustomModelToScene(modelId: string) {
+    try {
+      const root = await ensureModelRootCached(modelId);
+      if (!root) {
+        setError("저장된 3D 모델을 찾지 못했습니다.");
+        return;
+      }
+      // root.scale에 이미 오토핏이 반영돼 있으므로 인스턴스 자체의 scale은 [1,1,1]에서 시작한다
+      // (오토핏 배율을 인스턴스 scale에 다시 곱하면 이중 적용된다 — 인스턴스 scale은 "오토핏 위에
+      // 사용자가 추가로 조정한 배율"만 의미하게 한다).
+      const next = createBgCustomModelInstance(modelId, customModels.length);
+      setCustomModels((prev) => [...prev, next]);
+      setSelectedId(next.id);
+    } catch (caughtError: unknown) {
+      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 불러오지 못했습니다.");
+    }
+  }
+
+  async function handleUploadModelFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = ""; // StudioVrmPoser.tsx handleFileChange와 동일 — 같은 파일 재선택 허용
+    if (files.length === 0) return;
+
+    setIsUploadingModel(true);
+    setError(null);
+    try {
+      const saved = await Promise.all(files.map((file) => saveUploadedBg3dModel(file)));
+      setModelLibrary(await listBg3dModelLibraryEntries());
+      if (saved[0]) await addCustomModelToScene(saved[0].id);
+    } catch (caughtError: unknown) {
+      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 저장하지 못했습니다.");
+    } finally {
+      setIsUploadingModel(false);
+    }
+  }
+
+  async function handleDeleteModelFromLibrary(id: string) {
+    // 씬에 이 모델의 인스턴스가 남아있으면 참조가 끊긴다(라운드트립 시 modelId가 404) — 삭제 전
+    // 씬에서도 함께 제거한다.
+    const inUse = customModels.some((inst) => inst.modelId === id);
+    if (inUse) {
+      setCustomModels((prev) => prev.filter((inst) => inst.modelId !== id));
+    }
+    setDeletingModelId(id);
+    try {
+      await deleteStoredBg3dModel(id);
+      setModelLibrary(await listBg3dModelLibraryEntries());
+    } catch (caughtError: unknown) {
+      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 삭제하지 못했습니다.");
+    } finally {
+      setDeletingModelId(null);
+    }
+  }
+
   const handlePanelTabChange = (tab: BgPanelTab) => {
     setActivePanelTab(tab);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
@@ -453,12 +717,12 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   const selectedIdRef = useRef(selectedId);
   const undoRef = useRef(doUndo);
   const redoRef = useRef(doRedo);
-  const deleteSelectedRef = useRef(deleteSelected);
+  const deleteSelectedRef = useRef(deleteSelectedEntity);
   useEffect(() => {
     selectedIdRef.current = selectedId;
     undoRef.current = doUndo;
     redoRef.current = doRedo;
-    deleteSelectedRef.current = deleteSelected;
+    deleteSelectedRef.current = deleteSelectedEntity;
   });
 
   // 키보드 단축키: T/R/S 변환 모드, ⌘/Ctrl+Z(+Shift) undo/redo, Delete/Backspace 삭제,
@@ -537,13 +801,16 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
       setIsCapturing(false);
       if (transparentInsert) gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1);
 
-      const fullDataUrl = `${baseDataUrl}#${encodeBg3dSceneHash(primitives)}`;
+      const fullDataUrl = `${baseDataUrl}#${encodeBg3dSceneWithModelsHash(primitives, customModels)}`;
       onInsert(fullDataUrl, width, height);
       onClose(); // 모달이 곧 언마운트되므로 previewMode를 되돌릴 필요가 없다.
     });
   }
 
-  const selected = primitives.find((p) => p.id === selectedId) ?? null;
+  // 선택된 것이 도형(primitives)인지 커스텀 모델(customModels)인지는 배타적이다 — 둘 다 같은
+  // selectedId/primitiveObjectsRef를 공유하므로(§4) "primitives에 있으면 도형, 아니면 모델"로 분기한다.
+  const selectedPrimitive = primitives.find((p) => p.id === selectedId) ?? null;
+  const selectedCustomModel = customModels.find((m) => m.id === selectedId) ?? null;
   const hideOnTab = (tab: BgPanelTab) => activePanelTab !== tab;
 
   if (!open) return null;
@@ -601,6 +868,15 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       registerRef={registerPrimitiveRef}
                     />
                   ))}
+                  {customModels.map((inst) => (
+                    <BgCustomModelMesh
+                      key={inst.id}
+                      instance={inst}
+                      cachedRoot={modelRootCacheRef.current.get(inst.modelId)}
+                      onSelect={setSelectedId}
+                      registerRef={registerPrimitiveRef}
+                    />
+                  ))}
                   {selectedId && primitiveObjectsRef.current.get(selectedId) ? (
                     <TransformControls
                       object={primitiveObjectsRef.current.get(selectedId)}
@@ -611,11 +887,11 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       onObjectChange={() => {
                         const obj = primitiveObjectsRef.current.get(selectedId);
                         if (!obj) return;
-                        updateTransform(selectedId, {
-                          position: [obj.position.x, obj.position.y, obj.position.z],
-                          rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-                          scale: [obj.scale.x, obj.scale.y, obj.scale.z],
-                        });
+                        const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
+                        const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
+                        const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
+                        if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale });
+                        else if (selectedCustomModel) updateCustomModelTransform(selectedId, { position, rotation, scale });
                       }}
                     />
                   ) : null}
@@ -724,13 +1000,13 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                   </div>
                 ) : null}
 
-                {primitives.length === 0 ? (
+                {primitives.length === 0 && customModels.length === 0 ? (
                   <div className="pointer-events-none absolute inset-0 grid place-items-center p-6 text-center">
                     <div className="max-w-[18rem]">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Boxes size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">오른쪽 &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 추가해 배경을 잡아보세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">오른쪽 &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 추가하거나 &ldquo;모델&rdquo; 탭에서 3D 파일을 업로드해 배경을 잡아보세요.</p>
                     </div>
                   </div>
                 ) : null}
@@ -860,7 +1136,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  {selected ? (
+                  {selectedPrimitive ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="text-sm font-bold text-fg">선택한 도형</h3>
@@ -888,40 +1164,40 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
 
                       <Vec3Field
                         label="위치"
-                        values={selected.position}
+                        values={selectedPrimitive.position}
                         step={0.1}
                         precision={2}
                         onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selected.position];
+                          const next: [number, number, number] = [...selectedPrimitive.position];
                           next[i] = v;
-                          updateTransform(selected.id, { position: next });
+                          updateTransform(selectedPrimitive.id, { position: next });
                         }}
                       />
                       <Vec3Field
                         label="회전"
-                        values={[radToDeg(selected.rotation[0]), radToDeg(selected.rotation[1]), radToDeg(selected.rotation[2])]}
+                        values={[radToDeg(selectedPrimitive.rotation[0]), radToDeg(selectedPrimitive.rotation[1]), radToDeg(selectedPrimitive.rotation[2])]}
                         step={1}
                         precision={0}
                         suffix="°"
                         onCommit={(i, v) => {
                           const nextDeg: [number, number, number] = [
-                            radToDeg(selected.rotation[0]),
-                            radToDeg(selected.rotation[1]),
-                            radToDeg(selected.rotation[2]),
+                            radToDeg(selectedPrimitive.rotation[0]),
+                            radToDeg(selectedPrimitive.rotation[1]),
+                            radToDeg(selectedPrimitive.rotation[2]),
                           ];
                           nextDeg[i] = v;
-                          updateTransform(selected.id, { rotation: [degToRad(nextDeg[0]), degToRad(nextDeg[1]), degToRad(nextDeg[2])] });
+                          updateTransform(selectedPrimitive.id, { rotation: [degToRad(nextDeg[0]), degToRad(nextDeg[1]), degToRad(nextDeg[2])] });
                         }}
                       />
                       <Vec3Field
                         label="크기"
-                        values={selected.scale}
+                        values={selectedPrimitive.scale}
                         step={0.1}
                         precision={2}
                         onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selected.scale];
+                          const next: [number, number, number] = [...selectedPrimitive.scale];
                           next[i] = Math.max(0.01, v);
-                          updateTransform(selected.id, { scale: next });
+                          updateTransform(selectedPrimitive.id, { scale: next });
                         }}
                       />
 
@@ -929,14 +1205,81 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                         색상(셰이딩 미리보기 전용)
                         <input
                           type="color"
-                          value={selected.color}
-                          onChange={(e) => updateColor(selected.id, e.target.value)}
+                          value={selectedPrimitive.color}
+                          onChange={(e) => updateColor(selectedPrimitive.id, e.target.value)}
                           className="h-7 w-10 cursor-pointer rounded border border-line bg-card"
                         />
                       </label>
                     </div>
+                  ) : selectedCustomModel ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-fg">선택한 모델</h3>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label="복제"
+                            title="복제"
+                            className={cx(ICON_BUTTON, "size-8")}
+                            onClick={duplicateSelectedCustomModel}
+                          >
+                            <Copy size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="삭제"
+                            title="삭제 (Delete)"
+                            className={cx(ICON_BUTTON, "size-8 hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
+                            onClick={deleteSelectedCustomModel}
+                          >
+                            <Trash2 size={14} aria-hidden />
+                          </button>
+                        </div>
+                      </div>
+
+                      <Vec3Field
+                        label="위치"
+                        values={selectedCustomModel.position}
+                        step={0.1}
+                        precision={2}
+                        onCommit={(i, v) => {
+                          const next: [number, number, number] = [...selectedCustomModel.position];
+                          next[i] = v;
+                          updateCustomModelTransform(selectedCustomModel.id, { position: next });
+                        }}
+                      />
+                      <Vec3Field
+                        label="회전"
+                        values={[radToDeg(selectedCustomModel.rotation[0]), radToDeg(selectedCustomModel.rotation[1]), radToDeg(selectedCustomModel.rotation[2])]}
+                        step={1}
+                        precision={0}
+                        suffix="°"
+                        onCommit={(i, v) => {
+                          const nextDeg: [number, number, number] = [
+                            radToDeg(selectedCustomModel.rotation[0]),
+                            radToDeg(selectedCustomModel.rotation[1]),
+                            radToDeg(selectedCustomModel.rotation[2]),
+                          ];
+                          nextDeg[i] = v;
+                          updateCustomModelTransform(selectedCustomModel.id, { rotation: [degToRad(nextDeg[0]), degToRad(nextDeg[1]), degToRad(nextDeg[2])] });
+                        }}
+                      />
+                      <Vec3Field
+                        label="크기"
+                        values={selectedCustomModel.scale}
+                        step={0.1}
+                        precision={2}
+                        onCommit={(i, v) => {
+                          const next: [number, number, number] = [...selectedCustomModel.scale];
+                          next[i] = Math.max(0.01, v);
+                          updateCustomModelTransform(selectedCustomModel.id, { scale: next });
+                        }}
+                      />
+
+                      <p className="text-[0.68rem] leading-relaxed text-fg-3">업로드한 3D 모델은 셰이딩 미리보기 색상을 따로 지정할 수 없어요.</p>
+                    </div>
                   ) : (
-                    <p className="text-xs leading-relaxed text-fg-3">도형을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
+                    <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
                   )}
                 </div>
               </section>
@@ -947,10 +1290,10 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                     <Layers size={15} className="text-accent" aria-hidden />
                     레이어
                   </h3>
-                  <span className="text-[0.68rem] text-fg-3">{primitives.length}개</span>
+                  <span className="text-[0.68rem] text-fg-3">{primitives.length + customModels.length}개</span>
                 </div>
-                {primitives.length === 0 ? (
-                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형이 없습니다. &ldquo;도형&rdquo; 탭에서 먼저 추가해 주세요.</p>
+                {primitives.length === 0 && customModels.length === 0 ? (
+                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·모델이 없습니다. &ldquo;도형&rdquo;/&ldquo;모델&rdquo; 탭에서 먼저 추가해 주세요.</p>
                 ) : (
                   <ul className="space-y-1">
                     {primitives.map((prim, index) => {
@@ -990,6 +1333,53 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                               className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
                               onClick={() => {
                                 setPrimitives((prev) => prev.filter((p) => p.id !== prim.id));
+                                if (isActive) setSelectedId(null);
+                              }}
+                            >
+                              <Trash2 size={12} aria-hidden />
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                    {customModels.map((inst, index) => {
+                      const kindCountBefore = customModels.slice(0, index).filter((m) => m.modelId === inst.modelId).length;
+                      const modelName = modelLibrary.find((entry) => entry.id === inst.modelId)?.name ?? "3D 모델";
+                      const rowLabel = `${modelName} ${kindCountBefore + 1}`;
+                      const isActive = inst.id === selectedId;
+                      return (
+                        <li key={inst.id}>
+                          <div
+                            className={cx(
+                              "flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                              isActive ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                            )}
+                          >
+                            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setSelectedId(inst.id)}>
+                              <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
+                              <span className="truncate font-semibold">{rowLabel}</span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`${rowLabel} 복제`}
+                              title="복제"
+                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              onClick={() => {
+                                setSelectedId(inst.id);
+                                const clone = duplicateBgCustomModelInstance(inst);
+                                setCustomModels((prev) => [...prev, clone]);
+                                setSelectedId(clone.id);
+                              }}
+                            >
+                              <Copy size={12} aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`${rowLabel} 삭제`}
+                              title="삭제"
+                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              onClick={() => {
+                                setCustomModels((prev) => prev.filter((m) => m.id !== inst.id));
                                 if (isActive) setSelectedId(null);
                               }}
                             >
@@ -1100,6 +1490,86 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                   </div>
                 </div>
               </section>
+
+              <section hidden={hideOnTab("models")}>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                    <PackageOpen size={15} className="text-accent" aria-hidden />
+                    3D 모델
+                  </h3>
+                  <span className="text-[0.68rem] text-fg-3">{modelLibrary.length}개</span>
+                </div>
+
+                <input ref={fileInputRef} accept=".glb,.gltf,.obj" className="sr-only" multiple type="file" onChange={handleUploadModelFiles} />
+                <button
+                  type="button"
+                  className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
+                  disabled={isUploadingModel}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploadingModel ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+                  3D 모델 업로드
+                </button>
+                <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
+                  SketchUp·Blender 등에서 내보낸 .glb·.gltf·.obj 파일을 배경에 배치할 수 있어요. 텍스처가
+                  분리된 .gltf보다는 하나의 파일로 묶인 .glb를 권장해요.
+                </p>
+
+                {modelLibraryStatus === "error" ? (
+                  <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
+                    <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
+                    저장된 3D 모델 목록을 불러오지 못했습니다.
+                  </p>
+                ) : null}
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {modelLibraryStatus === "loading" ? (
+                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 3D 모델을 불러오는 중입니다.</div>
+                  ) : null}
+
+                  {modelLibraryStatus === "ready" && modelLibrary.length === 0 ? (
+                    <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
+                      업로드한 3D 모델이 아직 없습니다. 위 버튼으로 .glb·.gltf·.obj 파일을 올려보세요.
+                    </div>
+                  ) : null}
+
+                  {modelLibrary.map((entry) => {
+                    const isDeleting = deletingModelId === entry.id;
+                    return (
+                      <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
+                        <button
+                          type="button"
+                          className="grid min-h-[5.5rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                          onClick={() => void addCustomModelToScene(entry.id)}
+                        >
+                          <span className="grid h-12 place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
+                            <PackageOpen size={20} className="text-fg-3" aria-hidden />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
+                            <span className="mt-0.5 inline-flex rounded-full bg-raised px-1.5 py-0.5 text-[0.68rem] font-bold uppercase text-fg-3">
+                              {entry.format}
+                            </span>
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          aria-label={`${entry.name} 삭제`}
+                          className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
+                          disabled={isDeleting}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleDeleteModelFromLibrary(entry.id);
+                          }}
+                        >
+                          {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
 
             {error ? (
@@ -1116,7 +1586,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
-                disabled={primitives.length === 0 || isCapturing}
+                disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing}
                 onClick={handleInsert}
               >
                 {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
