@@ -48,6 +48,7 @@ import {
   Folder,
   FolderPlus,
   FolderMinus,
+  FileUp,
   Upload,
   Image as ImageIcon,
   Images,
@@ -361,6 +362,7 @@ import {
   type VanishingPoint,
 } from "./studio-perspective-guide";
 import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
+import { importPsdFile, psdImportResultMessage } from "./studio-psd-import";
 import {
   anchorQuickShapePoints,
   classifyQuickShape,
@@ -3487,6 +3489,10 @@ function StudioCuttoonEditor() {
   const [tagsText, setTagsText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // PSD 레이어 가져오기 — studio-psd-import.ts 통합 상태(tri-tone 배너, StudioExportMenuPanel의
+  // psdStatus/svgStatus/pdfStatus와 동일한 { tone, text } 관례).
+  const [psdImportBusy, setPsdImportBusy] = useState(false);
+  const [psdImportStatus, setPsdImportStatus] = useState<{ tone: "good" | "warn"; text: string } | null>(null);
   const [publishContext, setPublishContext] = useState<PublishContext>({});
   const [workHydrated, setWorkHydrated] = useState(!workId);
   const sceneTemplates = sceneTemplatePacks ?? EMPTY_STUDIO_SCENE_TEMPLATE_PACKS;
@@ -8694,6 +8700,51 @@ function StudioCuttoonEditor() {
     e.target.value = "";
   }
 
+  // PSD 레이어 가져오기 — ag-psd로 파싱해 레이어별 이미지 요소로 캔버스에 배치한다.
+  // "새 페이지로" vs "현재 페이지 맨 위에 얹기" 두 방식을 확인창 하나로 고른다 — handleDownloadAll의
+  // "확인=A/취소=B" confirm() 분기 관례를 그대로 따른다(전용 모달 컴포넌트를 새로 만들지 않는다).
+  async function handleImportPsd(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPsdImportBusy(true);
+    setPsdImportStatus(null);
+    try {
+      const result = await importPsdFile(file, CANVAS_W);
+      if (result.elements.length === 0) {
+        setPsdImportStatus({ tone: "warn", text: psdImportResultMessage(result) });
+        return;
+      }
+      const asNewPage = globalThis.confirm(
+        `PSD에서 레이어 ${result.elements.length}개를 찾았어요.\n` +
+          `확인: 새 페이지로 추가 / 취소: 현재 페이지 맨 위에 얹기`
+      );
+      if (asNewPage) {
+        const targetH = Math.max(1, Math.round(result.sourceHeight * result.scale));
+        const idx = findPageIndexInPages(activePage.id) + 1;
+        const withPage = insertBlankPageAt(pages, idx, uid, targetH);
+        const finalPages = withPage.map((p, i) =>
+          i === idx ? { ...p, elements: result.elements as El[] } : p
+        );
+        commitPages(finalPages);
+        setCurrentPageId(withPage[idx].id);
+      } else {
+        commit([...elements, ...(result.elements as El[])]);
+      }
+      setPsdImportStatus({
+        tone: result.skipped.length > 0 ? "warn" : "good",
+        text: psdImportResultMessage(result),
+      });
+    } catch (err) {
+      setPsdImportStatus({
+        tone: "warn",
+        text: err instanceof Error ? err.message : "PSD 파일을 읽지 못했어요.",
+      });
+    } finally {
+      setPsdImportBusy(false);
+    }
+  }
+
   return (
     <div
       ref={studioRootRef}
@@ -8796,6 +8847,35 @@ function StudioCuttoonEditor() {
             <Upload size={14} /> 복구 (.json)
             <input type="file" accept=".json" className="hidden" onChange={handleImportProject} />
           </label>
+          <label
+            className={cn(
+              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
+              "cursor-pointer",
+              psdImportBusy && "pointer-events-none opacity-60"
+            )}
+            title="포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"
+          >
+            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+            PSD 가져오기
+            <input
+              type="file"
+              accept=".psd,image/vnd.adobe.photoshop"
+              className="hidden"
+              disabled={psdImportBusy}
+              onChange={(e) => void handleImportPsd(e)}
+            />
+          </label>
+          {psdImportStatus && (
+            <span
+              className={cn(
+                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
+                psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
+                psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+              )}
+            >
+              {psdImportStatus.text}
+            </span>
+          )}
           {loadedWork ? (
             <button
               type="button"
