@@ -10857,7 +10857,12 @@ function StudioCuttoonEditor() {
               </div>
               {menu === "aiAssist" && (
                 <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
-                  <div className="flex flex-col gap-2">
+                  {/* AI 어시스트 서브탭 전용 내부 스크롤 — 그룹 팝오버 자체는(desktop lg:) overflow-visible로
+                      풀려 있어서(중첩 select/드롭다운이 잘리지 않게), 배경생성/캐릭터일관성/구도제안/대사제안/
+                      팔레트추천 5개 섹션이 쌓이면 뷰포트 아래 푸터 영역까지 내려가 isolate 스택 컨텍스트 때문에
+                      푸터 텍스트가 위에 겹쳐 보이는 렌더 깨짐이 있었다(2026-07-05 발견). 섹션이 늘어날수록
+                      재발하므로 여기서 독립적으로 높이를 제한해 항상 팝오버 자체 안에서 스크롤되게 한다. */}
+                  <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto pr-1">
                     <button
                       type="button"
                       onClick={() => {
