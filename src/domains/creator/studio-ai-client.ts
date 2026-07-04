@@ -30,6 +30,11 @@
  */
 
 import {
+  buildDialogueSuggestPrompt,
+  parseDialogueSuggestResponse,
+  type DialogueSuggestionCandidate,
+} from "./studio-dialogue-suggest";
+import {
   buildTranslationPrompt,
   parseTranslationResponse,
   type DialogueTranslatableItem,
@@ -532,6 +537,48 @@ export async function translateDialogueBatch(
     ok: true,
     data: { translations: [...parsed.translations].map(([id, text]) => ({ id, text })) },
   };
+}
+
+/**
+ * (5) 대사/나레이션 제안 — 장면 상황 텍스트(+ 선택적으로 캔버스에 이미 배치된 대사 맥락)를 OpenAI
+ * Chat Completions 형태 API로 보내, 자연스러운 대사·나레이션 후보 여러 개를 받는다. 프롬프트 구성·
+ * 응답 파싱은 studio-dialogue-suggest.ts(순수)에 맡기고, 이 함수는 fetch 오케스트레이션 + 에러 계약
+ * (StudioAiResult) 변환만 담당한다(suggestSceneComposition/generateScenarioScenes와 동일한 "얇은
+ * 래퍼" 성격).
+ *
+ * 결과 후보는 그 자체로 캔버스에 삽입되지 않는다 — 호출부(StudioPage.tsx)가 후보를 고르면
+ * studio-dialogue-suggest.formatDialogueSuggestionLine으로 "이름: 대사" 미니 문법 한 줄로 바꿔
+ * 기존 "대사 한 번에"(parseDialogueScript → layoutDialogueBubbles) 스크립트에 추가하거나, 선택된
+ * 말풍선·텍스트 요소에 직접 삽입한다(studio-dialogue-batch.applyDialogueTextEdit 재사용 — 이중 구현
+ * 없음).
+ */
+export async function suggestDialogueLines(
+  settings: StudioAiSettings,
+  situationText: string,
+  opts: { existingContext?: string } = {}
+): Promise<StudioAiResult<{ candidates: DialogueSuggestionCandidate[] }>> {
+  const trimmed = situationText.trim();
+  if (!trimmed) return { ok: false, code: "invalid_input", error: "장면 상황을 입력하세요." };
+  if (!isStudioAiConfigured(settings)) {
+    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  }
+  const { system, user } = buildDialogueSuggestPrompt(trimmed, opts.existingContext ?? "");
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  const result = await postJson(url, settings.apiKey, {
+    model: settings.textModel,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.8, // 서로 다른 후보 여러 개가 목적 — 장면 구성 제안(0.7)보다 살짝 높여 다양성을 늘린다.
+    max_tokens: 500,
+  });
+  if (!result.ok) return result;
+  const content = extractFirstChatContent(result.data);
+  if (!content) return { ok: false, code: "parse_error", error: "응답에서 대사 제안을 찾을 수 없습니다." };
+  const parsed = parseDialogueSuggestResponse(content);
+  if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
+  return { ok: true, data: { candidates: parsed.data } };
 }
 
 /**

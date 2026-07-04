@@ -109,6 +109,7 @@ import {
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
+  suggestDialogueLines,
   translateDialogueBatch,
   type StudioAiImageSize,
   type StudioAiResult,
@@ -214,6 +215,11 @@ import {
   collectDialogueItems,
   type DialogueReplacePlan,
 } from "./studio-dialogue-batch";
+import {
+  formatDialogueSuggestionLine,
+  joinDialogueContextLines,
+  type DialogueSuggestionCandidate,
+} from "./studio-dialogue-suggest";
 import {
   applyDialogueTranslations,
   chunkDialogueItemsForTranslation,
@@ -758,6 +764,10 @@ const StudioAiCharacterConsistencyPanel = lazyRetry(
       default: mod.StudioAiCharacterConsistencyPanel,
     })),
   "StudioAiCharacterConsistencyPanel"
+);
+const StudioDialogueSuggestPanel = lazyRetry(
+  () => import("./StudioDialogueSuggestPanel").then((mod) => ({ default: mod.StudioDialogueSuggestPanel })),
+  "StudioDialogueSuggestPanel"
 );
 const StudioDialogueTranslatePanel = lazyRetry(
   () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
@@ -5171,6 +5181,17 @@ function StudioCuttoonEditor() {
   const [aiCharacterPrompt, setAiCharacterPrompt] = useState("");
   const [aiCharacterBusy, setAiCharacterBusy] = useState(false);
   const [aiCharacterError, setAiCharacterError] = useState<string | null>(null);
+  // 대사/나레이션 제안 — 결과가 텍스트라 AI 최초 사용 고지(runWithAiNotice) 대상이 아니다
+  // (StudioAiCompositionPanel과 동일한 판단 근거). includeContext 기본값을 true로 둔 이유: 이미
+  // 대사가 있는 페이지에서 이 기능을 쓰는 사람은 대개 "이어지는 톤"을 원할 확률이 높고, 대사가 아직
+  // 없는 페이지에선 hasContext=false라 체크박스 자체가 안 보여 어차피 무해하다.
+  const [aiDialogueSuggestSituation, setAiDialogueSuggestSituation] = useState("");
+  const [aiDialogueSuggestIncludeContext, setAiDialogueSuggestIncludeContext] = useState(true);
+  const [aiDialogueSuggestBusy, setAiDialogueSuggestBusy] = useState(false);
+  const [aiDialogueSuggestError, setAiDialogueSuggestError] = useState<string | null>(null);
+  const [aiDialogueSuggestCandidates, setAiDialogueSuggestCandidates] = useState<DialogueSuggestionCandidate[] | null>(
+    null
+  );
   // 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크, docs/studio-competitor-features.md §4 로드맵) — 별도
   // 전체화면 모달(StudioScenarioAutoLayoutPanel)로 열린다. aiAssist 팝오버의 다른 AI 기능들과 달리
   // 여러 장면을 순차 생성해 시간이 걸리고 미리보기 그리드가 필요해 320px 팝오버에 넣지 않는다.
@@ -6964,6 +6985,47 @@ function StudioCuttoonEditor() {
   function insertAiCompositionNote(text: string) {
     const [cx, cy] = spawnCenter();
     addEl({ id: uid(), type: "text", text, x: cx - 130, y: cy - 70, width: 260, fontSize: 16, fill: color, rotation: 0 });
+  }
+
+  // 대사/나레이션 제안(BYOK) — 결과가 텍스트라 AI 최초 사용 고지(runWithAiNotice) 대상이 아니다
+  // (StudioAiCompositionPanel/executeGenerateTranslations와 동일 판단 근거). includeContext가 켜져
+  // 있으면 현재 페이지에 이미 배치된 대사(collectDialogueItems, 이 페이지로 스코프 한정 — 다른
+  // 페이지의 무관한 대사까지 섞으면 오히려 톤을 흐린다)를 시스템 프롬프트 맥락으로 함께 실어 보낸다.
+  async function executeSuggestDialogueLines() {
+    const situation = aiDialogueSuggestSituation.trim();
+    if (!situation || aiDialogueSuggestBusy) return;
+    setAiDialogueSuggestBusy(true);
+    setAiDialogueSuggestError(null);
+    setAiDialogueSuggestCandidates(null);
+    const existingContext = aiDialogueSuggestIncludeContext
+      ? joinDialogueContextLines(
+          collectDialogueItems(pages)
+            .filter((it) => it.pageId === activePage.id)
+            .map((it) => it.text)
+        )
+      : "";
+    const result = await suggestDialogueLines(aiSettings, situation, { existingContext });
+    if (result.ok) {
+      setAiDialogueSuggestCandidates(result.data.candidates);
+    } else {
+      setAiDialogueSuggestError(result.error);
+    }
+    setAiDialogueSuggestBusy(false);
+  }
+  // 후보를 "대사 한 번에" 스크립트(말풍선 탭의 dialogueScript)에 미니 문법 한 줄로 추가한다 — 이미
+  // 입력해 둔 스크립트가 있으면 줄바꿈으로 이어붙인다(덮어쓰지 않음, 여러 후보를 골라 순서대로 쌓을
+  // 수 있게). addDialogueBubbles()가 그대로 소비할 수 있는 형태라 새 삽입 경로를 만들지 않는다.
+  function addDialogueSuggestionToScript(candidate: DialogueSuggestionCandidate) {
+    const line = formatDialogueSuggestionLine(candidate);
+    setDialogueScript((prev) => (prev.trim() ? `${prev}\n${line}` : line));
+  }
+  // 선택된 말풍선·텍스트 요소에 후보를 바로 삽입 — 미니 문법("이름: ")이 아니라 candidate.text만
+  // 넣는다. bubble/text 요소의 text 필드는 원래도 화자 이름을 담지 않는다(studio-dialogue.ts의
+  // parseDialogueScript가 화자를 좌/우 배치에만 쓰고 text 자체엔 반영하지 않는 것과 동일한 관례 —
+  // patchDialogueText를 그대로 재사용해 이중 구현하지 않는다).
+  function insertDialogueSuggestionToSelected(candidate: DialogueSuggestionCandidate) {
+    if (!selected || (selected.type !== "bubble" && selected.type !== "text")) return;
+    patchDialogueText(activePage.id, selected.id, candidate.text);
   }
 
   function addFrame() {
@@ -10795,6 +10857,23 @@ function StudioCuttoonEditor() {
                       settings={aiSettings}
                       configured={isStudioAiConfigured(aiSettings)}
                       onInsertAsNote={insertAiCompositionNote}
+                    />
+                    <StudioDialogueSuggestPanel
+                      configured={isStudioAiConfigured(aiSettings)}
+                      situationText={aiDialogueSuggestSituation}
+                      onSituationTextChange={setAiDialogueSuggestSituation}
+                      hasContext={activePage.elements.some(
+                        (el) => (el.type === "bubble" || el.type === "text") && el.text.trim().length > 0
+                      )}
+                      includeContext={aiDialogueSuggestIncludeContext}
+                      onIncludeContextChange={setAiDialogueSuggestIncludeContext}
+                      busy={aiDialogueSuggestBusy}
+                      error={aiDialogueSuggestError}
+                      candidates={aiDialogueSuggestCandidates}
+                      onGenerate={() => void executeSuggestDialogueLines()}
+                      canInsertToSelected={!!selected && (selected.type === "bubble" || selected.type === "text")}
+                      onAddToScript={addDialogueSuggestionToScript}
+                      onInsertToSelected={insertDialogueSuggestionToSelected}
                     />
                   </div>
                 </Suspense>

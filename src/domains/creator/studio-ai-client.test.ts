@@ -13,6 +13,7 @@ import {
   saveStudioAiSettings,
   STUDIO_AI_DEFAULT_SETTINGS,
   STUDIO_AI_SETTINGS_KEY,
+  suggestDialogueLines,
   suggestSceneComposition,
   testAiConnection,
   type StudioAiSettings,
@@ -533,6 +534,95 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
       const result = await generateScenarioScenes(CONFIGURED, "스토리");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("http_error");
+    });
+  });
+
+  describe("suggestDialogueLines", () => {
+    it("does NOT call fetch when not configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestDialogueLines(STUDIO_AI_DEFAULT_SETTINGS, "옛 친구를 알아보고 반가워하는 장면");
+
+      expect(result).toEqual({ ok: false, code: "not_configured", error: expect.any(String) });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns invalid_input for blank situation text without calling fetch", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestDialogueLines(CONFIGURED, "   ");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("sends a Chat Completions request and parses the JSON candidate array", async () => {
+      const content = JSON.stringify([
+        { speaker: "민수", text: "나 전학왔어.", kind: "speech" },
+        { speaker: "", text: "(교실이 순간 조용해진다)", kind: "narration" },
+      ]);
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestDialogueLines(CONFIGURED, "주인공이 전학 첫날 교실에 들어온다");
+
+      const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://api.example.com/v1/chat/completions");
+      const body = JSON.parse(init.body as string);
+      expect(body.model).toBe(CONFIGURED.textModel);
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 전학 첫날 교실에 들어온다" });
+
+      expect(result).toEqual({
+        ok: true,
+        data: {
+          candidates: [
+            { speaker: "민수", text: "나 전학왔어.", kind: "speech" },
+            { speaker: "", text: "(교실이 순간 조용해진다)", kind: "narration" },
+          ],
+        },
+      });
+    });
+
+    it("passes existingContext through into the system prompt when given", async () => {
+      const content = JSON.stringify([{ speaker: "", text: "오랜만이야.", kind: "speech" }]);
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      await suggestDialogueLines(CONFIGURED, "상황", { existingContext: "민수: 안녕!" });
+
+      const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body.messages[0].content).toContain("민수: 안녕!");
+    });
+
+    it("surfaces parse_error when the response has no JSON array (e.g. a refusal message)", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content: "죄송하지만 도와드릴 수 없습니다." } }] }), {
+            status: 200,
+          })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestDialogueLines(CONFIGURED, "상황");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("parse_error");
+    });
+
+    it("surfaces http_error on a failed request", async () => {
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({ error: "bad key" }), { status: 401 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestDialogueLines(CONFIGURED, "상황");
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("http_error");
     });
