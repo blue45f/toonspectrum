@@ -4,7 +4,7 @@
 // "라이브러리 매니저" 컨벤션 — 자체 useState로 목록을 소유하고 localStorage를 직접
 // 읽고/쓴다(캔버스 도구 패널처럼 모든 값을 prop으로 받는 얇은 패널과는 다른 컨벤션).
 import { ImagePlus, Pencil, Plus, X } from "lucide-react";
-import { useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import {
   BRAND_KIT_FONTS,
@@ -18,6 +18,16 @@ import {
   type BrandKit,
   type BrandKitLogo,
 } from "./studio-brand-kit";
+import {
+  buildGoogleFontCss2Url,
+  filterStudioGoogleFonts,
+  googleFontLinkId,
+  resolveStudioGoogleFontFromCssValue,
+  STUDIO_GOOGLE_FONTS,
+  studioGoogleFontCssValue,
+  type StudioGoogleFont,
+  type StudioGoogleFontCategory,
+} from "./studio-google-fonts";
 import { downscaleImageFile } from "./studio-image-utils";
 import { listPalettes, type StudioNamedPalette } from "./studio-palette-library";
 
@@ -27,6 +37,142 @@ const MAX_LOGO_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB — 다운스케일 전 �
 const LOGO_MAX_DIM = 320; // downscaleImageFile 최대 픽셀 변 — 로고는 작은 코너 장식이라 320px면 충분하고 localStorage 예산도 지킨다.
 const LOGO_QUALITY = 0.92;
 const SWATCH_PREVIEW_COUNT = 8;
+
+// ── Google Fonts 온디맨드 로드 ───────────────────────────────────────────────
+// Google Fonts CSS2는 API 키가 필요 없는 완전 공개 엔드포인트다(과금·서버 비용 없음) — 다만
+// 이 브라우저에서 fonts.googleapis.com/fonts.gstatic.com으로 실제 네트워크 요청이 나간다는
+// 점은 그대로다(완전 오프라인은 아님). STUDIO_GOOGLE_FONTS 19종을 전부 한꺼번에 로드하지
+// 않고, 사용자가 그 폰트를 처음 선택하는 순간에만 폰트 하나짜리 <link>를 주입한다.
+//
+// 캔버스(Konva)는 실제 DOM 텍스트가 아니라 <canvas> 위에 그려지므로, 브라우저의 지연 웹폰트
+// 로딩 휴리스틱(렌더된 DOM 텍스트가 실제로 쓰는 문자 범위의 @font-face 블록만 내려받는 최적화)이
+// 저절로 트리거된다는 보장이 없다. 한글 지원이 핵심 요건이라 CSS2 응답은 유니코드 범위별로
+// 수십 개 @font-face로 쪼개져 있는데(용량 절약을 위한 구글 폰트 표준 관례), 이 패널의 버튼
+// label처럼 라틴 문자로만 이뤄진 DOM 텍스트만으로는 한글 블록이 로드된다는 보장이 없다.
+// 그래서 스타일시트 로드가 끝난 뒤 document.fonts.load(...)를 한글 샘플 문자열로 명시
+// 호출해 필요한 블록을 강제로 내려받는다 — 이렇게 받아온 뒤에는 StudioPage.tsx가 이미
+// 전역으로 구독 중인 document.fonts "loadingdone"(텍스트/말풍선 요소가 하나라도 있으면 항상
+// 마운트돼 있다 — canApplyFont가 true인 시점엔 반드시 성립)이 캔버스 재도장(batchDraw)을
+// 대신 처리하므로, 이 패널이 따로 stageRef를 받아 redraw할 필요는 없다.
+const HANGUL_FONT_LOAD_SAMPLE = "가나다라 웹툰 대사 0123";
+
+function triggerHangulFontLoad(font: StudioGoogleFont) {
+  for (const weight of font.weights) {
+    document.fonts.load(`${weight} 16px '${font.family}'`, HANGUL_FONT_LOAD_SAMPLE).catch(() => {
+      // 오프라인·네트워크 실패 등 — 조용히 무시한다(브랜드 킷 자체 저장/적용 흐름은 폰트
+      // 로드 성패와 무관하게 계속 동작해야 한다. 실패하면 폰트가 도착할 때까지 폴백 글꼴로 보일 뿐).
+    });
+  }
+}
+
+/** family에 해당하는 Google Font <link rel=stylesheet>를 아직 없으면 주입한다(id 가드로
+ *  중복 주입 방지 — StudioPage.tsx STUDIO_FONTS_LINK_ID와 동일한 패턴). 이미 있으면 로드
+ *  트리거만 재시도한다(멱등: 이미 받아온 굵기면 document.fonts.load가 즉시 resolve). */
+function ensureGoogleFontLinkInjected(font: StudioGoogleFont): void {
+  const id = googleFontLinkId(font.family);
+  if (document.getElementById(id)) {
+    triggerHangulFontLoad(font);
+    return;
+  }
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = buildGoogleFontCss2Url(font.family, font.weights);
+  link.addEventListener("load", () => triggerHangulFontLoad(font), { once: true });
+  document.head.appendChild(link);
+}
+
+/** BrandKit.headingFont/bodyFont 같은 CSS font-family 문자열을 받아, 그게 이 카탈로그의
+ *  Google Font를 가리키면 로드하고, 아니면(기존 9종 등) 아무 것도 하지 않는다. */
+function ensureGoogleFontLoadedForCssValue(cssValue: string): void {
+  const font = resolveStudioGoogleFontFromCssValue(cssValue);
+  if (font) ensureGoogleFontLinkInjected(font);
+}
+
+const GOOGLE_FONT_CATEGORY_LABELS: Record<StudioGoogleFontCategory | "all", string> = {
+  all: "전체",
+  sans: "고딕",
+  serif: "명조",
+  display: "디스플레이",
+  handwriting: "손글씨",
+};
+const GOOGLE_FONT_CATEGORIES: (StudioGoogleFontCategory | "all")[] = ["all", "sans", "serif", "display", "handwriting"];
+
+interface GoogleFontPickerGridProps {
+  /** 현재 선택된 CSS font-family 값(draftHeadingFont/draftBodyFont) — 활성 표시용. */
+  value: string;
+  /** 폰트를 고르면 호출 — 값은 studioGoogleFontCssValue()로 만든 CSS font-family 문자열.
+   *  <link> 주입은 이 컴포넌트가 직접 처리하므로 호출측은 draft 상태만 갱신하면 된다. */
+  onPick: (cssValue: string) => void;
+}
+
+/** 브랜드 킷 생성 폼의 제목/본문 글꼴 섹션에 덧붙는 Google Fonts 추가 선택지 그리드.
+ *  StudioBrandKitPanel 내부 전용(모듈 밖으로 내보내지 않음) — 두 군데(제목/본문)에서
+ *  독립된 검색어·카테고리 필터 상태를 갖도록 컴포넌트 레벨에서 재사용한다. */
+function GoogleFontPickerGrid({ value, onPick }: GoogleFontPickerGridProps) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<StudioGoogleFontCategory | "all">("all");
+  const filtered = filterStudioGoogleFonts(STUDIO_GOOGLE_FONTS, { category, query });
+
+  function handlePick(font: StudioGoogleFont) {
+    ensureGoogleFontLinkInjected(font);
+    onPick(studioGoogleFontCssValue(font));
+  }
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-line/70 bg-panel/60 p-1.5">
+      <p className="mb-1 text-[0.6rem] font-medium text-fg-3">Google Fonts (한글 지원 {STUDIO_GOOGLE_FONTS.length}종)</p>
+      <div className="mb-1 flex flex-wrap gap-0.5">
+        {GOOGLE_FONT_CATEGORIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(c)}
+            className={cx(
+              "rounded px-1.5 py-0.5 text-[0.58rem] font-medium transition-colors",
+              category === c ? "bg-accent text-on-accent" : "bg-panel text-fg-3 hover:bg-raised"
+            )}
+          >
+            {GOOGLE_FONT_CATEGORY_LABELS[c]}
+          </button>
+        ))}
+      </div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="폰트 이름 검색…"
+        aria-label="Google Fonts 검색"
+        className="mb-1 h-6 w-full rounded border border-line bg-panel px-1.5 text-[0.65rem] text-fg outline-none focus:border-accent"
+      />
+      <div className="grid max-h-24 grid-cols-2 gap-1 overflow-y-auto pr-0.5">
+        {filtered.length === 0 ? (
+          <p className="col-span-2 py-1 text-center text-[0.58rem] text-fg-3">일치하는 폰트가 없어요.</p>
+        ) : (
+          filtered.map((font) => {
+            const cssValue = studioGoogleFontCssValue(font);
+            const active = value === cssValue;
+            return (
+              <button
+                key={font.family}
+                type="button"
+                onClick={() => handlePick(font)}
+                style={{ fontFamily: cssValue }}
+                title={font.family}
+                className={cx(
+                  "truncate rounded border px-1 py-1 text-[0.6rem] transition-colors",
+                  active ? "border-accent bg-accent-soft/30 text-accent" : "border-line bg-panel text-fg-2 hover:bg-raised"
+                )}
+              >
+                {font.family}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
 
 export interface StudioBrandKitPanelProps {
   /** 스와치 클릭 시 호출 — 전역 브러시/도형 색(StudioPage의 `color`)을 갱신.
@@ -61,6 +207,18 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
   const [draftLogoBusy, setDraftLogoBusy] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+
+  // 저장된 킷 중 headingFont/bodyFont가 Google Font를 가리키면 패널이 열리자마자 미리 로드해
+  // 둔다 — 그래야 "제목/본문 글꼴 적용" 버튼 자체의 미리보기 라벨(style={{fontFamily}})이
+  // 클릭 전에도 실제 글꼴로 보인다(이전 세션에 저장해 이 페이지에서는 아직 한 번도 <link>를
+  // 주입한 적 없는 킷일 수 있으므로). 기존 9종을 가리키는 값은 ensureGoogleFontLoadedForCssValue
+  // 내부에서 조용히 no-op된다.
+  useEffect(() => {
+    for (const k of kits) {
+      ensureGoogleFontLoadedForCssValue(k.headingFont);
+      ensureGoogleFontLoadedForCssValue(k.bodyFont);
+    }
+  }, [kits]);
 
   function handleDelete(id: string) {
     setKits(deleteBrandKit(globalThis.localStorage, id));
@@ -210,6 +368,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
                 </button>
               ))}
             </div>
+            <GoogleFontPickerGrid value={draftHeadingFont} onPick={setDraftHeadingFont} />
           </div>
 
           <div>
@@ -232,6 +391,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
                 </button>
               ))}
             </div>
+            <GoogleFontPickerGrid value={draftBodyFont} onPick={setDraftBodyFont} />
           </div>
 
           <div>
@@ -353,7 +513,10 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
                 <div className="mt-1.5 flex gap-1">
                   <button
                     type="button"
-                    onClick={() => onApplyFont(k.headingFont)}
+                    onClick={() => {
+                      ensureGoogleFontLoadedForCssValue(k.headingFont);
+                      onApplyFont(k.headingFont);
+                    }}
                     disabled={!canApplyFont}
                     title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
                     style={{ fontFamily: k.headingFont }}
@@ -363,7 +526,10 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
                   </button>
                   <button
                     type="button"
-                    onClick={() => onApplyFont(k.bodyFont)}
+                    onClick={() => {
+                      ensureGoogleFontLoadedForCssValue(k.bodyFont);
+                      onApplyFont(k.bodyFont);
+                    }}
                     disabled={!canApplyFont}
                     title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
                     style={{ fontFamily: k.bodyFont }}
@@ -403,6 +569,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
         <p>브랜드 킷은 이 브라우저에만 저장돼요(다른 기기·계정과 공유되지 않아요).</p>
         <p>로고 적용은 문서 마스터에 저장되고, 실행취소(⌘Z)가 지원되지 않아요.</p>
         <p>팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).</p>
+        <p>Google Fonts는 처음 고를 때만 구글 서버에서 내려받아요(API 키·별도 비용 없음, 완전 오프라인은 아니에요).</p>
       </div>
     </div>
   );
