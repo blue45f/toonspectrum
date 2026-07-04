@@ -13,6 +13,7 @@ import {
   Hexagon,
   ImagePlus,
   Layers,
+  LayoutTemplate,
   Loader2,
   Maximize2,
   Move,
@@ -71,7 +72,13 @@ import {
   type BgPrimitive,
   type BgPrimitiveKind,
 } from "./studio-background-3d-primitives";
+import {
+  BG_SCENE_TEMPLATES,
+  instantiateSceneTemplate,
+  type BgSceneTemplateCategory,
+} from "./studio-background-3d-scene-templates";
 import { BG_SKY_PRESETS, DEFAULT_SKY_PRESET_ID, getSkyPreset } from "./studio-background-3d-sky";
+import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 
 export interface StudioBackground3DProps {
   open: boolean;
@@ -81,7 +88,7 @@ export interface StudioBackground3DProps {
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
-type BgPanelTab = "shapes" | "layers" | "view" | "models";
+type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "models";
 type CaptureState = { gl: THREE.WebGLRenderer | null; scene: THREE.Scene | null; camera: THREE.Camera | null };
 
 const CONTROL_BUTTON =
@@ -97,6 +104,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; hint: string }> = [
   { id: "shapes", label: "도형", icon: Boxes, hint: "추가 · 선택한 도형 수치 편집" },
+  { id: "templates", label: "템플릿", icon: LayoutTemplate, hint: "교실·거리·카페처럼 완성된 공간을 한 번에 추가" },
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
   { id: "models", label: "모델", icon: PackageOpen, hint: "업로드 · 배치 · 삭제" },
@@ -392,6 +400,10 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   const [skyPresetId, setSkyPresetId] = useState(DEFAULT_SKY_PRESET_ID);
   // 복합 오브젝트 프리셋 그리드 카테고리 필터. null=전체.
   const [compositeCategory, setCompositeCategory] = useState<BgCompositeCategory | null>(null);
+  // 씬 템플릿 그리드 카테고리 필터. null=전체. compositeCategory와 동형이지만 별개 상태 —
+  // BgSceneTemplateCategory와 BgCompositeCategory는 서로 다른 타입이라 공유할 수 없다("공간 종류" vs
+  // "물체 종류"라는 다른 축, studio-background-3d-scene-templates.ts 상단 주석 참고).
+  const [sceneTemplateCategory, setSceneTemplateCategory] = useState<BgSceneTemplateCategory | null>(null);
   // 배경(하늘색)을 캡처에서 빼고 오브젝트만 알파 채널로 남길지 — 다른 배경/레이어와 자유롭게
   // 합성할 수 있는 PNG를 만들기 위함. 뷰포트 표시 자체(하늘색 프리셋)는 계속 그대로 보여주고,
   // 실제로 alpha=0 clearColor 로 바꾸는 건 handleInsert 캡처 순간뿐이다(사용자가 작업 중엔 여전히
@@ -573,6 +585,19 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     const preset = COMPOSITE_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
     const parts = instantiateCompositePreset(preset, primitives.length);
+    setPrimitives((prev) => [...prev, ...parts]);
+    setSelectedId(parts[0].id);
+  };
+
+  // 씬 템플릿(교실/카페/거리 등 완성된 공간) 추가 — addComposite와 동일한 "추가 = 선택" UX.
+  // instantiateSceneTemplate이 이미 여러 프리셋/도형을 조합한 BgPrimitive[]를 통째로 돌려주므로,
+  // 그대로 append하고 첫 항목을 선택한다. undo/redo는 기존 디바운스 스냅샷 effect(§primitives 변화
+  // 감시)가 그대로 처리해 템플릿 하나를 통째로 추가해도 Ctrl+Z 한 번에 전부 되돌아간다.
+  const addSceneTemplate = (templateId: string) => {
+    const template = BG_SCENE_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    const parts = instantiateSceneTemplate(template, primitives.length);
+    if (parts.length === 0) return;
     setPrimitives((prev) => [...prev, ...parts]);
     setSelectedId(parts[0].id);
   };
@@ -1006,7 +1031,9 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Boxes size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">오른쪽 &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 추가하거나 &ldquo;모델&rdquo; 탭에서 3D 파일을 업로드해 배경을 잡아보세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">
+                        오른쪽 &ldquo;템플릿&rdquo; 탭에서 교실·거리 같은 완성된 공간을 통째로 추가하거나, &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩 추가하고 &ldquo;모델&rdquo; 탭에서 3D 파일을 업로드해 배경을 잡아보세요.
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -1015,7 +1042,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
           </section>
 
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
-            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-3 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
+            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
               {BG_PANEL_TABS.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activePanelTab === tab.id;
@@ -1282,6 +1309,18 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                     <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
                   )}
                 </div>
+              </section>
+
+              <section hidden={hideOnTab("templates")}>
+                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                  <LayoutTemplate size={15} className="text-accent" aria-hidden />
+                  씬 템플릿
+                </h3>
+                <StudioBg3dSceneTemplatePanel
+                  activeCategory={sceneTemplateCategory}
+                  onCategoryChange={setSceneTemplateCategory}
+                  onAddTemplate={addSceneTemplate}
+                />
               </section>
 
               <section hidden={hideOnTab("layers")}>
