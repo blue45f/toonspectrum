@@ -2486,7 +2486,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
-  // 87명 베이스 캐릭터를 검색 없이 그리드로 늘어놓으면 스크롤이 매우 길어져, 이름 검색만으로
+  // 89명 베이스 캐릭터를 검색 없이 그리드로 늘어놓으면 스크롤이 매우 길어져, 이름 검색만으로
   // 빠르게 좁힐 수 있게 한다(클라이언트 사이드 부분일치, 대소문자 무시) — "캐릭터 만들기" 진입점을
   // 통합하며 그쪽 UX를 이 라이브러리 자체로 흡수했다.
   const [libraryQuery, setLibraryQuery] = useState("");

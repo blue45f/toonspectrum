@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
 
-// 2026-06 추가된 번들 15종(헤어 전용 샘플 2종은 캐릭터가 아니라 제외·정리됨) + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 60종
-// — 모두 public/vrm/LICENSES.md 고지 대상.
+// 2026-06 추가된 번들 15종(헤어 전용 샘플 2종은 캐릭터가 아니라 제외·정리됨) + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 62종
+// (그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강분) — 모두 public/vrm/LICENSES.md 고지 대상.
 const NEW_BUNDLE_FILES = [
   // 2026-06: madjin/vrm-samples + UniVRM + 100Avatars 1차분
   "Sendagaya_Shino.vrm",
@@ -85,6 +85,8 @@ const NEW_BUNDLE_FILES = [
   "BotBunny.vrm",
   "SportMecha.vrm",
   "CosmicBot.vrm",
+  "OldMoustache.vrm",
+  "Eugenia.vrm",
 ] as const;
 
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
@@ -98,6 +100,8 @@ describe("VRM library helpers", () => {
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");
+    expect(names).toContain("올드무스타치 (할아버지)");
+    expect(names).toContain("유제니아 (할머니)");
 
     // 이름은 전부 비어있지 않고 유일해야 하며, 기술 용어 흔적이 없어야 한다.
     expect(new Set(names).size).toBe(names.length);
@@ -107,8 +111,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 87 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(87);
+  it("bundles 89 sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(89);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);

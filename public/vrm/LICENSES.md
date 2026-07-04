@@ -29,7 +29,7 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 ## 오픈소스 아바타 레지스트리 모델 (2026-07)
 
 출처: 오픈소스 아바타 레지스트리 <https://github.com/ToxSam/open-source-avatars> (모델 파일은 레지스트리가 가리키는 arweave.net 영구 저장소에서 다운로드).
-아래 60종은 전부 Polygonal Mind가 제작·공개한 100Avatars R1~R3 시리즈로, **CC0(퍼블릭 도메인)** 라이선스입니다.
+아래 62종은 전부 Polygonal Mind가 제작·공개한 100Avatars R1~R3 시리즈로, **CC0(퍼블릭 도메인)** 라이선스입니다.
 
 | 파일 | 스튜디오 이름 | 프로젝트 | 라이선스 |
 | --- | --- | --- | --- |
@@ -93,6 +93,37 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `BotBunny.vrm` | 봇버니 (토끼 로봇) | 100Avatars R3 (#297 BotBunny) | CC0 (Polygonal Mind) |
 | `SportMecha.vrm` | 스포츠메카 (메카) | 100Avatars R3 (#239 SportMecha) | CC0 (Polygonal Mind) |
 | `CosmicBot.vrm` | 코스믹봇 (로봇) | 100Avatars R3 (#237 CosmicBot) | CC0 (Polygonal Mind) |
+| `OldMoustache.vrm` | 올드무스타치 (할아버지) | 100Avatars R1 (#004 OldMoustache) | CC0 (Polygonal Mind) |
+| `Eugenia.vrm` | 유제니아 (할머니) | 100Avatars R3 (#226 Eugenia) | CC0 (Polygonal Mind) |
+
+## "노인" 카테고리 소싱 근거 (2026-07)
+
+사용자 요청("악당/남자/아이/노인 등 다양한 무료 캐릭터")의 마지막 미채움 카테고리 보강. VRoid Hub·BOOTH에서
+실제로 "노인/할머니/할아버지/elderly/grandpa/grandma" 검색어로 조사한 결과는 아래와 같다.
+
+- **채택**: `OldMoustache.vrm`(100Avatars R1 #004), `Eugenia.vrm`(100Avatars R3 #226) — 위 표와 동일한
+  오픈소스 아바타 레지스트리 출처. 두 파일 모두 **glTF 바이너리(.vrm) 내부에 임베드된 VRM 0.x
+  `extensions.VRM.meta` 라이선스 메타데이터를 직접 파싱해 재확인**했다(레지스트리의 `projects.json`
+  선언뿐 아니라 파일 자체의 1차 근거):
+  - `OldMoustache.vrm` meta: `"licenseName": "CC0"`, `"allowedUserName": "Everyone"`,
+    `"commercialUssageName": "Allow"`, `"author": "Polygonal Mind"`.
+  - `Eugenia.vrm` meta: `"licenseName": "CC0"`, `"licenseUrl":
+    "https://creativecommons.org/publicdomain/zero/1.0/"`, `"allowCommercialUse": true`,
+    `"allowRedistribution": true`, `"modification": "ALLOW"`, `"creditNotation": "UNNECESSARY"`.
+  - 시각적으로도 각각 흰머리·콧수염·주름(할아버지), 백발 쪽머리·머릿수건·안경·앞치마(할머니)로 명확히
+    "노인" 카테고리에 부합함을 썸네일로 확인.
+- **조사했으나 채택하지 않음(VRoid Hub 개별 창작자 아바타)**: "Old Man"(캐릭터 ID 8304527790381890780,
+  <https://hub.vroid.com/en/characters/8304527790381890780/models/6618804578068354490>)과 "Alioth2"
+  (<https://hub.vroid.com/en/characters/8935514809257186679/models/224770298213873059>, BOOTH
+  <https://booth.pm/ja/items/4167318> 무료 티어 연동)는 이용조건이 `redistribution: allow`,
+  `corporate_commercial_use: allow`, `personal_commercial_use: profit`로 재배포·상업적 이용까지 전부
+  허용되는 드문 케이스였으나, VRoid Hub 페이지 자체의 `is_downloadable`이 `false`라 Hub UI로는 원본
+  VRM 파일을 직접 받을 수 없었다(Alioth2는 BOOTH 연동 무료 다운로드 상품이 있으나 실제 동봉 파일
+  포맷·VRoid Studio import 경로 확인에 계정 로그인/장바구니 절차가 필요해 이번 세션에서 자동화된
+  라이선스 근거 확인 범위를 벗어남 — 필요 시 후속 세션에서 사람이 직접 확인 후 추가 검토 권장).
+  나머지 검색된 "おばあちゃん/おじいちゃん/おばあさん" 계열 아바타 대부분은 `redistribution: disallow`
+  또는 `personal_commercial_use: disallow`/`corporate_commercial_use: disallow`가 걸려 있어(창작자
+  개인 사용·비영리 한정 등) 재배포·상업적 웹툰 제작 도구 번들 목적에는 부적합해 제외했다.
 
 ## 기존 번들 모델 (참고)
 

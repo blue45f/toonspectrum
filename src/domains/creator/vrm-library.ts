@@ -41,7 +41,8 @@ type VrmThumbnailRecord = {
 // 모델별 출처 URL·라이선스 요약은 public/vrm/LICENSES.md 참고
 // (2026-06: madjin/vrm-samples VRoid 공식 샘플 + UniVRM Alicia Solid,
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
-//  100Avatars R1~R3 CC0 모델 69종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트).
+//  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
+//  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -130,6 +131,8 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "bot-bunny", name: "봇버니 (토끼 로봇)", url: "/vrm/BotBunny.vrm" },
   { id: "sport-mecha", name: "스포츠메카 (메카)", url: "/vrm/SportMecha.vrm" },
   { id: "cosmic-bot", name: "코스믹봇 (로봇)", url: "/vrm/CosmicBot.vrm" },
+  { id: "old-moustache", name: "올드무스타치 (할아버지)", url: "/vrm/OldMoustache.vrm" },
+  { id: "eugenia", name: "유제니아 (할머니)", url: "/vrm/Eugenia.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,
