@@ -453,6 +453,7 @@ import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
+import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
@@ -625,6 +626,10 @@ const StudioQuickShapePanel = lazyRetry(
 const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
+);
+const StudioEmeresLibraryPanel = lazyRetry(
+  () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
+  "StudioEmeresLibraryPanel"
 );
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
@@ -1039,7 +1044,12 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean };
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean;
+  /** 이 요소가 이메레스 밑그림 틀로 삽입됐는지 + 어디서 왔는지 표식. 카탈로그 틀: t.id 그대로.
+   *  개인 보관함 항목: `custom:${item.id}`. 두 출처 모두 "이메레스에서 온 요소"라는 사실만으로
+   *  일괄 삭제 대상이 된다. */
+  emeresSourceId?: string;
+};
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
@@ -4694,6 +4704,7 @@ function StudioCuttoonEditor() {
   // 이메레스(스케치 밑그림) 피커 검색/카테고리 상태
   const [emeresSearchQuery, setEmeresSearchQuery] = useState("");
   const [emeresCategoryFilter, setEmeresCategoryFilter] = useState("all");
+  const [emeresTab, setEmeresTab] = useState<"catalog" | "mine">("catalog");
   const emeresSectionsFiltered = emeresMenuOpen
     ? studioOptionalAssets.emeresSections
         .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
@@ -6164,6 +6175,7 @@ function StudioCuttoonEditor() {
         rotation: 0,
         opacity,
         locked: true,
+        emeresSourceId: t.id,
       };
     } else {
       el = {
@@ -6178,12 +6190,98 @@ function StudioCuttoonEditor() {
         }),
         opacity,
         locked: true,
+        emeresSourceId: t.id,
       };
     }
     commit([...elements, el]);
     setSelectedId(null);
     setTool("draw");
     setDrawMode("pen");
+  }
+  // 개인 보관함(studio-emeres-library) 항목을 캔버스에 삽입 — addEmeresTemplate과 배치 로직은
+  // 동일하되, svgToDataUrl 변환이 없고(item.src가 이미 dataURL) emeresSourceId에 custom: 접두사를 붙인다.
+  function addEmeresLibraryItem(item: StudioEmeresLibraryItem) {
+    setMenu(null);
+    const src = item.src;
+    const opacity = studioOptionalAssets.emeresUnderlayOpacity;
+    let el: El;
+    if (selected?.type === "frame") {
+      const fit = Math.min(selected.width / item.width, selected.height / item.height) * 0.94;
+      const w = Math.round(item.width * fit);
+      const h = Math.round(item.height * fit);
+      el = {
+        id: uid(),
+        type: "image",
+        src,
+        x: Math.round(selected.x + (selected.width - w) / 2),
+        y: Math.round(selected.y + (selected.height - h) / 2),
+        width: w,
+        height: h,
+        rotation: 0,
+        opacity,
+        locked: true,
+        emeresSourceId: `custom:${item.id}`,
+      };
+    } else {
+      el = {
+        ...createCanvasImageElement({
+          id: uid(),
+          src,
+          canvasWidth: CANVAS_W,
+          canvasHeight: canvasH,
+          sourceWidth: item.width,
+          sourceHeight: item.height,
+          horizontalInset: 80,
+        }),
+        opacity,
+        locked: true,
+        emeresSourceId: `custom:${item.id}`,
+      };
+    }
+    commit([...elements, el]);
+    setSelectedId(null);
+    setTool("draw");
+    setDrawMode("pen");
+  }
+  // 우클릭한 요소를 이메레스 개인 보관함에 저장 — captureAnimFrame의 stage.toDataURL + 회전 가드
+  // 패턴을 재사용하되, 프레임에 합성하지 않고 독립 StudioEmeresLibraryItem으로 저장한다.
+  async function saveElementAsEmeresLibraryItem(elId: string) {
+    const el = elementById.get(elId);
+    if (!el) return;
+    // "rotation" in el 가드가 필수 — El은 DrawEl/FrameEl을 포함한 유니언이고 그 둘은 rotation
+    // 필드가 없다(좌표/폭·높이 또는 points 자체로 형태를 표현). el.type !== "image"로 좁히지 않고
+    // 모든 타입을 받으므로 "rotation" in el로 먼저 좁혀야 컴파일이 통과한다.
+    if ("rotation" in el && el.rotation) {
+      setError("회전이 0°인 요소만 이메레스로 저장할 수 있어요.");
+      return;
+    }
+    if (el.groupId) {
+      setError("그룹에 속한 요소는 이메레스로 저장할 수 없어요. 그룹을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+    const bounds = elBounds(el);
+    setSelectedId(null);
+    await new Promise((r) => setTimeout(r, 60));
+    const src = stage.toDataURL({ x: bounds.x, y: bounds.y, width: bounds.w, height: bounds.h, pixelRatio: 2 / effScale });
+    const name = globalThis.prompt("틀 이름을 정해주세요", "내 이메레스 틀")?.trim();
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    if (!name) return;
+    try {
+      const { createEmeresLibraryItem, saveEmeresLibraryItem } = await import("./studio-emeres-library");
+      const created = createEmeresLibraryItem(name, { src, width: Math.round(bounds.w), height: Math.round(bounds.h) });
+      saveEmeresLibraryItem(globalThis.localStorage, created);
+    } catch (err) {
+      console.error("Failed to save emeres library item:", err);
+      setError("이메레스로 저장하지 못했습니다.");
+    }
+  }
+  const emeresUnderlayCount = elements.filter((e) => e.emeresSourceId != null).length;
+  function removeEmeresUnderlays() {
+    if (emeresUnderlayCount === 0) return;
+    if (!globalThis.confirm(`이메레스 밑그림 ${emeresUnderlayCount}개를 전부 지울까요? 그 위에 그린 펜 선은 지워지지 않아요.`)) return;
+    commit(elements.filter((e) => e.emeresSourceId == null));
   }
   // 장면 템플릿 삽입 — runStudioPageAddSceneTemplate 단일 shipped 경로.
   function addSceneTemplate(template: SceneTemplate) {
@@ -8600,78 +8698,111 @@ function StudioCuttoonEditor() {
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
               </p>
-              <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                <input
-                  type="text"
-                  placeholder="이메레스 검색..."
-                  value={emeresSearchQuery}
-                  onChange={(e) => setEmeresSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                />
-                {emeresSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setEmeresSearchQuery("")}
-                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              {studioOptionalAssets.emeresSections.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1">
-                  {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setEmeresCategoryFilter(category)}
-                      aria-pressed={emeresCategoryFilter === category}
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                        emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
-                      )}
-                    >
-                      {category === "all" ? "전체" : category}
-                    </button>
-                  ))}
-                </div>
+              {emeresUnderlayCount > 0 && (
+                <button
+                  type="button"
+                  onClick={removeEmeresUnderlays}
+                  className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
+                >
+                  <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
+                </button>
               )}
-              <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
-                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
-                )}
-                {studioEmeresAssetsError && (
-                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
-                )}
-                {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
-                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+              <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
+                {(["catalog", "mine"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setEmeresTab(tab)}
+                    aria-pressed={emeresTab === tab}
+                    className={cn(
+                      "flex-1 rounded-md py-1 text-[0.64rem] font-semibold transition-colors",
+                      emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+                    )}
+                  >
+                    {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
+                  </button>
+                ))}
+              </div>
+              {emeresTab === "catalog" ? (
+                <>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="이메레스 검색..."
+                      value={emeresSearchQuery}
+                      onChange={(e) => setEmeresSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                    />
+                    {emeresSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setEmeresSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
-                )}
-                {emeresSectionsFiltered.map((section) => (
-                  <div key={section.category}>
-                    <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {section.templates.map((t) => (
+                  {studioOptionalAssets.emeresSections.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
                         <button
-                          key={t.id}
+                          key={category}
                           type="button"
-                          title={`${t.label} — ${t.tip}`}
-                          onClick={() => addEmeresTemplate(t)}
-                          className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                          onClick={() => setEmeresCategoryFilter(category)}
+                          aria-pressed={emeresCategoryFilter === category}
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                            emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                          )}
                         >
-                          <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
-                            <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                          </div>
-                          <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
+                          {category === "all" ? "전체" : category}
                         </button>
                       ))}
                     </div>
+                  )}
+                  <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                    {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
+                    )}
+                    {studioEmeresAssetsError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
+                    )}
+                    {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
+                      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                        <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                        <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                      </div>
+                    )}
+                    {emeresSectionsFiltered.map((section) => (
+                      <div key={section.category}>
+                        <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {section.templates.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              title={`${t.label} — ${t.tip}`}
+                              onClick={() => addEmeresTemplate(t)}
+                              className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                            >
+                              <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
+                                <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                              </div>
+                              <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
+                  <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
+                </Suspense>
+              )}
             </div>
           )}
         </div>
@@ -14925,6 +15056,15 @@ function StudioCuttoonEditor() {
                   <div className="my-1 h-px bg-line" />
                 </>
               )}
+              <button
+                type="button"
+                onClick={() => void saveElementAsEmeresLibraryItem(contextMenu.elId!)}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <ImagePlus size={12} />
+                이메레스로 저장
+              </button>
+              <div className="my-1 h-px bg-line" />
               <button
                 type="button"
                 onClick={() => {
