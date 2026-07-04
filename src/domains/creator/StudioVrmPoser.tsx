@@ -2352,15 +2352,6 @@ function VrmActor({
 
 type LightingTone = "morning" | "sunset" | "night" | "studio";
 
-function GroundShadow() {
-  return (
-    <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.48, 0.82, 1]} renderOrder={-1}>
-      <circleGeometry args={[1, 72]} />
-      <meshBasicMaterial color="#3c2b20" transparent opacity={0.18} depthWrite={false} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
 function VrmLighting({ tone, lighting, env }: { tone: LightingTone; lighting?: LightingParams; env?: EnvVariant }) {
   const li = lighting ? computeLightingUniforms(lighting) : null;
   const iMul = li ? li.intensity : 1;
@@ -2581,6 +2572,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const thumbnailRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  // 캡처(투명 PNG 삽입) 순간에만 발밑 타원 그림자를 꺼서 캐릭터만 남긴다 — React state가 아니라
+  // three.js 객체를 직접 명령형으로 토글해야 gl.render() 호출 전에 확실히 반영된다(state 갱신은
+  // 다음 R3F 커밋을 기다려야 해서 같은 프레임 안에서 타이밍을 보장할 수 없다).
+  const groundShadowRef = useRef<THREE.Mesh>(null);
 
   const handlePanelTabChange = useCallback((tab: PanelTab) => {
     setActivePanelTab(tab);
@@ -4299,6 +4294,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
     const { camera, gl, scene } = currentCapture;
     setIsCapturing(true);
+    // 뷰포트에선 계속 보여주다가(접지감 확인용) 캡처 프레임 딱 한 번만 꺼서, 완전 투명 배경
+    // PNG에 발밑 타원 그림자가 캐릭터와 함께 찍히지 않게 한다.
+    const groundShadow = groundShadowRef.current;
+    if (groundShadow) groundShadow.visible = false;
     requestAnimationFrame(() => {
       // 정지 컷: 캡처 직전 흔들림을 정착시켜 머리카락/치마가 가라앉은 프레임을 쓴다.
       if (!physicsPreview && countSpringBoneJoints(currentVrm) > 0) {
@@ -4309,6 +4308,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       const baseDataUrl = gl.domElement.toDataURL("image/png");
       const { width, height } = roundExportSize(gl.domElement);
       setIsCapturing(false);
+      if (groundShadow) groundShadow.visible = true;
 
       const poseMetadata = {
         // "3D 배경" 도구도 같은 #해시 방식으로 재편집 메타를 싣기 시작해, src만 보고는 어느 모달을
@@ -4428,7 +4428,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       />
                     );
                   })}
-                  <GroundShadow />
+                  <mesh ref={groundShadowRef} position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.48, 0.82, 1]} renderOrder={-1}>
+                    <circleGeometry args={[1, 72]} />
+                    <meshBasicMaterial color="#3c2b20" transparent opacity={0.18} depthWrite={false} side={THREE.DoubleSide} />
+                  </mesh>
                   <OrbitControls
                     makeDefault
                     enableDamping
