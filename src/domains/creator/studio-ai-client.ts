@@ -342,6 +342,74 @@ export async function colorizeLineArt(
   return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}` } };
 }
 
+/**
+ * 캐릭터 일관성 생성용 프롬프트 조합(순수 함수, 단위 테스트 대상 — fetch 없음). 사용자가 입력한
+ * "상황" 텍스트만 그대로 Images Edits API에 보내면, 참고 이미지의 외모를 얼마나 반영할지가 전적으로
+ * 모델(제공자) 재량에 맡겨진다. 그래서 고정 지시문으로 감싸 "참고 이미지 속 캐릭터의 겉모습은 유지한
+ * 채 상황만 새로 그려달라"는 의도를 매 요청에 명시적으로 실어 보낸다 — studio-dialogue-translate.ts의
+ * buildTranslationPrompt와 동일하게, 프롬프트 조합은 fetch 오케스트레이션(아래
+ * generateConsistentCharacterImage)과 분리해 독립적으로 테스트 가능하게 둔다.
+ */
+export function buildCharacterConsistencyPrompt(situationPrompt: string): string {
+  const trimmed = situationPrompt.trim();
+  return (
+    "제공된 참고 이미지 속 캐릭터의 얼굴 생김새·헤어스타일·의상·색상 등 겉모습을 최대한 그대로 유지한 " +
+    `채, 다음 상황을 그려주세요: ${trimmed} ` +
+    "(캐릭터의 정체성과 외모는 바꾸지 말고, 포즈·표정·배경·상황만 새롭게 그립니다.)"
+  );
+}
+
+/**
+ * (2.5) 캐릭터 일관성 유지 생성 — 젠툰(GenToon) 벤치마크의 핵심 차별점("같은 캐릭터를 여러 컷에서
+ * 동일 외모로 유지")을 근사한다. 완벽한 일관성엔 IP-Adapter/캐릭터 LoRA 같은 전문 기법(모델 파인튜닝·
+ * 임베딩 주입)이 필요한데, 이 프로젝트는 BYOK 클라이언트일 뿐 자체 추론 인프라가 없어 그 방식은
+ * 스코프 밖이다(docs/studio-competitor-features.md §3 참고). 대신
+ * colorizeLineArt와 완전히 동일한 패턴(마스크 없이 참고 이미지 전체 + 텍스트 프롬프트만 Images Edits
+ * API로 전송)으로 근사한다 — 캔버스에서 고른 "기준 캐릭터" 이미지를 참고 이미지로 함께 보내면, 편집
+ * 모델이 원본 캐릭터의 외모를 어느 정도 참고해 새 상황을 그려준다.
+ *
+ * colorizeLineArt와의 차이: 그쪽은 "같은 요소의 src를 교체"(제자리 보정)가 목적이라 결과에 위치/크기
+ * 정보가 필요 없지만, 이 기능은 "참고 캐릭터 옆에 새로운 장면의 캐릭터를 추가"하는 것이 목적이라
+ * 호출부가 결과를 **별도의 새 이미지 요소**로 캔버스에 삽입한다(기존 요소를 덮어쓰지 않음). 그래서
+ * 결과 타입도 colorizeLineArt와 동일하게 dataUrl만 담고, 새 요소의 배치 크기는 호출부가 참고 이미지
+ * 요소 자체의 캔버스 표시 크기를 그대로 재사용한다(원본 픽셀 해상도를 알아내려 이미지를 다시 디코딩할
+ * 필요가 없다 — generateBackgroundImage가 요청 size 문자열에서 width/height를 동기적으로 아는 것과
+ * 같은 이유로 왕복을 줄인 설계).
+ *
+ * **완벽한 동일 인물 재현은 보장하지 않는다** — UI 문구(StudioAiCharacterConsistencyPanel)로 사용자
+ * 기대치를 명시적으로 낮춘다.
+ */
+export async function generateConsistentCharacterImage(
+  settings: StudioAiSettings,
+  referenceImageSrc: string,
+  situationPrompt: string
+): Promise<StudioAiResult<{ dataUrl: string }>> {
+  const trimmed = situationPrompt.trim();
+  if (!trimmed) return { ok: false, code: "invalid_input", error: "새로 그리고 싶은 상황을 입력하세요." };
+  if (!referenceImageSrc) return { ok: false, code: "invalid_input", error: "기준 캐릭터 이미지를 선택하세요." };
+  if (!isStudioAiConfigured(settings)) {
+    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  }
+  let blob: Blob;
+  try {
+    blob = dataUrlToBlob(referenceImageSrc);
+  } catch (e) {
+    return { ok: false, code: "invalid_input", error: e instanceof Error ? e.message : "기준 이미지를 읽지 못했습니다." };
+  }
+  const form = new FormData();
+  form.set("image", blob, "character-reference.png");
+  form.set("prompt", buildCharacterConsistencyPrompt(trimmed));
+  form.set("model", settings.imageModel);
+  form.set("n", "1");
+  form.set("response_format", "b64_json");
+  const url = buildUrl(settings.baseUrl, settings.imageEditPath);
+  const result = await postForm(url, settings.apiKey, form);
+  if (!result.ok) return result;
+  const b64 = extractFirstB64Json(result.data);
+  if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
+  return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}` } };
+}
+
 /** 콘티→그림 변환의 "장면 구성 제안" 시스템 프롬프트 — 완전한 이미지 생성이 아니라(기능 1과
  *  중복되므로) 구도/카메라앵글/인물배치 텍스트 조언으로 의도적으로 좁혔다. */
 const SCENE_COMPOSITION_SYSTEM_PROMPT =

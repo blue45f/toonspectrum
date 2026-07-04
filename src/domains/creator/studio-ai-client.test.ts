@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 import {
+  buildCharacterConsistencyPrompt,
   colorizeLineArt,
   dataUrlToBlob,
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
+  generateConsistentCharacterImage,
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
@@ -114,6 +116,26 @@ describe("dataUrlToBlob", () => {
 
   it("throws for a data: URL with no comma separator (malformed)", () => {
     expect(() => dataUrlToBlob("data:image/png;base64")).toThrow();
+  });
+});
+
+describe("buildCharacterConsistencyPrompt", () => {
+  it("wraps the situation prompt with fixed instructions to preserve the character's appearance", () => {
+    const result = buildCharacterConsistencyPrompt("비 오는 골목에서 우산을 쓰고 서 있는 모습");
+    expect(result).toContain("비 오는 골목에서 우산을 쓰고 서 있는 모습");
+    expect(result).toContain("겉모습을 최대한 그대로 유지");
+    expect(result).toContain("정체성과 외모는 바꾸지 말고");
+  });
+
+  it("trims the situation prompt before embedding it (no leading/trailing whitespace leaks through)", () => {
+    const result = buildCharacterConsistencyPrompt("   눈밭에 서 있는 모습   ");
+    expect(result).toContain("눈밭에 서 있는 모습");
+    expect(result.includes("   눈밭")).toBe(false);
+    expect(result.includes("모습   ")).toBe(false);
+  });
+
+  it("is deterministic for the same input (no randomness/timestamps)", () => {
+    expect(buildCharacterConsistencyPrompt("웃는 모습")).toBe(buildCharacterConsistencyPrompt("웃는 모습"));
   });
 });
 
@@ -281,6 +303,117 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(await (imageField as Blob).text()).toBe("line-art-bytes");
 
       expect(result).toEqual({ ok: true, data: { dataUrl: `data:image/png;base64,${btoa("colored")}` } });
+    });
+  });
+
+  describe("generateConsistentCharacterImage", () => {
+    const referenceDataUrl = `data:image/png;base64,${btoa("reference-character-bytes")}`;
+    const situationPrompt = "비 오는 골목에서 우산을 쓰고 서 있는 모습";
+
+    it("does NOT call fetch when not configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(STUDIO_AI_DEFAULT_SETTINGS, referenceDataUrl, situationPrompt);
+
+      expect(result).toEqual({ ok: false, code: "not_configured", error: expect.any(String) });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call fetch for a blank situation prompt even when configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, "   ");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call fetch when the reference image is missing (empty string)", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, "", situationPrompt);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call fetch for a non-data-URL reference (remote URLs unsupported)", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, "https://example.com/character.png", situationPrompt);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("sends a multipart request (reference image blob + composed prompt) without a manual Content-Type header", async () => {
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ data: [{ b64_json: btoa("new-scene-bytes") }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://api.example.com/v1/images/edits");
+      expect(init.method).toBe("POST");
+      // Authorization만 수동 설정 — Content-Type은 fetch가 FormData boundary를 위해 자동 지정해야 하므로 빠져 있어야 한다.
+      expect(init.headers).toEqual({ Authorization: "Bearer sk-test-key" });
+      expect(init.body).toBeInstanceOf(FormData);
+      const form = init.body as FormData;
+      // 사용자가 입력한 situationPrompt 그대로가 아니라, buildCharacterConsistencyPrompt로 감싼 결과가 나가야 한다.
+      expect(form.get("prompt")).toBe(buildCharacterConsistencyPrompt(situationPrompt));
+      expect(form.get("model")).toBe(CONFIGURED.imageModel);
+      expect(form.get("response_format")).toBe("b64_json");
+      const imageField = form.get("image");
+      expect(imageField).toBeInstanceOf(Blob);
+      expect(await (imageField as Blob).text()).toBe("reference-character-bytes");
+
+      expect(result).toEqual({ ok: true, data: { dataUrl: `data:image/png;base64,${btoa("new-scene-bytes")}` } });
+    });
+
+    it("returns parse_error when the response has no b64_json (e.g. url-only providers)", async () => {
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ data: [{ url: "https://cdn.example/x.png" }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt);
+      expect(result).toEqual({ ok: false, code: "parse_error", error: expect.any(String) });
+    });
+
+    it("returns http_error with the provider's error message on non-2xx", async () => {
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("http_error");
+        expect(result.error).toContain("401");
+        expect(result.error).toContain("Invalid API key");
+      }
+    });
+
+    it("returns network_error when fetch rejects", async () => {
+      const mockFetch = vi.fn(async () => {
+        throw new Error("offline");
+      });
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt);
+      expect(result).toEqual({ ok: false, code: "network_error", error: "offline" });
     });
   });
 

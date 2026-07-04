@@ -100,6 +100,7 @@ import {
   colorizeLineArt,
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
+  generateConsistentCharacterImage,
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
@@ -746,6 +747,13 @@ const StudioAiColorizePanel = lazyRetry(
 const StudioAiCompositionPanel = lazyRetry(
   () => import("./StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
   "StudioAiCompositionPanel"
+);
+const StudioAiCharacterConsistencyPanel = lazyRetry(
+  () =>
+    import("./StudioAiCharacterConsistencyPanel").then((mod) => ({
+      default: mod.StudioAiCharacterConsistencyPanel,
+    })),
+  "StudioAiCharacterConsistencyPanel"
 );
 const StudioDialogueTranslatePanel = lazyRetry(
   () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
@@ -5075,6 +5083,12 @@ function StudioCuttoonEditor() {
   const [aiColorizePrompt, setAiColorizePrompt] = useState("파스텔톤 웹툰 셀 채색, 부드러운 그림자와 하이라이트");
   const [aiColorizeBusy, setAiColorizeBusy] = useState(false);
   const [aiColorizeError, setAiColorizeError] = useState<string | null>(null);
+  // 캐릭터 일관성 생성(젠툰 벤치마크) — "기준 캐릭터"는 별도 상태로 들고 있지 않는다. 캔버스에서
+  // 선택된 요소(selected)가 이미지 타입인지를 그 순간의 파생값으로만 판단한다(다른 요소를 선택하면
+  // 자동으로 최신 기준 캐릭터로 바뀜 — 별도 "고정" 상태가 stale해질 여지를 원천 차단).
+  const [aiCharacterPrompt, setAiCharacterPrompt] = useState("");
+  const [aiCharacterBusy, setAiCharacterBusy] = useState(false);
+  const [aiCharacterError, setAiCharacterError] = useState<string | null>(null);
   // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
   // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
   // 타야 해서 일반화한다.
@@ -6670,6 +6684,37 @@ function StudioCuttoonEditor() {
     const elId = selected.id;
     const srcAtRequestTime = selected.src;
     runWithAiNotice(() => void executeAiColorize(elId, srcAtRequestTime, prompt));
+  }
+
+  // AI 캐릭터 일관성 생성 실행(젠툰 벤치마크) — refSrc/refWidth/refHeight를 호출 시점에 캡처해
+  // 넘긴다(await 도중 선택이 바뀌어도 엉뚱한 참고 이미지를 쓰지 않는다 — executeAiColorize와 동일
+  // 관례). colorizeLineArt와 달리 기존 요소의 src를 덮어쓰지 않고, addRenderedImage로 캔버스에 새
+  // 이미지 요소를 추가한다(참고 캐릭터의 온-캔버스 크기를 그대로 재사용 — studio-ai-client.ts
+  // generateConsistentCharacterImage 주석 참고, 생성된 이미지를 다시 디코딩해 원본 픽셀 크기를
+  // 알아낼 필요가 없다).
+  async function executeAiCharacterConsistency(refSrc: string, prompt: string, refWidth: number, refHeight: number) {
+    setAiCharacterBusy(true);
+    setAiCharacterError(null);
+    const result = await generateConsistentCharacterImage(aiSettings, refSrc, prompt);
+    if (!result.ok) {
+      setAiCharacterError(result.error);
+      setAiCharacterBusy(false);
+      return;
+    }
+    addRenderedImage(result.data.dataUrl, refWidth, refHeight);
+    setAiCharacterBusy(false);
+    setMenu(null); // 다른 "생성 후 팝오버 닫기" 흐름(AI 배경 생성 등)과 동일 UX.
+  }
+  // StudioAiCharacterConsistencyPanel의 "같은 캐릭터로 생성" 버튼이 호출하는 진입점 — 여기서만 AI
+  // 고지 게이트를 통과시킨다(다른 AI 이미지 생성 진입점과 동일 이유 — 고지 우회 방지).
+  function onGenerateAiCharacter() {
+    if (!selected || selected.type !== "image" || aiCharacterBusy || !isStudioAiConfigured(aiSettings)) return;
+    const prompt = aiCharacterPrompt.trim();
+    if (!prompt) return;
+    const refSrc = selected.src;
+    const refWidth = selected.width;
+    const refHeight = selected.height;
+    runWithAiNotice(() => void executeAiCharacterConsistency(refSrc, prompt, refWidth, refHeight));
   }
 
   // 장면 구성 제안 텍스트를 일반 텍스트 요소로 캔버스에 추가한다 — addText()와 동일한 스폰 위치 규칙
@@ -10129,7 +10174,7 @@ function StudioCuttoonEditor() {
             aria-haspopup="menu"
             aria-expanded={menu === "aiAssist"}
             className={toolBtn(menu === "aiAssist")}
-            title="내 API 키로 배경 생성·구도 제안(BYOK, 서버 비용 없음)"
+            title="내 API 키로 배경 생성·캐릭터 일관성 생성·구도 제안(BYOK, 서버 비용 없음)"
           >
             <Sparkles size={14} /> AI 어시스트
           </button>
@@ -10147,6 +10192,16 @@ function StudioCuttoonEditor() {
                     busy={aiBgBusy}
                     error={aiBgError}
                     onGenerate={onGenerateAiBackground}
+                  />
+                  <StudioAiCharacterConsistencyPanel
+                    configured={isStudioAiConfigured(aiSettings)}
+                    hasReference={selected?.type === "image"}
+                    referenceThumbnail={selected?.type === "image" ? selected.src : null}
+                    prompt={aiCharacterPrompt}
+                    onPromptChange={setAiCharacterPrompt}
+                    busy={aiCharacterBusy}
+                    error={aiCharacterError}
+                    onGenerate={onGenerateAiCharacter}
                   />
                   <StudioAiCompositionPanel
                     settings={aiSettings}
