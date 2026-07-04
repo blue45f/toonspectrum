@@ -50,6 +50,7 @@ import {
   FolderMinus,
   Upload,
   Image as ImageIcon,
+  Images,
   Bookmark,
   Download,
   ImagePlus,
@@ -486,6 +487,7 @@ import type { SceneTemplate } from "./studio-scene-templates";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { Sketch } from "./studio-sketch";
+import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-image-client";
 import type { Stylize } from "./studio-stylize";
 import type { Vibrance } from "./studio-vibrance";
 import type {
@@ -495,6 +497,7 @@ import type {
 } from "./StudioAssetMenuPanel";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
+import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
@@ -684,6 +687,22 @@ const StudioAssetMenuPanel = lazyRetry(loadStudioAssetMenuPanel, "StudioAssetMen
 
 function preloadStudioAssetMenuPanel(): void {
   void loadStudioAssetMenuPanel();
+}
+
+type StudioStockImagePanelModule = { default: ComponentType<StudioStockImagePanelProps> };
+let studioStockImagePanelPromise: Promise<StudioStockImagePanelModule> | null = null;
+
+function loadStudioStockImagePanel(): Promise<StudioStockImagePanelModule> {
+  studioStockImagePanelPromise ??= import("./StudioStockImagePanel").then((mod) => ({
+    default: mod.StudioStockImagePanel,
+  }));
+  return studioStockImagePanelPromise;
+}
+
+const StudioStockImagePanel = lazyRetry(loadStudioStockImagePanel, "StudioStockImagePanel");
+
+function preloadStudioStockImagePanel(): void {
+  void loadStudioStockImagePanel();
 }
 
 type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
@@ -917,6 +936,10 @@ export interface ImageEl {
   // 프레임으로 넘겨가며 재생하는 것이고, isAnimatedGif는 단일 src 하나를 브라우저가 자체
   // 재생하는 것 — 실질적으로 상호배타적으로 취급한다(UrlImage 리렌더 루프의 가드 참고).
   isAnimatedGif?: boolean;
+  // 스톡 사진(Unsplash) 삽입 출처 — StudioStockImagePanel에서 삽입한 이미지에만 설정된다.
+  // Unsplash API Guidelines가 요구하는 "사진 사용 시 작가·Unsplash 크레딧 표시"를 삽입 이후에도
+  // (예: 선택된 이미지 사이드바에서) 다시 보여줄 수 있도록 요소에 영구 보존한다.
+  stockImageCredit?: StudioStockImageCredit;
 }
 interface TextEl {
   id: string;
@@ -1083,7 +1106,7 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
    *  일괄 삭제 대상이 된다. */
   emeresSourceId?: string;
 };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -5514,6 +5537,22 @@ function StudioCuttoonEditor() {
       })
     );
   }
+  // 스톡 사진(Unsplash) 삽입 — addRenderedImage와 동일한 배치 정책(createCanvasImageElement로 캔버스
+  // 중앙에 맞춰 배치)이되, 크레딧 메타데이터를 함께 얹는다는 점만 다르다. StudioStockImagePanel이 이미
+  // (1) 데이터 URL로 인라인 변환하고 (2) download_location 트리거를 쐈으므로, 여기서는 캔버스 배치만
+  // 신경 쓰면 된다.
+  function insertStockImage(photo: StudioStockPhoto, dataUrl: string, width: number, height: number) {
+    setError(null);
+    const base = createCanvasImageElement({
+      id: uid(),
+      src: dataUrl,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      sourceWidth: width,
+      sourceHeight: height,
+    });
+    addEl({ ...base, stockImageCredit: photo.credit });
+  }
   function splitFrameSelected(orientation: "horizontal" | "vertical") {
     if (!selected || selected.type !== "frame") return;
     const f = selected as FrameEl;
@@ -9667,6 +9706,34 @@ function StudioCuttoonEditor() {
                 onUseSharedAsset={onUseSharedAsset}
                 onDeleteSharedAsset={onDeleteSharedAsset}
               />
+            </Suspense>
+          )}
+        </div>
+        <div ref={menu === "stockImage" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioStockImagePanel();
+              setMenu(menu === "stockImage" ? null : "stockImage");
+            }}
+            onMouseEnter={preloadStudioStockImagePanel}
+            onFocus={preloadStudioStockImagePanel}
+            aria-haspopup="menu"
+            aria-expanded={menu === "stockImage"}
+            className={toolBtn(menu === "stockImage")}
+            title="Unsplash 무료 사진 검색해 삽입(내 Access Key로, 서버 비용 없음)"
+          >
+            <Images size={14} /> 스톡 사진
+          </button>
+          {menu === "stockImage" && (
+            <Suspense
+              fallback={
+                <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
+                  스톡 사진 패널을 여는 중...
+                </div>
+              }
+            >
+              <StudioStockImagePanel onInsert={insertStockImage} />
             </Suspense>
           )}
         </div>
@@ -14195,6 +14262,28 @@ function StudioCuttoonEditor() {
                     src={selected.src}
                     onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                   />
+                  {selected.stockImageCredit && (
+                    <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
+                      출처:{" "}
+                      <a
+                        href={selected.stockImageCredit.photographerProfileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-fg-2"
+                      >
+                        {selected.stockImageCredit.photographerName}
+                      </a>{" "}
+                      ·{" "}
+                      <a
+                        href={selected.stockImageCredit.unsplashPhotoPageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-fg-2"
+                      >
+                        Unsplash
+                      </a>
+                    </p>
+                  )}
                   {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
                   <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
                   <StudioFloodFillPanel
