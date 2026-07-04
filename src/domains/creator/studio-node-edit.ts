@@ -17,7 +17,7 @@
 // 타입·상수
 // ---------------------------------------------------------------------------
 
-export type NodeEditTool = "move" | "width";
+export type NodeEditTool = "move" | "width" | "smooth";
 
 /** 캔버스 위 조작 가능한 핸들 1개 — pointIndex 는 points 배열의 "몇 번째 점"인지(2배 아님). */
 export type NodeEditHandle = {
@@ -45,6 +45,11 @@ export const NODE_EDIT_WIDTH_DRAG_RANGE_PX = 140;
 export const NODE_EDIT_TOOLS: { id: NodeEditTool; label: string; tip: string }[] = [
   { id: "move", label: "이동", tip: "핸들을 끌어 그 지점의 위치를 옮깁니다." },
   { id: "width", label: "굵기", tip: "핸들을 위아래로 끌어 그 지점의 필압(굵기)을 조절합니다." },
+  {
+    id: "smooth",
+    label: "스무딩",
+    tip: "핸들을 위로 끌거나 강도 슬라이더를 올려 그 점 주변 구간을 부드럽게 다듬습니다.",
+  },
 ];
 
 // ---------------------------------------------------------------------------

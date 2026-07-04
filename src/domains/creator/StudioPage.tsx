@@ -196,6 +196,12 @@ import {
   type CropRect,
 } from "./studio-crop";
 import {
+  NODE_SMOOTH_DEFAULT_STRENGTH,
+  NODE_SMOOTH_DRAG_RANGE_PX,
+  smoothPointsAroundIndex,
+  updateSmoothStrengthDrag,
+} from "./studio-curve-smoothing";
+import {
   applyDialogueTextEdit,
   applyReplacePlanToPages,
   collectDialogueItems,
@@ -2588,13 +2594,24 @@ function StudioNodeEditOverlay({
       {handles.map((h) => {
         const isActive = activeHandleIndex === h.pointIndex;
         const r = tool === "width" ? (4 + pressureAt(pressures, h.pointIndex) * 8) / scale : 5 / scale;
+        // "스무딩" 은 핸들 크기로 표현할 스칼라가 없다(강도는 도구 전역 값이지 핸들별 값이 아니다)
+        // — 색만 청록(#14b8a6)으로 구분해 "굵기"(보라)와 헷갈리지 않게 한다.
+        const fill = isActive
+          ? tool === "smooth"
+            ? "#0f766e"
+            : "#7c5cfc"
+          : tool === "width"
+            ? "#7c5cfc"
+            : tool === "smooth"
+              ? "#14b8a6"
+              : "#ffffff";
         return (
           <KCircle
             key={h.pointIndex}
             x={h.x}
             y={h.y}
             radius={r}
-            fill={tool === "width" || isActive ? "#7c5cfc" : "#ffffff"}
+            fill={fill}
             stroke="#18181b"
             strokeWidth={1.25 / scale}
           />
@@ -4302,6 +4319,15 @@ function StudioCuttoonEditor() {
     setNodeEditDraft(null);
     setNodeEditTool(null);
   }, [selectedId]);
+  // 벡터 노드 편집 "스무딩" 도구 전용 상태 — studio-curve-smoothing 통합.
+  // nodeSmoothStrength 는 healCloneRadius/Hardness/Opacity 와 동일한 "사용자 선호값" 관례를 따른다
+  // (요소·선택이 바뀌어도 리셋하지 않는다 — 그래서 위 useEffect 의 selectedId 리셋 목록에 넣지
+  // 않았다: 사용자가 이전에 맞춘 강도를 다음 스트로크에도 그대로 이어 쓰길 기대한다).
+  const [nodeSmoothStrength, setNodeSmoothStrength] = useState(NODE_SMOOTH_DEFAULT_STRENGTH);
+  // "스무딩" 핸들 드래그 시작 시점의 강도 스냅샷 — updateSmoothStrengthDrag 의 기준선(baseline).
+  // NodeDragSession.startPressure 는 "너비" 도구의 필압 개념이라 스무딩 강도를 담을 자리가 없어
+  // (studio-node-edit.ts 는 이 배치에서 수정하지 않는다) 별도 ref 로 스냅샷한다.
+  const nodeSmoothStrengthAtDragStartRef = useRef(NODE_SMOOTH_DEFAULT_STRENGTH);
   // ── 말풍선 커스텀 모양(폴리곤 점 편집) — studio-bubble-custom-shape 통합 상태. nodeEditDraft와
   // 동일한 구조(드래그 세션 ref + rAF 배칭 draft) — 좌표계만 다르다(말풍선 로컬, 회전 포함).
   const [bubbleShapeEditActive, setBubbleShapeEditActive] = useState(false);
@@ -7798,7 +7824,11 @@ function StudioCuttoonEditor() {
       const hitIdx = hitTestNodeHandle(pos, nodeEditHandles, tolerance);
       if (hitIdx !== null) {
         const session = beginNodeDrag(selected.points, selected.pressures, hitIdx, nodeEditTool!, pos);
-        if (session) nodeEditDragRef.current = { elId: selected.id, session };
+        if (session) {
+          nodeEditDragRef.current = { elId: selected.id, session };
+          // "스무딩" 드래그의 강도 기준선을 스냅샷(다른 도구에선 참조되지 않아 무해).
+          nodeSmoothStrengthAtDragStartRef.current = nodeSmoothStrength;
+        }
       }
       return;
     }
@@ -8135,12 +8165,30 @@ function StudioCuttoonEditor() {
               points: withPointMoved(el.points, session.pointIndex, x, y),
               pressures: el.pressures ?? [],
             });
-          } else {
+          } else if (session.tool === "width") {
             const pressure = updateNodeDragWidth(session, pos, NODE_EDIT_WIDTH_DRAG_RANGE_PX / effScale);
             scheduleNodeEditDraft({
               elId,
               points: el.points,
               pressures: withPressureEdited(el.pressures, Math.floor(el.points.length / 2), session.pointIndex, pressure),
+            });
+          } else {
+            // "smooth" — 세로 드래그는 위치가 아니라 강도(0..1)를 조절한다("굵기"와 동일한 부호
+            // 규약: 위로 끌수록 값 증가). 드래그 시작 시점 강도(nodeSmoothStrengthAtDragStartRef)를
+            // 기준선으로 매 틱 다시 계산한다 — updateNodeDragWidth 가 session.startPressure 를
+            // 기준선으로 삼는 것과 동일한 "무누적오차" 패턴(el.points 도 매 틱 커밋된 원본에서
+            // 다시 계산하므로 스무딩이 이전 틱의 결과 위에 누적되지 않는다).
+            const strength = updateSmoothStrengthDrag(
+              nodeSmoothStrengthAtDragStartRef.current,
+              session.startPointerY,
+              pos.y,
+              NODE_SMOOTH_DRAG_RANGE_PX / effScale
+            );
+            setNodeSmoothStrength(strength); // 패널 슬라이더도 실시간으로 같은 값을 보여준다.
+            scheduleNodeEditDraft({
+              elId,
+              points: smoothPointsAroundIndex(el.points, session.pointIndex, strength),
+              pressures: el.pressures ?? [],
             });
           }
         }
@@ -13639,6 +13687,8 @@ function StudioCuttoonEditor() {
                         tool={nodeEditTool ?? "move"}
                         handleCount={nodeEditHandles.length}
                         widthModeSupported={isPressureWidthBrush(selected.brush, selected.mode)}
+                        smoothStrength={nodeSmoothStrength}
+                        onSmoothStrengthChange={setNodeSmoothStrength}
                         onToggle={() => {
                           if (nodeEditTool) {
                             setNodeEditTool(null);
