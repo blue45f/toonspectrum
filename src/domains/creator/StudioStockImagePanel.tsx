@@ -1,32 +1,34 @@
 // 스톡 사진 검색 패널 — Unsplash BYOK(Bring Your Own Key) 검색 + 캔버스 삽입.
 //
-// StudioAiCompositionPanel과 동일하게 **자기완결형(self-contained)**이다 — Access Key/검색어/결과/
-// busy/error를 전부 이 컴포넌트가 직접 useState로 소유하고, studio-stock-image-client.ts의 세 함수
+// StudioAiCompositionPanel과 동일하게 **자기완결형(self-contained)**이다 — 검색어/결과/busy/error를
+// 전부 이 컴포넌트가 직접 useState로 소유하고, studio-stock-image-client.ts의 세 함수
 // (searchStockPhotos/inlineStockPhotoForCanvas/triggerStockImageDownload)도 전부 이 안에서 직접
-// 호출한다. StudioAiSettingsPanel과 달리 **별도 설정 패널을 만들지 않았다** — Unsplash 설정은
-// Access Key 한 개뿐이라(baseURL·모델·엔드포인트 경로 없음), 그리고 이 키를 공유해서 봐야 하는
-// "형제 패널"이 여러 개 있는 AI 어시스트(설정+배경생성+채색+구도제안 4패널)와 달리 이 기능은 패널이
-// 이거 하나뿐이라 부모(StudioPage.tsx)로 상태를 끌어올릴 이유가 없다(docs/studio-stock-image-
-// integration.md "설계 결정" 참고).
+// 호출한다.
 //
-// 부모에게 필요한 건 onInsert 콜백 하나뿐이다 — 이 패널이 이미 (1) 선택한 사진을 이 앱의 "항상
-// data: URL" 불변식에 맞게 인라인 변환하고 (2) Unsplash API Guidelines가 요구하는 download_location
-// 트리거를 fire-and-forget으로 쏜 뒤에 호출하므로, 부모는 그냥 주어진 dataUrl/width/height/사진
-// 메타데이터를 캔버스에 얹기만 하면 된다(addRenderedImage와 동일한 "이미 준비된 이미지 삽입" 책임
-// 분리).
+// Access Key **입력 UI는 이 패널에 없다** — StudioIntegrationsSettingsPanel(통합 "연동 설정" 패널)로
+// 옮겨졌다(2026-07 API 키 등록 동선 통합 — AI 어시스트 설정과 한 곳에서 관리하도록). 이 패널은 여전히
+// 마운트 시점에 저장된 Access Key를 읽어(검색·다운로드 트리거 호출에 실제 키 값이 필요하므로) 설정
+// 여부만 판단하고, 미설정이면 안내 문구 + onOpenSettings 콜백으로 통합 설정 패널을 열도록 안내한다.
+// menu는 StudioPage.tsx에서 단일 값이라 이 패널과 통합 설정 패널이 동시에 열리는 일이 없으므로,
+// "마운트 시점에만 재로드"로 충분하다(통합 설정 패널에서 키를 바꾼 뒤 이 팝오버를 다시 열면 항상
+// 새로 마운트되어 최신 값을 읽는다).
+//
+// 부모에게 필요한 건 onInsert/onOpenSettings 콜백 두 개뿐이다 — 이 패널이 이미 (1) 선택한 사진을 이
+// 앱의 "항상 data: URL" 불변식에 맞게 인라인 변환하고 (2) Unsplash API Guidelines가 요구하는
+// download_location 트리거를 fire-and-forget으로 쏜 뒤에 onInsert를 호출하므로, 부모는 그냥 주어진
+// dataUrl/width/height/사진 메타데이터를 캔버스에 얹기만 하면 된다(addRenderedImage와 동일한 "이미
+// 준비된 이미지 삽입" 책임 분리).
 //
 // 이 패널은 "생성형 AI 최초 사용 고지" 모달의 대상이 **아니다** — Unsplash 사진은 실사진(라이선스
 // 사진)이지 AI 생성물이 아니다.
-import { Eye, EyeOff, ExternalLink, Images, Loader2, Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { Images, Loader2, Search, Settings2 } from "lucide-react";
+import { useState } from "react";
 
 import {
   inlineStockPhotoForCanvas,
   isStudioStockImageConfigured,
   loadStudioStockImageAccessKey,
-  saveStudioStockImageAccessKey,
   searchStockPhotos,
-  STUDIO_STOCK_IMAGE_DEVELOPER_SIGNUP_URL,
   triggerStockImageDownload,
   type StudioStockImageRateLimit,
   type StudioStockPhoto,
@@ -36,23 +38,14 @@ export interface StudioStockImagePanelProps {
   /** 선택한 사진(이미 data: URL로 인라인 변환됨) + 원본 픽셀 크기를 캔버스에 얹고 싶을 때 호출된다.
    *  다운로드 트리거는 이 패널이 이미 쐈으므로, 이 콜백은 캔버스 배치만 신경 쓰면 된다. */
   onInsert: (photo: StudioStockPhoto, dataUrl: string, width: number, height: number) => void;
+  /** "연동 설정" 통합 패널(StudioIntegrationsSettingsPanel)을 열기 위한 콜백 — Access Key 등록·변경은
+   *  전부 그 패널에서 이뤄진다(이 패널은 더 이상 입력 UI를 갖지 않는다). */
+  onOpenSettings: () => void;
 }
 
-export function StudioStockImagePanel({ onInsert }: StudioStockImagePanelProps) {
-  const [accessKey, setAccessKey] = useState(() => loadStudioStockImageAccessKey(globalThis.localStorage));
-  const [showAccessKey, setShowAccessKey] = useState(false);
+export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockImagePanelProps) {
+  const [accessKey] = useState(() => loadStudioStockImageAccessKey(globalThis.localStorage));
   const configured = isStudioStockImageConfigured(accessKey);
-  // <details>의 초기 펼침 상태 — "마운트 시점"의 Access Key 유무만 반영하고, 그 뒤로는 절대 다시
-  // 계산하지 않는다. 예전에는 <details open={!configured}>처럼 매 렌더 반응형으로 파생시켰는데,
-  // 그러면 사용자가 Access Key 입력란에 글자를 단 하나라도 치는 순간 configured가 true로 바뀌어
-  // open prop이 true→false로 바뀐다 — React는 이전 렌더와 다른 prop 값이므로 실제 DOM의 open
-  // 속성을 다시 써서 <details>를 강제로 접어버리고, 그 안에 있던(지금 포커스 중인) <input>이
-  // display:none 처리되며 포커스를 잃는다 — 즉 키를 타이핑하는 도중 입력창 자체가 사라지는 버그였다
-  // (붙여넣기라도 입력 직후 패널이 한 번 튕기듯 접힌다). useRef로 마운트 시점 값만 고정해 두면,
-  // 이후 configured가 바뀌어도 이 값 자체가 변하지 않으므로 React가 open 속성을 다시 쓰지 않고
-  // (이전 렌더와 동일한 prop 값이라 diffing에서 스킵됨), 사용자가 <summary>를 눌러 직접 여닫는 것도
-  // 이후 재렌더에서 되돌려지지 않는다.
-  const detailsInitiallyOpenRef = useRef(!configured);
 
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -63,11 +56,6 @@ export function StudioStockImagePanel({ onInsert }: StudioStockImagePanelProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [insertingId, setInsertingId] = useState<string | null>(null);
-
-  function updateAccessKey(next: string) {
-    setAccessKey(next);
-    saveStudioStockImageAccessKey(globalThis.localStorage, next);
-  }
 
   async function runSearch(nextPage: number) {
     const term = (nextPage === 1 ? query : submittedQuery).trim();
@@ -105,54 +93,31 @@ export function StudioStockImagePanel({ onInsert }: StudioStockImagePanelProps) 
   }
 
   return (
-    <div className="fixed inset-x-2 top-48 z-30 flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
-        <Images size={14} />
-        스톡 사진 검색 (Unsplash)
+    <div className="fixed inset-x-2 top-48 z-[60] flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
+          <Images size={14} />
+          스톡 사진 검색 (Unsplash)
+        </div>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="연동 설정 열기"
+          title="연동 설정에서 Unsplash Access Key 등록·변경"
+          className="text-fg-3 transition-colors hover:text-fg-2"
+        >
+          <Settings2 size={13} />
+        </button>
       </div>
 
-      <details
-        open={detailsInitiallyOpenRef.current}
-        className="rounded-md border border-line bg-card/50 px-2 py-1.5 text-fg-3"
-      >
-        <summary className="cursor-pointer select-none text-[0.63rem] font-medium text-fg-2">
-          {configured ? "Unsplash Access Key 등록됨 · 변경" : "Unsplash Access Key 등록"}
-        </summary>
-        <div className="mt-1.5 flex flex-col gap-1.5">
-          <p className="text-[0.6rem] leading-relaxed text-fg-3">
-            무료 Unsplash 계정으로 Access Key를 발급받아 입력하면 사진을 검색할 수 있어요. 키는{" "}
-            <span className="font-semibold text-fg-2">이 브라우저에만</span> 저장되고, 이 앱 서버로는
-            전송되지 않아요 — 검색은 브라우저가 Unsplash로 직접 요청해요.{" "}
-            <a
-              href={STUDIO_STOCK_IMAGE_DEVELOPER_SIGNUP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 font-medium text-accent hover:underline"
-            >
-              키 발급받기 <ExternalLink size={9} />
-            </a>
-          </p>
-          <span className="relative flex items-center">
-            <input
-              type={showAccessKey ? "text" : "password"}
-              value={accessKey}
-              onChange={(e) => updateAccessKey(e.target.value)}
-              placeholder="Access Key"
-              className="w-full rounded-md border border-line bg-panel px-2 py-1 pr-7 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent"
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={() => setShowAccessKey((v) => !v)}
-              aria-label={showAccessKey ? "Access Key 숨기기" : "Access Key 표시"}
-              className="absolute right-1.5 text-fg-3 transition-colors hover:text-fg-2"
-            >
-              {showAccessKey ? <EyeOff size={12} /> : <Eye size={12} />}
-            </button>
-          </span>
-        </div>
-      </details>
+      {!configured && (
+        <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
+          설정에서 Unsplash Access Key를 등록하세요.{" "}
+          <button type="button" onClick={onOpenSettings} className="font-medium text-accent hover:underline">
+            연동 설정 열기
+          </button>
+        </p>
+      )}
 
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">

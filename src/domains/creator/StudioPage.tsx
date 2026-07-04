@@ -20,6 +20,7 @@ import {
   ArrowUpToLine,
   ArrowRight,
   Boxes,
+  CheckCircle2,
   Clapperboard,
   Music4,
   Package,
@@ -69,6 +70,7 @@ import {
   Plus,
   Redo2,
   Send,
+  Settings2,
   SlidersHorizontal,
   Grid2x2,
   Grid2x2Check,
@@ -561,6 +563,7 @@ import type {
 } from "./StudioAssetMenuPanel";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
+import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type {
   GeneratedAssetQuality,
@@ -737,10 +740,6 @@ const StudioEmeresLibraryPanel = lazyRetry(
   () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
   "StudioEmeresLibraryPanel"
 );
-const StudioAiSettingsPanel = lazyRetry(
-  () => import("./StudioAiSettingsPanel").then((mod) => ({ default: mod.StudioAiSettingsPanel })),
-  "StudioAiSettingsPanel"
-);
 const StudioAiBackgroundPanel = lazyRetry(
   () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
   "StudioAiBackgroundPanel"
@@ -813,6 +812,25 @@ const StudioStockImagePanel = lazyRetry(loadStudioStockImagePanel, "StudioStockI
 
 function preloadStudioStockImagePanel(): void {
   void loadStudioStockImagePanel();
+}
+
+type StudioIntegrationsSettingsPanelModule = { default: ComponentType<StudioIntegrationsSettingsPanelProps> };
+let studioIntegrationsSettingsPanelPromise: Promise<StudioIntegrationsSettingsPanelModule> | null = null;
+
+function loadStudioIntegrationsSettingsPanel(): Promise<StudioIntegrationsSettingsPanelModule> {
+  studioIntegrationsSettingsPanelPromise ??= import("./StudioIntegrationsSettingsPanel").then((mod) => ({
+    default: mod.StudioIntegrationsSettingsPanel,
+  }));
+  return studioIntegrationsSettingsPanelPromise;
+}
+
+const StudioIntegrationsSettingsPanel = lazyRetry(
+  loadStudioIntegrationsSettingsPanel,
+  "StudioIntegrationsSettingsPanel"
+);
+
+function preloadStudioIntegrationsSettingsPanel(): void {
+  void loadStudioIntegrationsSettingsPanel();
 }
 
 type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
@@ -1228,7 +1246,7 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
    *  일괄 삭제 대상이 된다. */
   emeresSourceId?: string;
 };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -10383,7 +10401,36 @@ function StudioCuttoonEditor() {
             <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
               <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
                 <div className="flex flex-col gap-2">
-                  <StudioAiSettingsPanel settings={aiSettings} onChange={updateAiSettings} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      preloadStudioIntegrationsSettingsPanel();
+                      setMenu("integrations");
+                    }}
+                    onMouseEnter={preloadStudioIntegrationsSettingsPanel}
+                    onFocus={preloadStudioIntegrationsSettingsPanel}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-line bg-panel/50 px-3 py-2 text-left transition-colors hover:bg-raised"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
+                      <Settings2 size={14} />
+                      AI 어시스트 설정
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1 text-[0.65rem] font-medium",
+                        isStudioAiConfigured(aiSettings) ? "text-good" : "text-fg-3"
+                      )}
+                    >
+                      {isStudioAiConfigured(aiSettings) ? (
+                        <>
+                          <CheckCircle2 size={12} /> 등록됨
+                        </>
+                      ) : (
+                        "API 키 등록 필요"
+                      )}
+                      <ChevronRight size={12} />
+                    </span>
+                  </button>
                   <StudioAiBackgroundPanel
                     configured={isStudioAiConfigured(aiSettings)}
                     prompt={aiBgPrompt}
@@ -10731,8 +10778,38 @@ function StudioCuttoonEditor() {
                 </div>
               }
             >
-              <StudioStockImagePanel onInsert={insertStockImage} />
+              <StudioStockImagePanel
+                onInsert={insertStockImage}
+                onOpenSettings={() => {
+                  preloadStudioIntegrationsSettingsPanel();
+                  setMenu("integrations");
+                }}
+              />
             </Suspense>
+          )}
+        </div>
+        <div ref={menu === "integrations" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioIntegrationsSettingsPanel();
+              setMenu(menu === "integrations" ? null : "integrations");
+            }}
+            onMouseEnter={preloadStudioIntegrationsSettingsPanel}
+            onFocus={preloadStudioIntegrationsSettingsPanel}
+            aria-haspopup="menu"
+            aria-expanded={menu === "integrations"}
+            className={toolBtn(menu === "integrations")}
+            title="AI 어시스트·스톡 사진 등 API 키가 필요한 기능을 한 곳에서 설정"
+          >
+            <Settings2 size={14} /> 연동 설정
+          </button>
+          {menu === "integrations" && (
+            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
+              <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
+                <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
+              </Suspense>
+            </div>
           )}
         </div>
         <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
