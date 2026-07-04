@@ -2486,6 +2486,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
+  // 87명 베이스 캐릭터를 검색 없이 그리드로 늘어놓으면 스크롤이 매우 길어져, 이름 검색만으로
+  // 빠르게 좁힐 수 있게 한다(클라이언트 사이드 부분일치, 대소문자 무시) — "캐릭터 만들기" 진입점을
+  // 통합하며 그쪽 UX를 이 라이브러리 자체로 흡수했다.
+  const [libraryQuery, setLibraryQuery] = useState("");
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
@@ -4711,12 +4715,29 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   </div>
                 ) : null}
 
+                <div className="relative mt-3">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
+                  <input
+                    type="text"
+                    value={libraryQuery}
+                    onChange={(e) => setLibraryQuery(e.target.value)}
+                    placeholder="캐릭터 이름 검색..."
+                    aria-label="캐릭터 라이브러리 검색"
+                    spellCheck={false}
+                    className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+                  />
+                </div>
+
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {libraryStatus === "loading" ? (
                     <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 캐릭터를 불러오는 중입니다.</div>
                   ) : null}
 
-                  {libraryEntries.map((entry) => {
+                  {libraryEntries.length > 0 && libraryEntries.filter((entry) => entry.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).length === 0 ? (
+                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">"{libraryQuery}"와 일치하는 캐릭터가 없어요.</div>
+                  ) : null}
+
+                  {libraryEntries.filter((entry) => entry.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((entry) => {
                     const isActive = entry.id === activeModelId;
                     const isDeleting = deletingModelId === entry.id;
 

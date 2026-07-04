@@ -39,7 +39,7 @@ export type StudioTimelapsePanelProps = {
   onRecordingEnd: () => void;
 };
 
-// StudioVrmCreator.tsx와 동일한 로컬 스타일 상수(자체완결 모달 컨벤션).
+// StudioBackground3D.tsx와 동일한 로컬 스타일 상수(자체완결 모달 컨벤션).
 const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
@@ -82,7 +82,7 @@ export function StudioTimelapsePanel({
     };
   }, []);
 
-  // ESC로 닫기 — StudioBackground3D/StudioVrmCreator 등 이 세션의 다른 모달들과 동일한 관례.
+  // ESC로 닫기 — StudioBackground3D/StudioVrmPoser 등 이 세션의 다른 모달들과 동일한 관례.
   // 녹화/내보내기 진행 중엔(exporting) 무시해 중간에 잘리는 걸 막는다(닫기 버튼도 이미 disabled).
   // exporting은 이 훅 아래에서 계산되는 파생값이라 여기서는 preparing/progress로 직접 판정한다.
   useEffect(() => {

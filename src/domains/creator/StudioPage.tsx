@@ -24,7 +24,6 @@ import {
   Package,
   Pipette,
   PictureInPicture2,
-  UserRound,
   Video,
   Triangle,
   Hexagon,
@@ -590,10 +589,6 @@ const StudioVrmPoser = lazyRetry(
 const StudioBackground3D = lazyRetry(
   () => import("./StudioBackground3D").then((mod) => ({ default: mod.StudioBackground3D })),
   "StudioBackground3D"
-);
-const StudioVrmCreator = lazyRetry(
-  () => import("./StudioVrmCreator").then((mod) => ({ default: mod.StudioVrmCreator })),
-  "StudioVrmCreator"
 );
 const StudioTimelapsePanel = lazyRetry(
   () => import("./StudioTimelapsePanel").then((mod) => ({ default: mod.StudioTimelapsePanel })),
@@ -3243,7 +3238,6 @@ function StudioCuttoonEditor() {
   const [bg3dOpen, setBg3dOpen] = useState(false);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
-  const [vrmCreatorOpen, setVrmCreatorOpen] = useState(false);
   // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때만 채워진다 — WorkDetail.pages(렌더링된
   // 컷 이미지)가 있어야 컷별 연출(WorkFxPanel)의 "컷 이미지 클릭해 마크 찍기" UI가 성립하므로,
   // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
@@ -8449,17 +8443,9 @@ function StudioCuttoonEditor() {
           type="button"
           onClick={() => setPoserVrmOpen(true)}
           className={cn(toolBtn(poserVrmOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
-          title="3D 캐릭터 생성 및 포즈 설정"
+          title="무료 베이스 캐릭터를 골라 포즈·표정·의상·색상까지 만들고 투명 배경으로 추가하기"
         >
           <Sparkles size={14} /> 3D 캐릭터
-        </button>
-        <button
-          type="button"
-          onClick={() => setVrmCreatorOpen(true)}
-          className={cn(toolBtn(vrmCreatorOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
-          title="무료 베이스 캐릭터를 골라 색상·의상·체형을 커스터마이즈해 내 캐릭터 만들기"
-        >
-          <UserRound size={14} /> 캐릭터 만들기
         </button>
         <button
           type="button"
@@ -14804,16 +14790,6 @@ function StudioCuttoonEditor() {
                 addRenderedImage(src, w, h);
               }
             }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<PoserLoadingOverlay />}>
-        {vrmCreatorOpen ? (
-          <StudioVrmCreator
-            open
-            onClose={() => setVrmCreatorOpen(false)}
-            onInsert={(src, w, h) => addRenderedImage(src, w, h)}
           />
         ) : null}
       </Suspense>
