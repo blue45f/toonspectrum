@@ -45,6 +45,7 @@ interface MobileHeaderNavigationProps {
   panelRef: RefObject<HTMLDivElement | null>;
   closeMenu: () => void;
   isActive: (href: string, exact?: boolean) => boolean;
+  hideBottomTabs?: boolean;
 }
 
 export function MobileHeaderNavigation({
@@ -53,6 +54,7 @@ export function MobileHeaderNavigation({
   panelRef,
   closeMenu,
   isActive,
+  hideBottomTabs = false,
 }: MobileHeaderNavigationProps) {
   const t = useT();
 
@@ -167,46 +169,49 @@ export function MobileHeaderNavigation({
         </div>
       )}
 
-      {/* 모바일 하단 탭바 (<768px): 빠른 접근용. 전체 목적지는 상단 햄버거 메뉴 */}
-      <nav
-        aria-label="빠른 이동"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
-          {MOBILE_TABS.map((n) => {
-            const active = isActive(n.href, n.exact);
-            const Icon = n.icon;
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                aria-current={active ? "page" : undefined}
-                className={cx(
-                  "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
-                  active ? "text-accent" : "text-fg-3"
-                )}
-              >
-                {active && (
-                  <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
-                )}
-                <Icon size={19} strokeWidth={active ? 2.4 : 1.9} />
-                {t(n.i18n)}
-              </Link>
-            );
-          })}
-          <Link
-            href="/library"
-            aria-current={isActive("/library") ? "page" : undefined}
-            className={cx(
-              "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
-              isActive("/library") ? "text-accent" : "text-fg-3"
-            )}
-          >
-            <Library size={19} strokeWidth={isActive("/library") ? 2.4 : 1.9} />
-            서재
-          </Link>
-        </div>
-      </nav>
+      {/* 모바일 하단 탭바 (<768px): 빠른 접근용. 전체 목적지는 상단 햄버거 메뉴.
+          /studio 등 자체 하단 도구막대를 쓰는 라우트에서는 겹치므로 hideBottomTabs로 뺀다. */}
+      {!hideBottomTabs && (
+        <nav
+          aria-label="빠른 이동"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
+        >
+          <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
+            {MOBILE_TABS.map((n) => {
+              const active = isActive(n.href, n.exact);
+              const Icon = n.icon;
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cx(
+                    "relative flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
+                    active ? "text-accent" : "text-fg-3"
+                  )}
+                >
+                  {active && (
+                    <span className="absolute left-1/2 top-0 h-0.5 w-10 -translate-x-1/2 rounded-full bg-accent" />
+                  )}
+                  <Icon size={19} strokeWidth={active ? 2.4 : 1.9} />
+                  {t(n.i18n)}
+                </Link>
+              );
+            })}
+            <Link
+              href="/library"
+              aria-current={isActive("/library") ? "page" : undefined}
+              className={cx(
+                "flex flex-col items-center gap-1 py-2.5 text-[0.65rem] font-medium transition-colors",
+                isActive("/library") ? "text-accent" : "text-fg-3"
+              )}
+            >
+              <Library size={19} strokeWidth={isActive("/library") ? 2.4 : 1.9} />
+              서재
+            </Link>
+          </div>
+        </nav>
+      )}
     </>
   );
 }

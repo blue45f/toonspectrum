@@ -10298,9 +10298,12 @@ function StudioCuttoonEditor() {
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
-              // 모바일: 상단 도구막대 1줄 + 하단 도구막대만 차감해 캔버스를 최대한 키운다(작은 폰에서 '그릴 면적' 우선).
+              // 모바일: 실측 기준 상단 UI(제목+액션바+로그인안내+도구모음 ≈ 17rem) + 하단 스튜디오
+              // 도구막대(safe-area 포함 ≈ 7rem) = 약 24rem을 차감해야 캔버스가 뷰포트 안에 들어온다.
+              // 13rem은 이 합계를 과소평가해 캔버스가 하단 도구막대 뒤로 넘쳐 숨는 버그였다(실측:
+              // top 275px + 하단바 111px = 386px ≈ 24.1rem, 로그인 배너 없는 상태에선 더 여유로움).
               // 데스크톱(lg): 좌/우 패널·줌 컨트롤이 있는 기존 레이아웃이라 21rem 차감 유지.
-              "max-h-[calc(100dvh-13rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              "max-h-[calc(100dvh-26rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >

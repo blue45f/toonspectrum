@@ -72,6 +72,12 @@ function MobileNavigationFallback() {
   );
 }
 
+// /studio 는 자체 모바일 도구막대(StudioPage.tsx)를 하단에 고정 배치하므로, 전역 하단 탭바를
+// 겹쳐 그리면 두 바가 동시에 화면 아래를 차지해 캔버스 조작 영역을 침범한다 — 여기서만 숨긴다.
+function isImmersiveMobileRoute(pathname: string) {
+  return pathname.startsWith("/studio");
+}
+
 export function SiteHeader() {
   const isActive = useActive();
   const pathname = usePathname();
@@ -84,6 +90,7 @@ export function SiteHeader() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const shouldRenderMobileNavigation = menuOpen || isMobileNavigationViewport;
+  const hideBottomTabs = isImmersiveMobileRoute(pathname);
 
   // 라우트 이동 시 오버플로 메뉴 닫기
   useEffect(() => {
@@ -219,13 +226,14 @@ export function SiteHeader() {
       </header>
 
       {shouldRenderMobileNavigation && (
-        <Suspense fallback={isMobileNavigationViewport ? <MobileNavigationFallback /> : null}>
+        <Suspense fallback={isMobileNavigationViewport && !hideBottomTabs ? <MobileNavigationFallback /> : null}>
           <MobileHeaderNavigation
             menuOpen={menuOpen}
             menuId={menuId}
             panelRef={panelRef}
             closeMenu={closeMenu}
             isActive={isActive}
+            hideBottomTabs={hideBottomTabs}
           />
         </Suspense>
       )}
