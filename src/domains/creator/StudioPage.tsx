@@ -403,6 +403,7 @@ import {
   type SelectionToolKind,
   type SelPoint,
 } from "./studio-selection-tools";
+import { hasSameCategorySiblings, sameCategoryItems } from "./studio-similar-style";
 import { normalizeSkewPatch, toKonvaSkewAttrs } from "./studio-skew";
 import {
   EMPTY_SMART_GUIDE_OVERLAY,
@@ -4819,12 +4820,31 @@ function StudioCuttoonEditor() {
   const [emeresSearchQuery, setEmeresSearchQuery] = useState("");
   const [emeresCategoryFilter, setEmeresCategoryFilter] = useState("all");
   const [emeresTab, setEmeresTab] = useState<"catalog" | "mine">("catalog");
+  // 비슷한 스타일 더보기 — 지금 이 카드와 같은 category 항목들을 보여줄 때 그 "기준" 카드의 id.
+  // null이면 스트립을 숨긴다. 카드별로 독립된 open/close가 아니라 피커당 슬롯 1개를 공유한다(한 번에
+  // 하나만 보여준다 — 다른 카드에서 다시 누르면 그 카드 기준으로 갈아탄다).
+  const [emeresSimilarAnchorId, setEmeresSimilarAnchorId] = useState<string | null>(null);
   const emeresSectionsFiltered = emeresMenuOpen
     ? studioOptionalAssets.emeresSections
         .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
         .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
         .filter((section) => section.templates.length > 0)
     : EMPTY_STUDIO_OPTIONAL_ASSETS.emeresSections;
+
+  // 비슷한 스타일 더보기 — emeresSections는 카테고리별로 이미 그룹돼 있어 평평한 배열로 한 번 풀어야
+  // sameCategoryItems 제네릭 헬퍼(studio-similar-style.ts)에 그대로 넘길 수 있다.
+  const emeresFlatCatalog = studioOptionalAssets.emeresSections.flatMap((section) => section.templates);
+  const emeresSimilarAnchor = emeresSimilarAnchorId
+    ? (emeresFlatCatalog.find((t) => t.id === emeresSimilarAnchorId) ?? null)
+    : null;
+  const emeresSimilarSiblings = emeresSimilarAnchor ? sameCategoryItems(emeresFlatCatalog, emeresSimilarAnchor.id, 8) : [];
+
+  // 장면 템플릿 피커 — 이메레스와 동일한 패턴의 "비슷한 스타일" 앵커 state + 파생 값.
+  const [sceneSimilarAnchorId, setSceneSimilarAnchorId] = useState<string | null>(null);
+  const sceneSimilarAnchor = sceneSimilarAnchorId
+    ? (sceneTemplates.templates.find((t) => t.id === sceneSimilarAnchorId) ?? null)
+    : null;
+  const sceneSimilarSiblings = sceneSimilarAnchor ? sameCategoryItems(sceneTemplates.templates, sceneSimilarAnchor.id, 8) : [];
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -8988,6 +9008,43 @@ function StudioCuttoonEditor() {
               </div>
               {emeresTab === "catalog" ? (
                 <>
+                  {emeresSimilarAnchor && (
+                    <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                          &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setEmeresSimilarAnchorId(null)}
+                          aria-label="비슷한 스타일 닫기"
+                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {emeresSimilarSiblings.length === 0 ? (
+                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
+                      ) : (
+                        <div className="flex gap-1.5 overflow-x-auto pb-1">
+                          {emeresSimilarSiblings.map((sib) => (
+                            <button
+                              key={sib.id}
+                              type="button"
+                              title={`${sib.label} — ${sib.tip}`}
+                              onClick={() => addEmeresTemplate(sib)}
+                              className="w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                            >
+                              <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)]">
+                                <img src={svgToDataUrl(sib.svg)} alt={sib.label} className="h-full w-full object-contain" />
+                              </div>
+                              <span className="mt-0.5 block truncate text-center text-[0.58rem] text-fg-3">{sib.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                     <input
@@ -9043,18 +9100,27 @@ function StudioCuttoonEditor() {
                         <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
                         <div className="grid grid-cols-2 gap-1.5">
                           {section.templates.map((t) => (
-                            <button
+                            <div
                               key={t.id}
-                              type="button"
-                              title={`${t.label} — ${t.tip}`}
-                              onClick={() => addEmeresTemplate(t)}
                               className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
                             >
-                              <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
-                                <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                              </div>
-                              <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
-                            </button>
+                              <button type="button" title={`${t.label} — ${t.tip}`} onClick={() => addEmeresTemplate(t)} className="block w-full">
+                                <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
+                                  <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                                </div>
+                                <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
+                              </button>
+                              {hasSameCategorySiblings(emeresFlatCatalog, t.id) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEmeresSimilarAnchorId(t.id)}
+                                  aria-controls="emeres-similar-strip"
+                                  className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
+                                >
+                                  비슷한 스타일 더보기
+                                </button>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -9079,6 +9145,40 @@ function StudioCuttoonEditor() {
               <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
                 프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
               </p>
+              {sceneSimilarAnchor && (
+                <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                      &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSceneSimilarAnchorId(null)}
+                      aria-label="비슷한 스타일 닫기"
+                      className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  {sceneSimilarSiblings.length === 0 ? (
+                    <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
+                  ) : (
+                    <div className="grid gap-1">
+                      {sceneSimilarSiblings.map((sib) => (
+                        <button
+                          key={sib.id}
+                          type="button"
+                          onClick={() => addSceneTemplate(sib)}
+                          className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
+                        >
+                          <span className="block text-xs font-semibold text-fg">{sib.label}</span>
+                          <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
                   <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
@@ -9094,15 +9194,25 @@ function StudioCuttoonEditor() {
                       <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
                       <div className="grid gap-1">
                         {items.map((t) => (
-                          <button
+                          <div
                             key={t.id}
-                            type="button"
-                            onClick={() => addSceneTemplate(t)}
-                            className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
+                            className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
                           >
-                            <span className="block text-xs font-semibold text-fg">{t.label}</span>
-                            <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
-                          </button>
+                            <button type="button" onClick={() => addSceneTemplate(t)} className="block w-full text-left">
+                              <span className="block text-xs font-semibold text-fg">{t.label}</span>
+                              <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
+                            </button>
+                            {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
+                              <button
+                                type="button"
+                                onClick={() => setSceneSimilarAnchorId(t.id)}
+                                aria-controls="scene-similar-strip"
+                                className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
+                              >
+                                비슷한 스타일 더보기
+                              </button>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>
