@@ -29,6 +29,12 @@
  * 테스트하기도 쉽다).
  */
 
+import {
+  buildTranslationPrompt,
+  parseTranslationResponse,
+  type DialogueTranslatableItem,
+} from "./studio-dialogue-translate";
+
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
 /** localStorage 호환 인터페이스 — studio-brand-kit.ts BrandKitStorage와 동일한 DI 패턴. */
@@ -264,7 +270,7 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([decodeURIComponent(payload)], { type: mime });
 }
 
-// ── 3개 기능별 얇은 래퍼 ─────────────────────────────────────────────────────
+// ── 4개 기능별 얇은 래퍼 ─────────────────────────────────────────────────────
 
 /**
  * (1) 배경 생성 — 텍스트 프롬프트를 OpenAI Images Generations 형태 API로 보내 배경 이미지를 받는다.
@@ -372,6 +378,45 @@ export async function suggestSceneComposition(
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 제안 텍스트를 찾을 수 없습니다." };
   return { ok: true, data: { suggestion: content } };
+}
+
+/**
+ * (4) 대사 번역 — 말풍선/텍스트 요소 배치(청크 1개 분량)를 OpenAI Chat Completions 형태 API로 보내
+ * 대상 언어로 번역한 결과를 받는다. 기능(3)의 SCENE_COMPOSITION_SYSTEM_PROMPT와 동일하게 프롬프트
+ * 구성은 studio-dialogue-translate.ts(순수·단위테스트 가능)에 맡기고, 이 함수는 fetch 오케스트레이션만
+ * 담당한다(studio-ai-client.ts의 "얇은 래퍼" 성격 유지 — 파싱 실패해도 throw하지 않고 StudioAiResult로
+ * 감싼다는 계약은 동일).
+ */
+export async function translateDialogueBatch(
+  settings: StudioAiSettings,
+  items: DialogueTranslatableItem[],
+  targetLocaleLabel: string,
+  glossary: string
+): Promise<StudioAiResult<{ translations: { id: string; text: string }[] }>> {
+  if (items.length === 0) return { ok: false, code: "invalid_input", error: "번역할 대사가 없습니다." };
+  if (!isStudioAiConfigured(settings)) {
+    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  }
+  const { system, user } = buildTranslationPrompt(items, targetLocaleLabel, glossary);
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  const result = await postJson(url, settings.apiKey, {
+    model: settings.textModel,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.3, // 창작적 변주보다 일관된 번역이 목적 — 장면 구성 제안(0.7)보다 낮춘다.
+    max_tokens: Math.max(400, items.length * 120),
+  });
+  if (!result.ok) return result;
+  const content = extractFirstChatContent(result.data);
+  if (!content) return { ok: false, code: "parse_error", error: "응답에서 번역 텍스트를 찾을 수 없습니다." };
+  const parsed = parseTranslationResponse(content, items.map((it) => it.id));
+  if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
+  return {
+    ok: true,
+    data: { translations: [...parsed.translations].map(([id, text]) => ({ id, text })) },
+  };
 }
 
 /**

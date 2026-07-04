@@ -96,6 +96,17 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
+import {
+  colorizeLineArt,
+  DEFAULT_STUDIO_AI_IMAGE_SIZE,
+  generateBackgroundImage,
+  isStudioAiConfigured,
+  loadStudioAiSettings,
+  saveStudioAiSettings,
+  translateDialogueBatch,
+  type StudioAiImageSize,
+  type StudioAiSettings,
+} from "./studio-ai-client";
 import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
@@ -171,8 +182,20 @@ import {
 import {
   applyDialogueTextEdit,
   applyReplacePlanToPages,
+  collectDialogueItems,
   type DialogueReplacePlan,
 } from "./studio-dialogue-batch";
+import {
+  applyDialogueTranslations,
+  chunkDialogueItemsForTranslation,
+  dialogueLocalesForPages,
+  dialogueTranslationCoverage,
+  localeLabel,
+  switchDialogueLocale,
+  DIALOGUE_LOCALE_PRESETS,
+  SOURCE_LOCALE,
+  type DialogueLocaleMap,
+} from "./studio-dialogue-translate";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -663,6 +686,26 @@ const StudioEmeresLibraryPanel = lazyRetry(
   () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
   "StudioEmeresLibraryPanel"
 );
+const StudioAiSettingsPanel = lazyRetry(
+  () => import("./StudioAiSettingsPanel").then((mod) => ({ default: mod.StudioAiSettingsPanel })),
+  "StudioAiSettingsPanel"
+);
+const StudioAiBackgroundPanel = lazyRetry(
+  () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
+  "StudioAiBackgroundPanel"
+);
+const StudioAiColorizePanel = lazyRetry(
+  () => import("./StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
+  "StudioAiColorizePanel"
+);
+const StudioAiCompositionPanel = lazyRetry(
+  () => import("./StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
+  "StudioAiCompositionPanel"
+);
+const StudioDialogueTranslatePanel = lazyRetry(
+  () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
+  "StudioDialogueTranslatePanel"
+);
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
 }
@@ -1108,7 +1151,7 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
    *  일괄 삭제 대상이 된다. */
   emeresSourceId?: string;
 };
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage";
+type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist";
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -3034,6 +3077,7 @@ interface PageState {
   hideMaster?: boolean; // 이 페이지에서 문서 마스터(공통 요소) 숨김 — studio-master-page. 미설정=표시(해제 시 키 제거).
   shotType?: string; // 샷 타입(클로즈업/와이드 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
   cameraAngle?: string; // 카메라 앵글(로우/하이/더치 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
+  dialogueI18n?: DialogueLocaleMap; // 대사 번역 저장소(studio-dialogue-translate) — elId→로케일→텍스트. 미설정=번역 없음(기존 문서 100% 호환).
 }
 
 export function StudioPage() {
@@ -3168,6 +3212,17 @@ function StudioCuttoonEditor() {
   const [dialogueScript, setDialogueScript] = useState("");
   // 배치된 대사 일괄 편집 패널(코미포식) — 목록 인라인 수정·찾아바꾸기·클릭 선택.
   const [dialogueBatchOpen, setDialogueBatchOpen] = useState(false);
+  // 대사 번역(BYOK) — studio-dialogue-translate.ts 통합 상태.
+  const [dialogueTranslateOpen, setDialogueTranslateOpen] = useState(false);
+  // 문서 전체에 지금 "표시 중"인 로케일 — SOURCE_LOCALE(원문)이 기본. switchDialogueLocale로만 바뀐다.
+  const [activeDialogueLocale, setActiveDialogueLocale] = useState<string>(SOURCE_LOCALE);
+  const [translateTargetLocale, setTranslateTargetLocale] = useState<string>(DIALOGUE_LOCALE_PRESETS[0].code);
+  const [translateGlossary, setTranslateGlossary] = useState("");
+  const [translateBusy, setTranslateBusy] = useState(false);
+  const [translateProgress, setTranslateProgress] = useState<{ done: number; total: number } | null>(null);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  // 생성된 번역 초안 — "적용" 누르기 전까지는 페이지에 반영되지 않는다(검토·개별 수정 가능).
+  const [translateDraft, setTranslateDraft] = useState<Map<string, string> | null>(null);
   // 작업 내역(히스토리) 패널 — 단계 목록 클릭으로 특정 시점 점프(포토샵 히스토리식).
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
@@ -4822,6 +4877,39 @@ function StudioCuttoonEditor() {
   const [assetGenerating, setAssetGenerating] = useState(false);
   // 생성형 AI 최초 사용 고지 모달(정책 필수). 미확인 상태에서 '생성'을 누르면 먼저 띄운다.
   const [aiNoticeOpen, setAiNoticeOpen] = useState(false);
+  // AI 어시스트(BYOK) — studio-ai-client.ts 통합 상태. aiSettings는 이 컴포넌트가 유일하게 소유하는
+  // "단일 진실 공급원"이다 — 설정/배경/채색 패널 셋 다 이 값을 prop으로만 받는다. 각 패널이 마운트
+  // 시점에 localStorage를 개별로 읽게 하면, 같은 "AI 어시스트" 팝오버 안에서 설정 패널에 방금 입력한
+  // 키를 배경 생성 패널이 못 보는 stale-read 문제가 생긴다(둘 다 menu==="aiAssist"가 될 때 함께
+  // 마운트되므로, prop 갱신만이 유일하게 신뢰할 수 있는 전파 경로다).
+  const [aiSettings, setAiSettings] = useState<StudioAiSettings>(() => loadStudioAiSettings(globalThis.localStorage));
+  function updateAiSettings(next: StudioAiSettings) {
+    setAiSettings(next);
+    saveStudioAiSettings(globalThis.localStorage, next);
+  }
+  const [aiBgPrompt, setAiBgPrompt] = useState("");
+  const [aiBgSize, setAiBgSize] = useState<StudioAiImageSize>(DEFAULT_STUDIO_AI_IMAGE_SIZE);
+  const [aiBgBusy, setAiBgBusy] = useState(false);
+  const [aiBgError, setAiBgError] = useState<string | null>(null);
+  const [aiColorizePrompt, setAiColorizePrompt] = useState("파스텔톤 웹툰 셀 채색, 부드러운 그림자와 하이라이트");
+  const [aiColorizeBusy, setAiColorizeBusy] = useState(false);
+  const [aiColorizeError, setAiColorizeError] = useState<string | null>(null);
+  // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
+  // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
+  // 타야 해서 일반화한다.
+  const aiNoticePendingActionRef = useRef<(() => void) | null>(null);
+  // 생성형 AI 콘텐츠를 만드는 동작(이미지 생성/편집) 전부가 이 게이트를 통과한다 — 최초 1회만
+  // 고지하고(readAiNoticeAck), 이후엔 바로 실행한다. 사용자가 고지 모달을 취소하면 아무 일도
+  // 일어나지 않는다(pending ref가 조용히 버려짐 — busy 상태를 미리 세팅하지 않았으므로 "취소했는데
+  // 계속 로딩 스피너가 도는" 문제가 없다).
+  function runWithAiNotice(action: () => void) {
+    if (!readAiNoticeAck()) {
+      aiNoticePendingActionRef.current = action;
+      setAiNoticeOpen(true);
+      return;
+    }
+    action();
+  }
 
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
@@ -4842,11 +4930,9 @@ function StudioCuttoonEditor() {
       setError("AI 에셋을 생성하려면 로그인이 필요해요.");
       return;
     }
-    // 생성형 AI 최초 사용 고지(정책 필수) — 아직 확인 전이면 먼저 안내 모달을 띄우고 생성은 보류한다.
-    if (!readAiNoticeAck()) {
-      setAiNoticeOpen(true);
-      return;
-    }
+    runWithAiNotice(() => void executeGenerateAsset(prompt));
+  }
+  async function executeGenerateAsset(prompt: string) {
     setAssetGenerating(true);
     setError(null);
     try {
@@ -4880,11 +4966,13 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // 사용자가 최초 사용 고지를 확인하면 저장하고, 곧바로 생성을 이어서 실행한다.
+  // 사용자가 최초 사용 고지를 확인하면 저장하고, 보류 중이던 동작(pending ref)을 이어서 실행한다.
   function acknowledgeAiNotice() {
     storeAiNoticeAck();
     setAiNoticeOpen(false);
-    void onGenerateAsset();
+    const action = aiNoticePendingActionRef.current;
+    aiNoticePendingActionRef.current = null;
+    action?.();
   }
 
   // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
@@ -6314,6 +6402,93 @@ function StudioCuttoonEditor() {
     setSelectedId(el.id);
     setTool("select");
   }
+
+  // AI로 생성된 배경 이미지를 삽입 — addBgScene과 동일한 배치 정책(선택된 프레임이 있으면 그 칸만,
+  // 프레임이 여럿이면 전부, 없으면 캔버스 전체 배경으로 맨 뒤에 새 요소 추가). width/height는
+  // generateBackgroundImage가 요청한 size 문자열에서 그대로 파생한 값이라 이미지 로드 없이 동기적으로
+  // 안다.
+  function insertAiBackgroundImage(dataUrl: string, width: number, height: number) {
+    if (selected?.type === "frame") {
+      patchEl(selected.id, { bg: dataUrl } as Partial<El>);
+      setTool("select");
+      return;
+    }
+    const frames = elements.filter((e) => e.type === "frame");
+    if (frames.length > 0) {
+      commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: dataUrl } as El) : e)));
+      setTool("select");
+      return;
+    }
+    const el = createCanvasImageElement({
+      id: uid(),
+      src: dataUrl,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      sourceWidth: width,
+      sourceHeight: height,
+      horizontalInset: 0,
+      minY: 0,
+    });
+    commit([el, ...elements]);
+    setSelectedId(el.id);
+    setTool("select");
+  }
+
+  // 배경 생성 실행 — 이미 runWithAiNotice로 게이팅된 상태에서만 호출된다. 실패해도 throw하지
+  // 않는다(studio-ai-client.ts 계약) — result.ok만 분기하면 된다.
+  async function executeAiBackgroundGenerate(prompt: string, size: StudioAiImageSize) {
+    setAiBgBusy(true);
+    setAiBgError(null);
+    const result = await generateBackgroundImage(aiSettings, prompt, { size });
+    if (!result.ok) {
+      setAiBgError(result.error);
+      setAiBgBusy(false);
+      return;
+    }
+    insertAiBackgroundImage(result.data.dataUrl, result.data.width, result.data.height);
+    setAiBgBusy(false);
+    setMenu(null); // 다른 "생성 후 팝오버 닫기" 흐름(addBgScene 등)과 동일 UX.
+  }
+  // StudioAiBackgroundPanel의 "생성" 버튼이 호출하는 진입점 — 여기서만 AI 고지 게이트를 통과시킨다
+  // (executeAiBackgroundGenerate를 직접 패널에 넘기지 않는 이유 — 고지 우회 방지).
+  function onGenerateAiBackground() {
+    const prompt = aiBgPrompt.trim();
+    if (!prompt || aiBgBusy || !isStudioAiConfigured(aiSettings)) return;
+    runWithAiNotice(() => void executeAiBackgroundGenerate(prompt, aiBgSize));
+  }
+
+  // AI 자동 채색 실행 — elId/srcAtRequestTime을 호출 시점에 캡처해 넘긴다(await 도중 선택이 바뀌어도
+  // 엉뚱한 요소를 덮어쓰지 않는다 — captureAnimFrame/bakeLiquifyStroke와 동일한 관례).
+  async function executeAiColorize(elId: string, srcAtRequestTime: string, prompt: string) {
+    setAiColorizeBusy(true);
+    setAiColorizeError(null);
+    const result = await colorizeLineArt(aiSettings, srcAtRequestTime, prompt);
+    if (!result.ok) {
+      setAiColorizeError(result.error);
+      setAiColorizeBusy(false);
+      return;
+    }
+    const target = elementById.get(elId);
+    if (target && target.type === "image") patchEl(elId, { src: result.data.dataUrl });
+    setAiColorizeBusy(false);
+  }
+  function onColorizeSelected() {
+    if (!selected || selected.type !== "image" || aiColorizeBusy || !isStudioAiConfigured(aiSettings)) return;
+    const prompt = aiColorizePrompt.trim();
+    if (!prompt) return;
+    const elId = selected.id;
+    const srcAtRequestTime = selected.src;
+    runWithAiNotice(() => void executeAiColorize(elId, srcAtRequestTime, prompt));
+  }
+
+  // 장면 구성 제안 텍스트를 일반 텍스트 요소로 캔버스에 추가한다 — addText()와 동일한 스폰 위치 규칙
+  // (선택된 패널이 있으면 그 중앙, 없으면 캔버스 중앙), 다만 제안 텍스트는 여러 줄 불릿이라 addText
+  // 기본값(fontSize 40, width 220)보다 작은 글자 크기·넓은 폭을 쓴다.
+  function insertAiCompositionNote(text: string) {
+    const [cx, cy] = spawnCenter();
+    addEl({ id: uid(), type: "text", text, x: cx - 130, y: cy - 70, width: 260, fontSize: 16, fill: color, rotation: 0 });
+  }
+
   function addFrame() {
     const margin = 24;
     const frames = elements.filter((e): e is FrameEl => e.type === "frame");
@@ -6600,6 +6775,74 @@ function StudioCuttoonEditor() {
     setTool("select");
     setSelectedId(elId);
   }
+
+  // 대사 번역(BYOK) — 생성(청크 순차 처리) — 결과는 즉시 반영하지 않고 검토용 draft에만 모아둔다.
+  // 이미지 생성과 달리 결과가 텍스트라 AI 최초 사용 고지(runWithAiNotice) 대상이 아니다
+  // (StudioAiCompositionPanel과 동일한 판단 근거 — "생성형 AI 이미지"에 한정된 고지이지 텍스트 생성
+  // 전반에 대한 고지가 아니다).
+  async function executeGenerateTranslations() {
+    if (translateBusy) return;
+    const items = collectDialogueItems(pages); // v1: 항상 문서 전체(스코프 "현재 페이지만"은 없음).
+    if (items.length === 0) {
+      setTranslateError("번역할 말풍선·텍스트가 없어요.");
+      return;
+    }
+    const chunks = chunkDialogueItemsForTranslation(items);
+    setTranslateBusy(true);
+    setTranslateError(null);
+    setTranslateProgress({ done: 0, total: chunks.length });
+    const collected = new Map<string, string>();
+    for (const chunk of chunks) {
+      const result = await translateDialogueBatch(
+        aiSettings,
+        chunk.map((it) => ({ id: it.id, text: it.text })),
+        localeLabel(translateTargetLocale),
+        translateGlossary
+      );
+      if (!result.ok) {
+        setTranslateError(result.error);
+        setTranslateBusy(false);
+        setTranslateProgress(null);
+        return; // 이미 모인 앞 청크 결과는 버린다 — 부분 draft가 혼란을 주지 않게 전부 실패로 취급.
+      }
+      for (const t of result.data.translations) collected.set(t.id, t.text);
+      setTranslateProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+    }
+    setTranslateDraft(collected);
+    setTranslateBusy(false);
+    setTranslateProgress(null);
+  }
+
+  // 검토 화면에서 개별 항목을 손으로 고칠 때(패널의 textarea onChange가 호출).
+  function patchTranslateDraft(id: string, text: string) {
+    setTranslateDraft((prev) => {
+      if (!prev) return prev;
+      const next = new Map(prev);
+      next.set(id, text);
+      return next;
+    });
+  }
+
+  // "적용" — dialogueI18n 병합 + 활성 로케일 전환을 단일 히스토리 커밋(⌘Z 1회)으로 실행.
+  function applyTranslationDraft() {
+    if (!translateDraft || translateDraft.size === 0) return;
+    const results = collectDialogueItems(pages)
+      .filter((it) => translateDraft.has(it.id))
+      .map((it) => ({ id: it.id, pageId: it.pageId, text: translateDraft.get(it.id)! }));
+    const withTranslations = applyDialogueTranslations(pages, results, translateTargetLocale);
+    const switched = switchDialogueLocale(withTranslations, translateTargetLocale);
+    if (switched !== pages) commitPages(switched as PageState[]);
+    setActiveDialogueLocale(translateTargetLocale);
+    setTranslateDraft(null);
+  }
+
+  // 이미 번역된 로케일 사이를 재생성 없이 토글(패널의 로케일 칩 클릭).
+  function switchToDialogueLocale(locale: string) {
+    const next = switchDialogueLocale(pages, locale);
+    if (next !== pages) commitPages(next as PageState[]);
+    setActiveDialogueLocale(locale);
+  }
+
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
     return el.type === "draw"
@@ -9517,6 +9760,42 @@ function StudioCuttoonEditor() {
             </Suspense>
           )}
         </div>
+        <div ref={menu === "aiAssist" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "aiAssist" ? null : "aiAssist")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "aiAssist"}
+            className={toolBtn(menu === "aiAssist")}
+            title="내 API 키로 배경 생성·구도 제안(BYOK, 서버 비용 없음)"
+          >
+            <Sparkles size={14} /> AI 어시스트
+          </button>
+          {menu === "aiAssist" && (
+            <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
+              <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
+                <div className="flex flex-col gap-2">
+                  <StudioAiSettingsPanel settings={aiSettings} onChange={updateAiSettings} />
+                  <StudioAiBackgroundPanel
+                    configured={isStudioAiConfigured(aiSettings)}
+                    prompt={aiBgPrompt}
+                    onPromptChange={setAiBgPrompt}
+                    size={aiBgSize}
+                    onSizeChange={setAiBgSize}
+                    busy={aiBgBusy}
+                    error={aiBgError}
+                    onGenerate={onGenerateAiBackground}
+                  />
+                  <StudioAiCompositionPanel
+                    settings={aiSettings}
+                    configured={isStudioAiConfigured(aiSettings)}
+                    onInsertAsNote={insertAiCompositionNote}
+                  />
+                </div>
+              </Suspense>
+            </div>
+          )}
+        </div>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -9572,6 +9851,17 @@ function StudioCuttoonEditor() {
                   className="mt-1.5 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
                 >
                   배치된 대사 일괄 편집…
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu(null);
+                    setDialogueBatchOpen(false); // 우상단 위치가 겹치므로 다른 플로팅 패널은 닫는다.
+                    setDialogueTranslateOpen(true);
+                  }}
+                  className="mt-1.5 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
+                >
+                  대사 번역(내 API 키)…
                 </button>
               </div>
             </div>
@@ -12357,6 +12647,31 @@ function StudioCuttoonEditor() {
               />
             </Suspense>
           )}
+          {dialogueTranslateOpen && (
+            <Suspense fallback={null}>
+              <StudioDialogueTranslatePanel
+                pages={pages}
+                configured={isStudioAiConfigured(aiSettings)}
+                activeLocale={activeDialogueLocale}
+                availableLocales={dialogueLocalesForPages(pages)}
+                coverageFor={(locale) => dialogueTranslationCoverage(pages, locale)}
+                targetLocale={translateTargetLocale}
+                onTargetLocaleChange={setTranslateTargetLocale}
+                glossary={translateGlossary}
+                onGlossaryChange={setTranslateGlossary}
+                busy={translateBusy}
+                progress={translateProgress}
+                error={translateError}
+                draft={translateDraft}
+                onGenerate={() => void executeGenerateTranslations()}
+                onDraftChange={patchTranslateDraft}
+                onApplyDraft={applyTranslationDraft}
+                onDiscardDraft={() => setTranslateDraft(null)}
+                onSwitchLocale={switchToDialogueLocale}
+                onClose={() => setDialogueTranslateOpen(false)}
+              />
+            </Suspense>
+          )}
           {masterPanelOpen && (
             <Suspense fallback={null}>
               <StudioMasterPagePanel
@@ -14341,6 +14656,14 @@ function StudioCuttoonEditor() {
                   <StudioBgRemoveButton
                     src={selected.src}
                     onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                  />
+                  <StudioAiColorizePanel
+                    configured={isStudioAiConfigured(aiSettings)}
+                    prompt={aiColorizePrompt}
+                    onPromptChange={setAiColorizePrompt}
+                    busy={aiColorizeBusy}
+                    error={aiColorizeError}
+                    onColorize={onColorizeSelected}
                   />
                   {selected.stockImageCredit && (
                     <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
