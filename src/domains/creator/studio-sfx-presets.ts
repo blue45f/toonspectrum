@@ -52,13 +52,15 @@ export interface SfxPreset {
 }
 
 // 무드별 공통 스타일 베이스 — 반복을 줄이고 톤을 통일한다.
-const IMPACT: SfxStyle = { fill: "#ffffff", stroke: "#161013", strokeWidth: 8, fontStyle: "bold", font: "Black Han Sans", rotation: -7 };
-const IMPACT_RED: SfxStyle = { fill: "#ff3b3b", stroke: "#1a0c0c", strokeWidth: 8, fontStyle: "bold", font: "Black Han Sans", rotation: -9 };
-const TENSION: SfxStyle = { fill: "#7aa8ff", fillType: "gradient", gradientColorStart: "#cfe0ff", gradientColorEnd: "#5b7fd6", gradientDirection: "vertical", stroke: "#1b2440", strokeWidth: 4, font: "Jua" };
-const MOTION: SfxStyle = { fill: "#ffffff", stroke: "#1d1a16", strokeWidth: 5, fontStyle: "italic", font: "Black Han Sans", rotation: -14 };
+// impact/motion은 예전 studio-assets.ts처럼 흰 글자+검은 외곽선으로 두면 촌스러워 보이므로
+// 그라디언트 채색 + 어두운 드롭섀도로 임팩트 있는 웹툰 레터링에 가깝게 잡는다.
+const IMPACT: SfxStyle = { fill: "#ffb24a", fillType: "gradient", gradientColorStart: "#fff3c2", gradientColorEnd: "#ff8a2e", gradientDirection: "vertical", stroke: "#33110a", strokeWidth: 8, fontStyle: "bold", font: "Black Han Sans", rotation: -7, shadowColor: "#1a0a04", shadowBlur: 10, shadowOpacity: 0.4 };
+const IMPACT_RED: SfxStyle = { fill: "#ff5f47", fillType: "gradient", gradientColorStart: "#ffcf5c", gradientColorEnd: "#e0233d", gradientDirection: "vertical", stroke: "#2a0808", strokeWidth: 8, fontStyle: "bold", font: "Black Han Sans", rotation: -9, shadowColor: "#1a0404", shadowBlur: 10, shadowOpacity: 0.4 };
+const TENSION: SfxStyle = { fill: "#7aa8ff", fillType: "gradient", gradientColorStart: "#cfe0ff", gradientColorEnd: "#5b7fd6", gradientDirection: "vertical", stroke: "#1b2440", strokeWidth: 4, font: "Jua", shadowColor: "#101a33", shadowBlur: 6, shadowOpacity: 0.25 };
+const MOTION: SfxStyle = { fill: "#bfe3ff", fillType: "gradient", gradientColorStart: "#ffffff", gradientColorEnd: "#6bb8f0", gradientDirection: "horizontal", stroke: "#123252", strokeWidth: 5, fontStyle: "italic", font: "Black Han Sans", rotation: -14, shadowColor: "#0a1c2e", shadowBlur: 6, shadowOpacity: 0.3 };
 const AMBIENT: SfxStyle = { fill: "#eaf3ff", stroke: "#2a3142", strokeWidth: 4, font: "Gaegu" };
 const QUIET: SfxStyle = { fill: "#8b8b8b", strokeWidth: 0, font: "Nanum Pen Script", shadowColor: "#000000", shadowBlur: 6, shadowOpacity: 0.25 };
-const EMOTION: SfxStyle = { fill: "#ff7aa8", stroke: "#ffffff", strokeWidth: 5, fontStyle: "bold", font: "Jua", rotation: -5 };
+const EMOTION: SfxStyle = { fill: "#ff9dc2", fillType: "gradient", gradientColorStart: "#ffd3e6", gradientColorEnd: "#ff5f95", gradientDirection: "vertical", stroke: "#ffffff", strokeWidth: 5, fontStyle: "bold", font: "Jua", rotation: -5, shadowColor: "#4a0f26", shadowBlur: 6, shadowOpacity: 0.25 };
 
 export const SFX_LIBRARY: SfxPreset[] = [
   // 충격·타격
@@ -76,7 +78,7 @@ export const SFX_LIBRARY: SfxPreset[] = [
   { id: "sfx-hwik", label: "휙", category: "motion", text: "휙", style: MOTION },
   { id: "sfx-syuuk", label: "슈욱", category: "motion", text: "슈욱", style: MOTION },
   { id: "sfx-hudadak", label: "후다닥", category: "motion", text: "후다닥", style: { ...MOTION, rotation: -10 } },
-  { id: "sfx-tadak", label: "타닥", category: "motion", text: "타닥", style: { ...MOTION, fill: "#ffe08a" } },
+  { id: "sfx-tadak", label: "타닥", category: "motion", text: "타닥", style: { fill: "#ffd27a", fillType: "gradient", gradientColorStart: "#fff3c2", gradientColorEnd: "#ff9f3d", gradientDirection: "vertical", stroke: "#3a1408", strokeWidth: 5, fontStyle: "italic", font: "Black Han Sans", rotation: -10, shadowColor: "#1a0a04", shadowBlur: 6, shadowOpacity: 0.3 } },
   // 환경·소리
   { id: "sfx-chwaaa", label: "촤아아", category: "ambient", text: "촤아아", style: AMBIENT },
   { id: "sfx-ureureung", label: "우르릉", category: "ambient", text: "우르릉", style: { ...AMBIENT, fill: "#c9d4e6" } },
@@ -87,10 +89,10 @@ export const SFX_LIBRARY: SfxPreset[] = [
   { id: "sfx-goyo", label: "고요", category: "silence", text: "고요…", style: { ...QUIET, fill: "#9aa0ad" } },
   { id: "sfx-jeong", label: "정적", category: "silence", text: "…정적…", style: { ...QUIET, fill: "#7d7d7d" } },
   // 감정
-  { id: "sfx-budeul", label: "부들부들", category: "emotion", text: "부들부들", style: { ...EMOTION, fill: "#9b8cff", rotation: 3 } },
-  { id: "sfx-balkkeun", label: "발끈", category: "emotion", text: "발끈!", style: { ...EMOTION, fill: "#ff5252", stroke: "#2a0d0d" } },
-  { id: "sfx-dudung", label: "두둥", category: "emotion", text: "두둥!", style: { ...IMPACT, fill: "#ffd84d" } },
-  { id: "sfx-banjjak", label: "반짝", category: "emotion", text: "반짝", style: { ...EMOTION, fill: "#7ad7ff", stroke: "#15384a" } },
+  { id: "sfx-budeul", label: "부들부들", category: "emotion", text: "부들부들", style: { ...EMOTION, fillType: "gradient", gradientColorStart: "#d9ccff", gradientColorEnd: "#7c5cff", fill: "#9b8cff", rotation: 3 } },
+  { id: "sfx-balkkeun", label: "발끈", category: "emotion", text: "발끈!", style: { ...EMOTION, fillType: "gradient", gradientColorStart: "#ffb199", gradientColorEnd: "#e0233d", fill: "#ff5252", stroke: "#2a0d0d" } },
+  { id: "sfx-dudung", label: "두둥", category: "emotion", text: "두둥!", style: { fill: "#ffe27a", fillType: "gradient", gradientColorStart: "#fff6d0", gradientColorEnd: "#c98a12", gradientDirection: "vertical", stroke: "#241004", strokeWidth: 8, fontStyle: "bold", font: "Black Han Sans", rotation: -6, shadowColor: "#1a0f02", shadowBlur: 8, shadowOpacity: 0.35 } },
+  { id: "sfx-banjjak", label: "반짝", category: "emotion", text: "반짝", style: { ...EMOTION, fillType: "gradient", gradientColorStart: "#e8fbff", gradientColorEnd: "#38c7ff", fill: "#7ad7ff", stroke: "#15384a" } },
 ];
 
 const SFX_DEFAULT_FONT_SIZE = 64;

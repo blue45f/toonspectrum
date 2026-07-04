@@ -50,8 +50,8 @@ export const GRADIENT_PRESETS: GradientPreset[] = [
   {
     id: "aurora",
     label: "오로라",
-    tip: "어두운 청록에서 형광 연두로 흐르는 극광.",
-    stops: ["#0b2a3a", "#5cf2b0"],
+    tip: "어두운 청록에서 옥빛 초록으로 흐르는 극광.",
+    stops: ["#0b2a3a", "#49dba0"],
     direction: "vertical",
   },
   {
@@ -71,15 +71,15 @@ export const GRADIENT_PRESETS: GradientPreset[] = [
   {
     id: "forest-shade",
     label: "숲 그늘",
-    tip: "밝은 연두 잎새에서 짙은 청록 그늘로 내려앉는 숲.",
-    stops: ["#8fd64a", "#163a26"],
+    tip: "은은한 세이지 잎새에서 짙은 청록 그늘로 내려앉는 숲.",
+    stops: ["#a9c95a", "#163a26"],
     direction: "vertical",
   },
   {
     id: "neon-city",
     label: "네온 시티",
-    tip: "자홍에서 청록으로 번지는 사이버펑크 야경.",
-    stops: ["#ff2db3", "#19d3e6"],
+    tip: "짙은 자홍 보석빛에서 청록으로 번지는 사이버펑크 야경.",
+    stops: ["#c81f96", "#22a8c2"],
     direction: "horizontal",
   },
   {
@@ -115,6 +115,20 @@ export const GRADIENT_PRESETS: GradientPreset[] = [
     label: "파스텔 무지개",
     tip: "파스텔 보라에서 연노랑으로 흐르는 무지개(앞 2색).",
     stops: ["#c9a8ff", "#fff3a8"],
+    direction: "horizontal",
+  },
+  {
+    id: "autumn-maple",
+    label: "가을 단풍",
+    tip: "따뜻한 호박빛에서 짙은 적갈로 무르익는 단풍 배경.",
+    stops: ["#f0a85c", "#5c2418"],
+    direction: "vertical",
+  },
+  {
+    id: "lavender-dusk",
+    label: "라벤더 황혼",
+    tip: "뽀얀 라벤더에서 짙은 남보라로 저무는 황혼.",
+    stops: ["#d7b8e0", "#33314f"],
     direction: "horizontal",
   },
 ];

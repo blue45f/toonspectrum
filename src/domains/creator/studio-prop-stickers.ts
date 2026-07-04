@@ -71,13 +71,15 @@ export const PROP_STICKERS: FxOverlay[] = [
     220,
     `${shadow(110, 195, 55, 10)}` +
       `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
-      `<rect x="70" y="100" width="80" height="70" rx="20" fill="#e0e7ff" />` +
-      `<rect x="70" y="100" width="80" height="20" rx="6" fill="#c7d2fe" />` +
-      `<path d="M60 90 L50 60 C50 50, 70 50, 70 60 C70 70, 60 75, 60 85" fill="${WHITE}" />` +
-      `<path d="M160 90 L170 60 C170 50, 150 50, 150 60 C150 70, 160 75, 160 85" fill="${WHITE}" />` +
-      `<path d="M40 45 Q45 35 55 40 M180 45 Q175 35 165 40" fill="none" stroke-width="5" />` +
-      `<path d="M100 40 Q105 25 115 30 L113 45" fill="none" stroke-width="4" />` +
-      `<circle cx="108" cy="45" r="4" fill="${INK}" />` +
+      `<rect x="70" y="140" width="80" height="55" rx="18" fill="#e0e7ff" />` +
+      `<rect x="70" y="140" width="80" height="14" rx="6" fill="#c7d2fe" />` +
+      `<circle cx="110" cy="168" r="4" fill="#34d399" stroke="none" />` +
+      `<circle cx="82" cy="95" r="20" fill="${WHITE}" />` +
+      `<circle cx="82" cy="95" r="9" fill="#c7d2fe" stroke="none" />` +
+      `<rect x="75" y="108" width="14" height="32" rx="7" fill="${WHITE}" />` +
+      `<circle cx="138" cy="95" r="20" fill="${WHITE}" />` +
+      `<circle cx="138" cy="95" r="9" fill="#c7d2fe" stroke="none" />` +
+      `<rect x="131" y="108" width="14" height="32" rx="7" fill="${WHITE}" />` +
       `</g>`,
   ),
   prop(
@@ -404,14 +406,15 @@ export const PROP_STICKERS: FxOverlay[] = [
     `${shadow(110, 225, 75, 12)}` +
       `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
       `<path d="M90 50 C90 30, 130 30, 130 50" fill="none" stroke-width="8" />` +
+      `<path d="M68 58 C56 62, 56 96, 68 104" fill="none" stroke-width="9" />` +
+      `<path d="M152 58 C164 62, 164 96, 152 104" fill="none" stroke-width="9" />` +
       `<rect x="50" y="50" width="120" height="150" rx="30" fill="#1e3a8a" />` +
       `<rect x="65" y="120" width="90" height="70" rx="15" fill="#3b82f6" />` +
+      `<line x1="110" y1="128" x2="110" y2="182" stroke-width="4" stroke-dasharray="3,8" />` +
+      `<polygon points="102,150 118,150 110,163" fill="#facc15" />` +
+      `<polygon points="120,66 124,76 135,77 127,84 129,95 120,89 111,95 113,84 105,77 116,76" fill="#fbbf24" stroke-width="4" />` +
       `<rect x="170" y="110" width="12" height="35" fill="#facc15" />` +
       `<path d="M165 125 H178 V150 H165 Z" fill="#4b5563" />` +
-      `<circle cx="110" cy="155" r="15" fill="#ffccd5" />` +
-      `<circle cx="105" cy="152" r="2" fill="${INK}" />` +
-      `<circle cx="115" cy="152" r="2" fill="${INK}" />` +
-      `<path d="M107 160 Q110 163 113 160" fill="none" stroke-width="3" />` +
       `</g>`,
   ),
   prop(
@@ -485,12 +488,18 @@ export const PROP_STICKERS: FxOverlay[] = [
       `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
       `<circle cx="110" cy="110" r="75" fill="#93c5fd" />` +
       `<circle cx="110" cy="110" r="60" fill="${WHITE}" />` +
+      `<path d="M70 65 A50 50 0 0 1 145 62" fill="none" stroke="#e0f2fe" stroke-width="8" opacity="0.8" />` +
       `<line x1="110" y1="58" x2="110" y2="68" stroke-width="5" />` +
       `<line x1="110" y1="162" x2="110" y2="152" stroke-width="5" />` +
       `<line x1="58" y1="110" x2="68" y2="110" stroke-width="5" />` +
       `<line x1="162" y1="110" x2="152" y2="110" stroke-width="5" />` +
+      `<circle cx="75" cy="75" r="3" fill="#1f2937" stroke="none" />` +
+      `<circle cx="145" cy="75" r="3" fill="#1f2937" stroke="none" />` +
+      `<circle cx="75" cy="145" r="3" fill="#1f2937" stroke="none" />` +
+      `<circle cx="145" cy="145" r="3" fill="#1f2937" stroke="none" />` +
       `<line x1="110" y1="110" x2="110" y2="80" stroke-width="7" />` +
       `<line x1="110" y1="110" x2="135" y2="120" stroke-width="7" />` +
+      `<line x1="110" y1="110" x2="118" y2="72" stroke="#ef4444" stroke-width="3" />` +
       `<circle cx="110" cy="110" r="8" fill="#1f2937" />` +
       `</g>`,
   ),
@@ -676,8 +685,11 @@ export const PROP_STICKERS: FxOverlay[] = [
     "구름",
     240,
     180,
-    `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
-      `<path d="M50 120 C30 120, 30 90, 55 90 C55 65, 90 55, 115 75 C135 55, 175 60, 185 85 C210 85, 210 120, 190 120 Z" fill="${WHITE}" />` +
+    `<defs><linearGradient id="propCloudShade" x1="0" y1="0" x2="0" y2="1">` +
+      `<stop offset="55%" stop-color="${WHITE}" /><stop offset="100%" stop-color="#d3e0ee" /></linearGradient></defs>` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M50 120 C30 120, 30 90, 55 90 C55 65, 90 55, 115 75 C135 55, 175 60, 185 85 C210 85, 210 120, 190 120 Z" fill="url(#propCloudShade)" />` +
+      `<ellipse cx="88" cy="82" rx="20" ry="12" fill="${WHITE}" opacity="0.9" stroke="none" />` +
       `</g>`,
   ),
   prop(
@@ -685,8 +697,11 @@ export const PROP_STICKERS: FxOverlay[] = [
     "비구름",
     240,
     220,
-    `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
-      `<path d="M50 100 C30 100, 30 70, 55 70 C55 45, 90 35, 115 55 C135 35, 175 40, 185 65 C210 65, 210 100, 190 100 Z" fill="#64748b" />` +
+    `<defs><linearGradient id="propRainCloudShade" x1="0" y1="0" x2="0" y2="1">` +
+      `<stop offset="45%" stop-color="#8895a8" /><stop offset="100%" stop-color="#48566b" /></linearGradient></defs>` +
+      `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
+      `<path d="M50 100 C30 100, 30 70, 55 70 C55 45, 90 35, 115 55 C135 35, 175 40, 185 65 C210 65, 210 100, 190 100 Z" fill="url(#propRainCloudShade)" />` +
+      `<ellipse cx="90" cy="62" rx="18" ry="10" fill="#a9b6c6" opacity="0.85" stroke="none" />` +
       `<line x1="75" y1="125" x2="65" y2="155" stroke="#38bdf8" stroke-width="6" />` +
       `<line x1="110" y1="130" x2="100" y2="160" stroke="#38bdf8" stroke-width="6" />` +
       `<line x1="145" y1="125" x2="135" y2="155" stroke="#38bdf8" stroke-width="6" />` +
@@ -700,6 +715,9 @@ export const PROP_STICKERS: FxOverlay[] = [
     240,
     `<g stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">` +
       `<polygon points="120,25 50,125 105,125 70,215 160,105 105,105" fill="#facc15" />` +
+      `<polygon points="118,45 76,120 112,120 92,180 145,100 108,100" fill="#fef08a" stroke="none" />` +
+      `<circle cx="45" cy="70" r="6" fill="#fde047" stroke="none" />` +
+      `<circle cx="168" cy="160" r="5" fill="#fde047" stroke="none" />` +
       `</g>`,
   ),
   prop(
