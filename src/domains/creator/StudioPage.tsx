@@ -109,6 +109,7 @@ import {
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
+  suggestColorPalette,
   suggestDialogueLines,
   translateDialogueBatch,
   type StudioAiImageSize,
@@ -394,6 +395,7 @@ import {
   movePage as movePagePure,
   reorderPages,
 } from "./studio-pages";
+import { createPalette, savePalette } from "./studio-palette-library";
 import { computePanelAutoFitPatch, isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { shotTagBadgeText, shotTagBadgeTitle, withShotTag } from "./studio-panel-shot-tags";
 import {
@@ -553,6 +555,7 @@ import type { Halftone } from "./studio-halftone";
 import type { Light } from "./studio-light";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { Outline } from "./studio-outline";
+import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PhotoFilter } from "./studio-photo-filter";
 import type { SceneTemplate } from "./studio-scene-templates";
@@ -768,6 +771,10 @@ const StudioAiCharacterConsistencyPanel = lazyRetry(
 const StudioDialogueSuggestPanel = lazyRetry(
   () => import("./StudioDialogueSuggestPanel").then((mod) => ({ default: mod.StudioDialogueSuggestPanel })),
   "StudioDialogueSuggestPanel"
+);
+const StudioPaletteSuggestPanel = lazyRetry(
+  () => import("./StudioPaletteSuggestPanel").then((mod) => ({ default: mod.StudioPaletteSuggestPanel })),
+  "StudioPaletteSuggestPanel"
 );
 const StudioDialogueTranslatePanel = lazyRetry(
   () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
@@ -5192,6 +5199,17 @@ function StudioCuttoonEditor() {
   const [aiDialogueSuggestCandidates, setAiDialogueSuggestCandidates] = useState<DialogueSuggestionCandidate[] | null>(
     null
   );
+  // 색상 팔레트 추천 — 결과가 색상 데이터(hex+용도 설명)라 대사/나레이션 제안과 동일한 이유로 AI 최초
+  // 사용 고지(runWithAiNotice) 대상이 아니다. "저장"은 새 상태를 만들지 않고 기존
+  // studio-palette-library.createPalette/savePalette를 그대로 재사용한다(아래
+  // saveSuggestedPaletteToLibrary 참고) — StudioPaletteLibraryPanel은 menu==="palette"일 때만
+  // 마운트되는 자기완결형 컴포넌트라, 다음에 그 탭을 열면 localStorage에서 새로 저장된 팔레트를 자동으로
+  // 읽어온다(별도 동기화 불필요).
+  const [aiPaletteSuggestMood, setAiPaletteSuggestMood] = useState("");
+  const [aiPaletteSuggestBusy, setAiPaletteSuggestBusy] = useState(false);
+  const [aiPaletteSuggestError, setAiPaletteSuggestError] = useState<string | null>(null);
+  const [aiPaletteSuggestion, setAiPaletteSuggestion] = useState<PaletteSuggestion | null>(null);
+  const [aiPaletteSuggestSavedMsg, setAiPaletteSuggestSavedMsg] = useState<string | null>(null);
   // 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크, docs/studio-competitor-features.md §4 로드맵) — 별도
   // 전체화면 모달(StudioScenarioAutoLayoutPanel)로 열린다. aiAssist 팝오버의 다른 AI 기능들과 달리
   // 여러 장면을 순차 생성해 시간이 걸리고 미리보기 그리드가 필요해 320px 팝오버에 넣지 않는다.
@@ -7026,6 +7044,43 @@ function StudioCuttoonEditor() {
   function insertDialogueSuggestionToSelected(candidate: DialogueSuggestionCandidate) {
     if (!selected || (selected.type !== "bubble" && selected.type !== "text")) return;
     patchDialogueText(activePage.id, selected.id, candidate.text);
+  }
+
+  // 색상 팔레트 추천(BYOK) — studio-ai-client.suggestColorPalette 문서 참고. 결과가 색상 데이터라
+  // 대사/나레이션 제안과 동일한 이유로 runWithAiNotice 게이트를 타지 않는다.
+  async function executeSuggestColorPalette() {
+    const mood = aiPaletteSuggestMood.trim();
+    if (!mood || aiPaletteSuggestBusy) return;
+    setAiPaletteSuggestBusy(true);
+    setAiPaletteSuggestError(null);
+    setAiPaletteSuggestion(null);
+    setAiPaletteSuggestSavedMsg(null);
+    const result = await suggestColorPalette(aiSettings, mood);
+    if (result.ok) {
+      setAiPaletteSuggestion(result.data);
+    } else {
+      setAiPaletteSuggestError(result.error);
+    }
+    setAiPaletteSuggestBusy(false);
+  }
+  // 제안받은 팔레트를 기존 팔레트 라이브러리에 저장 — 새 타입/저장 경로를 만들지 않고
+  // studio-palette-library.createPalette(이름 폴백·중복 제거)+savePalette(localStorage upsert)를
+  // 그대로 재사용한다(StudioPaletteLibraryPanel의 handleCreateFromPaste와 동일한 호출 관례).
+  function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion) {
+    try {
+      const palette = createPalette(
+        suggestion.name,
+        suggestion.colors.map((c) => c.hex)
+      );
+      savePalette(globalThis.localStorage, palette);
+      setAiPaletteSuggestError(null);
+      setAiPaletteSuggestSavedMsg(
+        `"${palette.name}" 팔레트로 저장했어요 (${palette.colors.length}색). "스타일" 탭에서 확인하세요.`
+      );
+    } catch (e) {
+      setAiPaletteSuggestSavedMsg(null);
+      setAiPaletteSuggestError(e instanceof Error ? e.message : "팔레트를 저장하지 못했어요.");
+    }
   }
 
   function addFrame() {
@@ -10874,6 +10929,17 @@ function StudioCuttoonEditor() {
                       canInsertToSelected={!!selected && (selected.type === "bubble" || selected.type === "text")}
                       onAddToScript={addDialogueSuggestionToScript}
                       onInsertToSelected={insertDialogueSuggestionToSelected}
+                    />
+                    <StudioPaletteSuggestPanel
+                      configured={isStudioAiConfigured(aiSettings)}
+                      moodText={aiPaletteSuggestMood}
+                      onMoodTextChange={setAiPaletteSuggestMood}
+                      busy={aiPaletteSuggestBusy}
+                      error={aiPaletteSuggestError}
+                      suggestion={aiPaletteSuggestion}
+                      savedMessage={aiPaletteSuggestSavedMsg}
+                      onGenerate={() => void executeSuggestColorPalette()}
+                      onSaveToLibrary={saveSuggestedPaletteToLibrary}
                     />
                   </div>
                 </Suspense>

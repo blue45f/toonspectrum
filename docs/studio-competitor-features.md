@@ -7,9 +7,10 @@
 > 작성일: 2026-07-04, 최종 갱신: 2026-07-05(3~6차 배치 + Google Fonts + 캐릭터 일관성 유지 생성(젠툰
 > 벤치마크) + VRM 캐릭터 "노인" 카테고리 리소스 소싱 + 시나리오 기반 자동 컷+말풍선 배치(투닝/투툰/
 > WeToon 벤치마크, §4 로드맵 마지막 우선순위였던 최종 항목) + **API 키 통합 "연동 설정" 패널 + 툴바
-> 20개 이상 플랫 버튼을 4개 논리 그룹(배경/에셋/스타일/AI 연동)으로 재구성** 전부 StudioPage.tsx 통합
-> 완료 반영) · 목적: 나중에 다시 고도화할 때 재조사 없이 이어갈 수 있도록 조사 내용·구현 현황·보류
-> 사유를 한곳에 남긴다.
+> 20개 이상 플랫 버튼을 4개 논리 그룹(배경/에셋/스타일/AI 연동)으로 재구성** + **AI 대사/나레이션 제안 +
+> AI 색상 팔레트 추천**(둘 다 BYOK, "AI 연동" 그룹의 "AI 어시스트" 서브탭에 4/5번째 섹션으로 편입) 전부
+> StudioPage.tsx 통합 완료 반영) · 목적: 나중에 다시 고도화할 때 재조사 없이 이어갈 수 있도록 조사
+> 내용·구현 현황·보류 사유를 한곳에 남긴다.
 >
 > **매시간 자동 실행되는 클라우드 에이전트가 이 문서를 먼저 읽고 작업을 이어간다** — 새 기능을 붙일
 > 때는 반드시 §2에 실제 배선 완료 여부와 커밋 해시를 기록하고, §3/§4를 그에 맞게 갱신해라. "설계 문서만
@@ -306,6 +307,59 @@ API 키를 등록해야 하는 곳이 AI 어시스트(baseURL/API키/모델)와 
   다른 세션의 `src/components/error-boundary.tsx` 동시 수정이 Vite HMR 풀 리로드를 유발해 팝오버 상태
   (`menu`)가 예고 없이 초기화되는 걸 실제로 겪었다. 앱 버그가 아니라 dev 환경 노이즈이므로, 자동화
   클릭이 다른 세션의 리로드 타이밍과 겹쳐 간헐적으로 실패하면 그냥 스냅샷을 새로 떠서 재시도하면 된다.
+
+### AI 대사/나레이션 제안 (완료, 프로덕션 배포됨) — design 문서 없이 신규 설계
+장면 상황을 짧게 설명하면 자연스러운 대사·나레이션 후보 3~5개를 제안받는 기능. "AI 생성 BYOK 구조"(5차
+배치) 위에 얹는 텍스트 전용 확장이라 서버 비용·이미지 생성 고지 게이트가 필요 없다.
+
+- `studio-dialogue-suggest.ts`(순수) — 프롬프트 구성(`buildDialogueSuggestPrompt`, 캔버스에 이미
+  배치된 대사를 "맥락"으로 선택적으로 포함) + 응답 파싱(`parseDialogueSuggestResponse` — 코드펜스·설명
+  문장이 섞여도 첫 JSON **배열**만 대괄호 짝matching으로 추출, `studio-dialogue-translate.ts`의 전략을
+  배열용으로 재사용) + `formatDialogueSuggestionLine`("이름: 대사"/"(지문)" 미니 문법 한 줄로 변환 —
+  새 스키마를 만들지 않고 기존 "대사 한 번에"(`parseDialogueScript` → `layoutDialogueBubbles`) 파이프라인에
+  그대로 태운다).
+- `studio-ai-client.ts`: `suggestDialogueLines` 추가(Chat Completions 얇은 래퍼, `suggestSceneComposition`
+  과 동일 패턴).
+- `StudioDialogueSuggestPanel.tsx`(신규, 프레젠테이션 전용·무상태) — "AI 연동" 그룹의 "AI 어시스트"
+  서브탭에 기존 배경생성/캐릭터일관성/구도제안과 나란히 4번째 섹션으로 편입. 후보를 "대사 스크립트에
+  추가"(dialogueScript에 이어붙임) 또는 "선택한 말풍선에 삽입"(`patchDialogueText` 재사용, 이중 구현
+  없음) 두 경로로 반영. 캔버스에 이미 배치된 대사가 있으면 맥락으로 함께 보낼지 선택하는 체크박스 포함
+  (`joinDialogueContextLines`가 문자수 상한 초과 시 최근 대사부터 보존).
+- 검증: tsc / `eslint --max-warnings=0` / vitest(199 files·3763 tests) 전부 클린. 브라우저 검증
+  (데스크톱 1440x900 + 모바일 390x844)으로 미설정 안내·API 키 등록 후 활성화·실제 fetch 엔드포인트·실패
+  에러 렌더링까지 확인.
+- 함정: 새 팝오버 섹션이 popover의 `overflow-y-auto` 스크롤 영역 밖(뷰포트 아래)에 있으면
+  chrome-devtools MCP의 click 툴이 "interactive 상태 안 됨" 타임아웃을 낸다 — `scrollIntoView` 후
+  `evaluate_script`로 직접 `.click()`을 디스패치하면 우회된다(아래 팔레트 추천 검증에도 동일하게 적용).
+
+### AI 색상 팔레트 추천 (완료, 프로덕션 배포됨) — design 문서 없이 신규 설계
+장르/무드를 텍스트로 설명하면("스릴러, 어둡고 차가운 느낌" 등) 웹툰 장면에 어울리는 색상 팔레트(5~6색 +
+각 색의 용도 설명)를 제안받고, 바로 기존 팔레트 라이브러리에 저장할 수 있는 기능. 대사/나레이션 제안과
+동일한 이유(결과가 이미지가 아니라 구조화 데이터)로 `runWithAiNotice` 게이트를 타지 않는다.
+
+- **새 팔레트 타입을 만들지 않았다** — `studio-palette-library.ts`의 기존
+  `StudioNamedPalette`(`{ id, name, createdAt, updatedAt, colors: string[] }`, 정규화된 소문자
+  `#rrggbb`)와 GPL 가져오기/내보내기 포맷을 그대로 조사한 뒤, AI 제안 색을 같은 `colors: string[]`
+  형태로만 반환하도록 설계해 `createPalette(name, colors)` + `savePalette`를 그대로 재사용했다.
+- `studio-palette-suggest.ts`(순수) — 프롬프트 구성(`buildPaletteSuggestPrompt`, 정확히 5~6색 지시) +
+  응답 파싱(`parsePaletteSuggestResponse` — 최상위가 이름+색 목록을 함께 담는 JSON **객체**라
+  `studio-scenario-scenes.ts`와 동일하게 중괄호 짝matching으로 추출). 색 값 검증은 새로 만들지 않고
+  `studio-color-utils.normalizeHexColor`를 재사용 — 통과하지 못하는 hex 항목은 환각/오타로 간주해
+  조용히 건너뛴다(대사 제안의 "빈 text 건너뛰기"와 동일한 방어 전략).
+- `studio-ai-client.ts`: `suggestColorPalette` 추가(Chat Completions 얇은 래퍼, `suggestDialogueLines`와
+  동일 패턴).
+- `StudioPaletteSuggestPanel.tsx`(신규, 프레젠테이션 전용·무상태) — "AI 어시스트" 서브탭에 5번째 섹션으로
+  편입(대사/나레이션 제안 바로 아래). 색상 스와치 + 용도 설명을 나열하고 "내 팔레트에 저장" 버튼 하나로
+  끝난다 — 저장 자체는 `StudioPage.tsx`가 `createPalette`/`savePalette`를 직접 호출해서 하고, 이 패널은
+  `PaletteSuggestion`을 그대로 부모에 넘기기만 한다(`studio-palette-library` 타입조차 모른다).
+  `StudioPaletteLibraryPanel`은 `menu==="palette"`일 때만 마운트되는 자기완결형 컴포넌트라(팔레트
+  목록을 자체 `useState` lazy 초기화로 들고 있음), 저장 직후 별도 동기화 없이도 다음에 "스타일 → 팔레트"
+  탭을 열면 localStorage에서 새로 저장된 팔레트를 자동으로 읽어온다.
+- 검증: tsc / `eslint --max-warnings=0` / vitest(201 files·3791 tests, 신규 3파일 28개 테스트 포함)
+  전부 클린. 브라우저 검증(데스크톱 1440x900 + 모바일 390x844, `window.fetch`를 팔레트 JSON으로
+  모킹)으로 미설정 안내 → 생성 → 스와치·용도 렌더 → "내 팔레트에 저장" → localStorage
+  `toonspectrum-studio-palette-library`에 `StudioNamedPalette`와 완전히 같은 구조로 반영 → "스타일 →
+  팔레트" 탭에서 5개 스와치 그대로 노출까지 왕복 확인. 콘솔 에러 없음.
 
 ---
 

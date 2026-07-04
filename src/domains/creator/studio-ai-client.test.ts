@@ -13,6 +13,7 @@ import {
   saveStudioAiSettings,
   STUDIO_AI_DEFAULT_SETTINGS,
   STUDIO_AI_SETTINGS_KEY,
+  suggestColorPalette,
   suggestDialogueLines,
   suggestSceneComposition,
   testAiConnection,
@@ -623,6 +624,85 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
       const result = await suggestDialogueLines(CONFIGURED, "상황");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("http_error");
+    });
+  });
+
+  describe("suggestColorPalette", () => {
+    it("does NOT call fetch when not configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(STUDIO_AI_DEFAULT_SETTINGS, "스릴러, 어둡고 차가운 느낌");
+
+      expect(result).toEqual({ ok: false, code: "not_configured", error: expect.any(String) });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns invalid_input for blank mood text without calling fetch", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(CONFIGURED, "   ");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("sends a Chat Completions request and parses the JSON palette object", async () => {
+      const content = JSON.stringify({
+        name: "스릴러 - 어둡고 차가운",
+        colors: [
+          { hex: "#101820", role: "주조색" },
+          { hex: "#c94f4f", role: "포인트색" },
+        ],
+      });
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(CONFIGURED, "스릴러, 어둡고 차가운 느낌");
+
+      const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://api.example.com/v1/chat/completions");
+      const body = JSON.parse(init.body as string);
+      expect(body.model).toBe(CONFIGURED.textModel);
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[1]).toEqual({ role: "user", content: "스릴러, 어둡고 차가운 느낌" });
+
+      expect(result).toEqual({
+        ok: true,
+        data: {
+          name: "스릴러 - 어둡고 차가운",
+          colors: [
+            { hex: "#101820", role: "주조색" },
+            { hex: "#c94f4f", role: "포인트색" },
+          ],
+        },
+      });
+    });
+
+    it("surfaces parse_error when the response has no JSON object (e.g. a refusal message)", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content: "죄송하지만 도와드릴 수 없습니다." } }] }), {
+            status: 200,
+          })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(CONFIGURED, "무드");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("parse_error");
+    });
+
+    it("surfaces http_error on a failed request", async () => {
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({ error: "bad key" }), { status: 401 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(CONFIGURED, "무드");
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("http_error");
     });

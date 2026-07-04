@@ -40,6 +40,11 @@ import {
   type DialogueTranslatableItem,
 } from "./studio-dialogue-translate";
 import {
+  buildPaletteSuggestPrompt,
+  parsePaletteSuggestResponse,
+  type PaletteSuggestion,
+} from "./studio-palette-suggest";
+import {
   buildScenarioScenesPrompt,
   parseScenarioScenesResponse,
   type ScenarioScenesPlan,
@@ -579,6 +584,45 @@ export async function suggestDialogueLines(
   const parsed = parseDialogueSuggestResponse(content);
   if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
   return { ok: true, data: { candidates: parsed.data } };
+}
+
+/**
+ * (6) 색상 팔레트 추천 — 장르/무드 텍스트를 OpenAI Chat Completions 형태 API로 보내, 그 장면에 어울리는
+ * 색상 팔레트(5~6색, 각 색의 용도 설명 포함)를 받는다. 프롬프트 구성·응답 파싱은
+ * studio-palette-suggest.ts(순수)에 맡기고, 이 함수는 fetch 오케스트레이션 + 에러 계약
+ * (StudioAiResult) 변환만 담당한다(suggestDialogueLines와 동일한 "얇은 래퍼" 성격).
+ *
+ * 결과 색상은 studio-palette-library.StudioNamedPalette.colors와 이미 같은 정규화된 hex 문자열
+ * 형식이라(studio-palette-suggest.ts가 normalizeHexColor를 통과한 값만 반환), 호출부가
+ * `createPalette(name, colors.map(c => c.hex))`로 바로 "내 팔레트에 저장"할 수 있다 — 새 팔레트 타입을
+ * 만들지 않는다.
+ */
+export async function suggestColorPalette(
+  settings: StudioAiSettings,
+  moodText: string
+): Promise<StudioAiResult<PaletteSuggestion>> {
+  const trimmed = moodText.trim();
+  if (!trimmed) return { ok: false, code: "invalid_input", error: "장르/무드를 입력하세요." };
+  if (!isStudioAiConfigured(settings)) {
+    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  }
+  const { system, user } = buildPaletteSuggestPrompt(trimmed);
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  const result = await postJson(url, settings.apiKey, {
+    model: settings.textModel,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.7,
+    max_tokens: 500,
+  });
+  if (!result.ok) return result;
+  const content = extractFirstChatContent(result.data);
+  if (!content) return { ok: false, code: "parse_error", error: "응답에서 팔레트 제안을 찾을 수 없습니다." };
+  const parsed = parsePaletteSuggestResponse(content);
+  if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
+  return { ok: true, data: parsed.data };
 }
 
 /**
