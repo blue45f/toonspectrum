@@ -332,6 +332,7 @@ import {
   movePage as movePagePure,
   reorderPages,
 } from "./studio-pages";
+import { computePanelAutoFitPatch, isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { shotTagBadgeText, shotTagBadgeTitle, withShotTag } from "./studio-panel-shot-tags";
 import {
   beginPanelSplitDrag,
@@ -2434,6 +2435,7 @@ function UrlImage({
   onSelect,
   onChange,
   dragBoundFunc,
+  autoFitFrames,
 }: {
   el: ImageEl;
   draggable: boolean;
@@ -2441,6 +2443,7 @@ function UrlImage({
   onSelect: () => void;
   onChange: (patch: Partial<ImageEl>) => void;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+  autoFitFrames: FrameEl[] | null;
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
@@ -2551,6 +2554,22 @@ function UrlImage({
       cornerRadius={el.cornerRadius ?? 0}
       {...toKonvaSkewAttrs(el)}
       {...resizableNodeProps<Partial<ImageEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
+      onDragEnd={(e) => {
+        // 패널 자동맞춤(studio-panel-autofit) — resizableNodeProps 의 기본 onDragEnd({x,y}만
+        // 패치)를 이 이미지 한정으로 덮어쓴다. autoFitFrames 는 호출부(renderEl)가 이미 "그룹
+        // 드래그 중이 아니고 자격도 있음"까지 걸러서 넘긴다 — null 이거나 빈 배열이면 시도조차
+        // 하지 않고 기존과 완전히 동일하게 동작한다.
+        const draggedX = e.target.x();
+        const draggedY = e.target.y();
+        const fit =
+          autoFitFrames && autoFitFrames.length > 0
+            ? computePanelAutoFitPatch(
+                { x: draggedX, y: draggedY, width: el.width, height: el.height },
+                autoFitFrames
+              )
+            : null;
+        onChange(fit ?? { x: draggedX, y: draggedY });
+      }}
     />
   );
 }
@@ -10418,6 +10437,13 @@ function StudioCuttoonEditor() {
                 const timelineComposite = timelinePlaying
                   ? resolveTimelineComposite(animTimeline, elements.map((e) => e.id), timelinePreviewFrame)
                   : null;
+                // 이미지 드래그-드롭 패널 자동맞춤(studio-panel-autofit) 후보 프레임 — renderEl 안에서
+                // 이미지 요소마다 매번 다시 필터링하지 않도록 렌더당 한 번만 계산한다. hidden 프레임은
+                // containingPanel()과 동일하게 제외한다(자동맞춤 결과도 결국 그 클립 메커니즘에
+                // 기대므로 대상이 일치해야 한다). locked 프레임은 제외하지 않는다(containingPanel()도
+                // 프레임의 locked 여부를 보지 않는다 — "잠금"은 프레임 자체가 옮겨지지 않게 하는 것이지
+                // 다른 요소가 그 위에 도킹되는 걸 막는 개념이 아니다).
+                const autoFitFrameCandidates = elements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
                 // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
@@ -10491,6 +10517,35 @@ function StudioCuttoonEditor() {
                   // 트랙 추가가 애초에 막힘), 여기서도 방어적으로 한 번 더 가드한다.
                   const timelineOverride = isAnimTarget ? undefined : timelineComposite?.get(el.id);
                   const effectiveEl = timelineOverride ? ({ ...el, src: timelineOverride.src } as ImageEl) : el;
+                  // 패널 자동맞춤(studio-panel-autofit) — 이 이미지가 드래그 종료 시 자동맞춤을
+                  // 시도해도 되는지 여기서 전부 판정해 autoFitFrames 하나로 UrlImage 에 넘긴다.
+                  // null 이면 UrlImage 는 시도조차 하지 않고 기존과 완전히 동일하게 {x,y}만 패치한다.
+                  //
+                  // isGroupDragMember 가드는 필수다 — 다중 선택(marqueeIds.length > 1)으로 이 이미지를
+                  // 포함해 여러 요소를 함께 끌면, onStageDragEnd 가 드래그 시작 시점의 stale elements
+                  // 스냅샷 + 델타로 marqueeIds 전원을 별도로 한 번 더 commit 한다 — 이 자동맞춤이 먼저
+                  // 커밋한 결과(오버사이즈 박스)를 그 델타 커밋이 곧바로 덮어써 버려(원래의 "옮겨진
+                  // 원본 위치 + 델타"로 되돌아감) 화면이 한 프레임 반짝인 뒤 자동맞춤이 무효화되는
+                  // 버그가 된다. 그룹 드래그 중엔 이 기능을 아예 끄는 것으로 피한다 — 사용자 의도도
+                  // "이 이미지를 패널에 맞추기"가 아니라 "선택한 여러 요소를 함께 옮기기"이므로
+                  // 자연스러운 선택이기도 하다.
+                  //
+                  // isEligibleForPanelAutoFit 은 회전/기울임/다중 프레임 셀 애니메이션/noClip 을
+                  // 걸러낸다 — 각 사유는 studio-panel-autofit.ts 의 isEligibleForPanelAutoFit
+                  // docstring 참고.
+                  const isGroupDragMember = marqueeIds.length > 1 && marqueeIds.includes(el.id);
+                  const autoFitFrames =
+                    !isGroupDragMember &&
+                    autoFitFrameCandidates.length > 0 &&
+                    isEligibleForPanelAutoFit({
+                      rotation: el.rotation,
+                      skewX: el.skewX,
+                      skewY: el.skewY,
+                      frameCount: el.frames?.length,
+                      noClip: el.noClip,
+                    })
+                      ? autoFitFrameCandidates
+                      : null;
                   return wrapClip(
                     <Fragment key={el.id}>
                       {onion.map((layer) => (
@@ -10503,6 +10558,7 @@ function StudioCuttoonEditor() {
                         onSelect={onSelect}
                         onChange={(patch) => patchEl(el.id, patch)}
                         dragBoundFunc={snapBoundFunc}
+                        autoFitFrames={autoFitFrames}
                       />
                     </Fragment>
                   );
