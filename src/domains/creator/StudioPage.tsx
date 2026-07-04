@@ -8849,6 +8849,7 @@ function StudioCuttoonEditor() {
                   value={dialogueScript}
                   onChange={(e) => setDialogueScript(e.target.value)}
                   placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
+                  spellCheck
                   rows={4}
                   className="w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50"
                 />
@@ -9686,6 +9687,7 @@ function StudioCuttoonEditor() {
                         defaultValue={p.note ?? ""}
                         placeholder="콘티 메모 (장면·대사 아이디어)"
                         maxLength={PAGE_NOTE_MAX}
+                        spellCheck
                         aria-label="콘티 메모"
                         className="w-full resize-none rounded border border-line bg-card px-1.5 py-1 text-[9px] leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
                         onClick={(e) => e.stopPropagation()}
@@ -11539,6 +11541,7 @@ function StudioCuttoonEditor() {
                 <textarea
                   // eslint-disable-next-line jsx-a11y/no-autofocus -- 텍스트 편집 모달은 사용자 액션으로만 열리며, 열릴 때 입력란에 포커스를 주는 것이 올바른 모달 a11y 패턴
                   autoFocus
+                  spellCheck
                   value={editing.value}
                   onChange={(e) => setEditing({ ...editing, value: e.target.value })}
                   onKeyDown={(e) => {
@@ -14277,6 +14280,7 @@ function StudioCuttoonEditor() {
               aria-label="게시 제목 (필수)"
               placeholder="제목 *"
               maxLength={80}
+              spellCheck
               className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
             />
             <textarea
@@ -14284,6 +14288,7 @@ function StudioCuttoonEditor() {
               onChange={(e) => setDescription(e.target.value)}
               aria-label="게시 설명 (선택)"
               placeholder="설명 (선택)"
+              spellCheck
               rows={2}
               className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
             />
