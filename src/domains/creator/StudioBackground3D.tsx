@@ -332,6 +332,11 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   const [skyPresetId, setSkyPresetId] = useState(DEFAULT_SKY_PRESET_ID);
   // 복합 오브젝트 프리셋 그리드 카테고리 필터. null=전체.
   const [compositeCategory, setCompositeCategory] = useState<BgCompositeCategory | null>(null);
+  // 배경(하늘색)을 캡처에서 빼고 오브젝트만 알파 채널로 남길지 — 다른 배경/레이어와 자유롭게
+  // 합성할 수 있는 PNG를 만들기 위함. 뷰포트 표시 자체(하늘색 프리셋)는 계속 그대로 보여주고,
+  // 실제로 alpha=0 clearColor 로 바꾸는 건 handleInsert 캡처 순간뿐이다(사용자가 작업 중엔 여전히
+  // 하늘색 배경을 보면서 구도를 잡을 수 있게).
+  const [transparentInsert, setTransparentInsert] = useState(false);
 
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
@@ -520,11 +525,17 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     // 트레이싱 참고선이지 셰이딩 미리보기 저장이 아니기 때문(설계 §4).
     setLineArtPreview(true);
     setIsCapturing(true);
+    // 투명 삽입: 캡처 프레임 딱 한 번만 clearColor의 알파를 0으로 낮춰 하늘색/배경을 비우고
+    // 오브젝트만 그린다(Canvas의 gl.alpha:true 가 있어야 실제로 캔버스 자체가 알파를 갖는다).
+    // 캡처가 끝나면 즉시 원래 하늘색 프리셋으로 되돌린다 — 그러지 않으면 모달이 닫히기 전
+    // 잠깐이라도 뷰포트가 투명하게 보여 다른 배경(페이지 배경색)이 비쳐 보이는 깜빡임이 생긴다.
+    if (transparentInsert) gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 0);
     requestAnimationFrame(() => {
       gl.render(scene, camera);
       const baseDataUrl = gl.domElement.toDataURL("image/png");
       const { width, height } = roundExportSize(gl.domElement);
       setIsCapturing(false);
+      if (transparentInsert) gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1);
 
       const fullDataUrl = `${baseDataUrl}#${encodeBg3dSceneHash(primitives)}`;
       onInsert(fullDataUrl, width, height);
@@ -570,7 +581,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                   camera={{ fov: 50, position: DEFAULT_CAMERA_POSITION, near: 0.1, far: 200 }}
                   className="h-full w-full"
                   dpr={[1, 2]}
-                  gl={{ antialias: true, preserveDrawingBuffer: true }}
+                  gl={{ antialias: true, preserveDrawingBuffer: true, alpha: true }}
                   onCreated={({ gl }) => gl.setClearColor(0xffffff, 1)}
                   onPointerMissed={() => setSelectedId(null)}
                 >
@@ -1047,12 +1058,28 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       </span>
                     </span>
                   </label>
+                  <label className="mt-3 flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={transparentInsert}
+                      onChange={(e) => setTransparentInsert(e.target.checked)}
+                      className="mt-0.5 size-4 accent-accent"
+                    />
+                    <span className="block text-xs font-bold text-fg">
+                      배경 없이 오브젝트만 추가
+                      <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
+                        하늘색·바닥 그리드를 빼고 건물·나무·도형만 투명 배경 PNG로 추가해요 — 다른 배경
+                        이미지 위에 자유롭게 겹쳐 쓸 수 있어요.
+                      </span>
+                    </span>
+                  </label>
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
                   <h3 className="mb-2 text-sm font-bold text-fg">뷰포트 하늘색</h3>
                   <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    작업 화면의 분위기만 바꿉니다. 내보내기는 항상 흰 배경 선화로 고정돼요.
+                    작업 화면의 분위기만 바꿉니다. 위 "배경 없이 오브젝트만 추가"를 켜지 않으면 내보내기는
+                    항상 이 하늘색이 그대로 캡처돼요(항상 흰 배경은 아니에요).
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {BG_SKY_PRESETS.map((sky) => (
