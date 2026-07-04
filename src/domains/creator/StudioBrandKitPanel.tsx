@@ -1,8 +1,10 @@
-// 브랜드 킷 패널 — 툴바 드롭다운으로 열리는 자기완결형(self-contained) 컴포넌트.
+// 브랜드 킷 패널 — "스타일" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트.
 // 팔레트(참조)·제목/본문 글꼴·로고를 하나의 이름 붙은 킷으로 저장·이름변경·삭제하고,
 // 스와치/글꼴/로고를 각각 개별적으로 적용한다. StudioPaletteLibraryPanel과 동일한
 // "라이브러리 매니저" 컨벤션 — 자체 useState로 목록을 소유하고 localStorage를 직접
 // 읽고/쓴다(캔버스 도구 패널처럼 모든 값을 prop으로 받는 얇은 패널과는 다른 컨벤션).
+// 팝오버 위치·z-index·max-height는 호출부(StudioPage.tsx의 스타일 그룹 wrapper)가 담당한다 —
+// 이 컴포넌트는 자체 fixed/absolute wrapper를 갖지 않는다(2026-07-05 툴바 그룹화로 이관).
 import { ImagePlus, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
@@ -290,7 +292,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
   }
 
   return (
-    <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
+    <>
       <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 브랜드 킷 — 팔레트·글꼴·로고 묶음</p>
 
       {error && (
@@ -571,6 +573,6 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
         <p>팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).</p>
         <p>Google Fonts는 처음 고를 때만 구글 서버에서 내려받아요(API 키·별도 비용 없음, 완전 오프라인은 아니에요).</p>
       </div>
-    </div>
+    </>
   );
 }

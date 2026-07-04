@@ -1,3 +1,5 @@
+// "에셋" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트 — 팝오버 위치·z-index·max-height는
+// 호출부(StudioPage.tsx의 에셋 그룹 wrapper)가 담당한다(2026-07-05 툴바 그룹화로 이관, 자체 wrapper 없음).
 import { Check, Globe, ImagePlus, Loader2, Pencil, Search, Share2, Sparkles, X } from "lucide-react";
 
 import type { StudioAsset } from "./studio-asset-library";
@@ -132,7 +134,7 @@ export function StudioAssetMenuPanel({
   const filteredShared = sortSharedAssets(shared, assetSearchQuery, assetSortOrder);
 
   return (
-    <div className="fixed inset-x-2 top-48 z-30 max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
+    <>
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-0.5 rounded-lg border border-line bg-card p-0.5">
           <button
@@ -285,7 +287,7 @@ export function StudioAssetMenuPanel({
           onDeleteSharedAsset={onDeleteSharedAsset}
         />
       )}
-    </div>
+    </>
   );
 }
 

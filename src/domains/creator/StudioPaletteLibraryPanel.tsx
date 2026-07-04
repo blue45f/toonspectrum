@@ -1,7 +1,9 @@
-// 팔레트 라이브러리 패널 — 툴바 드롭다운으로 열리는 자기완결형(self-contained) 컴포넌트.
+// 팔레트 라이브러리 패널 — "스타일" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트.
 // 이름 붙은 색상 팔레트를 저장·이름변경·삭제하고, GIMP .gpl 파일로 가져오기/내보내기 한다.
 // StudioColorPalettePanel(이미지 추출)과 달리 이 패널은 사용자가 직접 만들거나 가져온
 // 팔레트를 "보관"하는 라이브러리 매니저다.
+// 팝오버 위치·z-index·max-height는 호출부(StudioPage.tsx의 스타일 그룹 wrapper)가 담당한다 —
+// 이 컴포넌트는 자체 fixed/absolute wrapper를 갖지 않는다(2026-07-05 툴바 그룹화로 이관).
 import { Download, Pencil, Plus, Upload, X } from "lucide-react";
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 
@@ -134,7 +136,7 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
   }
 
   return (
-    <div className="fixed inset-x-2 top-[4.5rem] z-30 max-h-[calc(100dvh-9.5rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
+    <>
       <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 팔레트 — 저장·가져오기(.gpl)·내보내기</p>
 
       {error && (
@@ -277,6 +279,6 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

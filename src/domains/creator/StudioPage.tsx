@@ -1247,6 +1247,28 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
   emeresSourceId?: string;
 };
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
+// 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
+// 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
+// 그룹 팝오버는 `menu` 하나로 열림 상태·활성 서브탭을 동시에 표현한다(별도 상태 미도입) — 그룹 멤버인
+// StudioMenu 값이 `menu`에 들어오면 그 그룹이 열린 것으로 간주하고, 그 값 자체가 활성 서브탭이 된다.
+// 3D 배경·시나리오 자동 생성처럼 팝오버 콘텐츠가 없는 액션 버튼(별도 모달을 여는)은 StudioMenu 값이
+// 없으므로 이 매핑에 없다 — 그룹 안에서는 "선택 시 그룹을 닫고 모달을 여는" 액션 칩으로만 존재한다.
+type StudioToolbarGroupId = "bgGroup" | "assetGroup" | "styleGroup" | "aiGroup";
+const STUDIO_TOOLBAR_GROUP_OF: Partial<Record<StudioMenu, StudioToolbarGroupId>> = {
+  bgScene: "bgGroup",
+  tone: "bgGroup",
+  template: "assetGroup",
+  emeres: "assetGroup",
+  scene: "assetGroup",
+  clip: "assetGroup",
+  sticker: "assetGroup",
+  asset: "assetGroup",
+  palette: "styleGroup",
+  brandKit: "styleGroup",
+  aiAssist: "aiGroup",
+  stockImage: "aiGroup",
+  integrations: "aiGroup",
+};
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -9234,6 +9256,24 @@ function StudioCuttoonEditor() {
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
+  // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
+  // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
+  const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
+  // 그룹 팝오버 공통 위치·크기 — 개별 메뉴 팝오버와 동일한 z-[60]·max-h-[calc(100dvh-13rem)] 관례
+  // (2026-07-04 통일)를 그대로 물려받는다. 그룹별로 제각각이던 폭(w-64~w-80)은 그룹 안에서 가장 넓은
+  // 멤버 기준으로 통일해 서브탭 전환 시 팝오버 크기가 튀지 않게 한다.
+  const groupPopoverClass = (width: "w-72" | "w-80") =>
+    cn(
+      "fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg",
+      width === "w-72" ? "lg:w-72" : "lg:w-80"
+    );
+  // 그룹 팝오버 안의 서브탭 칩 — 기존 장르/카테고리 필터 칩(rounded-full)과 동일한 시각 언어를 재사용.
+  const groupTabBtn = (active: boolean) =>
+    cn(
+      "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.7rem] font-medium transition-colors",
+      active ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-2 hover:bg-raised"
+    );
+
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   const mobileBarBtn = (active: boolean) =>
     cn(
@@ -9784,49 +9824,568 @@ function StudioCuttoonEditor() {
       <div className="sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur">
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-2 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel/80 to-transparent lg:hidden" />
-        <div ref={menu === "template" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "template" ? null : "template")} aria-haspopup="menu" aria-expanded={menu === "template"} className={toolBtn(menu === "template")}>
-            <LayoutTemplate size={14} /> 템플릿
+        <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioAssetMenuPanel();
+              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+            }}
+            onMouseEnter={preloadStudioAssetMenuPanel}
+            onFocus={preloadStudioAssetMenuPanel}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "assetGroup"}
+            className={toolBtn(activeToolbarGroup === "assetGroup")}
+          >
+            <Folder size={14} /> 에셋
+            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "assetGroup" && "rotate-180")} />
           </button>
-          {menu === "template" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] grid max-h-[calc(100dvh-13rem)] w-auto gap-1.5 overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-80 lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:shadow-lg">
-              {TEMPLATE_GROUPS.map((group) => (
-                <div key={group.group} className="grid gap-1">
-                  <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
-                  {group.templates.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => applyTemplate(t)}
-                      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
-                    >
-                      <span className="font-medium text-fg">{t.label}</span>
-                      <span className="text-fg-3">{t.hint}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-              {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
-              <div className="grid gap-1 border-t border-line pt-1.5">
-                <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
-                {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
-                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
-                )}
-                {panelLayoutsError && (
-                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
-                )}
-                {panelLayoutPresets.map((layout) => (
-                  <button
-                    key={layout.id}
-                    type="button"
-                    onClick={() => applyPanelLayout(layout)}
-                    className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
-                  >
-                    <span className="font-medium text-fg">{layout.label}</span>
-                    <span className="text-fg-3">{layout.hint}</span>
-                  </button>
-                ))}
+          {activeToolbarGroup === "assetGroup" && (
+            <div className={groupPopoverClass("w-80")}>
+              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
+                <button type="button" onClick={() => setMenu("template")} aria-pressed={menu === "template"} className={groupTabBtn(menu === "template")}>
+                  <LayoutTemplate size={12} /> 템플릿
+                </button>
+                <button type="button" onClick={() => setMenu("emeres")} aria-pressed={menu === "emeres"} className={groupTabBtn(menu === "emeres")}>
+                  <PenTool size={12} /> 이메레스
+                </button>
+                <button type="button" onClick={() => setMenu("scene")} aria-pressed={menu === "scene"} className={groupTabBtn(menu === "scene")}>
+                  <Sparkles size={12} /> 장면
+                </button>
+                <button type="button" onClick={() => setMenu("clip")} aria-pressed={menu === "clip"} className={groupTabBtn(menu === "clip")}>
+                  <Bookmark size={12} /> 클립
+                </button>
+                <button type="button" onClick={() => setMenu("sticker")} aria-pressed={menu === "sticker"} className={groupTabBtn(menu === "sticker")}>
+                  <Sparkles size={12} /> 효과
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    preloadStudioAssetMenuPanel();
+                    setMenu("asset");
+                  }}
+                  onMouseEnter={preloadStudioAssetMenuPanel}
+                  onFocus={preloadStudioAssetMenuPanel}
+                  aria-pressed={menu === "asset"}
+                  className={groupTabBtn(menu === "asset")}
+                >
+                  <Folder size={12} /> 내 에셋
+                </button>
               </div>
+              {menu === "template" && (
+                <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
+                  <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
+                  {TEMPLATE_GROUPS.map((group) => (
+                    <div key={group.group} className="grid gap-1">
+                      <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
+                      {group.templates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => applyTemplate(t)}
+                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                        >
+                          <span className="font-medium text-fg">{t.label}</span>
+                          <span className="text-fg-3">{t.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
+                  <div className="grid gap-1 border-t border-line pt-1.5">
+                    <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
+                    {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
+                    )}
+                    {panelLayoutsError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
+                    )}
+                    {panelLayoutPresets.map((layout) => (
+                      <button
+                        key={layout.id}
+                        type="button"
+                        onClick={() => applyPanelLayout(layout)}
+                        className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                      >
+                        <span className="font-medium text-fg">{layout.label}</span>
+                        <span className="text-fg-3">{layout.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {menu === "emeres" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
+                  </p>
+                  {emeresUnderlayCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={removeEmeresUnderlays}
+                      className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
+                    >
+                      <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
+                    </button>
+                  )}
+                  <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
+                    {(["catalog", "mine"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setEmeresTab(tab)}
+                        aria-pressed={emeresTab === tab}
+                        className={cn(
+                          "flex-1 rounded-md py-1 text-[0.64rem] font-semibold transition-colors",
+                          emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+                        )}
+                      >
+                        {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
+                      </button>
+                    ))}
+                  </div>
+                  {emeresTab === "catalog" ? (
+                    <>
+                      {emeresSimilarAnchor && (
+                        <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                              &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setEmeresSimilarAnchorId(null)}
+                              aria-label="비슷한 스타일 닫기"
+                              className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          {emeresSimilarSiblings.length === 0 ? (
+                            <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
+                          ) : (
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {emeresSimilarSiblings.map((sib) => (
+                                <button
+                                  key={sib.id}
+                                  type="button"
+                                  title={`${sib.label} — ${sib.tip}`}
+                                  onClick={() => addEmeresTemplate(sib)}
+                                  className="w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                                >
+                                  <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)]">
+                                    <img src={svgToDataUrl(sib.svg)} alt={sib.label} className="h-full w-full object-contain" />
+                                  </div>
+                                  <span className="mt-0.5 block truncate text-center text-[0.58rem] text-fg-3">{sib.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                        <input
+                          type="text"
+                          placeholder="이메레스 검색..."
+                          value={emeresSearchQuery}
+                          onChange={(e) => setEmeresSearchQuery(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                        />
+                        {emeresSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setEmeresSearchQuery("")}
+                            aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                      {studioOptionalAssets.emeresSections.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1">
+                          {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => setEmeresCategoryFilter(category)}
+                              aria-pressed={emeresCategoryFilter === category}
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                                emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                              )}
+                            >
+                              {category === "all" ? "전체" : category}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                        {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
+                          <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
+                        )}
+                        {studioEmeresAssetsError && (
+                          <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
+                        )}
+                        {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
+                          <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                            <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                            <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                          </div>
+                        )}
+                        {emeresSectionsFiltered.map((section) => (
+                          <div key={section.category}>
+                            <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {section.templates.map((t) => (
+                                <div
+                                  key={t.id}
+                                  className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                                >
+                                  <button type="button" title={`${t.label} — ${t.tip}`} onClick={() => addEmeresTemplate(t)} className="block w-full">
+                                    <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
+                                      <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                                    </div>
+                                    <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
+                                  </button>
+                                  {hasSameCategorySiblings(emeresFlatCatalog, t.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEmeresSimilarAnchorId(t.id)}
+                                      aria-controls="emeres-similar-strip"
+                                      className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
+                                    >
+                                      비슷한 스타일 더보기
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
+                      <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
+                    </Suspense>
+                  )}
+                </>
+              )}
+              {menu === "scene" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
+                  </p>
+                  {sceneSimilarAnchor && (
+                    <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                          &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSceneSimilarAnchorId(null)}
+                          aria-label="비슷한 스타일 닫기"
+                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {sceneSimilarSiblings.length === 0 ? (
+                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
+                      ) : (
+                        <div className="grid gap-1">
+                          {sceneSimilarSiblings.map((sib) => (
+                            <button
+                              key={sib.id}
+                              type="button"
+                              onClick={() => addSceneTemplate(sib)}
+                              className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
+                            >
+                              <span className="block text-xs font-semibold text-fg">{sib.label}</span>
+                              <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
+                    )}
+                    {sceneTemplatesError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
+                    )}
+                    {sceneTemplates.categories.map((cat) => {
+                      const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={cat.id}>
+                          <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
+                          <div className="grid gap-1">
+                            {items.map((t) => (
+                              <div
+                                key={t.id}
+                                className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
+                              >
+                                <button type="button" onClick={() => addSceneTemplate(t)} className="block w-full text-left">
+                                  <span className="block text-xs font-semibold text-fg">{t.label}</span>
+                                  <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
+                                </button>
+                                {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSceneSimilarAnchorId(t.id)}
+                                    aria-controls="scene-similar-strip"
+                                    className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
+                                  >
+                                    비슷한 스타일 더보기
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              {menu === "clip" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
+                  <button
+                    type="button"
+                    onClick={() => void saveSelectionAsClip()}
+                    disabled={!selected}
+                    className={cn(
+                      "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
+                      selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
+                    )}
+                    title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
+                  >
+                    + 선택을 클립으로 저장
+                  </button>
+                  {clips.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
+                      저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
+                    </p>
+                  ) : (
+                    <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                      {clips.map((c) => (
+                        <div key={c.id} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => insertClip(c)}
+                            className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
+                            title="이 클립을 캔버스에 넣기"
+                          >
+                            {c.name}
+                            <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteClip(c.id)}
+                            aria-label={`${c.name} 클립 삭제`}
+                            className="shrink-0 text-fg-3 transition-colors hover:text-bad"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              {menu === "sticker" && (
+                <>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="효과 검색..."
+                      value={fxSearchQuery}
+                      onChange={(e) => setFxSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                    />
+                    {fxSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setFxSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {FX_PICKER_SECTIONS.map((section) => (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setFxPickerSection(section.id)}
+                        aria-pressed={fxPickerSection === section.id}
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                          fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                        )}
+                      >
+                        {section.label}
+                      </button>
+                    ))}
+                  </div>
+                  {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
+                  )}
+                  {sfxError && fxSectionVisible("sfx") && (
+                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
+                  )}
+                  {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        {fxSfxFiltered.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => void addSfxPreset(s)}
+                            title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
+                            className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
+                          >
+                            {s.text}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
+                      <div className="grid grid-cols-8 gap-1 mb-2">
+                        {fxEmojisFiltered.map((em) => (
+                          <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
+                  )}
+                  {studioStickerAssetsError && (
+                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                      {studioStickerAssetsError}
+                    </p>
+                  )}
+                  <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
+                    {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
+                      <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
+                    )}
+                    {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
+                      <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
+                    )}
+                    {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
+                      <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
+                    )}
+                  </Suspense>
+                  {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        {fxLinePresetsFiltered.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              if (preset.id === "focus") addFocusLines();
+                              else addSpeedLines();
+                              setMenu(null);
+                            }}
+                            className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
+                      <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
+                        {fxOverlaysFiltered.map((fx) => (
+                          <button
+                            key={fx.id}
+                            type="button"
+                            title={fx.label}
+                            onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
+                            className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                          >
+                            <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
+                              <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                            </div>
+                            <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {!fxPickerHasResults && fxQuery !== "" && (
+                    <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                      <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                      <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {menu === "asset" && (
+                <Suspense fallback={<StudioPanelLoading label="에셋 보관함을 여는 중..." />}>
+                  <StudioAssetMenuPanel
+                    assetTab={assetTab}
+                    setAssetTab={setAssetTab}
+                    onUploadAsset={onUploadAsset}
+                    assetPrompt={assetPrompt}
+                    setAssetPrompt={setAssetPrompt}
+                    assetPromptName={assetPromptName}
+                    setAssetPromptName={setAssetPromptName}
+                    assetPromptSize={assetPromptSize}
+                    setAssetPromptSize={setAssetPromptSize}
+                    assetPromptQuality={assetPromptQuality}
+                    setAssetPromptQuality={setAssetPromptQuality}
+                    assetGenerating={assetGenerating}
+                    onGenerateAsset={onGenerateAsset}
+                    assetSearchQuery={assetSearchQuery}
+                    setAssetSearchQuery={setAssetSearchQuery}
+                    assetSortOrder={assetSortOrder}
+                    setAssetSortOrder={setAssetSortOrder}
+                    assets={assets}
+                    assetsLoading={assetsLoading}
+                    renamingAssetId={renamingAssetId}
+                    setRenamingAssetId={setRenamingAssetId}
+                    renamingAssetName={renamingAssetName}
+                    setRenamingAssetName={setRenamingAssetName}
+                    handleRenameAsset={handleRenameAsset}
+                    onUseLocalAsset={(asset) => {
+                      addRenderedImage(asset.dataUrl, asset.width, asset.height);
+                      setMenu(null);
+                    }}
+                    onShareAsset={onShareAsset}
+                    onDeleteAsset={onDeleteAsset}
+                    publishingId={publishingId}
+                    shared={shared}
+                    sharedLoading={sharedLoading}
+                    sharedError={sharedError}
+                    loadSharedAssets={loadSharedAssets}
+                    onUseSharedAsset={onUseSharedAsset}
+                    onDeleteSharedAsset={onDeleteSharedAsset}
+                  />
+                </Suspense>
+              )}
             </div>
           )}
         </div>
@@ -9908,14 +10467,6 @@ function StudioCuttoonEditor() {
         </button>
         <button
           type="button"
-          onClick={() => setBg3dOpen(true)}
-          className={cn(toolBtn(bg3dOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
-          title="3D 배경 블록아웃 만들기"
-        >
-          <Boxes size={14} /> 3D 배경
-        </button>
-        <button
-          type="button"
           onClick={() => setReferencePanelOpen((v) => !v)}
           onMouseEnter={preloadStudioReferencePanel}
           onFocus={preloadStudioReferencePanel}
@@ -9925,552 +10476,348 @@ function StudioCuttoonEditor() {
         >
           <PictureInPicture2 size={14} /> 참고 이미지
         </button>
-        <div ref={menu === "bgScene" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "bgScene" ? null : "bgScene")} aria-haspopup="menu" aria-expanded={menu === "bgScene"} className={toolBtn(menu === "bgScene")}>
-            <ImageIcon size={14} /> 배경 씬
+        <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgScene")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "bgGroup"}
+            className={toolBtn(activeToolbarGroup === "bgGroup")}
+          >
+            <ImageIcon size={14} /> 배경
+            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "bgGroup" && "rotate-180")} />
           </button>
-          {menu === "bgScene" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
-              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
-              </p>
-              <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                <input
-                  type="text"
-                  placeholder="배경 씬 검색..."
-                  value={bgSceneSearchQuery}
-                  onChange={(e) => setBgSceneSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                />
-                {bgSceneSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setBgSceneSearchQuery("")}
-                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              {studioOptionalAssets.bgSceneSections.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1">
-                  {["all", ...studioOptionalAssets.bgSceneSections.map((group) => group.genre)].map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => setBgSceneGenreFilter(genre)}
-                      aria-pressed={bgSceneGenreFilter === genre}
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                        bgSceneGenreFilter === genre ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
-                      )}
-                    >
-                      {genre === "all" ? "전체" : genre}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                {studioBgSceneAssetsLoading && !studioBgSceneAssetsLoaded && (
-                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
-                )}
-                {studioBgSceneAssetsError && (
-                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                    {studioBgSceneAssetsError}
-                  </p>
-                )}
-                {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
-                  <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                    <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                    <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
-                  </div>
-                )}
-                {bgSceneSectionsFiltered.map((group) => (
-                  <div key={group.genre}>
-                    <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {group.scenes.map((bg) => (
-                        <button
-                          key={bg.id}
-                          type="button"
-                          title={bg.label}
-                          onClick={() => addBgScene(bg)}
-                          className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
-                        >
-                          <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                            <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                          </div>
-                          <span className="block text-center text-[0.66rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <div ref={menu === "tone" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "tone" ? null : "tone")} aria-haspopup="menu" aria-expanded={menu === "tone"} className={toolBtn(menu === "tone")}>
-            <Grid2x2 size={14} /> 톤
-          </button>
-          {menu === "tone" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
-              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
-              </p>
-              <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                <input
-                  type="text"
-                  placeholder="톤 검색 (망점·선·교차선...)"
-                  value={toneSearchQuery}
-                  onChange={(e) => setToneSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                />
-                {toneSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setToneSearchQuery("")}
-                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              <div className="max-h-72 overflow-y-auto pr-1">
-                <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
-                  <StudioTonePanel onPick={(svg) => void addTone(svg)} query={toneSearchQuery} />
-                </Suspense>
-              </div>
-            </div>
-          )}
-        </div>
-        <div ref={menu === "emeres" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "emeres" ? null : "emeres")} aria-haspopup="menu" aria-expanded={menu === "emeres"} className={toolBtn(menu === "emeres")}>
-            <PenTool size={14} /> 이메레스
-          </button>
-          {menu === "emeres" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
-              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
-              </p>
-              {emeresUnderlayCount > 0 && (
+          {activeToolbarGroup === "bgGroup" && (
+            <div className={groupPopoverClass("w-80")}>
+              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
+                <button type="button" onClick={() => setMenu("bgScene")} aria-pressed={menu === "bgScene"} className={groupTabBtn(menu === "bgScene")}>
+                  <ImageIcon size={12} /> 배경 씬
+                </button>
+                <button type="button" onClick={() => setMenu("tone")} aria-pressed={menu === "tone"} className={groupTabBtn(menu === "tone")}>
+                  <Grid2x2 size={12} /> 톤
+                </button>
                 <button
                   type="button"
-                  onClick={removeEmeresUnderlays}
-                  className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
+                  onClick={() => {
+                    setBg3dOpen(true);
+                    setMenu(null);
+                  }}
+                  title="3D 배경 블록아웃 만들기"
+                  className={groupTabBtn(false)}
                 >
-                  <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
+                  <Boxes size={12} /> 3D 배경
                 </button>
-              )}
-              <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
-                {(["catalog", "mine"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setEmeresTab(tab)}
-                    aria-pressed={emeresTab === tab}
-                    className={cn(
-                      "flex-1 rounded-md py-1 text-[0.64rem] font-semibold transition-colors",
-                      emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
-                    )}
-                  >
-                    {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
-                  </button>
-                ))}
               </div>
-              {emeresTab === "catalog" ? (
+              {menu === "bgScene" && (
                 <>
-                  {emeresSimilarAnchor && (
-                    <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                          &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setEmeresSimilarAnchorId(null)}
-                          aria-label="비슷한 스타일 닫기"
-                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                      {emeresSimilarSiblings.length === 0 ? (
-                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
-                      ) : (
-                        <div className="flex gap-1.5 overflow-x-auto pb-1">
-                          {emeresSimilarSiblings.map((sib) => (
-                            <button
-                              key={sib.id}
-                              type="button"
-                              title={`${sib.label} — ${sib.tip}`}
-                              onClick={() => addEmeresTemplate(sib)}
-                              className="w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                            >
-                              <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)]">
-                                <img src={svgToDataUrl(sib.svg)} alt={sib.label} className="h-full w-full object-contain" />
-                              </div>
-                              <span className="mt-0.5 block truncate text-center text-[0.58rem] text-fg-3">{sib.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
+                  </p>
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                     <input
                       type="text"
-                      placeholder="이메레스 검색..."
-                      value={emeresSearchQuery}
-                      onChange={(e) => setEmeresSearchQuery(e.target.value)}
+                      placeholder="배경 씬 검색..."
+                      value={bgSceneSearchQuery}
+                      onChange={(e) => setBgSceneSearchQuery(e.target.value)}
                       className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
                     />
-                    {emeresSearchQuery && (
+                    {bgSceneSearchQuery && (
                       <button
                         type="button"
-                        onClick={() => setEmeresSearchQuery("")}
+                        onClick={() => setBgSceneSearchQuery("")}
                         aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                       >
                         <X size={12} />
                       </button>
                     )}
                   </div>
-                  {studioOptionalAssets.emeresSections.length > 0 && (
+                  {studioOptionalAssets.bgSceneSections.length > 0 && (
                     <div className="mb-2 flex flex-wrap gap-1">
-                      {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
+                      {["all", ...studioOptionalAssets.bgSceneSections.map((group) => group.genre)].map((genre) => (
                         <button
-                          key={category}
+                          key={genre}
                           type="button"
-                          onClick={() => setEmeresCategoryFilter(category)}
-                          aria-pressed={emeresCategoryFilter === category}
+                          onClick={() => setBgSceneGenreFilter(genre)}
+                          aria-pressed={bgSceneGenreFilter === genre}
                           className={cn(
                             "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                            emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                            bgSceneGenreFilter === genre ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                           )}
                         >
-                          {category === "all" ? "전체" : category}
+                          {genre === "all" ? "전체" : genre}
                         </button>
                       ))}
                     </div>
                   )}
                   <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                    {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
+                    {studioBgSceneAssetsLoading && !studioBgSceneAssetsLoaded && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
                     )}
-                    {studioEmeresAssetsError && (
-                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
+                    {studioBgSceneAssetsError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                        {studioBgSceneAssetsError}
+                      </p>
                     )}
-                    {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
+                    {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
                       <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
                         <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
                         <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                       </div>
                     )}
-                    {emeresSectionsFiltered.map((section) => (
-                      <div key={section.category}>
-                        <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {section.templates.map((t) => (
-                            <div
-                              key={t.id}
+                    {bgSceneSectionsFiltered.map((group) => (
+                      <div key={group.genre}>
+                        <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {group.scenes.map((bg) => (
+                            <button
+                              key={bg.id}
+                              type="button"
+                              title={bg.label}
+                              onClick={() => addBgScene(bg)}
                               className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
                             >
-                              <button type="button" title={`${t.label} — ${t.tip}`} onClick={() => addEmeresTemplate(t)} className="block w-full">
-                                <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
-                                  <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                                </div>
-                                <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
-                              </button>
-                              {hasSameCategorySiblings(emeresFlatCatalog, t.id) && (
-                                <button
-                                  type="button"
-                                  onClick={() => setEmeresSimilarAnchorId(t.id)}
-                                  aria-controls="emeres-similar-strip"
-                                  className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
-                                >
-                                  비슷한 스타일 더보기
-                                </button>
-                              )}
-                            </div>
+                              <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                                <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                              </div>
+                              <span className="block text-center text-[0.66rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                            </button>
                           ))}
                         </div>
                       </div>
                     ))}
                   </div>
                 </>
-              ) : (
-                <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
-                  <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
+              )}
+              {menu === "tone" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
+                  </p>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="톤 검색 (망점·선·교차선...)"
+                      value={toneSearchQuery}
+                      onChange={(e) => setToneSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                    />
+                    {toneSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setToneSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto pr-1">
+                    <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
+                      <StudioTonePanel onPick={(svg) => void addTone(svg)} query={toneSearchQuery} />
+                    </Suspense>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "styleGroup"}
+            className={toolBtn(activeToolbarGroup === "styleGroup")}
+            title="색상 팔레트 · 브랜드 킷(글꼴·로고)"
+          >
+            <Palette size={14} /> 스타일
+            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "styleGroup" && "rotate-180")} />
+          </button>
+          {activeToolbarGroup === "styleGroup" && (
+            <div className={groupPopoverClass("w-72")}>
+              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
+                <button
+                  type="button"
+                  onClick={() => setMenu("palette")}
+                  aria-pressed={menu === "palette"}
+                  title="색상 팔레트 저장·가져오기(.gpl)·내보내기"
+                  className={groupTabBtn(menu === "palette")}
+                >
+                  <Palette size={12} /> 팔레트
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMenu("brandKit")}
+                  aria-pressed={menu === "brandKit"}
+                  title="팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용"
+                  className={groupTabBtn(menu === "brandKit")}
+                >
+                  <Package size={12} /> 브랜드 킷
+                </button>
+              </div>
+              {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
+              {menu === "brandKit" && (
+                <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
+                  <StudioBrandKitPanel
+                    onPickColor={(hex) => setColor(hex)}
+                    canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
+                    onApplyFont={applyBrandKitFont}
+                    onApplyLogo={applyBrandKitLogo}
+                  />
                 </Suspense>
               )}
             </div>
           )}
         </div>
-        <div ref={menu === "scene" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "scene" ? null : "scene")} aria-haspopup="menu" aria-expanded={menu === "scene"} className={toolBtn(menu === "scene")}>
-            <Sparkles size={14} /> 장면
+        <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "aiGroup" ? null : "aiAssist")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "aiGroup"}
+            className={toolBtn(activeToolbarGroup === "aiGroup")}
+            title="AI 어시스트 · 시나리오 자동 생성 · 스톡 사진 · 연동 설정 — API 키가 필요한 기능 모음(BYOK)"
+          >
+            <Sparkles size={14} /> AI 연동
+            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "aiGroup" && "rotate-180")} />
           </button>
-          {menu === "scene" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-72 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
-              <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
-              </p>
-              {sceneSimilarAnchor && (
-                <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                      &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
-                    </p>
+          {activeToolbarGroup === "aiGroup" && (
+            <div className={groupPopoverClass("w-80")}>
+              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
+                <button
+                  type="button"
+                  onClick={() => setMenu("aiAssist")}
+                  aria-pressed={menu === "aiAssist"}
+                  title="내 API 키로 배경 생성·캐릭터 일관성 생성·구도 제안(BYOK, 서버 비용 없음)"
+                  className={groupTabBtn(menu === "aiAssist")}
+                >
+                  <Sparkles size={12} /> AI 어시스트
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScenarioOpen(true);
+                    setMenu(null);
+                  }}
+                  disabled={masterEditMode}
+                  title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 자동 생성 — 스토리 텍스트로 컷+이미지+말풍선을 한 번에(BYOK)"}
+                  className={cn(groupTabBtn(false), "disabled:opacity-40")}
+                >
+                  <Clapperboard size={12} /> 시나리오 자동 생성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    preloadStudioStockImagePanel();
+                    setMenu("stockImage");
+                  }}
+                  onMouseEnter={preloadStudioStockImagePanel}
+                  onFocus={preloadStudioStockImagePanel}
+                  aria-pressed={menu === "stockImage"}
+                  title="Unsplash 무료 사진 검색해 삽입(내 Access Key로, 서버 비용 없음)"
+                  className={groupTabBtn(menu === "stockImage")}
+                >
+                  <Images size={12} /> 스톡 사진
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    preloadStudioIntegrationsSettingsPanel();
+                    setMenu("integrations");
+                  }}
+                  onMouseEnter={preloadStudioIntegrationsSettingsPanel}
+                  onFocus={preloadStudioIntegrationsSettingsPanel}
+                  aria-pressed={menu === "integrations"}
+                  title="AI 어시스트·스톡 사진 등 API 키가 필요한 기능을 한 곳에서 설정"
+                  className={groupTabBtn(menu === "integrations")}
+                >
+                  <Settings2 size={12} /> 연동 설정
+                </button>
+              </div>
+              {menu === "aiAssist" && (
+                <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
+                  <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => setSceneSimilarAnchorId(null)}
-                      aria-label="비슷한 스타일 닫기"
-                      className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                      onClick={() => {
+                        preloadStudioIntegrationsSettingsPanel();
+                        setMenu("integrations");
+                      }}
+                      onMouseEnter={preloadStudioIntegrationsSettingsPanel}
+                      onFocus={preloadStudioIntegrationsSettingsPanel}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-line bg-panel/50 px-3 py-2 text-left transition-colors hover:bg-raised"
                     >
-                      <X size={12} />
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
+                        <Settings2 size={14} />
+                        AI 어시스트 설정
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1 text-[0.65rem] font-medium",
+                          isStudioAiConfigured(aiSettings) ? "text-good" : "text-fg-3"
+                        )}
+                      >
+                        {isStudioAiConfigured(aiSettings) ? (
+                          <>
+                            <CheckCircle2 size={12} /> 등록됨
+                          </>
+                        ) : (
+                          "API 키 등록 필요"
+                        )}
+                        <ChevronRight size={12} />
+                      </span>
                     </button>
+                    <StudioAiBackgroundPanel
+                      configured={isStudioAiConfigured(aiSettings)}
+                      prompt={aiBgPrompt}
+                      onPromptChange={setAiBgPrompt}
+                      size={aiBgSize}
+                      onSizeChange={setAiBgSize}
+                      busy={aiBgBusy}
+                      error={aiBgError}
+                      onGenerate={onGenerateAiBackground}
+                    />
+                    <StudioAiCharacterConsistencyPanel
+                      configured={isStudioAiConfigured(aiSettings)}
+                      hasReference={selected?.type === "image"}
+                      referenceThumbnail={selected?.type === "image" ? selected.src : null}
+                      prompt={aiCharacterPrompt}
+                      onPromptChange={setAiCharacterPrompt}
+                      busy={aiCharacterBusy}
+                      error={aiCharacterError}
+                      onGenerate={onGenerateAiCharacter}
+                    />
+                    <StudioAiCompositionPanel
+                      settings={aiSettings}
+                      configured={isStudioAiConfigured(aiSettings)}
+                      onInsertAsNote={insertAiCompositionNote}
+                    />
                   </div>
-                  {sceneSimilarSiblings.length === 0 ? (
-                    <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
-                  ) : (
-                    <div className="grid gap-1">
-                      {sceneSimilarSiblings.map((sib) => (
-                        <button
-                          key={sib.id}
-                          type="button"
-                          onClick={() => addSceneTemplate(sib)}
-                          className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
-                        >
-                          <span className="block text-xs font-semibold text-fg">{sib.label}</span>
-                          <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                </Suspense>
               )}
-              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
-                  <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
-                )}
-                {sceneTemplatesError && (
-                  <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
-                )}
-                {sceneTemplates.categories.map((cat) => {
-                  const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={cat.id}>
-                      <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
-                      <div className="grid gap-1">
-                        {items.map((t) => (
-                          <div
-                            key={t.id}
-                            className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
-                          >
-                            <button type="button" onClick={() => addSceneTemplate(t)} className="block w-full text-left">
-                              <span className="block text-xs font-semibold text-fg">{t.label}</span>
-                              <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
-                            </button>
-                            {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
-                              <button
-                                type="button"
-                                onClick={() => setSceneSimilarAnchorId(t.id)}
-                                aria-controls="scene-similar-strip"
-                                className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
-                              >
-                                비슷한 스타일 더보기
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-        <div ref={menu === "clip" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "clip" ? null : "clip")} aria-haspopup="menu" aria-expanded={menu === "clip"} className={toolBtn(menu === "clip")}>
-            <Bookmark size={14} /> 클립
-          </button>
-          {menu === "clip" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
-              <button
-                type="button"
-                onClick={() => void saveSelectionAsClip()}
-                disabled={!selected}
-                className={cn(
-                  "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
-                  selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
-                )}
-                title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
-              >
-                + 선택을 클립으로 저장
-              </button>
-              {clips.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
-                  저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
-                </p>
-              ) : (
-                <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {clips.map((c) => (
-                    <div key={c.id} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5">
-                      <button
-                        type="button"
-                        onClick={() => insertClip(c)}
-                        className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
-                        title="이 클립을 캔버스에 넣기"
-                      >
-                        {c.name}
-                        <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteClip(c.id)}
-                        aria-label={`${c.name} 클립 삭제`}
-                        className="shrink-0 text-fg-3 transition-colors hover:text-bad"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div ref={menu === "palette" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "palette" ? null : "palette")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "palette"}
-            className={toolBtn(menu === "palette")}
-            title="색상 팔레트 저장·가져오기(.gpl)·내보내기"
-          >
-            <Palette size={14} /> 팔레트
-          </button>
-          {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
-        </div>
-        <div ref={menu === "brandKit" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "brandKit" ? null : "brandKit")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "brandKit"}
-            className={toolBtn(menu === "brandKit")}
-            title="팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용"
-          >
-            <Package size={14} /> 브랜드 킷
-          </button>
-          {menu === "brandKit" && (
-            <Suspense fallback={null}>
-              <StudioBrandKitPanel
-                onPickColor={(hex) => setColor(hex)}
-                canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
-                onApplyFont={applyBrandKitFont}
-                onApplyLogo={applyBrandKitLogo}
-              />
-            </Suspense>
-          )}
-        </div>
-        <div ref={menu === "aiAssist" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "aiAssist" ? null : "aiAssist")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "aiAssist"}
-            className={toolBtn(menu === "aiAssist")}
-            title="내 API 키로 배경 생성·캐릭터 일관성 생성·구도 제안(BYOK, 서버 비용 없음)"
-          >
-            <Sparkles size={14} /> AI 어시스트
-          </button>
-          {menu === "aiAssist" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
+              {menu === "stockImage" && (
+                <Suspense fallback={<StudioPanelLoading label="스톡 사진 패널을 여는 중..." />}>
+                  <StudioStockImagePanel
+                    onInsert={insertStockImage}
+                    onOpenSettings={() => {
                       preloadStudioIntegrationsSettingsPanel();
                       setMenu("integrations");
                     }}
-                    onMouseEnter={preloadStudioIntegrationsSettingsPanel}
-                    onFocus={preloadStudioIntegrationsSettingsPanel}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-line bg-panel/50 px-3 py-2 text-left transition-colors hover:bg-raised"
-                  >
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
-                      <Settings2 size={14} />
-                      AI 어시스트 설정
-                    </span>
-                    <span
-                      className={cn(
-                        "inline-flex shrink-0 items-center gap-1 text-[0.65rem] font-medium",
-                        isStudioAiConfigured(aiSettings) ? "text-good" : "text-fg-3"
-                      )}
-                    >
-                      {isStudioAiConfigured(aiSettings) ? (
-                        <>
-                          <CheckCircle2 size={12} /> 등록됨
-                        </>
-                      ) : (
-                        "API 키 등록 필요"
-                      )}
-                      <ChevronRight size={12} />
-                    </span>
-                  </button>
-                  <StudioAiBackgroundPanel
-                    configured={isStudioAiConfigured(aiSettings)}
-                    prompt={aiBgPrompt}
-                    onPromptChange={setAiBgPrompt}
-                    size={aiBgSize}
-                    onSizeChange={setAiBgSize}
-                    busy={aiBgBusy}
-                    error={aiBgError}
-                    onGenerate={onGenerateAiBackground}
                   />
-                  <StudioAiCharacterConsistencyPanel
-                    configured={isStudioAiConfigured(aiSettings)}
-                    hasReference={selected?.type === "image"}
-                    referenceThumbnail={selected?.type === "image" ? selected.src : null}
-                    prompt={aiCharacterPrompt}
-                    onPromptChange={setAiCharacterPrompt}
-                    busy={aiCharacterBusy}
-                    error={aiCharacterError}
-                    onGenerate={onGenerateAiCharacter}
-                  />
-                  <StudioAiCompositionPanel
-                    settings={aiSettings}
-                    configured={isStudioAiConfigured(aiSettings)}
-                    onInsertAsNote={insertAiCompositionNote}
-                  />
-                </div>
-              </Suspense>
+                </Suspense>
+              )}
+              {menu === "integrations" && (
+                <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
+                  <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
+                </Suspense>
+              )}
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setScenarioOpen(true)}
-          disabled={masterEditMode}
-          aria-label="시나리오 자동 생성 (스토리 텍스트로 컷+말풍선 자동 완성)"
-          className={cn(toolBtn(false), "disabled:opacity-40")}
-          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 자동 생성 — 스토리 텍스트로 컷+이미지+말풍선을 한 번에(BYOK)"}
-        >
-          <Clapperboard size={14} /> 시나리오 자동 생성
-        </button>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -10539,276 +10886,6 @@ function StudioCuttoonEditor() {
                   대사 번역(내 API 키)…
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-        <div ref={menu === "sticker" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "sticker" ? null : "sticker")} aria-haspopup="menu" aria-expanded={menu === "sticker"} className={toolBtn(menu === "sticker")}>
-            <Sparkles size={14} /> 효과
-          </button>
-          {menu === "sticker" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <div className="relative mb-2">
-                <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                <input
-                  type="text"
-                  placeholder="효과 검색..."
-                  value={fxSearchQuery}
-                  onChange={(e) => setFxSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                />
-                {fxSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setFxSearchQuery("")}
-                    aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              <div className="mb-2 flex flex-wrap gap-1">
-                {FX_PICKER_SECTIONS.map((section) => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => setFxPickerSection(section.id)}
-                    aria-pressed={fxPickerSection === section.id}
-                    className={cn(
-                      "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                      fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
-                    )}
-                  >
-                    {section.label}
-                  </button>
-                ))}
-              </div>
-              {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
-                <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
-              )}
-              {sfxError && fxSectionVisible("sfx") && (
-                <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
-              )}
-              {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {fxSfxFiltered.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => void addSfxPreset(s)}
-                        title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
-                        className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
-                      >
-                        {s.text}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
-                  <div className="grid grid-cols-8 gap-1 mb-2">
-                    {fxEmojisFiltered.map((em) => (
-                      <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
-                        {em}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
-                <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
-              )}
-              {studioStickerAssetsError && (
-                <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                  {studioStickerAssetsError}
-                </p>
-              )}
-              <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
-                {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
-                  <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
-                )}
-                {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
-                  <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
-                )}
-                {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
-                  <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
-                )}
-              </Suspense>
-              {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    {fxLinePresetsFiltered.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          if (preset.id === "focus") addFocusLines();
-                          else addSpeedLines();
-                          setMenu(null);
-                        }}
-                        className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
-                <>
-                  <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
-                  <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
-                    {fxOverlaysFiltered.map((fx) => (
-                      <button
-                        key={fx.id}
-                        type="button"
-                        title={fx.label}
-                        onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
-                        className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                      >
-                        <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
-                          <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                        </div>
-                        <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {!fxPickerHasResults && fxQuery !== "" && (
-                <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                  <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                  <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div ref={menu === "asset" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioAssetMenuPanel();
-              setMenu(menu === "asset" ? null : "asset");
-            }}
-            onMouseEnter={preloadStudioAssetMenuPanel}
-            onFocus={preloadStudioAssetMenuPanel}
-            aria-haspopup="menu"
-            aria-expanded={menu === "asset"}
-            className={toolBtn(menu === "asset")}
-          >
-            <Folder size={14} /> 내 에셋
-          </button>
-          {menu === "asset" && (
-            <Suspense
-              fallback={
-                <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
-                  에셋 보관함을 여는 중...
-                </div>
-              }
-            >
-              <StudioAssetMenuPanel
-                assetTab={assetTab}
-                setAssetTab={setAssetTab}
-                onUploadAsset={onUploadAsset}
-                assetPrompt={assetPrompt}
-                setAssetPrompt={setAssetPrompt}
-                assetPromptName={assetPromptName}
-                setAssetPromptName={setAssetPromptName}
-                assetPromptSize={assetPromptSize}
-                setAssetPromptSize={setAssetPromptSize}
-                assetPromptQuality={assetPromptQuality}
-                setAssetPromptQuality={setAssetPromptQuality}
-                assetGenerating={assetGenerating}
-                onGenerateAsset={onGenerateAsset}
-                assetSearchQuery={assetSearchQuery}
-                setAssetSearchQuery={setAssetSearchQuery}
-                assetSortOrder={assetSortOrder}
-                setAssetSortOrder={setAssetSortOrder}
-                assets={assets}
-                assetsLoading={assetsLoading}
-                renamingAssetId={renamingAssetId}
-                setRenamingAssetId={setRenamingAssetId}
-                renamingAssetName={renamingAssetName}
-                setRenamingAssetName={setRenamingAssetName}
-                handleRenameAsset={handleRenameAsset}
-                onUseLocalAsset={(asset) => {
-                  addRenderedImage(asset.dataUrl, asset.width, asset.height);
-                  setMenu(null);
-                }}
-                onShareAsset={onShareAsset}
-                onDeleteAsset={onDeleteAsset}
-                publishingId={publishingId}
-                shared={shared}
-                sharedLoading={sharedLoading}
-                sharedError={sharedError}
-                loadSharedAssets={loadSharedAssets}
-                onUseSharedAsset={onUseSharedAsset}
-                onDeleteSharedAsset={onDeleteSharedAsset}
-              />
-            </Suspense>
-          )}
-        </div>
-        <div ref={menu === "stockImage" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioStockImagePanel();
-              setMenu(menu === "stockImage" ? null : "stockImage");
-            }}
-            onMouseEnter={preloadStudioStockImagePanel}
-            onFocus={preloadStudioStockImagePanel}
-            aria-haspopup="menu"
-            aria-expanded={menu === "stockImage"}
-            className={toolBtn(menu === "stockImage")}
-            title="Unsplash 무료 사진 검색해 삽입(내 Access Key로, 서버 비용 없음)"
-          >
-            <Images size={14} /> 스톡 사진
-          </button>
-          {menu === "stockImage" && (
-            <Suspense
-              fallback={
-                <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
-                  스톡 사진 패널을 여는 중...
-                </div>
-              }
-            >
-              <StudioStockImagePanel
-                onInsert={insertStockImage}
-                onOpenSettings={() => {
-                  preloadStudioIntegrationsSettingsPanel();
-                  setMenu("integrations");
-                }}
-              />
-            </Suspense>
-          )}
-        </div>
-        <div ref={menu === "integrations" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioIntegrationsSettingsPanel();
-              setMenu(menu === "integrations" ? null : "integrations");
-            }}
-            onMouseEnter={preloadStudioIntegrationsSettingsPanel}
-            onFocus={preloadStudioIntegrationsSettingsPanel}
-            aria-haspopup="menu"
-            aria-expanded={menu === "integrations"}
-            className={toolBtn(menu === "integrations")}
-            title="AI 어시스트·스톡 사진 등 API 키가 필요한 기능을 한 곳에서 설정"
-          >
-            <Settings2 size={14} /> 연동 설정
-          </button>
-          {menu === "integrations" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
-                <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
-              </Suspense>
             </div>
           )}
         </div>

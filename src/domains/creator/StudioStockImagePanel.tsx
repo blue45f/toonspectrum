@@ -21,6 +21,11 @@
 //
 // 이 패널은 "생성형 AI 최초 사용 고지" 모달의 대상이 **아니다** — Unsplash 사진은 실사진(라이선스
 // 사진)이지 AI 생성물이 아니다.
+//
+// "AI 연동" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹힌다 — 팝오버 위치·z-index·max-height는 호출부
+// (StudioPage.tsx의 AI 연동 그룹 wrapper)가 담당한다(2026-07-05 툴바 그룹화로 이관). 이 컴포넌트는
+// 자체 fixed/absolute wrapper 없이 flex-col gap-2 레이아웃만 유지한다(자식들이 margin이 아니라
+// 부모 gap에 의존하므로 이 한 겹은 남겨둬야 한다).
 import { Images, Loader2, Search, Settings2 } from "lucide-react";
 import { useState } from "react";
 
@@ -93,7 +98,7 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
   }
 
   return (
-    <div className="fixed inset-x-2 top-48 z-[60] flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-lg sm:absolute sm:left-0 sm:right-auto sm:top-full sm:mt-1 sm:w-80 sm:max-h-none sm:overflow-visible">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
           <Images size={14} />
