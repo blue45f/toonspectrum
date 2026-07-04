@@ -34,6 +34,11 @@ import {
   parseTranslationResponse,
   type DialogueTranslatableItem,
 } from "./studio-dialogue-translate";
+import {
+  buildScenarioScenesPrompt,
+  parseScenarioScenesResponse,
+  type ScenarioScenesPlan,
+} from "./studio-scenario-scenes";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
@@ -270,7 +275,7 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([decodeURIComponent(payload)], { type: mime });
 }
 
-// ── 4개 기능별 얇은 래퍼 ─────────────────────────────────────────────────────
+// ── 기능별 얇은 래퍼 ─────────────────────────────────────────────────────────
 
 /**
  * (1) 배경 생성 — 텍스트 프롬프트를 OpenAI Images Generations 형태 API로 보내 배경 이미지를 받는다.
@@ -446,6 +451,48 @@ export async function suggestSceneComposition(
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 제안 텍스트를 찾을 수 없습니다." };
   return { ok: true, data: { suggestion: content } };
+}
+
+/**
+ * (4.5) 시나리오 자동 생성 — "장면 분할" 1단계(투닝/투툰/WeToon 벤치마크,
+ * docs/studio-competitor-features.md §4 로드맵 참고). 스토리 아이디어 텍스트 하나를 OpenAI Chat
+ * Completions 형태 API로 보내, 여러 장면(각 장면의 배경/상황 묘사 + 대사 스크립트)으로 나눈 JSON을
+ * 받는다. 프롬프트 구성·응답 파싱은 studio-scenario-scenes.ts(순수)에 맡기고, 이 함수는 fetch
+ * 오케스트레이션 + 에러 계약(StudioAiResult) 변환만 담당한다(suggestSceneComposition과 동일한
+ * "얇은 래퍼" 성격).
+ *
+ * 이미지 생성은 이 함수의 책임이 아니다 — 호출부(StudioPage.tsx)가 studio-scenario-layout.ts로 각
+ * 장면을 프레임+말풍선 배치로 변환한 뒤, 장면마다 순차적으로 generateBackgroundImage(첫 장면 —
+ * "기준 캐릭터" 확립) 또는 generateConsistentCharacterImage(다음 장면들 — 첫 장면 이미지를 참고해
+ * 외모 유지)를 호출한다.
+ */
+export async function generateScenarioScenes(
+  settings: StudioAiSettings,
+  storyText: string,
+  opts: { sceneCountHint?: number } = {}
+): Promise<StudioAiResult<ScenarioScenesPlan>> {
+  const trimmed = storyText.trim();
+  if (!trimmed) return { ok: false, code: "invalid_input", error: "스토리 아이디어를 입력하세요." };
+  if (!isStudioAiConfigured(settings)) {
+    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  }
+  const { system, user } = buildScenarioScenesPrompt(trimmed, opts.sceneCountHint);
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  const result = await postJson(url, settings.apiKey, {
+    model: settings.textModel,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.7,
+    max_tokens: 1800,
+  });
+  if (!result.ok) return result;
+  const content = extractFirstChatContent(result.data);
+  if (!content) return { ok: false, code: "parse_error", error: "응답에서 장면 구성 텍스트를 찾을 수 없습니다." };
+  const parsed = parseScenarioScenesResponse(content);
+  if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
+  return { ok: true, data: parsed.data };
 }
 
 /**

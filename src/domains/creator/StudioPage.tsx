@@ -20,6 +20,7 @@ import {
   ArrowUpToLine,
   ArrowRight,
   Boxes,
+  Clapperboard,
   Music4,
   Package,
   Pipette,
@@ -91,6 +92,7 @@ import {
   History as HistoryIcon,
 } from "lucide-react";
 import { Fragment, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -101,11 +103,13 @@ import {
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
   generateConsistentCharacterImage,
+  generateScenarioScenes,
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
   translateDialogueBatch,
   type StudioAiImageSize,
+  type StudioAiResult,
   type StudioAiSettings,
 } from "./studio-ai-client";
 import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha } from "./studio-alpha-lock";
@@ -426,6 +430,7 @@ import {
   QUICKSHAPE_STILL_RADIUS_PX,
   type QuickShapeKind,
 } from "./studio-quickshape";
+import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   computeAlignDeltas,
   computeDistributeDeltas,
@@ -758,6 +763,13 @@ const StudioAiCharacterConsistencyPanel = lazyRetry(
 const StudioDialogueTranslatePanel = lazyRetry(
   () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
   "StudioDialogueTranslatePanel"
+);
+const StudioScenarioAutoLayoutPanel = lazyRetry(
+  () =>
+    import("./StudioScenarioAutoLayoutPanel").then((mod) => ({
+      default: mod.StudioScenarioAutoLayoutPanel,
+    })),
+  "StudioScenarioAutoLayoutPanel"
 );
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
@@ -1245,6 +1257,13 @@ type StudioSfxPacks = {
 };
 
 const uid = () => crypto.randomUUID();
+// 시나리오 자동 생성의 패널 종횡비(studio-scenario-layout)를 AI 이미지 생성 사이즈 프리셋으로 매핑
+// — studio-scenario-layout.ts는 AI 클라이언트를 몰라도 되게 이 매핑을 호출부(StudioPage)에 남긴다.
+function scenarioAspectToImageSize(aspect: ScenarioPanelAspect): StudioAiImageSize {
+  if (aspect === "landscape") return "1792x1024";
+  if (aspect === "portrait") return "1024x1792";
+  return "1024x1024";
+}
 const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
   bgSceneSections: [],
   bgSceneGenreGroups: [],
@@ -2181,6 +2200,17 @@ function ScrollPreviewLoadingOverlay() {
   );
 }
 
+function ScenarioAutoLayoutLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>시나리오 자동 생성 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그(앱인토스 서비스 오픈 정책 필수).
  * 사용자가 처음 "생성"을 누를 때 1회 노출하고, 확인하면 곧바로 생성을 이어서 실행한다.
@@ -2204,14 +2234,20 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
     };
   }, [onCancel]);
 
-  return (
+  const notice = (
     <div
       role="presentation"
       onClick={(e) => {
         // 스크림(다이얼로그 바깥) 클릭일 때만 닫는다 — 내부 클릭은 currentTarget 이 아니라 무시.
         if (e.target === e.currentTarget) onCancel();
       }}
-      className="fixed inset-0 z-[70] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm"
+      // z-[90] — 전체화면 모달(StoryboardGrid/ScrollPreview/Timelapse/Background3D 등, z-[80])이
+      // 전부 route-stage(레이아웃 래퍼)의 isolation:isolate 안에 있어, 시나리오 자동 생성처럼 그
+      // z-80 모달이 열린 채로 안에서 이미지 생성을 시작하면 이 고지가 그 위에 떠야 한다(기존 z-70은
+      // z-80 모달 뒤로 가려 확인 버튼을 누를 수 없었다). 법적으로 필수인 고지라 항상 최상단이어야
+      // 하므로, 이 앱의 어떤 z-index보다도 높게 고정한다 — document.body에 포탈로 렌더(아래 참고)
+      // 하므로 route-stage의 격리 자체도 벗어난다(z-index 숫자만으로는 그 격리를 못 벗어난다).
+      className="fixed inset-0 z-[90] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm"
     >
       <div
         role="dialog"
@@ -2256,6 +2292,12 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
       </div>
     </div>
   );
+  // auth-modal.tsx와 동일한 이유로 document.body에 포탈 렌더 — 이 앱의 라우트 콘텐츠 래퍼
+  // (route-stage)가 isolation:isolate를 걸어놔서, 그 안에서 아무리 z-index를 높여도 사이트 전역
+  // 고정 헤더(z-50, route-stage 밖의 형제) 뒤로 가려진다(z-index는 같은 스태킹 컨텍스트 안에서만
+  // 비교된다). 이 고지는 페이지 어디서 트리거되든 항상 최상단이어야 해서 격리 자체를 벗어난다.
+  if (typeof document === "undefined") return null;
+  return createPortal(notice, document.body);
 }
 
 // data-URL 이미지를 maxDim 이하로 축소해 전송 크기를 제한한다.
@@ -5089,6 +5131,26 @@ function StudioCuttoonEditor() {
   const [aiCharacterPrompt, setAiCharacterPrompt] = useState("");
   const [aiCharacterBusy, setAiCharacterBusy] = useState(false);
   const [aiCharacterError, setAiCharacterError] = useState<string | null>(null);
+  // 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크, docs/studio-competitor-features.md §4 로드맵) — 별도
+  // 전체화면 모달(StudioScenarioAutoLayoutPanel)로 열린다. aiAssist 팝오버의 다른 AI 기능들과 달리
+  // 여러 장면을 순차 생성해 시간이 걸리고 미리보기 그리드가 필요해 320px 팝오버에 넣지 않는다.
+  const [scenarioOpen, setScenarioOpen] = useState(false);
+  const [scenarioStoryText, setScenarioStoryText] = useState("");
+  const [scenarioSceneCountHint, setScenarioSceneCountHint] = useState<number | undefined>(undefined);
+  const [scenarioBusy, setScenarioBusy] = useState(false);
+  const [scenarioStageLabel, setScenarioStageLabel] = useState<string | null>(null);
+  const [scenarioProgress, setScenarioProgress] = useState<{ done: number; total: number } | null>(null);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  // 장면 분할이 끝나면 채워진다(이미지는 이후 순차로 각 항목에 채워짐) — nextCanvasH는 적용(commit)
+  // 시점에 함께 커밋할 페이지 높이(레이아웃 계산 시점 값을 그대로 들고 있는다 — 적용 전에 사용자가
+  // 다른 편집으로 canvasH를 바꿀 수도 있으나, 그 경우도 Math.max로 방어한다 — onApplyScenarioPreview 참고).
+  const [scenarioResult, setScenarioResult] = useState<{ items: ScenarioPreviewItem[]; nextCanvasH: number } | null>(
+    null
+  );
+  // 다음 장면부터 생성을 멈추는 협조적 취소 플래그 — 이미 시작된 fetch 자체를 중단하진 않는다(이
+  // 클라이언트의 fetch 헬퍼들은 AbortController를 받지 않는다 — 그걸 위해 5개 함수 시그니처를 전부
+  // 바꾸는 건 이번 스코프 밖). 루프 반복 시작 직전에만 확인한다.
+  const scenarioCancelRef = useRef(false);
   // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
   // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
   // 타야 해서 일반화한다.
@@ -6715,6 +6777,145 @@ function StudioCuttoonEditor() {
     const refWidth = selected.width;
     const refHeight = selected.height;
     runWithAiNotice(() => void executeAiCharacterConsistency(refSrc, prompt, refWidth, refHeight));
+  }
+
+  // ── 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크) ──────────────────────────────────────────
+  // 파이프라인: (1) 장면 분할(텍스트 1회 호출, generateScenarioScenes) → (2) studio-scenario-layout
+  // .layoutScenarioPanels로 프레임+말풍선 배치 계산(기존 addFrame()과 동일하게 가장 아래 프레임
+  // 다음에 이어붙임) → (3) 장면마다 순차 이미지 생성. 캐릭터 일관성은 "첫 성공 이미지를 기준으로
+  // 고정"하는 방식으로 근사한다 — 첫 장면 생성이 실패해도 성공할 때까지 계속 generateBackgroundImage
+  // (+ characterDescription)를 시도하고, 일단 하나라도 성공하면 그 이미지를 이후 모든 장면의
+  // "기준 캐릭터"로 고정해 generateConsistentCharacterImage를 탄다(각 장면 이미지로 기준을 계속
+  // 갱신하지 않는다 — 그러면 오차가 누적돼 뒤로 갈수록 캐릭터가 달라진다).
+  // 부분 실패 허용: 한 장면의 이미지 생성이 실패해도 나머지 장면은 계속 진행하고, 실패한 장면은
+  // imageError로 표시된 채 preview에 남는다(적용하면 배경 없는 빈 컷이 되고, 사용자가 나중에 직접
+  // 채울 수 있다 — 정직성 규약, 조용히 건너뛰지 않는다).
+  async function executeGenerateScenario() {
+    if (masterEditMode) return; // 문서 마스터는 페이지별 canvasH/컷 배치 개념이 없어 대상 밖.
+    const storyText = scenarioStoryText.trim();
+    if (!storyText || scenarioBusy) return;
+
+    scenarioCancelRef.current = false;
+    setScenarioBusy(true);
+    setScenarioError(null);
+    setScenarioResult(null);
+    setScenarioProgress(null);
+    setScenarioStageLabel("장면 구성 생성 중…");
+
+    const scenesResult = await generateScenarioScenes(aiSettings, storyText, {
+      sceneCountHint: scenarioSceneCountHint,
+    });
+    if (!scenesResult.ok) {
+      setScenarioError(scenesResult.error);
+      setScenarioBusy(false);
+      setScenarioStageLabel(null);
+      return;
+    }
+    if (scenarioCancelRef.current) {
+      setScenarioBusy(false);
+      setScenarioStageLabel(null);
+      return;
+    }
+
+    const existingFrames = elements.filter((e): e is FrameEl => e.type === "frame");
+    const { panels, nextCanvasH } = layoutScenarioPanels(existingFrames, CANVAS_W, canvasH, scenesResult.data.scenes);
+    if (panels.length === 0) {
+      setScenarioError("생성된 장면이 없습니다. 스토리를 조금 더 자세히 입력해보세요.");
+      setScenarioBusy(false);
+      setScenarioStageLabel(null);
+      return;
+    }
+
+    setScenarioResult({ items: panels.map((p) => ({ ...p })), nextCanvasH });
+    setScenarioStageLabel("이미지 생성 중…");
+    setScenarioProgress({ done: 0, total: panels.length });
+
+    const characterDescription = scenesResult.data.characterDescription.trim();
+    let referenceImageDataUrl: string | null = null;
+
+    for (let i = 0; i < panels.length; i++) {
+      if (scenarioCancelRef.current) break;
+      const panel = panels[i];
+      let imageResult: StudioAiResult<{ dataUrl: string }>;
+      if (referenceImageDataUrl) {
+        imageResult = await generateConsistentCharacterImage(aiSettings, referenceImageDataUrl, panel.imagePrompt);
+      } else {
+        imageResult = await generateBackgroundImage(
+          aiSettings,
+          [characterDescription, panel.imagePrompt].filter((s) => s.length > 0).join(", "),
+          { size: scenarioAspectToImageSize(panel.aspect) }
+        );
+      }
+
+      if (imageResult.ok) {
+        const dataUrl = imageResult.data.dataUrl;
+        if (!referenceImageDataUrl) referenceImageDataUrl = dataUrl;
+        setScenarioResult((prev) =>
+          prev
+            ? { ...prev, items: prev.items.map((item, idx) => (idx === i ? { ...item, imageDataUrl: dataUrl } : item)) }
+            : prev
+        );
+      } else {
+        const errorMessage = imageResult.error;
+        setScenarioResult((prev) =>
+          prev
+            ? { ...prev, items: prev.items.map((item, idx) => (idx === i ? { ...item, imageError: errorMessage } : item)) }
+            : prev
+        );
+      }
+      setScenarioProgress({ done: i + 1, total: panels.length });
+    }
+
+    setScenarioBusy(false);
+    setScenarioStageLabel(null);
+  }
+  // 모달의 "자동 생성" 버튼이 호출하는 진입점 — 여기서만 AI 고지 게이트를 통과시킨다(다른 AI 이미지
+  // 생성 진입점과 동일 이유 — 고지 우회 방지). 장면 분할 자체는 텍스트 생성이라 고지 대상이 아니지만
+  // (suggestSceneComposition/translateDialogueBatch와 동일 판단 근거), 파이프라인 전체가 결국 이미지를
+  // 생성하므로 버튼 진입점 전체를 한 번에 게이팅한다.
+  function onGenerateScenario() {
+    if (masterEditMode || scenarioBusy || !isStudioAiConfigured(aiSettings)) return;
+    if (!scenarioStoryText.trim()) return;
+    runWithAiNotice(() => void executeGenerateScenario());
+  }
+  // 다음 장면부터 생성을 멈춘다 — 이미 생성된 장면까지는 preview에 그대로 남는다(전부 버리지 않음).
+  function onCancelScenario() {
+    scenarioCancelRef.current = true;
+  }
+  // preview를 캔버스에 커밋 — 프레임(이미지 성공 시 bg 포함)과 말풍선을 전부 한 번에 commit해
+  // undo 1회로 되돌릴 수 있게 한다(addSceneTemplate/addDialogueBubbles와 동일 관례).
+  function onApplyScenarioPreview() {
+    if (!scenarioResult || scenarioBusy) return;
+    const newEls: El[] = [];
+    for (const item of scenarioResult.items) {
+      newEls.push({
+        id: uid(),
+        type: "frame",
+        x: item.frame.x,
+        y: item.frame.y,
+        width: item.frame.width,
+        height: item.frame.height,
+        ...(item.imageDataUrl ? { bg: item.imageDataUrl } : {}),
+      });
+      for (const b of item.bubbles) {
+        newEls.push({ id: uid(), ...b });
+      }
+    }
+    if (newEls.length === 0) return;
+    commit([...elements, ...newEls], { canvasH: Math.max(canvasH, scenarioResult.nextCanvasH) });
+    setScenarioResult(null);
+    setScenarioStoryText("");
+    setScenarioSceneCountHint(undefined);
+    setScenarioProgress(null);
+    setScenarioOpen(false);
+    setTool("select");
+  }
+  // preview를 버리고 입력 단계로 돌아간다 — 캔버스는 건드리지 않는다. 스토리 텍스트는 남겨둔다
+  // (조금 고쳐서 다시 시도하기 쉽게 — 처음부터 다시 입력하게 강제하지 않는다).
+  function onDiscardScenarioPreview() {
+    setScenarioResult(null);
+    setScenarioError(null);
+    setScenarioProgress(null);
   }
 
   // 장면 구성 제안 텍스트를 일반 텍스트 요소로 캔버스에 추가한다 — addText()와 동일한 스폰 위치 규칙
@@ -10213,6 +10414,16 @@ function StudioCuttoonEditor() {
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setScenarioOpen(true)}
+          disabled={masterEditMode}
+          aria-label="시나리오 자동 생성 (스토리 텍스트로 컷+말풍선 자동 완성)"
+          className={cn(toolBtn(false), "disabled:opacity-40")}
+          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 자동 생성 — 스토리 텍스트로 컷+이미지+말풍선을 한 번에(BYOK)"}
+        >
+          <Clapperboard size={14} /> 시나리오 자동 생성
+        </button>
         <button type="button" onClick={addText} className={toolBtn(false)}>
           <TypeIcon size={14} /> 텍스트
         </button>
@@ -16738,6 +16949,29 @@ function StudioCuttoonEditor() {
               setCurrentPageId(id);
               setScrollPreviewOpen(false);
             }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScenarioAutoLayoutLoadingOverlay />}>
+        {scenarioOpen ? (
+          <StudioScenarioAutoLayoutPanel
+            open
+            onClose={() => setScenarioOpen(false)}
+            configured={isStudioAiConfigured(aiSettings)}
+            storyText={scenarioStoryText}
+            onStoryTextChange={setScenarioStoryText}
+            sceneCountHint={scenarioSceneCountHint}
+            onSceneCountHintChange={setScenarioSceneCountHint}
+            busy={scenarioBusy}
+            stageLabel={scenarioStageLabel}
+            progress={scenarioProgress}
+            error={scenarioError}
+            preview={scenarioResult?.items ?? null}
+            onGenerate={onGenerateScenario}
+            onCancel={onCancelScenario}
+            onApply={onApplyScenarioPreview}
+            onDiscard={onDiscardScenarioPreview}
           />
         ) : null}
       </Suspense>

@@ -7,6 +7,7 @@ import {
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
   generateConsistentCharacterImage,
+  generateScenarioScenes,
   isStudioAiConfigured,
   loadStudioAiSettings,
   saveStudioAiSettings,
@@ -457,6 +458,83 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("invalid_input");
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("generateScenarioScenes", () => {
+    it("does NOT call fetch when not configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(STUDIO_AI_DEFAULT_SETTINGS, "주인공이 학교 가는 길에 친구를 만난다");
+
+      expect(result).toEqual({ ok: false, code: "not_configured", error: expect.any(String) });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call fetch for a blank story even when configured", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(CONFIGURED, "   ");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("sends a Chat Completions request carrying the sceneCountHint and parses the JSON scene plan", async () => {
+      const content = JSON.stringify({
+        characterDescription: "단발머리 여고생, 교복 차림",
+        scenes: [
+          { imagePrompt: "아침 등굣길, 골목", dialogue: "민수: 안녕!\n지영: 오랜만이야" },
+          { imagePrompt: "교실, 창가 자리", dialogue: "" },
+        ],
+      });
+      const mockFetch = vi.fn(
+        async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(CONFIGURED, "주인공이 학교 가는 길에 친구를 만난다", {
+        sceneCountHint: 2,
+      });
+
+      const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://api.example.com/v1/chat/completions");
+      const body = JSON.parse(init.body as string);
+      expect(body.model).toBe(CONFIGURED.textModel);
+      expect(body.messages[0].role).toBe("system");
+      expect(body.messages[0].content).toContain("정확히 2개의 장면");
+      expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 학교 가는 길에 친구를 만난다" });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.characterDescription).toBe("단발머리 여고생, 교복 차림");
+      expect(result.data.scenes).toHaveLength(2);
+    });
+
+    it("surfaces parse_error when the response has no JSON object (e.g. a refusal message)", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content: "죄송하지만 도와드릴 수 없습니다." } }] }), {
+            status: 200,
+          })
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(CONFIGURED, "스토리");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("parse_error");
+    });
+
+    it("surfaces http_error on a failed request", async () => {
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({ error: "bad key" }), { status: 401 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(CONFIGURED, "스토리");
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("http_error");
     });
   });
 
