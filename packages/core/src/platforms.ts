@@ -20,6 +20,7 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
   onestory: { id: "onestory", name: "원스토리", short: "원스토리", type: "both", color: "#F04E45" },
   kyobo: { id: "kyobo", name: "교보문고", short: "교보", type: "webnovel", color: "#4F7C2F" },
   yes24: { id: "yes24", name: "예스24", short: "예스24", type: "webnovel", color: "#2B56A3" },
+  kmas: { id: "kmas", name: "만화규장각", short: "규장각", type: "both", color: "#6B5B95" },
 };
 
 export const PLATFORM_LIST = Object.values(PLATFORMS);

@@ -3,6 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
 import { BrowserCompatModal } from "../components/browser-compat-modal";
+import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
 
@@ -30,6 +31,7 @@ const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_CHANGELOGDESK_URL ||
   import.meta.env.VITE_NOTIFYDESK_URL,
 );
+let kmasEntryMergeStarted = false;
 
 function useDeferredByScroll(timeoutMs = 6500) {
   const [ready, setReady] = useState(false);
@@ -81,10 +83,26 @@ function DeferredBackToTop() {
   );
 }
 
+function useKmasEntryMerge() {
+  useEffect(() => {
+    if (kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
+    kmasEntryMergeStarted = true;
+    fetch(apiPath("/api/kmas/merge-on-access"), {
+      method: "POST",
+      cache: "no-store",
+      keepalive: true,
+    }).catch(() => {
+      kmasEntryMergeStarted = false;
+    });
+  }, []);
+}
+
 // 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
 export default function App() {
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
+
+  useKmasEntryMerge();
 
   useEffect(() => {
     const res = checkBrowserCompatibility();

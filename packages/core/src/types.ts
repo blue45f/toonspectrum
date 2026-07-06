@@ -29,7 +29,8 @@ export type PlatformId =
   | "bookcube"
   | "onestory"
   | "kyobo"
-  | "yes24";
+  | "yes24"
+  | "kmas";
 
 export interface Platform {
   id: PlatformId;

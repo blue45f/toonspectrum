@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Headers,
+  HttpCode,
   Inject,
   Get,
   Header,
@@ -56,6 +57,20 @@ interface CatalogIngestPayload {
   token?: unknown;
   requestedBy?: unknown;
   force?: unknown;
+}
+
+interface KmasBookAndWebtoonQuery {
+  title?: string;
+  isbn?: string;
+  listSeCd?: string;
+  pictrWritrNm?: string;
+  sntncWritrNm?: string;
+  pltfomCdNm?: string;
+  plscmpnIdNm?: string;
+  startDate?: string;
+  endDate?: string;
+  pageNo?: string;
+  viewItemCnt?: string;
 }
 
 @Controller()
@@ -205,6 +220,19 @@ export class CatalogController {
     return this.catalogService.getSearchData(query);
   }
 
+  @Get("/kmas/book-webtoons")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getKmasBookAndWebtoons(@Query() query: KmasBookAndWebtoonQuery) {
+    return this.catalogService.getKmasBookAndWebtoonData(query);
+  }
+
+  @Post("/kmas/merge-on-access")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store, max-age=0")
+  async mergeKmasOnAccess(@Query("force") force?: string) {
+    return this.catalogService.mergeKmasOnSiteAccess({ force: force === "1" || force === "true" });
+  }
+
   @Post("/recommend")
   @Header("Cache-Control", "no-store, max-age=0")
   async postRecommend(@Body() body: ReviewLikePostPayload) {
@@ -286,4 +314,3 @@ function sniffImageType(buf: Buffer): string | null {
   }
   return null;
 }
-

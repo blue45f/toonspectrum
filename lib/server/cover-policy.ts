@@ -26,13 +26,12 @@ export function coverImagePolicy(): CoverImagePolicy {
 // 처리한다. 현재 카탈로그엔 인증 없이 수집된 성인 전문 플랫폼 표지가 없지만, 향후 유입 대비 가드다.
 const ADULT_EXPLICIT_COVER_HOST = /(toptoon|toomics|lezhin|balcony\.studio|bomtoon|toonkor)/i;
 
-// coverImage(/api/cover?u=<원본 URL>)에서 원본 호스트를 뽑는다. 판별 불가 시 null.
+// coverImage(/api/cover?u=<원본 URL> 또는 원본 URL)에서 원본 호스트를 뽑는다. 판별 불가 시 null.
 function coverOriginHost(coverImage: string | undefined): string | null {
   if (!coverImage) return null;
   const match = coverImage.match(/[?&]u=([^&]+)/);
-  if (!match) return null;
   try {
-    return new URL(decodeURIComponent(match[1])).hostname;
+    return new URL(match ? decodeURIComponent(match[1]) : coverImage).hostname;
   } catch {
     return null;
   }

@@ -106,13 +106,16 @@ pnpm crawl                       # 크롤러 JSON을 stdout으로 출력(서버 
 pnpm ingest                      # 크롤 후 catalog.json.gz 원자적 갱신(DB 불필요; --db는 레거시)
 pnpm ingest --from out.json      # 미리 크롤해 둔 JSON 적재(재크롤 없음)
 pnpm catalog:gen                 # apps/api/data/catalog.json.gz → public/data/*.json 정적 카탈로그 생성
+KMAS_PRV_KEY=... pnpm kmas:update-catalog  # 기존 catalog.json.gz 썸네일 URL/줄거리/연령등급을 규장각 API 응답으로 점진 병합
 ```
 
 > DB는 **PostgreSQL**입니다(`lib/db`가 `DATABASE_URL`로 연결, 미설정 시 로컬 docker `:55432` 폴백). 리뷰·커뮤니티·인증 같은 동적 데이터와 ingest 실행 이력(수 KB)에만 사용합니다 — 카탈로그 본문은 DB에 저장하지 않습니다. 설정은 아래 [실행](#실행)의 "DB 준비"를 참고하세요.
 
 - **웹툰**: 요일별/완결 목록 전체를 검색 색인으로 저장하고, 상위/설정 범위는 상세 API로 제목·작가·**별점·장르·시놉시스·태그·연재요일·연령등급·연재 시작 연도·표지 썸네일**을 보강합니다. 카카오웹툰/레진을 비롯한 14개 공개 카탈로그도 추가로 정규화합니다.
 - **웹소설**: 웹툰의 원작 정보(`novelOriginAuthors`)로 실제 원작 엔트리와 **원작↔웹툰 어댑테이션 연결**을 생성하고, 네이버 시리즈 장르 랭킹으로 보강.
-- **표지 썸네일**: 핫링크/CORS 회피를 위해 Nest API의 `/api/cover` 프록시를 경유해 표시. 허용 호스트는 플랫폼별 표지 CDN으로 한정합니다 — pstatic·kakaopagecdn·kakaocdn·lezhin·ridicdn·munpia·joara·cloudfront(포스타입)·mrblue·bookcube·onestore·yes24·novelpia·balcony(봄툰)·toptoon·toomics·kyobobook.
+- **규장각 실시간 병합**: `KMAS_PRV_KEY`가 설정되어 있으면 웹 앱 진입 시 브라우저가 `/api/kmas/merge-on-access`를 한 번 호출하고, 서버가 기존 스냅샷의 노출 우선순위 작품을 만화규장각 Open API(`result` + `itemList`)로 제목 조회해 `imageDownloadUrl` 썸네일 URL, `outline` 줄거리, 연령등급을 병합합니다. KMAS 썸네일은 기존 크롤 썸네일 URL과 같은 `coverImage` 메타데이터로 저장/노출하되, 이미지 바이너리는 저장하지 않고 `/api/cover` 서버 프록시로도 중계하지 않습니다. `/api/home` 등 카탈로그 API 진입도 같은 병합 루틴을 공유합니다. `KMAS_MERGE_ON_ACCESS=0`으로 끌 수 있고, `KMAS_MERGE_ON_ACCESS_LIMIT`/`KMAS_RESPONSE_ENRICH_LIMIT`로 최초 병합·응답 보강 건수를 조절합니다. 외부 KMAS 진입 병합 결과는 `KMAS_MERGE_ON_ACCESS_TTL_MS` 동안 서버 메모리에 캐시되며 기본값은 5분입니다. 제목별 KMAS 조회도 일 1,000회 한도와 응답 지연을 줄이기 위해 서버 메모리 TTL 캐시를 사용하며, 기본값은 24시간입니다(`KMAS_LOOKUP_CACHE_TTL_MS`). 클라이언트가 인증키를 직접 들고 호출하지 않도록 서버 프록시 `/api/kmas/book-webtoons`도 제공합니다.
+- **KMAS 전체 목록 제약**: `bookAndWebtoonList`와 `dcmtDtaList` 모두 `prvKey`만 붙인 무조건 전체 목록 호출은 실제 응답에서 `데이터가 없습니다.`를 반환합니다. 전체 목록 단독 호출 검증 경로는 남겨두되, 운영 갱신은 기존 카탈로그 제목을 기준으로 공식 KMAS 응답을 매칭합니다.
+- **표지 썸네일**: 플랫폼 표지는 핫링크/CORS 회피를 위해 Nest API의 `/api/cover` 프록시를 경유해 표시합니다. 허용 호스트는 플랫폼별 표지 CDN으로 한정합니다 — pstatic·kakaopagecdn·kakaocdn·lezhin·ridicdn·munpia·joara·cloudfront(포스타입)·mrblue·bookcube·onestore·yes24·novelpia·balcony(봄툰)·toptoon·toomics·kyobobook. KMAS 썸네일은 `/api/cover`로 중계하지 않고, KMAS API가 응답한 `imageDownloadUrl` 원본 URL을 `coverImage`로 직접 노출합니다.
 - 평가 수·평점 분포·완독률·몰입 지수 등 공개되지 않는 일부 보조 지표는 추정값이며, 랭킹은 실제 수집 데이터에 산식을 적용해 계산합니다. **네이버 웹툰 별점은 실수집이지만, 네이버가 공개 조회수 집계를 비공개로 전환(목록 API가 `viewCount=0` 응답)함에 따라 조회·관심수는 추정값(≈)으로 표시합니다.** 어떤 경로로든 조회수가 0/누락이면 `scripts/crawl.mjs`의 `normalizeStats`가 별점·해시 기반 추정값으로 보정하고, 해당 작품은 `statsEstimated` 플래그로 표기되어 화면에서 ≈/추정 배지가 붙습니다(**"조회 0" 노출 방지**).
 - **플랫폼 커버리지(19개 슬롯)**: 공개 카탈로그 크롤러로 수집 가능한 플랫폼 — 네이버웹툰·네이버시리즈·카카오웹툰·카카오페이지·레진·리디·문피아·조아라·노벨피아·봄툰·탑툰·포스타입·미스터블루·투믹스·북큐브·원스토리·교보문고·예스24·코미코. 구현 상태는 `scripts/crawlers/<id>.mjs`와 `lib/server/catalog-sources.ts`가 관리합니다. 로그인/성인 인증/약관을 우회하지 않고 공개 목록 메타데이터만 사용합니다. **피너툰**(도메인 연결 종료)·**버프툰**(서비스 종료, nc.com 리다이렉트)은 폐기 서비스라 목록에서 제외했습니다. **코미코**는 운영 중이지만 한국 외 IP를 방화벽에서 차단(지오펜스)하므로, 크롤러(`scripts/crawlers/comico.mjs`)를 **KR egress 조건부**로 배선했습니다 — 한국 리전 egress(운영 크론)에선 자동 수집되고, 그 외 환경에선 첫 요청 타임아웃 시 즉시 빈 결과로 종료합니다. 또한 검색·랭킹·캘린더의 플랫폼 필터는 **카탈로그에 실제 존재하는 플랫폼만** 노출하므로(데이터 기반), 수집되지 않은 환경에서 코미코가 빈 슬롯으로 보이지 않습니다.
 - **DB 주기 갱신**:
@@ -121,7 +124,8 @@ pnpm catalog:gen                 # apps/api/data/catalog.json.gz → public/data
   - `CATALOG_INGEST_TRIGGER_TOKEN` 설정 시 `/api/catalog/ingest/run` 수동 실행 가능
   - `/api/catalog/ingest/status`에서 current snapshot, 최근 실행 이력, 다음 실행 예정 시각 확인
   - `WEBDEX_SOURCE_IDS=all` 또는 쉼표 구분 source id로 실제 실행 소스를 제한
-- **랭킹 갱신성**: 현재 활성 사용자 경로는 `scripts/build-static-catalog.ts`와 `src/catalog-static.ts`가 `disableLive=true`로 계산하는 스냅샷 산식 랭킹입니다. `/api/ranking`도 기본적으로 같은 스냅샷 산식 모드로 동작합니다. `lib/server/live.ts`의 실시간 어댑터와 `WEBTOON_LIVE_*` 환경변수는 보존되어 있지만, 별도 운영 경로로 다시 연결하기 전까지 기본 랭킹에는 외부 실시간 호출을 반영하지 않습니다.
+- **랭킹 갱신성**: 웹 기본 경로는 `/api/ranking` 서버 응답이며, 정적 모드(`VITE_CATALOG_SOURCE=static`)에서는 `scripts/build-static-catalog.ts`와 `src/catalog-static.ts`가 사전 계산한 파일을 사용합니다. 두 경로 모두 기본 랭킹은 같은 스냅샷 산식으로 동작하고, 규장각 병합은 작품 메타와 썸네일 URL 보강에만 적용됩니다. `lib/server/live.ts`의 실시간 어댑터와 `WEBTOON_LIVE_*` 환경변수는 보존되어 있지만, 별도 운영 경로로 다시 연결하기 전까지 기본 랭킹에는 외부 실시간 랭킹 호출을 반영하지 않습니다.
+- **카탈로그 호출 경로**: 웹 기본값은 `/api/*` 서버 경로입니다. 규장각 병합·런타임 정책을 타지 않는 완전 정적 카탈로그가 필요하면 `VITE_CATALOG_SOURCE=static`을 명시합니다(토스처럼 `dataBase`를 주입하는 교차 출처 셸은 정적 라우팅 유지).
 
 법적 리스크 완화를 위해 기본 수집 모드는 `off`입니다. 운영 전 플랫폼별 robots.txt, 이용약관, API 약관, 제휴 가능성, 저장 필드 범위를 검토해야 합니다. 랭킹 산식·스냅샷 모드·보존된 live 어댑터의 경계는 [`docs/ranking-architecture.md`](docs/ranking-architecture.md)에서 확인하세요. 수집 → 스냅샷 → 정적 카탈로그/API → 화면 노출까지의 전 과정 도식과 단계별 설명은 [`docs/data-pipeline.md`](docs/data-pipeline.md)를 참고하세요.
 

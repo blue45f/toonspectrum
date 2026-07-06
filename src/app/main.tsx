@@ -9,8 +9,8 @@ import { installStaticCatalog } from "../catalog-static";
 import App from "./App";
 import "../styles/globals.css";
 
-// 정적 카탈로그 모드(기본): 카탈로그 /api/* 호출을 정적 파일/클라이언트 계산으로 라우팅.
-// VITE_CATALOG_SOURCE=api 면 비활성(기존 DB/API 경로 유지). 렌더 전에 설치해 첫 fetch부터 적용.
+// API 카탈로그 모드(기본): /api/* 서버 경로에서 KMAS 병합/런타임 정책을 적용한다.
+// VITE_CATALOG_SOURCE=static 일 때만 정적 파일/클라이언트 계산 라우팅을 설치한다.
 installStaticCatalog();
 
 createRoot(document.getElementById("root")!).render(
@@ -23,4 +23,3 @@ createRoot(document.getElementById("root")!).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
-

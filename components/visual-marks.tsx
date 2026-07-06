@@ -43,7 +43,8 @@ type PlatformPattern =
   | "bookcube"
   | "onestory"
   | "kyobo"
-  | "yes24";
+  | "yes24"
+  | "kmas";
 
 const PLATFORM_MARKS: Record<
   Platform["id"],
@@ -103,6 +104,7 @@ const PLATFORM_MARKS: Record<
   onestory: { glyph: "1", pattern: "onestory", bg: "#F04E45", fg: "#FFF7F6" },
   kyobo: { glyph: "K", pattern: "kyobo", bg: "#4F7C2F", fg: "#F8FFF1" },
   yes24: { glyph: "24", pattern: "yes24", bg: "#2B56A3", fg: "#F5F8FF" },
+  kmas: { glyph: "규", pattern: "kmas", bg: "#6B5B95", fg: "#FBFAFF" },
 };
 
 function luminance(hex: string) {

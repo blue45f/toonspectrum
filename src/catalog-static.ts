@@ -2,7 +2,7 @@
 // before the app renders. Heavy catalog search/ranking logic lives in catalog-static-engine
 // and is loaded only for dynamic catalog routes.
 
-const STATIC_MODE = (import.meta.env.VITE_CATALOG_SOURCE ?? "static") !== "api";
+const STATIC_MODE = import.meta.env.VITE_CATALOG_SOURCE === "static";
 
 const STATIC_FILES: Record<string, string> = {
   "/api/home": "/data/home.json",
@@ -98,8 +98,9 @@ export interface StaticCatalogOptions {
  *   배포 오리진에서 가져오고 19+ 만 정책 제외한다(데이터/페이지 포크 0).
  */
 export function installStaticCatalog(options: StaticCatalogOptions = {}): void {
-  if (!STATIC_MODE || typeof window === "undefined" || (globalThis.fetch as { __toonspectrumStatic?: boolean }).__toonspectrumStatic) return;
   const { dataBase, filterTitle } = options;
+  const useStaticMode = STATIC_MODE || Boolean(dataBase);
+  if (!useStaticMode || typeof window === "undefined" || (globalThis.fetch as { __toonspectrumStatic?: boolean }).__toonspectrumStatic) return;
   const base = dataBase ? dataBase.replace(/\/+$/, "") : "";
 
   // 콘텐츠 정책 필터(토스 19+ 제외)는 엔진이 카탈로그 로드 시 읽어 시드 자체에서 제외한다.

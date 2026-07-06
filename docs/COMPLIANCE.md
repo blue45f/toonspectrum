@@ -36,11 +36,12 @@
   **폐기**했다. 랭킹은 커밋된 스냅샷에 대한 산식 전용.) 카탈로그는 커밋 스냅샷(`apps/api/data/
   catalog.json.gz`)을 정적 서빙하며, 수집(`CATALOG_INGEST_MODE`)은 **기본 off**·오프라인 수동
   작업(`pnpm catalog:update`)이다.
-- **공식 API 전환(진행 중):** 근본 대응으로 **KMAS(한국만화영상진흥원 만화규장각) 오픈 API**(공공
-  데이터: 도서·웹툰 메타 + 이미지 URL, REST/JSON, 일 1000회)를 채택. 2026-07-03 사용 신청 완료
-  (승인 대기). 승인 후 KMAS 데이터를 정당한 소스로 카탈로그에 병합하고 KMAS 이미지를 표지로 사용
-  (크롤 표지 대체)한다. 관련정보(`docs/related-info.md`)는 이미 네이버 검색 API·YouTube Data API
-  전환 경로(env 키)를 갖춰 뒀다.
+- **공식 API 전환(진행 중):** 근본 대응으로 **KMAS(한국만화영상진흥원 만화규장각) 오픈 API**(도서·웹툰
+  메타 + `imageDownloadUrl`, REST/JSON, 일 1000회)를 채택. KMAS 메타데이터와 시놉시스는 정당한
+  보강 소스로 쓰고, `imageDownloadUrl`은 기존 크롤 썸네일 URL과 같은 `coverImage` 메타데이터로
+  저장/노출한다. 단, KMAS 이미지 바이너리는 저장하지 않고 서버 이미지 프록시로도 중계하지 않는다.
+  KMAS 일 1,000회 한도와 응답 지연을 고려해 제목 조회 결과는 서버 메모리 TTL 캐시로 재사용한다.
+  관련정보(`docs/related-info.md`)는 이미 네이버 검색 API·YouTube Data API 전환 경로(env 키)를 갖춰 뒀다.
 - 소스 레지스트리(`lib/server/catalog-sources.ts`)는 플랫폼별 `implementation`·`risk`·`requiredReview`
   를 둔다. `partner-required`/`high` 소스는 **제휴·공식 피드 확인 전까지 운영 활성화 금지**.
 - ⚠️ **잔존 갭 — 시놉시스 원문:** detail 샤드(`s` 필드)에 플랫폼 시놉시스가 원문 그대로 저장된다.
@@ -87,7 +88,7 @@
 
 ## 출시 전 최종 체크리스트(요약)
 
-1. [ ] **KMAS 등 공식 API 승인·연동** — 크롤 의존을 공식 소스로 대체(§2). 표지는 KMAS 이미지로.
+1. [ ] **KMAS 등 공식 API 승인·연동** — 크롤 의존을 공식 소스로 대체(§2). KMAS 이미지는 바이너리 저장·서버 중계 없이 `imageDownloadUrl` 주소만 사용.
 2. [ ] `COVER_IMAGE_POLICY` 결정(`proxy` / `off` 최대안전) + 시놉시스 원문 노출 축소(스니펫/자체요약)
 3. [ ] 크롤 대상 플랫폼 robots/ToS 검토 완료, `partner-required` 소스 비활성 유지, 런타임 페치 없음 확인
 4. [ ] 개인정보처리방침·이용약관 정식 게시 + 동의 플로우

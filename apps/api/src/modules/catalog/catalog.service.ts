@@ -16,6 +16,16 @@ import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../..
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
 import { isAdminUser } from "../../../../../lib/server/app-config";
 import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
+import {
+  enrichTitleWithKmas,
+  enrichTitlesWithKmas,
+  getKmasBookAndWebtoonProxyResponse,
+  getKmasSearchData,
+  mergeKmasForSiteAccessOnce,
+  shouldMergeKmasOnAccess,
+  withKmasImageUrlsForResponse,
+  type KmasSiteAccessMergeResult,
+} from "../../../../../lib/server/kmas";
 import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
 // 브라우저-세이프 카탈로그 read-model 7종은 @toonspectrum/core 패키지(packages/core/src/server)로 이전됨
 // (웹·토스와 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
@@ -75,6 +85,24 @@ interface IngestRunPayload {
   force?: unknown;
 }
 
+interface KmasBookAndWebtoonQuery {
+  title?: string;
+  isbn?: string;
+  listSeCd?: string;
+  pictrWritrNm?: string;
+  sntncWritrNm?: string;
+  pltfomCdNm?: string;
+  plscmpnIdNm?: string;
+  startDate?: string;
+  endDate?: string;
+  pageNo?: string;
+  viewItemCnt?: string;
+}
+
+interface KmasMergeOptions {
+  force?: boolean;
+}
+
 const validSorts = new Set<SortKey>([
   "relevance",
   "rating",
@@ -100,6 +128,7 @@ export class CatalogService implements OnModuleInit {
   private ingestInProgress: Promise<CatalogIngestRunResult> | null = null;
   private consecutiveIngestFailures = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private kmasSiteAccessLogged = false;
 
   async onModuleInit() {
     try {
@@ -123,6 +152,56 @@ export class CatalogService implements OnModuleInit {
     // 갱신 감지 폴링: 파일 모드는 mtime/size 스탯 비교(무비용)라 항상 켠다.
     // 레거시 FORCE_DB 모드에서만 기존 DB 해시 폴링이 동작한다(refreshCatalogIfChanged 내부 분기).
     this.startCatalogRefreshPoll();
+  }
+
+  async mergeKmasOnSiteAccess(options: KmasMergeOptions = {}): Promise<KmasSiteAccessMergeResult & { generatedAt: string }> {
+    if (!shouldMergeKmasOnAccess()) {
+      return {
+        enabled: false,
+        attempted: 0,
+        updated: 0,
+        cached: false,
+        cacheTtlMs: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+    try {
+      const result = await mergeKmasForSiteAccessOnce(process.env, options);
+      if (!this.kmasSiteAccessLogged && result.enabled && !result.cached) {
+        this.kmasSiteAccessLogged = true;
+        console.log(
+          `KMAS live merge on access: attempted=${result.attempted} updated=${result.updated} cacheTtlMs=${result.cacheTtlMs}`
+        );
+      }
+      return { ...result, generatedAt: new Date().toISOString() };
+    } catch (error) {
+      console.error("KMAS live merge on access failed; using existing catalog data", error);
+      return {
+        enabled: true,
+        attempted: 0,
+        updated: 0,
+        cached: false,
+        cacheTtlMs: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  private async enrichResponseTitles(items: readonly Title[]) {
+    if (!shouldMergeKmasOnAccess() || items.length === 0) return;
+    const limit = clampLimit(process.env.KMAS_RESPONSE_ENRICH_LIMIT ?? 12);
+    await enrichTitlesWithKmas(items.slice(0, limit)).catch((error) => {
+      console.error("KMAS response enrichment failed; returning existing title data", error);
+    });
+  }
+
+  private async withKmasImages<T>(data: T): Promise<T> {
+    if (!shouldMergeKmasOnAccess()) return data;
+    const limit = clampLimit(process.env.KMAS_RESPONSE_IMAGE_LIMIT ?? 96);
+    return withKmasImageUrlsForResponse(data, process.env, limit, { cachedOnly: true }).catch((error) => {
+      console.error("KMAS response image URL overlay failed; returning existing title data", error);
+      return data;
+    });
   }
 
   // 무중단 핫 리로드 폴링: 외부 프로세스(CLI/cron/다른 인스턴스)가 새 카탈로그를 적재하면
@@ -156,26 +235,38 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getHomeData() {
-    return getHomeData();
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getHomeData());
   }
 
   async getCalendarData() {
-    return getCalendarData();
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getCalendarData());
   }
 
   async getInsightsData() {
-    return getInsightsData();
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getInsightsData());
   }
 
   async getRankingData(query: QueryRecord) {
-    return getRankingData(createQueryReader(query));
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getRankingData(createQueryReader(query)));
   }
 
   async getExploreData(query: QueryRecord) {
-    return getExploreData(query);
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getExploreData(query));
   }
 
   async getSearchData(query: SearchRouteQuery) {
+    await this.mergeKmasOnSiteAccess();
+    const kmasLive = await getKmasSearchData({ q: query.q }).catch((error) => {
+      console.error("KMAS live search failed; falling back to existing catalog search", error);
+      return null;
+    });
+    if (kmasLive) return kmasLive;
+
     const sort = validSorts.has(query.sort as SortKey) ? (query.sort as SortKey) : "popular";
     const filters: SearchFilters = {
       q: query.q ?? "",
@@ -192,12 +283,13 @@ export class CatalogService implements OnModuleInit {
       adaptedOnly: boolParam(query.adaptedOnly),
     };
     const items = searchTitles(TITLES, filters, sort);
+    await this.enrichResponseTitles(items);
     const typeCount = {
       webtoon: items.filter((title) => title.type === "webtoon").length,
       webnovel: items.filter((title) => title.type === "webnovel").length,
     };
 
-    return {
+    return this.withKmasImages({
       items,
       total: items.length,
       typeCount,
@@ -208,10 +300,11 @@ export class CatalogService implements OnModuleInit {
       },
       topTags: activeTags().slice(0, 18).map((tag) => tag.tag),
       generatedAt: new Date().toISOString(),
-    };
+    });
   }
 
   async getRecommendData(payload: RecommendPayload) {
+    await this.mergeKmasOnSiteAccess();
     const body = (payload ?? {}) as Record<string, unknown>;
     const picked = stringList(body.picked);
     const seedId = typeof body.seedId === "string" ? body.seedId : null;
@@ -238,7 +331,7 @@ export class CatalogService implements OnModuleInit {
     const seed = (seedId && getTitle(seedId)) || popular[0] || null;
     const similar = seed ? similarTitles(TITLES, seed, 12) : [];
 
-    return {
+    return this.withKmasImages({
       pickedRecs,
       pickedLabelGenres: genres,
       tasteRecs,
@@ -252,18 +345,21 @@ export class CatalogService implements OnModuleInit {
         topGenres: profile.topGenres,
       },
       generatedAt: new Date().toISOString(),
-    };
+    });
   }
 
   async getTagCloud() {
+    await this.mergeKmasOnSiteAccess();
     return { tags: activeTags() };
   }
 
   async getAuthorDirectory() {
-    return getAuthorDirectory();
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getAuthorDirectory());
   }
 
   async getTitles(query: TitleQuery) {
+    await this.mergeKmasOnSiteAccess();
     const sort = SORTS.includes((query.sort as SortKey) ? (query.sort as SortKey) : "popular")
       ? (query.sort as SortKey)
       : "popular";
@@ -292,8 +388,9 @@ export class CatalogService implements OnModuleInit {
     } else {
       items = sortTitles(TITLES, sort).slice(0, limit);
     }
+    await this.enrichResponseTitles(items);
 
-    return {
+    return this.withKmasImages({
       items,
       meta: {
         total: items.length,
@@ -303,11 +400,14 @@ export class CatalogService implements OnModuleInit {
         generatedAt: new Date().toISOString(),
         source: "server-catalog",
       },
-    };
+    });
   }
 
   async getTitleDetail(id: string) {
-    return getTitleDetailFromLib(id);
+    await this.mergeKmasOnSiteAccess();
+    const data = await getTitleDetailFromLib(id);
+    if (data?.title) await enrichTitleWithKmas(data.title).catch(() => data.title);
+    return this.withKmasImages(data);
   }
 
   async getTitleReviews(titleId: string) {
@@ -358,7 +458,24 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getAuthorData(name: string) {
-    return getAuthorData(name);
+    await this.mergeKmasOnSiteAccess();
+    return this.withKmasImages(getAuthorData(name));
+  }
+
+  async getKmasBookAndWebtoonData(query: KmasBookAndWebtoonQuery) {
+    return getKmasBookAndWebtoonProxyResponse({
+      title: query.title,
+      isbn: query.isbn,
+      listSeCd: query.listSeCd,
+      pictrWritrNm: query.pictrWritrNm,
+      sntncWritrNm: query.sntncWritrNm,
+      pltfomCdNm: query.pltfomCdNm,
+      plscmpnIdNm: query.plscmpnIdNm,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      pageNo: numberParam(query.pageNo),
+      viewItemCnt: numberParam(query.viewItemCnt),
+    });
   }
 
   async getCatalogIngestStatus() {
