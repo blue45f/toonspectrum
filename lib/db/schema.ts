@@ -1,4 +1,5 @@
-import { pgTable, text, integer, bigint, timestamp, boolean, jsonb, primaryKey, unique, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, boolean, check, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
@@ -383,6 +384,8 @@ export const creatorWorks = pgTable(
     status: text("status").notNull().default("published"), // draft | published
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     views: integer("views").notNull().default(0),
+    // 편집 저장용 단조 증가 버전. 공개 작품 정렬/조회수와 무관하며, 소유자의 낙관적 충돌 방지에만 사용.
+    revision: integer("revision").notNull().default(1),
     // 연재 시리즈(코미코 베스트도전 스타일) — 설정 시 시리즈의 한 회차가 된다.
     // FK는 의도적으로 생략(reviewLikes.reviewId와 동일 관례) — 런타임 ensure DDL과 push 양쪽 호환.
     seriesId: text("seriesId"),
@@ -401,6 +404,31 @@ export const creatorWorks = pgTable(
     index("idx_creator_work_series_episode").on(t.seriesId, t.episodeNo), // 시리즈 회차 정렬
     index("idx_creator_work_challenge_created").on(t.challengeId, t.createdAt), // 챌린지 참여작
     index("idx_creator_work_remix").on(t.remixFromId), // 리믹스 쿼리 최적화
+    check("creator_work_revision_value_positive_check", sql`${t.revision} >= 1`),
+  ]
+);
+
+// 작품 편집 revision의 전체 snapshot. owner-only API에서만 읽고 복원하며 공개 작품 투영에는 포함하지 않는다.
+// PK(workId, revision)는 작품별 최신순 조회를 역방향 index scan으로 처리하고 FK cascade도 빠르게 만든다.
+export const creatorWorkRevisions = pgTable(
+  "creator_work_revision",
+  {
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    restoredFromRevision: integer("restoredFromRevision"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "creator_work_revision_pkey", columns: [t.workId, t.revision] }),
+    check("creator_work_revision_positive_check", sql`${t.revision} >= 1`),
+    check(
+      "creator_work_revision_restored_from_positive_check",
+      sql`${t.restoredFromRevision} is null or ${t.restoredFromRevision} >= 1`
+    ),
+    check("creator_work_revision_snapshot_object_check", sql`jsonb_typeof(${t.snapshot}) = 'object'`),
   ]
 );
 
@@ -510,6 +538,73 @@ export const creatorAssets = pgTable(
   (t) => [
     index("creator_asset_created_idx").on(t.createdAt), // 런타임 ensure 미러(이름 유지)
     index("idx_creator_asset_user").on(t.userId), // 내 에셋 목록
+  ]
+);
+
+// ── 창작 스튜디오 서버 AI: 분산 일일 쿼터 + 최소 사용 이력 ──────────────
+// 원장에는 프롬프트/응답/API 키/제공자 오류 본문을 저장하지 않는다. 일일 집계 행은 외부 호출 전에
+// 토큰을 보수적으로 예약해 여러 API 인스턴스의 동시 요청도 단일 Postgres UPSERT로 제한한다.
+export const studioAiDailyQuotas = pgTable(
+  "studio_ai_daily_quota",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    usageDay: date("usageDay", { mode: "string" }).notNull(), // DB clock 기준 UTC 날짜
+    requestCount: integer("requestCount").notNull().default(0),
+    tokenCount: bigint("tokenCount", { mode: "number" }).notNull().default(0),
+    reservedTokens: bigint("reservedTokens", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "studio_ai_daily_quota_pkey", columns: [t.userId, t.usageDay] }),
+    check("studio_ai_daily_quota_request_count_check", sql`${t.requestCount} >= 0`),
+    check("studio_ai_daily_quota_token_count_check", sql`${t.tokenCount} >= 0`),
+    check("studio_ai_daily_quota_reserved_tokens_check", sql`${t.reservedTokens} >= 0`),
+  ]
+);
+
+export const studioAiUsageLedger = pgTable(
+  "studio_ai_usage_ledger",
+  {
+    id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    task: text("task").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(), // 서버가 요청한 고정 모델; 제공자 응답 본문 값은 기록하지 않음
+    attemptCount: integer("attemptCount").notNull().default(1),
+    status: text("status").notNull(),
+    promptTokens: integer("promptTokens"),
+    completionTokens: integer("completionTokens"),
+    totalTokens: integer("totalTokens"),
+    startedAt: timestamp("startedAt", { mode: "date", withTimezone: true }).notNull(),
+    finishedAt: timestamp("finishedAt", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_ai_usage_user_started").on(t.userId, t.startedAt),
+    index("idx_studio_ai_usage_status_started").on(t.status, t.startedAt),
+    check(
+      "studio_ai_usage_task_check",
+      sql`${t.task} in ('composition', 'scenario', 'translation', 'dialogue', 'palette')`
+    ),
+    check("studio_ai_usage_provider_check", sql`${t.provider} in ('zai', 'deepseek')`),
+    check("studio_ai_usage_model_check", sql`char_length(${t.model}) between 1 and 200`),
+    check("studio_ai_usage_attempt_count_check", sql`${t.attemptCount} between 1 and 2`),
+    check(
+      "studio_ai_usage_status_check",
+      sql`${t.status} in ('success', 'client_aborted', 'timeout', 'provider_rate_limited', 'provider_error', 'network_error', 'content_filtered')`
+    ),
+    check("studio_ai_usage_prompt_tokens_check", sql`${t.promptTokens} is null or ${t.promptTokens} >= 0`),
+    check(
+      "studio_ai_usage_completion_tokens_check",
+      sql`${t.completionTokens} is null or ${t.completionTokens} >= 0`
+    ),
+    check("studio_ai_usage_total_tokens_check", sql`${t.totalTokens} is null or ${t.totalTokens} >= 0`),
+    check("studio_ai_usage_timestamps_check", sql`${t.finishedAt} >= ${t.startedAt}`),
   ]
 );
 

@@ -14,6 +14,7 @@ import { cx } from "@/lib/cx";
 import { useT } from "@/lib/i18n";
 import { keepInlineText } from "@/lib/text";
 import { useUi } from "@/lib/ui-store";
+import { isImmersiveMobileRoute } from "@/src/app/routes/immersive-mobile-route";
 import { usePathname } from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
 
@@ -70,12 +71,6 @@ function MobileNavigationFallback() {
       className="fixed inset-x-0 bottom-0 z-50 h-[calc(3.75rem+env(safe-area-inset-bottom))] border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
     />
   );
-}
-
-// /studio 는 자체 모바일 도구막대(StudioPage.tsx)를 하단에 고정 배치하므로, 전역 하단 탭바를
-// 겹쳐 그리면 두 바가 동시에 화면 아래를 차지해 캔버스 조작 영역을 침범한다 — 여기서만 숨긴다.
-function isImmersiveMobileRoute(pathname: string) {
-  return pathname.startsWith("/studio");
 }
 
 export function SiteHeader() {

@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
 import { BrowserCompatModal } from "../components/browser-compat-modal";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
+import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
@@ -97,6 +98,23 @@ function useKmasEntryMerge() {
   }, []);
 }
 
+/**
+ * Studio 모바일은 2단 하단 도크와 선택 컨텍스트 바를 직접 소유한다. 그 위에 전역 설정
+ * 버튼을 다시 띄우면 375px 화면에서 핵심 도구를 가리므로 모바일에서만 숨긴다. 데스크톱은
+ * 작업 영역과 충돌하지 않아 전역 사운드·테마·언어 접근을 그대로 유지한다.
+ */
+function WebFloatingControls() {
+  const { pathname } = useLocation();
+  const hideOnMobile = isImmersiveMobileRoute(pathname);
+
+  return (
+    <FloatingControls
+      placement="bottom-left"
+      className={hideOnMobile ? "max-md:hidden" : undefined}
+    />
+  );
+}
+
 // 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
 export default function App() {
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
@@ -124,7 +142,7 @@ export default function App() {
       <AppShell
         header={<SiteHeader />}
         footer={<DeferredFooter />}
-        floatingControls={<FloatingControls placement="bottom-left" />}
+        floatingControls={<WebFloatingControls />}
         chromeOverlay={
           <>
             <DeferredBackToTop />

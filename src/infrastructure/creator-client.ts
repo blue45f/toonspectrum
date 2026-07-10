@@ -4,7 +4,7 @@
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
 import { ensureArray } from "@/lib/http-safe";
 import { getAuthUserId } from "@/src/compat/auth-session-store";
-import { api, toApiError } from "@/src/infrastructure/api";
+import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
 
 export type WorkFormat = "cuttoon" | "upload";
 
@@ -36,6 +36,8 @@ export interface WorkSummary {
   challengeId?: string | null;
   challengeTitle?: string | null;
   remixFromId?: string | null;
+  // Owner-only detail/create/update responses include this optimistic concurrency token.
+  revision?: number;
 }
 
 // 작품 상세의 이전화/다음화 내비게이션 항목.
@@ -96,7 +98,60 @@ export interface CreateWorkInput {
   remixFromId?: string | null;
 }
 
-export type UpdateWorkInput = Partial<CreateWorkInput>;
+export type UpdateWorkInput = Partial<CreateWorkInput> & { baseRevision?: number };
+
+export interface WorkRevisionSummary {
+  revision: number;
+  restoredFromRevision: number | null;
+  createdAt: string;
+}
+
+export interface WorkRevisionDetail extends WorkRevisionSummary {
+  snapshot: Record<string, unknown>;
+}
+
+export class WorkRevisionConflictError extends Error {
+  readonly currentRevision: number;
+
+  constructor(currentRevision: number) {
+    super("다른 기기나 창에서 먼저 저장했습니다. 작품을 다시 불러온 뒤 변경 내용을 확인해 주세요.");
+    this.name = "WorkRevisionConflictError";
+    this.currentRevision = currentRevision;
+  }
+}
+
+function revisionConflictFrom(error: unknown): WorkRevisionConflictError | null {
+  if (!isHttpError(error) || error.response.status !== 409) return null;
+  const payload = error.data;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  if (record.code !== "creator_work_revision_conflict") return null;
+  const currentRevision = record.currentRevision;
+  if (
+    typeof currentRevision !== "number" ||
+    !Number.isInteger(currentRevision) ||
+    currentRevision < 1 ||
+    currentRevision > 2_147_483_647
+  ) {
+    return null;
+  }
+  return new WorkRevisionConflictError(currentRevision);
+}
+
+async function mutateWorkOrThrow(
+  run: () => Promise<WorkSummary>,
+  fallback: string
+): Promise<WorkSummary> {
+  try {
+    const work = await run();
+    if (work == null) throw new Error(fallback);
+    return work;
+  } catch (error) {
+    const conflict = revisionConflictFrom(error);
+    if (conflict) throw conflict;
+    throw await toApiError(error, fallback);
+  }
+}
 
 // api 래퍼는 "/api" 이후 경로를 받는다(내부에서 apiPath 가 "/api" 를 붙임).
 const BASE = "/creator";
@@ -155,9 +210,49 @@ export async function createWork(input: CreateWorkInput): Promise<WorkSummary> {
 }
 
 export async function updateWork(id: string, input: UpdateWorkInput): Promise<WorkSummary> {
-  return callOrThrow(
+  return mutateWorkOrThrow(
     () => api.patch<WorkSummary>(`${BASE}/works/${encodeURIComponent(id)}`, input),
     "창작물을 수정하지 못했습니다."
+  );
+}
+
+export async function listWorkRevisions(
+  id: string,
+  limit = 20,
+  signal?: AbortSignal
+): Promise<WorkRevisionSummary[]> {
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/works/${encodeURIComponent(id)}/revisions`, { params: { limit }, signal }),
+    "작품 버전 목록을 불러오지 못했습니다."
+  );
+  return ensureArray<WorkRevisionSummary>(data);
+}
+
+export async function getWorkRevision(
+  id: string,
+  revision: number,
+  signal?: AbortSignal
+): Promise<WorkRevisionDetail> {
+  return callOrThrow(
+    () => api.get<WorkRevisionDetail>(
+      `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}`,
+      { signal }
+    ),
+    "작품 버전을 불러오지 못했습니다."
+  );
+}
+
+export async function restoreWorkRevision(
+  id: string,
+  revision: number,
+  baseRevision: number
+): Promise<WorkSummary> {
+  return mutateWorkOrThrow(
+    () => api.post<WorkSummary>(
+      `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}/restore`,
+      { baseRevision }
+    ),
+    "작품 버전을 복원하지 못했습니다."
   );
 }
 

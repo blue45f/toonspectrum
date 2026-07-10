@@ -20,6 +20,7 @@
  */
 import { Copy, LayoutGrid, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type ReactElement } from "react";
+import { createPortal } from "react-dom";
 
 import { hasCustomPageName, pageDisplayName } from "./studio-page-meta";
 import { StudioPanelChip } from "./studio-panel-ui";
@@ -107,7 +108,7 @@ export function StudioStoryboardGridPanel({
 
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
       role="dialog"
       aria-modal="true"
@@ -257,4 +258,7 @@ export function StudioStoryboardGridPanel({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

@@ -12,6 +12,8 @@ describe("buildScenarioScenesPrompt", () => {
     expect(user).toBe("주인공이 학교 가는 길에 친구를 만난다");
     expect(system).toContain("3~8개의 장면");
     expect(system).toContain("JSON");
+    expect(system).toContain("beatType");
+    expect(system).toContain("summary");
   });
 
   it("asks for an exact scene count when a valid hint (2~10) is given", () => {
@@ -30,6 +32,18 @@ describe("buildScenarioScenesPrompt", () => {
     const b = buildScenarioScenesPrompt("같은 스토리", 4);
     expect(a).toEqual(b);
   });
+
+  it("adds a bounded character bible section and protects locked fields", () => {
+    const { system, user } = buildScenarioScenesPrompt(
+      "학교에서 재회한다",
+      3,
+      "캐릭터 1\n- 외형 [고정]: 은빛 단발"
+    );
+    expect(system).toContain("[고정]");
+    expect(user).toContain("[캐릭터 바이블]");
+    expect(user).toContain("은빛 단발");
+    expect(user).toContain("[스토리 아이디어]\n학교에서 재회한다");
+  });
 });
 
 describe("parseScenarioScenesResponse", () => {
@@ -47,6 +61,63 @@ describe("parseScenarioScenesResponse", () => {
     expect(result.data.characterDescription).toBe("단발머리 여고생, 교복 차림");
     expect(result.data.scenes).toHaveLength(2);
     expect(result.data.scenes[0]).toEqual({ imagePrompt: "아침 등굣길, 골목", dialogue: "민수: 안녕!\n지영: 오랜만이야" });
+  });
+
+  it("parses structured beat metadata and normalizes an unknown beat type", () => {
+    const result = parseScenarioScenesResponse(
+      JSON.stringify({
+        characterDescription: "",
+        scenes: [
+          {
+            beatType: "climax",
+            summary: "주인공이 마침내 진실을 밝힌다",
+            imagePrompt: "옥상, 폭우",
+            dialogue: "주인공: 이제 끝이야.",
+          },
+          { beatType: "unsupported", summary: "다음 회차로 연결된다", imagePrompt: "", dialogue: "" },
+        ],
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.scenes[0]).toMatchObject({ beatType: "climax", summary: "주인공이 마침내 진실을 밝힌다" });
+    expect(result.data.scenes[1]).toEqual({
+      beatType: "transition",
+      summary: "다음 회차로 연결된다",
+      imagePrompt: "",
+      dialogue: "",
+    });
+  });
+
+  it("normalizes structured continuity facts and drops malformed empty values", () => {
+    const result = parseScenarioScenesResponse(
+      JSON.stringify({
+        characterDescription: "",
+        scenes: [{
+          summary: "교실에서 옥상으로 이동한다",
+          imagePrompt: "옥상",
+          dialogue: "윤슬: 찾았다.",
+          continuity: {
+            characterNames: [" 윤슬 ", "윤슬", null],
+            location: " 옥상 ",
+            time: "밤",
+            costumes: { 윤슬: " 교복 ", 빈값: " " },
+            props: { 열쇠: "윤슬 소유" },
+            transitionExplanations: { location: "계단으로 이동", props: { 열쇠: "주웠다" } },
+          },
+        }],
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.scenes[0].continuity).toEqual({
+      characterNames: ["윤슬"],
+      location: "옥상",
+      time: "밤",
+      costumes: { 윤슬: "교복" },
+      props: { 열쇠: "윤슬 소유" },
+      transitionExplanations: { location: "계단으로 이동", props: { 열쇠: "주웠다" } },
+    });
   });
 
   it("extracts the JSON object even when wrapped in a markdown code fence with prose around it", () => {
@@ -92,6 +163,15 @@ describe("parseScenarioScenesResponse", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.scenes).toEqual([{ imagePrompt: "유효한 장면", dialogue: "" }]);
+  });
+
+  it("keeps a summary-only structural beat", () => {
+    const result = parseScenarioScenesResponse(
+      JSON.stringify({ characterDescription: "", scenes: [{ summary: "긴장감이 높아진다" }] })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.scenes).toEqual([{ summary: "긴장감이 높아진다", imagePrompt: "", dialogue: "" }]);
   });
 
   it("returns ok:false when every scene entry is empty after filtering", () => {

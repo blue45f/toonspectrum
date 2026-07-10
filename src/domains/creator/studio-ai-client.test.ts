@@ -8,8 +8,10 @@ import {
   generateBackgroundImage,
   generateConsistentCharacterImage,
   generateScenarioScenes,
+  generateStudioWriterRoomDraft,
   isStudioAiConfigured,
   loadStudioAiSettings,
+  loadStudioAiSessionSettings,
   saveStudioAiSettings,
   STUDIO_AI_DEFAULT_SETTINGS,
   STUDIO_AI_SETTINGS_KEY,
@@ -17,9 +19,11 @@ import {
   suggestDialogueLines,
   suggestSceneComposition,
   testAiConnection,
+  translateDialogueBatch,
   type StudioAiSettings,
   type StudioAiStorage,
 } from "./studio-ai-client";
+import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
 // 인메모리 storage — studio-brand-kit.test.ts 계열과 동일하게 localStorage 인터페이스만 흉내낸다.
 function createMemoryStorage(): StudioAiStorage & { data: Map<string, string> } {
@@ -30,6 +34,9 @@ function createMemoryStorage(): StudioAiStorage & { data: Map<string, string> } 
     setItem: (key, value) => {
       data.set(key, value);
     },
+    removeItem: (key) => {
+      data.delete(key);
+    },
   };
 }
 
@@ -38,6 +45,21 @@ const CONFIGURED: StudioAiSettings = {
   baseUrl: "https://api.example.com/v1",
   apiKey: "sk-test-key",
 };
+
+function createAbortAwareFetch() {
+  return vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      const rejectAsAborted = () => {
+        reject(Object.assign(new Error("provider-specific abort message"), { name: "AbortError" }));
+      };
+      if (init?.signal?.aborted) {
+        rejectAsAborted();
+        return;
+      }
+      init?.signal?.addEventListener("abort", rejectAsAborted, { once: true });
+    })
+  );
+}
 
 describe("studio-ai-client settings storage", () => {
   it("returns defaults when storage is empty/absent", () => {
@@ -67,6 +89,27 @@ describe("studio-ai-client settings storage", () => {
     const storage = createMemoryStorage();
     saveStudioAiSettings(storage, { ...STUDIO_AI_DEFAULT_SETTINGS, apiKey: "" });
     expect(loadStudioAiSettings(storage).apiKey).toBe("");
+  });
+
+  it("migrates a legacy persistent BYOK key into the tab session and removes the durable copy", () => {
+    const session = createMemoryStorage();
+    const legacy = createMemoryStorage();
+    saveStudioAiSettings(legacy, CONFIGURED);
+
+    expect(loadStudioAiSessionSettings(session, legacy)).toEqual(CONFIGURED);
+    expect(loadStudioAiSettings(session)).toEqual(CONFIGURED);
+    expect(legacy.getItem(STUDIO_AI_SETTINGS_KEY)).toBeNull();
+  });
+
+  it("prefers the current tab session and still deletes a stale legacy key", () => {
+    const session = createMemoryStorage();
+    const legacy = createMemoryStorage();
+    const sessionSettings = { ...CONFIGURED, apiKey: "session-only-key" };
+    saveStudioAiSettings(session, sessionSettings);
+    saveStudioAiSettings(legacy, { ...CONFIGURED, apiKey: "stale-persistent-key" });
+
+    expect(loadStudioAiSessionSettings(session, legacy)).toEqual(sessionSettings);
+    expect(legacy.getItem(STUDIO_AI_SETTINGS_KEY)).toBeNull();
   });
 
   it("isStudioAiConfigured requires both baseUrl and apiKey", () => {
@@ -238,6 +281,23 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
 
       const result = await generateBackgroundImage(CONFIGURED, "prompt");
       expect(result).toEqual({ ok: false, code: "network_error", error: "offline" });
+    });
+
+    it("forwards opts.signal to the JSON request and resolves an abort as network_error", async () => {
+      const controller = new AbortController();
+      const mockFetch = createAbortAwareFetch();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const resultPromise = generateBackgroundImage(CONFIGURED, "prompt", { signal: controller.signal });
+      const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(init.signal).toBe(controller.signal);
+
+      controller.abort();
+      await expect(resultPromise).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
     });
 
     it("returns parse_error when the response has no b64_json (e.g. url-only providers)", async () => {
@@ -418,6 +478,26 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       const result = await generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt);
       expect(result).toEqual({ ok: false, code: "network_error", error: "offline" });
     });
+
+    it("forwards opts.signal to the multipart request and resolves an abort as network_error", async () => {
+      const controller = new AbortController();
+      const mockFetch = createAbortAwareFetch();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const resultPromise = generateConsistentCharacterImage(CONFIGURED, referenceDataUrl, situationPrompt, {
+        signal: controller.signal,
+      });
+      const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(init.signal).toBe(controller.signal);
+      expect(init.body).toBeInstanceOf(FormData);
+
+      controller.abort();
+      await expect(resultPromise).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
+    });
   });
 
   describe("suggestSceneComposition", () => {
@@ -449,7 +529,17 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 교실에 들어온다" });
       expect(body.messages[0].role).toBe("system");
 
-      expect(result).toEqual({ ok: true, data: { suggestion: "- 미디엄샷으로 시작\n- ..." } });
+      expect(result).toMatchObject({
+        ok: true,
+        data: {
+          suggestion: "- 미디엄샷으로 시작\n- ...",
+          textProvenance: {
+            provider: "api.example.com",
+            model: CONFIGURED.textModel,
+            transport: "byok",
+          },
+        },
+      });
     });
 
     it("returns invalid_input for blank scene text without calling fetch", async () => {
@@ -494,12 +584,21 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
         ],
       });
       const mockFetch = vi.fn(
-        async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content } }],
+              model: "provider-text-v2",
+              usage: { prompt_tokens: 120, completion_tokens: 80, total_tokens: 200 },
+            }),
+            { status: 200 }
+          )
       );
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
       const result = await generateScenarioScenes(CONFIGURED, "주인공이 학교 가는 길에 친구를 만난다", {
         sceneCountHint: 2,
+        characterContext: "캐릭터 1\n- 외형 [고정]: 은빛 단발",
       });
 
       const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -508,12 +607,23 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(body.model).toBe(CONFIGURED.textModel);
       expect(body.messages[0].role).toBe("system");
       expect(body.messages[0].content).toContain("정확히 2개의 장면");
-      expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 학교 가는 길에 친구를 만난다" });
+      expect(body.messages[1].role).toBe("user");
+      expect(body.messages[1].content).toContain("[캐릭터 바이블]");
+      expect(body.messages[1].content).toContain("외형 [고정]: 은빛 단발");
+      expect(body.messages[1].content).toContain("[스토리 아이디어]\n주인공이 학교 가는 길에 친구를 만난다");
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.data.characterDescription).toBe("단발머리 여고생, 교복 차림");
       expect(result.data.scenes).toHaveLength(2);
+      expect(result.data.textProvenance).toMatchObject({
+        provider: "api.example.com",
+        model: "provider-text-v2",
+        transport: "byok",
+        promptVersion: 1,
+        usage: { promptTokens: 120, completionTokens: 80, totalTokens: 200 },
+      });
+      expect(Number.isNaN(Date.parse(result.data.textProvenance.createdAt))).toBe(false);
     });
 
     it("surfaces parse_error when the response has no JSON object (e.g. a refusal message)", async () => {
@@ -537,6 +647,134 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       const result = await generateScenarioScenes(CONFIGURED, "스토리");
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("http_error");
+    });
+
+    it("forwards opts.signal to the scenario JSON request and resolves an abort as network_error", async () => {
+      const controller = new AbortController();
+      const mockFetch = createAbortAwareFetch();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const resultPromise = generateScenarioScenes(CONFIGURED, "스토리", { signal: controller.signal });
+      const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      expect(init.signal).toBe(controller.signal);
+
+      controller.abort();
+      await expect(resultPromise).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
+    });
+  });
+
+  describe("generateStudioWriterRoomDraft", () => {
+    it("does not request an unconfigured transport", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateStudioWriterRoomDraft(STUDIO_AI_DEFAULT_SETTINGS, {
+        stage: "premise",
+        document: createEmptyStudioWriterRoomDocument(),
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "not_configured" });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns a reviewed candidate and provenance without applying it to the source document", async () => {
+      const source = createEmptyStudioWriterRoomDocument();
+      const content = JSON.stringify({
+        stage: "premise",
+        rationale: "주인공의 선택과 대가를 명확히 함",
+        draft: { text: "꿈을 거래하는 소년이 마지막 꿈을 지키려 한다.", characterIds: [] },
+      });
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({
+        choices: [{ message: { content } }],
+        model: "writer-model-v1",
+        usage: { total_tokens: 321 },
+      }), { status: 200 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateStudioWriterRoomDraft(CONFIGURED, {
+        stage: "premise",
+        document: source,
+        direction: "미스터리 톤",
+      });
+
+      expect(source.stages.premise.text).toBe("");
+      expect(result).toMatchObject({
+        ok: true,
+        data: {
+          stage: "premise",
+          rationale: "주인공의 선택과 대가를 명확히 함",
+          draft: { text: "꿈을 거래하는 소년이 마지막 꿈을 지키려 한다." },
+          textProvenance: {
+            provider: "api.example.com",
+            model: "writer-model-v1",
+            transport: "byok",
+            usage: { totalTokens: 321 },
+          },
+        },
+      });
+      const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body.messages[0].content).toContain("전문 스토리 에디터");
+      expect(body.messages[1].content).toContain("미스터리 톤");
+    });
+
+    it("rejects a structurally invalid candidate as parse_error", async () => {
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({
+        choices: [{ message: { content: '{"stage":"premise","rationale":"x","draft":{"text":"x"}}' } }],
+      }), { status: 200 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateStudioWriterRoomDraft(CONFIGURED, {
+        stage: "premise",
+        document: createEmptyStudioWriterRoomDocument(),
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "parse_error" });
+    });
+  });
+
+  describe("translateDialogueBatch", () => {
+    it("returns translations with the actual provider/model usage provenance", async () => {
+      const content = JSON.stringify([
+        { id: "bubble-1", text: "Hello!" },
+        { id: "bubble-2", text: "Nice to meet you." },
+      ]);
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({
+        choices: [{ message: { content } }],
+        model: "translation-model-v2",
+        usage: { prompt_tokens: 42, completion_tokens: 18, total_tokens: 60 },
+      }), { status: 200 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await translateDialogueBatch(
+        CONFIGURED,
+        [
+          { id: "bubble-1", text: "안녕!" },
+          { id: "bubble-2", text: "만나서 반가워." },
+        ],
+        "영어",
+        "",
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: {
+          translations: [
+            { id: "bubble-1", text: "Hello!" },
+            { id: "bubble-2", text: "Nice to meet you." },
+          ],
+          textProvenance: {
+            provider: "api.example.com",
+            model: "translation-model-v2",
+            transport: "byok",
+            usage: { promptTokens: 42, completionTokens: 18, totalTokens: 60 },
+          },
+        },
+      });
     });
   });
 
@@ -580,13 +818,18 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(body.messages[0].role).toBe("system");
       expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 전학 첫날 교실에 들어온다" });
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         ok: true,
         data: {
           candidates: [
             { speaker: "민수", text: "나 전학왔어.", kind: "speech" },
             { speaker: "", text: "(교실이 순간 조용해진다)", kind: "narration" },
           ],
+          textProvenance: {
+            provider: "api.example.com",
+            model: CONFIGURED.textModel,
+            transport: "byok",
+          },
         },
       });
     });
@@ -672,7 +915,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(body.messages[0].role).toBe("system");
       expect(body.messages[1]).toEqual({ role: "user", content: "스릴러, 어둡고 차가운 느낌" });
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         ok: true,
         data: {
           name: "스릴러 - 어둡고 차가운",
@@ -680,6 +923,11 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
             { hex: "#101820", role: "주조색" },
             { hex: "#c94f4f", role: "포인트색" },
           ],
+          textProvenance: {
+            provider: "api.example.com",
+            model: CONFIGURED.textModel,
+            transport: "byok",
+          },
         },
       });
     });

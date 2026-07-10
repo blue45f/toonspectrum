@@ -1,5 +1,5 @@
 /**
- * Studio AI 어시스트 — BYOK(Bring Your Own Key) 범용 REST 클라이언트.
+ * Studio AI 어시스트 — 서버 텍스트 AI + BYOK 범용 REST 클라이언트.
  *
  * 특정 AI 벤더에 종속되지 않는다 — OpenAI Chat Completions / Images(Generations·Edits) API와
  * "호환되는" 엔드포인트라면 무엇이든 붙일 수 있다(대부분의 이미지/텍스트 생성 서비스가 OpenAI 호환
@@ -8,19 +8,18 @@
  * 붙여 호출한다 — OpenAI SDK들이 "baseURL + 경로" 구조를 쓰는 것과 동일한 관례(Azure OpenAI처럼
  * 경로가 다른 제공자를 위해 세 경로 모두 개별적으로 override 가능하게 설정에 노출해뒀다).
  *
- * **서버를 거치지 않는다** — API 키는 절대 이 앱의 백엔드로 전송되지 않고 브라우저
- * localStorage에만 저장되며, fetch도 브라우저 → AI 제공자로 직접 나간다("$0 서버비용" 원칙과
- * 일치 — 사용자가 자기 키로 자기 비용을 낸다). 코드 어디에도 API 키를 하드코딩하지 않는다.
+ * 로그인 사용자의 텍스트 작업은 서버 보유 Z.ai/DeepSeek 설정을 사용할 수 있고, 이미지 작업 및
+ * 선택한 BYOK 텍스트 작업은 브라우저에서 제공자로 직접 요청한다. 사용자가 입력한 BYOK 키는 앱
+ * 백엔드로 전송하지 않고 탭 수명의 sessionStorage에만 임시 보관한다. 서버 공급자 키는 반대로 서버
+ * 환경변수에만 있으며 응답·로그·클라이언트 번들에 노출하지 않는다.
  *
- * 이 파일은 순수 로직이다(DOM/Konva 의존 없음, 결정적) — 유일한 예외는 fetch/localStorage
+ * 이 파일은 순수 로직이다(DOM/Konva 의존 없음, 결정적) — 유일한 예외는 fetch/주입 저장소
  * 자체지만, 둘 다 인터페이스 뒤에 있어 테스트에서 완전히 모킹 가능하다(studio-brand-kit.ts의
  * "저장소를 주입받는" 패턴과 동일).
  *
- * 이 모듈이 앱의 기존 "AI 에셋 생성"(studio-asset-library.ts 의 kind:"ai", 실제로는
- * src/infrastructure/creator-client.ts → 이 앱의 NestJS 백엔드가 서버 보유 키로 대신 호출)과는
- * **완전히 별개의 독립 경로**다 — 그건 로그인 필요·서버가 비용을 대납하는 유료 기능이고, 이건
- * 로그인 불필요·사용자가 자기 키로 직접 호출하는 무료(앱 입장에서 $0) 기능이다. 통합 시 두 경로를
- * 섞지 않는다(docs/studio-ai-assist-integration.md 참고).
+ * 텍스트와 이미지 transport를 의도적으로 분리한다. 서버 텍스트 AI가 구성돼 있어도 이미지
+ * 생성·편집은 BYOK 이미지 설정을 요구하며, 어느 경로에서도 키를 요청/응답 provenance에 기록하지
+ * 않는다(docs/studio-ai-assist-integration.md 참고).
  *
  * 에러 계약: 이 모듈의 모든 async 함수는 **절대 throw하지 않는다** — 항상
  * `StudioAiResult<T>`(성공 { ok:true, data } / 실패 { ok:false, code, error })를 resolve한다.
@@ -49,13 +48,28 @@ import {
   parseScenarioScenesResponse,
   type ScenarioScenesPlan,
 } from "./studio-scenario-scenes";
+import {
+  completeStudioServerText,
+  parseStudioServerAiFailoverMetadata,
+  type StudioServerAiFailoverMetadata,
+  type StudioServerAiTask,
+  type StudioServerAiProviderPreference,
+} from "./studio-server-ai-client";
+import {
+  buildStudioWriterRoomAiPrompt,
+  parseStudioWriterRoomAiDraft,
+  type StudioWriterRoomAiDraft,
+} from "./studio-writer-room-ai";
+
+import type { StudioWriterRoomStage } from "./studio-writer-room";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
-/** localStorage 호환 인터페이스 — studio-brand-kit.ts BrandKitStorage와 동일한 DI 패턴. */
+/** Web Storage 호환 인터페이스 — 호출자가 수명(session/persistent)을 명시적으로 선택한다. */
 export interface StudioAiStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
 
 export const STUDIO_AI_SETTINGS_KEY = "toonspectrum-studio-ai-settings";
@@ -63,7 +77,7 @@ export const STUDIO_AI_SETTINGS_KEY = "toonspectrum-studio-ai-settings";
 export interface StudioAiSettings {
   /** 예: "https://api.openai.com/v1" (끝에 슬래시 없이). 아래 세 경로가 이 뒤에 그대로 붙는다. */
   baseUrl: string;
-  /** 절대 서버로 전송하지 않는다 — localStorage에만 저장, 브라우저→제공자 직접 fetch에만 사용. */
+  /** 절대 앱 서버로 전송하지 않는다 — 탭 세션에만 보관하고 브라우저→제공자 직접 fetch에 사용. */
   apiKey: string;
   imageModel: string;
   textModel: string;
@@ -128,9 +142,81 @@ export function saveStudioAiSettings(storage: StudioAiStorage | null | undefined
   }
 }
 
+/** 민감 키가 든 설정을 제거한다. removeItem 미지원 테스트 저장소도 기본값 덮어쓰기로 키를 폐기한다. */
+export function clearStudioAiSettings(storage: StudioAiStorage | null | undefined): void {
+  if (!storage) return;
+  try {
+    if (storage.removeItem) storage.removeItem(STUDIO_AI_SETTINGS_KEY);
+    else storage.setItem(STUDIO_AI_SETTINGS_KEY, JSON.stringify(STUDIO_AI_DEFAULT_SETTINGS));
+  } catch {
+    // 저장소가 차단돼도 현재 메모리 설정은 호출부가 별도로 비운다.
+  }
+}
+
+/**
+ * Loads BYOK settings from the current tab session. A legacy localStorage value is migrated once
+ * for compatibility and then securely removed, so refreshing the same tab keeps the connection
+ * while closing the tab ends credential persistence.
+ */
+export function loadStudioAiSessionSettings(
+  sessionStorage: StudioAiStorage | null | undefined,
+  legacyPersistentStorage?: StudioAiStorage | null
+): StudioAiSettings {
+  let hasSessionValue = false;
+  try {
+    hasSessionValue = Boolean(sessionStorage?.getItem(STUDIO_AI_SETTINGS_KEY));
+  } catch {
+    // sessionStorage가 차단된 환경은 아래 메모리-only 경로로 폴백한다.
+  }
+  const settings = hasSessionValue
+    ? loadStudioAiSettings(sessionStorage)
+    : loadStudioAiSettings(legacyPersistentStorage);
+  if (!hasSessionValue && legacyPersistentStorage) saveStudioAiSettings(sessionStorage, settings);
+  if (legacyPersistentStorage && legacyPersistentStorage !== sessionStorage) {
+    clearStudioAiSettings(legacyPersistentStorage);
+  }
+  return settings;
+}
+
 /** baseUrl과 apiKey가 둘 다 채워져 있어야 "설정 완료"로 간주한다(모델/경로는 기본값으로도 동작). */
 export function isStudioAiConfigured(settings: StudioAiSettings): boolean {
   return settings.baseUrl.trim().length > 0 && settings.apiKey.trim().length > 0;
+}
+
+/** 텍스트 생성만 서버 보유 Z.ai/DeepSeek를 사용할 수 있다. 이미지 생성/편집은 계속 BYOK 설정을 요구한다. */
+export type StudioTextAiTransport =
+  | { mode: "byok"; signal?: AbortSignal }
+  | { mode: "server"; provider?: StudioServerAiProviderPreference; signal?: AbortSignal };
+
+export interface StudioAiTokenUsage {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}
+
+/** 저장 가능한 텍스트 생성 이력. API 키·전체 프롬프트·응답 본문은 의도적으로 포함하지 않는다. */
+export interface StudioTextAiProvenance {
+  provider: string;
+  model: string;
+  transport: StudioTextAiTransport["mode"];
+  promptVersion: 1;
+  createdAt: string;
+  requestId?: string;
+  usage?: StudioAiTokenUsage;
+  /** 서버 자동 선택이 잔액 소진을 감지해 다른 공급자로 전환한 경우의 안전한 구조화 이력. */
+  failover?: StudioServerAiFailoverMetadata;
+}
+
+/** 텍스트 AI 결과에 실제 공급자·모델 감사 정보를 일관되게 붙이는 공통 결과 형태. */
+export type StudioTextAiData<T extends object> = T & { textProvenance: StudioTextAiProvenance };
+
+const DEFAULT_TEXT_AI_TRANSPORT: StudioTextAiTransport = { mode: "byok" };
+
+export function isStudioTextAiConfigured(
+  settings: StudioAiSettings,
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): boolean {
+  return transport.mode === "server" || isStudioAiConfigured(settings);
 }
 
 // ── 공통 타입 ──────────────────────────────────────────────────────────────
@@ -165,11 +251,25 @@ function buildUrl(baseUrl: string, path: string): string {
 }
 
 /** 응답 바디를 텍스트로 먼저 읽고(2xx/에러 양쪽에서 재사용), 상태코드/JSON 유효성을 순서대로 판정한다. */
-async function parseHttpResponse(res: Response): Promise<StudioAiResult<unknown>> {
+function isAbortError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
+}
+
+function networkErrorMessage(error: unknown): string {
+  if (isAbortError(error)) return "요청이 취소되었습니다.";
+  return error instanceof Error ? error.message : "네트워크 요청에 실패했습니다.";
+}
+
+async function parseHttpResponse(res: Response, signal?: AbortSignal): Promise<StudioAiResult<unknown>> {
   let text: string;
   try {
     text = await res.text();
-  } catch {
+  } catch (error) {
+    // fetch가 헤더를 받은 뒤 응답 body를 읽는 도중 취소될 수도 있다. 이 경우에도 요청 단계에서
+    // 취소된 것과 같은 network_error 계약을 유지한다(parse_error로 오인하지 않는다).
+    if (signal?.aborted || isAbortError(error)) {
+      return { ok: false, code: "network_error", error: "요청이 취소되었습니다." };
+    }
     return { ok: false, code: "parse_error", error: "응답 본문을 읽지 못했습니다." };
   }
   if (!res.ok) {
@@ -201,31 +301,96 @@ function extractErrorMessage(text: string): string | null {
   return null;
 }
 
-async function postJson(url: string, apiKey: string, body: unknown): Promise<StudioAiResult<unknown>> {
+async function postJson(
+  url: string,
+  apiKey: string,
+  body: unknown,
+  signal?: AbortSignal
+): Promise<StudioAiResult<unknown>> {
   let res: Response;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      ...(signal === undefined ? {} : { signal }),
     });
   } catch (e) {
-    return { ok: false, code: "network_error", error: e instanceof Error ? e.message : "네트워크 요청에 실패했습니다." };
+    return { ok: false, code: "network_error", error: networkErrorMessage(e) };
   }
-  return parseHttpResponse(res);
+  return parseHttpResponse(res, signal);
 }
 
-async function postForm(url: string, apiKey: string, form: FormData): Promise<StudioAiResult<unknown>> {
+async function postForm(
+  url: string,
+  apiKey: string,
+  form: FormData,
+  signal?: AbortSignal
+): Promise<StudioAiResult<unknown>> {
   let res: Response;
   try {
     // Content-Type을 직접 지정하지 않는다 — FormData를 body로 넘기면 fetch가 boundary를 포함한
     // multipart/form-data Content-Type을 자동으로 설정한다(직접 지정하면 boundary가 빠져 서버가
     // 파싱하지 못한다).
-    res = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${apiKey}` }, body: form });
+    res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      ...(signal === undefined ? {} : { signal }),
+    });
   } catch (e) {
-    return { ok: false, code: "network_error", error: e instanceof Error ? e.message : "네트워크 요청에 실패했습니다." };
+    return { ok: false, code: "network_error", error: networkErrorMessage(e) };
   }
-  return parseHttpResponse(res);
+  return parseHttpResponse(res, signal);
+}
+
+async function postTextCompletion(
+  settings: StudioAiSettings,
+  request: {
+    task: StudioServerAiTask;
+    system: string;
+    user: string;
+    temperature: number;
+    maxTokens: number;
+    responseFormat: "text" | "json";
+  },
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<unknown>> {
+  if (transport.mode === "server") {
+    const result = await completeStudioServerText(
+      {
+        task: request.task,
+        promptVersion: 1,
+        system: request.system,
+        user: request.user,
+        ...(transport.provider ? { provider: transport.provider } : {}),
+      },
+      transport.signal
+    );
+    if (!result.ok) return result;
+    // 기존 OpenAI 호환 응답 파서를 그대로 재사용할 수 있도록 최소 choices envelope로 정규화한다.
+    return {
+      ok: true,
+      data: {
+        choices: [{ message: { content: result.data.content } }],
+        provider: result.data.provider,
+        model: result.data.model,
+        requestId: result.data.requestId,
+        usage: result.data.usage,
+        failover: result.data.failover,
+      },
+    };
+  }
+  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
+  return postJson(url, settings.apiKey, {
+    model: settings.textModel,
+    messages: [
+      { role: "system", content: request.system },
+      { role: "user", content: request.user },
+    ],
+    temperature: request.temperature,
+    max_tokens: request.maxTokens,
+  }, transport.signal);
 }
 
 function extractFirstB64Json(json: unknown): string | null {
@@ -244,6 +409,73 @@ function extractFirstChatContent(json: unknown): string | null {
   const message = (choices[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined;
   const content = message?.content;
   return typeof content === "string" && content.trim().length > 0 ? content.trim() : null;
+}
+
+function textProviderFromSettings(settings: StudioAiSettings): string {
+  try {
+    return new URL(settings.baseUrl).hostname.slice(0, 120) || "custom";
+  } catch {
+    return settings.baseUrl.trim().slice(0, 120) || "custom";
+  }
+}
+
+function optionalTokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? Math.min(value, 2_147_483_647)
+    : undefined;
+}
+
+function extractTextAiProvenance(
+  json: unknown,
+  settings: StudioAiSettings,
+  transport: StudioTextAiTransport
+): StudioTextAiProvenance {
+  const record = json && typeof json === "object" && !Array.isArray(json)
+    ? json as Record<string, unknown>
+    : {};
+  const usageRecord = record.usage && typeof record.usage === "object" && !Array.isArray(record.usage)
+    ? record.usage as Record<string, unknown>
+    : {};
+  const promptTokens = optionalTokenCount(usageRecord.promptTokens ?? usageRecord.prompt_tokens);
+  const completionTokens = optionalTokenCount(
+    usageRecord.completionTokens ?? usageRecord.completion_tokens
+  );
+  const totalTokens = optionalTokenCount(usageRecord.totalTokens ?? usageRecord.total_tokens);
+  const usage = promptTokens !== undefined || completionTokens !== undefined || totalTokens !== undefined
+    ? {
+        ...(promptTokens !== undefined ? { promptTokens } : {}),
+        ...(completionTokens !== undefined ? { completionTokens } : {}),
+        ...(totalTokens !== undefined ? { totalTokens } : {}),
+      }
+    : undefined;
+  const rawProvider = typeof record.provider === "string" ? record.provider.trim().slice(0, 120) : "";
+  const rawModel = typeof record.model === "string" ? record.model.trim().slice(0, 200) : "";
+  const rawRequestId = typeof record.requestId === "string"
+    ? record.requestId.trim().slice(0, 240)
+    : "";
+  const provider = rawProvider || (
+    transport.mode === "server"
+      ? transport.provider === "zai"
+        ? "zai"
+        : transport.provider === "deepseek"
+          ? "deepseek"
+          : "server-auto"
+      : textProviderFromSettings(settings)
+  );
+  const model = rawModel || settings.textModel.trim().slice(0, 200) || "unknown";
+  const failover = transport.mode === "server" && (provider === "zai" || provider === "deepseek")
+    ? parseStudioServerAiFailoverMetadata(record.failover, { provider, model })
+    : undefined;
+  return {
+    provider,
+    model,
+    transport: transport.mode,
+    promptVersion: 1,
+    createdAt: new Date().toISOString(),
+    ...(rawRequestId ? { requestId: rawRequestId } : {}),
+    ...(usage ? { usage } : {}),
+    ...(failover ? { failover } : {}),
+  };
 }
 
 function parseImageSize(size: StudioAiImageSize): { width: number; height: number } {
@@ -296,7 +528,7 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 export async function generateBackgroundImage(
   settings: StudioAiSettings,
   prompt: string,
-  opts: { size?: StudioAiImageSize } = {}
+  opts: { size?: StudioAiImageSize; signal?: AbortSignal } = {}
 ): Promise<StudioAiResult<{ dataUrl: string; width: number; height: number }>> {
   const trimmed = prompt.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "배경 프롬프트를 입력하세요." };
@@ -311,7 +543,7 @@ export async function generateBackgroundImage(
     n: 1,
     size,
     response_format: "b64_json",
-  });
+  }, opts.signal);
   if (!result.ok) return result;
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
@@ -397,7 +629,8 @@ export function buildCharacterConsistencyPrompt(situationPrompt: string): string
 export async function generateConsistentCharacterImage(
   settings: StudioAiSettings,
   referenceImageSrc: string,
-  situationPrompt: string
+  situationPrompt: string,
+  opts: { signal?: AbortSignal } = {}
 ): Promise<StudioAiResult<{ dataUrl: string }>> {
   const trimmed = situationPrompt.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "새로 그리고 싶은 상황을 입력하세요." };
@@ -418,7 +651,7 @@ export async function generateConsistentCharacterImage(
   form.set("n", "1");
   form.set("response_format", "b64_json");
   const url = buildUrl(settings.baseUrl, settings.imageEditPath);
-  const result = await postForm(url, settings.apiKey, form);
+  const result = await postForm(url, settings.apiKey, form, opts.signal);
   if (!result.ok) return result;
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
@@ -440,27 +673,32 @@ const SCENE_COMPOSITION_SYSTEM_PROMPT =
  */
 export async function suggestSceneComposition(
   settings: StudioAiSettings,
-  sceneText: string
-): Promise<StudioAiResult<{ suggestion: string }>> {
+  sceneText: string,
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<{ suggestion: string }>>> {
   const trimmed = sceneText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "장면 시나리오/대사를 입력하세요." };
-  if (!isStudioAiConfigured(settings)) {
-    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  const result = await postJson(url, settings.apiKey, {
-    model: settings.textModel,
-    messages: [
-      { role: "system", content: SCENE_COMPOSITION_SYSTEM_PROMPT },
-      { role: "user", content: trimmed },
-    ],
+  const result = await postTextCompletion(settings, {
+    task: "composition",
+    system: SCENE_COMPOSITION_SYSTEM_PROMPT,
+    user: trimmed,
     temperature: 0.7,
-    max_tokens: 400,
-  });
+    maxTokens: 400,
+    responseFormat: "text",
+  }, transport);
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 제안 텍스트를 찾을 수 없습니다." };
-  return { ok: true, data: { suggestion: content } };
+  return {
+    ok: true,
+    data: {
+      suggestion: content,
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
+  };
 }
 
 /**
@@ -479,30 +717,82 @@ export async function suggestSceneComposition(
 export async function generateScenarioScenes(
   settings: StudioAiSettings,
   storyText: string,
-  opts: { sceneCountHint?: number } = {}
-): Promise<StudioAiResult<ScenarioScenesPlan>> {
+  opts: { sceneCountHint?: number; characterContext?: string; signal?: AbortSignal } = {},
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<ScenarioScenesPlan>>> {
   const trimmed = storyText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "스토리 아이디어를 입력하세요." };
-  if (!isStudioAiConfigured(settings)) {
-    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
-  const { system, user } = buildScenarioScenesPrompt(trimmed, opts.sceneCountHint);
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  const result = await postJson(url, settings.apiKey, {
-    model: settings.textModel,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
+  const { system, user } = buildScenarioScenesPrompt(trimmed, opts.sceneCountHint, opts.characterContext);
+  const result = await postTextCompletion(settings, {
+    task: "scenario",
+    system,
+    user,
     temperature: 0.7,
-    max_tokens: 1800,
-  });
+    maxTokens: 1800,
+    responseFormat: "json",
+  }, { ...transport, signal: opts.signal ?? transport.signal });
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 장면 구성 텍스트를 찾을 수 없습니다." };
   const parsed = parseScenarioScenesResponse(content);
   if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
-  return { ok: true, data: parsed.data };
+  return {
+    ok: true,
+    data: {
+      ...parsed.data,
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
+  };
+}
+
+/**
+ * Writer Room 단계 초안 생성. 모델 결과는 현재 문서에 적용하지 않고 엄격하게 파싱한 후보만
+ * 반환한다. 호출부는 현재 값과 후보를 함께 보여준 뒤 사용자의 명시적 승인에서만 문서를 바꿔야 한다.
+ */
+export async function generateStudioWriterRoomDraft(
+  settings: StudioAiSettings,
+  input: {
+    stage: StudioWriterRoomStage;
+    document: unknown;
+    characterContext?: string;
+    direction?: string;
+    signal?: AbortSignal;
+  },
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<StudioWriterRoomAiDraft>>> {
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요.",
+    };
+  }
+  const prompt = buildStudioWriterRoomAiPrompt(input);
+  const result = await postTextCompletion(settings, {
+    task: "scenario",
+    system: prompt.system,
+    user: prompt.user,
+    temperature: 0.55,
+    maxTokens: 2_400,
+    responseFormat: "json",
+  }, { ...transport, signal: input.signal ?? transport.signal });
+  if (!result.ok) return result;
+  const content = extractFirstChatContent(result.data);
+  if (!content) {
+    return { ok: false, code: "parse_error", error: "응답에서 Writer Room 초안을 찾을 수 없습니다." };
+  }
+  const parsed = parseStudioWriterRoomAiDraft(content, input.stage);
+  if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
+  return {
+    ok: true,
+    data: {
+      ...parsed.data,
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
+  };
 }
 
 /**
@@ -516,23 +806,22 @@ export async function translateDialogueBatch(
   settings: StudioAiSettings,
   items: DialogueTranslatableItem[],
   targetLocaleLabel: string,
-  glossary: string
-): Promise<StudioAiResult<{ translations: { id: string; text: string }[] }>> {
+  glossary: string,
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<{ translations: { id: string; text: string }[] }>>> {
   if (items.length === 0) return { ok: false, code: "invalid_input", error: "번역할 대사가 없습니다." };
-  if (!isStudioAiConfigured(settings)) {
-    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
   const { system, user } = buildTranslationPrompt(items, targetLocaleLabel, glossary);
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  const result = await postJson(url, settings.apiKey, {
-    model: settings.textModel,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
+  const result = await postTextCompletion(settings, {
+    task: "translation",
+    system,
+    user,
     temperature: 0.3, // 창작적 변주보다 일관된 번역이 목적 — 장면 구성 제안(0.7)보다 낮춘다.
-    max_tokens: Math.max(400, items.length * 120),
-  });
+    maxTokens: Math.max(400, items.length * 120),
+    responseFormat: "json",
+  }, transport);
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 번역 텍스트를 찾을 수 없습니다." };
@@ -540,7 +829,10 @@ export async function translateDialogueBatch(
   if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
   return {
     ok: true,
-    data: { translations: [...parsed.translations].map(([id, text]) => ({ id, text })) },
+    data: {
+      translations: [...parsed.translations].map(([id, text]) => ({ id, text })),
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
   };
 }
 
@@ -560,30 +852,35 @@ export async function translateDialogueBatch(
 export async function suggestDialogueLines(
   settings: StudioAiSettings,
   situationText: string,
-  opts: { existingContext?: string } = {}
-): Promise<StudioAiResult<{ candidates: DialogueSuggestionCandidate[] }>> {
+  opts: { existingContext?: string } = {},
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<{ candidates: DialogueSuggestionCandidate[] }>>> {
   const trimmed = situationText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "장면 상황을 입력하세요." };
-  if (!isStudioAiConfigured(settings)) {
-    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
   const { system, user } = buildDialogueSuggestPrompt(trimmed, opts.existingContext ?? "");
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  const result = await postJson(url, settings.apiKey, {
-    model: settings.textModel,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
+  const result = await postTextCompletion(settings, {
+    task: "dialogue",
+    system,
+    user,
     temperature: 0.8, // 서로 다른 후보 여러 개가 목적 — 장면 구성 제안(0.7)보다 살짝 높여 다양성을 늘린다.
-    max_tokens: 500,
-  });
+    maxTokens: 500,
+    responseFormat: "json",
+  }, transport);
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 대사 제안을 찾을 수 없습니다." };
   const parsed = parseDialogueSuggestResponse(content);
   if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
-  return { ok: true, data: { candidates: parsed.data } };
+  return {
+    ok: true,
+    data: {
+      candidates: parsed.data,
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
+  };
 }
 
 /**
@@ -599,30 +896,35 @@ export async function suggestDialogueLines(
  */
 export async function suggestColorPalette(
   settings: StudioAiSettings,
-  moodText: string
-): Promise<StudioAiResult<PaletteSuggestion>> {
+  moodText: string,
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+): Promise<StudioAiResult<StudioTextAiData<PaletteSuggestion>>> {
   const trimmed = moodText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "장르/무드를 입력하세요." };
-  if (!isStudioAiConfigured(settings)) {
-    return { ok: false, code: "not_configured", error: "설정에서 API 키를 등록하세요." };
+  if (!isStudioTextAiConfigured(settings, transport)) {
+    return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
   const { system, user } = buildPaletteSuggestPrompt(trimmed);
-  const url = buildUrl(settings.baseUrl, settings.chatCompletionsPath);
-  const result = await postJson(url, settings.apiKey, {
-    model: settings.textModel,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
+  const result = await postTextCompletion(settings, {
+    task: "palette",
+    system,
+    user,
     temperature: 0.7,
-    max_tokens: 500,
-  });
+    maxTokens: 500,
+    responseFormat: "json",
+  }, transport);
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 팔레트 제안을 찾을 수 없습니다." };
   const parsed = parsePaletteSuggestResponse(content);
   if (!parsed.ok) return { ok: false, code: "parse_error", error: parsed.error };
-  return { ok: true, data: parsed.data };
+  return {
+    ok: true,
+    data: {
+      ...parsed.data,
+      textProvenance: extractTextAiProvenance(result.data, settings, transport),
+    },
+  };
 }
 
 /**

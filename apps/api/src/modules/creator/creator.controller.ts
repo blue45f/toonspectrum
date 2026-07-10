@@ -6,12 +6,21 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
   Param,
   Patch,
   Post,
   Query,
 } from "@nestjs/common";
 
+import {
+  CreateCreatorWorkDto,
+  CreatorWorkRevisionListParamsDto,
+  CreatorWorkRevisionListQueryDto,
+  CreatorWorkRevisionParamsDto,
+  RestoreCreatorWorkRevisionDto,
+  UpdateCreatorWorkDto,
+} from "./creator.dto";
 import { CreatorService } from "./creator.service";
 
 interface ListQuery {
@@ -30,7 +39,9 @@ function enforceUserOrError(userId: string | null | undefined) {
 
 @Controller()
 export class CreatorController {
-  private readonly creatorService = new CreatorService();
+  // `tsx watch` does not emit Nest's design:paramtypes metadata, so use an
+  // explicit token to keep development and compiled production behavior equal.
+  constructor(@Inject(CreatorService) private readonly creatorService: CreatorService) {}
 
   @Get("/creator/works")
   @Header("Cache-Control", "no-store, max-age=0")
@@ -45,15 +56,55 @@ export class CreatorController {
   }
 
   @Post("/creator/works")
-  async createWork(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
+  async createWork(@Body() body: CreateCreatorWorkDto, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.createWork(uid, body);
   }
 
   @Patch("/creator/works/:id")
-  async updateWork(@Param("id") id: string, @Body() body: unknown, @Headers("x-user-id") userId?: string) {
+  async updateWork(
+    @Param("id") id: string,
+    @Body() body: UpdateCreatorWorkDto,
+    @Headers("x-user-id") userId?: string
+  ) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.updateWork(uid, id, body);
+  }
+
+  @Get("/creator/works/:id/revisions")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listWorkRevisions(
+    @Param() params: CreatorWorkRevisionListParamsDto,
+    @Query() query: CreatorWorkRevisionListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.listWorkRevisions(uid, params.id, query.limit);
+  }
+
+  @Get("/creator/works/:id/revisions/:revision")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getWorkRevision(
+    @Param() params: CreatorWorkRevisionParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getWorkRevision(uid, params.id, params.revision);
+  }
+
+  @Post("/creator/works/:id/revisions/:revision/restore")
+  async restoreWorkRevision(
+    @Param() params: CreatorWorkRevisionParamsDto,
+    @Body() body: RestoreCreatorWorkRevisionDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.restoreWorkRevision(
+      uid,
+      params.id,
+      params.revision,
+      body.baseRevision
+    );
   }
 
   @Delete("/creator/works/:id")
@@ -99,8 +150,8 @@ export class CreatorController {
 
   @Post("/creator/assets/generate")
   async generateAsset(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
-    enforceUserOrError(userId);
-    return this.creatorService.generateAsset(body);
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.generateAsset(uid, body);
   }
 
   @Delete("/creator/assets/:id")

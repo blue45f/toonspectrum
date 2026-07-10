@@ -10,17 +10,37 @@
 import { Clapperboard, Copy, Loader2, StickyNote } from "lucide-react";
 import { useState } from "react";
 
-import { suggestSceneComposition, type StudioAiSettings } from "./studio-ai-client";
+import {
+  suggestSceneComposition,
+  type StudioAiResult,
+  type StudioAiSettings,
+  type StudioTextAiProvenance,
+  type StudioTextAiTransport,
+} from "./studio-ai-client";
+
+export interface StudioAiCompositionOperationSettlement {
+  operationId: string;
+  result: StudioAiResult<unknown>;
+  textProvenance?: StudioTextAiProvenance;
+}
 
 export function StudioAiCompositionPanel({
   settings,
+  transport,
   configured,
   onInsertAsNote,
+  onOperationStart,
+  onOperationSettled,
 }: {
   settings: StudioAiSettings;
+  transport?: StudioTextAiTransport;
   configured: boolean;
   /** 제안 텍스트를 캔버스에 메모(텍스트 요소)로 추가하고 싶을 때만 넘긴다 — 선택 사항. */
   onInsertAsNote?: (text: string) => void;
+  /** 중앙 provenance가 실제 네트워크 요청 전에 pending을 남길 수 있게 한다. */
+  onOperationStart?: (prompt: string) => string;
+  /** 결과 본문·원문 오류 대신 구조화 결과와 안전한 실제 공급자 정보만 전달한다. */
+  onOperationSettled?: (settlement: StudioAiCompositionOperationSettlement) => void;
 }) {
   const [sceneText, setSceneText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,11 +49,20 @@ export function StudioAiCompositionPanel({
   const [copied, setCopied] = useState(false);
 
   const run = async () => {
-    if (busy || !sceneText.trim()) return;
+    const prompt = sceneText.trim();
+    if (busy || !prompt) return;
     setBusy(true);
     setError(null);
     setCopied(false);
-    const result = await suggestSceneComposition(settings, sceneText);
+    const operationId = onOperationStart?.(prompt);
+    const result = await suggestSceneComposition(settings, prompt, transport);
+    if (operationId) {
+      onOperationSettled?.({
+        operationId,
+        result,
+        ...(result.ok ? { textProvenance: result.data.textProvenance } : {}),
+      });
+    }
     if (result.ok) {
       setSuggestion(result.data.suggestion);
     } else {
@@ -61,8 +90,8 @@ export function StudioAiCompositionPanel({
 
       {!configured && (
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          위 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 API 키를 등록하면 이
-          기능을 쓸 수 있어요.
+          로그인해 서버 AI를 사용하거나 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>
+          에서 내 API 키를 등록하면 쓸 수 있어요.
         </p>
       )}
 

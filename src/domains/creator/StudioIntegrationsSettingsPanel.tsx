@@ -36,7 +36,7 @@ import type { StudioAiSettings } from "./studio-ai-client";
 
 const LABEL = "block text-[0.65rem] font-medium text-fg-2";
 const INPUT =
-  "w-full rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent";
+  "min-h-11 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export interface StudioIntegrationsSettingsPanelProps {
   aiSettings: StudioAiSettings;
@@ -56,9 +56,8 @@ export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[0.63rem] leading-relaxed text-fg-3">
-        API 키가 필요한 기능을 한 곳에서 관리해요. 모든 키는{" "}
-        <span className="font-semibold text-fg-2">이 브라우저에만</span> 저장되고, 이 앱 서버로는 전송되지
-        않아요.
+        API 키가 필요한 기능을 한 곳에서 관리해요. AI 키는 현재 탭 세션에만, Unsplash 키는 이
+        브라우저에 저장되며 어느 키도 이 앱 서버로 전송하지 않아요.
       </p>
 
       <StudioAiSettingsPanel settings={aiSettings} onChange={onAiSettingsChange} />
@@ -90,7 +89,7 @@ export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange
               value={accessKey}
               onChange={(e) => updateAccessKey(e.target.value)}
               placeholder="Access Key"
-              className={`${INPUT} pr-7`}
+              className={`${INPUT} pr-12`}
               spellCheck={false}
               autoComplete="off"
             />
@@ -98,9 +97,9 @@ export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange
               type="button"
               onClick={() => setShowAccessKey((v) => !v)}
               aria-label={showAccessKey ? "Access Key 숨기기" : "Access Key 표시"}
-              className="absolute right-1.5 text-fg-3 transition-colors hover:text-fg-2"
+              className="absolute right-0 grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {showAccessKey ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showAccessKey ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </span>
         </label>

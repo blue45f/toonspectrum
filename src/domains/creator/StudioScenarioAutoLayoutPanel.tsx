@@ -22,13 +22,25 @@
  * 최초 사용 고지 게이팅·캔버스 커밋은 전부 부모(StudioPage.tsx)가 수행한다. 이 패널은 그 진행 상태를
  * 보여주고 사용자 입력(스토리 텍스트·장면 수 힌트)과 액션(생성/취소/적용/다시 만들기)만 전달한다.
  */
-import { AlertTriangle, Clapperboard, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Clapperboard,
+  ImagePlus,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
-import { dialogueExcerpt } from "./studio-dialogue-batch";
 import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
+import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
+import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 
+import type { StudioTextAiProvenance } from "./studio-ai-client";
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
 import { cn } from "@/lib/utils";
@@ -43,13 +55,18 @@ const STORY_TEXT_MAX = 2000;
 export interface StudioScenarioAutoLayoutPanelProps {
   open: boolean;
   onClose: () => void;
-  /** AI 어시스트(BYOK) 설정 완료 여부 — StudioAiSettingsPanel과 동일 판단(isStudioAiConfigured). */
-  configured: boolean;
+  /** 장면 텍스트 구성은 서버 DeepSeek 또는 BYOK 텍스트 모델 중 하나만 있어도 가능하다. */
+  textConfigured: boolean;
+  /** 이미지 생성은 DeepSeek 텍스트 transport와 분리되어 BYOK 이미지 설정을 요구한다. */
+  imageConfigured: boolean;
   storyText: string;
   onStoryTextChange: (value: string) => void;
   /** 2~10 사이 유효 값이면 "정확히 N개"로 요청, undefined("자동")면 모델이 3~8개 사이로 판단. */
   sceneCountHint: number | undefined;
   onSceneCountHintChange: (value: number | undefined) => void;
+  /** 검토한 장면을 현재 페이지 뒤에 붙일지, 현재 페이지 다음의 새 페이지로 만들지 선택한다. */
+  applyTarget: "current-page" | "new-page";
+  onApplyTargetChange: (value: "current-page" | "new-page") => void;
   /** 장면 분할(텍스트) 또는 이미지 순차 생성 중 하나라도 진행 중이면 true. */
   busy: boolean;
   /** "장면 구성 생성 중…" / "이미지 생성 중…" 등 현재 단계 라벨(busy가 아니면 null). */
@@ -60,8 +77,25 @@ export interface StudioScenarioAutoLayoutPanelProps {
   error: string | null;
   /** 장면 분할이 완료되면 채워진다(이미지는 순차로 채워지는 중일 수 있음) — null이면 아직 결과 없음. */
   preview: ScenarioPreviewItem[] | null;
+  /** 장면 설계에 사용된 텍스트 모델 이력. 키·프롬프트·응답 본문은 포함하지 않는다. */
+  textProvenance: StudioTextAiProvenance | null;
   onGenerate: () => void;
-  /** 다음 장면부터 생성을 멈춘다(busy일 때만 노출) — 이미 생성된 장면까지는 preview에 남는다. */
+  /** 검토·수정이 끝난 장면 중 이미지가 없는 항목만 순차 생성한다. */
+  onGenerateImages: () => void;
+  onChangeScene: (
+    index: number,
+    patch: {
+      beatType?: ScenarioBeatType;
+      summary?: string;
+      imagePrompt?: string;
+      dialogue?: string;
+      continuity?: ScenarioPreviewItem["continuity"];
+    }
+  ) => void;
+  onRemoveScene: (index: number) => void;
+  onRegenerateScene: (index: number) => void;
+  regeneratingIndex: number | null;
+  /** 현재 네트워크 요청을 중단한다(busy일 때만 노출) — 이미 생성된 장면까지는 preview에 남는다. */
   onCancel: () => void;
   /** preview를 캔버스에 커밋한다(성공한 장면은 이미지 포함, 실패한 장면은 배경 없는 빈 컷으로). */
   onApply: () => void;
@@ -93,17 +127,26 @@ function StageThumbnail({ item, generating }: { item: ScenarioPreviewItem; gener
 export function StudioScenarioAutoLayoutPanel({
   open,
   onClose,
-  configured,
+  textConfigured,
+  imageConfigured,
   storyText,
   onStoryTextChange,
   sceneCountHint,
   onSceneCountHintChange,
+  applyTarget,
+  onApplyTargetChange,
   busy,
   stageLabel,
   progress,
   error,
   preview,
+  textProvenance,
   onGenerate,
+  onGenerateImages,
+  onChangeScene,
+  onRemoveScene,
+  onRegenerateScene,
+  regeneratingIndex,
   onCancel,
   onApply,
   onDiscard,
@@ -122,9 +165,11 @@ export function StudioScenarioAutoLayoutPanel({
 
   if (!open) return null;
 
-  const canGenerate = configured && !busy && storyText.trim().length > 0;
+  const canGenerate = textConfigured && !busy && regeneratingIndex === null && storyText.trim().length > 0;
   const hasPreview = !!preview && preview.length > 0;
   const generatingIndex = busy && progress ? progress.done : -1;
+  const editingLocked = busy || regeneratingIndex !== null;
+  const missingImageCount = preview?.filter((item) => !item.imageDataUrl).length ?? 0;
 
   const modal = (
     <div
@@ -137,7 +182,7 @@ export function StudioScenarioAutoLayoutPanel({
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <Clapperboard size={16} className="text-accent" aria-hidden />
           <h2 className="text-sm font-bold text-fg">시나리오 자동 생성</h2>
-          <span className="text-xs text-fg-3">스토리 → 컷 분할 → 이미지 → 말풍선까지 한 번에(첫 버전)</span>
+          <span className="text-xs text-fg-3">스토리 → 장면 검토 → 선택적 이미지 생성 → 편집 가능한 컷</span>
           <button
             type="button"
             aria-label="닫기"
@@ -150,10 +195,10 @@ export function StudioScenarioAutoLayoutPanel({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          {!configured && (
+          {!textConfigured && (
             <p className="mb-3 rounded-md border border-line bg-card/70 px-2.5 py-2 text-xs leading-relaxed text-fg-3">
-              위 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 API 키를 등록하면 이 기능을
-              쓸 수 있어요.
+              로그인해 서버 AI를 사용하거나, 위 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서
+              내 텍스트 API 키를 등록하면 장면 구성을 만들 수 있어요.
             </p>
           )}
 
@@ -166,7 +211,7 @@ export function StudioScenarioAutoLayoutPanel({
             onChange={(e) => onStoryTextChange(e.target.value.slice(0, STORY_TEXT_MAX))}
             placeholder="예: 주인공이 학교 가는 길에 오랜만에 친구를 만나 반갑게 인사를 나눈다."
             rows={4}
-            disabled={busy}
+            disabled={editingLocked}
             className="w-full resize-y rounded-lg border border-line bg-card px-3 py-2 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
           />
           <div className="mt-1 flex items-center justify-between text-[0.65rem] text-fg-3">
@@ -182,7 +227,7 @@ export function StudioScenarioAutoLayoutPanel({
                   const v = e.target.value;
                   onSceneCountHintChange(v === "" ? undefined : Number(v));
                 }}
-                disabled={busy}
+                disabled={editingLocked}
                 className="rounded-md border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
               >
                 <option value="">자동(3~8개)</option>
@@ -232,28 +277,153 @@ export function StudioScenarioAutoLayoutPanel({
 
           {hasPreview && (
             <div className="mt-4 border-t border-line pt-3">
-              <p className="mb-2 text-xs font-medium text-fg-2">
-                미리보기 — {preview!.length}개 컷
-                {!busy && preview!.some((p) => p.imageError) && (
-                  <span className="ml-1 text-bad">(일부 이미지 생성 실패 — 적용 후 직접 채울 수 있어요)</span>
-                )}
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                {preview!.map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-1 rounded-lg border border-line bg-card/60 p-1.5">
-                    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md bg-raised">
-                      <span className="absolute left-1 top-1 z-10 grid size-4 place-items-center rounded-full bg-black/60 text-[0.6rem] font-bold text-white">
-                        {idx + 1}
-                      </span>
-                      <StageThumbnail item={item} generating={idx === generatingIndex} />
+              <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-fg-2">장면 초안 — {preview!.length}개 컷</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    그림을 만들기 전에 프롬프트와 대사를 장면별로 검토하세요. 수정한 장면만 다시 생성할 수 있어요.
+                  </p>
+                  {textProvenance ? (
+                    <div className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
+                      <p>
+                        텍스트 생성 이력 · {textProvenance.provider} / {textProvenance.model} · 프롬프트 v
+                        {textProvenance.promptVersion} · {textProvenance.transport === "server" ? "서버" : "내 키"}
+                        {textProvenance.usage?.totalTokens !== undefined
+                          ? ` · ${textProvenance.usage.totalTokens.toLocaleString("ko-KR")} tokens`
+                          : ""}
+                      </p>
+                      {textProvenance.failover ? (
+                        <p className="mt-1 rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-warn" role="status">
+                          {textProvenance.failover.attemptedProvider === "zai" ? "Z.ai" : "DeepSeek"} 잔액·패키지 한도 소진으로 {textProvenance.failover.actualProvider === "zai" ? "Z.ai" : "DeepSeek"}에 자동 전환했어요.
+                        </p>
+                      ) : null}
                     </div>
-                    <p className="line-clamp-2 text-[0.65rem] leading-snug text-fg-3" title={item.imagePrompt}>
-                      {item.imagePrompt || "(배경 묘사 없음)"}
-                    </p>
-                    <p className="line-clamp-1 text-[0.65rem] font-medium text-fg-2" title={item.bubbles.map((b) => b.text).join(" / ")}>
-                      {item.bubbles.length > 0 ? dialogueExcerpt(item.bubbles.map((b) => b.text).join("\n"), 30) : "대사 없음"}
-                    </p>
-                  </div>
+                  ) : null}
+                </div>
+                {!imageConfigured && (
+                  <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] text-fg-3">
+                    이미지 생성은 내 API 키 연동 필요
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {preview!.map((item, idx) => (
+                  <article key={idx} className="rounded-xl border border-line bg-card/60 p-2">
+                    <div className="mb-2 grid gap-2 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                      <label className="block text-[0.65rem] font-semibold text-fg-3">
+                        비트 역할
+                        <select
+                          value={item.beatType}
+                          onChange={(event) =>
+                            onChangeScene(idx, { beatType: event.target.value as ScenarioBeatType })
+                          }
+                          disabled={editingLocked}
+                          aria-label={`${idx + 1}번 장면 비트 역할`}
+                          className="mt-1 w-full rounded-md border border-line bg-panel px-2 py-1.5 text-[0.72rem] text-fg outline-none focus:border-accent disabled:opacity-60"
+                        >
+                          {SCENARIO_BEAT_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {SCENARIO_BEAT_LABELS[type]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-[0.65rem] font-semibold text-fg-3">
+                        장면 변화 요약
+                        <textarea
+                          value={item.summary}
+                          onChange={(event) => onChangeScene(idx, { summary: event.target.value.slice(0, 240) })}
+                          disabled={editingLocked}
+                          rows={2}
+                          aria-label={`${idx + 1}번 장면 변화 요약`}
+                          className="mt-1 w-full resize-y rounded-md border border-line bg-panel px-2 py-1.5 text-[0.72rem] leading-relaxed text-fg outline-none focus:border-accent disabled:opacity-60"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-lg bg-raised sm:w-32">
+                        <span className="absolute left-1 top-1 z-10 grid size-5 place-items-center rounded-full bg-black/65 text-[0.65rem] font-bold text-white">
+                          {idx + 1}
+                        </span>
+                        <StageThumbnail
+                          item={item}
+                          generating={idx === generatingIndex || idx === regeneratingIndex}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <label className="block text-[0.65rem] font-semibold text-fg-3">
+                          그림 프롬프트
+                          <textarea
+                            value={item.imagePrompt}
+                            onChange={(event) =>
+                              onChangeScene(idx, { imagePrompt: event.target.value.slice(0, 1_000) })
+                            }
+                            disabled={editingLocked}
+                            rows={3}
+                            aria-label={`${idx + 1}번 장면 그림 프롬프트`}
+                            className="mt-1 w-full resize-y rounded-md border border-line bg-panel px-2 py-1.5 text-[0.72rem] leading-relaxed text-fg outline-none focus:border-accent disabled:opacity-60"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <label className="mt-2 block text-[0.65rem] font-semibold text-fg-3">
+                      대사·지문
+                      <textarea
+                        value={item.dialogue}
+                        onChange={(event) => onChangeScene(idx, { dialogue: event.target.value.slice(0, 2_000) })}
+                        disabled={editingLocked}
+                        rows={3}
+                        placeholder={'민수: 안녕!\n(잠시 정적)'}
+                        aria-label={`${idx + 1}번 장면 대사와 지문`}
+                        className="mt-1 w-full resize-y rounded-md border border-line bg-panel px-2 py-1.5 text-[0.72rem] leading-relaxed text-fg outline-none focus:border-accent disabled:opacity-60"
+                      />
+                    </label>
+                    <details className="mt-2 rounded-lg border border-line bg-panel/55 px-2.5 py-2">
+                      <summary className="cursor-pointer text-[0.68rem] font-semibold text-fg-2">
+                        연속성 메타 — 인물·장소·시간·의상·소품
+                      </summary>
+                      <div className="mt-2">
+                        <StudioContinuityMetadataEditor
+                          value={item.continuity ?? {}}
+                          onChange={(continuity) => onChangeScene(idx, { continuity })}
+                          disabled={editingLocked}
+                          compact
+                        />
+                      </div>
+                    </details>
+                    {item.imageError && (
+                      <p className="mt-1.5 flex items-start gap-1 text-[0.65rem] leading-snug text-bad">
+                        <AlertTriangle size={11} className="mt-0.5 shrink-0" aria-hidden />
+                        {item.imageError}
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onRegenerateScene(idx)}
+                        disabled={!imageConfigured || editingLocked || item.imagePrompt.trim().length === 0}
+                        title={!imageConfigured ? "AI 연동에서 이미지 API 키를 설정하세요" : undefined}
+                        className="inline-flex min-h-7 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {idx === regeneratingIndex ? (
+                          <Loader2 size={11} className="animate-spin" aria-hidden />
+                        ) : (
+                          <RefreshCw size={11} aria-hidden />
+                        )}
+                        {item.imageDataUrl ? "이 장면 다시 생성" : "이 장면 이미지 생성"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveScene(idx)}
+                        disabled={editingLocked || preview!.length <= 1}
+                        className="ml-auto inline-grid size-7 place-items-center rounded-md border border-line text-fg-3 hover:border-bad/50 hover:bg-bad/10 hover:text-bad disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label={`${idx + 1}번 장면 삭제`}
+                        title={preview!.length <= 1 ? "장면은 하나 이상 필요해요" : "이 장면 삭제"}
+                      >
+                        <Trash2 size={12} aria-hidden />
+                      </button>
+                    </div>
+                  </article>
                 ))}
               </div>
             </div>
@@ -265,29 +435,54 @@ export function StudioScenarioAutoLayoutPanel({
             <button
               type="button"
               onClick={onDiscard}
-              disabled={busy}
+              disabled={editingLocked}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RotateCcw size={13} aria-hidden />
               다시 만들기
             </button>
+            {missingImageCount > 0 && (
+              <button
+                type="button"
+                onClick={onGenerateImages}
+                disabled={!imageConfigured || editingLocked}
+                title={!imageConfigured ? "AI 연동에서 이미지 API 키를 설정하세요" : undefined}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft/50 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <ImagePlus size={13} aria-hidden />
+                빈 장면 이미지 {missingImageCount}개 생성
+              </button>
+            )}
+            <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-fg-2">
+              적용 위치
+              <select
+                value={applyTarget}
+                onChange={(event) =>
+                  onApplyTargetChange(event.target.value === "new-page" ? "new-page" : "current-page")
+                }
+                disabled={editingLocked}
+                className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+              >
+                <option value="current-page">현재 페이지 아래</option>
+                <option value="new-page">다음 새 페이지</option>
+              </select>
+            </label>
             <button
               type="button"
               onClick={onApply}
-              disabled={busy}
+              disabled={editingLocked}
               className={cn(
-                "ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+                "inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
               )}
             >
-              캔버스에 적용
+              {applyTarget === "new-page" ? "새 페이지로 적용" : "현재 페이지에 적용"}
             </button>
           </div>
         )}
 
         <p className="shrink-0 border-t border-line px-4 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-          적용하면 현재 페이지 아래로 컷이 이어 붙어요 — 적용된 컷·말풍선은 다른 요소와 똑같은 일반
-          레이어라 이후 위치·크기·이미지·대사를 자유롭게 다듬을 수 있어요. 이미지 생성에는 여러 번의 API
-          호출이 필요해 시간이 걸릴 수 있어요.
+          이미지 없이도 컷·말풍선만 먼저 적용할 수 있어요. 선택한 위치에 적용한 결과는 일반 레이어가 되어
+          위치·크기·이미지·대사를 계속 다듬을 수 있어요.
         </p>
       </div>
     </div>

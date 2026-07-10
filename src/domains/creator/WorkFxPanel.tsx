@@ -39,7 +39,7 @@ export function WorkFxPanel({
   onUpdated,
 }: {
   work: WorkDetail;
-  onUpdated: (doc: Record<string, unknown>) => void;
+  onUpdated: (doc: Record<string, unknown>, revision?: number) => void;
 }) {
   const initial = readWorkFx(work.doc);
   const [open, setOpen] = useState(false);
@@ -100,8 +100,11 @@ export function WorkFxPanel({
     setSavedMsg(false);
     const nextDoc = { ...work.doc, fx };
     try {
-      await updateWork(work.id, { doc: nextDoc });
-      onUpdated(nextDoc);
+      const saved = await updateWork(work.id, {
+        doc: nextDoc,
+        ...(work.revision ? { baseRevision: work.revision } : {}),
+      });
+      onUpdated(nextDoc, saved.revision);
       setSavedMsg(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "효과 설정을 저장하지 못했습니다.");

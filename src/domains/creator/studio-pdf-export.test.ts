@@ -9,6 +9,7 @@ import {
   formatPdfFileSize,
   pdfExportFileName,
   pdfExportResultMessage,
+  renderPagesToPdf,
   type PdfJpegPage,
 } from "./studio-pdf-export";
 
@@ -362,7 +363,7 @@ describe("pdfExportFileName · formatPdfFileSize · pdfExportResultMessage", () 
   });
 });
 
-describe("exportPagesToPdf", () => {
+describe("renderPagesToPdf · exportPagesToPdf", () => {
   const watermarkOff = { enabled: false, text: "© x", position: "br", opacity: 0.5, size: 0.028 } as const;
 
   function makeToJpeg() {
@@ -373,6 +374,136 @@ describe("exportPagesToPdf", () => {
     };
     return { calls, toJpeg };
   }
+
+  it("다운로드 없이 재사용 가능한 PDF Blob과 파일 메타데이터를 반환한다", async () => {
+    const sources = [new FakeCanvas(690, 1280), new FakeCanvas(690, 900)];
+    const progress: number[][] = [];
+    const { toJpeg } = makeToJpeg();
+
+    const result = await renderPagesToPdf({
+      pages: sources.map(asCanvas),
+      title: "검토본",
+      createCanvas: (width, height) => asCanvas(new FakeCanvas(width, height)),
+      toJpeg,
+      onProgress: (done, total) => progress.push([done, total]),
+    });
+
+    expect(result).toMatchObject({
+      fileName: "검토본.pdf",
+      pageCount: 2,
+      bytes: result.blob.size,
+    });
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect(result.blob.type).toBe("application/pdf");
+    expect(progress).toEqual([[1, 2], [2, 2]]);
+    const pdf = new Uint8Array(await result.blob.arrayBuffer());
+    const { text } = parseXref(pdf);
+    expect(text.startsWith("%PDF-1.4\n")).toBe(true);
+    expect(text).toContain("/Count 2");
+    expect(text).toContain("/Title <FEFF");
+  });
+
+  it("Blob 렌더에서도 워터마크와 품질 주입을 유지하고 임시 캔버스를 해제한다", async () => {
+    const created: FakeCanvas[] = [];
+    const released: FakeCanvas[] = [];
+    const { calls, toJpeg } = makeToJpeg();
+
+    await renderPagesToPdf({
+      pages: [asCanvas(new FakeCanvas(690, 1280)), asCanvas(new FakeCanvas(690, 900))],
+      title: "x",
+      quality: 0.73,
+      watermark: {
+        enabled: true,
+        text: "© 툰스펙트럼",
+        position: "br",
+        opacity: 0.5,
+        size: 0.028,
+      },
+      createCanvas: (width, height) => {
+        const canvas = new FakeCanvas(width, height);
+        created.push(canvas);
+        return asCanvas(canvas);
+      },
+      toJpeg,
+      releaseCanvas: (canvas) => {
+        const fake = canvas as unknown as FakeCanvas;
+        released.push(fake);
+        canvas.width = 0;
+        canvas.height = 0;
+      },
+    });
+
+    expect(calls).toEqual([
+      { width: 690, height: 1280, quality: 0.73 },
+      { width: 690, height: 900, quality: 0.73 },
+    ]);
+    expect(released).toEqual(created);
+    expect(created.map(({ width, height }) => [width, height])).toEqual([[0, 0], [0, 0]]);
+    for (const canvas of created) {
+      expect(canvas.ctx.strokeTexts).toEqual(["© 툰스펙트럼"]);
+      expect(canvas.ctx.fillTexts).toEqual(["© 툰스펙트럼"]);
+    }
+  });
+
+  it("JPEG 인코딩 실패 때도 임시 캔버스를 해제하고 원래 오류를 보존한다", async () => {
+    const created = new FakeCanvas(100, 200);
+    const released: HTMLCanvasElement[] = [];
+    const progress: number[][] = [];
+
+    await expect(renderPagesToPdf({
+      pages: [asCanvas(new FakeCanvas(100, 200))],
+      title: "x",
+      createCanvas: () => asCanvas(created),
+      toJpeg: () => Promise.reject(new Error("JPEG encoder failed")),
+      releaseCanvas: (canvas) => {
+        released.push(canvas);
+        throw new Error("cleanup failed");
+      },
+      onProgress: (done, total) => progress.push([done, total]),
+    })).rejects.toThrow("JPEG encoder failed");
+
+    expect(released).toEqual([asCanvas(created)]);
+    expect(progress).toEqual([]);
+  });
+
+  it("기존 다운로드 API는 Blob 렌더 결과를 한 번만 저장하고 Blob 없는 계약을 유지한다", async () => {
+    const source = asCanvas(new FakeCanvas(100, 200));
+    const toJpeg = () => Promise.resolve(fakeJpeg(7));
+    const rendered = await renderPagesToPdf({
+      pages: [source],
+      title: "동일 결과",
+      createCanvas: (width, height) => asCanvas(new FakeCanvas(width, height)),
+      toJpeg,
+    });
+    const downloads: { blob: Blob; name: string }[] = [];
+    const exported = await exportPagesToPdf({
+      pages: [source],
+      title: "동일 결과",
+      createCanvas: (width, height) => asCanvas(new FakeCanvas(width, height)),
+      toJpeg,
+      download: (blob, name) => downloads.push({ blob, name }),
+    });
+
+    expect(downloads).toHaveLength(1);
+    expect(downloads[0]?.name).toBe(rendered.fileName);
+    expect(new Uint8Array(await downloads[0]!.blob.arrayBuffer()))
+      .toEqual(new Uint8Array(await rendered.blob.arrayBuffer()));
+    expect(exported).toEqual({
+      pageCount: rendered.pageCount,
+      bytes: rendered.bytes,
+      fileName: rendered.fileName,
+    });
+    expect(exported).not.toHaveProperty("blob");
+  });
+
+  it("Blob 렌더도 유효한 페이지가 없으면 기존 한글 오류를 유지한다", async () => {
+    await expect(renderPagesToPdf({ pages: [], title: "x" }))
+      .rejects.toThrow("내보낼 페이지가 없어요.");
+    await expect(renderPagesToPdf({
+      pages: [asCanvas(new FakeCanvas(0, 100))],
+      title: "x",
+    })).rejects.toThrow("내보낼 페이지가 없어요.");
+  });
 
   it("페이지마다 흰 배경→원본 합성→JPEG 인코드 후 PDF 한 파일을 다운로드한다", async () => {
     const sources = [new FakeCanvas(690, 1280), new FakeCanvas(690, 900)];

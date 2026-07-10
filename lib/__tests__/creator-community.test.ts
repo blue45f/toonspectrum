@@ -3,7 +3,15 @@
 import { inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { creatorFollows, creatorSeries, creatorWorks, db, dbClient, users } from "../db";
+import {
+  creatorFollows,
+  creatorSeries,
+  creatorWorkRevisions,
+  creatorWorks,
+  db,
+  dbClient,
+  users,
+} from "../db";
 import {
   SEED_CHALLENGES,
   challengeStateOf,
@@ -12,16 +20,28 @@ import {
   deleteSeries,
   ensureCreatorCommunitySchema,
   getSeries,
+  getWork,
+  getWorkRevision,
+  addComment,
+  listComments,
+  listWorkRevisions,
   listWorks,
   nextEpisodeNumber,
   parseSeriesSort,
   parseSeriesStatus,
   seedChallengeWindow,
   toggleFollow,
+  toggleLike,
+  restoreWorkRevision,
   updateWork,
   validateFollowPair,
   validateSeriesInput,
 } from "../server/creator";
+import {
+  CREATOR_WORK_REVISION_RETENTION,
+  CreatorWorkRevisionConflictError,
+  CreatorWorkRevisionNotFoundError,
+} from "../server/creator-work-revisions";
 
 import { retryOnDeadlock } from "./db-test-utils";
 
@@ -70,10 +90,10 @@ async function ensureTestUserSchema() {
   `);
 }
 
-async function createCreatorTestUser(name = "테스트 창작자") {
+async function createCreatorTestUser(name = "테스트 창작자", idPrefix = "test-user-") {
   await ensureTestUserSchema();
   expect(await ensureCreatorCommunitySchema()).toBe(true);
-  const id = `test-user-${crypto.randomUUID()}`;
+  const id = `${idPrefix}${crypto.randomUUID()}`;
   createdUserIds.add(id);
   await db.insert(users).values({
     id,
@@ -171,6 +191,119 @@ describe("creator community validation", () => {
 
 // ── DB 통합 ──────────────────────────────────────────────────────────
 describe("creator community (DB)", { timeout: 90000 }, () => {
+  it("owner-only snapshot, 낙관적 충돌, 복원을 단조 revision으로 처리한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const owner = await createCreatorTestUser("revision 소유자", "revision-owner-");
+    const reader = await createCreatorTestUser("revision 외부인", "revision-reader-");
+    const created = await createWork(owner, {
+      title: "revision 원고",
+      status: "published",
+      pages: ["data:image/png;base64,AA=="],
+      doc: { versionLabel: "initial", privateNote: "owner only" },
+    });
+    createdWorkIds.add(created.id);
+    expect(created.revision).toBe(1);
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({ revision: 1 });
+    const publicWork = await getWork(created.id, reader);
+    expect(publicWork).not.toHaveProperty("revision");
+    expect(publicWork?.doc).not.toHaveProperty("privateNote");
+    await expect(listWorkRevisions(reader, created.id)).rejects.toBeInstanceOf(
+      CreatorWorkRevisionNotFoundError
+    );
+
+    const baseline = await getWorkRevision(owner, created.id, 1);
+    expect(baseline.snapshot.doc).toEqual({ versionLabel: "initial", privateNote: "owner only" });
+
+    const updated = await updateWork(owner, created.id, {
+      doc: { versionLabel: "updated", privateNote: "still owner only" },
+      baseRevision: 1,
+    });
+    expect(updated.revision).toBe(2);
+    const stale = await updateWork(owner, created.id, { title: "stale", baseRevision: 1 })
+      .catch((error: unknown) => error);
+    expect(stale).toBeInstanceOf(CreatorWorkRevisionConflictError);
+    expect((stale as CreatorWorkRevisionConflictError).currentRevision).toBe(2);
+
+    const restored = await restoreWorkRevision(owner, created.id, 1, 2);
+    expect(restored.revision).toBe(3);
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({
+      revision: 3,
+      doc: { versionLabel: "initial", privateNote: "owner only" },
+    });
+    await expect(listWorkRevisions(owner, created.id)).resolves.toMatchObject([
+      { revision: 3, restoredFromRevision: 1 },
+      { revision: 2, restoredFromRevision: null },
+      { revision: 1, restoredFromRevision: null },
+    ]);
+  }, 90000);
+
+  it("작품별 snapshot은 성공한 저장과 같은 transaction에서 최신 보존 상한까지만 유지한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const owner = await createCreatorTestUser("retention 소유자", "revision-retention-");
+    const created = await createWork(owner, { title: "보존 상한 원고", status: "draft" });
+    createdWorkIds.add(created.id);
+    let currentRevision = created.revision;
+    for (let index = 0; index < CREATOR_WORK_REVISION_RETENTION + 2; index += 1) {
+      const saved = await updateWork(owner, created.id, {
+        description: `저장 ${index + 1}`,
+        baseRevision: currentRevision,
+      });
+      currentRevision = saved.revision;
+    }
+
+    const revisions = await listWorkRevisions(owner, created.id, CREATOR_WORK_REVISION_RETENTION);
+    expect(revisions).toHaveLength(CREATOR_WORK_REVISION_RETENTION);
+    expect(revisions[0]?.revision).toBe(currentRevision);
+    expect(revisions.at(-1)?.revision).toBe(currentRevision - CREATOR_WORK_REVISION_RETENTION + 1);
+    expect(revisions.some((item) => item.revision === 1)).toBe(false);
+  }, 90000);
+
+  it("snapshot insert가 실패하면 같은 transaction의 작품 수정과 revision 증가도 rollback한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const owner = await createCreatorTestUser("rollback 소유자", "revision-rollback-");
+    const created = await createWork(owner, { title: "원본 제목", status: "draft" });
+    createdWorkIds.add(created.id);
+
+    // 다음 번호를 미리 점유해 snapshot insert만 실패하도록 의도적으로 불일치 상태를 만든다.
+    await db.insert(creatorWorkRevisions).values({
+      workId: created.id,
+      revision: 2,
+      snapshot: {},
+    });
+
+    await expect(updateWork(owner, created.id, {
+      title: "rollback되어야 하는 제목",
+      baseRevision: 1,
+    })).rejects.toThrow();
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({
+      title: "원본 제목",
+      revision: 1,
+    });
+  }, 90000);
+
+  it("초안은 소유자만 조회할 수 있고 좋아요·댓글 경로에서도 공개되지 않는다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const owner = await createCreatorTestUser("초안 소유자", "draft-owner-");
+    const reader = await createCreatorTestUser("다른 독자", "draft-reader-");
+    const draft = await createWork(owner, {
+      title: "아직 공개하지 않은 원고",
+      status: "draft",
+      pages: ["data:image/png;base64,AA=="],
+      doc: { privateNote: "외부에 보이면 안 됨" },
+    });
+    createdWorkIds.add(draft.id);
+
+    await expect(getWork(draft.id, owner)).resolves.toMatchObject({ id: draft.id, isOwner: true });
+    await expect(getWork(draft.id, reader)).resolves.toBeNull();
+    await expect(getWork(draft.id)).resolves.toBeNull();
+    await expect(toggleLike(reader, draft.id)).rejects.toThrow(/공개된 작품/);
+    await expect(addComment(reader, draft.id, "미공개 작품 댓글")).rejects.toThrow(/공개된 작품/);
+    await expect(listComments(draft.id)).resolves.toEqual([]);
+
+    await updateWork(owner, draft.id, { status: "published" });
+    await expect(getWork(draft.id, reader)).resolves.toMatchObject({ id: draft.id, status: "published" });
+  }, 90000);
+
   it("시리즈에 회차를 게시하면 episodeNo 가 max+1 로 자동 부여된다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const userId = await createCreatorTestUser();
@@ -242,8 +375,8 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
 
   it("팔로우 토글과 팔로잉 피드가 동작한다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const follower = await createCreatorTestUser("팔로워");
-    const creator = await createCreatorTestUser("창작자");
+    const follower = await createCreatorTestUser("팔로워", "feed-follower-");
+    const creator = await createCreatorTestUser("창작자", "feed-creator-");
 
     const on = await toggleFollow(follower, creator);
     expect(on.following).toBe(true);

@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 
+import { rateLimit } from "../../../../../lib/rate-limit";
 import {
   addComment,
   bumpAssetDownloads,
@@ -14,19 +23,28 @@ import {
   getCreatorPublicProfile,
   getSeries,
   getWork,
+  getWorkRevision,
   listChallenges,
   listComments,
   listSeries,
   listSharedAssets,
+  listWorkRevisions,
   listWorks,
   parseCreatorSort,
   parseSeriesSort,
   publishAsset,
+  restoreWorkRevision,
   toggleFollow,
   toggleLike,
   updateSeries,
   updateWork,
 } from "../../../../../lib/server/creator";
+import {
+  CreatorWorkRevisionConflictError,
+  CreatorWorkRevisionNotFoundError,
+} from "../../../../../lib/server/creator-work-revisions";
+
+import type { CreateCreatorWorkDto, UpdateCreatorWorkDto } from "./creator.dto";
 
 interface ListQuery {
   titleId?: string | null;
@@ -54,25 +72,72 @@ export class CreatorService {
   async getWork(id: string, viewerId?: string) {
     const work = await getWork(id, viewerId);
     if (!work) throw new NotFoundException("작품을 찾을 수 없습니다.");
-    // 조회수 증가는 best-effort(소유자/뷰어 구분 없이 1 증가).
-    await bumpViews(id);
+    // 소유자가 편집/미리보기로 새로고침하는 횟수는 공개 조회수에 포함하지 않는다.
+    if (!work.isOwner) await bumpViews(id);
     return work;
   }
 
-  async createWork(userId: string, body: unknown) {
+  async createWork(userId: string, body: CreateCreatorWorkDto) {
     try {
       // 페이지/문서가 클 수 있으나 다른 모듈과 동일하게 별도 크기 제한은 두지 않는다.
-      return await createWork(userId, (body ?? {}) as Record<string, unknown>);
+      return await createWork(userId, body);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 저장할 수 없습니다.");
     }
   }
 
-  async updateWork(userId: string, id: string, body: unknown) {
+  async updateWork(userId: string, id: string, body: UpdateCreatorWorkDto) {
     try {
-      return await updateWork(userId, id, (body ?? {}) as Record<string, unknown>);
+      return await updateWork(userId, id, body);
     } catch (error) {
+      if (error instanceof CreatorWorkRevisionConflictError) {
+        throw new ConflictException({
+          code: "creator_work_revision_conflict",
+          message: "다른 저장이 먼저 반영되었습니다. 작품을 다시 불러온 뒤 변경 내용을 확인해 주세요.",
+          currentRevision: error.currentRevision,
+        });
+      }
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 수정할 수 없습니다.");
+    }
+  }
+
+  async listWorkRevisions(userId: string, id: string, limit: number) {
+    try {
+      return await listWorkRevisions(userId, id, limit);
+    } catch (error) {
+      if (error instanceof CreatorWorkRevisionNotFoundError) {
+        throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
+      }
+      throw new BadRequestException("작품 revision을 불러올 수 없습니다.");
+    }
+  }
+
+  async getWorkRevision(userId: string, id: string, revision: number) {
+    try {
+      return await getWorkRevision(userId, id, revision);
+    } catch (error) {
+      if (error instanceof CreatorWorkRevisionNotFoundError) {
+        throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
+      }
+      throw new BadRequestException("작품 revision을 불러올 수 없습니다.");
+    }
+  }
+
+  async restoreWorkRevision(userId: string, id: string, revision: number, baseRevision: number) {
+    try {
+      return await restoreWorkRevision(userId, id, revision, baseRevision);
+    } catch (error) {
+      if (error instanceof CreatorWorkRevisionConflictError) {
+        throw new ConflictException({
+          code: "creator_work_revision_conflict",
+          message: "다른 저장이 먼저 반영되었습니다. 작품을 다시 불러온 뒤 복원을 다시 시도해 주세요.",
+          currentRevision: error.currentRevision,
+        });
+      }
+      if (error instanceof CreatorWorkRevisionNotFoundError) {
+        throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
+      }
+      throw new BadRequestException("작품 revision을 복원할 수 없습니다.");
     }
   }
 
@@ -122,10 +187,17 @@ export class CreatorService {
     }
   }
 
-  async generateAsset(body: unknown) {
+  async generateAsset(userId: string, body: unknown) {
+    if (process.env.CREATOR_IMAGE_AI_ENABLED !== "true") {
+      throw new ServiceUnavailableException("서버 이미지 생성은 현재 비활성화되어 있어요. 내 API 키 연동을 이용해 주세요.");
+    }
+    if (!rateLimit(`creator-image-ai:${userId}`, 5, 60 * 60_000)) {
+      throw new HttpException("이미지 생성 한도에 도달했어요. 잠시 후 다시 시도해 주세요.", HttpStatus.TOO_MANY_REQUESTS);
+    }
     try {
       return await generateImageAsset((body ?? {}) as Record<string, unknown>);
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       throw new BadRequestException(error instanceof Error ? error.message : "이미지를 생성할 수 없습니다.");
     }
   }

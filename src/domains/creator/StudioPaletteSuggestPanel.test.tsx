@@ -45,7 +45,8 @@ describe("StudioPaletteSuggestPanel mount-time render contract", () => {
     const html = renderPanel({ configured: false });
 
     expect(html).toContain("AI 어시스트 설정");
-    expect(html).toContain("API 키를 등록하면 이");
+    expect(html).toContain("로그인해 서버 AI를 사용하거나");
+    expect(html).toContain("내 API 키를 등록하면 쓸 수 있어요");
     expect(html).toMatch(/<textarea[^>]*disabled=""/);
     expect(html).toMatch(/<button type="button"[^>]*disabled=""/);
   });

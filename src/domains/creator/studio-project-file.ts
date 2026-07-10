@@ -1,0 +1,95 @@
+import { z } from "zod";
+
+import {
+  normalizeStudioAiProvenanceDocument,
+  type StudioAiProvenanceDocument,
+} from "./studio-ai-provenance";
+
+const OptionalAiProvenanceSchema = z
+  .unknown()
+  .optional()
+  .transform((value): StudioAiProvenanceDocument | undefined =>
+    value === undefined ? undefined : normalizeStudioAiProvenanceDocument(value)
+  );
+
+const ProjectPageSchema = z
+  .object({
+    id: z.string().min(1),
+    elements: z.array(z.unknown()).max(10_000),
+    bg: z.string(),
+    bgGrad: z.array(z.string()).nullable(),
+    canvasH: z.number().finite().positive().max(100_000),
+  })
+  .passthrough();
+
+const CommonProjectSchema = z.object({
+  title: z.string().max(200).default(""),
+  description: z.string().max(10_000).default(""),
+  tagsText: z.string().max(2_000).default(""),
+  currentPageId: z.string().optional(),
+  webtoonTheme: z.enum(["classic", "soft", "vivid"]).default("classic"),
+  panelGutter: z.number().finite().min(0).max(500).default(24),
+  master: z.unknown().optional(),
+  characterBible: z.unknown().optional(),
+  writerRoom: z.unknown().optional(),
+  comments: z.unknown().optional(),
+  releaseSchedule: z.unknown().optional(),
+  publicationAnalytics: z.unknown().optional(),
+  /** Private operation history; hydration always strips raw prompt fields by default. */
+  aiProvenance: OptionalAiProvenanceSchema,
+  // 목적지 정책은 자주 바뀌므로 프로젝트 파서는 느슨하게 보존하고, UI에서 별도 정규화한다.
+  publishPack: z.unknown().optional(),
+});
+
+const ProjectV2Schema = CommonProjectSchema.extend({
+  version: z.literal(2),
+  savedAt: z.string().optional(),
+  pagesList: z.array(ProjectPageSchema).min(1).max(200),
+}).passthrough();
+
+const LegacyProjectSchema = z
+  .object({
+    version: z.union([z.literal("1.0"), z.literal(1)]).optional(),
+    title: z.string().max(200).default(""),
+    pages: z.array(ProjectPageSchema).min(1).max(200),
+    master: z.unknown().optional(),
+    writerRoom: z.unknown().optional(),
+    aiProvenance: OptionalAiProvenanceSchema,
+  })
+  .passthrough();
+
+export type StudioProjectFile = z.infer<typeof ProjectV2Schema>;
+
+export function parseStudioProjectFile(value: unknown): StudioProjectFile {
+  const current = ProjectV2Schema.safeParse(value);
+  if (current.success) return current.data;
+  const legacy = LegacyProjectSchema.safeParse(value);
+  if (!legacy.success) throw new Error("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");
+  return {
+    version: 2,
+    title: legacy.data.title,
+    description: "",
+    tagsText: "",
+    pagesList: legacy.data.pages,
+    master: legacy.data.master,
+    writerRoom: legacy.data.writerRoom,
+    aiProvenance: legacy.data.aiProvenance,
+    currentPageId: legacy.data.pages[0].id,
+    webtoonTheme: "classic",
+    panelGutter: 24,
+  };
+}
+
+/** Serializes an importable project using the same bounded, hash-only provenance policy. */
+export function serializeStudioProjectFile(value: unknown, space?: number): string {
+  return JSON.stringify(parseStudioProjectFile(value), null, space);
+}
+
+/**
+ * A remix is a new authorship context. It must not inherit the source creator's private prompt
+ * hashes, provider request identifiers, target IDs, or usage log. New remix operations are
+ * recorded into this fresh document after the remix opens.
+ */
+export function resetStudioAiProvenanceForRemix(): StudioAiProvenanceDocument {
+  return normalizeStudioAiProvenanceDocument(undefined);
+}

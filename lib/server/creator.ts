@@ -10,12 +10,28 @@ import {
   creatorSeries,
   creatorWorkComments,
   creatorWorkLikes,
+  creatorWorkRevisions,
   creatorWorks,
   db,
   dbPool,
   users,
 } from "../db";
 
+import { toPublicCreatorDoc } from "./creator-doc-visibility";
+import {
+  CREATOR_WORK_REVISION_MAX,
+  CREATOR_WORK_REVISION_RETENTION,
+  CreatorWorkRevisionConflictError,
+  CreatorWorkRevisionNotFoundError,
+  createCreatorWorkRevisionSnapshot,
+  creatorWorkRevisionRetentionCutoff,
+  parseCreatorWorkRevision,
+} from "./creator-work-revisions";
+
+import type {
+  CreatorWorkRevisionSnapshot,
+  CreatorWorkRevisionSnapshotSource,
+} from "./creator-work-revisions";
 import type { SQL } from "drizzle-orm";
 
 const SORTS = new Set<CreatorWorkSort>(["recent", "likes", "views"]);
@@ -74,6 +90,8 @@ export interface CreatorWorkDetail extends CreatorWorkSummary {
   pages: string[];
   doc: unknown;
   isOwner: boolean;
+  /** Owner-only optimistic concurrency token. Public projections omit it. */
+  revision?: number;
   updatedAt: string;
   series: { id: string; title: string; status: CreatorSeriesStatus } | null;
   prevEpisode: CreatorEpisodeRef | null;
@@ -86,6 +104,20 @@ export interface CreatorWorkDetail extends CreatorWorkSummary {
     cover: string;
     author: CreatorAuthor;
   }[];
+}
+
+export interface CreatorWorkMutationResult extends CreatorWorkSummary {
+  revision: number;
+}
+
+export interface CreatorWorkRevisionSummary {
+  revision: number;
+  restoredFromRevision: number | null;
+  createdAt: string;
+}
+
+export interface CreatorWorkRevisionDetail extends CreatorWorkRevisionSummary {
+  snapshot: CreatorWorkRevisionSnapshot;
 }
 
 export interface CreatorWorkComment {
@@ -111,6 +143,8 @@ export interface CreatorWorkInput {
   challengeId?: unknown;
   // 리믹스 (이어서 편집하기) 원본 작품 ID
   remixFromId?: unknown;
+  // 생략 시 레거시 last-write-wins. 전달 시 현재 revision과 정확히 일치해야만 수정한다.
+  baseRevision?: unknown;
 }
 
 function safeDate(value: Date | number | string | null | undefined): string {
@@ -342,14 +376,58 @@ const CREATE_COMMUNITY_SCHEMA_SQL = `
     "status" text NOT NULL DEFAULT 'published',
     "hidden" boolean NOT NULL DEFAULT false,
     "views" integer NOT NULL DEFAULT 0,
+    "revision" integer NOT NULL DEFAULT 1,
     "createdAt" timestamp,
     "updatedAt" timestamp
   );
+  ALTER TABLE "creator_work" ADD COLUMN IF NOT EXISTS "revision" integer NOT NULL DEFAULT 1;
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'creator_work_revision_value_positive_check'
+        AND conrelid = 'creator_work'::regclass
+    ) THEN
+      ALTER TABLE "creator_work"
+        ADD CONSTRAINT "creator_work_revision_value_positive_check" CHECK ("revision" >= 1);
+    END IF;
+  END $$;
   ALTER TABLE "creator_work" ADD COLUMN IF NOT EXISTS "seriesId" text;
   ALTER TABLE "creator_work" ADD COLUMN IF NOT EXISTS "episodeNo" integer;
   ALTER TABLE "creator_work" ADD COLUMN IF NOT EXISTS "challengeId" text;
+  ALTER TABLE "creator_work" ADD COLUMN IF NOT EXISTS "remixFromId" text;
   CREATE INDEX IF NOT EXISTS "creator_work_series_idx" ON "creator_work" ("seriesId", "episodeNo");
   CREATE INDEX IF NOT EXISTS "creator_work_challenge_idx" ON "creator_work" ("challengeId");
+  CREATE TABLE IF NOT EXISTS "creator_work_revision" (
+    "workId" text NOT NULL REFERENCES "creator_work"("id") ON DELETE CASCADE,
+    "revision" integer NOT NULL CHECK ("revision" >= 1),
+    "snapshot" jsonb NOT NULL CHECK (jsonb_typeof("snapshot") = 'object'),
+    "restoredFromRevision" integer CHECK ("restoredFromRevision" IS NULL OR "restoredFromRevision" >= 1),
+    "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "creator_work_revision_pkey" PRIMARY KEY ("workId", "revision")
+  );
+  INSERT INTO "creator_work_revision" ("workId", "revision", "snapshot", "createdAt")
+  SELECT
+    work."id",
+    work."revision",
+    jsonb_build_object(
+      'titleId', work."titleId",
+      'title', work."title",
+      'description', COALESCE(work."description", ''),
+      'cover', COALESCE(work."cover", ''),
+      'tags', COALESCE(work."tags", '[]'::jsonb),
+      'format', COALESCE(work."format", 'cuttoon'),
+      'pages', COALESCE(work."pages", '[]'::jsonb),
+      'doc', COALESCE(work."doc", '{}'::jsonb),
+      'status', COALESCE(work."status", 'draft'),
+      'seriesId', work."seriesId",
+      'episodeNo', work."episodeNo",
+      'challengeId', work."challengeId",
+      'remixFromId', work."remixFromId"
+    ),
+    COALESCE(work."updatedAt", work."createdAt", CURRENT_TIMESTAMP)
+  FROM "creator_work" AS work
+  ON CONFLICT ("workId", "revision") DO NOTHING;
   CREATE TABLE IF NOT EXISTS "creator_series" (
     "id" text PRIMARY KEY NOT NULL,
     "userId" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
@@ -552,6 +630,7 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
         views: creatorWorks.views,
         pages: creatorWorks.pages,
         doc: creatorWorks.doc,
+        revision: creatorWorks.revision,
         createdAt: creatorWorks.createdAt,
         updatedAt: creatorWorks.updatedAt,
         ownerId: creatorWorks.userId,
@@ -569,7 +648,7 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       .limit(1);
     if (!row) return null;
     const isOwner = !!viewerId && viewerId === row.ownerId;
-    if (row.hidden && !isOwner) return null;
+    if ((row.hidden || row.status !== "published") && !isOwner) return null;
 
     const [likeCount] = await db
       .select({ count: sql<number>`count(*)`.as("count") })
@@ -712,8 +791,9 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       createdAt: safeDate(row.createdAt),
       updatedAt: safeDate(row.updatedAt),
       pages: parsePages(row.pages),
-      doc: row.doc ?? {},
+      doc: isOwner ? row.doc ?? {} : toPublicCreatorDoc(row.doc),
       isOwner,
+      ...(isOwner ? { revision: Number(row.revision ?? 1) } : {}),
       series,
       prevEpisode,
       nextEpisode,
@@ -737,7 +817,10 @@ export async function bumpViews(id: string): Promise<void> {
 }
 
 // ── 생성 ─────────────────────────────────────────────────────────────
-export async function createWork(userId: string, input: CreatorWorkInput): Promise<CreatorWorkSummary> {
+export async function createWork(userId: string, input: CreatorWorkInput): Promise<CreatorWorkMutationResult> {
+  if (!(await ensureCreatorCommunitySchema())) {
+    throw new Error("작품 revision 저장소를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  }
   const title = clampText(input.title, MAX_TITLE);
   if (title.length < 1) throw new Error("제목을 입력해 주세요.");
   const description = normalizeMultiline(input.description, MAX_DESCRIPTION);
@@ -787,6 +870,7 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     doc,
     status,
     remixFromId,
+    revision: 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -795,7 +879,15 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     values.episodeNo = episodeNo;
   }
   if (challengeId) values.challengeId = challengeId;
-  await db.insert(creatorWorks).values(values);
+  await db.transaction(async (tx) => {
+    await tx.insert(creatorWorks).values(values);
+    await tx.insert(creatorWorkRevisions).values({
+      workId: id,
+      revision: 1,
+      snapshot: createCreatorWorkRevisionSnapshot(values),
+      createdAt: now,
+    });
+  });
   if (seriesId) await touchSeries(seriesId);
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return {
@@ -818,21 +910,84 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     challengeId,
     challengeTitle,
     remixFromId,
+    revision: 1,
     createdAt: safeDate(now),
   };
 }
 
+const creatorWorkSnapshotSelection = {
+  titleId: creatorWorks.titleId,
+  title: creatorWorks.title,
+  description: creatorWorks.description,
+  cover: creatorWorks.cover,
+  tags: creatorWorks.tags,
+  format: creatorWorks.format,
+  pages: creatorWorks.pages,
+  doc: creatorWorks.doc,
+  status: creatorWorks.status,
+  seriesId: creatorWorks.seriesId,
+  episodeNo: creatorWorks.episodeNo,
+  challengeId: creatorWorks.challengeId,
+  remixFromId: creatorWorks.remixFromId,
+  revision: creatorWorks.revision,
+};
+
+async function mutationResultForWork(
+  userId: string,
+  id: string,
+  revision: number
+): Promise<CreatorWorkMutationResult> {
+  const detail = await getWork(id, userId);
+  if (!detail) throw new Error("작품을 찾을 수 없습니다.");
+  const {
+    pages: _pages,
+    doc: _doc,
+    isOwner: _isOwner,
+    revision: _detailRevision,
+    updatedAt: _updatedAt,
+    series: _series,
+    prevEpisode: _prevEpisode,
+    nextEpisode: _nextEpisode,
+    challenge: _challenge,
+    ...summary
+  } = detail;
+  return { ...summary, revision };
+}
+
 // ── 수정(작성자 전용) ────────────────────────────────────────────────
-export async function updateWork(userId: string, id: string, patch: CreatorWorkInput): Promise<CreatorWorkSummary> {
+export async function updateWork(
+  userId: string,
+  id: string,
+  patch: CreatorWorkInput
+): Promise<CreatorWorkMutationResult> {
+  if (!(await ensureCreatorCommunitySchema())) {
+    throw new Error("작품 revision 저장소를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+  const baseRevision = patch.baseRevision === undefined
+    ? undefined
+    : parseCreatorWorkRevision(patch.baseRevision, "baseRevision");
   const [existing] = await db
-    .select({ id: creatorWorks.id, ownerId: creatorWorks.userId })
+    .select({
+      id: creatorWorks.id,
+      ownerId: creatorWorks.userId,
+      revision: creatorWorks.revision,
+      seriesId: creatorWorks.seriesId,
+      challengeId: creatorWorks.challengeId,
+    })
     .from(creatorWorks)
     .where(eq(creatorWorks.id, id))
     .limit(1);
   if (!existing) throw new Error("작품을 찾을 수 없습니다.");
   if (existing.ownerId !== userId) throw new Error("작성자만 수정할 수 있습니다.");
+  if (baseRevision !== undefined && existing.revision !== baseRevision) {
+    throw new CreatorWorkRevisionConflictError(existing.revision);
+  }
+  if (existing.revision >= CREATOR_WORK_REVISION_MAX) {
+    throw new Error("작품 revision 상한에 도달해 더 저장할 수 없습니다.");
+  }
 
-  const fields: Record<string, unknown> = { updatedAt: new Date() };
+  const now = new Date();
+  const fields: Record<string, unknown> = { updatedAt: now };
   if (patch.title !== undefined) {
     const title = clampText(patch.title, MAX_TITLE);
     if (title.length < 1) throw new Error("제목을 입력해 주세요.");
@@ -846,56 +1001,222 @@ export async function updateWork(userId: string, id: string, patch: CreatorWorkI
   if (patch.status !== undefined) fields.status = parseStatus(patch.status);
   if (patch.titleId !== undefined) fields.titleId = parseTitleId(patch.titleId);
 
-  // 시리즈/챌린지 연결 변경(선택 필드 — 미전달 시 기존 값 유지, 새 컬럼도 건드리지 않음).
+  // 시리즈/챌린지 연결 변경(선택 필드 — 미전달 시 기존 값 유지).
   let bumpSeriesId: string | null = null;
-  if (patch.seriesId !== undefined || patch.challengeId !== undefined) {
-    if (!(await ensureCreatorCommunitySchema())) {
-      throw new Error("연재·챌린지 기능을 준비 중입니다. 잠시 후 다시 시도해 주세요.");
-    }
-    const [current] = await db
-      .select({ seriesId: creatorWorks.seriesId, challengeId: creatorWorks.challengeId })
-      .from(creatorWorks)
-      .where(eq(creatorWorks.id, id))
-      .limit(1);
-    if (patch.seriesId !== undefined) {
-      const nextSeriesId = parseRefId(patch.seriesId);
-      if (nextSeriesId !== (current?.seriesId ?? null)) {
-        if (nextSeriesId) {
-          await getOwnedSeriesOrThrow(nextSeriesId, userId);
-          fields.seriesId = nextSeriesId;
-          fields.episodeNo = await nextEpisodeNoOf(nextSeriesId); // 새 시리즈 기준 max+1
-          bumpSeriesId = nextSeriesId;
-        } else {
-          fields.seriesId = null;
-          fields.episodeNo = null;
-        }
-      }
-    }
-    if (patch.challengeId !== undefined) {
-      const nextChallengeId = parseRefId(patch.challengeId);
-      if (nextChallengeId !== (current?.challengeId ?? null)) {
-        if (nextChallengeId) await assertJoinableChallenge(nextChallengeId);
-        fields.challengeId = nextChallengeId;
+  if (patch.seriesId !== undefined) {
+    const nextSeriesId = parseRefId(patch.seriesId);
+    if (nextSeriesId !== (existing.seriesId ?? null)) {
+      if (nextSeriesId) {
+        await getOwnedSeriesOrThrow(nextSeriesId, userId);
+        fields.seriesId = nextSeriesId;
+        fields.episodeNo = await nextEpisodeNoOf(nextSeriesId); // 새 시리즈 기준 max+1
+        bumpSeriesId = nextSeriesId;
+      } else {
+        fields.seriesId = null;
+        fields.episodeNo = null;
       }
     }
   }
+  if (patch.challengeId !== undefined) {
+    const nextChallengeId = parseRefId(patch.challengeId);
+    if (nextChallengeId !== (existing.challengeId ?? null)) {
+      if (nextChallengeId) await assertJoinableChallenge(nextChallengeId);
+      fields.challengeId = nextChallengeId;
+    }
+  }
 
-  await db.update(creatorWorks).set(fields).where(eq(creatorWorks.id, id));
+  const updated = await db.transaction(async (tx) => {
+    // `baseRevision`을 생략한 레거시 저장도 동시 요청으로 PostgreSQL integer 상한을 넘지 않게
+    // write 조건에서 다시 막는다. 사전 조회는 친절한 오류용이며 안전성은 이 조건이 담당한다.
+    const conditions = [
+      eq(creatorWorks.id, id),
+      eq(creatorWorks.userId, userId),
+      lt(creatorWorks.revision, CREATOR_WORK_REVISION_MAX),
+    ];
+    if (baseRevision !== undefined) conditions.push(eq(creatorWorks.revision, baseRevision));
+    const [row] = await tx
+      .update(creatorWorks)
+      .set({ ...fields, revision: sql`${creatorWorks.revision} + 1` })
+      .where(and(...conditions))
+      .returning(creatorWorkSnapshotSelection);
+
+    if (!row) {
+      const [current] = await tx
+        .select({ ownerId: creatorWorks.userId, revision: creatorWorks.revision })
+        .from(creatorWorks)
+        .where(eq(creatorWorks.id, id))
+        .limit(1);
+      if (!current) throw new Error("작품을 찾을 수 없습니다.");
+      if (current.ownerId !== userId) throw new Error("작성자만 수정할 수 있습니다.");
+      if (current.revision >= CREATOR_WORK_REVISION_MAX) {
+        throw new Error("작품 revision 상한에 도달해 더 저장할 수 없습니다.");
+      }
+      if (baseRevision !== undefined) throw new CreatorWorkRevisionConflictError(current.revision);
+      throw new Error("작품을 수정할 수 없습니다.");
+    }
+
+    await tx.insert(creatorWorkRevisions).values({
+      workId: id,
+      revision: row.revision,
+      snapshot: createCreatorWorkRevisionSnapshot(row),
+      createdAt: now,
+    });
+    const cutoff = creatorWorkRevisionRetentionCutoff(row.revision);
+    if (cutoff !== null) {
+      await tx
+        .delete(creatorWorkRevisions)
+        .where(and(eq(creatorWorkRevisions.workId, id), lte(creatorWorkRevisions.revision, cutoff)));
+    }
+    return row;
+  });
+
   if (bumpSeriesId) await touchSeries(bumpSeriesId);
-  const detail = await getWork(id, userId);
-  if (!detail) throw new Error("작품을 찾을 수 없습니다.");
-  const {
-    pages: _pages,
-    doc: _doc,
-    isOwner: _isOwner,
-    updatedAt: _updatedAt,
-    series: _series,
-    prevEpisode: _prevEpisode,
-    nextEpisode: _nextEpisode,
-    challenge: _challenge,
-    ...summary
-  } = detail;
-  return summary;
+  return mutationResultForWork(userId, id, updated.revision);
+}
+
+async function assertRevisionOwner(userId: string, workId: string): Promise<void> {
+  const [work] = await db
+    .select({ ownerId: creatorWorks.userId })
+    .from(creatorWorks)
+    .where(eq(creatorWorks.id, workId))
+    .limit(1);
+  // Owner-only endpoint에서는 작품 없음과 타인 작품을 같은 오류로 취급해 존재 여부를 노출하지 않는다.
+  if (!work || work.ownerId !== userId) throw new CreatorWorkRevisionNotFoundError();
+}
+
+export async function listWorkRevisions(
+  userId: string,
+  workId: string,
+  limit = CREATOR_WORK_REVISION_RETENTION
+): Promise<CreatorWorkRevisionSummary[]> {
+  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
+  await assertRevisionOwner(userId, workId);
+  const parsedLimit = Number.isFinite(limit) ? Math.floor(limit) : CREATOR_WORK_REVISION_RETENTION;
+  const safeLimit = Math.max(1, Math.min(CREATOR_WORK_REVISION_RETENTION, parsedLimit));
+  const rows = await db
+    .select({
+      revision: creatorWorkRevisions.revision,
+      restoredFromRevision: creatorWorkRevisions.restoredFromRevision,
+      createdAt: creatorWorkRevisions.createdAt,
+    })
+    .from(creatorWorkRevisions)
+    .where(eq(creatorWorkRevisions.workId, workId))
+    .orderBy(desc(creatorWorkRevisions.revision))
+    .limit(safeLimit);
+  return rows.map((row) => ({
+    revision: row.revision,
+    restoredFromRevision: row.restoredFromRevision ?? null,
+    createdAt: safeDate(row.createdAt),
+  }));
+}
+
+export async function getWorkRevision(
+  userId: string,
+  workId: string,
+  revisionValue: unknown
+): Promise<CreatorWorkRevisionDetail> {
+  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
+  await assertRevisionOwner(userId, workId);
+  const revision = parseCreatorWorkRevision(revisionValue);
+  const [row] = await db
+    .select({
+      revision: creatorWorkRevisions.revision,
+      snapshot: creatorWorkRevisions.snapshot,
+      restoredFromRevision: creatorWorkRevisions.restoredFromRevision,
+      createdAt: creatorWorkRevisions.createdAt,
+    })
+    .from(creatorWorkRevisions)
+    .where(and(eq(creatorWorkRevisions.workId, workId), eq(creatorWorkRevisions.revision, revision)))
+    .limit(1);
+  if (!row) throw new CreatorWorkRevisionNotFoundError();
+  return {
+    revision: row.revision,
+    restoredFromRevision: row.restoredFromRevision ?? null,
+    createdAt: safeDate(row.createdAt),
+    snapshot: createCreatorWorkRevisionSnapshot(row.snapshot as CreatorWorkRevisionSnapshotSource),
+  };
+}
+
+export async function restoreWorkRevision(
+  userId: string,
+  workId: string,
+  revisionValue: unknown,
+  baseRevisionValue: unknown
+): Promise<CreatorWorkMutationResult> {
+  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
+  const targetRevision = parseCreatorWorkRevision(revisionValue);
+  const baseRevision = parseCreatorWorkRevision(baseRevisionValue, "baseRevision");
+  const now = new Date();
+
+  const restored = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ ownerId: creatorWorks.userId, revision: creatorWorks.revision })
+      .from(creatorWorks)
+      .where(eq(creatorWorks.id, workId))
+      .limit(1);
+    if (!current || current.ownerId !== userId) throw new CreatorWorkRevisionNotFoundError();
+    if (current.revision !== baseRevision) throw new CreatorWorkRevisionConflictError(current.revision);
+    if (current.revision >= CREATOR_WORK_REVISION_MAX) {
+      throw new Error("작품 revision 상한에 도달해 더 저장할 수 없습니다.");
+    }
+
+    const [target] = await tx
+      .select({ snapshot: creatorWorkRevisions.snapshot })
+      .from(creatorWorkRevisions)
+      .where(
+        and(
+          eq(creatorWorkRevisions.workId, workId),
+          eq(creatorWorkRevisions.revision, targetRevision)
+        )
+      )
+      .limit(1);
+    if (!target) throw new CreatorWorkRevisionNotFoundError();
+    const snapshot = createCreatorWorkRevisionSnapshot(
+      target.snapshot as CreatorWorkRevisionSnapshotSource
+    );
+
+    const [row] = await tx
+      .update(creatorWorks)
+      .set({
+        ...snapshot,
+        revision: sql`${creatorWorks.revision} + 1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(creatorWorks.id, workId),
+          eq(creatorWorks.userId, userId),
+          eq(creatorWorks.revision, baseRevision)
+        )
+      )
+      .returning(creatorWorkSnapshotSelection);
+    if (!row) {
+      const [latest] = await tx
+        .select({ ownerId: creatorWorks.userId, revision: creatorWorks.revision })
+        .from(creatorWorks)
+        .where(eq(creatorWorks.id, workId))
+        .limit(1);
+      if (!latest || latest.ownerId !== userId) throw new CreatorWorkRevisionNotFoundError();
+      throw new CreatorWorkRevisionConflictError(latest.revision);
+    }
+
+    await tx.insert(creatorWorkRevisions).values({
+      workId,
+      revision: row.revision,
+      snapshot: createCreatorWorkRevisionSnapshot(row),
+      restoredFromRevision: targetRevision,
+      createdAt: now,
+    });
+    const cutoff = creatorWorkRevisionRetentionCutoff(row.revision);
+    if (cutoff !== null) {
+      await tx
+        .delete(creatorWorkRevisions)
+        .where(and(eq(creatorWorkRevisions.workId, workId), lte(creatorWorkRevisions.revision, cutoff)));
+    }
+    return row;
+  });
+
+  return mutationResultForWork(userId, workId, restored.revision);
 }
 
 // ── 삭제(작성자 또는 관리자) ─────────────────────────────────────────
@@ -911,8 +1232,20 @@ export async function deleteWork(userId: string, id: string, isAdmin: boolean): 
   return { deleted: true };
 }
 
+async function assertPublicCreatorWork(workId: string): Promise<void> {
+  const [work] = await db
+    .select({ id: creatorWorks.id, status: creatorWorks.status, hidden: creatorWorks.hidden, ownerId: creatorWorks.userId })
+    .from(creatorWorks)
+    .where(eq(creatorWorks.id, workId))
+    .limit(1);
+  if (!work || work.hidden || work.status !== "published") {
+    throw new Error("공개된 작품을 찾을 수 없습니다.");
+  }
+}
+
 // ── 좋아요 토글 ──────────────────────────────────────────────────────
 export async function toggleLike(userId: string, workId: string): Promise<{ liked: boolean; likes: number }> {
+  await assertPublicCreatorWork(workId);
   const [existing] = await db
     .select({ workId: creatorWorkLikes.workId })
     .from(creatorWorkLikes)
@@ -940,6 +1273,7 @@ export async function toggleLike(userId: string, workId: string): Promise<{ like
 // ── 댓글 목록 ────────────────────────────────────────────────────────
 export async function listComments(workId: string, includeHidden = false): Promise<CreatorWorkComment[]> {
   try {
+    await assertPublicCreatorWork(workId);
     let where: SQL | undefined = eq(creatorWorkComments.workId, workId);
     if (!includeHidden) where = and(where, eq(creatorWorkComments.hidden, false));
     const rows = await db
@@ -972,12 +1306,7 @@ export async function listComments(workId: string, includeHidden = false): Promi
 export async function addComment(userId: string, workId: string, text: unknown): Promise<CreatorWorkComment> {
   const clean = normalizeMultiline(text, MAX_COMMENT);
   if (clean.length < 1) throw new Error("댓글 내용을 입력해 주세요.");
-  const [work] = await db
-    .select({ id: creatorWorks.id })
-    .from(creatorWorks)
-    .where(eq(creatorWorks.id, workId))
-    .limit(1);
-  if (!work) throw new Error("댓글을 달 작품을 찾을 수 없습니다.");
+  await assertPublicCreatorWork(workId);
 
   const id = crypto.randomUUID();
   const now = new Date();

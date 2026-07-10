@@ -3,7 +3,7 @@
 // onChange를 부모(StudioPage.tsx)에서 받는다(studio-brand-kit "라이브러리 매니저" 자기완결형
 // 패턴이 아니라, StudioImageAdjustmentsPanel 계열의 "모든 값을 prop으로 받는 얇은 패널" 컨벤션을
 // 따른다) — 같은 팝오버 안의 배경 생성/구도 제안 패널이 설정 변경을 즉시(리마운트 없이) 반영해야
-// 하기 때문이다(설정을 각 패널이 마운트 시점에 localStorage에서 개별로 읽으면, 이 패널에서 방금
+// 하기 때문이다(설정을 각 패널이 마운트 시점에 저장소에서 개별로 읽으면, 이 패널에서 방금
 // 입력한 키를 옆 패널이 못 보는 stale-read 문제가 생긴다 — 부모가 단일 진실 공급원이어야 한다).
 //
 // "테스트" 버튼은 실제 네트워크 요청(Chat Completions, max_tokens:1)을 보낸다 — 아주 저렴하지만
@@ -15,7 +15,7 @@ import { testAiConnection, type StudioAiSettings } from "./studio-ai-client";
 
 const LABEL = "block text-[0.65rem] font-medium text-fg-2";
 const INPUT =
-  "w-full rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent";
+  "min-h-11 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 type TestState = { status: "idle" } | { status: "busy" } | { status: "success"; latencyMs: number } | { status: "error"; message: string };
 
@@ -48,8 +48,8 @@ export function StudioAiSettingsPanel({
       </div>
       <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
         직접 준비한 AI API 키를 입력하세요(OpenAI 또는 호환 서비스). 키는{" "}
-        <span className="font-semibold text-fg-2">이 브라우저에만</span> 저장되고, 이 앱 서버로는 전송되지
-        않아요 — 입력한 엔드포인트로 브라우저가 직접 요청을 보내요.
+        <span className="font-semibold text-fg-2">현재 탭 세션에만 임시 보관</span>되고 탭을 닫으면 삭제돼요.
+        이 앱 서버로 보내지 않고 입력한 엔드포인트로 브라우저가 직접 요청합니다.
       </p>
 
       <label className="flex flex-col gap-1">
@@ -72,7 +72,7 @@ export function StudioAiSettingsPanel({
             value={settings.apiKey}
             onChange={(e) => patch({ apiKey: e.target.value })}
             placeholder="sk-..."
-            className={`${INPUT} pr-7`}
+            className={`${INPUT} pr-12`}
             spellCheck={false}
             autoComplete="off"
           />
@@ -80,11 +80,24 @@ export function StudioAiSettingsPanel({
             type="button"
             onClick={() => setShowApiKey((v) => !v)}
             aria-label={showApiKey ? "API 키 숨기기" : "API 키 표시"}
-            className="absolute right-1.5 text-fg-3 transition-colors hover:text-fg-2"
+            className="absolute right-0 grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {showApiKey ? <EyeOff size={12} /> : <Eye size={12} />}
+            {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </span>
+        {settings.apiKey ? (
+          <button
+            type="button"
+            onClick={() => {
+              patch({ apiKey: "" });
+              setShowApiKey(false);
+              setTestState({ status: "idle" });
+            }}
+            className="mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad"
+          >
+            <XCircle size={14} aria-hidden /> 이 탭에서 키 지우기
+          </button>
+        ) : null}
       </label>
 
       <div className="grid grid-cols-2 gap-1.5">
@@ -111,7 +124,7 @@ export function StudioAiSettingsPanel({
       </div>
 
       <details className="rounded-md border border-line bg-card/50 px-2 py-1.5 text-fg-3">
-        <summary className="cursor-pointer select-none text-[0.63rem] font-medium text-fg-2">
+        <summary className="flex min-h-11 cursor-pointer select-none items-center text-xs font-medium text-fg-2">
           고급: 엔드포인트 경로 직접 지정
         </summary>
         <div className="mt-1.5 flex flex-col gap-1.5">
@@ -153,7 +166,7 @@ export function StudioAiSettingsPanel({
           type="button"
           onClick={() => void runTest()}
           disabled={testState.status === "busy"}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-60"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-2 text-xs font-medium text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
         >
           {testState.status === "busy" ? <Loader2 size={13} className="animate-spin" /> : <Settings2 size={13} />}
           연결 테스트

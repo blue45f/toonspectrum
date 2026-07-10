@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2, Play, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { downloadBlob } from "./studio-export";
 import {
@@ -151,7 +152,7 @@ export function StudioTimelapsePanel({
         ? "영상 파일 생성 중…"
         : "영상으로 녹화하는 중…";
 
-  return (
+  const modal = (
     <div
       aria-modal="true"
       role="dialog"
@@ -299,4 +300,7 @@ export function StudioTimelapsePanel({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

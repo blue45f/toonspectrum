@@ -35,6 +35,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { createPortal } from "react-dom";
 import * as THREE from "three";
 
 import {
@@ -840,7 +841,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
 
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
       aria-modal="true"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
@@ -1637,4 +1638,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

@@ -17,7 +17,17 @@
  * 대괄호 대신 중괄호 짝을 맞춰 찾는다.
  */
 
+import { normalizeScenarioBeatType, type ScenarioBeatType } from "./studio-story-beats";
+
+import type { StudioStoryBeat } from "./studio-continuity";
+
+export type ScenarioContinuityMetadata = Omit<StudioStoryBeat, "sceneId">;
+
 export interface ScenarioSceneDraft {
+  /** 장면의 서사 역할. 레거시 제공자가 생략하면 layout 단계에서 transition으로 정규화한다. */
+  beatType?: ScenarioBeatType;
+  /** 이 장면에서 무엇이 일어나고 무엇이 달라지는지 설명하는 한 문장. */
+  summary?: string;
   /** 이 장면의 배경·상황·구도 묘사(그림 생성용). 인물 외모 세부묘사는 반복하지 않는다 —
    *  그건 ScenarioScenesPlan.characterDescription 쪽 책임이다. 대사만 있고 배경 지시가 없는
    *  장면은 빈 문자열일 수 있다. */
@@ -25,6 +35,8 @@ export interface ScenarioSceneDraft {
   /** studio-dialogue.parseDialogueScript 호환 미니 문법("이름: 대사" 줄 / "(지문)" 줄, 빈 줄 무시).
    *  대사가 없는 장면(지문 없는 순수 배경 컷)은 빈 문자열. */
   dialogue: string;
+  /** 연속성 린트가 자유문장 추론 없이 비교할 수 있는 장면 사실. */
+  continuity?: ScenarioContinuityMetadata;
 }
 
 export interface ScenarioScenesPlan {
@@ -46,7 +58,7 @@ function isValidSceneCountHint(n: number | undefined): n is number {
 }
 
 const JSON_SHAPE_EXAMPLE =
-  '{"characterDescription":"단발머리 여고생, 교복 차림","scenes":[{"imagePrompt":"아침 등굣길, 골목, 벚꽃","dialogue":"민수: 안녕!\\n(잠시 정적)"}]}';
+  '{"characterDescription":"단발머리 여고생, 교복 차림","scenes":[{"beatType":"setup","summary":"등굣길에 두 친구가 재회한다","imagePrompt":"아침 등굣길, 골목, 벚꽃","dialogue":"민수: 안녕!\\n(잠시 정적)","continuity":{"characterNames":["민수"],"location":"학교 앞","time":"아침","costumes":{"민수":"교복"},"props":{"우산":"민수가 들고 있음"},"transitionExplanations":{}}}]}';
 
 /**
  * 장면 분할 프롬프트(system/user) — 순수·결정적. sceneCountHint가 유효 범위(2~10)면 "정확히 N개"로,
@@ -54,23 +66,107 @@ const JSON_SHAPE_EXAMPLE =
  */
 export function buildScenarioScenesPrompt(
   storyText: string,
-  sceneCountHint?: number
+  sceneCountHint?: number,
+  characterContext = ""
 ): { system: string; user: string } {
   const countInstruction = isValidSceneCountHint(sceneCountHint)
     ? `정확히 ${Math.round(sceneCountHint)}개의 장면으로 나누세요.`
     : "스토리 길이에 맞게 자연스럽게 3~8개의 장면으로 나누세요.";
 
+  const normalizedCharacterContext = characterContext.trim().slice(0, 12_000);
   const system = [
     "당신은 한국 웹툰 시나리오 작가입니다. 사용자가 입력한 짧은 스토리 아이디어를 여러 개의 장면(컷)으로 나눕니다.",
     countInstruction,
     "다른 설명이나 마크다운 코드블록 없이, 반드시 아래 예시와 동일한 구조의 JSON 객체 하나만 응답하세요.",
     JSON_SHAPE_EXAMPLE,
     "characterDescription: 이야기에 등장하는 주요 인물의 외모(헤어스타일·의상·특징 등)를 한국어 한 문장으로. 특정 인물이 없으면 빈 문자열.",
+    '각 장면의 beatType: "setup"(도입), "inciting"(사건 발생), "escalation"(고조), "turn"(전환), "climax"(절정), "resolution"(해결), "transition"(연결) 중 하나.',
+    "각 장면의 summary: 이 장면에서 무엇이 일어나고 무엇이 달라지는지 한국어 한 문장으로.",
     "각 장면의 imagePrompt: 그 장면의 배경·상황·구도를 그림으로 그리기 위한 묘사(인물 외모 묘사는 반복하지 마세요 — 상황·배경 위주).",
     '각 장면의 dialogue: 그 장면 대사를 한 줄에 한 마디씩 "이름: 대사" 형식으로 적으세요(지문·내레이션은 "(지문)"처럼 괄호로 감싸세요). 대사가 없는 장면은 빈 문자열("")로 두세요.',
+    "각 장면의 continuity: characterNames(등장인물 이름 배열), location(장소), time(시간대), costumes(캐릭터 이름→의상), props(소품 이름→상태·소유·위치)를 명시하세요.",
+    "직전 장면과 장소·시간·의상·소품이 의도적으로 달라지면 continuity.transitionExplanations의 같은 필드(의상·소품은 같은 이름 키)에 변경 이유를 적으세요. 알 수 없는 값은 추측하지 말고 생략하세요.",
+    ...(normalizedCharacterContext
+      ? ["사용자 메시지의 캐릭터 바이블을 모든 장면에 일관되게 반영하고, [고정] 표시가 붙은 설정은 바꾸거나 모순되게 쓰지 마세요."]
+      : []),
   ].join("\n");
 
-  return { system, user: storyText.trim() };
+  return {
+    system,
+    user: normalizedCharacterContext
+      ? `[캐릭터 바이블]\n${normalizedCharacterContext}\n\n[스토리 아이디어]\n${storyText.trim()}`
+      : storyText.trim(),
+  };
+}
+
+function normalizedSceneText(value: unknown, maxLength = 240): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizedSceneList(value: unknown): string[] {
+  const input = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/[,;\n]+/u)
+      : [];
+  const result: string[] = [];
+  for (const item of input) {
+    const text = normalizedSceneText(item, 80);
+    if (text && !result.includes(text)) result.push(text);
+    if (result.length >= 24) break;
+  }
+  return result;
+}
+
+function normalizedNamedSceneValues(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const result: Record<string, string> = {};
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const key = normalizedSceneText(rawKey, 80);
+    const text = normalizedSceneText(rawValue, 240);
+    if (!key || !text || Object.hasOwn(result, key)) continue;
+    result[key] = text;
+    if (Object.keys(result).length >= 24) break;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Normalizes optional structured facts returned by an AI provider or restored from a draft. */
+export function normalizeScenarioContinuity(value: unknown): ScenarioContinuityMetadata | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const characterNames = normalizedSceneList(record.characterNames);
+  const location = normalizedSceneText(record.location);
+  const time = normalizedSceneText(record.time);
+  const costumes = normalizedNamedSceneValues(record.costumes);
+  const props = normalizedNamedSceneValues(record.props);
+  const transitionRecord =
+    record.transitionExplanations && typeof record.transitionExplanations === "object" &&
+    !Array.isArray(record.transitionExplanations)
+      ? record.transitionExplanations as Record<string, unknown>
+      : {};
+  const transitionLocation = normalizedSceneText(transitionRecord.location);
+  const transitionTime = normalizedSceneText(transitionRecord.time);
+  const transitionCostumes = normalizedNamedSceneValues(transitionRecord.costumes);
+  const transitionProps = normalizedNamedSceneValues(transitionRecord.props);
+  const transitionExplanations =
+    transitionLocation || transitionTime || transitionCostumes || transitionProps
+      ? {
+          ...(transitionLocation ? { location: transitionLocation } : {}),
+          ...(transitionTime ? { time: transitionTime } : {}),
+          ...(transitionCostumes ? { costumes: transitionCostumes } : {}),
+          ...(transitionProps ? { props: transitionProps } : {}),
+        }
+      : undefined;
+  const result: ScenarioContinuityMetadata = {
+    ...(characterNames.length > 0 ? { characterNames } : {}),
+    ...(location ? { location } : {}),
+    ...(time ? { time } : {}),
+    ...(costumes ? { costumes } : {}),
+    ...(props ? { props } : {}),
+    ...(transitionExplanations ? { transitionExplanations } : {}),
+  };
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 /** raw 문자열에서 첫 `{` 로 시작해 짝이 맞는(중첩 중괄호를 세어가며 찾은) `}` 까지를 잘라낸다.
@@ -93,7 +189,7 @@ function extractJsonObjectLiteral(raw: string): string | null {
 
 /**
  * 모델 응답(자유 텍스트, 코드펜스·설명 섞여 있을 수 있음)에서 첫 JSON 객체를 뽑아 ScenarioScenesPlan
- * 으로 파싱한다. 완전히 빈 장면(imagePrompt·dialogue 둘 다 빈 문자열)은 환각 방어로 건너뛴다.
+ * 으로 파싱한다. 완전히 빈 장면(summary·imagePrompt·dialogue가 모두 빈 문자열)은 환각 방어로 건너뛴다.
  * 파싱 자체 실패·유효 장면 0개는 ok:false.
  */
 export function parseScenarioScenesResponse(
@@ -122,10 +218,18 @@ export function parseScenarioScenesResponse(
   for (const entry of scenesRaw.slice(0, SCENARIO_MAX_PARSED_SCENES)) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
+    const summary = typeof e.summary === "string" ? e.summary.trim().slice(0, 240) : "";
     const imagePrompt = typeof e.imagePrompt === "string" ? e.imagePrompt.trim() : "";
     const dialogue = typeof e.dialogue === "string" ? e.dialogue.trim() : "";
-    if (!imagePrompt && !dialogue) continue; // 완전히 빈 장면은 환각으로 간주해 건너뛴다.
-    scenes.push({ imagePrompt, dialogue });
+    const continuity = normalizeScenarioContinuity(e.continuity);
+    if (!summary && !imagePrompt && !dialogue) continue; // 완전히 빈 장면은 환각으로 간주해 건너뛴다.
+    scenes.push({
+      ...(typeof e.beatType === "string" ? { beatType: normalizeScenarioBeatType(e.beatType) } : {}),
+      ...(summary ? { summary } : {}),
+      imagePrompt,
+      dialogue,
+      ...(continuity ? { continuity } : {}),
+    });
   }
   if (scenes.length === 0) {
     return { ok: false, error: "장면 구성 응답에서 유효한 장면을 찾지 못했습니다." };

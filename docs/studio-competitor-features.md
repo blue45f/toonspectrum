@@ -4,7 +4,15 @@
 > **창작 스튜디오(`src/domains/creator/StudioPage.tsx`, 컷툰 제작 캔버스 에디터)** 가 벤치마킹하는
 > 드로잉/만화 제작 소프트웨어 대상이다.
 >
-> 작성일: 2026-07-04, 최종 갱신: 2026-07-05(3~6차 배치 + Google Fonts + 캐릭터 일관성 유지 생성(젠툰
+> 작성일: 2026-07-04, 최종 갱신: 2026-07-11(잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
+> 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
+> 캡처 readiness·모바일 복구 안전성. 모바일 검증 캡처는 `docs/screenshots/studio-commercial-suite/`) ·
+> 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
+> 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
+> 적용 대상/권리 체크리스트/문맥 댓글/프로덕션 인사이트 배치. 상세 매트릭스는
+> `docs/studio-competitor-benchmark-2026-07-10.md`). 모바일·전문 제작 흐름의 상용 프로그램 공식 매뉴얼
+> 비교는 `docs/studio-commercial-manual-benchmark-2026-07-10.md`에 별도 정리했다.
+> · 이전 갱신: 2026-07-05(3~6차 배치 + Google Fonts + 캐릭터 일관성 유지 생성(젠툰
 > 벤치마크) + VRM 캐릭터 "노인" 카테고리 리소스 소싱 + 시나리오 기반 자동 컷+말풍선 배치(투닝/투툰/
 > WeToon 벤치마크, §4 로드맵 마지막 우선순위였던 최종 항목) + **API 키 통합 "연동 설정" 패널 + 툴바
 > 20개 이상 플랫 버튼을 4개 논리 그룹(배경/에셋/스타일/AI 연동)으로 재구성** + **AI 대사/나레이션 제안 +
@@ -52,6 +60,86 @@
 
 모든 배치는 `src/domains/creator/studio-*.ts`(순수 로직) + `Studio*Panel.tsx`(프레젠테이션) 조합으로
 구현되고, `StudioPage.tsx`에 통합됐다. 세션 내 배치 순서:
+
+### 2026-07-11 상용 제작·복구 하드닝 배치 (현재 작업 트리 통합 완료)
+
+- **잔액/패키지 소진 전용 AI failover**: DeepSeek HTTP 402와 Z.ai HTTP 429의 공식 잔액·패키지 오류
+  코드만 다음 공급자로 전환한다. 일반 rate limit, 인증, 서버 오류, 네트워크 단절, timeout, 사용자 취소,
+  malformed 응답은 이중 과금 위험 때문에 자동 재전송하지 않는다. 최종 응답에는 요청 선호값이 아니라 실제
+  provider/model과 안전한 failover 사유만 남긴다.
+- **중앙 AI 작업 원장**: Writer Room, 시나리오 텍스트·이미지, 구도, 대사, 번역, 팔레트, 배경·채색·캐릭터
+  요청을 각각 pending→success/failure/cancelled 상태로 기록한다. 원문 프롬프트·API 키·원시 오류는 보존하지
+  않으며 중단된 세션은 `SESSION_INTERRUPTED`로 복구한다. BYOK AI 키는 현재 탭의 `sessionStorage`에만
+  유지하고 이전 영구 저장값은 삭제한다.
+- **Writer Room→canvas 제작 투영**: premise부터 dialogue/SFX까지 7단계 문서를 페이지·컷·대사 계획으로
+  결정적으로 검증하고, 준비 오류가 없을 때만 한 번의 히스토리 커밋으로 캔버스에 적용한다.
+- **실제 단일 Publish Package ZIP**: 목적지별 slice PNG/JPEG, thumbnail, manifest, 검토 보고서, 공개용 AI
+  provenance, credits를 하나의 저메모리 ZIP으로 생성한다. 렌더 후 실제 byte size·SHA-256을 manifest에
+  확정하고 ZIP signature/CRC/파일 목록을 테스트한다.
+- **명시적 캡처 readiness**: 임의 지연시간 대신 React 페이지 commit, 웹폰트, 래스터·마스크 decode,
+  Konva `batchDraw`, 두 paint frame을 기다린 뒤 저장·다운로드·클립보드·전체 스크롤·Publish Package·
+  타임랩스를 캡처한다. 페이지 전환·중단·timeout·asset 실패를 구분하고 원본 URL은 오류에 반사하지 않는다.
+- **self-contained `.toonproject.zip`**: canonical `project.json`, manifest, SHA-256 content-addressed attachment를
+  결정적으로 패키징한다. 동일 이미지/마스크를 중복 제거하고 ZIP path traversal, case-fold collision,
+  CRC/SHA/MIME 위조, 숨은 entry, 크기/개수/압축비 한도와 외부 glTF/OBJ 종속성을 검사한다. 모바일은 더 낮은
+  메모리 상한을 적용한다.
+- **서버 owner-only revision**: 작품 생성·수정·복원을 snapshot과 같은 PostgreSQL transaction으로 처리하고
+  `baseRevision` 불일치를 안전한 409로 반환한다. 복원도 새 revision을 만들며 최근 20개만 보존한다.
+  Studio의 버전 패널에서 로컬 이름 있는 복구 지점과 서버 자동 버전을 분리해 조회·복원한다. 공개 응답에는
+  revision/snapshot과 재귀적 private note 필드를 노출하지 않는다.
+- **typed Auto Actions**: 임의 JavaScript를 실행하지 않는 버전형 JSON allowlist로 글꼴·크기·색, opacity,
+  blend, 표시, 잠금, 페이지 배경·색보정을 현재/선택/전체 페이지에 적용한다. 페이지 다중 선택, dry run,
+  영향 수치·경고, 진행률, 취소, 실행 직전 자동 복구 지점, 원자적 롤백, 단일 undo 커밋을 제공한다.
+- **모바일 회귀 검증**: 375×812 실제 브라우저에서 Writer Room, AI 작업 이력, Publish Package,
+  Auto Actions를 조작하고 44px 핵심 터치 타깃과 가로 overflow 0을 확인했다. 프로젝트 archive와 Publish
+  Package는 브라우저 실제 다운로드 후 `unzip -t`, entry·hash manifest를 함께 확인했다.
+
+증거 캡처: [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md).
+
+### 2026-07-10 공식 경쟁사 재벤치마크 배치 (현재 작업 트리 통합 완료)
+
+- 서버 전용 DeepSeek 텍스트 transport, 인증·task allowlist·rate limit·timeout·사용자 식별 HMAC과 비용형
+  이미지 kill switch. DeepSeek는 구조화 텍스트에만 사용하고 이미지 capability와 분리.
+- Z.ai 일반 API의 공식 최신 `glm-5.1` transport를 같은 서버 경계에 추가. 제공자 선택/자동 전환,
+  disconnect abort, 분산 UTC 일일 request/token quota와 최소 usage ledger를 공유하며 키·프롬프트·응답
+  본문은 원장에 저장하지 않음. 제공된 키는 일반 API 잔액/패키지 부족(1113)으로 실호출 차단 상태.
+- 초안 가시성·좋아요·댓글·조회수 안전성, 업로드 작품 형식 보존 편집, 사용자/작품별 v2 autosave와
+  프로젝트 v2 백업.
+- 이미지 생성 전 구조화 비트 시트 검토: 서사 역할·변화 요약·프롬프트·대사·연속성 메타를 장면별 수정,
+  텍스트 설계와 비용형 이미지 생성을 분리, 장면별 삭제/재생성/이미지 없는 컷 적용.
+- AI provenance와 WEBTOON/Tapas/일반 Publish Pack 정책 사전검사, Tapas의 현재 AI 생성 콘텐츠 금지
+  차단, JSON 검사 보고서.
+- Adobe/Storyboard That식 이름 있는 복구 지점(작품별 최신 10개).
+- Dashtoon/Anifusion식 작품 내 캐릭터 바이블: 9개 설정 필드, 필드별 AI 고정 제약, 자동저장·게시 문서·
+  프로젝트 백업·복구 지점 포함, 시나리오/이미지 요청 컨텍스트 연결.
+- 구조화 continuity lint: 캐릭터 바이블 누락·중복/미등록 인물과 장면 순서별 장소·시간·의상·소품 변화를
+  결정적으로 비교하고, 명시한 전환 이유가 있으면 의도된 변화로 허용. AI 초안과 적용된 프레임 양쪽에서
+  메타 편집 가능.
+- Clip Studio/Adobe식 페이지 검토 상태·담당·메모·승인 시 로컬 편집 잠금. 잠긴 페이지 변경을 공용
+  커밋 관문에서 차단하며, 서버 권한/실시간 협업 잠금과는 구분해 UI에 고지.
+- 장면 설계·일괄/개별 이미지 생성 요청에 실제 `AbortSignal` 전달, 현재 페이지/다음 새 페이지 적용 대상,
+  텍스트 provider/model/transport/prompt version/token usage provenance를 검토 UI→프레임→Publish Pack까지
+  보존.
+- 예상 독자 등급·민감 표현·원본/참고/제3자 소재 권리·AI 고지·최신 정책 검토를 묻는 버전형 Publish Pack
+  자체 점검. 필수 누락은 게시를 차단하고 자동저장·게시 문서·프로젝트·복구 지점에 함께 보존하되 법률 인증이나
+  플랫폼 승인으로 표현하지 않음.
+- Canva/Adobe식 페이지·컷·요소 문맥 댓글의 로컬 우선 구현: 댓글/답글/담당/해결 상태와 필터·앵커 이동,
+  프로젝트 보존. 실시간 동기화·알림·계정 조회·서버 권한 검사는 제공하지 않는다는 경계 표시.
+- 비소유자가 게시 작품 상세를 읽을 때 문서 댓글·캐릭터 내부 기획·권리 체크 답변·페이지 검토 메모가
+  공개되지 않도록 서버 공개용 문서 투영을 적용하고, 렌더 구조와 AI 사용 고지만 유지.
+- 로컬 문서 기반 프로덕션 인사이트: 페이지/컷/대사/내레이션, 공개 계산식의 읽기 시간 추정, 검토·잠금
+  커버리지, AI 에셋, 연속성·게시·권리·댓글 이슈. 독자 행동 분석이나 원격 텔레메트리가 아님을 명시.
+- 외부 자동 게시를 가장하지 않는 연재 운영: 회차/마일스톤별 목적지·현지 날짜/시간·IANA 시간대·상태를
+  로컬 문서에 보존하고 DST·중복 슬롯·과거 예약·목적지 정책 재확인을 검사하며 RFC 5545 캘린더로 내보냄.
+- 플랫폼 API가 없는 경우를 위한 CSV/수동 성과 가져오기: WEBTOON/Tapas/기타별 조회·좋아요·댓글·신규
+  구독·통화별 수익, 합계·비율·시계열·기간 비교. 안전한 CSV 파싱, 수식 주입 무력화, 입력 한도와 구조화
+  진단을 적용하고 사용자 제공 로컬 수치라는 근거를 계속 표시.
+- 검증: 관련 순수 모듈 테스트, 전체 TypeScript/ESLint, 실제 Vite 브라우저 왕복. 375px 모바일에서
+  캐릭터 바이블 가로 넘침 없음, AI 요청에 `[고정]` 바이블 포함, continuity 경고 장면 이동, 잠금 뒤 편집
+  차단을 확인. 후속 왕복에서 체크리스트 입력/저장, 새 페이지 적용의 원본 페이지 무변경, 모델·토큰 이력,
+  컷 댓글/답글/해결 자동저장, 인사이트 집계와 375px 무가로넘침도 확인.
+- 연재 운영 왕복에서 목적지 정책 경고와 메모 기본 제외 `.ics`, 수동·CSV 성과 병합/게시처 비교,
+  수식형 CSV 셀 중립화, 일정·성과 자동저장, 375px 가로 넘침 0과 새 브라우저 세션 콘솔 오류 0을 확인.
 
 ### CSP 갭 8개 (완료, 프로덕션 배포됨)
 패널컷 자동분할 · 셀 애니메이션(프레임) · 원근자(perspective guide) · 매직 완드(색상 선택) · 타임랩스
@@ -442,15 +530,16 @@ Liquify/Content-aware fill/Puppet warp — 위 §2 "3차 배치"(완료) 참고.
 
 다시 고도화할 때 이 순서를 권장한다(가치·리스크 대비 판단):
 
-1. **AI 생성 BYOK 구조의 실제 키 검증** — 코드 통합은 완료됐으나(§2), 키 없이도 앱이 정상 작동하는지는
-   확인됐고 **실제 API 키를 등록한 상태의 호출 형식·에러 처리**는 아직 실사용자 키로 1차 검증이 안 됨.
+1. **AI 생성 transport의 운영 검증** — 서버/BYOK 호출 형식과 안전한 오류 표시는 검증됨. 서버 경로의
+   브라우저 연결 종료를 upstream 취소로 전달하고, 다중 인스턴스 공용 사용량 원장을 추가하는 비용 안전성
+   보강이 다음 우선순위. 실제 제공자 호출은 유효하고 잔액이 있는 사용자 키가 있을 때만 가능.
 2. ~~**캐릭터 일관성 생성**(젠툰 벤치마크)~~ — 완료됨(2026-07, §2 "캐릭터 일관성 유지 생성" 참고).
 3. ~~**VRM 캐릭터 노인 카테고리 소싱**~~ — 완료됨(2026-07, §2 참고).
 4. ~~**시나리오 기반 자동 컷+말풍선 배치**(투닝/투툰/WeToon 공통)~~ — 완료됨(2026-07, "첫 버전"
    스코프. §2 "시나리오 기반 자동 컷+말풍선 배치" 참고). 텍스트 생성(장면 분할)+이미지 생성(각 컷,
-   캐릭터 일관성 생성 재사용)+기존 말풍선 시스템(studio-dialogue.ts)을 체이닝. 다음에 확장할 부분:
-   장면 텍스트를 이미지 생성 전에 검토·수정하는 중간 단계, 장면별 재시도, 진짜 네트워크 레벨 취소
-   (AbortController — 지금은 "다음 장면부터 중단"하는 협조적 취소만 있음), 새 페이지에 생성하는 옵션.
+   캐릭터 일관성 생성 재사용)+기존 말풍선 시스템(studio-dialogue.ts)을 체이닝. 장면별 검토·재시도,
+   프런트 네트워크 취소, 현재/새 페이지 적용은 완료됐고, 다음 확장은 premise→outline→beats→dialogue/SFX
+   단계와 필드별 제안 수락/거절을 갖춘 작가실 문서임.
 5. **Pexels/Pixabay 등 스톡 이미지 소스 추가** — Unsplash와 완전히 동일한 BYOK 아키텍처 복제 수준이라
    구현 리스크는 낮지만, 이미 Unsplash가 있어 한계효용은 "소스 다양화" 정도(우선순위 낮음).
 6. **전체화면 모달 4개의 사이트 헤더 가림 확인·수정**(StoryboardGrid/ScrollPreview/Timelapse/

@@ -51,6 +51,9 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.
     expect(html).toContain("무료 스톡 이미지 (Unsplash)");
     expect(html).toContain("Unsplash Access Key");
+    expect(html).toContain("AI 키는 현재 탭 세션에만");
+    expect(html).toContain("min-h-11 w-full");
+    expect(html).toContain("size-11");
     expect(html).not.toContain("Access Key 등록됨");
   });
 

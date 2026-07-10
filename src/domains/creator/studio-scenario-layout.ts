@@ -17,6 +17,10 @@
  */
 
 import { layoutDialogueBubbles, parseDialogueScript, type DialogueBubbleSeed } from "./studio-dialogue";
+import { normalizeScenarioBeatType, type ScenarioBeatType } from "./studio-story-beats";
+
+import type { StudioStoryBeat } from "./studio-continuity";
+import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
 
 const MARGIN = 24;
 const MIN_FRAME_HEIGHT = 360;
@@ -29,8 +33,11 @@ export type ScenarioFrameRect = { x: number; y: number; width: number; height: n
 /** studio-scenario-scenes.ScenarioSceneDraft와 구조 호환(그 타입을 직접 import하지 않아 두 모듈이
  *  서로 독립적으로 테스트 가능 — studio-ai-client.ts가 둘을 이어붙인다). */
 export interface ScenarioSceneInput {
+  beatType?: ScenarioBeatType;
+  summary?: string;
   imagePrompt: string;
   dialogue: string;
+  continuity?: Omit<StudioStoryBeat, "sceneId">;
 }
 
 /** 패널 가로세로 비를 3단계로 단순화 — AI 이미지 생성 사이즈 프리셋(정사각/세로/가로) 선택에만 쓰인다
@@ -48,7 +55,13 @@ export function scenarioPanelAspect(width: number, height: number): ScenarioPane
 export interface ScenarioPanelSeed {
   frame: ScenarioFrameRect;
   bubbles: DialogueBubbleSeed[];
+  beatType: ScenarioBeatType;
+  summary: string;
   imagePrompt: string;
+  /** 원본 미니 문법을 함께 보존해 미리보기 단계에서 사용자가 장면별 대사를 고치고 다시
+   * 레이아웃할 수 있게 한다. bubbles만 남기면 화자 표기와 지문 문법을 복원할 수 없다. */
+  dialogue: string;
+  continuity?: Omit<StudioStoryBeat, "sceneId">;
   aspect: ScenarioPanelAspect;
 }
 
@@ -57,6 +70,7 @@ export interface ScenarioPanelSeed {
 export interface ScenarioPreviewItem extends ScenarioPanelSeed {
   imageDataUrl?: string;
   imageError?: string;
+  imageProvenance?: StudioPublishAiProvenance;
 }
 
 export interface ScenarioLayoutResult {
@@ -103,7 +117,11 @@ export function layoutScenarioPanels(
     panels.push({
       frame,
       bubbles,
+      beatType: normalizeScenarioBeatType(scene.beatType),
+      summary: scene.summary?.trim() || scene.imagePrompt.trim() || scene.dialogue.trim().split("\n")[0] || "장면",
       imagePrompt: scene.imagePrompt,
+      dialogue: scene.dialogue,
+      ...(scene.continuity ? { continuity: scene.continuity } : {}),
       aspect: scenarioPanelAspect(frame.width, frame.height),
     });
     cursorY = frame.y + frame.height + MARGIN;

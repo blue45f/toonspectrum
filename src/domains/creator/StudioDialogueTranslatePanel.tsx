@@ -17,6 +17,7 @@ export type StudioDialogueTranslatePanelProps = {
   pages: readonly DialoguePageLike[];
   /** API 키 설정 완료 여부 — false 면 "번역 생성" 이 비활성화된다(네트워크 요청 없음). */
   configured: boolean;
+  providerLabel?: string;
   /** 문서 전체에 지금 "표시 중"인 로케일(SOURCE_LOCALE 포함) — 칩 바 강조 표시 기준. */
   activeLocale: string;
   /** 이미 번역이 하나라도 있는 로케일 코드 목록(등장 순서, SOURCE_LOCALE 제외). */
@@ -55,6 +56,7 @@ const localeChipClass = (active: boolean) =>
 export function StudioDialogueTranslatePanel({
   pages,
   configured,
+  providerLabel = "AI",
   activeLocale,
   availableLocales,
   coverageFor,
@@ -114,7 +116,7 @@ export function StudioDialogueTranslatePanel({
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <Languages size={13} className="text-accent" aria-hidden />
           대사 번역
-          <span className="font-medium text-fg-4">· 내 API 키</span>
+          <span className="font-medium text-fg-4">· {providerLabel}</span>
         </p>
         <button
           type="button"
@@ -218,7 +220,7 @@ export function StudioDialogueTranslatePanel({
 
           {!configured && (
             <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
-              설정에서 API 키를 등록하세요.
+              로그인해 서버 AI를 사용하거나 설정에서 내 API 키를 등록하세요.
             </p>
           )}
           {error && (

@@ -85,8 +85,32 @@ describe("layoutScenarioPanels", () => {
   });
 
   it("carries the imagePrompt through to each panel seed untouched", () => {
-    const result = layoutScenarioPanels([], CANVAS_W, 1080, [{ imagePrompt: "학교 옥상, 노을", dialogue: "" }]);
+    const result = layoutScenarioPanels([], CANVAS_W, 1080, [
+      {
+        beatType: "turn",
+        summary: "친구가 숨겨온 사실을 고백한다",
+        imagePrompt: "학교 옥상, 노을",
+        dialogue: "민수: 늦었네",
+        continuity: { characterNames: ["민수"], location: "학교 옥상", time: "노을" },
+      },
+    ]);
+    expect(result.panels[0].beatType).toBe("turn");
+    expect(result.panels[0].summary).toBe("친구가 숨겨온 사실을 고백한다");
     expect(result.panels[0].imagePrompt).toBe("학교 옥상, 노을");
+    expect(result.panels[0].dialogue).toBe("민수: 늦었네");
+    expect(result.panels[0].continuity).toEqual({
+      characterNames: ["민수"],
+      location: "학교 옥상",
+      time: "노을",
+    });
+  });
+
+  it("normalizes legacy scenes without beat metadata", () => {
+    const result = layoutScenarioPanels([], CANVAS_W, 1080, [
+      { imagePrompt: "버스 정류장", dialogue: "민수: 기다렸어?" },
+    ]);
+    expect(result.panels[0].beatType).toBe("transition");
+    expect(result.panels[0].summary).toBe("버스 정류장");
   });
 
   it("does not mutate the existingFrames input array", () => {

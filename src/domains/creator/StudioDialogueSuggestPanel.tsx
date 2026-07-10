@@ -59,8 +59,8 @@ export function StudioDialogueSuggestPanel({
 
       {!configured && (
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          위 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 API 키를 등록하면 이
-          기능을 쓸 수 있어요.
+          로그인해 서버 AI를 사용하거나 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>
+          에서 내 API 키를 등록하면 쓸 수 있어요.
         </p>
       )}
 

@@ -20,6 +20,7 @@
  */
 import { LocateFixed, Smartphone, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactElement } from "react";
+import { createPortal } from "react-dom";
 
 import { CANVAS_W } from "./studio-assets";
 import { pageDisplayName } from "./studio-page-meta";
@@ -91,7 +92,7 @@ export function StudioScrollPreviewPanel({
 
   const framePx = FRAME_WIDTH_PRESETS.find((p) => p.id === frameWidthId)?.px ?? 400;
 
-  return (
+  const modal = (
     <div
       role="dialog"
       aria-modal="true"
@@ -207,4 +208,7 @@ export function StudioScrollPreviewPanel({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

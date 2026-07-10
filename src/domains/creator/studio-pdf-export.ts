@@ -14,8 +14,8 @@
  * - 결정성: 같은 입력 → 같은 출력 바이트. CreationDate 등 시각 메타데이터를 넣지 않는다.
  *
  * 순수 코어(buildPdfFromJpegPages)는 DOM 없이 동작하고, 캔버스→JPEG 어댑터
- * (canvasToJpegBytes)와 다운로드 실행부(exportPagesToPdf)만 브라우저를 만진다(테스트 주입
- * 가능). 사용자 노출 문자열은 한글.
+ * (canvasToJpegBytes), Blob 렌더러(renderPagesToPdf), 다운로드 경계(exportPagesToPdf)만
+ * 브라우저를 만진다(테스트 주입 가능). 사용자 노출 문자열은 한글.
  */
 
 import { JPEG_QUALITY, canvasToBlob, downloadBlob } from "./studio-export";
@@ -202,12 +202,17 @@ export interface PdfExportResult {
   fileName: string;
 }
 
+/** 다운로드 전 PDF 산출물 — 게시 패키지·미리보기·업로드 흐름에서 Blob을 직접 재사용한다. */
+export interface PdfRenderResult extends PdfExportResult {
+  blob: Blob;
+}
+
 /** 실행 결과 한 줄 한글 안내. */
 export function pdfExportResultMessage(result: PdfExportResult): string {
   return `전체 ${result.pageCount}페이지를 PDF 한 파일(${formatPdfFileSize(result.bytes)})로 저장했어요.`;
 }
 
-export interface PdfPagesExportOptions {
+export interface PdfPagesRenderOptions {
   /** 캡처된 페이지 캔버스(색보정 합성 완료, 페이지 순서). */
   pages: HTMLCanvasElement[];
   /** 작품 제목 — 파일명과 PDF docinfo /Title에 쓴다(비어 있으면 기본 파일명·/Title 생략). */
@@ -221,6 +226,14 @@ export interface PdfPagesExportOptions {
   createCanvas?: (width: number, height: number) => HTMLCanvasElement;
   /** 테스트 주입용 — 기본은 canvasToJpegBytes. */
   toJpeg?: (canvas: HTMLCanvasElement, quality: number) => Promise<Uint8Array>;
+  /**
+   * 임시 평탄화 캔버스 해제 주입. createCanvas를 직접 주입하면 소유권도 호출자에게 있으므로
+   * 명시한 경우에만 호출하고, 기본 브라우저 팩토리에는 width/height=0 해제를 자동 적용한다.
+   */
+  releaseCanvas?: (canvas: HTMLCanvasElement) => void;
+}
+
+export interface PdfPagesExportOptions extends PdfPagesRenderOptions {
   /** 테스트 주입용 — 기본은 downloadBlob(실제 파일 저장). */
   download?: (blob: Blob, filename: string) => void;
 }
@@ -233,37 +246,76 @@ function createPageCanvas(width: number, height: number): HTMLCanvasElement {
   return canvas;
 }
 
+/** 임시 캔버스 backing store를 즉시 반납한다. 원본 페이지 캔버스는 호출자 소유라 건드리지 않는다. */
+function releasePageCanvas(canvas: HTMLCanvasElement): void {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 /**
- * 전체 페이지 → PDF 한 파일 실행부. 페이지마다 흰 배경에 눌러 붙이고(JPEG 인코드 시
+ * 전체 페이지 → 다운로드하지 않은 PDF Blob. 페이지마다 흰 배경에 눌러 붙이고(JPEG 인코드 시
  * 투명 영역이 검게 뭉개지는 것 방지) 워터마크를 찍은 뒤 JPEG로 인코드, 순수 코어로
- * PDF를 조립해 한 번의 다운로드로 저장한다. 유효한(양수 크기) 페이지가 없거나 캔버스
- * 생성이 막히면 한글 메시지로 throw.
+ * PDF를 조립한다. 유효한(양수 크기) 페이지가 없거나 캔버스 생성이 막히면 한글 메시지로
+ * throw. 이 함수는 URL 생성이나 다운로드를 절대 실행하지 않는다.
  */
-export async function exportPagesToPdf(options: PdfPagesExportOptions): Promise<PdfExportResult> {
+export async function renderPagesToPdf(options: PdfPagesRenderOptions): Promise<PdfRenderResult> {
   const valid = options.pages.filter((page) => page.width > 0 && page.height > 0);
   if (valid.length === 0) throw new Error("내보낼 페이지가 없어요.");
   const createCanvas = options.createCanvas ?? createPageCanvas;
   const toJpeg = options.toJpeg ?? canvasToJpegBytes;
-  const download = options.download ?? downloadBlob;
+  const releaseCanvas = options.releaseCanvas ?? (options.createCanvas ? undefined : releasePageCanvas);
   const quality = options.quality ?? JPEG_QUALITY;
   const jpegPages: PdfJpegPage[] = [];
   for (let index = 0; index < valid.length; index++) {
     const page = valid[index];
     const flat = createCanvas(page.width, page.height);
-    const ctx = flat.getContext("2d");
-    if (!ctx) throw new Error("PDF 페이지 캔버스를 만들지 못했어요. 다시 시도해주세요.");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, page.width, page.height);
-    ctx.drawImage(page, 0, 0);
-    if (options.watermark) drawWatermarkOnSlice(flat, options.watermark);
-    jpegPages.push({ jpegBytes: await toJpeg(flat, quality), width: page.width, height: page.height });
+    try {
+      const ctx = flat.getContext("2d");
+      if (!ctx) throw new Error("PDF 페이지 캔버스를 만들지 못했어요. 다시 시도해주세요.");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, page.width, page.height);
+      ctx.drawImage(page, 0, 0);
+      if (options.watermark) drawWatermarkOnSlice(flat, options.watermark);
+      jpegPages.push({ jpegBytes: await toJpeg(flat, quality), width: page.width, height: page.height });
+    } finally {
+      try {
+        releaseCanvas?.(flat);
+      } catch {
+        // 메모리 정리는 best-effort다. 인코딩 성공/실패 결과를 정리 오류로 덮어쓰지 않는다.
+      }
+    }
     options.onProgress?.(index + 1, valid.length);
   }
-  const pdfBytes = buildPdfFromJpegPages(jpegPages, { title: options.title });
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = buildPdfFromJpegPages(jpegPages, { title: options.title });
+  } finally {
+    // buildPdfFromJpegPages가 PDF 바이트로 복사한 뒤 대용량 JPEG 참조를 즉시 놓는다.
+    jpegPages.length = 0;
+  }
   const fileName = pdfExportFileName(options.title);
   // TS6 타입드어레이 제네릭: Blob은 ArrayBuffer 기반 뷰만 받으므로 명시 복사로 백킹 버퍼를 고정한다.
   const blobBytes = new Uint8Array(pdfBytes.length);
   blobBytes.set(pdfBytes);
-  download(new Blob([blobBytes], { type: "application/pdf" }), fileName);
-  return { pageCount: jpegPages.length, bytes: pdfBytes.length, fileName };
+  return {
+    blob: new Blob([blobBytes], { type: "application/pdf" }),
+    pageCount: valid.length,
+    bytes: pdfBytes.length,
+    fileName,
+  };
+}
+
+/**
+ * 기존 다운로드 API. 렌더링·워터마크·진행률은 renderPagesToPdf에 단일화하고, 여기서는
+ * 완성 Blob을 한 번 다운로드한 뒤 기존의 Blob 없는 결과 계약을 그대로 반환한다.
+ */
+export async function exportPagesToPdf(options: PdfPagesExportOptions): Promise<PdfExportResult> {
+  const rendered = await renderPagesToPdf(options);
+  const download = options.download ?? downloadBlob;
+  download(rendered.blob, rendered.fileName);
+  return {
+    pageCount: rendered.pageCount,
+    bytes: rendered.bytes,
+    fileName: rendered.fileName,
+  };
 }

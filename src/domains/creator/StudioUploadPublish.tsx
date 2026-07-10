@@ -26,6 +26,8 @@ import {
   createWork,
   getChallenge,
   getSeries,
+  getWork,
+  updateWork,
 } from "@/src/infrastructure/creator-client";
 
 const MAX_PAGES = 40;
@@ -43,11 +45,12 @@ function uid() {
 }
 
 export function StudioUploadPublish() {
-  useDocumentTitle("이미지 업로드 게시");
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
   const loggedIn = Boolean(session?.user?.id);
+  const workId = params.get("id");
+  useDocumentTitle(workId ? "업로드 작품 수정" : "이미지 업로드 게시");
 
   const seriesId = params.get("seriesId");
   const challengeId = params.get("challengeId");
@@ -61,6 +64,49 @@ export function StudioUploadPublish() {
   const [error, setError] = useState<string | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [publishContext, setPublishContext] = useState<PublishContext>({});
+  const [hydrating, setHydrating] = useState(Boolean(workId));
+  const [workRevision, setWorkRevision] = useState<number | undefined>();
+
+  useEffect(() => {
+    if (!workId) return;
+    const controller = new AbortController();
+    let alive = true;
+    void getWork(workId, controller.signal)
+      .then((work) => {
+        if (!alive) return;
+        if (!work.isOwner) throw new Error("작성자만 작품을 수정할 수 있어요.");
+        if (work.format !== "upload") throw new Error("이 작품은 컷툰 스튜디오에서 수정해야 해요.");
+        const pageMeta = Array.isArray(work.doc?.pageMeta)
+          ? (work.doc.pageMeta as Array<{ width?: unknown; height?: unknown; name?: unknown }>)
+          : [];
+        setPages(
+          work.pages.map((src, index) => {
+            const meta = pageMeta[index];
+            return {
+              id: uid(),
+              src,
+              width: Math.max(1, Number(meta?.width) || 1),
+              height: Math.max(1, Number(meta?.height) || 1),
+              name: typeof meta?.name === "string" && meta.name.trim() ? meta.name : `${index + 1}페이지`,
+            };
+          })
+        );
+        setTitle(work.title);
+        setDescription(work.description);
+        setTagsText(work.tags.join(", "));
+        setWorkRevision(work.revision);
+      })
+      .catch((cause) => {
+        if (alive) setError(cause instanceof Error ? cause.message : "작품을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (alive) setHydrating(false);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [workId]);
 
   useEffect(() => {
     let alive = true;
@@ -180,11 +226,11 @@ export function StudioUploadPublish() {
         .map((tag) => tag.trim().replace(/^#/, ""))
         .filter(Boolean)
         .slice(0, 8);
-      const work = await createWork({
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         tags,
-        format: "upload",
+        format: "upload" as const,
         titleId: titleId ?? undefined,
         cover,
         pages: pageImages,
@@ -199,7 +245,14 @@ export function StudioUploadPublish() {
         status,
         seriesId: seriesId ?? undefined,
         challengeId: challengeId ?? undefined,
-      });
+      };
+      const work = workId
+        ? await updateWork(workId, {
+            ...payload,
+            ...(workRevision ? { baseRevision: workRevision } : {}),
+          })
+        : await createWork(payload);
+      setWorkRevision(work.revision);
       navigate(`/create/${work.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "게시에 실패했어요.");
@@ -217,18 +270,22 @@ export function StudioUploadPublish() {
           <ArrowLeft size={15} />
           창작 게시판
         </Link>
-        <Link
-          href={buildStudioHref({ seriesId, challengeId, titleId })}
-          className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto gap-1.5" })}
-        >
-          <PenLine size={14} />
-          컷툰 스튜디오로 전환
-        </Link>
+        {!workId && (
+          <Link
+            href={buildStudioHref({ seriesId, challengeId, titleId })}
+            className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto gap-1.5" })}
+          >
+            <PenLine size={14} />
+            컷툰 스튜디오로 전환
+          </Link>
+        )}
       </div>
 
       <header className="mb-5 rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
-        <p className="eyebrow text-accent">UPLOAD PUBLISH</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">이미지 업로드 게시</h1>
+        <p className="eyebrow text-accent">{workId ? "UPLOAD EDIT" : "UPLOAD PUBLISH"}</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+          {workId ? "업로드 작품 수정" : "이미지 업로드 게시"}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
           완성된 이미지를 그대로 올려 공유하세요. 여러 장을 순서대로 배치하면 세로 스크롤 웹툰처럼 읽을 수
           있습니다.
@@ -245,6 +302,12 @@ export function StudioUploadPublish() {
 
       {error && (
         <div className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
+      )}
+
+      {hydrating && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2" role="status">
+          <Loader2 size={14} className="animate-spin" /> 기존 작품을 불러오는 중…
+        </div>
       )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -365,19 +428,19 @@ export function StudioUploadPublish() {
             <button
               type="button"
               onClick={() => handlePublish("draft")}
-              disabled={saving}
+              disabled={saving || hydrating}
               className={buttonClass({ size: "md", variant: "outline", className: "w-full" })}
             >
-              임시저장
+              {workId ? "초안으로 저장" : "임시저장"}
             </button>
             <button
               type="button"
               onClick={() => handlePublish("published")}
-              disabled={saving}
+              disabled={saving || hydrating}
               className={buttonClass({ size: "md", variant: "solid", className: "w-full gap-1.5" })}
             >
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-              게시하기
+              {workId ? "수정사항 게시" : "게시하기"}
             </button>
           </div>
         </aside>

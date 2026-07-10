@@ -29,6 +29,27 @@ const envSchema = z.object({
   ADMIN_EMAILS: z.string().optional(),
   // 창작 스튜디오 LLM 키(선택 — 미설정 시 해당 기능만 비활성).
   OPENAI_API_KEY: z.string().min(1).optional(),
+  CREATOR_IMAGE_AI_ENABLED: z.enum(["true", "false"]).optional(),
+  DEEPSEEK_API_KEY: z.string().min(1).optional(),
+  DEEPSEEK_MODEL: z.string().min(1).max(200).optional(),
+  DEEPSEEK_TIMEOUT_MS: z.string().regex(/^\d+$/, "DEEPSEEK_TIMEOUT_MS must be numeric").optional(),
+  DEEPSEEK_USER_ID_SALT: z.string().min(32).optional(),
+  ZAI_API_KEY: z.string().min(1).optional(),
+  ZAI_MODEL: z.string().min(1).max(200).optional(),
+  ZAI_TIMEOUT_MS: z.string().regex(/^\d+$/, "ZAI_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_TIMEOUT_MS: z.string().regex(/^\d+$/, "STUDIO_AI_TIMEOUT_MS must be numeric").optional(),
+  STUDIO_AI_PROVIDER_ORDER: z
+    .string()
+    .regex(/^(zai|deepseek)(,(zai|deepseek))*$/, "STUDIO_AI_PROVIDER_ORDER must be a provider CSV")
+    .optional(),
+  STUDIO_AI_DAILY_REQUEST_LIMIT: z
+    .string()
+    .regex(/^[1-9]\d*$/, "STUDIO_AI_DAILY_REQUEST_LIMIT must be a positive integer")
+    .optional(),
+  STUDIO_AI_DAILY_TOKEN_LIMIT: z
+    .string()
+    .regex(/^[1-9]\d*$/, "STUDIO_AI_DAILY_TOKEN_LIMIT must be a positive integer")
+    .optional(),
   // OAuth(선택 — 둘 다 있으면 실제 OAuth, 없으면 데모 폴백).
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
@@ -56,6 +77,9 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "CATALOG_INGEST_TRIGGER_TOKEN",
   "DATABASE_URL",
   "OPENAI_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "DEEPSEEK_USER_ID_SALT",
+  "ZAI_API_KEY",
   "GOOGLE_OAUTH_CLIENT_SECRET",
   "TOSS_MTLS_CERT",
   "TOSS_MTLS_KEY",

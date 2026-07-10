@@ -102,6 +102,7 @@ function WorkCommunityPanel({
       const saved = await updateWork(work.id, {
         seriesId: seriesId || null,
         challengeId: challengeId || null,
+        ...(work.revision ? { baseRevision: work.revision } : {}),
       });
       onUpdated({
         seriesId: saved.seriesId ?? null,
@@ -109,6 +110,7 @@ function WorkCommunityPanel({
         seriesTitle: saved.seriesTitle ?? null,
         challengeId: saved.challengeId ?? null,
         challengeTitle: saved.challengeTitle ?? null,
+        revision: saved.revision ?? work.revision,
       });
       setOpen(false);
     } catch (err) {
@@ -733,7 +735,11 @@ export function CreateWorkPage() {
           {work.isOwner && (
             <div className="ml-auto flex items-center gap-2">
               <Link
-                href={`/studio?id=${encodeURIComponent(work.id)}`}
+                href={
+                  work.format === "upload"
+                    ? `/studio?mode=upload&id=${encodeURIComponent(work.id)}`
+                    : `/studio?id=${encodeURIComponent(work.id)}`
+                }
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
               >
                 <Pencil size={14} />
@@ -769,7 +775,9 @@ export function CreateWorkPage() {
         {work.isOwner && (
           <WorkFxPanel
             work={work}
-            onUpdated={(doc) => setWork((current) => (current ? { ...current, doc } : current))}
+            onUpdated={(doc, revision) =>
+              setWork((current) => current ? { ...current, doc, revision: revision ?? current.revision } : current)
+            }
           />
         )}
 
