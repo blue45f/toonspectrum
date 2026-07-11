@@ -378,9 +378,7 @@ import {
 } from "./studio-history-brush";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
-  loadStudioInspectorLayout,
   navigateStudioInspector,
-  saveStudioInspectorLayout,
   type StudioInspectorLayout,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
@@ -589,8 +587,6 @@ import {
   type PuppetPin,
 } from "./studio-puppet-warp";
 import {
-  loadStudioQuickActionsPreferences,
-  saveStudioQuickActionsPreferences,
   type StudioQuickActionId,
   type StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
@@ -693,6 +689,22 @@ import {
   type WatermarkSettings,
 } from "./studio-watermark";
 import {
+  STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
+  STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
+  areStudioWorkspaceLayoutsEqual,
+  loadStudioWorkspacePersistence,
+  normalizeStudioWorkspaceLayout,
+  resolveStudioWorkspace,
+  saveStudioWorkspaceState,
+  studioWorkspaceOwnerScope,
+  studioWorkspaceStorageKey,
+  updateStudioWorkspaceLiveLayout,
+  type StudioWorkspaceLayout,
+  type StudioWorkspaceLoadResult,
+  type StudioWorkspaceSaveResult,
+  type StudioWorkspaceState,
+} from "./studio-workspaces";
+import {
   createEmptyStudioWriterRoomDocument,
   normalizeStudioWriterRoomDocument,
   replaceStudioWriterRoomStage,
@@ -737,6 +749,7 @@ import { StudioPublishContextBanner, type PublishContext } from "./StudioPublish
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
+import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
 
 import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAsset } from "./studio-asset-library";
@@ -3700,7 +3713,7 @@ const MOBILE_PROJECT_ARCHIVE_LIMITS = Object.freeze({
   maxProjectBytes: 8_000_000,
 });
 
-function studioQuickActionsStorage(): Storage | null {
+function studioWorkspaceStorage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
   } catch {
@@ -3998,11 +4011,27 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     return () => autoActionAbortRef.current?.abort();
   }, []);
+  // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 초기 레이아웃부터 하나의
+  // owner-scoped envelope에서 읽어 패널·인스펙터·퀵 메뉴가 서로 다른 저장본으로 갈라지지 않게 한다.
+  const currentWorkspaceOwnerScope = studioWorkspaceOwnerScope(studioAuthUserId);
+  const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() =>
+    loadStudioWorkspacePersistence(studioWorkspaceStorage(), studioAuthUserId)
+  );
+  const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
+  const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
+  const workspaceState = workspacePersistence.state;
+  const workspaceSnapshotLayout =
+    resolveStudioWorkspace(workspaceState, workspaceState.activeWorkspaceId)?.layout ??
+    workspaceState.liveLayout;
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(
+    workspaceState.liveLayout.desktop.leftPanelOpen
+  );
+  const [rightPanelOpen, setRightPanelOpen] = useState(
+    workspaceState.liveLayout.desktop.rightPanelOpen
+  );
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
-    loadStudioInspectorLayout(studioQuickActionsStorage())
+    workspaceState.liveLayout.inspector
   );
   // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
   const isMobile = useIsMobile();
@@ -4033,7 +4062,7 @@ function StudioCuttoonEditor() {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionsAnchor, setQuickActionsAnchor] = useState({ x: 180, y: 320 });
   const [quickActionsPreferences, setQuickActionsPreferences] = useState<StudioQuickActionsPreferences>(() =>
-    loadStudioQuickActionsPreferences(studioQuickActionsStorage())
+    workspaceState.liveLayout.quickActions
   );
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
@@ -4056,12 +4085,6 @@ function StudioCuttoonEditor() {
       setQuickActionsOpen(false);
     }
   }, [isMobile]);
-  useEffect(() => {
-    saveStudioQuickActionsPreferences(studioQuickActionsStorage(), quickActionsPreferences);
-  }, [quickActionsPreferences]);
-  useEffect(() => {
-    saveStudioInspectorLayout(studioQuickActionsStorage(), inspectorLayout);
-  }, [inspectorLayout]);
   // 바텀시트 a11y: 열리면 시트 내부(닫기 버튼)로 포커스를 옮기고, 닫히면 트리거로 되돌린다.
   useEffect(() => {
     if (!isMobile) return;
@@ -4091,14 +4114,244 @@ function StudioCuttoonEditor() {
     return () => cancelAnimationFrame(id);
   }, [mobileSheet, isMobile]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
-  const leftResize = useResizable({ initial: 176, min: 132, max: 360, edge: "right", storageKey: "studio:leftW" });
-  const rightResize = useResizable({ initial: 304, min: 248, max: 720, edge: "left", storageKey: "studio:rightW" });
+  const leftResize = useResizable({
+    initial: workspaceSnapshotLayout.desktop.leftPanelWidth,
+    min: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
+    max: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
+    edge: "right",
+  });
+  const rightResize = useResizable({
+    initial: workspaceSnapshotLayout.desktop.rightPanelWidth,
+    min: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
+    max: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
+    edge: "left",
+  });
+  const leftResizeSetWidthRef = useRef(leftResize.setWidth);
+  const rightResizeSetWidthRef = useRef(rightResize.setWidth);
+  leftResizeSetWidthRef.current = leftResize.setWidth;
+  rightResizeSetWidthRef.current = rightResize.setWidth;
   const [pageGradePanelOpen, setPageGradePanelOpen] = useState(false);
   const [menu, setMenu] = useState<null | StudioMenu>(null);
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
   const [isFullscreen, setIsFullscreen] = useState(false);
   // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
   const [maximized, setMaximized] = useState(false);
+  // 전체화면/브라우저 맞춤은 저장된 작업공간을 바꾸지 않는 일시적인 프레젠테이션 상태다.
+  // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
+  // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
+  const presentationPanelsHidden = isFullscreen || maximized;
+  const visibleLeftPanelOpen = leftPanelOpen && !presentationPanelsHidden;
+  const visibleRightPanelOpen = rightPanelOpen && !presentationPanelsHidden;
+  const liveWorkspaceLayout = normalizeStudioWorkspaceLayout(
+    {
+      inspector: inspectorLayout,
+      desktop: {
+        leftPanelOpen,
+        rightPanelOpen,
+        leftPanelWidth: leftResize.width,
+        rightPanelWidth: rightResize.width,
+      },
+      quickActions: quickActionsPreferences,
+    },
+    workspaceState.liveLayout
+  );
+  const workspacePersistenceRef = useRef(workspacePersistence);
+  const liveWorkspaceLayoutRef = useRef(liveWorkspaceLayout);
+  workspacePersistenceRef.current = workspacePersistence;
+  liveWorkspaceLayoutRef.current = liveWorkspaceLayout;
+
+  function applyStudioWorkspaceLayout(layout: StudioWorkspaceLayout) {
+    setInspectorLayout(layout.inspector);
+    setLeftPanelOpen(layout.desktop.leftPanelOpen);
+    setRightPanelOpen(layout.desktop.rightPanelOpen);
+    leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
+    rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
+    setQuickActionsPreferences(layout.quickActions);
+    setMobileSheet(null);
+    setQuickActionsOpen(false);
+    setMenu(null);
+    setWorkspaceSyncNotice(null);
+    globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
+  }
+
+  function persistStudioWorkspaceState(nextState: StudioWorkspaceState): StudioWorkspaceSaveResult {
+    const result = saveStudioWorkspaceState(
+      studioWorkspaceStorage(),
+      studioAuthUserId,
+      nextState,
+      { sourceOwnerScope: workspacePersistence.ownerScope }
+    );
+    if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
+    setWorkspacePersistence((current) => {
+      // 로그인 경계가 바뀐 렌더의 오래된 이벤트는 새 계정 작업공간에 섞지 않는다.
+      if (current.ownerScope !== result.ownerScope || result.failure === "owner-mismatch") {
+        return current;
+      }
+      return {
+        ...current,
+        state: result.state,
+        status: result.status,
+        failure: result.failure,
+      };
+    });
+    return result;
+  }
+
+  // 로그인/로그아웃으로 owner가 바뀌면 새 범위의 상태를 원자적으로 읽고 실제 패널에도 적용한다.
+  // guest 상태를 인증 계정 키로 저장하거나 반대 방향으로 덮어쓰는 것을 막는 핵심 경계다.
+  useEffect(() => {
+    if (workspacePersistence.ownerScope === currentWorkspaceOwnerScope) return;
+    const nextPersistence = loadStudioWorkspacePersistence(
+      studioWorkspaceStorage(),
+      studioAuthUserId
+    );
+    const layout = nextPersistence.state.liveLayout;
+    setWorkspacePersistence(nextPersistence);
+    setInspectorLayout(layout.inspector);
+    setLeftPanelOpen(layout.desktop.leftPanelOpen);
+    setRightPanelOpen(layout.desktop.rightPanelOpen);
+    leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
+    rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
+    setQuickActionsPreferences(layout.quickActions);
+    setMobileSheet(null);
+    setQuickActionsOpen(false);
+    setMenu(null);
+    setWorkspaceSyncNotice(null);
+  }, [
+    currentWorkspaceOwnerScope,
+    studioAuthUserId,
+    workspacePersistence.ownerScope,
+  ]);
+
+  // 활성 프리셋 스냅샷은 그대로 두고 liveLayout만 즉시 저장한다. 패널 폭은 pointerup까지
+  // 기다렸다가 최종값 한 번만 저장해 드래그 쓰기 폭주와 탭 종료 직전 상태 유실을 함께 막는다.
+  useEffect(() => {
+    const ownerScope = currentWorkspaceOwnerScope;
+    if (workspacePersistence.ownerScope !== ownerScope) return;
+    if (leftResize.dragging || rightResize.dragging) return;
+    const nextLayout = normalizeStudioWorkspaceLayout(
+      {
+        inspector: inspectorLayout,
+        desktop: {
+          leftPanelOpen,
+          rightPanelOpen,
+          leftPanelWidth: leftResize.width,
+          rightPanelWidth: rightResize.width,
+        },
+        quickActions: quickActionsPreferences,
+      },
+      workspacePersistence.state.liveLayout
+    );
+    if (
+      areStudioWorkspaceLayoutsEqual(
+        workspacePersistence.state.liveLayout,
+        nextLayout
+      )
+    ) {
+      return;
+    }
+
+    const sourceState = workspacePersistence.state;
+    const nextState = updateStudioWorkspaceLiveLayout(sourceState, nextLayout);
+    const result = saveStudioWorkspaceState(
+      studioWorkspaceStorage(),
+      studioAuthUserId,
+      nextState,
+      { sourceOwnerScope: ownerScope }
+    );
+    setWorkspacePersistence((current) => {
+      if (
+        current.ownerScope !== ownerScope ||
+        current.state !== sourceState ||
+        result.failure === "owner-mismatch"
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        state: result.state,
+        status: result.status,
+        failure: result.failure,
+      };
+    });
+    if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
+  }, [
+    currentWorkspaceOwnerScope,
+    inspectorLayout,
+    leftPanelOpen,
+    leftResize.dragging,
+    leftResize.width,
+    quickActionsPreferences,
+    rightPanelOpen,
+    rightResize.dragging,
+    rightResize.width,
+    studioAuthUserId,
+    workspacePersistence.ownerScope,
+    workspacePersistence.state,
+  ]);
+
+  // 다른 탭에서 같은 계정의 작업공간을 저장하면 원고를 새로고침하지 않고 UI 배치만 동기화한다.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storage = studioWorkspaceStorage();
+    if (!storage) return;
+    const ownerScope = currentWorkspaceOwnerScope;
+    const storageKey = studioWorkspaceStorageKey(studioAuthUserId);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== storageKey) return;
+      if (event.storageArea && event.storageArea !== storage) return;
+      const currentPersistence = workspacePersistenceRef.current;
+      if (currentPersistence.ownerScope !== ownerScope) return;
+      // 폭 드래그나 아직 반영 중인 로컬 변경을 다른 탭 이벤트가 조용히 덮어쓰지 않는다.
+      // 저장이 끝난 상태에서만 최신 외부 작업공간을 받아 양쪽 탭을 안전하게 맞춘다.
+      if (
+        !areStudioWorkspaceLayoutsEqual(
+          currentPersistence.state.liveLayout,
+          liveWorkspaceLayoutRef.current
+        )
+      ) {
+        setWorkspaceSyncNotice(
+          "다른 탭의 작업공간 변경과 충돌해 현재 배치를 우선 유지했어요."
+        );
+        return;
+      }
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof Element &&
+        activeElement.closest('[data-testid="studio-workspace-menu"]')
+      ) {
+        setWorkspaceSyncNotice(
+          "작업공간 이름 입력을 보호하기 위해 다른 탭의 변경을 반영하지 않았어요."
+        );
+        return;
+      }
+      const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId);
+      if (loaded.failure) {
+        setWorkspacePersistence((current) =>
+          current.ownerScope === ownerScope
+            ? { ...current, status: loaded.status, failure: loaded.failure }
+            : current
+        );
+        setWorkspaceSyncNotice("다른 탭의 작업공간을 확인하지 못했어요. 현재 배치를 유지합니다.");
+        return;
+      }
+      const layout = loaded.state.liveLayout;
+      setWorkspacePersistence(loaded);
+      setInspectorLayout(layout.inspector);
+      setLeftPanelOpen(layout.desktop.leftPanelOpen);
+      setRightPanelOpen(layout.desktop.rightPanelOpen);
+      leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
+      rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
+      setQuickActionsPreferences(layout.quickActions);
+      setMobileSheet(null);
+      setQuickActionsOpen(false);
+      setMenu(null);
+      setWorkspaceMenuEpoch((current) => current + 1);
+      setWorkspaceSyncNotice("다른 탭에서 저장한 작업공간을 반영했어요.");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [currentWorkspaceOwnerScope, studioAuthUserId]);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
 
@@ -4194,9 +4447,6 @@ function StudioCuttoonEditor() {
     const onChange = () => {
       const fs = document.fullscreenElement === studioRootRef.current;
       setIsFullscreen(fs);
-      // 전체화면이면 좌우 패널을 접어 캔버스가 화면 폭을 최대한 쓰게 한다(빠져나오면 복원).
-      setLeftPanelOpen(!fs);
-      setRightPanelOpen(!fs);
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
@@ -4209,22 +4459,19 @@ function StudioCuttoonEditor() {
       void studioRootRef.current?.requestFullscreen?.();
     }
   }
-  // 브라우저 창 최대화 토글 — 켜면 좌우 패널을 접어 캔버스를 뷰포트 폭에 꽉 채운다(복원 시 펼침).
+  // 브라우저 창 최대화 토글 — 저장된 패널 상태는 보존하고 화면에서만 잠시 숨긴다.
   function toggleMaximize() {
-    const next = !maximized;
-    setMaximized(next);
-    setLeftPanelOpen(!next);
-    setRightPanelOpen(!next);
+    setMaximized((current) => !current);
   }
-  // 최대화 상태에서 ESC로 빠져나오기 — 버튼으로 끌 때(toggleMaximize)와 동일하게 접어둔 좌우
-  // 패널도 함께 복원해야 한다. 이걸 빠뜨리면 ESC로 나온 뒤 패널이 계속 접힌 채로 남는다.
+  // 최대화 상태에서 ESC로 빠져나오면 일시적으로 가렸던 패널이 저장된 레이아웃 그대로 돌아온다.
   useEffect(() => {
     if (!maximized || typeof window === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
+      // 열린 작업공간/내보내기 대화상자가 Escape를 소비했다면 브라우저 맞춤까지 함께
+      // 닫지 않는다. 한 번의 키 입력은 사용자가 보고 있는 최상위 레이어만 닫아야 한다.
+      if (e.defaultPrevented) return;
       if (e.key === "Escape") {
         setMaximized(false);
-        setLeftPanelOpen(true);
-        setRightPanelOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -4858,7 +5105,7 @@ function StudioCuttoonEditor() {
 
   useEffect(() => {
     updateScrollPosRef.current();
-  }, [canvasH, effScale, leftPanelOpen, rightPanelOpen, isFullscreen, maximized]);
+  }, [canvasH, effScale, visibleLeftPanelOpen, visibleRightPanelOpen, isFullscreen, maximized]);
 
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
@@ -12270,14 +12517,14 @@ function StudioCuttoonEditor() {
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   const mobileBarBtn = (active: boolean) =>
     cn(
-      "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+      "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
     );
 
   // 모바일 하단 '드로잉 도구' 버튼 — 한 손 조작용 큰 터치 타깃(>=44px). 활성 도구는 감귤색으로 또렷하게.
   const mobileDrawToolBtn = (active: boolean) =>
     cn(
-      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.66rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
       active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
   const quickActionsDisabledActions = new Set<StudioQuickActionId>();
@@ -12297,6 +12544,32 @@ function StudioCuttoonEditor() {
     quickActionsDisabledActions.add("add-bubble");
   }
   if (advancedFillUnsupportedReason) quickActionsDisabledActions.add("advanced-fill");
+  // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
+  // flex-row-reverse를 쓰지 않아 보이는 순서와 키보드/스위치 제어 순서가 항상 일치한다.
+  const mobileQuickActionsButton: ReactNode = (
+    <button
+      type="button"
+      onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setQuickActionsAnchor({
+          // 트리거가 좌우 끝으로 이동해도 방사형 메뉴는 화면 중앙 기준으로 열어 모든 슬롯을 안전 영역에 둔다.
+          x: globalThis.innerWidth / 2,
+          y: rect.top + rect.height / 2,
+        });
+        setMobileSheet(null);
+        setMenu(null);
+        setColorWheelOpen(false);
+        setQuickActionsOpen(true);
+      }}
+      aria-haspopup="menu"
+      aria-expanded={quickActionsOpen}
+      aria-label={`퀵 메뉴 · ${workspaceState.mobileControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
+      className={mobileBarBtn(quickActionsOpen)}
+    >
+      <Command size={17} aria-hidden />
+      <span>퀵 메뉴</span>
+    </button>
+  );
 
   async function handleDownload() {
     const watermarkForExport = ensureWatermarkLoaded();
@@ -13330,13 +13603,38 @@ function StudioCuttoonEditor() {
     >
     <Container size="wide" className={cn("py-3 lg:py-6", !(isFullscreen || maximized) && "xl:max-w-[1700px] 2xl:max-w-[2200px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
       <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4">
-        <div>
-          {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
-          <h1 className="text-lg font-bold tracking-tight lg:text-2xl">창작 스튜디오</h1>
-          <p className="mt-1 hidden text-sm text-fg-3 lg:block">
-            이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
-            {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
-          </p>
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2.5">
+          <div className="min-w-0">
+            {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
+            <h1 className="text-lg font-bold tracking-tight lg:text-2xl">창작 스튜디오</h1>
+            <p className="mt-1 hidden text-sm text-fg-3 lg:block">
+              이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
+              {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
+            </p>
+          </div>
+          {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
+            <StudioWorkspaceMenu
+              key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
+              state={workspaceState}
+              liveLayout={liveWorkspaceLayout}
+              persistence={workspacePersistence}
+              onStateChange={persistStudioWorkspaceState}
+              onApplyLayout={applyStudioWorkspaceLayout}
+            />
+          ) : (
+            <span role="status" className="inline-flex min-h-11 items-center text-xs text-fg-3">
+              계정 작업공간 전환 중…
+            </span>
+          )}
+          {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
+            <span
+              role="status"
+              title={workspaceSyncNotice}
+              className="max-w-56 truncate text-[0.6875rem] font-medium text-cool"
+            >
+              {workspaceSyncNotice}
+            </span>
+          ) : null}
         </div>
         {/* 모바일: 액션 버튼을 한 줄 가로 스크롤로 압축(모든 기능 유지하되 세로를 잡아먹지 않게). 데스크톱은 wrap. */}
         <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:overflow-visible">
@@ -15309,9 +15607,17 @@ function StudioCuttoonEditor() {
               setLeftPanelOpen(!anyOpen);
               setRightPanelOpen(!anyOpen);
             }}
-            aria-pressed={!leftPanelOpen && !rightPanelOpen}
-            className={cn(toolBtn(!leftPanelOpen && !rightPanelOpen), "hidden h-8 gap-1 px-2 text-[10px] font-semibold lg:inline-flex")}
-            title="집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
+            disabled={presentationPanelsHidden}
+            aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
+            className={cn(
+              toolBtn(!visibleLeftPanelOpen && !visibleRightPanelOpen),
+              "hidden h-8 gap-1 px-2 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 lg:inline-flex"
+            )}
+            title={
+              presentationPanelsHidden
+                ? "전체화면·브라우저 맞춤에서는 작업공간 패널을 임시로 숨깁니다"
+                : "집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
+            }
           >
             <Maximize2 size={12} /> 넓게
           </button>
@@ -15367,7 +15673,7 @@ function StudioCuttoonEditor() {
           />
         )}
         {/* 왼쪽: 페이지 목록 사이드바 (접으면 얇은 레일로) */}
-        {!leftPanelOpen && (
+        {!visibleLeftPanelOpen && !presentationPanelsHidden && (
           <button
             type="button"
             onClick={() => setLeftPanelOpen(true)}
@@ -15391,7 +15697,7 @@ function StudioCuttoonEditor() {
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
             "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
-            !leftPanelOpen && "lg:hidden"
+            !visibleLeftPanelOpen && "lg:hidden"
           )}
           style={
             isMobile
@@ -15714,7 +16020,7 @@ function StudioCuttoonEditor() {
         </div>
 
         {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
-        {leftPanelOpen && (
+        {visibleLeftPanelOpen && (
           <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
         )}
 
@@ -17862,12 +18168,12 @@ function StudioCuttoonEditor() {
         </div>
 
         {/* 캔버스 ↔ 속성 패널 너비 스플리터(데스크톱) */}
-        {rightPanelOpen && (
+        {visibleRightPanelOpen && (
           <PanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="속성 패널 너비 조절" />
         )}
 
         {/* 사이드: 속성 + 게시 정보 (접으면 얇은 레일로) */}
-        {!rightPanelOpen && (
+        {!visibleRightPanelOpen && !presentationPanelsHidden && (
           <button
             type="button"
             onClick={() => setRightPanelOpen(true)}
@@ -17892,7 +18198,7 @@ function StudioCuttoonEditor() {
             // 밀어내지 않아 긴 웹툰 캔버스와 패널 스크롤이 서로 독립적이다.
             "lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
-            !rightPanelOpen && "lg:hidden",
+            !visibleRightPanelOpen && "lg:hidden",
             inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden"
           )}
           style={
@@ -21168,7 +21474,7 @@ function StudioCuttoonEditor() {
         {isMobile && (
           <nav
             aria-label="스튜디오 모바일 도구막대"
-            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 px-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
             style={{ bottom: mobileKeyboardInset }}
           >
             {/* 1행: 핵심 드로잉 도구 (>=44px 터치 타깃, 활성 도구 감귤색) */}
@@ -21286,6 +21592,9 @@ function StudioCuttoonEditor() {
 
             {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
             <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1">
+              {workspaceState.mobileControlSide === "left"
+                ? mobileQuickActionsButton
+                : null}
               <button
                 type="button"
                 onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
@@ -21308,28 +21617,6 @@ function StudioCuttoonEditor() {
               </button>
               <button
                 type="button"
-                onClick={(event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setQuickActionsAnchor({
-                    // 도크의 개별 버튼 위치보다 화면 중앙을 기준으로 열어 6개 방향의 좌우 여백을
-                    // 대칭으로 유지한다. 세로 위치는 도크에서 시작하되 메뉴가 자체 안전 영역으로 보정한다.
-                    x: globalThis.innerWidth / 2,
-                    y: rect.top + rect.height / 2,
-                  });
-                  setMobileSheet(null);
-                  setMenu(null);
-                  setColorWheelOpen(false);
-                  setQuickActionsOpen(true);
-                }}
-                aria-haspopup="menu"
-                aria-expanded={quickActionsOpen}
-                className={mobileBarBtn(quickActionsOpen)}
-              >
-                <Command size={17} aria-hidden />
-                <span>퀵 메뉴</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   if (mobileSheet === "props") {
                     setMobileSheet(null);
@@ -21344,7 +21631,7 @@ function StudioCuttoonEditor() {
                 <Layers size={17} aria-hidden />
                 <span>작업 패널</span>
               </button>
-              <div className="flex w-32 flex-none items-center justify-center">
+              <div className="flex w-[8.25rem] flex-none items-center justify-center">
                 <button
                   type="button"
                   onClick={() => setZoom((z) => clampZoom(z - 0.25))}
@@ -21357,7 +21644,7 @@ function StudioCuttoonEditor() {
                 <button
                   type="button"
                   onClick={fitCanvasToWidth}
-                  className="min-h-11 min-w-10 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                  className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
                   aria-label="화면 폭에 맞춤"
                 >
                   {Math.round(zoom * 100)}%
@@ -21372,6 +21659,9 @@ function StudioCuttoonEditor() {
                   <Plus size={16} aria-hidden />
                 </button>
               </div>
+              {workspaceState.mobileControlSide === "right"
+                ? mobileQuickActionsButton
+                : null}
             </div>
           </nav>
         )}

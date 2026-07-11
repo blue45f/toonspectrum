@@ -80,6 +80,11 @@ export function useResizable(options: ResizableOptions): Resizable {
   }, [dragging]);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // preventDefault가 브라우저의 기본 포커스 이동도 막으므로 직접 포커스를 준다.
+    // 마우스/펜으로 폭을 조절한 뒤에도 화살표·Home·End 조작을 바로 이어갈 수 있다.
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.focus({ preventScroll: true });
+    }
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = width;
