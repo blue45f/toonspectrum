@@ -226,6 +226,28 @@ export function removeTrack(doc: AnimationTimelineDoc, trackId: string): Animati
   return { ...doc, tracks };
 }
 
+/**
+ * 레이어 복제 ID 매핑에 맞춰 타임라인 트랙도 복제한다. 각 키프레임 frame.id 역시 새로 발급해
+ * 원본/복제본의 프레임 편집·내보내기 식별자가 충돌하지 않게 한다. 복제할 트랙이 없으면 no-op.
+ */
+export function duplicateAnimationTracks(
+  doc: AnimationTimelineDoc,
+  copyIdBySourceId: ReadonlyMap<string, string>,
+  createFrameId: () => string
+): AnimationTimelineDoc {
+  let tracks: Record<string, StudioAnimKeyframe[]> | null = null;
+  for (const [sourceId, copyId] of copyIdBySourceId) {
+    const sourceTrack = doc.tracks[sourceId];
+    if (!sourceTrack || sourceTrack.length === 0 || !copyId || copyId === sourceId) continue;
+    tracks ??= { ...doc.tracks };
+    tracks[copyId] = sourceTrack.map((keyframe) => ({
+      frameIndex: keyframe.frameIndex,
+      frame: { ...keyframe.frame, id: createFrameId() },
+    }));
+  }
+  return tracks ? { ...doc, tracks } : doc;
+}
+
 // ── 재생 타이밍 — frameIndexAtElapsed를 그대로 재사용하기 위한 다리(bridge) ─────
 
 /** 전 프레임이 doc.fps 기준 균등 노출시간을 갖는 배열 — frameIndexAtElapsed에 그대로 넘긴다. */

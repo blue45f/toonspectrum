@@ -39,8 +39,6 @@ import {
   Command,
   Copy,
   Eraser,
-  Eye,
-  EyeOff,
   Files,
   AlignLeft,
   AlignCenter,
@@ -51,7 +49,6 @@ import {
   FlipVertical2,
   Folder,
   FolderPlus,
-  FolderMinus,
   FileUp,
   Upload,
   Image as ImageIcon,
@@ -66,7 +63,6 @@ import {
   LockOpen,
   MessageCircle,
   Minus,
-  MoreHorizontal,
   MousePointer2,
   PaintBucket,
   Pencil,
@@ -78,8 +74,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Grid2x2,
-  Grid2x2Check,
-  Grid2x2X,
   Smile,
   Sparkles,
   WandSparkles,
@@ -163,12 +157,10 @@ import {
   type StudioAiObservableResult,
   type StudioAiPendingOperationInput,
 } from "./studio-ai-provenance-recorder";
-import {
-  canAlphaLock,
-  shouldClipToExistingAlpha,
-} from "./studio-alpha-lock";
+import { shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
+  duplicateAnimationTracks,
   globalFrameIndexAtElapsed,
   hasTrack,
   moveKeyframe,
@@ -416,7 +408,6 @@ import {
   bakeLayerMaskStroke,
   canLayerMask,
   createLayerMaskCanvas,
-  hasLayerMask,
   invertLayerMaskAlpha,
   shouldApplyLayerMask,
   LAYER_MASK_BRUSH_HARDNESS_DEFAULT,
@@ -425,13 +416,23 @@ import {
   type LayerMaskPaintMode,
 } from "./studio-layer-mask";
 import {
+  normalizeStudioLayerColor,
+  normalizeStudioLayerRole,
+} from "./studio-layer-navigator";
+import {
   createLayerGroup,
+  groupItems,
   groupOfItem,
+  insertLayerCopiesAdjacent,
   isEffectivelyHidden,
   isEffectivelyLocked,
+  missingLayerGroupIds,
+  moveLayerGroup,
+  removeItemsFromGroups,
+  removeLayerItems,
+  reorderLayerItem,
   setItemGroup,
   ungroupItems,
-  buildLayerTree,
   type LayerGroup,
 } from "./studio-layers";
 import {
@@ -720,6 +721,10 @@ import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
 import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
+import {
+  StudioLayerNavigator,
+  type StudioLayerNavigatorAction,
+} from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
@@ -756,6 +761,11 @@ import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
+import type {
+  StudioLayerColor,
+  StudioLayerNavigatorItem,
+  StudioLayerRole,
+} from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { Outline } from "./studio-outline";
@@ -1564,12 +1574,13 @@ interface SpeedLinesEl {
   opacity?: number;
 }
 // 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean;
+export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor;
   /** 이 요소가 이메레스 밑그림 틀로 삽입됐는지 + 어디서 왔는지 표식. 카탈로그 틀: t.id 그대로.
    *  개인 보관함 항목: `custom:${item.id}`. 두 출처 모두 "이메레스에서 온 요소"라는 사실만으로
    *  일괄 삭제 대상이 된다. */
   emeresSourceId?: string;
 };
+const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
 type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
 // 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
@@ -3791,6 +3802,7 @@ function StudioCuttoonEditor() {
     canvasH: 1080,
   };
   const pageEditLocked = isPageReviewLocked(activePage.review);
+  const activeSurfaceReviewLocked = pageEditLocked && !masterEditMode;
 
   // 마스터 편집 모드에서는 편집 대상(선택·레이어 패널·속성·commit)이 문서 마스터 요소로 바뀐다(studio-master-page 규약).
   const elements = masterEditMode ? master.elements : activePage.elements;
@@ -3802,7 +3814,7 @@ function StudioCuttoonEditor() {
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
   const pageGradeActive = !isDefaultPageGrade(pageGrade);
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
-  const groups = activePage.groups ?? [];
+  const groups = activePage.groups ?? EMPTY_LAYER_GROUPS;
   const animTimeline = normalizeAnimationTimelineDoc(activePage.animTimeline);
   const elementById = new Map<string, El>();
   for (const element of elements) elementById.set(element.id, element);
@@ -3810,6 +3822,16 @@ function StudioCuttoonEditor() {
   // closure, preventing a stale fill result from overwriting an undo, page switch, or source edit.
   const activeElementsRef = useRef(elements);
   activeElementsRef.current = elements;
+  const activeGroupsRef = useRef(groups);
+  activeGroupsRef.current = groups;
+  const activeSurfaceReviewLockedRef = useRef(activeSurfaceReviewLocked);
+  activeSurfaceReviewLockedRef.current = activeSurfaceReviewLocked;
+
+  function isLatestLayerContentMutationLocked(id: string): boolean {
+    if (activeSurfaceReviewLockedRef.current) return true;
+    const current = activeElementsRef.current.find((element) => element.id === id);
+    return !current || isEffectivelyLocked(current, activeGroupsRef.current);
+  }
 
   const hi = pagesHi;
   const history = pagesHistory;
@@ -4108,7 +4130,6 @@ function StudioCuttoonEditor() {
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [layerActionMenuId, setLayerActionMenuId] = useState<string | null>(null);
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -4119,9 +4140,16 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (selectedId) setMarqueeIds([]);
   }, [selectedId]);
+  // 작업면이 바뀌거나 요소가 제거되면 현재 작업면에 실제로 존재하는 ID만 남긴다. 댓글·대사·
+  // 연속성 탐색처럼 페이지를 전환하면서 새 작업면의 요소를 의도적으로 선택하는 흐름은 보존한다.
   useEffect(() => {
-    setLayerActionMenuId(null);
-  }, [currentPageId, inspectorLayout.primary]);
+    const activeIds = new Set(activeElementsRef.current.map((element) => element.id));
+    setSelectedId((current) => (current && activeIds.has(current) ? current : null));
+    setMarqueeIds((current) => {
+      const next = current.filter((id) => activeIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [activePage.id, masterEditMode, pagesHi]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
@@ -5750,6 +5778,34 @@ function StudioCuttoonEditor() {
   }, [menu]);
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const layerNavigatorItems: StudioLayerNavigatorItem[] = elements.map((element, zIndex) => ({
+    id: element.id,
+    type: element.type,
+    label: element.name?.trim() || elementLabel(element),
+    textContent:
+      element.type === "text" || element.type === "bubble" || element.type === "sticker"
+        ? element.text
+        : element.type === "frame"
+          ? element.storyBeat?.summary
+          : undefined,
+    zIndex,
+    groupId: masterEditMode ? undefined : element.groupId,
+    hidden: element.hidden,
+    locked: element.locked,
+    alphaLocked: element.alphaLocked,
+    fillReference: element.type === "image" ? element.fillReference : undefined,
+    masked: Boolean(element.maskSrc),
+    maskEnabled: element.maskEnabled,
+    aiGenerated:
+      ((element.type === "image" || element.type === "frame") && Boolean(element.aiProvenance)) ||
+      (element.type === "frame" && Boolean(element.storyBeat?.textAiProvenance)),
+    clipBelow: element.clipBelow,
+    animated:
+      element.type === "image" &&
+      (element.isAnimatedGif === true || (element.frames?.length ?? 0) > 1 || hasTrack(animTimeline, element.id)),
+    role: normalizeStudioLayerRole(element.layerRole),
+    color: normalizeStudioLayerColor(element.layerColor),
+  }));
   const selectedBubbleTailGeometry = selected?.type === "bubble"
     ? computeBubbleShapeGeometry({
         width: selected.width,
@@ -5864,9 +5920,12 @@ function StudioCuttoonEditor() {
                       : null;
   const advancedFillArmed =
     advancedFillActive && tool === "select" && selected?.type === "image" && advancedFillUnsupportedReason === null;
+  const selectedContentMutationLocked =
+    activeSurfaceReviewLocked || (selected !== null && isEffectivelyLocked(selected, groups));
   // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
-  const pixelToolArmed = pixelTool !== null && selected?.type === "image";
+  const pixelToolArmed =
+    pixelTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
   const pixelOverlayFrame: SelectionFrame | null =
     selected?.type === "image"
@@ -5875,11 +5934,19 @@ function StudioCuttoonEditor() {
   const pixelOverlaySel = pixelSel && (pixelSel.subpaths.length > 0 || pixelSel.invert) ? pixelSel : null;
   // 크롭 모드 무장(이미지 요소 선택 + 크롭 rect 존재) — 무장 중엔 스테이지 드래그를 크롭 rect
   // 조작으로 가로채고, 요소 드래그/클릭 선택 전환을 함께 잠근다(픽셀 선택 도구와 동일 정책).
-  const cropArmed = cropRect !== null && selected?.type === "image";
+  const cropArmed =
+    cropRect !== null && selected?.type === "image" && !selectedContentMutationLocked;
   // 패널 손그림 컷 무장(패널 선택 + 도구 on, 잠긴 패널은 제외) — 크롭·픽셀 선택과 동일한 정책.
-  const panelSplitArmed = panelSplitActive && selected?.type === "frame" && !selected.locked;
+  const panelSplitArmed =
+    panelSplitActive &&
+    selected?.type === "frame" &&
+    !isEffectivelyLocked(selected, groups);
   // 벡터 노드 편집 무장(자유선 요소 선택 + 도구 on) — crop/pixel-select 와 동일한 정책.
-  const nodeEditArmed = nodeEditTool !== null && selected?.type === "draw" && isNodeEditableKind(selected.kind);
+  const nodeEditArmed =
+    nodeEditTool !== null &&
+    selected?.type === "draw" &&
+    isNodeEditableKind(selected.kind) &&
+    !selectedContentMutationLocked;
   const nodeEditHandles: NodeEditHandle[] =
     nodeEditArmed && selected?.type === "draw"
       ? decimateStrokeHandles(nodeEditDraft?.elId === selected.id ? nodeEditDraft.points : selected.points, {
@@ -5890,20 +5957,28 @@ function StudioCuttoonEditor() {
   // 말풍선 커스텀 모양 점 편집 무장(bubble 선택 + customShapePoints 존재 + 편집 토글 on) — crop/
   // node-edit 과 동일한 정책. decimateStrokeHandles 대신 전부를 핸들로(폴리곤은 이미 성글다).
   const bubbleShapeArmed =
-    bubbleShapeEditActive && selected?.type === "bubble" && hasCustomBubbleShape(selected.customShapePoints);
+    bubbleShapeEditActive &&
+    selected?.type === "bubble" &&
+    hasCustomBubbleShape(selected.customShapePoints) &&
+    !selectedContentMutationLocked;
   const bubbleShapeHandles: NodeEditHandle[] =
     bubbleShapeArmed && selected?.type === "bubble"
       ? bubbleShapePointHandles(
           bubbleShapeDraft?.elId === selected.id ? bubbleShapeDraft.points : (selected.customShapePoints ?? [])
         )
       : [];
-  const smudgeArmed = smudgeActive && selected?.type === "image";
-  const healCloneArmed = healCloneTool !== null && selected?.type === "image";
-  const layerMaskPaintArmed = layerMaskPaintActive && selected?.type === "image";
-  const historyBrushArmed = historyBrushActive && selected?.type === "image";
+  const smudgeArmed =
+    smudgeActive && selected?.type === "image" && !selectedContentMutationLocked;
+  const healCloneArmed =
+    healCloneTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
+  const layerMaskPaintArmed =
+    layerMaskPaintActive && selected?.type === "image" && !selectedContentMutationLocked;
+  const historyBrushArmed =
+    historyBrushActive && selected?.type === "image" && !selectedContentMutationLocked;
   // 퍼펫 워프 무장(이미지 요소 선택 + 모드 on) — crop과 동일한 정책(무장 중 다른 스테이지
   // 제스처·요소 드래그/선택 전환을 막는다).
-  const puppetWarpArmed = puppetWarpActive && selected?.type === "image";
+  const puppetWarpArmed =
+    puppetWarpActive && selected?.type === "image" && !selectedContentMutationLocked;
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const showQuickStart = !menu && (
     quickStartOpen ||
@@ -7023,17 +7098,21 @@ function StudioCuttoonEditor() {
       tr.nodes([]);
     } else if (marqueeIds.length > 0) {
       const nodes = marqueeIds
-        .filter((id) => !lookup.get(id)?.locked)
+        .filter((id) => {
+          const element = lookup.get(id);
+          return element ? !isEffectivelyLocked(element, groups) : false;
+        })
         .map((id) => nodeRefs.current[id])
         .filter((n): n is Konva.Node => !!n);
       tr.nodes(nodes);
     } else {
-      const selLocked = selectedId ? lookup.get(selectedId)?.locked : false;
+      const selectedElement = selectedId ? lookup.get(selectedId) : undefined;
+      const selLocked = selectedElement ? isEffectivelyLocked(selectedElement, groups) : false;
       const node = selectedId && !selLocked ? nodeRefs.current[selectedId] : null;
       tr.nodes(node ? [node] : []);
     }
     tr.getLayer()?.batchDraw();
-  }, [selectedId, marqueeIds, tool, elements]);
+  }, [selectedId, marqueeIds, tool, elements, groups]);
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
   // extraPatch — 레이어 삭제 시 elements 와 animTimeline(트랙 정리)을 원자적(단일 undo 스텝)으로
@@ -7118,7 +7197,21 @@ function StudioCuttoonEditor() {
     );
     if (commitPages(nextPages, { bypassReviewLock: true })) setError(null);
   }
+  function isLayerMetadataPatch(patch: Partial<El>): boolean {
+    const keys = Object.keys(patch);
+    return keys.length > 0 && keys.every((key) =>
+      key === "name" ||
+      key === "hidden" ||
+      key === "locked" ||
+      key === "layerRole" ||
+      key === "layerColor" ||
+      key === "fillReference" ||
+      key === "alphaLocked"
+    );
+  }
   function patchEl(id: string, patch: Partial<El>) {
+    const target = elementById.get(id);
+    if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
   }
   // 매직 리사이즈 — 프리셋을 누르면 폭(CANVAS_W)은 그대로 두고 높이만 목표 비율로 바꾼 뒤,
@@ -7184,6 +7277,14 @@ function StudioCuttoonEditor() {
     setColorWheelOpen(true);
   }
   function toggleBubbleAnchorPick() {
+    if (
+      selected?.type !== "bubble" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) {
+      setError("말풍선 또는 상위 그룹의 잠금을 해제한 뒤 꼬리 대상을 지정해 주세요.");
+      return;
+    }
     setBubbleAnchorPickActive((v) => {
       const next = !v;
       if (next) {
@@ -7235,6 +7336,8 @@ function StudioCuttoonEditor() {
 
   // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
   function patchElCoalesced(id: string, patch: Partial<El>, key: string) {
+    const target = elementById.get(id);
+    if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
     commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
   }
   // 브랜드 킷 — 제목/본문 글꼴을 현재 선택된 텍스트/말풍선 요소에 적용.
@@ -7323,28 +7426,17 @@ function StudioCuttoonEditor() {
   // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
   function addLayerGroup(seedElId?: string) {
     const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
-    const nextElements = seedElId ? (setItemGroup(elements, seedElId, g.id) as El[]) : elements;
+    const nextElements = seedElId ? (groupItems(elements, [seedElId], g.id) as El[]) : elements;
     updateActivePage({ groups: [...groups, g], elements: nextElements });
   }
   function groupSelectedElements() {
     if (marqueeIds.length < 2) return;
     const groupId = uid();
     const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
-    const nextElements = elements.map((el) => {
-      if (marqueeIds.includes(el.id)) {
-        return { ...el, groupId } as El;
-      }
-      return el;
-    });
+    const nextElements = groupItems(elements, marqueeIds, groupId) as El[];
     updateActivePage({ groups: [...groups, g], elements: nextElements });
     setSelectedId(null);
     setMarqueeIds([]);
-  }
-  function renameLayerGroup(groupId: string, name: string) {
-    updateActivePage({ groups: groups.map((g) => (g.id === groupId ? { ...g, name } : g)) });
-  }
-  function toggleGroupFlag(groupId: string, flag: "hidden" | "locked" | "collapsed") {
-    updateActivePage({ groups: groups.map((g) => (g.id === groupId ? { ...g, [flag]: !g[flag] } : g)) });
   }
   // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
   function deleteLayerGroup(groupId: string) {
@@ -7357,209 +7449,134 @@ function StudioCuttoonEditor() {
   function assignElementToGroup(elId: string, groupId: string | undefined) {
     updateActivePage({ elements: setItemGroup(elements, elId, groupId) as El[] });
   }
-  // 레이어 패널 한 행(요소). dimmed=소속 그룹이 숨김/잠금이라 흐리게.
-  const layerRow = (el: El, dimmed: boolean) => {
-    const i = elements.indexOf(el);
-    return (
-      <li
-        key={el.id}
-        className={cn(
-          "flex min-h-11 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1 lg:min-h-0",
-          el.id === selectedId ? "border-accent/60 bg-accent-soft/40" : "border-line",
-          dimmed && "opacity-50"
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setTool("select");
-            setSelectedId(el.id);
-          }}
-          onDoubleClick={() => {
-            const newName = globalThis.prompt("레이어 이름 변경", el.name || elementLabel(el));
-            if (newName !== null) {
-              patchEl(el.id, { name: newName.trim() } as Partial<El>);
-            }
-          }}
-          className={cn(
-            "flex min-h-11 min-w-0 flex-1 items-center truncate text-left text-xs select-none lg:min-h-0",
-            el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
-          )}
-          title={el.locked ? `${elementLabel(el)} (잠김) · 더블클릭하여 이름 변경` : `${elementLabel(el)} · 더블클릭하여 이름 변경`}
-        >
-          {el.clipBelow ? "⤵ " : ""}
-          {canLayerMask(el) && hasLayerMask(el) ? (el.maskEnabled === false ? "▢ " : "▣ ") : ""}
-          {elementLabel(el)}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const willLock = !el.locked;
-            patchEl(el.id, { locked: willLock } as Partial<El>);
-            if (willLock && selectedId === el.id) setSelectedId(null);
-          }}
-          className={cn("hidden size-6 place-items-center rounded hover:bg-raised lg:grid", el.locked ? "text-accent" : "text-fg-3")}
-          aria-label={el.locked ? "레이어 잠금 해제" : "레이어 잠금"}
-          title={el.locked ? "잠금 해제" : "잠금"}
-        >
-          {el.locked ? <Lock size={13} /> : <LockOpen size={13} />}
-        </button>
-        {canAlphaLock(el) && (
-          <button
-            type="button"
-            onClick={() => patchEl(el.id, { alphaLocked: !el.alphaLocked } as Partial<El>)}
-            className={cn("hidden size-6 place-items-center rounded hover:bg-raised lg:grid", el.alphaLocked ? "text-accent" : "text-fg-3")}
-            aria-label={el.alphaLocked ? "알파 락 해제" : "알파 락"}
-            title={el.alphaLocked ? "알파 락 해제 — 투명 영역도 다시 칠할 수 있어요" : "알파 락 — 켜면 이 레이어의 불투명한 부분에만 칠해져요"}
-          >
-            {el.alphaLocked ? <Grid2x2Check size={13} /> : <Grid2x2X size={13} />}
-          </button>
-        )}
-        {el.type === "image" && (
-          <button
-            type="button"
-            onClick={() => patchEl(el.id, { fillReference: !el.fillReference } as Partial<El>)}
-            className={cn(
-              "hidden size-6 place-items-center rounded hover:bg-raised lg:grid",
-              el.fillReference ? "bg-accent-soft text-accent" : "text-fg-3",
-            )}
-            aria-pressed={el.fillReference === true}
-            aria-label={el.fillReference ? "채우기 참조 레이어 해제" : "채우기 참조 레이어로 지정"}
-            title={
-              el.fillReference
-                ? "채우기 참조 해제 — 고급 채우기가 이 레이어의 경계를 더 이상 읽지 않아요"
-                : "채우기 참조로 지정 — 선화 레이어를 따로 두고 아래 채색 레이어에 색을 넣을 수 있어요"
-            }
-          >
-            <ScanLine size={13} aria-hidden />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
-          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
-          aria-label={el.hidden ? "레이어 표시" : "레이어 숨김"}
-          title={el.hidden ? "표시" : "숨김"}
-        >
-          {el.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => moveLayer(el.id, "up")}
-          disabled={i === elements.length - 1}
-          className="hidden size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30 lg:grid"
-          aria-label="위로"
-          title="위로"
-        >
-          <ChevronUp size={13} />
-        </button>
-        <button
-          type="button"
-          onClick={() => moveLayer(el.id, "down")}
-          disabled={i === 0}
-          className="hidden size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30 lg:grid"
-          aria-label="아래로"
-          title="아래로"
-        >
-          <ChevronDown size={13} />
-        </button>
-        <button
-          type="button"
-          onClick={() => removeById(el.id)}
-          className="hidden size-6 place-items-center rounded text-bad hover:bg-raised lg:grid"
-          aria-label="레이어 삭제"
-          title="삭제"
-        >
-          <Trash2 size={13} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setLayerActionMenuId((current) => (current === el.id ? null : el.id))}
-          aria-expanded={layerActionMenuId === el.id}
-          aria-label={`${elementLabel(el)} 레이어 작업 더보기`}
-          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:hidden"
-        >
-          <MoreHorizontal size={17} aria-hidden />
-        </button>
-        {layerActionMenuId === el.id ? (
-          <div className="grid basis-full grid-cols-2 gap-1 border-t border-line/50 pt-1.5 lg:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                const willLock = !el.locked;
-                patchEl(el.id, { locked: willLock } as Partial<El>);
-                if (willLock && selectedId === el.id) setSelectedId(null);
-                setLayerActionMenuId(null);
-              }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
-            >
-              {el.locked ? <LockOpen size={15} aria-hidden /> : <Lock size={15} aria-hidden />}
-              {el.locked ? "잠금 해제" : "잠금"}
-            </button>
-            {canAlphaLock(el) ? (
-              <button
-                type="button"
-                onClick={() => {
-                  patchEl(el.id, { alphaLocked: !el.alphaLocked } as Partial<El>);
-                  setLayerActionMenuId(null);
-                }}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
-              >
-                {el.alphaLocked ? <Grid2x2X size={15} aria-hidden /> : <Grid2x2Check size={15} aria-hidden />}
-                {el.alphaLocked ? "알파 락 해제" : "알파 락"}
-              </button>
-            ) : null}
-            {el.type === "image" ? (
-              <button
-                type="button"
-                onClick={() => {
-                  patchEl(el.id, { fillReference: !el.fillReference } as Partial<El>);
-                  setLayerActionMenuId(null);
-                }}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
-              >
-                <ScanLine size={15} aria-hidden />
-                {el.fillReference ? "참조 해제" : "채우기 참조"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                moveLayer(el.id, "up");
-                setLayerActionMenuId(null);
-              }}
-              disabled={i === elements.length - 1}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised disabled:opacity-35"
-            >
-              <ChevronUp size={15} aria-hidden /> 앞으로
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                moveLayer(el.id, "down");
-                setLayerActionMenuId(null);
-              }}
-              disabled={i === 0}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised disabled:opacity-35"
-            >
-              <ChevronDown size={15} aria-hidden /> 뒤로
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                removeById(el.id);
-                setLayerActionMenuId(null);
-              }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-bad hover:bg-bad-soft/20"
-            >
-              <Trash2 size={15} aria-hidden /> 삭제
-            </button>
-          </div>
-        ) : null}
-      </li>
-    );
-  };
 
+  function selectLayersFromNavigator(ids: readonly string[]) {
+    const validIds = [...new Set(ids)].filter((id) => elementById.has(id)).slice(0, 500);
+    setTool("select");
+    if (validIds.length === 0) {
+      setSelectedId(null);
+      setMarqueeIds([]);
+      return;
+    }
+    if (validIds.length === 1) {
+      setMarqueeIds([]);
+      setSelectedId(validIds[0] ?? null);
+      return;
+    }
+    setSelectedId(null);
+    setMarqueeIds(validIds);
+  }
+
+  function patchLayerItems(
+    ids: readonly string[],
+    resolvePatch: (element: El) => Partial<El>
+  ) {
+    const idSet = new Set(ids);
+    if (idSet.size === 0) return;
+    let changed = false;
+    const next = elements.map((element) => {
+      if (!idSet.has(element.id)) return element;
+      const patch = resolvePatch(element);
+      if (Object.keys(patch).every((key) => Object.is(element[key as keyof El], patch[key as keyof El]))) {
+        return element;
+      }
+      changed = true;
+      return { ...element, ...patch } as El;
+    });
+    if (changed) commit(next);
+  }
+
+  function handleLayerNavigatorAction(action: StudioLayerNavigatorAction) {
+    if (pageEditLocked && !masterEditMode) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      return;
+    }
+    switch (action.type) {
+      case "create-group": {
+        if (masterEditMode) return;
+        const group = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
+        const seedIds = [...new Set(action.seedIds)].filter((id) => elementById.has(id));
+        updateActivePage({
+          groups: [...groups, group],
+          elements: seedIds.length > 0 ? (groupItems(elements, seedIds, group.id) as El[]) : elements,
+        });
+        return;
+      }
+      case "rename-item":
+        patchLayerItems([action.id], () => ({ name: action.name.trim().slice(0, 160) }));
+        return;
+      case "rename-group": {
+        if (masterEditMode) return;
+        const name = action.name.trim().slice(0, 160);
+        const current = groups.find((group) => group.id === action.groupId);
+        if (!name || !current || current.name === name) return;
+        updateActivePage({
+          groups: groups.map((group) =>
+            group.id === action.groupId ? { ...group, name } : group
+          ),
+        });
+        return;
+      }
+      case "set-group-flag": {
+        if (masterEditMode) return;
+        const current = groups.find((group) => group.id === action.groupId);
+        if (!current || current[action.flag] === action.value) return;
+        updateActivePage({
+          groups: groups.map((group) =>
+            group.id === action.groupId ? { ...group, [action.flag]: action.value } : group
+          ),
+        });
+        return;
+      }
+      case "set-items-hidden":
+        patchLayerItems(action.ids, () => ({ hidden: action.hidden }));
+        return;
+      case "set-items-locked":
+        patchLayerItems(action.ids, () => ({ locked: action.locked }));
+        return;
+      case "set-item-flag":
+        patchLayerItems([action.id], () => ({ [action.flag]: action.value } as Partial<El>));
+        return;
+      case "assign-items-to-group": {
+        if (masterEditMode) return;
+        const requestedIds = new Set(action.ids.filter((id) => elementById.has(id)));
+        if (requestedIds.size === 0) return;
+        if (!action.groupId) {
+          const next = removeItemsFromGroups(elements, [...requestedIds]) as El[];
+          if (next !== elements) updateActivePage({ elements: next });
+          return;
+        }
+        if (!groups.some((group) => group.id === action.groupId)) return;
+        const memberIds = elements
+          .filter((element) => element.groupId === action.groupId || requestedIds.has(element.id))
+          .map((element) => element.id);
+        updateActivePage({ elements: groupItems(elements, memberIds, action.groupId) as El[] });
+        return;
+      }
+      case "set-items-role":
+        patchLayerItems(action.ids, () => ({ layerRole: action.role }));
+        return;
+      case "set-items-color":
+        patchLayerItems(action.ids, () => ({ layerColor: action.color }));
+        return;
+      case "move-item":
+        moveLayer(action.id, action.direction);
+        return;
+      case "move-group": {
+        if (masterEditMode) return;
+        const next = moveLayerGroup(elements, action.groupId, action.direction) as El[];
+        if (next !== elements) commit(next);
+        return;
+      }
+      case "ungroup":
+        if (!masterEditMode) deleteLayerGroup(action.groupId);
+        return;
+      case "delete-items": {
+        deleteLayerElements(action.ids);
+        return;
+      }
+    }
+  }
   // ── 페이지 관련 명령 조작 (pure studio-pages로 위임 — 동일 동작 유지 + 고도화) ──────────────────────────────────────────────
   function addPage() {
     // thin wrapper over pure shipped command + commit (behavior unchanged)
@@ -8018,56 +8035,65 @@ function StudioCuttoonEditor() {
     commit(sample);
     dismissQuickStart();
   }
-  function removeById(id: string) {
-    commit(
-      elements.filter((e) => e.id !== id),
-      hasTrack(animTimeline, id) ? { animTimeline: removeTrack(animTimeline, id) } : undefined
+  // 삭제 버튼·Delete 키·퀵 액션·내비게이터가 모두 같은 명시적 삭제 정책을 사용한다. 잠금은
+  // 이동/변형을 막지만 사용자가 직접 요청한 삭제는 허용하며, 실제로 제거된 ID의 타임라인만 함께 지운다.
+  function deleteLayerElements(ids: readonly string[]) {
+    if (activeSurfaceReviewLocked) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 삭제해 주세요.");
+      return;
+    }
+    const removal = removeLayerItems(elements, ids);
+    if (removal.removedIds.length === 0) return;
+    const idSet = new Set(removal.removedIds);
+    const trackedDeleted = removal.removedIds.filter((id) => hasTrack(animTimeline, id));
+    const nextTimeline = trackedDeleted.reduce(
+      (document, id) => removeTrack(document, id),
+      animTimeline
     );
-    if (selectedId === id) setSelectedId(null);
+    commit(
+      removal.items,
+      trackedDeleted.length > 0 ? { animTimeline: nextTimeline } : undefined
+    );
+    if (selectedId && idSet.has(selectedId)) setSelectedId(null);
+    setMarqueeIds((current) => current.filter((id) => !idSet.has(id)));
   }
   function removeSelected() {
     if (marqueeIds.length > 0) {
-      const dl = new Set(marqueeIds);
-      const trackedDeleted = [...dl].filter((id) => hasTrack(animTimeline, id));
-      commit(
-        elements.filter((e) => !(dl.has(e.id) && !e.locked)),
-        trackedDeleted.length > 0
-          ? { animTimeline: trackedDeleted.reduce((d, id) => removeTrack(d, id), animTimeline) }
-          : undefined
-      );
-      setMarqueeIds([]);
+      deleteLayerElements(marqueeIds);
       return;
     }
-    // 잠금이어도 '선택 후 명시적 삭제'는 허용(이메레스 밑그림 등). 잠금은 이동/변형만 막는다.
-    if (!selectedId) return;
-    removeById(selectedId);
+    if (selectedId) deleteLayerElements([selectedId]);
   }
   function moveLayer(id: string, dir: "up" | "down") {
-    const idx = elements.findIndex((e) => e.id === id);
-    if (idx < 0) return;
-    const swap = dir === "up" ? idx + 1 : idx - 1; // up = 앞으로(위 레이어)
-    if (swap < 0 || swap >= elements.length) return;
-    const next = [...elements];
-    [next[idx], next[swap]] = [next[swap], next[idx]];
+    const next = reorderLayerItem(elements, id, dir === "up" ? "forward" : "backward");
+    if (next === elements) return;
     commit(next);
   }
   function duplicateSelected() {
     if (marqueeIds.length > 0) {
       const mv = new Set(marqueeIds);
-      const copies: El[] = [];
+      const copies = new Map<string, El>();
       const newIds: string[] = [];
       for (const e of elements) {
         if (!mv.has(e.id)) continue;
         const id = uid();
         newIds.push(id);
-        copies.push(
+        copies.set(
+          e.id,
           e.type === "draw"
             ? { ...e, id, points: e.points.map((v) => v + 16), hidden: false, locked: false }
             : ({ ...e, id, x: (e as { x: number }).x + 16, y: (e as { y: number }).y + 16, hidden: false, locked: false } as El)
         );
       }
-      if (copies.length) {
-        commit([...elements, ...copies]);
+      if (copies.size > 0) {
+        const copyIds = new Map(
+          [...copies.entries()].map(([sourceId, copy]) => [sourceId, copy.id] as const)
+        );
+        const nextTimeline = duplicateAnimationTracks(animTimeline, copyIds, uid);
+        commit(
+          insertLayerCopiesAdjacent(elements, copies),
+          nextTimeline !== animTimeline ? { animTimeline: nextTimeline } : undefined
+        );
         setMarqueeIds(newIds);
         setSelectedId(null);
         setTool("select");
@@ -8079,7 +8105,15 @@ function StudioCuttoonEditor() {
       selected.type === "draw"
         ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16), hidden: false, locked: false }
         : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16, hidden: false, locked: false } as El);
-    commit([...elements, copy]);
+    const nextTimeline = duplicateAnimationTracks(
+      animTimeline,
+      new Map([[selected.id, copy.id]]),
+      uid
+    );
+    commit(
+      insertLayerCopiesAdjacent(elements, new Map([[selected.id, copy]])),
+      nextTimeline !== animTimeline ? { animTimeline: nextTimeline } : undefined
+    );
     setSelectedId(copy.id);
     setTool("select");
   }
@@ -8087,7 +8121,7 @@ function StudioCuttoonEditor() {
     if (marqueeIds.length > 0) {
       const mv = new Set(marqueeIds);
       const next = elements.map((e) =>
-        !(mv.has(e.id) && !e.locked)
+        !(mv.has(e.id) && !isEffectivelyLocked(e, groups))
           ? e
           : e.type === "draw"
             ? ({ ...e, points: e.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
@@ -8096,7 +8130,7 @@ function StudioCuttoonEditor() {
       commitCoalesced(next, "nudge-multi");
       return;
     }
-    if (!selected || selected.locked) return;
+    if (!selected || isEffectivelyLocked(selected, groups)) return;
     const id = selected.id;
     const next = elements.map((e) =>
       e.id !== id
@@ -8111,7 +8145,9 @@ function StudioCuttoonEditor() {
   // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하 / 다중 분배.
   function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") {
     if (marqueeIds.length > 1) {
-      const selectedEls = elements.filter((el) => marqueeIds.includes(el.id) && !el.locked);
+      const selectedEls = elements.filter(
+        (el) => marqueeIds.includes(el.id) && !isEffectivelyLocked(el, groups)
+      );
       if (selectedEls.length === 0) return;
 
       const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
@@ -8122,7 +8158,7 @@ function StudioCuttoonEditor() {
         if (!deltas) return;
         const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
         const next = elements.map((el) => {
-          if (!marqueeIds.includes(el.id) || el.locked) return el;
+          if (!marqueeIds.includes(el.id) || isEffectivelyLocked(el, groups)) return el;
           const delta = deltaById.get(el.id);
           if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
           return el.type === "draw"
@@ -8141,7 +8177,7 @@ function StudioCuttoonEditor() {
       const deltas = computeAlignDeltas(bounds, mode, box);
       const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
       const next = elements.map((el) => {
-        if (!marqueeIds.includes(el.id) || el.locked) return el;
+        if (!marqueeIds.includes(el.id) || isEffectivelyLocked(el, groups)) return el;
         const delta = deltaById.get(el.id);
         if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
         return el.type === "draw"
@@ -8155,7 +8191,7 @@ function StudioCuttoonEditor() {
       return;
     }
 
-    if (!selected || selected.locked) return;
+    if (!selected || isEffectivelyLocked(selected, groups)) return;
     if (mode === "distributeH" || mode === "distributeV") return;
     const b = elBounds(selected);
     const frame = containingPanel(selected, elements);
@@ -8180,19 +8216,8 @@ function StudioCuttoonEditor() {
   }
   function reorder(dir: "front" | "back" | "forward" | "backward") {
     if (!selectedId) return;
-    const idx = elements.findIndex((e) => e.id === selectedId);
-    if (idx < 0) return;
-    const next = [...elements];
-    const [el] = next.splice(idx, 1);
-    if (dir === "front") next.push(el);
-    else if (dir === "back") next.unshift(el);
-    else if (dir === "forward") {
-      const targetIdx = Math.min(next.length, idx + 1);
-      next.splice(targetIdx, 0, el);
-    } else if (dir === "backward") {
-      const targetIdx = Math.max(0, idx - 1);
-      next.splice(targetIdx, 0, el);
-    }
+    const next = reorderLayerItem(elements, selectedId, dir);
+    if (next === elements) return;
     commit(next);
   }
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
@@ -8348,8 +8373,15 @@ function StudioCuttoonEditor() {
       // 탭·메뉴·캔버스 내부 위젯이 이미 소비한 키는 전역 원고 편집 명령으로 다시 실행하지 않는다.
       if (e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
-      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (typing || editing) return;
+      const typing = !!target && (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      );
+      const insideShortcutBoundary =
+        target instanceof Element && target.closest("[data-studio-shortcut-boundary='true']") !== null;
+      if (typing || insideShortcutBoundary || editing) return;
       if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
       const mod = e.metaKey || e.ctrlKey;
       if (mod && (e.key === "z" || e.key === "Z")) {
@@ -8518,7 +8550,19 @@ function StudioCuttoonEditor() {
         );
         if (plan) {
           e.preventDefault();
-          commit([...elements, ...(plan.els as unknown as El[])]);
+          const plannedElements = plan.els as unknown as El[];
+          const insertedElements = masterEditMode
+            ? plannedElements.map((element) => ({ ...element, groupId: undefined } as El))
+            : plannedElements;
+          const pastedGroups = masterEditMode
+            ? []
+            : missingLayerGroupIds(insertedElements, groups).map((groupId, index) =>
+                createLayerGroup(groupId, `붙여넣은 그룹 ${groups.length + index + 1}`)
+              );
+          commit(
+            [...elements, ...insertedElements],
+            pastedGroups.length > 0 ? { groups: [...groups, ...pastedGroups] } : undefined
+          );
           setMarqueeIds(plan.ids.length > 1 ? plan.ids : []);
           setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
           setTool("select");
@@ -9460,7 +9504,7 @@ function StudioCuttoonEditor() {
   }
   // 선택한 사각형 프레임을 평행사변형(사선)으로 ↔ 사각형으로 토글.
   function toggleSelectedFrameDiagonal() {
-    if (!selected || selected.type !== "frame") return;
+    if (!selected || selected.type !== "frame" || isEffectivelyLocked(selected, groups)) return;
     if (selected.points) {
       patchEl(selected.id, { points: undefined } as Partial<El>);
     } else {
@@ -9472,7 +9516,7 @@ function StudioCuttoonEditor() {
   }
   // 선택 이미지를 들어있는 패널(없으면 캔버스)에 꽉 채운다(cover) — 드롭 후 수동 리사이즈 제거.
   async function fitSelectedToFrame() {
-    if (!selected || selected.type !== "image" || selected.locked) return;
+    if (!selected || selected.type !== "image" || isEffectivelyLocked(selected, groups)) return;
     const frame = containingPanel(selected, elements);
     const target = frame
       ? { x: frame.x, y: frame.y, width: frame.width, height: frame.height }
@@ -9482,7 +9526,7 @@ function StudioCuttoonEditor() {
   }
   // 선택 말풍선 높이를 대사 길이에 자동으로 맞춘다.
   async function fitBubbleToText() {
-    if (!selected || selected.type !== "bubble" || selected.locked) return;
+    if (!selected || selected.type !== "bubble" || isEffectivelyLocked(selected, groups)) return;
     const { estimateBubbleHeight } = await import("./studio-fit");
     const h = estimateBubbleHeight(selected.text, selected.width, selected.fontSize ?? 24, selected.lineHeight ?? 1.2);
     patchEl(selected.id, { height: h });
@@ -9817,7 +9861,21 @@ function StudioCuttoonEditor() {
       return { ...shiftEl(e, cx - 120, cy - 120), id: uid(), groupId, hidden: false, locked: false };
     });
     if (newEls.length === 0) return;
-    commit([...elements, ...newEls]);
+    const insertedElements = masterEditMode
+      ? newEls.map((element) => ({ ...element, groupId: undefined } as El))
+      : newEls;
+    const clipGroups = masterEditMode
+      ? []
+      : missingLayerGroupIds(insertedElements, groups).map((groupId, index) =>
+          createLayerGroup(
+            groupId,
+            groupMap.size > 1 ? `${clip.name} ${index + 1}` : clip.name
+          )
+        );
+    commit(
+      [...elements, ...insertedElements],
+      clipGroups.length > 0 ? { groups: [...groups, ...clipGroups] } : undefined
+    );
     setMenu(null);
     setTool("select");
   }
@@ -9977,6 +10035,7 @@ function StudioCuttoonEditor() {
     if (pixelBusy || isSelectionAdjustNoop(plan)) return;
     if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
     const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷.
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(target, groups)) return;
     const sel = pixelSel;
     setPixelBusy(true);
     try {
@@ -9997,6 +10056,7 @@ function StudioCuttoonEditor() {
       // 팩토리가 HTMLCanvasElement 만 만들므로 구조 타입 → DOM 타입 복원은 안전하다.
       // PNG: 삭제(투명)·페더의 알파를 보존하는 무손실 포맷.
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
       setError(null);
     } catch (err) {
@@ -10015,6 +10075,7 @@ function StudioCuttoonEditor() {
     if (pixelBusy) return;
     if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
     const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷.
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(target, groups)) return;
     const sel = pixelSel;
     setPixelBusy(true);
     try {
@@ -10031,6 +10092,7 @@ function StudioCuttoonEditor() {
       const out = mask && bakeContentAwareFillToCanvas(img, mask, w, h, undefined, createPixelEditCanvas);
       if (!out) throw new Error("채우기 캔버스를 만들지 못했습니다.");
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
       setError(null);
     } catch (err) {
@@ -10045,7 +10107,12 @@ function StudioCuttoonEditor() {
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
     if (smudgeBusy) return;
     const target = elementById.get(elId);
-    if (!target || target.type !== "image") return;
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
     setSmudgeBusy(true);
     try {
       const radiusNorm = smudgeRadius / Math.max(1, target.width);
@@ -10053,7 +10120,9 @@ function StudioCuttoonEditor() {
         flipX: target.flipped,
         flipY: target.flippedY,
       });
-      if (src !== target.src) patchEl(target.id, { src } as Partial<El>);
+      if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
+        patchEl(target.id, { src } as Partial<El>);
+      }
       setError(null);
     } catch (err) {
       console.error("Failed to apply smudge stroke:", err);
@@ -10068,7 +10137,12 @@ function StudioCuttoonEditor() {
   // 정확한 요소에 적용된다). 기존 el.src는 절대 patchEl하지 않는다 — maskSrc만 바뀐다(비파괴).
   async function bakeLayerMaskPaintStroke(session: { elId: string; frame: SelectionFrame; points: SelPoint[] }) {
     const target = elementById.get(session.elId);
-    if (!target || target.type !== "image") return;
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
     setLayerMaskBusy(true);
     try {
       const img = await loadPixelEditImage(target.src);
@@ -10092,6 +10166,7 @@ function StudioCuttoonEditor() {
       );
       if (!out) throw new Error("마스크 결과를 만들지 못했습니다.");
       const maskSrc = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { maskSrc, maskEnabled: true } as Partial<El>);
       setError(null);
     } catch (err) {
@@ -10103,7 +10178,12 @@ function StudioCuttoonEditor() {
   }
   // ── 레이어 마스크 즉시 실행(굽기) 액션 4개 — 전부 patchEl 1회로 히스토리 1건. ──
   function addLayerMask(fill: LayerMaskPaintMode) {
-    if (selected?.type !== "image" || !canLayerMask(selected)) return;
+    if (
+      selected?.type !== "image" ||
+      !canLayerMask(selected) ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
     const target = selected;
     void (async () => {
       const img = await loadPixelEditImage(target.src);
@@ -10111,19 +10191,33 @@ function StudioCuttoonEditor() {
       const h = img.naturalHeight || img.height;
       const out = createLayerMaskCanvas(w, h, fill, createPixelEditCanvas);
       if (!out) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), maskEnabled: true } as Partial<El>);
     })();
   }
   function deleteLayerMask() {
-    if (selected?.type !== "image") return;
+    if (
+      selected?.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
     patchEl(selected.id, { maskSrc: undefined, maskEnabled: undefined } as Partial<El>);
   }
   function toggleLayerMaskEnabled() {
-    if (selected?.type !== "image") return;
+    if (
+      selected?.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
     patchEl(selected.id, { maskEnabled: selected.maskEnabled === false } as Partial<El>);
   }
   function invertLayerMask() {
-    if (selected?.type !== "image" || !selected.maskSrc) return;
+    if (
+      selected?.type !== "image" ||
+      !selected.maskSrc ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
     const target = selected;
     void (async () => {
       const img = await loadPixelEditImage(target.src);
@@ -10132,6 +10226,7 @@ function StudioCuttoonEditor() {
       const maskImg = await loadPixelEditImage(target.maskSrc!);
       const out = invertLayerMaskAlpha(maskImg, w, h, createPixelEditCanvas);
       if (!out) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png") } as Partial<El>);
     })();
   }
@@ -10148,7 +10243,12 @@ function StudioCuttoonEditor() {
     points: SelPoint[];
   }) {
     const target = elementById.get(session.elId);
-    if (!target || target.type !== "image") return;
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
     setHealCloneBusy(true);
     try {
       const img = await loadPixelEditImage(target.src);
@@ -10171,6 +10271,7 @@ function StudioCuttoonEditor() {
       );
       if (!out) throw new Error("복구 브러시 결과를 만들지 못했습니다.");
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
       setError(null);
     } catch (err) {
@@ -10185,7 +10286,12 @@ function StudioCuttoonEditor() {
   // resolveHistoryBrushSource 는 순수 함수라 아무것도 기억하지 않는다 — 이 함수가 결과를 즉시
   // 상태로 저장한다(heal-clone 의 Alt+클릭 핸들러가 오프셋을 1회 계산해 두는 것과 동일한 정신).
   function designateHistoryBrushSource(index: number) {
-    if (masterEditMode || selected?.type !== "image") return;
+    if (
+      masterEditMode ||
+      activeSurfaceReviewLocked ||
+      selected?.type !== "image" ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
     const snapshot = pagesHistory[index];
     if (!snapshot) return;
     const result = resolveHistoryBrushSource(snapshot, activePage.id, selected.id);
@@ -10208,7 +10314,12 @@ function StudioCuttoonEditor() {
     points: SelPoint[];
   }) {
     const target = elementById.get(session.elId);
-    if (!target || target.type !== "image") return;
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
     const historySrc = historyBrushSourceSrc;
     if (!historySrc) return; // 굽는 사이 소스가 해제됐으면(요소 전환 등) 조용히 무시 — 방어적.
     setHistoryBrushBusy(true);
@@ -10236,6 +10347,7 @@ function StudioCuttoonEditor() {
       );
       if (!out) throw new Error("히스토리 브러시 결과를 만들지 못했습니다.");
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
       setError(null);
     } catch (err) {
@@ -10495,6 +10607,7 @@ function StudioCuttoonEditor() {
   async function applyCropToSelectedImage() {
     if (cropBusy || !cropRect) return;
     if (selected?.type !== "image") return;
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) return;
     if (isCropRectNoop(cropRect)) {
       setCropRect(null); // 전체 영역 = 자를 것 없음 → 모드만 종료.
       return;
@@ -10527,6 +10640,7 @@ function StudioCuttoonEditor() {
       );
       // PNG: 투명 배경(누끼·스티커) 알파를 보존하는 무손실 포맷.
       const src = out.canvas.toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, {
         src,
         x: plan.el.x,
@@ -10554,6 +10668,7 @@ function StudioCuttoonEditor() {
   async function applyPuppetWarpToSelectedImage() {
     if (puppetWarpBusy || isPuppetWarpNoop(puppetWarpPins)) return;
     if (selected?.type !== "image") return;
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) return;
     const target = selected; // await 사이 선택 변경에 흔들리지 않게 스냅샷(crop/heal-clone과 동일).
     const pins = puppetWarpPins;
     setPuppetWarpBusy(true);
@@ -10567,6 +10682,7 @@ function StudioCuttoonEditor() {
       });
       if (!out) throw new Error("퍼펫 워프 결과를 만들지 못했습니다.");
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
       setPuppetWarpActive(false);
       setPuppetWarpPins([]);
@@ -10724,7 +10840,9 @@ function StudioCuttoonEditor() {
       setBubbleAnchorPickActive(false);
       if (pos && selected?.type === "bubble") {
         const clickedId = studioElementIdOf(e.target);
-        if (clickedId && clickedId === selected.id) {
+        if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) {
+          setError("말풍선 또는 상위 그룹의 잠금을 해제한 뒤 꼬리 대상을 지정해 주세요.");
+        } else if (clickedId && clickedId === selected.id) {
           setError("말풍선 자기 자신은 부착 대상으로 고를 수 없어요.");
         } else if (clickedId) {
           patchEl(selected.id, { tailAnchorId: clickedId, tailAnchorPoint: undefined } as Partial<El>);
@@ -11577,7 +11695,13 @@ function StudioCuttoonEditor() {
       flushPanelSplitPreview();
       const line = panelSplitLastLineRef.current;
       const frame = elements.find((el) => el.id === session.targetFrameId);
-      if (line && frame && frame.type === "frame") {
+      if (
+        line &&
+        frame &&
+        frame.type === "frame" &&
+        !activeSurfaceReviewLocked &&
+        !isEffectivelyLocked(frame, groups)
+      ) {
         const plan = planPanelSplit({ frame, line, gutterPx: panelGutter });
         if (plan) {
           // frame 을 먼저 펼치고 plan.shape* 로 덮어써야 shapeA/B 의 항상-존재하는 points 키(뒤집힌
@@ -11611,7 +11735,14 @@ function StudioCuttoonEditor() {
       const finalDraft = pendingNodeEditDraftRef.current;
       pendingNodeEditDraftRef.current = null;
       setNodeEditDraft(null);
-      if (finalDraft && finalDraft.elId === elId && elementById.get(elId)?.type === "draw") {
+      const current = elementById.get(elId);
+      if (
+        finalDraft &&
+        finalDraft.elId === elId &&
+        current?.type === "draw" &&
+        !activeSurfaceReviewLocked &&
+        !isEffectivelyLocked(current, groups)
+      ) {
         patchEl(elId, { points: finalDraft.points, pressures: finalDraft.pressures } as Partial<El>);
       }
       return;
@@ -11628,7 +11759,14 @@ function StudioCuttoonEditor() {
       const finalDraft = pendingBubbleShapeDraftRef.current;
       pendingBubbleShapeDraftRef.current = null;
       setBubbleShapeDraft(null);
-      if (finalDraft && finalDraft.elId === elId && elementById.get(elId)?.type === "bubble") {
+      const current = elementById.get(elId);
+      if (
+        finalDraft &&
+        finalDraft.elId === elId &&
+        current?.type === "bubble" &&
+        !activeSurfaceReviewLocked &&
+        !isEffectivelyLocked(current, groups)
+      ) {
         patchEl(elId, { customShapePoints: finalDraft.points } as Partial<El>);
       }
       return;
@@ -11682,7 +11820,7 @@ function StudioCuttoonEditor() {
           elements,
           (el) => elBounds(el),
           rect,
-          { include: (el) => !el.hidden }
+          { include: (el) => !isEffectivelyHidden(el, groups) }
         );
         setMarqueeIds(ids);
         setSelectedId(null);
@@ -11751,7 +11889,7 @@ function StudioCuttoonEditor() {
     const draggedId = studioElementIdOf(node);
     if (draggedId && marqueeIds.length > 1 && marqueeIds.includes(draggedId)) {
       const draggedEl = elementById.get(draggedId);
-      if (draggedEl && draggedEl.type !== "draw" && !draggedEl.locked) {
+      if (draggedEl && draggedEl.type !== "draw" && !isEffectivelyLocked(draggedEl, groups)) {
         const g = groupDragRef.current;
         if (!g || g.id !== draggedId) {
           groupDragRef.current = { id: draggedId, x0: node.x(), y0: node.y(), lastX: node.x(), lastY: node.y() };
@@ -11762,7 +11900,7 @@ function StudioCuttoonEditor() {
             for (const id of marqueeIds) {
               if (id === draggedId) continue;
               const oel = elementById.get(id);
-              if (!oel || oel.type === "draw" || oel.locked) continue;
+              if (!oel || oel.type === "draw" || isEffectivelyLocked(oel, groups)) continue;
               const other = nodeRefs.current[id];
               if (other) {
                 other.x(other.x() + ddx);
@@ -11906,7 +12044,7 @@ function StudioCuttoonEditor() {
         if (dx !== 0 || dy !== 0) {
           const mv = new Set(marqueeIds);
           const next = elements.map((el) =>
-            !mv.has(el.id) || el.locked || el.type === "draw"
+            !mv.has(el.id) || isEffectivelyLocked(el, groups) || el.type === "draw"
               ? el
               : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El)
           );
@@ -16857,7 +16995,7 @@ function StudioCuttoonEditor() {
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
               {/* 잠긴 선택 요소는 트랜스포머가 안 붙으므로 점선 박스로 '선택됨'을 표시(삭제·잠금해제 안내). */}
-              {selected && selected.locked && marqueeIds.length === 0 && tool === "select" && !isExporting && (() => {
+              {selected && isEffectivelyLocked(selected, groups) && marqueeIds.length === 0 && tool === "select" && !isExporting && (() => {
                 const sb = elBounds(selected);
                 return (
                   <Rect
@@ -17540,7 +17678,7 @@ function StudioCuttoonEditor() {
                     id: el.id,
                     label: elementLabel(el),
                     eligible: el.type === "image" && !((el as ImageEl).frames && (el as ImageEl).frames!.length > 1),
-                    hidden: !!el.hidden,
+                    hidden: isEffectivelyHidden(el, groups),
                     locked: isEffectivelyLocked(el, groups),
                   }))}
                 playhead={timelinePlayhead}
@@ -17754,7 +17892,8 @@ function StudioCuttoonEditor() {
             // 밀어내지 않아 긴 웹툰 캔버스와 패널 스크롤이 서로 독립적이다.
             "lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
-            !rightPanelOpen && "lg:hidden"
+            !rightPanelOpen && "lg:hidden",
+            inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden"
           )}
           style={
             isMobile
@@ -18501,6 +18640,7 @@ function StudioCuttoonEditor() {
                   active={bubbleShapeArmed}
                   pointCount={bubbleShapeHandles.length || Math.floor((selected.customShapePoints?.length ?? 0) / 2)}
                   onConvert={() => {
+                    if (selectedContentMutationLocked) return;
                     const input: BubbleShapeGeometryInput = {
                       width: selected.width,
                       height: selected.height,
@@ -18517,6 +18657,7 @@ function StudioCuttoonEditor() {
                     patchEl(selected.id, { customShapePoints: points } as Partial<El>);
                   }}
                   onToggleEdit={() => {
+                    if (selectedContentMutationLocked) return;
                     if (bubbleShapeEditActive) {
                       setBubbleShapeEditActive(false);
                       return;
@@ -18525,6 +18666,7 @@ function StudioCuttoonEditor() {
                     setBubbleShapeEditActive(true);
                   }}
                   onRevert={() => {
+                    if (selectedContentMutationLocked) return;
                     setBubbleShapeEditActive(false);
                     patchEl(selected.id, { customShapePoints: undefined } as Partial<El>);
                   }}
@@ -20473,106 +20615,23 @@ function StudioCuttoonEditor() {
             </div>
           ) : null}
 
-          {elements.length > 0 && (
-            <div
-              role="tabpanel"
-              aria-label="레이어"
-              hidden={inspectorLayout.primary !== "layers"}
-              className="rounded-xl border border-line bg-panel/40 p-3"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-semibold text-fg-3">레이어 ({elements.length})</p>
-                <button
-                  type="button"
-                  onClick={() => addLayerGroup(selectedId ?? undefined)}
-                  className="flex items-center gap-1 rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.66rem] text-fg-2 hover:bg-raised transition-colors"
-                  title="새 레이어 그룹(폴더). 선택한 레이어가 있으면 그 안에 넣어요."
-                >
-                  <FolderPlus size={12} /> 그룹
-                </button>
-              </div>
-              <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto pr-1">
-                {buildLayerTree(elements.slice().reverse(), groups).map((node) =>
-                  node.kind === "group" ? (
-                    <li key={node.group.id} className="rounded-lg border border-line/70 bg-card/30">
-                      <div className="flex min-h-11 items-center gap-1 px-1.5 py-1 lg:min-h-0">
-                        <button
-                          type="button"
-                          onClick={() => toggleGroupFlag(node.group.id, "collapsed")}
-                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-5"
-                          aria-label={node.group.collapsed ? "그룹 펼치기" : "그룹 접기"}
-                          title={node.group.collapsed ? "펼치기" : "접기"}
-                        >
-                          {node.group.collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const name = globalThis.prompt("그룹 이름", node.group.name);
-                            if (name != null && name.trim()) renameLayerGroup(node.group.id, name.trim());
-                          }}
-                          className="flex min-w-0 flex-1 items-center gap-1 truncate text-left text-[0.7rem] font-semibold text-fg-2"
-                          title="이름 변경"
-                        >
-                          <Folder size={12} className="shrink-0 text-accent" />
-                          <span className="truncate">{node.group.name}</span>
-                          <span className="shrink-0 text-fg-3">({node.items.length})</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleGroupFlag(node.group.id, "hidden")}
-                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
-                          aria-label={node.group.hidden ? "그룹 표시" : "그룹 숨김"}
-                          title={node.group.hidden ? "표시" : "숨김"}
-                        >
-                          {node.group.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleGroupFlag(node.group.id, "locked")}
-                          className={cn("grid size-11 place-items-center rounded hover:bg-raised lg:size-6", node.group.locked ? "text-accent" : "text-fg-3")}
-                          aria-label={node.group.locked ? "그룹 잠금 해제" : "그룹 잠금"}
-                          title={node.group.locked ? "잠금 해제" : "잠금"}
-                        >
-                          {node.group.locked ? <Lock size={13} /> : <LockOpen size={13} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteLayerGroup(node.group.id)}
-                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
-                          aria-label="그룹 해제"
-                          title="그룹 해제 (레이어는 보존)"
-                        >
-                          <FolderMinus size={13} />
-                        </button>
-                      </div>
-                      {!node.group.collapsed && (
-                        <ul className="flex flex-col gap-1 border-t border-line/40 px-1.5 py-1 pl-3">
-                          {node.items.map((el) => layerRow(el, !!node.group.hidden || !!node.group.locked))}
-                        </ul>
-                      )}
-                    </li>
-                  ) : (
-                    layerRow(node.item, false)
-                  )
-                )}
-              </ul>
-            </div>
-          )}
-
-          {inspectorLayout.primary === "layers" && elements.length === 0 ? (
-            <div
-              role="tabpanel"
-              aria-label="레이어"
-              className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
-            >
-              <Layers size={22} className="mx-auto text-fg-3" aria-hidden />
-              <p className="mt-2 text-xs font-semibold text-fg-2">아직 레이어가 없습니다</p>
-              <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                이미지, 말풍선, 텍스트 또는 그리기를 추가하면 이곳에서 순서를 관리할 수 있습니다.
-              </p>
-            </div>
-          ) : null}
+          <div
+            role="tabpanel"
+            aria-label="레이어"
+            hidden={inspectorLayout.primary !== "layers"}
+            className="h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72 [&>section]:h-full"
+          >
+            <StudioLayerNavigator
+              items={layerNavigatorItems}
+              groups={masterEditMode ? [] : groups}
+              selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
+              pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
+              readOnly={pageEditLocked && !masterEditMode}
+              groupingDisabled={masterEditMode}
+              onSelectionChange={selectLayersFromNavigator}
+              onAction={handleLayerNavigatorAction}
+            />
+          </div>
 
           {/* 미니맵 / 네비게이터 */}
           <div

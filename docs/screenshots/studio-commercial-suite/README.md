@@ -26,6 +26,9 @@ These are implementation evidence, not product mockups.
 | `project-actions-mobile.png` | Two-column mobile project menu replacing the long horizontal project-action strip |
 | `project-actions-tablet.png` | Viewport-fixed three-column project menu at 768px, proving the scroll-header clipping boundary |
 | `project-actions-desktop.png` | Compact desktop project bar with backup, planning, review, and publish tools in one popover |
+| `layer-navigator-desktop.png` | Professional layer tree with multi-selection, production roles, color labels, grouping, search, and bounded panel height |
+| `layer-navigator-mobile.png` | 375px layer workspace with 44px controls, internal scrolling, grouped rows, and zero document overflow |
+| `layer-navigator-actions-mobile.png` | One bounded batch dialog for grouping, production role, color label, current-result deletion, and selection clearing |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
@@ -100,3 +103,17 @@ Additional measured checks for this batch:
   than unfocusable label-only triggers. At 768 × 1024 the fixed menu measured 752 × 329px, remained wholly
   inside the viewport, and document horizontal overflow was zero. The only browser console errors were the
   expected 502 responses from the intentionally absent local API proxy; no client runtime warning/error was emitted.
+- The professional layer navigator measured 349 × 396px inside the 375 × 812 mobile workspace instead of
+  extending the Studio document. Five real sample layers were exercised; two bubbles were selected, moved
+  into one contiguous group, and locked through the group action dialog. Search narrowed the tree to one
+  current result while preserving two outside selections; the toolbar announced `1개 · 밖 2` and the batch
+  dialog limited destructive work to the current result. All 27 visible navigator controls measured at least
+  44 × 44 CSS pixels, document horizontal overflow was zero, and exactly one internal vertical scroll
+  container remained (`220 / 329px`). The batch dialog measured 331 × 322px with zero horizontal or vertical
+  overflow and no undersized controls. ArrowLeft/Right, Shift+F10, and Escape produced no window-level canvas
+  shortcut events; opening focused the dialog, Escape returned focus to the source tree row, and selection
+  remained intact. Updating group lock state also kept focus on the operated button instead of resetting it
+  to the dialog. A filtered, normally collapsed group exposed its child on ArrowRight while retaining its
+  stored collapsed state after search was cleared. A clean reload produced no client runtime warning/error;
+  only the two expected 502 responses from the intentionally absent local API proxy remained. The desktop
+  capture verifies that the same tree stays aligned with the canvas-height inspector and scrolls independently.

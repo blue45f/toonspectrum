@@ -9,7 +9,8 @@
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
 > 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR + 6방향 모바일 퀵 액션 + 브라우저 내장 대사 낭독
 > 검수 + 메타데이터 기반 내부 검수 PDF + 참조 레이어 기반 고급 채우기 + 탭형 작업공간 인스펙터·
-> 문맥 검색·프로젝트 메뉴 재배치. 모바일 검증 캡처는
+> 문맥 검색·프로젝트 메뉴 재배치 + 검색·복합 필터·다중 선택·제작 역할·색 라벨을 갖춘 전문 레이어
+> 내비게이터. 모바일 검증 캡처는
 > `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
@@ -169,6 +170,69 @@ ibisPaint의 [도구 선택 바](https://ibispaint.com/lecture/index.jsp?no=4)�
 탭→ArrowRight→레이어 탭 이동 뒤에도 X=250으로 원고가 움직이지 않았다. 브라우저의 클라이언트 runtime
 warning/error는 0이었고 로컬 API를 일부러 띄우지 않아 발생한 두 502 proxy 응답만 확인됐다. 캡처는
 [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md)에 남겼다.
+
+### 2026-07-11 전문 레이어 내비게이터 배치 (현재 작업 트리 통합 완료)
+
+공식 동작 기준은 Clip Studio Paint의
+[팔레트 탭·도크](https://help.clip-studio.com/en-us/manual_en/690_interface/Palettes.htm), Procreate의
+[Layers 인터페이스](https://help.procreate.com/procreate/handbook/5.0/layers/layers-interface), ibisPaint의
+[크기 조절형 Layer Window](https://ibispaint.com/lecture/index.jsp?no=156)와
+[도구 선택 UI](https://ibispaint.com/lecture/index.jsp?no=4), Photoshop의
+[Contextual Task Bar](https://helpx.adobe.com/photoshop/desktop/get-started/learn-the-basics/boost-workflows-with-the-contextual-task-bar.html)로
+교차 확인했다. 경쟁사의 화면을 복제하지 않고, 긴 세로 원고에서 원하는 요소를 빨리 찾고 콘티→선화→
+채색→레터링→검수 사이의 레이어 의미를 잃지 않는 문제로 번역했다.
+
+- **이름·내용·종류·그룹 통합 검색**: 이름뿐 아니라 텍스트/말풍선/스티커 원문, 컷 비트 요약,
+  그룹 이름, 한·영 종류 별칭, 제작 역할과 색 라벨까지 NFKC 정규화한 AND 검색으로 찾는다. 검색 입력은
+  새 네트워크 요청을 만들지 않고 내비게이터 컴포넌트의 로컬 상태에 있어, 타이핑이 2만 줄 규모의
+  `StudioPage` 전체 상태를 갱신하지 않는다.
+- **상용 제작용 복합 필터**: 이미지·텍스트·말풍선·선화·컷·스티커·효과 종류, 실제 유효 표시/잠금,
+  제작 역할, 색 라벨, 채우기 참조·알파 락·마스크·AI 작업·아래 클리핑·애니메이션 상태를 교차한다.
+  총계/결과/표시/숨김/잠금 통계를 live region으로 알리고, 선택 항목이 결과 밖에 남아 있으면 개수를
+  명시해 필터가 선택을 몰래 지우지 않는다.
+- **제작 역할과 색 라벨**: `콘티 / 밑그림 / 선화 / 채색 / 톤 / 레터링 / 효과 / 참고` 역할과 여섯 색
+  라벨을 요소 메타에 저장한다. 검색·일괄 편집·행 표시가 같은 필드를 공유하므로 회차를 다시 열어도
+  제작 단계와 인계 의도가 보존된다.
+- **정확한 그룹·순서 불변식**: 여러 선택을 그룹으로 만들 때 요소 `groupId`만 바꾸지 않고 z-order에서
+  실제 연속 블록으로 모은다. 단일 레이어는 같은 그룹 안에서만 교환하고, 그룹 이동은 연속 블록 전체를
+  이웃 레이어/그룹 블록과 교환한다. 손상된 비연속 그룹은 임의로 재정렬하지 않고 이동을 거부한다.
+  일부 멤버만 다른 그룹으로 옮기거나 그룹에서 꺼내도 남은 소스 그룹을 한 구간으로 유지한다. 그룹 자식
+  복제본은 원본 바로 앞에 삽입하고, 무그룹 레이어가 폴더를 지나갈 때는 폴더 블록 전체를 건너므로 빠른
+  작업·키보드·행 메뉴 어느 경로에서도 폴더가 갈라지지 않는다. 붙여넣기와 재사용 클립은 새 `groupId`와
+  대응하는 그룹 메타데이터를 같은 undo 단계로 만들며, 마스터 작업면에서는 그룹을 명시적으로 제거해
+  조작할 수 없는 고아 그룹을 남기지 않는다.
+  검색·필터 중에는 보이지 않는 레이어와 순서가 섞이지 않도록 모든 순서 변경을 잠근다. 빈 그룹과
+  손상된 중복 구간도 고유 노드로 표시해 데이터가 조용히 사라지지 않는다.
+- **하나의 다중 선택 모델**: 일반 클릭, Cmd/Ctrl 토글, Shift 범위, 누적 범위, 터치용 다중 선택 모드를
+  지원하고 선택 ID를 기존 단일 선택/마퀴 선택으로 변환한다. 표시·숨김·잠금·해제·그룹 배정·역할·색·
+  삭제는 한 번의 문서 커밋으로 적용하며, 삭제는 연결된 애니메이션 트랙도 같은 undo 단계에서 정리한다.
+  애니메이션 레이어 복제는 새 레이어 ID뿐 아니라 트랙과 키프레임 ID까지 독립 복제한다. 검토 잠긴
+  페이지에서 삭제가 거부되면 선택도 그대로 남고, 페이지를 넘기며 댓글·대사·연속성 결과로 지정한 새
+  작업면의 선택은 보존하되 이전 페이지에만 존재하는 ID는 제거한다.
+- **키보드 트리와 인라인 편집**: `role=tree`, roving focus, ArrowUp/Down, Home/End, Enter, Space, F2,
+  Shift+F10/Menu, ArrowLeft/Right, Ctrl/Cmd+A를 제공한다. 행 내부 아이콘은 500개 문서에서 천 개의
+  추가 Tab 정지점을 만들지 않으며, 팝오버 열기·대상 삭제·Escape에 초기/복구 포커스를 지정한다. 행 키는
+  인덱스나 zIndex가 아니라 안정적인 요소 ID를 사용해 삭제·재정렬 뒤에도 인접 행 포커스를 복구한다.
+  그룹 잠금은 행 표시와 Transformer뿐 아니라 미세 이동·정렬·드래그·크롭·픽셀 조정·콘텐츠 인식 채우기·
+  노드/말풍선 모양·스머지·복구/도장·레이어 마스크·히스토리 브러시·퍼펫 워프의 진입과 최종 비동기 커밋에
+  모두 반영한다. 작업 도중 그룹이 잠겨도 최신 요소/그룹 상태를 다시 확인해 오래된 결과를 적용하지 않는다.
+- **긴 목록 성능과 짧은 패널**: 필터·선택 anchor·행 작업 상태를 별도 컴포넌트에 격리하고 그룹 인덱스는
+  `Map`으로 한 번 만든다. 모든 행에 `content-visibility: auto`와 44px intrinsic size를 두며, 500개
+  레이어 SSR 계약을 자동 테스트한다. 검색어만 바뀔 때는 동일 불변 레이어 객체의 최대 4KB NFKC 검색
+  인덱스를 `WeakMap`에서 재사용하고, 전문 상태 필터가 없으면 행별 플래그 `Set`도 만들지 않는다. 행마다
+  펼치는 메뉴 대신 내비게이터 전체에 작업 팝오버 하나만
+  마운트하고, 뷰포트 제한 높이 안에서 트리만 독립 스크롤한다.
+- **모바일 실측 보강**: 375×812에서 내비게이터는 349×396px였고 보이는 27개 입력·선택·버튼은 정밀
+  포인터 여부와 무관하게 전부 44px 이상이었다. 문서 가로 overflow는 0, 실제 세로 스크롤은 트리 한
+  곳뿐이었으며 일괄 작업 대화상자는 331×322px, 내부 overflow 0이었다. 다섯 샘플 레이어 중 두
+  말풍선을 선택→연속 그룹→그룹 잠금으로 왕복했고, 필터 중 `현재 결과 1 · 밖 2` 범위 제한도 확인했다.
+  ArrowLeft/Right·Shift+F10·Escape는 캔버스 전역 단축키로 새지 않았고, 팝오버 포커스 진입/복구와
+  문서 업데이트 뒤 현재 버튼 포커스가 유지됐다. 새로고침 후 브라우저 클라이언트 오류는 없었고 로컬
+  API를 띄우지 않아 발생한 예상 502 두 건만 남았다. 캡처는
+  [`layer-navigator-desktop.png`](screenshots/studio-commercial-suite/layer-navigator-desktop.png),
+  [`layer-navigator-mobile.png`](screenshots/studio-commercial-suite/layer-navigator-mobile.png),
+  [`layer-navigator-actions-mobile.png`](screenshots/studio-commercial-suite/layer-navigator-actions-mobile.png)에
+  남겼다.
 
 ### 2026-07-11 모바일 퀵 액션·대사 낭독 검수 배치 (현재 작업 트리 통합 완료)
 

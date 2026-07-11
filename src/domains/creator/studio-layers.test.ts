@@ -7,9 +7,17 @@ import {
   findGroup,
   groupItems,
   groupOfItem,
+  hasContiguousLayerGroups,
+  insertLayerCopiesAdjacent,
   isEffectivelyHidden,
   isEffectivelyLocked,
   itemBelowId,
+  missingLayerGroupIds,
+  moveLayerItem,
+  moveLayerGroup,
+  removeItemsFromGroups,
+  removeLayerItems,
+  reorderLayerItem,
   setItemGroup,
   ungroupItems,
   type LayerGroup,
@@ -81,6 +89,21 @@ describe("groupOfItem", () => {
 
   it("returns null for an item with an unknown groupId", () => {
     expect(groupOfItem({ id: "x", groupId: "ghost" }, groups)).toBeNull();
+  });
+});
+
+describe("missingLayerGroupIds", () => {
+  it("reports orphan group references once in first z-order occurrence order", () => {
+    const items = makeItems([
+      { id: "a", groupId: "missing-b" },
+      { id: "b", groupId: "known" },
+      { id: "c", groupId: "missing-a" },
+      { id: "d", groupId: "missing-b" },
+    ]);
+    expect(missingLayerGroupIds(items, [createLayerGroup("known", "알려진 그룹")])).toEqual([
+      "missing-b",
+      "missing-a",
+    ]);
   });
 });
 
@@ -164,6 +187,61 @@ describe("groupItems", () => {
     // 바뀌지 않은 비멤버는 동일 참조.
     expect(out.find((i) => i.id === "a")).toBe(objA);
   });
+
+  it("extracts a partial source group without splitting its remaining run", () => {
+    const input = makeItems([
+      "x",
+      { id: "a", groupId: "old" },
+      { id: "b", groupId: "old" },
+      { id: "c", groupId: "old" },
+    ]);
+    const out = groupItems(input, ["x", "b"], "new");
+    expect(ids(out)).toEqual(["a", "c", "x", "b"]);
+    expect(out.map((item) => item.groupId)).toEqual(["old", "old", "new", "new"]);
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+  });
+
+  it("keeps an existing target group at its z-position when assigning external layers", () => {
+    const input = makeItems([
+      { id: "g1", groupId: "target" },
+      { id: "g2", groupId: "target" },
+      "middle",
+      "front",
+    ]);
+    const out = groupItems(input, ["front"], "target");
+    expect(ids(out)).toEqual(["g1", "g2", "front", "middle"]);
+    expect(out.slice(0, 3).every((item) => item.groupId === "target")).toBe(true);
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+  });
+
+  it("regroups selections from multiple groups while preserving every source run", () => {
+    const input = makeItems([
+      { id: "a1", groupId: "a" },
+      { id: "a2", groupId: "a" },
+      "solo",
+      { id: "b1", groupId: "b" },
+      { id: "b2", groupId: "b" },
+      { id: "b3", groupId: "b" },
+    ]);
+    const out = groupItems(input, ["a2", "solo", "b2"], "new");
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+    expect(out.filter((item) => item.groupId === "a").map((item) => item.id)).toEqual(["a1"]);
+    expect(out.filter((item) => item.groupId === "b").map((item) => item.id)).toEqual(["b1", "b3"]);
+    expect(out.filter((item) => item.groupId === "new").map((item) => item.id)).toEqual([
+      "a2",
+      "solo",
+      "b2",
+    ]);
+  });
+
+  it("refuses to regroup an already non-contiguous affected source group", () => {
+    const input = makeItems([
+      { id: "a", groupId: "broken" },
+      "middle",
+      { id: "b", groupId: "broken" },
+    ]);
+    expect(groupItems(input, ["a"], "new")).toBe(input);
+  });
 });
 
 describe("ungroupItems", () => {
@@ -237,17 +315,14 @@ describe("setItemGroup", () => {
     expect(groupIdOf(out, "a")).toBe("g");
   });
 
-  it("places the moved item after the FRONTMOST existing member", () => {
-    // 멤버가 a(0), c(2). b(1)를 g 로 옮기면 가장 앞 멤버 c 뒤로 → [a, c, b, d].
+  it("refuses an already non-contiguous target group instead of silently repairing it", () => {
     const input = makeItems([
       { id: "a", groupId: "g" },
       { id: "b" },
       { id: "c", groupId: "g" },
       { id: "d" },
     ]);
-    const out = setItemGroup(input, "b", "g");
-    expect(ids(out)).toEqual(["a", "c", "b", "d"]);
-    expect(groupIdOf(out, "b")).toBe("g");
+    expect(setItemGroup(input, "b", "g")).toBe(input);
   });
 
   it("moving a front item back to a group lands right after its frontmost member", () => {
@@ -276,6 +351,19 @@ describe("setItemGroup", () => {
     expect(groupIdOf(out, "a")).toBe("g");
   });
 
+  it("extracts a middle member to the source group's front boundary", () => {
+    const input = makeItems([
+      { id: "a", groupId: "g" },
+      { id: "b", groupId: "g" },
+      { id: "c", groupId: "g" },
+      "front",
+    ]);
+    const out = setItemGroup(input, "b", undefined);
+    expect(ids(out)).toEqual(["a", "c", "b", "front"]);
+    expect(groupIdOf(out, "b")).toBeUndefined();
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+  });
+
   it("returns an equivalent copy when the id does not exist", () => {
     const input = makeItems(["a", "b"]);
     const out = setItemGroup(input, "ghost", "g");
@@ -295,6 +383,241 @@ describe("setItemGroup", () => {
     // 옮겨진 c 는 새 객체, 안 옮긴 a 는 동일 참조.
     expect(out.find((i) => i.id === "c")).not.toBe(objC);
     expect(out.find((i) => i.id === "a")).toBe(objA);
+  });
+});
+
+describe("removeItemsFromGroups", () => {
+  it("extracts a middle item without splitting the remaining source group", () => {
+    const input = makeItems([
+      { id: "a", groupId: "g" },
+      { id: "b", groupId: "g" },
+      { id: "c", groupId: "g" },
+      "front",
+    ]);
+    const out = removeItemsFromGroups(input, ["b"]);
+    expect(ids(out)).toEqual(["a", "c", "b", "front"]);
+    expect(groupIdOf(out, "b")).toBeUndefined();
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+  });
+
+  it("preserves selected relative order while extracting several members from several groups", () => {
+    const input = makeItems([
+      { id: "a1", groupId: "a" },
+      { id: "a2", groupId: "a" },
+      { id: "a3", groupId: "a" },
+      "middle",
+      { id: "b1", groupId: "b" },
+      { id: "b2", groupId: "b" },
+      { id: "b3", groupId: "b" },
+    ]);
+    const out = removeItemsFromGroups(input, ["a1", "a3", "b2"]);
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+    expect(out.filter((item) => item.groupId === "a").map((item) => item.id)).toEqual(["a2"]);
+    expect(out.filter((item) => item.groupId === "b").map((item) => item.id)).toEqual([
+      "b1",
+      "b3",
+    ]);
+    expect(ids(out).filter((id) => ["a1", "a3", "b2"].includes(id))).toEqual([
+      "a1",
+      "a3",
+      "b2",
+    ]);
+  });
+
+  it("refuses to extract from an already non-contiguous source group", () => {
+    const input = makeItems([
+      { id: "a", groupId: "broken" },
+      "middle",
+      { id: "b", groupId: "broken" },
+    ]);
+    expect(removeItemsFromGroups(input, ["a"])).toBe(input);
+  });
+
+  it("returns the original reference when no requested item belongs to a group", () => {
+    const input = makeItems(["a", "b"]);
+    expect(removeItemsFromGroups(input, ["a", "missing"])).toBe(input);
+  });
+});
+
+describe("moveLayerItem", () => {
+  it("moves adjacent ungrouped layers and same-group members", () => {
+    const ungrouped = makeItems(["a", "b", "c"]);
+    expect(ids(moveLayerItem(ungrouped, "b", "up"))).toEqual(["a", "c", "b"]);
+    expect(ids(moveLayerItem(ungrouped, "b", "down"))).toEqual(["b", "a", "c"]);
+
+    const grouped = makeItems([
+      { id: "a", groupId: "g" },
+      { id: "b", groupId: "g" },
+      { id: "outside" },
+    ]);
+    expect(ids(moveLayerItem(grouped, "a", "up"))).toEqual(["b", "a", "outside"]);
+  });
+
+  it("returns the original reference at document and group boundaries", () => {
+    const input = makeItems([
+      { id: "back" },
+      { id: "g-back", groupId: "g" },
+      { id: "g-front", groupId: "g" },
+      { id: "front" },
+    ]);
+    expect(moveLayerItem(input, "back", "down")).toBe(input);
+    expect(moveLayerItem(input, "front", "up")).toBe(input);
+    expect(moveLayerItem(input, "back", "up")).toBe(input);
+    expect(moveLayerItem(input, "g-back", "down")).toBe(input);
+    expect(moveLayerItem(input, "g-front", "up")).toBe(input);
+    expect(moveLayerItem(input, "front", "down")).toBe(input);
+  });
+
+  it("returns the original reference for unknown ids", () => {
+    const input = makeItems(["a"]);
+    expect(moveLayerItem(input, "missing", "up")).toBe(input);
+  });
+});
+
+describe("moveLayerGroup", () => {
+  it("moves a whole group across an ungrouped layer without splitting members", () => {
+    const input = makeItems([
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      { id: "front" },
+    ]);
+    expect(ids(moveLayerGroup(input, "g", "up"))).toEqual(["front", "g1", "g2"]);
+    expect(ids(moveLayerGroup(moveLayerGroup(input, "g", "up"), "g", "down"))).toEqual([
+      "g1",
+      "g2",
+      "front",
+    ]);
+  });
+
+  it("swaps two complete neighboring group blocks", () => {
+    const input = makeItems([
+      { id: "a1", groupId: "a" },
+      { id: "a2", groupId: "a" },
+      { id: "b1", groupId: "b" },
+      { id: "b2", groupId: "b" },
+    ]);
+    expect(ids(moveLayerGroup(input, "a", "up"))).toEqual(["b1", "b2", "a1", "a2"]);
+    expect(ids(moveLayerGroup(input, "b", "down"))).toEqual(["b1", "b2", "a1", "a2"]);
+  });
+
+  it("refuses to move across an already non-contiguous neighboring group", () => {
+    const input = makeItems([
+      { id: "target-a", groupId: "target" },
+      { id: "broken-a", groupId: "broken" },
+      "middle",
+      { id: "broken-b", groupId: "broken" },
+    ]);
+    expect(moveLayerGroup(input, "target", "up")).toBe(input);
+
+    const reverse = makeItems([
+      { id: "broken-a", groupId: "broken" },
+      "middle",
+      { id: "broken-b", groupId: "broken" },
+      { id: "target-a", groupId: "target" },
+    ]);
+    expect(moveLayerGroup(reverse, "target", "down")).toBe(reverse);
+  });
+
+  it("returns the original reference for boundaries, missing, or non-contiguous groups", () => {
+    const input = makeItems([
+      { id: "a", groupId: "g" },
+      { id: "outside" },
+      { id: "b", groupId: "g" },
+    ]);
+    expect(moveLayerGroup(input, "g", "up")).toBe(input);
+    expect(moveLayerGroup(input, "missing", "up")).toBe(input);
+    expect(moveLayerGroup([{ id: "only", groupId: "g" }], "g", "up")[0]?.id).toBe("only");
+  });
+});
+
+describe("reorderLayerItem", () => {
+  it("moves grouped children only within their own group", () => {
+    const input = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      { id: "g3", groupId: "g" },
+      "front",
+    ]);
+    expect(ids(reorderLayerItem(input, "g2", "front"))).toEqual(["back", "g1", "g3", "g2", "front"]);
+    expect(ids(reorderLayerItem(input, "g2", "back"))).toEqual(["back", "g2", "g1", "g3", "front"]);
+    expect(ids(reorderLayerItem(input, "g2", "forward"))).toEqual(["back", "g1", "g3", "g2", "front"]);
+    expect(hasContiguousLayerGroups(reorderLayerItem(input, "g2", "back"))).toBe(true);
+  });
+
+  it("moves an ungrouped layer across complete neighboring group blocks", () => {
+    const behind = makeItems([
+      "loose",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "front",
+    ]);
+    expect(ids(reorderLayerItem(behind, "loose", "forward"))).toEqual(["g1", "g2", "loose", "front"]);
+
+    const ahead = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "loose",
+    ]);
+    expect(ids(reorderLayerItem(ahead, "loose", "backward"))).toEqual(["back", "loose", "g1", "g2"]);
+  });
+
+  it("supports document edges without splitting unrelated groups", () => {
+    const input = makeItems([
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "loose",
+      "front",
+    ]);
+    const toFront = reorderLayerItem(input, "loose", "front");
+    const toBack = reorderLayerItem(input, "front", "back");
+    expect(ids(toFront)).toEqual(["g1", "g2", "front", "loose"]);
+    expect(ids(toBack)).toEqual(["front", "g1", "g2", "loose"]);
+    expect(hasContiguousLayerGroups(toFront)).toBe(true);
+    expect(hasContiguousLayerGroups(toBack)).toBe(true);
+  });
+});
+
+describe("insertLayerCopiesAdjacent", () => {
+  it("keeps copied group members inside the same contiguous run", () => {
+    const input = makeItems([
+      "back",
+      { id: "a", groupId: "g" },
+      { id: "b", groupId: "g" },
+      "front",
+    ]);
+    const copyBySourceId = new Map<string, LayerItemLike>([
+      ["a", { id: "a-copy", groupId: "g" }],
+      ["b", { id: "b-copy", groupId: "g" }],
+    ]);
+    const out = insertLayerCopiesAdjacent(input, copyBySourceId);
+    expect(ids(out)).toEqual(["back", "a", "a-copy", "b", "b-copy", "front"]);
+    expect(hasContiguousLayerGroups(out)).toBe(true);
+  });
+
+  it("returns the original reference when no source id matches", () => {
+    const input = makeItems(["a"]);
+    expect(insertLayerCopiesAdjacent(input, new Map([["missing", { id: "copy" }]]))).toBe(input);
+  });
+});
+
+describe("removeLayerItems", () => {
+  it("removes exactly the requested locked and unlocked items", () => {
+    const input = makeItems([
+      { id: "locked", locked: true },
+      { id: "open", locked: false },
+      { id: "kept", locked: true },
+    ]);
+    const result = removeLayerItems(input, ["locked", "open", "missing"]);
+    expect(ids(result.items)).toEqual(["kept"]);
+    expect(result.removedIds).toEqual(["locked", "open"]);
+  });
+
+  it("returns the original reference when no requested id exists", () => {
+    const input = makeItems(["a"]);
+    expect(removeLayerItems(input, ["missing"])).toEqual({ items: input, removedIds: [] });
+    expect(removeLayerItems(input, ["missing"]).items).toBe(input);
   });
 });
 

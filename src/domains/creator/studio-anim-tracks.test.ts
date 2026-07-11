@@ -7,6 +7,7 @@ import {
   canAddKeyframe,
   clampGlobalFrameIndex,
   createEmptyAnimationTimelineDoc,
+  duplicateAnimationTracks,
   globalFrameDurationsMs,
   globalFrameIndexAtElapsed,
   hasTrack,
@@ -337,6 +338,42 @@ describe("removeTrack", () => {
   it("없는 트랙은 no-op(동일 참조)", () => {
     const doc = makeDoc({});
     expect(removeTrack(doc, "missing")).toBe(doc);
+  });
+});
+
+describe("duplicateAnimationTracks", () => {
+  it("duplicates mapped tracks with independent frame ids and preserves timing/source data", () => {
+    const doc = makeDoc({
+      source: [
+        { frameIndex: 0, frame: { id: "frame-a", src: "data:a", durationMs: 80 } },
+        { frameIndex: 4, frame: { id: "frame-b", src: "data:b", durationMs: 120 } },
+      ],
+      untouched: [kf(1, "untouched")],
+    });
+    let sequence = 0;
+    const next = duplicateAnimationTracks(
+      doc,
+      new Map([
+        ["source", "copy"],
+        ["missing", "missing-copy"],
+      ]),
+      () => `copy-frame-${++sequence}`
+    );
+
+    expect(next).not.toBe(doc);
+    expect(next.tracks.source).toBe(doc.tracks.source);
+    expect(next.tracks.untouched).toBe(doc.tracks.untouched);
+    expect(next.tracks.copy).toEqual([
+      { frameIndex: 0, frame: { id: "copy-frame-1", src: "data:a", durationMs: 80 } },
+      { frameIndex: 4, frame: { id: "copy-frame-2", src: "data:b", durationMs: 120 } },
+    ]);
+  });
+
+  it("returns the original document when no mapped source has a track", () => {
+    const doc = makeDoc({ source: [kf(0, "a")] });
+    expect(
+      duplicateAnimationTracks(doc, new Map([["missing", "copy"]]), () => "unused")
+    ).toBe(doc);
   });
 });
 
