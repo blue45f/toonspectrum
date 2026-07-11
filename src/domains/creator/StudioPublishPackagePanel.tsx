@@ -48,6 +48,11 @@ import {
   type StudioPublishPackageSettings,
   type StudioPublishThumbnailSlot,
 } from "./studio-publish-package";
+import {
+  STUDIO_REVIEW_PDF_PROFILE_IDS,
+  STUDIO_REVIEW_PDF_PROFILES,
+  type StudioReviewPdfProfileId,
+} from "./studio-review-pdf-profile";
 
 export interface StudioPublishPackagePanelProps {
   open: boolean;
@@ -405,6 +410,7 @@ export function StudioPublishPackagePanel({
   const disclosureId = useId();
   const creditsId = useId();
   const destinationId = useId();
+  const reviewPdfProfileId = useId();
   const aiUsageIdPrefix = useId();
   const preset = plan.preset;
   const supportedFormats = (Object.keys(FORMAT_LABELS) as OutputFormat[]).filter((format) =>
@@ -784,9 +790,39 @@ export function StudioPublishPackagePanel({
                   <SettingToggle
                     checked={settings.includeReviewPdf}
                     onChange={(includeReviewPdf) => updateSettings({ includeReviewPdf })}
-                    label="검수용 PDF 포함"
-                    description="내부 회람과 승인 기록을 위한 review.pdf를 패키지에 계획합니다."
+                    label="내부 검수 PDF 포함"
+                    description="공개 게시 이미지와 분리된 내부 회람용 review.pdf를 패키지에 계획합니다."
                   />
+                  {settings.includeReviewPdf ? (
+                    <div className="px-3 py-3">
+                      <label htmlFor={reviewPdfProfileId} className="block text-xs font-semibold text-fg-2">
+                        검수 PDF 구성
+                        <select
+                          id={reviewPdfProfileId}
+                          value={settings.reviewPdfProfile}
+                          onChange={(event) =>
+                            updateSettings({
+                              reviewPdfProfile: event.currentTarget.value as StudioReviewPdfProfileId,
+                            })
+                          }
+                          className={`${FIELD_CLASS} mt-1.5`}
+                        >
+                          {STUDIO_REVIEW_PDF_PROFILE_IDS.map((profileId) => (
+                            <option key={profileId} value={profileId}>
+                              {STUDIO_REVIEW_PDF_PROFILES[profileId].label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="mt-1.5 text-[0.7rem] leading-relaxed text-fg-3">
+                        {STUDIO_REVIEW_PDF_PROFILES[settings.reviewPdfProfile].description}
+                      </p>
+                      <p className="mt-2 flex min-h-11 items-center gap-2 rounded-lg border border-warn/35 bg-warn/10 px-3 text-[0.68rem] leading-relaxed text-warn">
+                        <ShieldCheck size={15} className="shrink-0" aria-hidden />
+                        내부 전용: 담당자·검토 메모·갱신 시각은 선택한 review.pdf에만 그리며 공개 manifest에는 기록하지 않습니다.
+                      </p>
+                    </div>
+                  ) : null}
                   <SettingToggle
                     checked={settings.includeCredits}
                     onChange={(includeCredits) => updateSettings({ includeCredits })}

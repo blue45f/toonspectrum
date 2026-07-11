@@ -222,6 +222,13 @@ export interface PdfPagesRenderOptions {
   /** 있으면 페이지마다 서명 합성 — 규격 슬라이스 내보내기와 같은 규칙. */
   watermark?: WatermarkSettings;
   onProgress?: (done: number, total: number) => void;
+  /**
+   * 선택적 페이지별 전처리. 긴 원고의 주석 레일처럼 큰 임시 캔버스를 전 페이지 분량 쌓지 않고
+   * 현재 페이지 하나만 합성한 뒤 즉시 JPEG로 인코드할 때 쓴다. sourceIndex는 원본 pages 인덱스다.
+   */
+  preparePage?: (page: HTMLCanvasElement, sourceIndex: number) => HTMLCanvasElement;
+  /** preparePage가 새 캔버스를 반환했을 때의 즉시 해제 훅. 원본 페이지에는 호출하지 않는다. */
+  releasePreparedPage?: (page: HTMLCanvasElement, sourceIndex: number) => void;
   /** 테스트 주입용 — 기본은 document.createElement("canvas"). */
   createCanvas?: (width: number, height: number) => HTMLCanvasElement;
   /** 테스트 주입용 — 기본은 canvasToJpegBytes. */
@@ -259,7 +266,9 @@ function releasePageCanvas(canvas: HTMLCanvasElement): void {
  * throw. 이 함수는 URL 생성이나 다운로드를 절대 실행하지 않는다.
  */
 export async function renderPagesToPdf(options: PdfPagesRenderOptions): Promise<PdfRenderResult> {
-  const valid = options.pages.filter((page) => page.width > 0 && page.height > 0);
+  const valid = options.pages
+    .map((page, sourceIndex) => ({ page, sourceIndex }))
+    .filter(({ page }) => page.width > 0 && page.height > 0);
   if (valid.length === 0) throw new Error("내보낼 페이지가 없어요.");
   const createCanvas = options.createCanvas ?? createPageCanvas;
   const toJpeg = options.toJpeg ?? canvasToJpegBytes;
@@ -267,9 +276,20 @@ export async function renderPagesToPdf(options: PdfPagesRenderOptions): Promise<
   const quality = options.quality ?? JPEG_QUALITY;
   const jpegPages: PdfJpegPage[] = [];
   for (let index = 0; index < valid.length; index++) {
-    const page = valid[index];
-    const flat = createCanvas(page.width, page.height);
+    const { page: sourcePage, sourceIndex } = valid[index];
+    let page = sourcePage;
+    let flat: HTMLCanvasElement | null = null;
     try {
+      page = options.preparePage?.(sourcePage, sourceIndex) ?? sourcePage;
+      if (
+        !Number.isFinite(page.width) ||
+        !Number.isFinite(page.height) ||
+        page.width <= 0 ||
+        page.height <= 0
+      ) {
+        throw new Error(`PDF 페이지 ${sourceIndex + 1}의 준비된 크기가 올바르지 않아요.`);
+      }
+      flat = createCanvas(page.width, page.height);
       const ctx = flat.getContext("2d");
       if (!ctx) throw new Error("PDF 페이지 캔버스를 만들지 못했어요. 다시 시도해주세요.");
       ctx.fillStyle = "#ffffff";
@@ -278,10 +298,19 @@ export async function renderPagesToPdf(options: PdfPagesRenderOptions): Promise<
       if (options.watermark) drawWatermarkOnSlice(flat, options.watermark);
       jpegPages.push({ jpegBytes: await toJpeg(flat, quality), width: page.width, height: page.height });
     } finally {
-      try {
-        releaseCanvas?.(flat);
-      } catch {
-        // 메모리 정리는 best-effort다. 인코딩 성공/실패 결과를 정리 오류로 덮어쓰지 않는다.
+      if (flat) {
+        try {
+          releaseCanvas?.(flat);
+        } catch {
+          // 메모리 정리는 best-effort다. 인코딩 성공/실패 결과를 정리 오류로 덮어쓰지 않는다.
+        }
+      }
+      if (page !== sourcePage) {
+        try {
+          options.releasePreparedPage?.(page, sourceIndex);
+        } catch {
+          // 준비 캔버스 해제도 best-effort다. 인코딩 성공/실패 결과를 정리 오류로 덮지 않는다.
+        }
       }
     }
     options.onProgress?.(index + 1, valid.length);

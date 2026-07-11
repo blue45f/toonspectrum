@@ -466,6 +466,85 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
     expect(progress).toEqual([]);
   });
 
+  it("페이지별 준비 캔버스를 한 장씩 인코드한 뒤 즉시 해제하고 원본 인덱스를 보존한다", async () => {
+    const sources = [new FakeCanvas(100, 200), new FakeCanvas(0, 50), new FakeCanvas(120, 240)];
+    const prepared: FakeCanvas[] = [];
+    const sourceIndexes: number[] = [];
+    const events: string[] = [];
+    const { calls, toJpeg } = makeToJpeg();
+
+    const result = await renderPagesToPdf({
+      pages: sources.map(asCanvas),
+      title: "주석 검토본",
+      preparePage: (_source, sourceIndex) => {
+        sourceIndexes.push(sourceIndex);
+        events.push(`prepare:${sourceIndex}`);
+        const canvas = new FakeCanvas(300 + sourceIndex, 400 + sourceIndex);
+        prepared.push(canvas);
+        return asCanvas(canvas);
+      },
+      releasePreparedPage: (_page, sourceIndex) => events.push(`release:${sourceIndex}`),
+      createCanvas: (width, height) => asCanvas(new FakeCanvas(width, height)),
+      toJpeg: async (canvas, quality) => {
+        events.push(`encode:${canvas.width - 300}`);
+        return toJpeg(canvas, quality);
+      },
+    });
+
+    expect(result.pageCount).toBe(2);
+    expect(sourceIndexes).toEqual([0, 2]);
+    expect(calls.map(({ width, height }) => [width, height])).toEqual([[300, 400], [302, 402]]);
+    expect(events).toEqual([
+      "prepare:0",
+      "encode:0",
+      "release:0",
+      "prepare:2",
+      "encode:2",
+      "release:2",
+    ]);
+    expect(prepared).toHaveLength(2);
+  });
+
+  it("평탄화 캔버스 생성이 실패해도 준비된 페이지를 해제하고 원래 오류를 보존한다", async () => {
+    const prepared = asCanvas(new FakeCanvas(300, 400));
+    const released: number[] = [];
+
+    await expect(renderPagesToPdf({
+      pages: [asCanvas(new FakeCanvas(100, 200))],
+      title: "x",
+      preparePage: () => prepared,
+      releasePreparedPage: (_page, sourceIndex) => {
+        released.push(sourceIndex);
+        throw new Error("cleanup failed");
+      },
+      createCanvas: () => {
+        throw new Error("canvas allocation failed");
+      },
+    })).rejects.toThrow("canvas allocation failed");
+
+    expect(released).toEqual([0]);
+  });
+
+  it("준비된 페이지 크기가 잘못돼도 해당 캔버스를 해제하고 크기 오류를 보존한다", async () => {
+    const prepared = asCanvas(new FakeCanvas(0, 400));
+    const released: number[] = [];
+
+    await expect(renderPagesToPdf({
+      pages: [asCanvas(new FakeCanvas(100, 200))],
+      title: "x",
+      preparePage: () => prepared,
+      releasePreparedPage: (_page, sourceIndex) => {
+        released.push(sourceIndex);
+        throw new Error("cleanup failed");
+      },
+      createCanvas: () => {
+        throw new Error("must not allocate");
+      },
+    })).rejects.toThrow("PDF 페이지 1의 준비된 크기가 올바르지 않아요.");
+
+    expect(released).toEqual([0]);
+  });
+
   it("기존 다운로드 API는 Blob 렌더 결과를 한 번만 저장하고 Blob 없는 계약을 유지한다", async () => {
     const source = asCanvas(new FakeCanvas(100, 200));
     const toJpeg = () => Promise.resolve(fakeJpeg(7));

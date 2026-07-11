@@ -7,6 +7,10 @@
  * the planned renders and re-run validation with the resulting dimensions and byte sizes.
  */
 
+import { normalizeStudioReviewPdfProfileId } from "./studio-review-pdf-profile";
+
+import type { StudioReviewPdfProfileId } from "./studio-review-pdf-profile";
+
 export const STUDIO_PUBLISH_PACKAGE_SCHEMA = "toonspectrum.publish-package" as const;
 export const STUDIO_PUBLISH_PACKAGE_VERSION = 1 as const;
 export const STUDIO_PUBLISH_PACKAGE_POLICY_SNAPSHOT = "2026-07-10" as const;
@@ -257,6 +261,8 @@ export interface StudioPublishPackageSettings {
   outputFormat: Exclude<StudioPublishPackageFormat, "gif">;
   requestedThumbnailSlots: StudioPublishThumbnailSlot[];
   includeReviewPdf: boolean;
+  /** 내부 review.pdf에만 쓰는 구성. 공개 manifest에는 프로필이나 검토 메타데이터를 투영하지 않는다. */
+  reviewPdfProfile: StudioReviewPdfProfileId;
   includeCredits: boolean;
   aiUsage: StudioPublishPackageAiUsage;
   aiDisclosure: string;
@@ -270,6 +276,7 @@ export const DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS: StudioPublishPackageSettin
   outputFormat: "png",
   requestedThumbnailSlots: ["episode"],
   includeReviewPdf: false,
+  reviewPdfProfile: "image-only",
   includeCredits: true,
   aiUsage: "none",
   aiDisclosure: "",
@@ -621,6 +628,9 @@ export function normalizeStudioPublishPackageSettings(value: unknown): StudioPub
     outputFormat: normalizeOutputFormat(decoded.outputFormat ?? decoded.format),
     requestedThumbnailSlots,
     includeReviewPdf: decoded.includeReviewPdf === true || decoded.includePdf === true,
+    reviewPdfProfile: normalizeStudioReviewPdfProfileId(
+      decoded.reviewPdfProfile ?? decoded.reviewProfile ?? decoded.pdfProfile
+    ),
     includeCredits: decoded.includeCredits !== false,
     aiUsage: normalizeAiUsage(decoded.aiUsage ?? decoded.aiContent),
     aiDisclosure: normalizeText(

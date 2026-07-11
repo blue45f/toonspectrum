@@ -7,7 +7,8 @@
 > 작성일: 2026-07-04, 최종 갱신: 2026-07-11(잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
-> 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR. 모바일 검증 캡처는
+> 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR + 6방향 모바일 퀵 액션 + 브라우저 내장 대사 낭독
+> 검수 + 메타데이터 기반 내부 검수 PDF. 모바일 검증 캡처는
 > `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
@@ -97,6 +98,74 @@
   Package는 브라우저 실제 다운로드 후 `unzip -t`, entry·hash manifest를 함께 확인했다.
 
 증거 캡처: [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md).
+
+### 2026-07-11 모바일 퀵 액션·대사 낭독 검수 배치 (현재 작업 트리 통합 완료)
+
+Procreate의 [QuickMenu](https://help.procreate.com/procreate/handbook/interface-gestures/quickmenu)는 여섯 방향
+작업을 사용자별로 바꾸고 캔버스 문맥에서 즉시 실행하게 한다. Pixton의
+[Read Aloud](https://help.pixton.com/read-aloud)는 완성 전 대사를 귀로 검수하는 흐름을 제공하며, Canva의
+[Text to Speech](https://www.canva.com/features/text-to-speech/)도 텍스트 기반 창작물의 음성 미리보기를
+핵심 접근성 기능으로 제공한다. ToonSpectrum은 경쟁사의 화면·아이콘을 복제하지 않고 웹툰 모바일 편집과
+비공개 원고 검수에 맞춰 자체 구현했다.
+
+- **엄지 영역 6방향 퀵 액션**: 모바일 도크에서 열리는 방사형 메뉴에 되돌리기·다시 실행·선택·펜·지우개·
+  스포이트를 기본 배치했다. 중앙 허브를 원하는 방향으로 끌었다 놓거나 64px 슬롯을 직접 탭할 수 있고,
+  데드존·취소·비활성 작업은 실행하지 않는다. 슬롯이 실제로 바뀔 때만 짧은 햅틱을 내며 키보드 방향키,
+  Home/End, 포커스 트랩, Escape, reduced motion도 지원한다.
+- **12개 작업 사용자 구성**: 속성, 복제, 삭제, 맨 앞으로, 폭 맞춤, 말풍선 추가까지 포함한 12개 작업을
+  여섯 방향마다 독립 배치한다. 손상·구버전·저장소 차단을 방어하는 v1 로컬 선호로 저장하며 같은 작업의
+  중복 배치도 허용한다. 프로젝트 콘텐츠가 아닌 작업공간 선호라 archive·Publish Package에는 섞지 않는다.
+- **화면 경계·도크 안전성**: 메뉴 중심을 뷰포트, safe area, 112px 모바일 도크 바깥으로 보정한다. 기존
+  선택 문맥 작업바와 첫 사용 안내는 메뉴 동안 숨기고 롱프레스 색상 휠을 닫는다. 화면 맞춤·속성 외의
+  실행 작업은 이전 armed pixel tool을 해제해 다음 캔버스 탭을 잘못 가로채지 않게 한다.
+- **브라우저 내장 대사 낭독 검수**: 현재 검색 결과의 말풍선·텍스트를 페이지 순서로 읽으며 저장 전 임시
+  수정본도 비파괴적으로 확인한다. 0.6–1.6× 속도, 정확한 선호 음성→한국어→현재 로케일→기본 음성 폴백,
+  전체 재생·일시 정지·계속·중지, 진행 상태, 행별 44px 재생+캔버스 이동을 제공한다.
+- **프라이버시·점진 향상**: 브라우저 `speechSynthesis` 중 `localService === true`로 확인된 기기 내 음성을
+  기본값으로 제한한다. 원격·출처 불명 음성은 대사가 운영체제·브라우저 음성 서비스로 전송될 수 있음을
+  표시하고 작가가 체크박스로 명시 허용한 뒤에만 쓴다. 어느 경우에도 ToonSpectrum 서버·AI·스토리지·
+  로그로 원문을 보내지 않는다. 미지원 브라우저에서는 편집을 유지하고 안내만 보이며, 시작 전 이전 큐,
+  stale callback·브라우저 예외·React StrictMode effect replay·닫기/언마운트를 안전하게 처리한다.
+- **모바일 패널 재배치**: 기존 캔버스 높이에 갇히던 대사 패널을 도크 위 전체 높이 시트로 바꾸고 찾기·
+  바꾸기, 낭독, 대사 목록을 하나의 overscroll-contained 영역으로 구성해 짧은 폰에서도 모든 제어에
+  도달하게 했다.
+
+집중 테스트 4개 파일·76개, 전체 TypeScript, 변경 파일 warning 0 ESLint를 통과했다. 실제 브라우저에서
+Quick Action 6개가 360×640·375×812·430×932 모두 화면 안에 유지되고 가로 overflow가 0임을 확인했다.
+375×812에서 슬롯은 84×64px, 허브는 64×64px, 구성 select는 299×44px이었다. 실포인터 드래그는 펜을
+정확히 한 번 실행했고 데드존은 아무 작업도 하지 않았으며, 사용자 배치는 새로고침 뒤 복구됐다. 대사
+패널은 359×632px로 112px 도크 바로 위에 맞았고 재생·pause/resume·stop과 한국어 시스템 음성을 실제로
+왕복 검증했다.
+
+### 2026-07-11 메타데이터 기반 내부 검수 PDF 배치 (현재 작업 트리 통합 완료)
+
+Toon Boom Storyboard Pro는 [PDF Profile](https://docs.toonboom.com/help/storyboard-pro-25/storyboard/reference/dialogs/pdf-profile-dialog.html)과
+[Panel PDF Options](https://docs.toonboom.com/help/storyboard-pro-25/storyboard/reference/dialogs/panel-pdf-options-window.html)로
+페이지/패널 배치와 캡션 포함 범위를 저장하고, 기본 패널 캡션에
+[Dialogue·Action Notes·Slugging Notes·Notes](https://docs.toonboom.com/help/storyboard-pro-25/storyboard/caption/about-default-panel-caption.html)를
+구분한다. ToonSpectrum의 기존 `review.pdf`는 완성 페이지 이미지만 담아 담당자·승인 상태·콘티 메모·컷
+대사를 별도 문서와 대조해야 했으므로, 내부 회람 경계를 유지하면서 프로필형 주석 레일을 추가했다.
+
+- **호환 기본값 + 4개 프로필**: `image-only`는 기존 PDF 렌더러와 페이지 크기를 그대로 유지한다.
+  `editorial`은 페이지·콘티·컷 캡션·대사, `approval`은 상태·담당·검토 메모·갱신 시각,
+  `production-full`은 두 범위를 모두 싣는다. 알 수 없는 과거 값은 이미지 전용으로 폴백한다.
+- **결정적 컷/대사 투영**: 표시 중인 프레임을 y→x→원본 순서로 정렬하고 말풍선·텍스트 중심이 들어가는
+  가장 작은 프레임에 배정한다. 프레임 밖 대사는 별도 항목으로 남기며 숨긴 요소·그룹은 이미지처럼
+  주석에서도 제외한다. 제어·bidi 문자, 잘못된 타입, 과도한 길이, 비정상 시각을 정규화한다.
+- **인쇄 친화 주석 레일**: 원고 높이는 늘리지 않고 왼쪽에 종이색 레일을 합성해 페이지 번호·제목·승인
+  정보·페이지 메모·컷 태그·캡션·대사를 픽셀로 굽는다. PDF 문자열 객체에 원문을 주입하거나 별도 폰트를
+  임베드하지 않는다.
+- **한 페이지씩 메모리 해제**: PDF 코어의 선택적 prepare/release 훅으로 현재 페이지만 합성·JPEG 인코드한
+  뒤 임시 캔버스를 즉시 해제한다. 성공뿐 아니라 JPEG 실패, 평탄화 실패, 준비 크기 오류에서도 반환하며
+  cleanup 오류가 원래 실패를 덮지 않는다.
+- **공개 산출물 경계**: 선택 프로필과 담당자·검토 메모·갱신 시각은 opt-in `review.pdf` 픽셀에만 전달하고
+  게시 이미지와 public manifest에는 투영하지 않는다. UI도 “내부 검수 PDF”로 이름을 바꾸고 내부 전용
+  경고를 최소 44px로 항상 보여준다. 기본값은 계속 미포함이다.
+
+집중 테스트 3개 파일·100개, TypeScript, 변경 파일 warning 0 ESLint를 통과했다. 375×812 실제 브라우저에서
+프로필 select 325×44px, 내부 전용 경고 44px, 가로 overflow 0을 측정하고 제작 전체 프로필의 포함 범위를
+확인했다. 이 모바일 퀵 액션·대사 낭독·검수 PDF 통합 체크포인트는 전체 회귀 251개 파일·4,394개 테스트,
+TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드까지 모두 통과했다.
 
 ### 2026-07-11 통합 에셋 즐겨찾기 배치 (현재 작업 트리 통합 완료)
 

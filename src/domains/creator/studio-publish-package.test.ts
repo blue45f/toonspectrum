@@ -119,6 +119,7 @@ describe("publish package settings and file names", () => {
       format: "jpg",
       thumbnailSlots: ["series-vertical", "episode", "episode", "invalid"],
       includePdf: true,
+      pdfProfile: "full",
       includeCredits: false,
       aiContent: "assisted",
       disclosure: `  ${"설명".repeat(1_000)}  `,
@@ -134,6 +135,7 @@ describe("publish package settings and file names", () => {
       outputFormat: "jpeg",
       requestedThumbnailSlots: ["episode", "series-vertical"],
       includeReviewPdf: true,
+      reviewPdfProfile: "production-full",
       includeCredits: false,
       aiUsage: "assisted",
       aiDisclosure: expect.any(String),
@@ -143,6 +145,19 @@ describe("publish package settings and file names", () => {
     expect(settings.aiDisclosure.length).toBe(1_000);
     expect(serializeStudioPublishPackageSettings(settings)).not.toContain("apiKey");
     expect(serializeStudioPublishPackageSettings(settings)).not.toContain("rawPrompt");
+  });
+
+  it("defaults unknown review PDF profiles to image-only and never exposes the profile in the public manifest", () => {
+    expect(normalizeStudioPublishPackageSettings({ reviewPdfProfile: "unknown" }).reviewPdfProfile).toBe("image-only");
+    const input = validInput("generic");
+    input.settings = {
+      ...completeSettings("generic"),
+      includeReviewPdf: true,
+      reviewPdfProfile: "approval",
+    };
+    const manifest = planStudioPublishPackage(input).manifest;
+    expect(JSON.stringify(manifest)).not.toContain("approval");
+    expect(JSON.stringify(manifest)).not.toContain("reviewPdfProfile");
   });
 
   it("returns a cloned safe default for non-record settings", () => {

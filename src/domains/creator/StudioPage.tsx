@@ -36,6 +36,7 @@ import {
   Maximize2,
   ChevronUp,
   Circle,
+  Command,
   Copy,
   Eraser,
   Eye,
@@ -554,6 +555,12 @@ import {
   type PuppetPin,
 } from "./studio-puppet-warp";
 import {
+  loadStudioQuickActionsPreferences,
+  saveStudioQuickActionsPreferences,
+  type StudioQuickActionId,
+  type StudioQuickActionsPreferences,
+} from "./studio-quick-actions";
+import {
   anchorQuickShapePoints,
   classifyQuickShape,
   regularizeQuickShapePoints,
@@ -789,6 +796,10 @@ const StudioBubbleAutoShrinkPanel = lazyRetry(
 const StudioDialogueBatchPanel = lazyRetry(
   () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
   "StudioDialogueBatchPanel"
+);
+const StudioQuickActionsMenu = lazyRetry(
+  () => import("./StudioQuickActionsMenu").then((mod) => ({ default: mod.StudioQuickActionsMenu })),
+  "StudioQuickActionsMenu"
 );
 const StudioHistoryPanel = lazyRetry(
   () => import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel })),
@@ -3617,6 +3628,14 @@ const MOBILE_PROJECT_ARCHIVE_LIMITS = Object.freeze({
   maxProjectBytes: 8_000_000,
 });
 
+function studioQuickActionsStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function StudioPage() {
   const [params] = useSearchParams();
   if (params.get("mode") === "upload") {
@@ -3900,14 +3919,25 @@ function StudioCuttoonEditor() {
   }, [isMobile]);
   // 모바일에서 열려 있는 바텀시트(페이지 목록 / 속성 / 브러시 설정). null=캔버스 전체.
   const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw">(null);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [quickActionsAnchor, setQuickActionsAnchor] = useState({ x: 180, y: 320 });
+  const [quickActionsPreferences, setQuickActionsPreferences] = useState<StudioQuickActionsPreferences>(() =>
+    loadStudioQuickActionsPreferences(studioQuickActionsStorage())
+  );
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);
   const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
-    if (!isMobile) setMobileSheet(null);
+    if (!isMobile) {
+      setMobileSheet(null);
+      setQuickActionsOpen(false);
+    }
   }, [isMobile]);
+  useEffect(() => {
+    saveStudioQuickActionsPreferences(studioQuickActionsStorage(), quickActionsPreferences);
+  }, [quickActionsPreferences]);
   // 바텀시트 a11y: 열리면 시트 내부(닫기 버튼)로 포커스를 옮기고, 닫히면 트리거로 되돌린다.
   useEffect(() => {
     if (!isMobile) return;
@@ -4974,7 +5004,7 @@ function StudioCuttoonEditor() {
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const quickShapeStillSinceRef = useRef<number>(0);
+  const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const quickShapeConvertedRef = useRef<boolean>(false); // 이 스트로크가 QuickShape 로 변환됐는지
   const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
@@ -7781,6 +7811,43 @@ function StudioCuttoonEditor() {
     if (masterEditMode) return;
     setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
   };
+  function fitCanvasToWidth() {
+    const wrap = wrapRef.current;
+    if (wrap) setScale(Math.min(2.5, Math.max(0.1, wrap.clientWidth / CANVAS_W)));
+    setZoom(1);
+  }
+  function executeQuickAction(action: StudioQuickActionId) {
+    setQuickActionsOpen(false);
+    setMenu(null);
+    setColorWheelOpen(false);
+    // 화면 보기/패널 열기 외의 작업은 이전 armed 캔버스 제스처가 다음 탭을 가로채지 않게 종료한다.
+    // 특히 복제·삭제·말풍선 추가도 도구 상태를 바꾸지 않아 예전 armed 상태가 남기 쉬웠다.
+    if (action !== "fit-width" && action !== "properties") disarmAllPixelTools();
+
+    if (action === "undo") undo();
+    else if (action === "redo") redo();
+    else if (action === "select") {
+      setTool("select");
+      setMobileSheet(null);
+    } else if (action === "pen") {
+      setTool("draw");
+      setDrawMode("pen");
+      setMobileSheet(null);
+    } else if (action === "eraser") {
+      setTool("draw");
+      setDrawMode("eraser");
+      setMobileSheet(null);
+    } else if (action === "eyedropper") {
+      setEyedropperActive(true);
+      setMobileSheet(null);
+    } else if (action === "properties") {
+      setMobileSheet("props");
+    } else if (action === "duplicate") duplicateSelected();
+    else if (action === "delete") removeSelected();
+    else if (action === "bring-front") reorder("front");
+    else if (action === "fit-width") fitCanvasToWidth();
+    else if (action === "add-bubble") addBubble("speech");
+  }
   const mobileHistoryGestureRef = useRef({ undo, redo });
   mobileHistoryGestureRef.current = { undo, redo };
   useEffect(() => {
@@ -9885,12 +9952,8 @@ function StudioCuttoonEditor() {
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
     quickShapeStillAnchorRef.current = pos;
-    // 이 함수는 onStageDown(포인터 이벤트 핸들러) 안에서만 호출된다 — 렌더 경로가 아니다.
-    // react-hooks/purity 는 setInterval 콜백(runQuickShapeTick)으로 전달되는 함수를 보수적으로
-    // "렌더 중 호출 가능"으로 오판하는데, 실제로는 아래 setInterval 자체가 이 함수 호출 시점
-    // 이후에만 등록되는 진짜 타이머 콜백이라 안전하다.
-    // eslint-disable-next-line react-hooks/purity -- pointerdown 이벤트 핸들러에서만 호출한다.
-    quickShapeStillSinceRef.current = performance.now();
+    // onStageDown(포인터 이벤트 핸들러)에서만 호출되며 아래 타이머도 렌더가 끝난 뒤 시작한다.
+    quickShapeStillElapsedRef.current = 0;
     if (quickShapeTimerRef.current !== null) globalThis.clearInterval(quickShapeTimerRef.current);
     quickShapeTimerRef.current = globalThis.setInterval(runQuickShapeTick, 80);
   }
@@ -9900,6 +9963,7 @@ function StudioCuttoonEditor() {
       quickShapeTimerRef.current = null;
     }
     quickShapeStillAnchorRef.current = null;
+    quickShapeStillElapsedRef.current = 0;
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
   }
@@ -9909,12 +9973,11 @@ function StudioCuttoonEditor() {
     const radius = QUICKSHAPE_STILL_RADIUS_PX / effScale;
     if (Math.hypot(pos.x - anchor.x, pos.y - anchor.y) > radius) {
       quickShapeStillAnchorRef.current = pos;
-      // onStageMove(포인터 이벤트 핸들러) 안에서만 호출된다 — 위 startQuickShapeTracking 과 동일 근거.
-      // eslint-disable-next-line react-hooks/purity -- pointermove 이벤트 핸들러에서만 호출한다.
-      quickShapeStillSinceRef.current = performance.now();
+      // onStageMove(포인터 이벤트 핸들러) 안에서만 갱신한다.
+      quickShapeStillElapsedRef.current = 0;
     }
   }
-  // globalThis.setInterval 콜백으로만 등록된다(startQuickShapeTracking 참고) — 렌더 경로가 아니다.
+  // globalThis.setInterval 콜백으로만 등록된다(startQuickShapeTracking 참고).
   function runQuickShapeTick() {
     const current = drawingRef.current;
     const anchor = quickShapeStillAnchorRef.current;
@@ -9922,8 +9985,10 @@ function StudioCuttoonEditor() {
       stopQuickShapeTracking();
       return;
     }
-    // eslint-disable-next-line react-hooks/purity -- setInterval 타이머 콜백에서만 호출한다.
-    const elapsed = performance.now() - quickShapeStillSinceRef.current;
+    // 실제 타이머가 발화한 간격만 누적한다. 배경 탭에서 타이머가 오래 멈춘 뒤 복귀했을 때
+    // 한 번에 정비율 고정으로 점프하지 않고, 렌더 중 impure clock 호출도 만들지 않는다.
+    quickShapeStillElapsedRef.current += 80;
+    const elapsed = quickShapeStillElapsedRef.current;
 
     if (!quickShapeConvertedRef.current) {
       if ((current.kind ?? "freehand") !== "freehand") return; // 방어적
@@ -11310,7 +11375,7 @@ function StudioCuttoonEditor() {
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   const mobileBarBtn = (active: boolean) =>
     cn(
-      "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+      "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
     );
 
@@ -11320,6 +11385,22 @@ function StudioCuttoonEditor() {
       "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.66rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
       active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
+  const quickActionsDisabledActions = new Set<StudioQuickActionId>();
+  if (hi === 0 || masterEditMode) quickActionsDisabledActions.add("undo");
+  if (hi >= history.length - 1 || masterEditMode) quickActionsDisabledActions.add("redo");
+  if (!selected && marqueeIds.length === 0) {
+    quickActionsDisabledActions.add("duplicate");
+    quickActionsDisabledActions.add("delete");
+  }
+  if (!selected || marqueeIds.length > 0) quickActionsDisabledActions.add("bring-front");
+  if (pageEditLocked) {
+    quickActionsDisabledActions.add("pen");
+    quickActionsDisabledActions.add("eraser");
+    quickActionsDisabledActions.add("duplicate");
+    quickActionsDisabledActions.add("delete");
+    quickActionsDisabledActions.add("bring-front");
+    quickActionsDisabledActions.add("add-bubble");
+  }
 
   async function handleDownload() {
     const watermarkForExport = ensureWatermarkLoaded();
@@ -11608,9 +11689,13 @@ function StudioCuttoonEditor() {
       ];
       if (effectivePublishPackageSettings.includeReviewPdf) {
         setPublishPackageExportStatus({ tone: "info", text: "검수용 PDF를 만드는 중…" });
-        const { renderPagesToPdf } = await import("./studio-pdf-export");
-        const reviewPdf = await renderPagesToPdf({
+        const { renderStudioReviewPdf } = await import("./studio-review-pdf");
+        // 페이지 검토 메타데이터는 내부 review.pdf의 픽셀 주석에만 전달한다. public manifest와
+        // 게시용 이미지 렌더 경로에는 넘기지 않아 담당자·검토 메모가 외부 산출물에 섞이지 않는다.
+        const reviewPdf = await renderStudioReviewPdf({
           pages: captured,
+          pageMetadata: pages,
+          profile: effectivePublishPackageSettings.reviewPdfProfile,
           title: "review",
           watermark: ensureWatermarkLoaded(),
           onProgress: (done, total) => {
@@ -16570,6 +16655,7 @@ function StudioCuttoonEditor() {
                 pages={pages}
                 currentPageId={activePage.id}
                 selectedId={selectedId}
+                mobileKeyboardInset={mobileKeyboardInset}
                 onClose={() => setDialogueBatchOpen(false)}
                 onSelectElement={selectDialogueElement}
                 onPatchText={patchDialogueText}
@@ -19546,7 +19632,7 @@ function StudioCuttoonEditor() {
 
         {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
             엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다. */}
-        {isMobile && !mobileSheet && !showMobileHint && (selected || marqueeIds.length > 0) ? (
+        {isMobile && !mobileSheet && !quickActionsOpen && !showMobileHint && (selected || marqueeIds.length > 0) ? (
           <div
             role="toolbar"
             aria-label="선택 항목 빠른 작업"
@@ -19619,7 +19705,7 @@ function StudioCuttoonEditor() {
         ) : null}
 
         {/* 모바일 첫 사용 안내 — 하단 도구막대 + 두 손가락 이동/확대를 한 줄로. 1회만, 시트가 떠 있지 않을 때만. */}
-        {showMobileHint && !mobileSheet && (
+        {showMobileHint && !mobileSheet && !quickActionsOpen && (
           <div
             role="status"
             className="fixed inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-300 lg:hidden"
@@ -20048,7 +20134,7 @@ function StudioCuttoonEditor() {
               </button>
             </div>
 
-            {/* 2행: 보조 내비 — 페이지·추가·속성(레이어)·줌 */}
+            {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
             <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1">
               <button
                 type="button"
@@ -20072,6 +20158,28 @@ function StudioCuttoonEditor() {
               </button>
               <button
                 type="button"
+                onClick={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setQuickActionsAnchor({
+                    // 도크의 개별 버튼 위치보다 화면 중앙을 기준으로 열어 6개 방향의 좌우 여백을
+                    // 대칭으로 유지한다. 세로 위치는 도크에서 시작하되 메뉴가 자체 안전 영역으로 보정한다.
+                    x: globalThis.innerWidth / 2,
+                    y: rect.top + rect.height / 2,
+                  });
+                  setMobileSheet(null);
+                  setMenu(null);
+                  setColorWheelOpen(false);
+                  setQuickActionsOpen(true);
+                }}
+                aria-haspopup="menu"
+                aria-expanded={quickActionsOpen}
+                className={mobileBarBtn(quickActionsOpen)}
+              >
+                <Command size={17} aria-hidden />
+                <span>퀵 메뉴</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setMobileSheet((s) => (s === "props" ? null : "props"))}
                 aria-pressed={mobileSheet === "props"}
                 className={mobileBarBtn(mobileSheet === "props")}
@@ -20079,25 +20187,20 @@ function StudioCuttoonEditor() {
                 <Layers size={17} aria-hidden />
                 <span>속성·레이어</span>
               </button>
-              <div className="flex flex-[1.3] items-center justify-center gap-0.5">
+              <div className="flex w-32 flex-none items-center justify-center">
                 <button
                   type="button"
                   onClick={() => setZoom((z) => clampZoom(z - 0.25))}
                   disabled={zoom <= ZOOM_MIN}
-                  className="grid size-10 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
                   aria-label="축소"
                 >
                   <Minus size={16} aria-hidden />
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    // 너비 맞춤: 컨테이너 폭에 캔버스를 다시 채운다(줌 100% 복귀가 아니라 '폭맞춤'이 작은 폰에 자연스럽다).
-                    const wrap = wrapRef.current;
-                    if (wrap) setScale(Math.min(2.5, Math.max(0.1, wrap.clientWidth / CANVAS_W)));
-                    setZoom(1);
-                  }}
-                  className="min-w-[2.6rem] rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                  onClick={fitCanvasToWidth}
+                  className="min-h-11 min-w-10 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
                   aria-label="화면 폭에 맞춤"
                 >
                   {Math.round(zoom * 100)}%
@@ -20106,7 +20209,7 @@ function StudioCuttoonEditor() {
                   type="button"
                   onClick={() => setZoom((z) => clampZoom(z + 0.25))}
                   disabled={zoom >= ZOOM_MAX}
-                  className="grid size-10 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
                   aria-label="확대"
                 >
                   <Plus size={16} aria-hidden />
@@ -20115,6 +20218,20 @@ function StudioCuttoonEditor() {
             </div>
           </nav>
         )}
+
+        <Suspense fallback={null}>
+          {isMobile ? (
+            <StudioQuickActionsMenu
+              open={quickActionsOpen}
+              anchor={quickActionsAnchor}
+              preferences={quickActionsPreferences}
+              disabledActions={[...quickActionsDisabledActions]}
+              onExecute={executeQuickAction}
+              onPreferencesChange={setQuickActionsPreferences}
+              onClose={() => setQuickActionsOpen(false)}
+            />
+          ) : null}
+        </Suspense>
       </div>
 
       <Suspense fallback={<PoserLoadingOverlay />}>
