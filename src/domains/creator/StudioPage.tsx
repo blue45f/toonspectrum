@@ -59,6 +59,7 @@ import {
   Download,
   ImagePlus,
   LayoutTemplate,
+  Library,
   Loader2,
   Lock,
   LockOpen,
@@ -86,6 +87,8 @@ import {
   Type as TypeIcon,
   Undo2,
   Search,
+  ScanLine,
+  Sticker as StickerIcon,
   X,
   Layers,
   LayoutGrid,
@@ -95,6 +98,7 @@ import {
   Film,
   GanttChartSquare,
   History as HistoryIcon,
+  Wind,
 } from "lucide-react";
 import { Fragment, Suspense, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -191,12 +195,19 @@ import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBou
 import {
   bubbleShapeCanvasPointToLocal,
   bubbleShapePointHandles,
+  computeBubbleShapeGeometry,
   computeCustomShapePointsForBubble,
   hasCustomBubbleShape,
   normalizeCustomShapePoints,
   type BubbleShapeGeometryInput,
 } from "./studio-bubble-custom-shape";
-import { BUBBLE_MAX_TAILS, bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  bubblePathData,
+  bubblePathDataMulti,
+  doubleBubblePathData,
+  normalizeExtraTails,
+  type BubbleTailSpec,
+} from "./studio-bubble-path";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   bubbleHorizontalPadding,
@@ -541,6 +552,11 @@ import {
   type QuickShapeKind,
 } from "./studio-quickshape";
 import {
+  filterStudioRasterAssets,
+  STUDIO_RASTER_ASSETS,
+  type StudioRasterAsset,
+} from "./studio-raster-assets";
+import {
   createEmptyStudioReleaseSchedule,
   normalizeStudioReleaseSchedule,
   type StudioReleaseSchedule,
@@ -639,6 +655,7 @@ import {
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
+import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -822,6 +839,10 @@ const StudioStickerGrid = lazyRetry(
   () => import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid })),
   "StudioStickerGrid"
 );
+const StudioRasterAssetGrid = lazyRetry(
+  () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
+  "StudioRasterAssetGrid"
+);
 const StudioTextEffectPanel = lazyRetry(
   () => import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
   "StudioTextEffectPanel"
@@ -885,6 +906,10 @@ const StudioBrandKitPanel = lazyRetry(
 const StudioBubbleAnchorPanel = lazyRetry(
   () => import("./StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
   "StudioBubbleAnchorPanel"
+);
+const StudioBubbleTailControls = lazyRetry(
+  () => import("./StudioBubbleTailControls").then((mod) => ({ default: mod.StudioBubbleTailControls })),
+  "StudioBubbleTailControls"
 );
 const StudioSmudgePanel = lazyRetry(
   () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
@@ -1295,6 +1320,8 @@ export interface ImageEl {
   stockImageCredit?: StudioStockImageCredit;
   /** AI 생성/편집 provenance. 페이지 JSON과 함께 저장되어 Publish Pack 사전검사에 사용된다. */
   aiProvenance?: StudioPublishAiProvenance;
+  /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */
+  builtinRasterAssetId?: StudioRasterAsset["id"];
 }
 interface TextEl {
   id: string;
@@ -1331,7 +1358,7 @@ interface TextEl {
 interface BubbleEl {
   id: string;
   type: "bubble";
-  variant: BubbleVariant; // speech | thought | shout | box
+  variant: BubbleVariant;
   text: string;
   x: number;
   y: number;
@@ -1351,6 +1378,8 @@ interface BubbleEl {
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   tailXRatio?: number;
   tailHeight?: number;
+  tailBase?: number; // 주 꼬리 밑동 너비(px). 미설정이면 말풍선 크기·테마에 맞춰 자동 계산.
+  tailBend?: number; // 주 꼬리 곡률(-1..1). 0은 직선형 테이퍼.
   /** 꼬리 자동 부착 대상 요소 id. 설정되면 매 커밋마다 대상의 중심점을 향해 tailDirection/
    *  tailXRatio/tailHeight 가 자동 재계산된다(studio-bubble-anchor.ts). 대상이 삭제되면
    *  자동으로 지워진다(마지막 tail 값은 그대로 남아 수동 모드로 복귀). tailAnchorPoint 와
@@ -1560,10 +1589,11 @@ const EMPTY_STUDIO_SFX_PACKS: StudioSfxPacks = {
   presets: [],
 };
 
-// 효과 피커 카테고리 칩 — 클릭 시 해당 섹션만 보여줘 7개 섹션 스크롤 없이 점프한다.
-type FxPickerSection = "all" | "sfx" | "emoji" | "comic" | "creature" | "prop" | "lines" | "overlay";
+// 효과 피커 카테고리 칩 — 클릭 시 해당 섹션만 보여줘 긴 소재 목록을 스크롤 없이 점프한다.
+type FxPickerSection = "all" | "raster" | "sfx" | "emoji" | "comic" | "creature" | "prop" | "lines" | "overlay";
 const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
   { id: "all", label: "전체" },
+  { id: "raster", label: "장면 소품" },
   { id: "sfx", label: "효과음" },
   { id: "emoji", label: "이모지" },
   { id: "comic", label: "만화 스티커" },
@@ -1575,8 +1605,8 @@ const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
 
 // 만화 선 효과(집중선·속도선) — 효과 피커 검색이 라벨로 거를 수 있게 데이터로 둔다.
 const FX_LINE_PRESETS: { id: "focus" | "speed"; label: string }[] = [
-  { id: "focus", label: "🔆 집중선 생성" },
-  { id: "speed", label: "💨 속도선 생성" },
+  { id: "focus", label: "집중선 생성" },
+  { id: "speed", label: "속도선 생성" },
 ];
 const EMPTY_EFFECT_EMOJIS: string[] = [];
 const EMPTY_FX_LINE_PRESETS: typeof FX_LINE_PRESETS = [];
@@ -1697,7 +1727,7 @@ function elementLabel(el: El): string {
       return `T ${el.text.slice(0, 14).trim() || "텍스트"}`;
     case "bubble": {
       const v = BUBBLE_VARIANT_BY_ID.get(el.variant);
-      return `${v?.sample ?? "💬"} ${v?.label ?? "말풍선"}`;
+      return `${v?.label ?? "대사"} 말풍선`;
     }
     case "sticker":
       return `${el.text} 스티커`;
@@ -4071,6 +4101,7 @@ function StudioCuttoonEditor() {
   const [sfxError, setSfxError] = useState<string | null>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [builtinRasterBusyId, setBuiltinRasterBusyId] = useState<string | null>(null);
   // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
   const [assetTab, setAssetTab] = useState<StudioAssetTab>("mine");
   const [shared, setShared] = useState<SharedAsset[]>([]);
@@ -5402,6 +5433,19 @@ function StudioCuttoonEditor() {
   }, [menu]);
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const selectedBubbleTailGeometry = selected?.type === "bubble"
+    ? computeBubbleShapeGeometry({
+        width: selected.width,
+        height: selected.height,
+        theme: webtoonTheme,
+        tail: selected.tail,
+        tailDirection: selected.tailDirection,
+        tailXRatio: selected.tailXRatio,
+        tailHeight: selected.tailHeight,
+        tailBase: selected.tailBase,
+        tailBend: selected.tailBend,
+      })
+    : null;
   const studioCommentActor: StudioCommentActor = {
     ...(studioAuthUserId ? { id: studioAuthUserId } : {}),
     displayName: session?.user?.name?.trim().slice(0, 80) || "로컬 작가",
@@ -6473,6 +6517,9 @@ function StudioCuttoonEditor() {
   const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
     fxPickerSection === "all" || fxPickerSection === section;
   const fxSfxFiltered = fxMenuOpen ? filterSfxPresets(studioSfx.presets, fxSearchQuery) : EMPTY_STUDIO_SFX_PACKS.presets;
+  const fxRasterFiltered = fxMenuOpen
+    ? filterStudioRasterAssets(STUDIO_RASTER_ASSETS, { query: fxSearchQuery })
+    : [];
   const fxEmojisFiltered = fxMenuOpen && !fxQuery ? EFFECT_EMOJIS : EMPTY_EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
   const fxComicFiltered = fxMenuOpen
     ? filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery)
@@ -6488,6 +6535,7 @@ function StudioCuttoonEditor() {
     ? filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery)
     : EMPTY_STUDIO_OPTIONAL_ASSETS.fxOverlays;
   const fxPickerHasResults = fxMenuOpen && (
+    (fxSectionVisible("raster") && fxRasterFiltered.length > 0) ||
     (fxSectionVisible("sfx") && fxSfxFiltered.length > 0) ||
     (fxSectionVisible("emoji") && fxEmojisFiltered.length > 0) ||
     (fxSectionVisible("comic") && fxComicFiltered.length > 0) ||
@@ -7146,6 +7194,74 @@ function StudioCuttoonEditor() {
         sourceHeight: height,
       });
     addEl({ ...element, ...(aiProvenance ? { aiProvenance } : {}) });
+  }
+  async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
+    if (builtinRasterBusyId) return;
+    setBuiltinRasterBusyId(asset.id);
+    setError(null);
+    try {
+      const response = await fetch(resolveAssetUrl(asset.src), { headers: { Accept: asset.mimeType } });
+      if (!response.ok) throw new Error(`소재 파일을 불러오지 못했습니다. (${response.status})`);
+      const blob = await response.blob();
+      if (blob.type && blob.type !== asset.mimeType) {
+        throw new Error("소재 파일 형식이 카탈로그 정보와 다릅니다.");
+      }
+      const src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("소재 파일을 읽지 못했습니다."));
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsDataURL(blob);
+      });
+
+      let element = createCanvasImageElement({
+        id: uid(),
+        src,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: asset.width,
+        sourceHeight: asset.height,
+        horizontalInset: 80,
+      });
+      if (selected?.type === "frame") {
+        const inset = Math.max(10, Math.min(selected.width, selected.height) * 0.04);
+        const maxWidth = Math.max(1, selected.width - inset * 2);
+        const maxHeight = Math.max(1, selected.height - inset * 2);
+        const scale = Math.min(maxWidth / asset.width, maxHeight / asset.height, 1);
+        const width = Math.round(asset.width * scale);
+        const height = Math.round(asset.height * scale);
+        element = {
+          ...element,
+          x: Math.round(selected.x + (selected.width - width) / 2),
+          y:
+            asset.defaultPlacement === "frame-bottom-center"
+              ? Math.round(selected.y + selected.height - height - inset)
+              : Math.round(selected.y + (selected.height - height) / 2),
+          width,
+          height,
+        };
+      }
+
+      addEl({
+        ...element,
+        name: asset.label,
+        opacity: asset.defaultOpacity,
+        blendMode: asset.defaultBlendMode === "source-over" ? "normal" : asset.defaultBlendMode,
+        builtinRasterAssetId: asset.id,
+        aiProvenance: {
+          action: "generated",
+          provider: asset.provenance.provider,
+          model: asset.provenance.model,
+          transport: "server",
+          promptVersion: 1,
+          createdAt: `${asset.provenance.generatedOn}T00:00:00.000Z`,
+        },
+      });
+      setMenu(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "소재를 캔버스에 추가하지 못했습니다.");
+    } finally {
+      setBuiltinRasterBusyId(null);
+    }
   }
   // 스톡 사진(Unsplash) 삽입 — addRenderedImage와 동일한 배치 정책(createCanvasImageElement로 캔버스
   // 중앙에 맞춰 배치)이되, 크레딧 메타데이터를 함께 얹는다는 점만 다르다. StudioStockImagePanel이 이미
@@ -7905,7 +8021,11 @@ function StudioCuttoonEditor() {
     let width = 260;
     let height = 140;
 
-    if (variant === "shout") {
+    if (variant === "double") {
+      width = 280;
+      height = 180;
+      text = "긴 대사를\n이어 입력";
+    } else if (variant === "shout") {
       fill = "#fff6d6";
       text = "!!";
     } else if (variant === "scared") {
@@ -11086,7 +11206,7 @@ function StudioCuttoonEditor() {
   // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
   const toolBtn = (active: boolean) =>
     cn(
-      "inline-flex h-9 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-10 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
+      "inline-flex h-9 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
       active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
@@ -11104,7 +11224,7 @@ function StudioCuttoonEditor() {
   // 그룹 팝오버 안의 서브탭 칩 — 기존 장르/카테고리 필터 칩(rounded-full)과 동일한 시각 언어를 재사용.
   const groupTabBtn = (active: boolean) =>
     cn(
-      "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.7rem] font-medium transition-colors",
+      "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.7rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3",
       active ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-2 hover:bg-raised"
     );
 
@@ -12505,13 +12625,13 @@ function StudioCuttoonEditor() {
                   <PenTool size={12} /> 이메레스
                 </button>
                 <button type="button" onClick={() => setMenu("scene")} aria-pressed={menu === "scene"} className={groupTabBtn(menu === "scene")}>
-                  <Sparkles size={12} /> 장면
+                  <Clapperboard size={12} /> 장면
                 </button>
                 <button type="button" onClick={() => setMenu("clip")} aria-pressed={menu === "clip"} className={groupTabBtn(menu === "clip")}>
                   <Bookmark size={12} /> 클립
                 </button>
                 <button type="button" onClick={() => setMenu("sticker")} aria-pressed={menu === "sticker"} className={groupTabBtn(menu === "sticker")}>
-                  <Sparkles size={12} /> 효과
+                  <StickerIcon size={12} /> 효과
                 </button>
                 <button
                   type="button"
@@ -12524,7 +12644,7 @@ function StudioCuttoonEditor() {
                   aria-pressed={menu === "asset"}
                   className={groupTabBtn(menu === "asset")}
                 >
-                  <Folder size={12} /> 내 에셋
+                  <Library size={12} /> 내 에셋
                 </button>
               </div>
               {menu === "template" && (
@@ -12865,13 +12985,13 @@ function StudioCuttoonEditor() {
                       placeholder="효과 검색..."
                       value={fxSearchQuery}
                       onChange={(e) => setFxSearchQuery(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                      className="min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-11 text-xs placeholder:text-fg-3 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/40"
                     />
                     {fxSearchQuery && (
                       <button
                         type="button"
                         onClick={() => setFxSearchQuery("")}
-                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                        aria-label="검색어 지우기" className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
                       >
                         <X size={12} />
                       </button>
@@ -12885,7 +13005,7 @@ function StudioCuttoonEditor() {
                         onClick={() => setFxPickerSection(section.id)}
                         aria-pressed={fxPickerSection === section.id}
                         className={cn(
-                          "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                          "min-h-8 rounded-full border px-2 text-[0.66rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3",
                           fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                         )}
                       >
@@ -12893,6 +13013,15 @@ function StudioCuttoonEditor() {
                       </button>
                     ))}
                   </div>
+                  {fxSectionVisible("raster") && fxRasterFiltered.length > 0 && (
+                    <Suspense fallback={<StudioPanelLoading label="장면 소품을 여는 중..." />}>
+                      <StudioRasterAssetGrid
+                        assets={fxRasterFiltered}
+                        busyId={builtinRasterBusyId}
+                        onAdd={(asset) => void addBuiltinRasterAsset(asset)}
+                      />
+                    </Suspense>
+                  )}
                   {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
                     <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
                   )}
@@ -12909,7 +13038,7 @@ function StudioCuttoonEditor() {
                             type="button"
                             onClick={() => void addSfxPreset(s)}
                             title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
-                            className="rounded-md border border-line px-2 py-1 text-xs font-bold text-fg hover:bg-raised"
+                            className="min-h-9 rounded-md border border-line px-2 text-xs font-bold text-fg hover:bg-raised pointer-coarse:min-h-11"
                           >
                             {s.text}
                           </button>
@@ -12922,7 +13051,7 @@ function StudioCuttoonEditor() {
                       <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
                       <div className="grid grid-cols-8 gap-1 mb-2">
                         {fxEmojisFiltered.map((em) => (
-                          <button key={em} type="button" onClick={() => addSticker(em)} className="rounded-md p-1 text-lg hover:bg-raised">
+                          <button key={em} type="button" onClick={() => addSticker(em)} className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11">
                             {em}
                           </button>
                         ))}
@@ -12961,8 +13090,9 @@ function StudioCuttoonEditor() {
                               else addSpeedLines();
                               setMenu(null);
                             }}
-                            className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                            className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
                           >
+                            {preset.id === "focus" ? <ScanLine size={15} aria-hidden /> : <Wind size={15} aria-hidden />}
                             {preset.label}
                           </button>
                         ))}
@@ -13573,17 +13703,31 @@ function StudioCuttoonEditor() {
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:w-64 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg">
-              <div className="grid gap-1">
+            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg">
+              <div className="mb-2 flex items-start gap-2 px-1 pt-1">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                  <MessageCircle size={17} aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-fg">말풍선 라이브러리</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">장면의 목소리와 감정에 맞는 형태를 고르세요.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5" role="menu" aria-label="말풍선 종류">
                 {BUBBLE_VARIANTS.map((v) => (
                   <button
                     key={v.id}
                     type="button"
+                    role="menuitem"
                     onClick={() => addBubble(v.id)}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                    className="group min-h-24 rounded-xl border border-line/70 bg-card/45 p-2 text-left transition-colors hover:border-accent/35 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    <span className="text-base">{v.sample}</span>
-                    <span className="font-medium text-fg">{v.label}</span>
+                    <StudioBubbleVariantGlyph
+                      variant={v.id}
+                      className="h-11 w-full text-fg-2 transition-colors group-hover:text-accent"
+                    />
+                    <span className="mt-1 block text-xs font-bold text-fg">{v.label}</span>
+                    <span className="mt-0.5 block text-[0.62rem] text-fg-3">{v.hint}</span>
                   </button>
                 ))}
               </div>
@@ -15058,7 +15202,11 @@ function StudioCuttoonEditor() {
                 const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
                 const bMinDim = Math.min(el.width, el.height);
                 const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeightWithTheme), bMinDim * 0.3));
-                const bTailBase = Math.max(bMinDim * 0.1, (tailIsVertical ? el.width : el.height) * borderRatio * 1.8);
+                const automaticTailBase = Math.max(
+                  bMinDim * 0.1,
+                  (tailIsVertical ? el.width : el.height) * borderRatio * 1.8
+                );
+                const bTailBase = Math.max(4, Math.min(el.tailBase ?? automaticTailBase, bMinDim * 0.62));
                 const bubbleTailSpec: BubbleTailSpec | null = showTail
                   ? {
                       direction: tailDirection,
@@ -15066,6 +15214,7 @@ function StudioCuttoonEditor() {
                       length: bTailLen,
                       base: bTailBase,
                       side: "center",
+                      bend: Math.max(-1, Math.min(el.tailBend ?? 0, 1)),
                     }
                   : null;
                 // 추가 꼬리(두 화자 동시 대사)가 있으면 다중 꼬리 워커로 — 없으면 기존 단일 경로 바이트 동일 유지.
@@ -15312,6 +15461,17 @@ function StudioCuttoonEditor() {
                         fill={el.fill}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
+                        lineJoin="round"
+                        lineCap="round"
+                      />
+                    ) : el.variant === "double" ? (
+                      <Path
+                        data={doubleBubblePathData(el.width, el.height, bubbleTailSpec)}
+                        fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        dash={bDash}
                         lineJoin="round"
                         lineCap="round"
                       />
@@ -17209,7 +17369,8 @@ function StudioCuttoonEditor() {
                   </div>
                 </>
               )}
-              {selected.type === "bubble" && (
+              {selected.type === "bubble" &&
+                (selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)) && (
                 <StudioBubbleShapePanel
                   hasCustomShape={hasCustomBubbleShape(selected.customShapePoints)}
                   active={bubbleShapeArmed}
@@ -17223,6 +17384,8 @@ function StudioCuttoonEditor() {
                       tailDirection: selected.tailDirection,
                       tailXRatio: selected.tailXRatio,
                       tailHeight: selected.tailHeight,
+                      tailBase: selected.tailBase,
+                      tailBend: selected.tailBend,
                       extraTails: normalizeExtraTails(selected.extraTails),
                     };
                     const points = computeCustomShapePointsForBubble(input);
@@ -17246,64 +17409,25 @@ function StudioCuttoonEditor() {
                 selected.variant !== "shout" &&
                 selected.variant !== "box" &&
                 !hasCustomBubbleShape(selected.customShapePoints) && (
-                <div className="mt-2.5 border-t border-line/40 pt-2.5">
-                  <p className="mb-1 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">꼬리 위치 & 방향</p>
-                  
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs text-fg-2">
-                      <span>꼬리 대칭 방향</span>
-                      <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
-                        {[
-                          { label: "왼쪽", v: "left" },
-                          { label: "오른쪽", v: "right" },
-                          { label: "없음", v: "none" },
-                        ].map((t) => (
-                          <button
-                            key={t.v}
-                            type="button"
-                            onClick={() => patchEl(selected.id, { tail: t.v } as Partial<El>)}
-                            className={cn(
-                              "rounded px-2 py-0.5 text-[0.68rem] font-medium transition-colors cursor-pointer",
-                              (selected.tail ?? "left") === t.v
-                                ? "bg-accent text-on-accent shadow-sm font-semibold"
-                                : "text-fg-2 hover:bg-raised"
-                            )}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {(selected.tail ?? "left") !== "none" && (
-                      <div className="flex items-center justify-between text-xs text-fg-2">
-                        <span>말풍선 부착면</span>
-                        <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
-                          {[
-                            { label: "위", v: "top" },
-                            { label: "아래", v: "bottom" },
-                            { label: "왼쪽", v: "left" },
-                            { label: "오른쪽", v: "right" },
-                          ].map((td) => (
-                            <button
-                              key={td.v}
-                              type="button"
-                              onClick={() => patchEl(selected.id, { tailDirection: td.v as "top" | "bottom" | "left" | "right" } as Partial<El>)}
-                              className={cn(
-                                "rounded px-1.5 py-0.5 text-[0.68rem] font-medium transition-colors cursor-pointer",
-                                (selected.tailDirection ?? "bottom") === td.v
-                                  ? "bg-accent text-on-accent shadow-sm font-semibold"
-                                  : "text-fg-2 hover:bg-raised"
-                              )}
-                            >
-                              {td.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <Suspense fallback={null}>
+                  <StudioBubbleTailControls
+                    tail={selected.tail ?? "left"}
+                    direction={selected.tailDirection ?? "bottom"}
+                    ratio={selected.tailXRatio ?? 0.35}
+                    length={selected.tailHeight ?? 30}
+                    base={selectedBubbleTailGeometry?.tailSpec?.base ?? selected.tailBase ?? 18}
+                    bend={selected.tailBend ?? 0}
+                    extraTails={normalizeExtraTails(selected.extraTails)}
+                    anchored={Boolean(selected.tailAnchorId || selected.tailAnchorPoint)}
+                    allowMultiple={selected.variant !== "double"}
+                    onPatchPrimary={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                    onChangeExtraTails={(tails) =>
+                      patchEl(selected.id, {
+                        extraTails: tails.length > 0 ? [...tails] : undefined,
+                      } as Partial<El>)
+                    }
+                  />
+                </Suspense>
               )}
               {selected.type === "bubble" &&
                 selected.variant !== "shout" &&
@@ -17327,127 +17451,6 @@ function StudioCuttoonEditor() {
                     onDetach={detachBubbleAnchor}
                   />
                 </Suspense>
-              )}
-              {selected.type === "bubble" &&
-                selected.variant !== "shout" &&
-                selected.variant !== "box" &&
-                !hasCustomBubbleShape(selected.customShapePoints) &&
-                (selected.tail ?? "left") !== "none" && (
-                <div className="mt-3 space-y-2 border-t border-line/40 pt-2.5">
-                  {!!(selected.tailAnchorId || selected.tailAnchorPoint) && (
-                    <p className="text-[0.68rem] text-fg-3">
-                      자동 부착 중에는 위 '꼬리 자동 부착' 패널에서 해제해야 조절할 수 있어요.
-                    </p>
-                  )}
-                  <label
-                    className={cn(
-                      "flex items-center justify-between gap-2 text-sm text-fg-2",
-                      !!(selected.tailAnchorId || selected.tailAnchorPoint) && "pointer-events-none opacity-40"
-                    )}
-                  >
-                    {(selected.tailDirection === "left" || selected.tailDirection === "right") ? "꼬리 세로 위치" : "꼬리 가로 위치"}
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={0.9}
-                        step={0.05}
-                        value={selected.tailXRatio ?? 0.35}
-                        disabled={!!(selected.tailAnchorId || selected.tailAnchorPoint)}
-                        onChange={(e) => patchEl(selected.id, { tailXRatio: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.tailXRatio ?? 0.35) * 100)}%</span>
-                    </span>
-                  </label>
-                  <label
-                    className={cn(
-                      "flex items-center justify-between gap-2 text-sm text-fg-2",
-                      !!(selected.tailAnchorId || selected.tailAnchorPoint) && "pointer-events-none opacity-40"
-                    )}
-                  >
-                    꼬리 길이
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={10}
-                        max={80}
-                        step={2}
-                        value={selected.tailHeight ?? 30}
-                        disabled={!!(selected.tailAnchorId || selected.tailAnchorPoint)}
-                        onChange={(e) => patchEl(selected.id, { tailHeight: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.tailHeight ?? 30}px</span>
-                    </span>
-                  </label>
-
-                  {/* 추가 꼬리 — 두 화자 동시 대사(합창) 말풍선. 주 꼬리 외 최대 2개. */}
-                  <div className="mt-2 border-t border-line/40 pt-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[0.72rem] font-semibold text-fg-2">추가 꼬리 (동시 대사)</p>
-                      <button
-                        type="button"
-                        disabled={normalizeExtraTails(selected.extraTails).length >= BUBBLE_MAX_TAILS - 1}
-                        onClick={() =>
-                          patchEl(selected.id, {
-                            extraTails: [
-                              ...normalizeExtraTails(selected.extraTails),
-                              { direction: "bottom", ratio: 0.75, length: 26, base: 18, side: "center" },
-                            ],
-                          } as Partial<El>)
-                        }
-                        className="rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] font-medium text-fg-2 hover:bg-raised disabled:opacity-40"
-                      >
-                        + 꼬리 추가
-                      </button>
-                    </div>
-                    {normalizeExtraTails(selected.extraTails).map((extraTail, extraIdx) => (
-                      <div key={extraIdx} className="mt-1.5 flex items-center gap-1.5">
-                        <select
-                          value={extraTail.direction}
-                          aria-label={`추가 꼬리 ${extraIdx + 1} 방향`}
-                          onChange={(e) => {
-                            const next = normalizeExtraTails(selected.extraTails);
-                            next[extraIdx] = { ...next[extraIdx], direction: e.target.value as BubbleTailSpec["direction"] };
-                            patchEl(selected.id, { extraTails: next } as Partial<El>);
-                          }}
-                          className="rounded border border-line bg-card px-1.5 py-1 text-[0.72rem] text-fg cursor-pointer"
-                        >
-                          <option value="bottom">아래</option>
-                          <option value="top">위</option>
-                          <option value="left">왼쪽</option>
-                          <option value="right">오른쪽</option>
-                        </select>
-                        <input
-                          type="range"
-                          min={0.1}
-                          max={0.9}
-                          step={0.05}
-                          value={extraTail.ratio}
-                          aria-label={`추가 꼬리 ${extraIdx + 1} 위치`}
-                          onChange={(e) => {
-                            const next = normalizeExtraTails(selected.extraTails);
-                            next[extraIdx] = { ...next[extraIdx], ratio: Number(e.target.value) };
-                            patchEl(selected.id, { extraTails: next } as Partial<El>);
-                          }}
-                          className="h-2 flex-1 accent-accent cursor-pointer"
-                        />
-                        <button
-                          type="button"
-                          aria-label={`추가 꼬리 ${extraIdx + 1} 제거`}
-                          onClick={() => {
-                            const next = normalizeExtraTails(selected.extraTails).filter((_, i) => i !== extraIdx);
-                            patchEl(selected.id, { extraTails: next.length ? next : undefined } as Partial<El>);
-                          }}
-                          className="rounded p-1 text-fg-3 hover:bg-raised hover:text-bad"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
               {(selected.type === "text" || selected.type === "bubble") && (
                 <>

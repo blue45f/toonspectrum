@@ -26,7 +26,13 @@
  */
 
 import { gpenSegmentWidths, processFreehandPoints, processPencilPoints, screentoneDotRadius, screentoneDotsForStroke } from "./studio-brush";
-import { bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  bubblePathData,
+  bubblePathDataMulti,
+  doubleBubblePathData,
+  normalizeExtraTails,
+  type BubbleTailSpec,
+} from "./studio-bubble-path";
 import {
   estimateTextGradientBBox,
   legacyTextGradientToSpec,
@@ -147,6 +153,8 @@ export interface SvgBubbleElLike extends SvgElMeta {
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   tailXRatio?: number;
   tailHeight?: number;
+  tailBase?: number;
+  tailBend?: number;
   stroke?: string;
   strokeWidth?: number;
   shadowColor?: string;
@@ -958,7 +966,11 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
   const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
   const bMinDim = Math.min(el.width, el.height);
   const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeight + tailHeightAdjust), bMinDim * 0.3));
-  const bTailBase = Math.max(bMinDim * 0.1, (tailIsVertical ? el.width : el.height) * borderRatio * 1.8);
+  const automaticTailBase = Math.max(
+    bMinDim * 0.1,
+    (tailIsVertical ? el.width : el.height) * borderRatio * 1.8
+  );
+  const bTailBase = Math.max(4, Math.min(el.tailBase ?? automaticTailBase, bMinDim * 0.62));
   const bubbleTailSpec: BubbleTailSpec | null = showTail
     ? {
         direction: tailDirection,
@@ -966,6 +978,7 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
         length: bTailLen,
         base: bTailBase,
         side: "center",
+        bend: Math.max(-1, Math.min(el.tailBend ?? 0, 1)),
       }
     : null;
   const bubbleExtraTails = normalizeExtraTails(el.extraTails);
@@ -995,6 +1008,10 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
     const starStrokeW = isShout ? bStrokeW : Math.max(bStrokeW, 3.5);
     body.push(
       `<polygon points="${pointsAttr(pts)}" transform="translate(${fmt(el.width / 2)} ${fmt(el.height / 2)}) scale(${fmt(el.width / base)} ${fmt(el.height / base)})" fill="${escapeXml(el.fill)}" stroke="${escapeXml(starStroke)}" stroke-width="${fmt(starStrokeW)}" stroke-linejoin="round"/>`
+    );
+  } else if (el.variant === "double") {
+    body.push(
+      `<path d="${escapeXml(doubleBubblePathData(el.width, el.height, bubbleTailSpec))}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
     );
   } else if (el.variant === "thought") {
     body.push(

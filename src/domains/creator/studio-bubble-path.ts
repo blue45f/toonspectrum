@@ -18,6 +18,8 @@ export interface BubbleTailSpec {
   length: number; // 바깥으로 뻗는 길이(px)
   base: number; // 꼬리 밑동 너비(px)
   side: BubbleTailSide; // 꼬리 끝이 기우는 방향(화자 쪽)
+  /** -1..1. 음수는 진행축의 왼쪽/위쪽, 양수는 오른쪽/아래쪽으로 꼬리 몸통을 휜다. */
+  bend?: number;
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -39,6 +41,7 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
   const dir = tail.direction;
   // 꼬리 끝 기울기(화자 방향). 0.45로 키워 더 자연스러운 lean(현재 호출은 side:center라 시각변화 없음, 선반영).
   const sideShift = tail.side === "left" ? -tail.base * 0.45 : tail.side === "right" ? tail.base * 0.45 : 0;
+  const bend = clamp(tail.bend ?? 0, -1, 1) * Math.min(Math.max(tail.base, tail.length) * 0.42, tail.base * 1.4);
   // 꼬리 밑동이 둥근 모서리 직선구간 안에 들도록 안전 마진(곡률 충돌 방지).
   const safe = r * 0.8;
   // 테이퍼: 밑동→끝 변을 직선 대신 이차베지어로 본체 쪽 0.55 지점으로 당겨 코미포/클립스튜디오식 부드러운 수렴.
@@ -59,8 +62,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
         `V ${N(h - r)}`,
         `A ${N(r)} ${N(r)} 0 0 1 ${N(w - r)} ${N(h)}`,
         `H ${N(b2)}`,
-        `Q ${N((b2 + tip) / 2)} ${N(cy)} ${N(tip)} ${N(ty)}`,
-        `Q ${N((tip + b1) / 2)} ${N(cy)} ${N(b1)} ${N(h)}`,
+        `Q ${N((b2 + tip) / 2 + bend)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+        `Q ${N((tip + b1) / 2 + bend)} ${N(cy)} ${N(b1)} ${N(h)}`,
         `H ${N(r)}`,
         `A ${N(r)} ${N(r)} 0 0 1 0 ${N(h - r)}`,
         `V ${N(r)}`,
@@ -74,8 +77,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
     return [
       `M ${N(r)} 0`,
       `H ${N(b1)}`,
-      `Q ${N((b1 + tip) / 2)} ${N(cy)} ${N(tip)} ${N(ty)}`,
-      `Q ${N((tip + b2) / 2)} ${N(cy)} ${N(b2)} 0`,
+      `Q ${N((b1 + tip) / 2 + bend)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+      `Q ${N((tip + b2) / 2 + bend)} ${N(cy)} ${N(b2)} 0`,
       `H ${N(w - r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 ${N(w)} ${N(r)}`,
       `V ${N(h - r)}`,
@@ -105,8 +108,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
       `H ${N(r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 0 ${N(h - r)}`,
       `V ${N(b2)}`,
-      `Q ${N(cx)} ${N((b2 + tip) / 2)} ${N(tx)} ${N(tip)}`,
-      `Q ${N(cx)} ${N((tip + b1) / 2)} 0 ${N(b1)}`,
+      `Q ${N(cx)} ${N((b2 + tip) / 2 + bend)} ${N(tx)} ${N(tip)}`,
+      `Q ${N(cx)} ${N((tip + b1) / 2 + bend)} 0 ${N(b1)}`,
       `V ${N(r)}`,
       `A ${N(r)} ${N(r)} 0 0 1 ${N(r)} 0`,
       "Z",
@@ -120,8 +123,8 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
     `H ${N(w - r)}`,
     `A ${N(r)} ${N(r)} 0 0 1 ${N(w)} ${N(r)}`,
     `V ${N(b1)}`,
-    `Q ${N(cx)} ${N((b1 + tip) / 2)} ${N(tx)} ${N(tip)}`,
-    `Q ${N(cx)} ${N((tip + b2) / 2)} ${N(w)} ${N(b2)}`,
+    `Q ${N(cx)} ${N((b1 + tip) / 2 + bend)} ${N(tx)} ${N(tip)}`,
+    `Q ${N(cx)} ${N((tip + b2) / 2 + bend)} ${N(w)} ${N(b2)}`,
     `V ${N(h - r)}`,
     `A ${N(r)} ${N(r)} 0 0 1 ${N(w - r)} ${N(h)}`,
     `H ${N(r)}`,
@@ -130,6 +133,143 @@ export function bubblePathData(w: number, h: number, radius: number, tail?: Bubb
     `A ${N(r)} ${N(r)} 0 0 1 ${N(r)} 0`,
     "Z",
   ].join(" ");
+}
+
+/**
+ * 긴 대사·시간차 대사용 이중 로브 말풍선.
+ *
+ * 두 타원을 겹쳐 그리면 가운데 외곽선이 남으므로, 위·아래 로브와 허리를 하나의 연속 path로
+ * 만든다. 주 꼬리는 어느 변에나 붙일 수 있고 bubblePathData와 같은 밑동·기울기·곡률 규약을
+ * 사용한다. 이 변형은 한 화자의 이어지는 대사용이라 추가 꼬리는 받지 않는다.
+ */
+export function doubleBubblePathData(w: number, h: number, tail?: BubbleTailSpec | null): string {
+  const r = clamp(Math.min(w * 0.12, h * 0.13), 0, Math.min(w, h) / 3);
+  const upperEnd = h * 0.34;
+  const upperJoin = h * 0.43;
+  const middle = h * 0.5;
+  const lowerJoin = h * 0.57;
+  const lowerStart = h * 0.66;
+  const waistInset = Math.min(w * 0.085, Math.max(4, r * 0.75));
+  const activeTail = tail && tail.length > 0 && tail.base > 0 ? tail : null;
+  const TAPER = 0.55;
+
+  type HorizontalTailPlan = { b1: number; b2: number; tip: number; bend: number; len: number };
+  type VerticalTailPlan = HorizontalTailPlan & { section: "upper" | "lower" };
+
+  const horizontalPlan = (): HorizontalTailPlan | null => {
+    if (!activeTail) return null;
+    const span = Math.max(0, w - r * 2 - 8);
+    if (span < 4) return null;
+    const base = Math.min(activeTail.base, span);
+    const half = base / 2;
+    const center = clamp(w * activeTail.ratio, r + half + 4, w - r - half - 4);
+    const sideShift = activeTail.side === "left" ? -base * 0.45 : activeTail.side === "right" ? base * 0.45 : 0;
+    return {
+      b1: center - half,
+      b2: center + half,
+      tip: clamp(center + sideShift, r + 2, w - r - 2),
+      bend: clamp(activeTail.bend ?? 0, -1, 1) * Math.min(Math.max(base, activeTail.length) * 0.42, base * 1.4),
+      len: activeTail.length,
+    };
+  };
+
+  const verticalPlan = (): VerticalTailPlan | null => {
+    if (!activeTail) return null;
+    const section = activeTail.ratio < 0.5 ? "upper" : "lower";
+    const start = section === "upper" ? r : lowerStart;
+    const end = section === "upper" ? upperEnd : h - r;
+    const span = Math.max(0, end - start - 8);
+    if (span < 4) return null;
+    const base = Math.min(activeTail.base, span);
+    const half = base / 2;
+    const center = clamp(h * activeTail.ratio, start + half + 4, end - half - 4);
+    const sideShift = activeTail.side === "left" ? -base * 0.45 : activeTail.side === "right" ? base * 0.45 : 0;
+    return {
+      section,
+      b1: center - half,
+      b2: center + half,
+      tip: clamp(center + sideShift, start + 2, end - 2),
+      bend: clamp(activeTail.bend ?? 0, -1, 1) * Math.min(Math.max(base, activeTail.length) * 0.42, base * 1.4),
+      len: activeTail.length,
+    };
+  };
+
+  const horizontal = activeTail?.direction === "top" || activeTail?.direction === "bottom" ? horizontalPlan() : null;
+  const vertical = activeTail?.direction === "left" || activeTail?.direction === "right" ? verticalPlan() : null;
+  const parts: string[] = [`M ${N(r)} 0`];
+
+  if (activeTail?.direction === "top" && horizontal) {
+    const ty = -horizontal.len;
+    const cy = ty * TAPER;
+    parts.push(
+      `H ${N(horizontal.b1)}`,
+      `Q ${N((horizontal.b1 + horizontal.tip) / 2 + horizontal.bend)} ${N(cy)} ${N(horizontal.tip)} ${N(ty)}`,
+      `Q ${N((horizontal.tip + horizontal.b2) / 2 + horizontal.bend)} ${N(cy)} ${N(horizontal.b2)} 0`
+    );
+  }
+  parts.push(`H ${N(w - r)}`, `Q ${N(w)} 0 ${N(w)} ${N(r)}`);
+
+  if (activeTail?.direction === "right" && vertical?.section === "upper") {
+    const tx = w + vertical.len;
+    const cx = w + vertical.len * TAPER;
+    parts.push(
+      `V ${N(vertical.b1)}`,
+      `Q ${N(cx)} ${N((vertical.b1 + vertical.tip) / 2 + vertical.bend)} ${N(tx)} ${N(vertical.tip)}`,
+      `Q ${N(cx)} ${N((vertical.tip + vertical.b2) / 2 + vertical.bend)} ${N(w)} ${N(vertical.b2)}`
+    );
+  }
+  parts.push(`V ${N(upperEnd)}`);
+  parts.push(
+    `Q ${N(w)} ${N(upperJoin)} ${N(w - waistInset)} ${N(middle)}`,
+    `Q ${N(w)} ${N(lowerJoin)} ${N(w)} ${N(lowerStart)}`
+  );
+  if (activeTail?.direction === "right" && vertical?.section === "lower") {
+    const tx = w + vertical.len;
+    const cx = w + vertical.len * TAPER;
+    parts.push(
+      `V ${N(vertical.b1)}`,
+      `Q ${N(cx)} ${N((vertical.b1 + vertical.tip) / 2 + vertical.bend)} ${N(tx)} ${N(vertical.tip)}`,
+      `Q ${N(cx)} ${N((vertical.tip + vertical.b2) / 2 + vertical.bend)} ${N(w)} ${N(vertical.b2)}`
+    );
+  }
+  parts.push(`V ${N(h - r)}`, `Q ${N(w)} ${N(h)} ${N(w - r)} ${N(h)}`);
+
+  if (activeTail?.direction === "bottom" && horizontal) {
+    const ty = h + horizontal.len;
+    const cy = h + horizontal.len * TAPER;
+    parts.push(
+      `H ${N(horizontal.b2)}`,
+      `Q ${N((horizontal.b2 + horizontal.tip) / 2 + horizontal.bend)} ${N(cy)} ${N(horizontal.tip)} ${N(ty)}`,
+      `Q ${N((horizontal.tip + horizontal.b1) / 2 + horizontal.bend)} ${N(cy)} ${N(horizontal.b1)} ${N(h)}`
+    );
+  }
+  parts.push(`H ${N(r)}`, `Q 0 ${N(h)} 0 ${N(h - r)}`);
+
+  if (activeTail?.direction === "left" && vertical?.section === "lower") {
+    const tx = -vertical.len;
+    const cx = tx * TAPER;
+    parts.push(
+      `V ${N(vertical.b2)}`,
+      `Q ${N(cx)} ${N((vertical.b2 + vertical.tip) / 2 + vertical.bend)} ${N(tx)} ${N(vertical.tip)}`,
+      `Q ${N(cx)} ${N((vertical.tip + vertical.b1) / 2 + vertical.bend)} 0 ${N(vertical.b1)}`
+    );
+  }
+  parts.push(`V ${N(lowerStart)}`);
+  parts.push(
+    `Q 0 ${N(lowerJoin)} ${N(waistInset)} ${N(middle)}`,
+    `Q 0 ${N(upperJoin)} 0 ${N(upperEnd)}`
+  );
+  if (activeTail?.direction === "left" && vertical?.section === "upper") {
+    const tx = -vertical.len;
+    const cx = tx * TAPER;
+    parts.push(
+      `V ${N(vertical.b2)}`,
+      `Q ${N(cx)} ${N((vertical.b2 + vertical.tip) / 2 + vertical.bend)} ${N(tx)} ${N(vertical.tip)}`,
+      `Q ${N(cx)} ${N((vertical.tip + vertical.b1) / 2 + vertical.bend)} 0 ${N(vertical.b1)}`
+    );
+  }
+  parts.push(`V ${N(r)}`, `Q 0 0 ${N(r)} 0`, "Z");
+  return parts.join(" ");
 }
 
 /* ── 다중 꼬리(최대 3) — 두 화자 동시 대사/합창 말풍선 ─────────────────────
@@ -145,6 +285,7 @@ interface NotchPlan {
   b2: number; // 밑동 끝
   tip: number; // 끝점의 변 방향 좌표
   len: number; // 바깥으로 뻗는 길이
+  bend: number; // 변 진행축 기준 곡률 제어점 오프셋
 }
 
 /** 한 변 위 꼬리들을 진행 좌표로 정렬·클램프하고 겹침을 밀어내 홈 계획을 만든다. */
@@ -162,6 +303,7 @@ function planNotches(tails: BubbleTailSpec[], span: number, r: number): NotchPla
         half,
         len: t.length,
         tip: clamp(center + sideShift, r + safe, span - r - safe),
+        bend: clamp(t.bend ?? 0, -1, 1) * Math.min(Math.max(t.base, t.length) * 0.42, t.base * 1.4),
       };
     })
     .sort((a, b) => a.center - b.center);
@@ -175,7 +317,13 @@ function planNotches(tails: BubbleTailSpec[], span: number, r: number): NotchPla
     const b2 = b1 + p.half * 2;
     if (b2 > span - r * 0.8 - 0.5) continue; // 변 밖으로 밀려나면 스킵(안전)
     const drift = b1 + p.half - p.center;
-    out.push({ b1, b2, tip: clamp(p.tip + drift, b1 - p.half, b2 + p.half), len: p.len });
+    out.push({
+      b1,
+      b2,
+      tip: clamp(p.tip + drift, b1 - p.half, b2 + p.half),
+      len: p.len,
+      bend: p.bend,
+    });
     cursor = b2;
   }
   return out;
@@ -202,28 +350,28 @@ export function bubblePathDataMulti(w: number, h: number, radius: number, tails:
   for (const nt of top) {
     const ty = -nt.len;
     const cy = ty * TAPER;
-    parts.push(`H ${N(nt.b1)}`, `Q ${N((nt.b1 + nt.tip) / 2)} ${N(cy)} ${N(nt.tip)} ${N(ty)}`, `Q ${N((nt.tip + nt.b2) / 2)} ${N(cy)} ${N(nt.b2)} 0`);
+    parts.push(`H ${N(nt.b1)}`, `Q ${N((nt.b1 + nt.tip) / 2 + nt.bend)} ${N(cy)} ${N(nt.tip)} ${N(ty)}`, `Q ${N((nt.tip + nt.b2) / 2 + nt.bend)} ${N(cy)} ${N(nt.b2)} 0`);
   }
   parts.push(`H ${N(w - r)}`, `A ${N(r)} ${N(r)} 0 0 1 ${N(w)} ${N(r)}`);
   // 오른변: y 증가 방향.
   for (const nt of right) {
     const tx = w + nt.len;
     const cx = w + nt.len * TAPER;
-    parts.push(`V ${N(nt.b1)}`, `Q ${N(cx)} ${N((nt.b1 + nt.tip) / 2)} ${N(tx)} ${N(nt.tip)}`, `Q ${N(cx)} ${N((nt.tip + nt.b2) / 2)} ${N(w)} ${N(nt.b2)}`);
+    parts.push(`V ${N(nt.b1)}`, `Q ${N(cx)} ${N((nt.b1 + nt.tip) / 2 + nt.bend)} ${N(tx)} ${N(nt.tip)}`, `Q ${N(cx)} ${N((nt.tip + nt.b2) / 2 + nt.bend)} ${N(w)} ${N(nt.b2)}`);
   }
   parts.push(`V ${N(h - r)}`, `A ${N(r)} ${N(r)} 0 0 1 ${N(w - r)} ${N(h)}`);
   // 아랫변: x 감소 방향 — 정렬은 증가 기준이므로 역순 순회, 홈은 b2→tip→b1.
   for (const nt of [...bottom].reverse()) {
     const ty = h + nt.len;
     const cy = h + nt.len * TAPER;
-    parts.push(`H ${N(nt.b2)}`, `Q ${N((nt.b2 + nt.tip) / 2)} ${N(cy)} ${N(nt.tip)} ${N(ty)}`, `Q ${N((nt.tip + nt.b1) / 2)} ${N(cy)} ${N(nt.b1)} ${N(h)}`);
+    parts.push(`H ${N(nt.b2)}`, `Q ${N((nt.b2 + nt.tip) / 2 + nt.bend)} ${N(cy)} ${N(nt.tip)} ${N(ty)}`, `Q ${N((nt.tip + nt.b1) / 2 + nt.bend)} ${N(cy)} ${N(nt.b1)} ${N(h)}`);
   }
   parts.push(`H ${N(r)}`, `A ${N(r)} ${N(r)} 0 0 1 0 ${N(h - r)}`);
   // 왼변: y 감소 방향 — 역순 순회, 홈은 b2→tip→b1.
   for (const nt of [...left].reverse()) {
     const tx = -nt.len;
     const cx = tx * TAPER;
-    parts.push(`V ${N(nt.b2)}`, `Q ${N(cx)} ${N((nt.b2 + nt.tip) / 2)} ${N(tx)} ${N(nt.tip)}`, `Q ${N(cx)} ${N((nt.tip + nt.b1) / 2)} 0 ${N(nt.b1)}`);
+    parts.push(`V ${N(nt.b2)}`, `Q ${N(cx)} ${N((nt.b2 + nt.tip) / 2 + nt.bend)} ${N(tx)} ${N(nt.tip)}`, `Q ${N(cx)} ${N((nt.tip + nt.b1) / 2 + nt.bend)} 0 ${N(nt.b1)}`);
   }
   parts.push(`V ${N(r)}`, `A ${N(r)} ${N(r)} 0 0 1 ${N(r)} 0`, "Z");
   return parts.join(" ");
@@ -245,6 +393,7 @@ export function normalizeExtraTails(raw: unknown): BubbleTailSpec[] {
       length: clamp(typeof e.length === "number" && Number.isFinite(e.length) ? e.length : 26, 4, 200),
       base: clamp(typeof e.base === "number" && Number.isFinite(e.base) ? e.base : 18, 4, 120),
       side: sides.includes(e.side as BubbleTailSide) ? (e.side as BubbleTailSide) : "center",
+      bend: clamp(typeof e.bend === "number" && Number.isFinite(e.bend) ? e.bend : 0, -1, 1),
     });
     if (out.length >= BUBBLE_MAX_TAILS - 1) break;
   }

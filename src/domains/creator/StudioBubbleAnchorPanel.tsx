@@ -12,7 +12,16 @@
  * 비활성화된다 — 세 값 모두 이 패널이 자동으로 채우므로 수동 조작이 무의미하기 때문이다
  * (StudioPage 쪽 처리, 이 컴포넌트는 그 사실을 안내 문구로만 알려준다).
  */
-import { Anchor, Crosshair, Unlink2 } from "lucide-react";
+import {
+  Anchor,
+  Crosshair,
+  Info,
+  Link2,
+  MapPin,
+  MousePointerClick,
+  TriangleAlert,
+  Unlink2,
+} from "lucide-react";
 
 import { StudioToggleChip } from "./studio-panel-ui";
 
@@ -44,59 +53,70 @@ export function StudioBubbleAnchorPanel({
   const attached = !!anchorId || !!anchorPoint;
 
   return (
-    <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
+    <div className="mt-2.5 space-y-2.5 rounded-xl border border-line bg-card/45 p-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          <Anchor size={12} aria-hidden />
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
+          <Anchor size={14} className="shrink-0 text-accent" aria-hidden />
           꼬리 자동 부착
         </p>
         {attached && (
           <button
             type="button"
             onClick={onDetach}
+            aria-label="꼬리 자동 부착 해제"
             title="부착을 해제하고 수동으로 꼬리를 조절합니다."
-            className="flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-card pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:px-3"
           >
-            <Unlink2 className="size-3" aria-hidden />
+            <Unlink2 className="size-3.5 shrink-0" aria-hidden />
             해제
           </button>
         )}
       </div>
 
-      <StudioToggleChip
-        active={pickActive}
-        onClick={onTogglePick}
-        title="켜고 캔버스에서 요소를 클릭하면 그 요소에 꼬리가 자동으로 부착됩니다. 빈 곳을 클릭하면 그 좌표에 고정됩니다."
-      >
-        <span className="inline-flex items-center gap-1">
-          <Crosshair className="size-3" aria-hidden />
+      <div className="[&>button]:inline-flex [&>button]:min-h-11 [&>button]:w-full [&>button]:items-center [&>button]:justify-center [&>button]:gap-1.5 [&>button]:px-3 [&>button]:text-xs [&>button]:font-semibold [&>button]:focus-visible:outline-none [&>button]:focus-visible:ring-2 [&>button]:focus-visible:ring-accent [&>button]:focus-visible:ring-offset-2 [&>button]:focus-visible:ring-offset-card">
+        <StudioToggleChip
+          active={pickActive}
+          onClick={onTogglePick}
+          title="켜고 캔버스에서 요소를 클릭하면 그 요소에 꼬리가 자동으로 부착됩니다. 빈 곳을 클릭하면 그 좌표에 고정됩니다."
+        >
+          <Crosshair className="size-3.5 shrink-0" aria-hidden />
           {pickActive ? "대상을 클릭하세요…" : attached ? "다시 지정" : "대상 지정"}
-        </span>
-      </StudioToggleChip>
+        </StudioToggleChip>
+      </div>
 
       {anchorId ? (
         anchorTargetLabel ? (
-          <p className="text-[0.72rem] leading-relaxed text-fg-2" role="status">
-            🔗 <strong className="font-semibold text-fg">{anchorTargetLabel}</strong>에 부착됨 — 대상이 움직이면
-            꼬리가 따라갑니다.
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-2" role="status" aria-live="polite" aria-atomic="true">
+            <Link2 size={14} className="mt-0.5 shrink-0 text-good" aria-hidden />
+            <span>
+              <strong className="font-semibold text-fg">{anchorTargetLabel}</strong>에 부착됨 — 대상이 움직이면
+              꼬리가 따라갑니다.
+            </span>
           </p>
         ) : (
-          <p className="text-[0.72rem] leading-relaxed text-amber-600 dark:text-amber-400" role="status">
-            ⚠️ 부착 대상을 찾을 수 없어요(삭제됨). 부착이 자동으로 해제됩니다.
+          <p className="flex items-start gap-2 text-xs leading-relaxed text-warn" role="status" aria-live="polite" aria-atomic="true">
+            <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+            <span>부착 대상을 찾을 수 없어요(삭제됨). 부착이 자동으로 해제됩니다.</span>
           </p>
         )
       ) : anchorPoint ? (
-        <p className="text-[0.72rem] leading-relaxed text-fg-2" role="status">
-          🔗 고정 좌표({Math.round(anchorPoint.x)}, {Math.round(anchorPoint.y)})에 부착됨 — 말풍선을 옮기면 꼬리
-          각도가 따라갑니다.
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-2" role="status" aria-live="polite" aria-atomic="true">
+          <MapPin size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+          <span>
+            고정 좌표
+            <span className="tabular-nums">({Math.round(anchorPoint.x)}, {Math.round(anchorPoint.y)})</span>에 부착됨 —
+            말풍선을 옮기면 꼬리 각도가 따라갑니다.
+          </span>
         </p>
       ) : pickActive ? (
-        <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-          캔버스에서 요소를 클릭해 부착 대상으로 지정하세요. 빈 캔버스를 클릭하면 그 좌표에 고정됩니다.
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-3" role="status" aria-live="polite" aria-atomic="true">
+          <MousePointerClick size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+          <span>캔버스에서 요소를 클릭해 부착 대상으로 지정하세요. 빈 캔버스를 클릭하면 그 좌표에 고정됩니다.</span>
         </p>
       ) : (
-        <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-          대상을 지정하면 대상이나 말풍선이 움직여도 꼬리가 계속 그쪽을 가리켜요.
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-3" role="status" aria-atomic="true">
+          <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
+          <span>대상을 지정하면 대상이나 말풍선이 움직여도 꼬리가 계속 그쪽을 가리켜요.</span>
         </p>
       )}
     </div>

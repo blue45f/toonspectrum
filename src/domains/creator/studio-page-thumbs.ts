@@ -12,7 +12,7 @@
  * 실제 순서 변경은 studio-pages.reorderPages 가 담당하고, 여기는 슬롯 산술만 제공한다.
  */
 
-import { bubblePathData, type BubbleTailDirection, type BubbleTailSpec } from "./studio-bubble-path";
+import { bubblePathData, doubleBubblePathData, type BubbleTailDirection, type BubbleTailSpec } from "./studio-bubble-path";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 
 // ── 입력 — 느슨한 구조 타입(StudioPage 의 El/PageState 가 그대로 대입 가능) ────────────
@@ -55,6 +55,8 @@ export interface ThumbElement {
   tailDirection?: string;
   tailXRatio?: number;
   tailHeight?: number;
+  tailBase?: number;
+  tailBend?: number;
   // frame
   bg?: string;
   bgColor?: string;
@@ -525,13 +527,15 @@ export function bubbleTailSpecOf(el: ThumbElement, w: number, h: number): Bubble
   const minDim = Math.min(w, h);
   const themeLen = (el.tailHeight ?? 30) - 10; // soft 테마 보정(-10)
   const length = Math.max(minDim * 0.12, Math.min(Math.max(8, themeLen), minDim * 0.3));
-  const base = Math.max(minDim * 0.1, (tailIsVertical ? w : h) * 0.08 * 1.8);
+  const automaticBase = Math.max(minDim * 0.1, (tailIsVertical ? w : h) * 0.08 * 1.8);
+  const base = Math.max(4, Math.min(el.tailBase ?? automaticBase, minDim * 0.62));
   return {
     direction,
     ratio: tailSide === "right" && tailIsVertical ? 1 - ratioBase : ratioBase,
     length,
     base,
     side: "center",
+    bend: Math.max(-1, Math.min(el.tailBend ?? 0, 1)),
   };
 }
 
@@ -575,6 +579,18 @@ function bubbleNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
       kind: "path",
       key: el.id,
       d: bubblePathData(w, h, Math.min(w, h) / 2, null),
+      fill,
+      stroke,
+      strokeWidth,
+      dashed: false,
+      transform: local,
+      opacity,
+    });
+  } else if (variant === "double") {
+    nodes.push({
+      kind: "path",
+      key: el.id,
+      d: doubleBubblePathData(w, h, bubbleTailSpecOf(el, w, h)),
       fill,
       stroke,
       strokeWidth,

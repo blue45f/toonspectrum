@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { doubleBubblePathData } from "./studio-bubble-path";
 import {
   buildThumbNodes,
   bubbleTailSpecOf,
@@ -332,6 +333,43 @@ describe("studio-page-thumbs — buildThumbNodes(요소 프록시)", () => {
     expect(bubbleTailSpecOf({ id: "b5", type: "bubble", tailDirection: "diagonal" }, 100, 100)?.direction).toBe(
       "bottom"
     );
+  });
+
+  it("bubbleTailSpecOf: 편집한 밑동 너비와 곡률을 썸네일에도 동일하게 반영한다", () => {
+    const spec = bubbleTailSpecOf(
+      { id: "b6", type: "bubble", tailBase: 38, tailBend: 0.55 },
+      200,
+      120
+    );
+    expect(spec?.base).toBe(38);
+    expect(spec?.bend).toBe(0.55);
+
+    const clamped = bubbleTailSpecOf(
+      { id: "b7", type: "bubble", tailBase: 999, tailBend: -9 },
+      200,
+      120
+    );
+    expect(clamped?.base).toBeCloseTo(74.4);
+    expect(clamped?.bend).toBe(-1);
+  });
+
+  it("bubble(double): 캔버스와 같은 이중 로브 path를 썸네일에 사용한다", () => {
+    const el: ThumbElement = {
+      id: "b8",
+      type: "bubble",
+      variant: "double",
+      text: "이어 말하기",
+      x: 10,
+      y: 20,
+      width: 260,
+      height: 170,
+      tailBase: 36,
+      tailBend: 0.25,
+    };
+    const { nodes } = buildThumbNodes(pageWith([el]));
+    const body = nodes[0];
+    if (body.kind !== "path") throw new Error("double 말풍선 path 노드가 아님");
+    expect(body.d).toBe(doubleBubblePathData(260, 170, bubbleTailSpecOf(el, 260, 170)));
   });
 
   it("draw: 지우개는 생략, 프리핸드는 다운샘플 폴리라인, 도형은 프리미티브", () => {

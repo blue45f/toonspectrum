@@ -88,18 +88,30 @@ export function groupTemplates(templates: TemplateSpec[]): { group: string; temp
   })).filter((g) => g.templates.length > 0);
 }
 
-export type BubbleVariant = "speech" | "thought" | "shout" | "box" | "whisper" | "scared" | "system" | "heart" | "phone" | "angry";
-export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; sample: string }[] = [
-  { id: "speech", label: "말하기", sample: "💬" },
-  { id: "thought", label: "생각", sample: "💭" },
-  { id: "shout", label: "외침", sample: "📢" },
-  { id: "whisper", label: "속삭임", sample: "🤫" },
-  { id: "scared", label: "소심/공포", sample: "😰" },
-  { id: "system", label: "상태창/퀘스트", sample: "⚙️" },
-  { id: "heart", label: "사랑/러블리", sample: "🩷" },
-  { id: "phone", label: "폰 메신저", sample: "📱" },
-  { id: "angry", label: "분노/격앙", sample: "⚡" },
-  { id: "box", label: "내레이션", sample: "▭" },
+export type BubbleVariant =
+  | "speech"
+  | "double"
+  | "thought"
+  | "shout"
+  | "box"
+  | "whisper"
+  | "scared"
+  | "system"
+  | "heart"
+  | "phone"
+  | "angry";
+export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; hint: string }[] = [
+  { id: "speech", label: "말하기", hint: "기본 대사" },
+  { id: "double", label: "이어 말하기", hint: "긴 대사·시간차" },
+  { id: "thought", label: "생각", hint: "속마음·독백" },
+  { id: "shout", label: "외침", hint: "큰 소리·충격" },
+  { id: "whisper", label: "속삭임", hint: "작은 목소리" },
+  { id: "scared", label: "소심·공포", hint: "떨림·불안" },
+  { id: "system", label: "상태창", hint: "퀘스트·알림" },
+  { id: "heart", label: "러블리", hint: "호감·설렘" },
+  { id: "phone", label: "메신저", hint: "채팅·문자" },
+  { id: "angry", label: "격앙", hint: "분노·절규" },
+  { id: "box", label: "내레이션", hint: "시간·장소 설명" },
 ];
 
 // 만화 효과 이모지(스티커).

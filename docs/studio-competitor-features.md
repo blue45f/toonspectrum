@@ -6,7 +6,8 @@
 >
 > 작성일: 2026-07-04, 최종 갱신: 2026-07-11(잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
-> 캡처 readiness·모바일 복구 안전성. 모바일 검증 캡처는 `docs/screenshots/studio-commercial-suite/`) ·
+> 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
+> 자산 관리 + Babylon.js 실측 ADR. 모바일 검증 캡처는 `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
 > 적용 대상/권리 체크리스트/문맥 댓글/프로덕션 인사이트 배치. 상세 매트릭스는
@@ -95,6 +96,46 @@
   Package는 브라우저 실제 다운로드 후 `unzip -t`, entry·hash manifest를 함께 확인했다.
 
 증거 캡처: [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md).
+
+### 2026-07-11 말풍선·소재·모바일 조작성 배치 (현재 작업 트리 통합 완료)
+
+공식 기능 근거는 Clip Studio Paint의 [Balloons 매뉴얼](https://help.clip-studio.com/en-us/manual_en/540_comic/Balloons.htm),
+MediBang의 [말풍선 종류 튜토리얼](https://medibangpaint.com/en/use/2021/11/mangatutorialforbeginners08/)과
+[Tiles/Tones/Items 소재 매뉴얼](https://medibangpaint.com/en/use/2016/12/pc-use-materials-tiles-tones-items/),
+ibisPaint의 [타원자 말풍선 제작](https://ibispaint.com/lecture/index.jsp?lang=en&no=45)을 기준으로 삼았다.
+경쟁사의 실제 소재 파일·썸네일·아이콘은 복제하지 않고 편집 규칙과 작업 흐름만 자체 구현했다.
+
+- **말풍선 꼬리 정밀 편집**: 주 꼬리와 추가 꼬리마다 부착면·위치·길이·밑동 너비·끝 기울기·곡률을
+  독립 편집한다. 본체와 꼬리는 하나의 SVG path라 밑동의 이중 외곽선 이음새가 없고, 화면·페이지
+  썸네일·SVG 내보내기·커스텀 모양 전환이 같은 기하 규칙을 사용한다. 최대 세 화자의 동시 대사를
+  표현할 수 있다.
+- **이어 말하기 이중 말풍선**: MediBang의 긴 대사/시간차용 double bubble을 기능 기준으로 재해석해,
+  위·아래 두 로브를 내부 이음선 없는 하나의 벡터 path로 구현했다. 상·하·좌·우 주 꼬리와 밑동·곡률,
+  SVG·썸네일 직렬화를 지원하며 의미가 다른 다중 화자 꼬리는 의도적으로 비활성화한다.
+- **실물 형태 벡터 선택기**: 운영체제마다 달라지는 이모지 10종을 제거하고 실제 캔버스 실루엣과 맞는
+  자체 SVG 11종을 2열 갤러리로 제공한다. 용도 설명, 메뉴 역할, 키보드 포커스와 99px 높이 모바일
+  선택 영역을 포함한다.
+- **앵커·자산 관리 접근성**: 말풍선 앵커 상태의 이모지와 하드코딩 색을 Lucide/semantic token으로
+  교체하고 live status를 추가했다. 내 에셋의 20px hover-only 이름변경·공유·삭제를 항상 발견 가능한
+  44px 작업 행으로 바꾸고, 업로드·생성·검색·정렬도 터치 기준을 맞췄다.
+- **검수형 투명 전경 소재 4종**: 카페 2인 테이블, 교실 책상·학습 소품, 왕실 편지·봉인, 도시 거리
+  시설물을 1536×1024 RGBA WebP로 자체 생성했다. 에셋 ID·한/영 태그·배치 기본값·내부 라이선스 참조·
+  provider/model·날짜·원문 없는 prompt/edit SHA-256을 `studio-raster-assets.ts` 한 곳에서 관리한다.
+  삽입 시 정적 URL을 WebP data URL로 바꿔 프로젝트 archive가 self-contained 상태를 유지하고 Publish
+  preflight용 AI provenance도 요소에 보존한다.
+- **메뉴 아이콘·터치 품질**: 장면/효과/내 에셋 중복 아이콘을 Clapperboard/Sticker/Library로 분리하고,
+  집중선·속도선의 이모지를 ScanLine/Wind로 바꿨다. 검색, 필터 칩, 효과음·이모지·선 효과도 coarse
+  pointer에서 최소 44px이 되게 했다.
+- **Babylon.js 도입 결론 — 보류**: 격리 Vite PoC에서 Babylon creator WebGL 시작 경로는 305,625 B
+  gzip, 현재 Three 기반 3D 배경 시작 경로는 79,398 B gzip이었다. 현재 VRM 포저가
+  `@pixiv/three-vrm`에 깊게 의존하고 두 엔진 병행 비용이 크므로 프로덕션 의존성을 추가하지 않는다.
+  WebGPU 대표 장면이 p95 frame time 25% 이상 개선되는 등 정량 기준을 충족할 때만 별도 실험으로
+  재검토한다. 전체 수치와 채택 게이트는
+  [`studio-babylonjs-adoption-evaluation-2026-07-11.md`](studio-babylonjs-adoption-evaluation-2026-07-11.md)에 기록했다.
+
+모바일 375×812 실제 브라우저에서 말풍선 갤러리·꼬리 편집·자산 작업·래스터 소재를 각각 조작했고,
+가로 overflow 0과 핵심 44px 터치 영역을 측정했다. 관련 집중 테스트 173개와 전체 회귀
+244개 파일·4,281개 테스트, TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드를 모두 통과했다.
 
 ### 2026-07-10 공식 경쟁사 재벤치마크 배치 (현재 작업 트리 통합 완료)
 

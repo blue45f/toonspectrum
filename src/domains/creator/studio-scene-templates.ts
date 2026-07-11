@@ -17,6 +17,7 @@ const CANVAS_W = 720;
 
 type BubbleVariant =
   | "speech"
+  | "double"
   | "thought"
   | "shout"
   | "box"

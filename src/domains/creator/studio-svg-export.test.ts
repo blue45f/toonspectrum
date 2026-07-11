@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { screentoneDotsForStroke } from "./studio-brush";
-import { bubblePathData } from "./studio-bubble-path";
+import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
 import {
   SVG_EXPORT_MIME,
   escapeXml,
@@ -347,6 +347,33 @@ describe("말풍선 직렬화", () => {
     expect(svg).toContain(`<path d="${expected}" fill="#ffffff" stroke="#1f1a16" stroke-width="2.5"`);
     expect(svg).toContain('<tspan x="100" y="67.14">야!</tspan>');
     expect(svg).toContain('letter-spacing="0.3"');
+  });
+
+  it("speech — 편집한 꼬리 밑동과 곡률이 SVG path에 보존된다", () => {
+    const { svg } = exportPageToSvg(page([bubbleEl({ tailBase: 42, tailBend: 0.65 })]));
+    const expected = bubblePathData(200, 120, 18, {
+      direction: "bottom",
+      ratio: 0.35,
+      length: 30,
+      base: 42,
+      side: "center",
+      bend: 0.65,
+    });
+    expect(svg).toContain(`<path d="${expected}"`);
+  });
+
+  it("double — 긴 대사를 위한 이중 로브와 주 꼬리를 단일 path로 내보낸다", () => {
+    const el = bubbleEl({ variant: "double", width: 260, height: 170, tailBase: 38, tailBend: -0.4 });
+    const { svg } = exportPageToSvg(page([el]));
+    const expected = doubleBubblePathData(260, 170, {
+      direction: "bottom",
+      ratio: 0.35,
+      length: 30,
+      base: 38,
+      side: "center",
+      bend: -0.4,
+    });
+    expect(svg).toContain(`<path d="${expected}"`);
   });
 
   it("whisper — 점선(8 5) 외곽선으로 그린다", () => {

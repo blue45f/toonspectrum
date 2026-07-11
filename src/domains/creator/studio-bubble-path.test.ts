@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { bubblePathData, bubblePathDataMulti, normalizeExtraTails, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  bubblePathData,
+  bubblePathDataMulti,
+  doubleBubblePathData,
+  normalizeExtraTails,
+  type BubbleTailSpec,
+} from "./studio-bubble-path";
 
 const tail = (over: Partial<BubbleTailSpec> = {}): BubbleTailSpec => ({
   direction: "bottom",
@@ -58,6 +64,40 @@ describe("bubblePathData", () => {
     const center = bubblePathData(200, 120, 18, tail({ side: "center" }));
     const leaned = bubblePathData(200, 120, 18, tail({ side: "right" }));
     expect(center).not.toBe(leaned);
+  });
+
+  it("bend로 꼬리 몸통의 곡률을 좌우로 조절한다", () => {
+    const straight = bubblePathData(200, 120, 18, tail({ bend: 0 }));
+    const leftCurve = bubblePathData(200, 120, 18, tail({ bend: -0.8 }));
+    const rightCurve = bubblePathData(200, 120, 18, tail({ bend: 0.8 }));
+    expect(leftCurve).not.toBe(straight);
+    expect(rightCurve).not.toBe(straight);
+    expect(leftCurve).not.toBe(rightCurve);
+    expect(leftCurve).not.toContain("NaN");
+  });
+});
+
+describe("doubleBubblePathData", () => {
+  it("위·아래 로브를 내부 이음새 없는 단일 닫힌 path로 만든다", () => {
+    const d = doubleBubblePathData(260, 170, null);
+    expect(d.startsWith("M ")).toBe(true);
+    expect(d.endsWith(" Z")).toBe(true);
+    expect(d.match(/M /g)).toHaveLength(1);
+    expect(d).not.toContain("NaN");
+  });
+
+  it.each(["top", "bottom", "left", "right"] as const)("%s 변 꼬리를 같은 path에 통합한다", (direction) => {
+    const withoutTail = doubleBubblePathData(260, 170, null);
+    const withTail = doubleBubblePathData(260, 170, tail({ direction, ratio: 0.72, bend: 0.5 }));
+    expect(withTail).not.toBe(withoutTail);
+    expect(withTail.match(/Q /g)?.length ?? 0).toBeGreaterThan(withoutTail.match(/Q /g)?.length ?? 0);
+    expect(withTail).not.toContain("NaN");
+  });
+
+  it("극단적인 ratio·base·bend도 유효한 경로로 클램프한다", () => {
+    const d = doubleBubblePathData(120, 90, tail({ ratio: 99, base: 999, bend: -99 }));
+    expect(d).not.toContain("NaN");
+    expect(d.endsWith(" Z")).toBe(true);
   });
 });
 
@@ -117,6 +157,16 @@ describe("다중 꼬리(bubblePathDataMulti)", () => {
     expect(d.includes("NaN")).toBe(false);
     expect(d.match(/Q /g)).toHaveLength(6);
   });
+
+  it("다중 꼬리마다 독립적인 bend를 보존한다", () => {
+    const straight = bubblePathDataMulti(240, 120, 12, [TAIL({ ratio: 0.3 }), TAIL({ ratio: 0.7 })]);
+    const curved = bubblePathDataMulti(240, 120, 12, [
+      TAIL({ ratio: 0.3, bend: -1 }),
+      TAIL({ ratio: 0.7, bend: 1 }),
+    ]);
+    expect(curved).not.toBe(straight);
+    expect(curved.match(/Q /g)).toHaveLength(4);
+  });
 });
 
 describe("normalizeExtraTails", () => {
@@ -128,13 +178,14 @@ describe("normalizeExtraTails", () => {
 
   it("유효 항목은 클램프되어 최대 2개까지 수용된다", () => {
     const out = normalizeExtraTails([
-      { direction: "top", ratio: 9, length: 9999, base: 1, side: "left" },
-      { direction: "left", ratio: -1, length: 0.1, base: 999, side: "weird" },
+      { direction: "top", ratio: 9, length: 9999, base: 1, side: "left", bend: 9 },
+      { direction: "left", ratio: -1, length: 0.1, base: 999, side: "weird", bend: -9 },
       { direction: "right", ratio: 0.5, length: 20, base: 16, side: "center" },
     ]);
     expect(out).toHaveLength(2);
-    expect(out[0]).toEqual({ direction: "top", ratio: 1, length: 200, base: 4, side: "left" });
+    expect(out[0]).toEqual({ direction: "top", ratio: 1, length: 200, base: 4, side: "left", bend: 1 });
     expect(out[1].side).toBe("center");
     expect(out[1].direction).toBe("left");
+    expect(out[1].bend).toBe(-1);
   });
 });

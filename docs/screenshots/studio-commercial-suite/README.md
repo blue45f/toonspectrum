@@ -9,8 +9,22 @@ These are implementation evidence, not product mockups.
 | `ai-provenance-mobile.png` | Provider/model/result provenance without raw prompts or credentials |
 | `publish-package-mobile.png` | Publish preflight and deterministic single-ZIP package workflow |
 | `auto-actions-mobile.png` | Typed batch actions, page scope, dry run, automatic recovery point, and one-step undo |
+| `bubble-library-mobile.png` | Two-column vector preview gallery for eleven emotion and narrative bubble variants |
+| `bubble-tail-editor-mobile.png` | Speaker side, attachment edge, position, length, base width, and bend controls |
+| `asset-actions-mobile.png` | Always-discoverable 44px rename, share, and delete actions for saved assets |
+| `raster-props-mobile.png` | Reviewed transparent café, school, fantasy, and urban foreground prop catalog |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
 flows were also exercised through real browser downloads; their binary ZIP integrity is covered by the
 corresponding automated tests.
+
+Additional measured checks for this batch:
+
+- Bubble gallery cards measured 168 × 99 CSS pixels at 375px viewport width.
+- Every segmented bubble-tail button measured exactly 44 CSS pixels tall; the range rows provide a
+  44px label hit area around the native slider.
+- Saved-asset actions measured 44px tall and the preview insertion target measured 80px tall.
+- Raster prop cards measured 167 × 160 CSS pixels and inserted a self-contained WebP data URL with a
+  stable catalog ID plus publish-preflight AI provenance.
+- All four screens retained zero horizontal document overflow.

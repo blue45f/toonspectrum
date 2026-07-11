@@ -53,6 +53,8 @@ export interface BubbleShapeGeometryInput {
   tailDirection?: BubbleTailDirection;
   tailXRatio?: number;
   tailHeight?: number;
+  tailBase?: number;
+  tailBend?: number;
   /** studio-bubble-path.normalizeExtraTails 로 이미 정규화된 배열을 넘긴다(호출자 책임). */
   extraTails?: BubbleTailSpec[];
 }
@@ -93,7 +95,11 @@ export function computeBubbleShapeGeometry(input: BubbleShapeGeometryInput): Bub
   const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
   const bMinDim = Math.min(input.width, input.height);
   const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeight + tailLenAdjust), bMinDim * 0.3));
-  const bTailBase = Math.max(bMinDim * 0.1, (tailIsVertical ? input.width : input.height) * borderRatio * 1.8);
+  const automaticTailBase = Math.max(
+    bMinDim * 0.1,
+    (tailIsVertical ? input.width : input.height) * borderRatio * 1.8
+  );
+  const bTailBase = Math.max(4, Math.min(input.tailBase ?? automaticTailBase, bMinDim * 0.62));
 
   const tailSpec: BubbleTailSpec | null = showTail
     ? {
@@ -102,6 +108,7 @@ export function computeBubbleShapeGeometry(input: BubbleShapeGeometryInput): Bub
         length: bTailLen,
         base: bTailBase,
         side: "center",
+        bend: Math.max(-1, Math.min(input.tailBend ?? 0, 1)),
       }
     : null;
 

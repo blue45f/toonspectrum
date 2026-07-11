@@ -49,6 +49,9 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 - **리뷰 피드** `/reviews` — Letterboxd 감성의 한 줄 리뷰 피드 (스포일러 블러·공감·정렬)
 - **인사이트** `/insights` — 장르·플랫폼·연도·평점·가격·어댑테이션을 시각화한 트렌드 대시보드
 - **내 서재** `/library` — 관심/평가/완독 관리, **취향 분석**, 맞춤 추천, 컬렉션
+- **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·3D/VRM·벡터/래스터 소재·AI 제작 보조·검토·
+  복구·Publish Package를 합친 모바일 대응 올인원 제작실. 상세 벤치마크와 구현 현황은
+  [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md) 참고
 - **⌘K 커맨드 팔레트** — 어디서든 통합 검색
 
 <br/>

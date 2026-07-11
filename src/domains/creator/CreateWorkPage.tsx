@@ -17,7 +17,9 @@ import {
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { BUBBLE_VARIANTS } from "./studio-assets";
 import { readWorkFx } from "./studio-motion-fx";
+import { STUDIO_RASTER_ASSETS } from "./studio-raster-assets";
 import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
 import { WorkFxPanel } from "./WorkFxPanel";
 
@@ -46,6 +48,12 @@ import {
 } from "@/src/infrastructure/creator-client";
 
 const MAX_COMMENT_LENGTH = 700;
+const BUBBLE_LABEL_BY_ID: ReadonlyMap<string, string> = new Map(
+  BUBBLE_VARIANTS.map((variant) => [variant.id, variant.label] as const)
+);
+const RASTER_ASSET_LABEL_BY_ID: ReadonlyMap<string, string> = new Map(
+  STUDIO_RASTER_ASSETS.map((asset) => [asset.id, asset.label] as const)
+);
 
 // 모션툰 영상(WebM) 내보내기 패널 — 작성자에게만 보이므로 녹화 엔진 청크를 지연 로드한다.
 const StudioMotionExportPanel = lazy(() =>
@@ -335,6 +343,7 @@ interface ElNode {
   details?: string;
   opacity?: number;
   hidden?: boolean;
+  builtinRasterAssetId?: string;
 }
 
 interface StudioElement {
@@ -352,6 +361,7 @@ interface StudioElement {
   lineCount?: number;
   opacity?: number;
   hidden?: boolean;
+  builtinRasterAssetId?: string;
 }
 
 interface StudioDoc {
@@ -380,13 +390,17 @@ function mapElementsToNodes(elements: StudioElement[]): ElNode[] {
     let name = "레이어";
     let details = "";
     if (el.type === "bubble") {
-      name = `말풍선 (${el.variant === "speech" ? "대사" : el.variant === "thought" ? "생각" : el.variant === "shout" ? "외침" : "설명"})`;
+      name = `${BUBBLE_LABEL_BY_ID.get(el.variant ?? "") ?? "대사"} 말풍선`;
       details = el.text ? `"${el.text.slice(0, 30)}${el.text.length > 30 ? "..." : ""}"` : "(비어 있음)";
     } else if (el.type === "text") {
       name = "텍스트 레이어";
       details = el.text ? `"${el.text.slice(0, 30)}${el.text.length > 30 ? "..." : ""}"` : "(비어 있음)";
     } else if (el.type === "image") {
-      name = el.src && el.src.startsWith("data:") ? "3D 캐릭터 렌더" : "배경 / 스튜디오 이미지";
+      name = el.builtinRasterAssetId
+        ? RASTER_ASSET_LABEL_BY_ID.get(el.builtinRasterAssetId) ?? "번들 장면 소품"
+        : el.src && el.src.startsWith("data:")
+          ? "3D 캐릭터 렌더"
+          : "배경 / 스튜디오 이미지";
       details = el.src && !el.src.startsWith("data:") ? el.src.split("/").pop() || "" : "";
     } else if (el.type === "sticker") {
       name = "소품 / 스티커";

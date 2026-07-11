@@ -34,6 +34,28 @@ describe("computeBubbleShapeGeometry", () => {
     expect(g.tailSpec?.direction).toBe("bottom");
   });
 
+  it("사용자 밑동 너비와 곡률을 보존하고 안전 범위로 제한한다", () => {
+    const custom = computeBubbleShapeGeometry({
+      width: 200,
+      height: 120,
+      theme: "classic",
+      tailBase: 42,
+      tailBend: -0.65,
+    });
+    expect(custom.tailSpec?.base).toBe(42);
+    expect(custom.tailSpec?.bend).toBe(-0.65);
+
+    const clamped = computeBubbleShapeGeometry({
+      width: 200,
+      height: 120,
+      theme: "classic",
+      tailBase: 999,
+      tailBend: 9,
+    });
+    expect(clamped.tailSpec?.base).toBeCloseTo(74.4);
+    expect(clamped.tailSpec?.bend).toBe(1);
+  });
+
   it("같은 입력 → 같은 결과(결정적)", () => {
     const a = computeBubbleShapeGeometry({ width: 200, height: 120, theme: "classic", tailDirection: "left" });
     const b = computeBubbleShapeGeometry({ width: 200, height: 120, theme: "classic", tailDirection: "left" });
