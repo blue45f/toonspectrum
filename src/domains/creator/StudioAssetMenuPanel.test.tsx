@@ -5,6 +5,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { createStudioAssetFavoriteId } from "./studio-asset-favorites";
 import { StudioAssetMenuPanel } from "./StudioAssetMenuPanel";
 
 import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
@@ -56,6 +57,10 @@ function renderPanel(overrides: Partial<StudioAssetMenuPanelProps> = {}) {
     setAssetSearchQuery: noop,
     assetSortOrder: "newest",
     setAssetSortOrder: noop,
+    favoriteState: { version: 1, ids: [] },
+    favoriteOnly: false,
+    setFavoriteOnly: noop,
+    onToggleFavorite: noop,
     assets: [LOCAL_ASSET],
     assetsLoading: false,
     renamingAssetId: null,
@@ -115,5 +120,105 @@ describe("StudioAssetMenuPanel mobile asset controls", () => {
     expect(html).toContain('aria-controls="shared-asset-actions-shared-1"');
     expect(html).toContain('aria-label="공유 에셋 공유 관리 작업 열기"');
     expect(html).not.toContain("group-hover:opacity-100");
+  });
+});
+
+describe("StudioAssetMenuPanel favorites", () => {
+  it("keeps the selected sort order inside favorite and non-favorite groups", () => {
+    const assets = [
+      { ...LOCAL_ASSET, id: "ga", name: "가 에셋", createdAt: 1 },
+      { ...LOCAL_ASSET, id: "da", name: "다 에셋", createdAt: 3 },
+      { ...LOCAL_ASSET, id: "na", name: "나 에셋", createdAt: 2 },
+    ];
+    const html = renderPanel({
+      assetSortOrder: "name",
+      assets,
+      favoriteState: {
+        version: 1,
+        ids: [
+          createStudioAssetFavoriteId("local", "na"),
+          createStudioAssetFavoriteId("local", "da"),
+        ],
+      },
+    });
+
+    const na = html.indexOf('data-favorite-id="local:na"');
+    const da = html.indexOf('data-favorite-id="local:da"');
+    const ga = html.indexOf('data-favorite-id="local:ga"');
+    expect(na).toBeGreaterThan(-1);
+    expect(na).toBeLessThan(da);
+    expect(da).toBeLessThan(ga);
+  });
+
+  it("intersects the favorite-only filter with the current search", () => {
+    const html = renderPanel({
+      favoriteOnly: true,
+      assetSearchQuery: "match",
+      assets: [
+        { ...LOCAL_ASSET, id: "match-favorite", name: "Match Favorite" },
+        { ...LOCAL_ASSET, id: "match-regular", name: "Match Regular" },
+        { ...LOCAL_ASSET, id: "hidden-favorite", name: "Hidden Favorite" },
+      ],
+      favoriteState: {
+        version: 1,
+        ids: [
+          createStudioAssetFavoriteId("local", "match-favorite"),
+          createStudioAssetFavoriteId("local", "hidden-favorite"),
+        ],
+      },
+    });
+
+    expect(html).toContain('data-favorite-id="local:match-favorite"');
+    expect(html).not.toContain('data-favorite-id="local:match-regular"');
+    expect(html).not.toContain('data-favorite-id="local:hidden-favorite"');
+    expect(html).toContain('aria-pressed="true"');
+  });
+
+  it("explains an empty favorite-only intersection instead of reporting a generic search miss", () => {
+    const html = renderPanel({ favoriteOnly: true });
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain("조건에 맞는 즐겨찾기가 없습니다.");
+    expect(html).toContain("별표를 추가하거나 검색 조건을 바꿔보세요.");
+    expect(html).not.toContain("검색 결과가 없습니다.");
+  });
+
+  it("keeps identical local and community raw IDs in separate favorite namespaces", () => {
+    const rawId = "same-id";
+    const favoriteState = {
+      version: 1 as const,
+      ids: [createStudioAssetFavoriteId("local", rawId)],
+    };
+    const localHtml = renderPanel({
+      assets: [{ ...LOCAL_ASSET, id: rawId, name: "같은 로컬" }],
+      shared: [{ ...SHARED_ASSET, id: rawId, name: "같은 공유" }],
+      favoriteState,
+    });
+    const communityHtml = renderPanel({
+      assetTab: "community",
+      assets: [{ ...LOCAL_ASSET, id: rawId, name: "같은 로컬" }],
+      shared: [{ ...SHARED_ASSET, id: rawId, name: "같은 공유" }],
+      favoriteState,
+    });
+
+    expect(localHtml).toContain('data-favorite-id="local:same-id"');
+    expect(localHtml).toContain('aria-label="같은 로컬 즐겨찾기에서 제거" aria-pressed="true"');
+    expect(communityHtml).toContain('data-favorite-id="community:same-id"');
+    expect(communityHtml).toContain('aria-label="같은 공유 즐겨찾기에 추가" aria-pressed="false"');
+  });
+
+  it("renders the star as a 44px sibling control, separate from use and management actions", () => {
+    const html = renderPanel();
+    const favoriteButton = html.indexOf('aria-label="로컬 에셋 즐겨찾기에 추가"');
+    const favoriteButtonEnd = html.indexOf("</button>", favoriteButton);
+    const useButton = html.indexOf('aria-label="로컬 에셋 캔버스에 추가"');
+
+    expect(html).toContain('aria-label="즐겨찾기만"');
+    expect(html).toContain('aria-label="로컬 에셋 즐겨찾기에 추가" aria-pressed="false"');
+    expect(html.slice(favoriteButton, favoriteButtonEnd)).toContain("size-11");
+    expect(favoriteButton).toBeGreaterThan(-1);
+    expect(favoriteButtonEnd).toBeLessThan(useButton);
+    expect(html.slice(favoriteButton, favoriteButtonEnd)).not.toContain("캔버스에 추가");
+    expect(html.slice(favoriteButton, favoriteButtonEnd)).not.toContain("관리 작업");
   });
 });

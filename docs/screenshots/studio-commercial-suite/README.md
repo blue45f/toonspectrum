@@ -13,6 +13,7 @@ These are implementation evidence, not product mockups.
 | `bubble-tail-editor-mobile.png` | Speaker side, attachment edge, position, length, base width, and bend controls |
 | `asset-actions-mobile.png` | Always-discoverable 44px rename, share, and delete actions for saved assets |
 | `raster-props-mobile.png` | Reviewed transparent café, school, fantasy, and urban foreground prop catalog |
+| `asset-favorites-mobile.png` | Persistent raster favorite, favorite-only intersection, and independent insert action |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
@@ -27,4 +28,9 @@ Additional measured checks for this batch:
 - Saved-asset actions measured 44px tall and the preview insertion target measured 80px tall.
 - Raster prop cards measured 167 × 160 CSS pixels and inserted a self-contained WebP data URL with a
   stable catalog ID plus publish-preflight AI provenance.
-- All four screens retained zero horizontal document overflow.
+- Raster favorite buttons measured 44 × 44 CSS pixels and the favorite-only filter measured
+  81.875 × 44 pixels. The saved-asset favorite-only control measured 167.5 × 44 pixels.
+- Reloading the Studio restored the guest-scoped favorite ID; favorite-only left exactly the selected
+  café prop visible without triggering canvas insertion.
+- All five screens from the speech-bubble, asset, and favorite batches retained zero horizontal
+  document overflow.

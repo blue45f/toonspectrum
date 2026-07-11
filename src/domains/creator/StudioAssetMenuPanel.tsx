@@ -11,11 +11,23 @@ import {
   Search,
   Share2,
   Sparkles,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
 import { useState } from "react";
 
+import {
+  createStudioAssetFavoriteId,
+  favoriteFirst,
+  favoriteOnly as filterFavoriteOnly,
+  isStudioAssetFavorite,
+} from "./studio-asset-favorites";
+
+import type {
+  StudioAssetFavoriteId,
+  StudioAssetFavoriteState,
+} from "./studio-asset-favorites";
 import type { StudioAsset } from "./studio-asset-library";
 import type {
   GeneratedAssetQuality,
@@ -25,7 +37,6 @@ import type {
 import type { ChangeEvent, Dispatch, DragEvent, KeyboardEvent, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";
-
 
 export type StudioAssetTab = "mine" | "community";
 export type StudioAssetSortOrder = "newest" | "name" | "size";
@@ -54,6 +65,10 @@ export interface StudioAssetMenuPanelProps {
   setAssetSearchQuery: Dispatch<SetStateAction<string>>;
   assetSortOrder: StudioAssetSortOrder;
   setAssetSortOrder: Dispatch<SetStateAction<StudioAssetSortOrder>>;
+  favoriteState: StudioAssetFavoriteState;
+  favoriteOnly: boolean;
+  setFavoriteOnly: Dispatch<SetStateAction<boolean>>;
+  onToggleFavorite: (id: StudioAssetFavoriteId) => void;
   assets: StudioAsset[];
   assetsLoading: boolean;
   renamingAssetId: string | null;
@@ -114,6 +129,50 @@ function dragAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAsset, "
   );
 }
 
+function AssetFavoriteButton({
+  assetName,
+  favoriteId,
+  favoriteState,
+  onToggleFavorite,
+}: {
+  assetName: string;
+  favoriteId: StudioAssetFavoriteId;
+  favoriteState: StudioAssetFavoriteState;
+  onToggleFavorite: (id: StudioAssetFavoriteId) => void;
+}) {
+  const favorite = isStudioAssetFavorite(favoriteState, favoriteId);
+  const label = `${assetName} 즐겨찾기${favorite ? "에서 제거" : "에 추가"}`;
+
+  return (
+    <button
+      type="button"
+      draggable={false}
+      onPointerDown={(event) => event.stopPropagation()}
+      onDragStart={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggleFavorite(favoriteId);
+      }}
+      aria-label={label}
+      aria-pressed={favorite}
+      title={label}
+      data-favorite-id={favoriteId}
+      className={cx(
+        "absolute right-1.5 top-1.5 z-10 flex size-11 items-center justify-center rounded-md border shadow-sm transition-colors",
+        CONTROL_FOCUS_CLASS,
+        favorite
+          ? "border-accent bg-panel text-accent"
+          : "border-line bg-panel/95 text-fg-2 hover:border-accent/60 hover:text-accent"
+      )}
+    >
+      <Star size={16} className={favorite ? "fill-current" : undefined} aria-hidden />
+    </button>
+  );
+}
+
 export function StudioAssetMenuPanel({
   assetTab,
   setAssetTab,
@@ -132,6 +191,10 @@ export function StudioAssetMenuPanel({
   setAssetSearchQuery,
   assetSortOrder,
   setAssetSortOrder,
+  favoriteState,
+  favoriteOnly,
+  setFavoriteOnly,
+  onToggleFavorite,
   assets,
   assetsLoading,
   renamingAssetId,
@@ -150,8 +213,24 @@ export function StudioAssetMenuPanel({
   onUseSharedAsset,
   onDeleteSharedAsset,
 }: StudioAssetMenuPanelProps) {
-  const filteredAssets = sortLocalAssets(assets, assetSearchQuery, assetSortOrder);
-  const filteredShared = sortSharedAssets(shared, assetSearchQuery, assetSortOrder);
+  const localFavoriteId = (asset: StudioAsset) => createStudioAssetFavoriteId("local", asset.id);
+  const sharedFavoriteId = (asset: SharedAsset) => createStudioAssetFavoriteId("community", asset.id);
+  const sortedAssets = favoriteFirst(
+    sortLocalAssets(assets, assetSearchQuery, assetSortOrder),
+    favoriteState,
+    localFavoriteId
+  );
+  const sortedShared = favoriteFirst(
+    sortSharedAssets(shared, assetSearchQuery, assetSortOrder),
+    favoriteState,
+    sharedFavoriteId
+  );
+  const filteredAssets = favoriteOnly
+    ? filterFavoriteOnly(sortedAssets, favoriteState, localFavoriteId)
+    : sortedAssets;
+  const filteredShared = favoriteOnly
+    ? filterFavoriteOnly(sortedShared, favoriteState, sharedFavoriteId)
+    : sortedShared;
 
   return (
     <>
@@ -279,8 +358,8 @@ export function StudioAssetMenuPanel({
         </div>
       )}
 
-      <div className="mb-2 flex items-center gap-1.5">
-        <div className="relative flex-1">
+      <div className="mb-2 grid grid-cols-2 gap-1.5">
+        <div className="relative col-span-2">
           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
           <input
             type="text"
@@ -313,13 +392,29 @@ export function StudioAssetMenuPanel({
           aria-label="에셋 정렬"
           className={cx(
             TOUCH_CONTROL_CLASS,
-            "cursor-pointer rounded-lg border border-line bg-card px-2 text-[0.65rem] text-fg-2 outline-none transition-colors focus:border-accent"
+            "w-full cursor-pointer rounded-lg border border-line bg-card px-2 text-[0.65rem] text-fg-2 outline-none transition-colors focus:border-accent"
           )}
         >
           <option value="newest">최신순</option>
           <option value="name">이름순</option>
           <option value="size">크기순</option>
         </select>
+        <button
+          type="button"
+          onClick={() => setFavoriteOnly((current) => !current)}
+          aria-pressed={favoriteOnly}
+          aria-label="즐겨찾기만"
+          className={cx(
+            TOUCH_CONTROL_CLASS,
+            "inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-[0.65rem] font-semibold transition-colors",
+            favoriteOnly
+              ? "border-accent bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-2 hover:bg-raised"
+          )}
+        >
+          <Star size={14} className={favoriteOnly ? "fill-current" : undefined} aria-hidden />
+          즐겨찾기만
+        </button>
       </div>
 
       {assetTab === "mine" ? (
@@ -336,6 +431,9 @@ export function StudioAssetMenuPanel({
           onShareAsset={onShareAsset}
           onDeleteAsset={onDeleteAsset}
           publishingId={publishingId}
+          favoriteState={favoriteState}
+          favoriteOnly={favoriteOnly}
+          onToggleFavorite={onToggleFavorite}
         />
       ) : (
         <SharedAssetGrid
@@ -346,6 +444,9 @@ export function StudioAssetMenuPanel({
           loadSharedAssets={loadSharedAssets}
           onUseSharedAsset={onUseSharedAsset}
           onDeleteSharedAsset={onDeleteSharedAsset}
+          favoriteState={favoriteState}
+          favoriteOnly={favoriteOnly}
+          onToggleFavorite={onToggleFavorite}
         />
       )}
     </>
@@ -365,6 +466,9 @@ function LocalAssetGrid({
   onShareAsset,
   onDeleteAsset,
   publishingId,
+  favoriteState,
+  favoriteOnly,
+  onToggleFavorite,
 }: Pick<
   StudioAssetMenuPanelProps,
   | "assets"
@@ -378,6 +482,9 @@ function LocalAssetGrid({
   | "onShareAsset"
   | "onDeleteAsset"
   | "publishingId"
+  | "favoriteState"
+  | "favoriteOnly"
+  | "onToggleFavorite"
 > & {
   filteredAssets: StudioAsset[];
 }) {
@@ -399,7 +506,7 @@ function LocalAssetGrid({
     );
   }
   if (filteredAssets.length === 0) {
-    return <EmptySearchResult />;
+    return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
     <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
@@ -407,6 +514,7 @@ function LocalAssetGrid({
         const actionRegionId = `local-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
         const isRenaming = renamingAssetId === asset.id;
+        const favoriteId = createStudioAssetFavoriteId("local", asset.id);
 
         return (
           <div
@@ -415,6 +523,12 @@ function LocalAssetGrid({
             draggable
             onDragStart={(event) => dragAssetData(event, asset)}
           >
+            <AssetFavoriteButton
+              assetName={asset.name}
+              favoriteId={favoriteId}
+              favoriteState={favoriteState}
+              onToggleFavorite={onToggleFavorite}
+            />
             <button
               type="button"
               onClick={() => onUseLocalAsset(asset)}
@@ -609,9 +723,15 @@ function SharedAssetGrid({
   loadSharedAssets,
   onUseSharedAsset,
   onDeleteSharedAsset,
+  favoriteState,
+  favoriteOnly,
+  onToggleFavorite,
 }: Pick<
   StudioAssetMenuPanelProps,
   "shared" | "sharedLoading" | "sharedError" | "loadSharedAssets" | "onUseSharedAsset" | "onDeleteSharedAsset"
+  | "favoriteState"
+  | "favoriteOnly"
+  | "onToggleFavorite"
 > & {
   filteredShared: SharedAsset[];
 }) {
@@ -650,13 +770,14 @@ function SharedAssetGrid({
     );
   }
   if (filteredShared.length === 0) {
-    return <EmptySearchResult />;
+    return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
     <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
       {filteredShared.map((asset) => {
         const actionRegionId = `shared-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
+        const favoriteId = createStudioAssetFavoriteId("community", asset.id);
 
         return (
           <div
@@ -665,6 +786,12 @@ function SharedAssetGrid({
             draggable
             onDragStart={(event) => dragAssetData(event, asset)}
           >
+            <AssetFavoriteButton
+              assetName={asset.name}
+              favoriteId={favoriteId}
+              favoriteState={favoriteState}
+              onToggleFavorite={onToggleFavorite}
+            />
             <button
               type="button"
               onClick={() => onUseSharedAsset(asset)}
@@ -734,6 +861,19 @@ function EmptySearchResult() {
     <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
       <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
       <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">다른 검색어로 찾아보세요.</p>
+    </div>
+  );
+}
+
+function EmptyFavoriteResult() {
+  return (
+    <div
+      role="status"
+      className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center"
+    >
+      <Star size={18} className="text-fg-3" aria-hidden />
+      <p className="mt-2 text-xs font-semibold text-fg-2">조건에 맞는 즐겨찾기가 없습니다.</p>
+      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">별표를 추가하거나 검색 조건을 바꿔보세요.</p>
     </div>
   );
 }

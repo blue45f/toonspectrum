@@ -158,6 +158,16 @@ import {
   type AnimationTimelineDoc,
 } from "./studio-anim-tracks";
 import {
+  createStudioAssetFavoriteId,
+  loadStudioAssetFavoriteState,
+  normalizeStudioAssetFavoriteState,
+  removeStudioAssetFavorite,
+  saveStudioAssetFavoriteState,
+  toggleStudioAssetFavorite,
+  type StudioAssetFavoriteId,
+  type StudioAssetFavoriteState,
+} from "./studio-asset-favorites";
+import {
   BG_PRESETS,
   BUBBLE_VARIANTS,
   CANVAS_W,
@@ -3588,6 +3598,15 @@ async function sha256Blob(blob: Blob): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function studioFavoriteStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    // Sandboxed/private browser contexts can throw while the storage property itself is accessed.
+    return null;
+  }
+}
+
 // data URL rehydration temporarily needs more memory than the ZIP itself. Keep phone imports well
 // below the archive core's desktop hard ceiling so a valid-but-huge project fails cleanly instead
 // of letting the mobile browser process be killed by the OS.
@@ -4102,6 +4121,19 @@ function StudioCuttoonEditor() {
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [builtinRasterBusyId, setBuiltinRasterBusyId] = useState<string | null>(null);
+  const [assetFavoriteWorkspace, setAssetFavoriteWorkspace] = useState<{
+    userId: string | null;
+    state: StudioAssetFavoriteState;
+  }>(() => ({
+    userId: studioAuthUserId,
+    state: loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
+  }));
+  const [assetFavoriteOnly, setAssetFavoriteOnly] = useState(false);
+  const [rasterFavoriteOnly, setRasterFavoriteOnly] = useState(false);
+  const assetFavoriteState =
+    assetFavoriteWorkspace.userId === studioAuthUserId
+      ? assetFavoriteWorkspace.state
+      : normalizeStudioAssetFavoriteState(undefined);
   // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
   const [assetTab, setAssetTab] = useState<StudioAssetTab>("mine");
   const [shared, setShared] = useState<SharedAsset[]>([]);
@@ -4114,6 +4146,51 @@ function StudioCuttoonEditor() {
   const [bg3dOpen, setBg3dOpen] = useState(false);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
+
+  // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 localStorage에 분리하고,
+  // 로그인 사용자가 바뀌는 한 렌더 동안 이전 계정의 별표가 보이거나 새 키에 기록되지 않게 owner와
+  // 상태를 한 객체로 묶는다. 저장소가 막힌 브라우저에서도 모듈의 best-effort 계약으로 편집은 유지된다.
+  useEffect(() => {
+    setAssetFavoriteWorkspace({
+      userId: studioAuthUserId,
+      state: loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
+    });
+    setAssetFavoriteOnly(false);
+    setRasterFavoriteOnly(false);
+  }, [studioAuthUserId]);
+
+  useEffect(() => {
+    if (assetFavoriteWorkspace.userId !== studioAuthUserId) return;
+    saveStudioAssetFavoriteState(
+      studioFavoriteStorage(),
+      studioAuthUserId,
+      assetFavoriteWorkspace.state
+    );
+  }, [assetFavoriteWorkspace, studioAuthUserId]);
+
+  function toggleAssetFavorite(id: StudioAssetFavoriteId) {
+    setAssetFavoriteWorkspace((current) => ({
+      userId: studioAuthUserId,
+      state: toggleStudioAssetFavorite(
+        current.userId === studioAuthUserId
+          ? current.state
+          : loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
+        id
+      ),
+    }));
+  }
+
+  function removeAssetFavorite(id: StudioAssetFavoriteId) {
+    setAssetFavoriteWorkspace((current) => ({
+      userId: studioAuthUserId,
+      state: removeStudioAssetFavorite(
+        current.userId === studioAuthUserId
+          ? current.state
+          : loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
+        id
+      ),
+    }));
+  }
   // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때만 채워진다 — WorkDetail.pages(렌더링된
   // 컷 이미지)가 있어야 컷별 연출(WorkFxPanel)의 "컷 이미지 클릭해 마크 찍기" UI가 성립하므로,
   // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
@@ -5981,6 +6058,7 @@ function StudioCuttoonEditor() {
     try {
       const { deleteAsset } = await import("./studio-asset-library");
       await deleteAsset(id);
+      removeAssetFavorite(createStudioAssetFavoriteId("local", id));
       await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
@@ -6633,6 +6711,7 @@ function StudioCuttoonEditor() {
     try {
       const { deleteSharedAsset } = await import("@/src/infrastructure/creator-client");
       await deleteSharedAsset(id);
+      removeAssetFavorite(createStudioAssetFavoriteId("community", id));
       await loadSharedAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "공유 에셋을 삭제하지 못했어요.");
@@ -13019,6 +13098,10 @@ function StudioCuttoonEditor() {
                         assets={fxRasterFiltered}
                         busyId={builtinRasterBusyId}
                         onAdd={(asset) => void addBuiltinRasterAsset(asset)}
+                        favoriteState={assetFavoriteState}
+                        favoriteOnly={rasterFavoriteOnly}
+                        setFavoriteOnly={setRasterFavoriteOnly}
+                        onToggleFavorite={toggleAssetFavorite}
                       />
                     </Suspense>
                   )}
@@ -13148,6 +13231,10 @@ function StudioCuttoonEditor() {
                     setAssetSearchQuery={setAssetSearchQuery}
                     assetSortOrder={assetSortOrder}
                     setAssetSortOrder={setAssetSortOrder}
+                    favoriteState={assetFavoriteState}
+                    favoriteOnly={assetFavoriteOnly}
+                    setFavoriteOnly={setAssetFavoriteOnly}
+                    onToggleFavorite={toggleAssetFavorite}
                     assets={assets}
                     assetsLoading={assetsLoading}
                     renamingAssetId={renamingAssetId}

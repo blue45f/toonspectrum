@@ -7,7 +7,8 @@
 > 작성일: 2026-07-04, 최종 갱신: 2026-07-11(잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
-> 자산 관리 + Babylon.js 실측 ADR. 모바일 검증 캡처는 `docs/screenshots/studio-commercial-suite/`) ·
+> 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR. 모바일 검증 캡처는
+> `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
 > 적용 대상/권리 체크리스트/문맥 댓글/프로덕션 인사이트 배치. 상세 매트릭스는
@@ -96,6 +97,35 @@
   Package는 브라우저 실제 다운로드 후 `unzip -t`, entry·hash manifest를 함께 확인했다.
 
 증거 캡처: [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md).
+
+### 2026-07-11 통합 에셋 즐겨찾기 배치 (현재 작업 트리 통합 완료)
+
+반복 사용 소재를 다시 찾는 비용을 줄이는 작업공간 패턴을 공식 문서로 재확인했다. Pixton은
+[모든 콘텐츠 썸네일의 별표와 다음 진입 시 즐겨찾기 우선 배치](https://help.pixton.com/how-to-bookmark-your-favorite-content)를,
+Clip Studio Paint는 [소재 하트와 Favorites 폴더·태그](https://help.clip-studio.com/en-us/manual_en/630_material/Organizing_materials.htm)를,
+Adobe Fresco는 [통합 브러시 패널의 별표와 즐겨찾기 순서 관리](https://helpx.adobe.com/fresco/desktop/draw-paint-animate-and-share/brushes.html)를
+제공한다. ToonSpectrum은 이 흐름을 현재 보유한 세 에셋 표면에 맞게 자체 구현했다.
+
+- **한 저장 규칙, 세 출처**: `local:`, `community:`, `raster:` 네임스페이스로 같은 원본 ID의 충돌을
+  막고 내 에셋·커뮤니티 에셋·검수형 투명 소품이 하나의 즐겨찾기 상태를 공유한다. 프로젝트 콘텐츠가
+  아닌 작업공간 선호이므로 `.toonproject.zip`과 게시 문서에는 섞지 않는다.
+- **계정 경계와 손상 복구**: 게스트와 로그인 사용자마다 별도 bounded key를 쓰며 계정 전환 한 렌더
+  동안 이전 사용자의 별표를 노출하거나 새 키에 쓰지 않는다. 손상 JSON·알 수 없는 namespace·중복·
+  빈/과도한 ID를 정규화하고 최대 500개로 제한한다. private/quota 제한으로 storage가 실패해도 편집은
+  중단되지 않는다.
+- **작가 정렬을 보존하는 우선 배치**: 검색과 사용자가 선택한 최신순·이름순·크기순을 먼저 적용한 뒤
+  즐겨찾기/일반 두 그룹으로 안정 분할한다. `즐겨찾기만`은 현재 탭·검색·분류 결과와 교집합으로
+  동작하므로 검색 문맥이 갑자기 사라지지 않는다.
+- **모바일 독립 동작**: 모든 별표와 필터는 최소 44px이며 `aria-pressed`, 추가/제거 이름, 포커스 링을
+  제공한다. 래스터 카드 전체 버튼을 비대화형 `article`로 바꿔 별표와 캔버스 삽입을 형제 버튼으로
+  분리했고, 로컬/커뮤니티 카드에서도 별 클릭이 삽입·드래그·관리 작업으로 전파되지 않는다. 삭제에
+  성공한 로컬/공유 에셋의 별표 참조도 함께 제거한다.
+
+모바일 375×812 실제 브라우저에서 래스터 별 버튼 44×44px, 래스터 필터 81.875×44px, 저장 에셋
+필터 167.5×44px, 가로 overflow 0을 측정했다. 새로고침 뒤 게스트 즐겨찾기가 복구됐고, 필터 활성 시
+선택한 카페 소품 하나만 남으며 캔버스 삽입은 실행되지 않았다. 관련 집중 테스트 4개 파일·31개와
+전체 회귀 246개 파일·4,302개 테스트, TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드를
+모두 통과했다. 즐겨찾기 순수 모듈은 빌드에서 1.99 kB min / 1.02 kB gzip 별도 청크로 확인됐다.
 
 ### 2026-07-11 말풍선·소재·모바일 조작성 배치 (현재 작업 트리 통합 완료)
 
