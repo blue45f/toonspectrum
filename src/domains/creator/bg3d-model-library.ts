@@ -804,10 +804,15 @@ export async function importVerifiedBg3dModelsAtomically(
   const existing = storedRecords.filter(isVerifiedBg3dModelRecord);
   const existingByHash = new Map(existing.map((record) => [record.contentHash, record] as const));
   const occupiedStorageIds = new Set(storedRecords.map((record) => record.id));
-  const storedBytes = uniqueVerifiedRecords(existing).reduce((sum, record) => sum + record.byteSize, 0);
-  let cumulativeUsedBytes = Math.max(options.cumulativeUsedBytes ?? 0, storedBytes);
+  // The GLB validator's cumulative budget is a batch/project admission boundary, not a hidden
+  // quota for every unrelated asset already present in IndexedDB. A separate storage quota can be
+  // enforced by the persistence layer with its own error; counting the whole library here made a
+  // small valid archive fail merely because another project had cached models locally.
+  let cumulativeUsedBytes = options.cumulativeUsedBytes ?? 0;
   const preparedByHash = new Map<string, Bg3dVerifiedStoredRecord>();
-  const countedHashes = new Set(existingByHash.keys());
+  // Storage dedupe and this batch's admission accounting are different concerns. An existing hash
+  // still belongs to the imported project's unique-byte total the first time it appears here.
+  const countedHashes = new Set<string>();
   const orderedHashes: `sha256:${string}`[] = [];
 
   for (const input of inputs) {
@@ -826,6 +831,8 @@ export async function importVerifiedBg3dModelsAtomically(
       if (occupiedStorageIds.has(prepared.id)) throw createLibraryError("storage-id-conflict");
       occupiedStorageIds.add(prepared.id);
       preparedByHash.set(prepared.contentHash, prepared);
+    }
+    if (!countedHashes.has(prepared.contentHash)) {
       countedHashes.add(prepared.contentHash);
       cumulativeUsedBytes += prepared.byteSize;
     }

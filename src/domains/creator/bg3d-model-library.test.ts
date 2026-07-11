@@ -671,6 +671,73 @@ describe("V2 IndexedDB behavior", () => {
     expect(existingState.transactionModes).not.toContain("readwrite");
   });
 
+  it("does not charge unrelated existing library bytes against the current batch budget", async () => {
+    const existingBytes = validGlb({ extras: { project: "unrelated" } });
+    const incomingBytes = validGlb({ extras: { project: "current" } });
+    const existing = await prepareVerifiedBg3dModelRecord(
+      glbFile("unrelated.glb", existingBytes),
+      { idFactory: () => "unrelated-storage", now: 1 },
+    );
+    const state = installFakeIndexedDb([existing]);
+
+    const imported = await importVerifiedBg3dModelsAtomically(
+      [glbFile("current.glb", incomingBytes)],
+      {
+        idFactory: () => "current-storage",
+        now: 2,
+        cumulativeUsedBytes: 0,
+        maximumCumulativeBytes: incomingBytes.byteLength,
+      },
+    );
+
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({ id: "current-storage", byteSize: incomingBytes.byteLength });
+    expect(state.records.has("unrelated-storage")).toBe(true);
+    expect(state.records.has("current-storage")).toBe(true);
+  });
+
+  it("counts a referenced existing hash once in the current batch cumulative budget", async () => {
+    const existingBytes = validGlb({ extras: { asset: "existing-and-referenced" } });
+    const incomingBytes = validGlb({ extras: { asset: "new-and-referenced" } });
+    const existing = await prepareVerifiedBg3dModelRecord(
+      glbFile("existing.glb", existingBytes),
+      { idFactory: () => "existing-storage", now: 1 },
+    );
+    const maximum = existingBytes.byteLength + incomingBytes.byteLength;
+    const state = installFakeIndexedDb([existing]);
+
+    await expect(importVerifiedBg3dModelsAtomically(
+      [glbFile("existing-again.glb", existingBytes), glbFile("new.glb", incomingBytes)],
+      {
+        idFactory: () => "not-committed",
+        maximumCumulativeBytes: maximum - 1,
+      },
+    )).rejects.toMatchObject({
+      code: "validation-failed",
+      validationCode: "cumulative-byte-budget-exceeded",
+    });
+    expect(state.transactionModes).not.toContain("readwrite");
+
+    const retryState = installFakeIndexedDb([existing]);
+    let id = 0;
+    const imported = await importVerifiedBg3dModelsAtomically(
+      [
+        glbFile("existing-first.glb", existingBytes),
+        glbFile("existing-duplicate.glb", existingBytes),
+        glbFile("new.glb", incomingBytes),
+      ],
+      {
+        idFactory: () => `batch-storage-${++id}`,
+        maximumCumulativeBytes: maximum,
+      },
+    );
+
+    expect(imported).toHaveLength(2);
+    expect(imported[0]?.id).toBe("existing-storage");
+    expect(imported[1]?.contentHash).toBe(await sha256(incomingBytes));
+    expect(retryState.records.size).toBe(2);
+  });
+
   it("fails closed when a duplicate hash changes rights or different hashes reuse a storage id", async () => {
     const bytes = validGlb();
     const owned = await prepareVerifiedBg3dModelRecord({

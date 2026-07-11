@@ -39,11 +39,15 @@ import { createPortal } from "react-dom";
 import * as THREE from "three";
 
 import {
+  admitStoredBg3dModelForRendering,
+  createStudioBg3dModelAttachment,
   deleteStoredBg3dModel,
   getStoredBg3dModel,
+  getStoredBg3dModelByHash,
+  importVerifiedBg3dModelsAtomically,
   listBg3dModelLibraryEntries,
-  saveUploadedBg3dModel,
   type Bg3dModelLibraryEntry,
+  type Bg3dVerifiedStoredRecord,
 } from "./bg3d-model-library";
 import {
   COMPOSITE_CATEGORIES,
@@ -54,14 +58,16 @@ import {
 } from "./studio-background-3d-composites";
 import {
   cloneBgCustomModelInstances,
+  cloneStudioBg3dThreeObject,
+  checkStudioBg3dThreeBudgets,
   computeAutoFitScale,
   createBgCustomModelInstance,
   duplicateBgCustomModelInstance,
-  encodeBg3dSceneWithModelsHash,
-  loadBg3dCustomModelFromBlob,
+  loadVerifiedStudioBg3dGlbWithThree,
   measureBg3dObjectSize,
   parseBg3dSceneWithModelsFromDataUrl,
   type BgCustomModelInstance,
+  type StudioBg3dThreeLoadSuccess,
 } from "./studio-background-3d-model";
 import {
   clonePrimitives,
@@ -79,25 +85,57 @@ import {
   type BgSceneTemplateCategory,
 } from "./studio-background-3d-scene-templates";
 import { BG_SKY_PRESETS, DEFAULT_SKY_PRESET_ID, getSkyPreset } from "./studio-background-3d-sky";
+import {
+  deriveStudioBg3dGlbValidationPolicy,
+  resolveStudioBg3dDeviceQuality,
+  type StudioBg3dDeviceSignals,
+  type StudioBg3dResolvedDeviceQuality,
+} from "./studio-bg3d-device-quality";
+import {
+  DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  parseStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+  type StudioBg3dCameraSettings,
+  type StudioBg3dModelAttachment,
+  type StudioBg3dSceneBudgets,
+  type StudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
+import {
+  adaptStudioBg3dRuntimeToDocument,
+  hydrateStudioBg3dDocumentToRuntime,
+} from "./studio-bg3d-scene-runtime";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
+
+export interface StudioBackground3DInsertResult {
+  readonly pngDataUrl: string;
+  readonly width: number;
+  readonly height: number;
+  readonly bg3dScene: StudioBg3dSceneDocument;
+}
 
 export interface StudioBackground3DProps {
   open: boolean;
   initialDataUrl?: string;
+  initialScene?: StudioBg3dSceneDocument;
   onClose: () => void;
-  onInsert: (pngDataUrl: string, width: number, height: number) => void;
+  onInsert: (result: StudioBackground3DInsertResult) => boolean | void;
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
 type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "models";
 type CaptureState = { gl: THREE.WebGLRenderer | null; scene: THREE.Scene | null; camera: THREE.Camera | null };
+type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose"> & {
+  readonly record: Bg3dVerifiedStoredRecord;
+  readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
+  readonly admittedProfiles: Set<StudioBg3dResolvedDeviceQuality["profile"]>;
+};
 
 const CONTROL_BUTTON =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9";
 const ICON_BUTTON =
-  "inline-grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 const VIEWPORT_BTN =
-  "grid size-9 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -143,6 +181,199 @@ const CAMERA_PRESETS: Record<string, { label: string; position: [number, number,
   side: { label: "측면", position: [9, 1.6, 0], target: [0, 0.9, 0] },
 };
 
+type BrowserNavigatorCapabilities = Navigator & {
+  readonly connection?: {
+    readonly saveData?: boolean;
+    addEventListener?: (type: "change", listener: () => void) => void;
+    removeEventListener?: (type: "change", listener: () => void) => void;
+  };
+  readonly deviceMemory?: number;
+};
+
+interface ModelBindingMaps {
+  readonly attachmentByStorageModelId: Map<string, StudioBg3dModelAttachment>;
+  readonly storageModelIdByAttachmentId: Map<string, string>;
+}
+
+function canonicalSceneDocument(raw: StudioBg3dSceneDocument | undefined): StudioBg3dSceneDocument | null {
+  if (!raw) return null;
+  const serialized = serializeStudioBg3dSceneDocument(raw);
+  return serialized ? parseStudioBg3dSceneDocument(serialized) : null;
+}
+
+function collectDeviceSignals(host?: HTMLElement | null): StudioBg3dDeviceSignals {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return {};
+  const browserNavigator = navigator as BrowserNavigatorCapabilities;
+  const rect = host?.getBoundingClientRect();
+  let pointer: StudioBg3dDeviceSignals["pointer"] = "none";
+  if (typeof window.matchMedia === "function") {
+    if (window.matchMedia("(pointer: coarse)").matches) pointer = "coarse";
+    else if (window.matchMedia("(pointer: fine)").matches) pointer = "fine";
+  }
+  return {
+    cssWidth: rect && rect.width >= 1 ? rect.width : window.innerWidth,
+    cssHeight: rect && rect.height >= 1 ? rect.height : window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    pointer,
+    saveData: browserNavigator.connection?.saveData,
+    deviceMemoryGb: browserNavigator.deviceMemory,
+    hardwareConcurrency: browserNavigator.hardwareConcurrency,
+  };
+}
+
+function resolveDeviceQuality(
+  document: StudioBg3dSceneDocument,
+  host: HTMLElement | null,
+  mode: "edit" | "capture" = "edit"
+): StudioBg3dResolvedDeviceQuality {
+  return resolveStudioBg3dDeviceQuality({
+    document,
+    mode,
+    signals: collectDeviceSignals(host),
+  });
+}
+
+function rightsMatchRecord(
+  attachment: StudioBg3dModelAttachment,
+  record: Bg3dVerifiedStoredRecord
+): boolean {
+  return attachment.rights.status === record.rights.status
+    && attachment.rights.commercialUse === record.rights.commercialUse
+    && attachment.rights.attributionRequired === record.rights.attributionRequired
+    && attachment.rights.attribution === record.rights.attribution
+    && attachment.rights.licenseName === record.rights.licenseName;
+}
+
+function attachmentMatchesRecord(
+  attachment: StudioBg3dModelAttachment,
+  record: Bg3dVerifiedStoredRecord
+): boolean {
+  return attachment.hash === record.contentHash
+    && attachment.byteSize === record.byteSize
+    && attachment.mime === record.mime
+    && rightsMatchRecord(attachment, record);
+}
+
+function bindModelAttachment(
+  maps: ModelBindingMaps,
+  record: Bg3dVerifiedStoredRecord,
+  attachment: StudioBg3dModelAttachment
+): boolean {
+  if (!attachmentMatchesRecord(attachment, record) || attachment.id === record.id) return false;
+  const existingAttachment = maps.attachmentByStorageModelId.get(record.id);
+  const existingStorageId = maps.storageModelIdByAttachmentId.get(attachment.id);
+  if (
+    (existingAttachment && existingAttachment.id !== attachment.id) ||
+    (existingStorageId && existingStorageId !== record.id)
+  ) {
+    return false;
+  }
+  maps.attachmentByStorageModelId.set(record.id, attachment);
+  maps.storageModelIdByAttachmentId.set(attachment.id, record.id);
+  return true;
+}
+
+function sceneModelByteTotal(attachments: ReadonlyMap<string, StudioBg3dModelAttachment>): number {
+  const hashes = new Set<string>();
+  let total = 0;
+  for (const attachment of attachments.values()) {
+    if (hashes.has(attachment.hash)) continue;
+    hashes.add(attachment.hash);
+    total += attachment.byteSize;
+  }
+  return total;
+}
+
+function placedModelByteTotal(
+  models: readonly BgCustomModelInstance[],
+  attachments: ReadonlyMap<string, StudioBg3dModelAttachment>,
+  excludedStorageId?: string
+): number {
+  const usedStorageIds = new Set(models.map((model) => model.modelId));
+  if (excludedStorageId) usedStorageIds.delete(excludedStorageId);
+  const selected = new Map<string, StudioBg3dModelAttachment>();
+  for (const storageId of usedStorageIds) {
+    const attachment = attachments.get(storageId);
+    if (attachment) selected.set(storageId, attachment);
+  }
+  return sceneModelByteTotal(selected);
+}
+
+async function admitAndCacheModel(args: {
+  readonly record: Bg3dVerifiedStoredRecord;
+  readonly document: StudioBg3dSceneDocument;
+  readonly quality: StudioBg3dResolvedDeviceQuality;
+  readonly cumulativeUsedBytes: number;
+  readonly cache: Map<string, ModelRootCacheEntry>;
+  readonly pending: Map<string, Promise<ModelRootCacheEntry>>;
+  readonly isActive: () => boolean;
+}): Promise<ModelRootCacheEntry> {
+  const policy = deriveStudioBg3dGlbValidationPolicy(args.document, args.quality);
+  const selectedBudgets: StudioBg3dSceneBudgets = policy.budgets[policy.profile];
+  const cached = args.cache.get(args.record.id);
+  if (cached) {
+    if (!cached.admittedProfiles.has(policy.profile)) {
+      await admitStoredBg3dModelForRendering(args.record.id, {
+        profile: policy.profile,
+        budgets: policy.budgets,
+        cumulativeUsedBytes: args.cumulativeUsedBytes,
+        maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
+      });
+      const budgetFailure = checkStudioBg3dThreeBudgets(cached.metrics, selectedBudgets);
+      if (budgetFailure) throw new Error(budgetFailure.message);
+      cached.admittedProfiles.add(policy.profile);
+    }
+    return cached;
+  }
+  const pending = args.pending.get(args.record.id);
+  if (pending) {
+    await pending;
+    return admitAndCacheModel(args);
+  }
+
+  const task = (async (): Promise<ModelRootCacheEntry> => {
+    const verification = await admitStoredBg3dModelForRendering(args.record.id, {
+      profile: policy.profile,
+      budgets: policy.budgets,
+      cumulativeUsedBytes: args.cumulativeUsedBytes,
+      maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
+    });
+    const loaded = await loadVerifiedStudioBg3dGlbWithThree(verification, selectedBudgets);
+    if (!loaded.ok) throw new Error(loaded.message);
+    loaded.root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(loaded.root)));
+    loaded.root.traverse((object) => {
+      const renderable = object as THREE.Mesh;
+      if (!renderable.isMesh) return;
+      renderable.castShadow = true;
+      renderable.receiveShadow = true;
+    });
+    if (!args.isActive()) {
+      loaded.dispose();
+      throw new Error("3D 편집기가 닫혀 모델 불러오기를 중단했습니다.");
+    }
+    const entry: ModelRootCacheEntry = {
+      root: loaded.root,
+      dispose: loaded.dispose,
+      record: args.record,
+      metrics: loaded.metrics,
+      admittedProfiles: new Set([policy.profile]),
+    };
+    args.cache.set(args.record.id, entry);
+    return entry;
+  })();
+  args.pending.set(args.record.id, task);
+  try {
+    return await task;
+  } finally {
+    if (args.pending.get(args.record.id) === task) args.pending.delete(args.record.id);
+  }
+}
+
+function disposeModelCache(cache: Map<string, ModelRootCacheEntry>): void {
+  for (const entry of cache.values()) entry.dispose();
+  cache.clear();
+}
+
 /* ── 헬퍼: 라디안 ↔ 도(deg) 변환. 상태 자체는 항상 라디안(BgPrimitive 계약)으로 두고
    숫자 패널 경계에서만 변환한다 — three.js 회전 API와의 단위 불일치를 막기 위함. */
 function radToDeg(rad: number): number {
@@ -183,7 +414,12 @@ function SkyClearColorController({ clearColor }: { clearColor: string }) {
 }
 
 type OrbitLike = { target?: THREE.Vector3; update?: () => void } | null;
-type BgViewportApi = { zoomBy: (factor: number) => void; applyPreset: (presetId: string) => void };
+type BgViewportApi = {
+  zoomBy: (factor: number) => void;
+  applyPreset: (presetId: string) => void;
+  applyView: (view: StudioBg3dCameraSettings) => void;
+  readView: () => StudioBg3dCameraSettings;
+};
 
 /* Canvas 내부에서 카메라/컨트롤을 잡아 줌·프리셋 같은 명령형 동작을 패널 오버레이(Canvas 밖 HTML 버튼)에
    노출한다. target을 OrbitControls의 JSX prop으로 매 렌더 다시 넘기면(리터럴 배열은 매번 새 참조라
@@ -222,6 +458,34 @@ function BgViewportController({ onReady }: { onReady: (api: BgViewportApi | null
         } else {
           camera.lookAt(preset.target[0], preset.target[1], preset.target[2]);
         }
+      },
+      applyView: (view) => {
+        if (camera instanceof THREE.PerspectiveCamera) {
+          const projection = new THREE.PerspectiveCamera(
+            view.fovDegrees,
+            camera.aspect,
+            camera.near,
+            camera.far
+          );
+          camera.copy(projection, false);
+        }
+        camera.position.set(view.position[0], view.position[1], view.position[2]);
+        camera.updateMatrixWorld();
+        if (controls?.target) {
+          controls.target.set(view.target[0], view.target[1], view.target[2]);
+          controls.update?.();
+        } else {
+          camera.lookAt(view.target[0], view.target[1], view.target[2]);
+        }
+      },
+      readView: () => {
+        const target = controls?.target ?? new THREE.Vector3(...DEFAULT_CAMERA_TARGET);
+        const fovDegrees = camera instanceof THREE.PerspectiveCamera ? camera.fov : 50;
+        return {
+          position: [camera.position.x, camera.position.y, camera.position.z],
+          target: [target.x, target.y, target.z],
+          fovDegrees,
+        };
       },
     });
     return () => onReady(null);
@@ -289,7 +553,7 @@ function BgPrimitiveMesh({ prim, lineArt, onSelect, registerRef }: BgPrimitiveMe
         onSelect(prim.id);
       }}
     >
-      <mesh geometry={geometry}>
+      <mesh geometry={geometry} castShadow receiveShadow>
         {lineArt ? (
           <meshBasicMaterial color="#ffffff" polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         ) : (
@@ -308,17 +572,40 @@ interface BgCustomModelMeshProps {
   cachedRoot: THREE.Object3D | undefined;
   onSelect: (id: string) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
+  onCloneStatus: (id: string, ok: boolean) => void;
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef }: BgCustomModelMeshProps) {
-  // cachedRoot(모델 하나당 1개, modelRootCacheRef가 소유)를 인스턴스마다 clone()한다. clone()은
-  // 씬그래프(트랜스폼 계층)는 깊은 복제하지만 geometry/material은 얕게(참조로) 공유한다 — 즉
-  // 같은 모델을 3개 배치하면 3개의 Object3D가 생기되 그 안의 BufferGeometry/Material 인스턴스는
-  // 단 1세트를 공유한다. 따라서 이 컴포넌트의 언마운트(unmount)에서 geometry/material을
-  // dispose()하면 안 된다 — 그 순간 씬에 남아있는 다른 두 인스턴스가 참조하는 GPU 리소스까지
-  // 함께 파괴돼 렌더링이 깨진다(BgPrimitiveMesh의 useEffect cleanup 패턴을 그대로 복붙하면 안
-  // 되는 지점). 공유 리소스의 dispose는 오직 §11(모달 닫힘)에서 캐시 전체를 한 번에 처리한다.
-  const cloned = useMemo(() => cachedRoot?.clone(), [cachedRoot]);
+function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onCloneStatus }: BgCustomModelMeshProps) {
+  // 검증 로더의 루트를 인스턴스마다 복제하되, 스킨 메시가 있으면 SkeletonUtils.clone을 거쳐 뼈와
+  // 스켈레톤 바인딩을 분리한다. geometry/material은 로더 캐시가 소유하므로 여기서는 dispose하지 않는다.
+  const [cloned, setCloned] = useState<THREE.Object3D | null>(null);
+  const onCloneStatusRef = useRef(onCloneStatus);
+  useEffect(() => {
+    onCloneStatusRef.current = onCloneStatus;
+  });
+  useEffect(() => {
+    let active = true;
+    setCloned(null);
+    if (!cachedRoot) {
+      onCloneStatusRef.current(instance.id, false);
+      return () => {
+        active = false;
+      };
+    }
+    void cloneStudioBg3dThreeObject(cachedRoot)
+      .then((next) => {
+        if (!active) return;
+        setCloned(next);
+        onCloneStatusRef.current(instance.id, true);
+      })
+      .catch(() => {
+        if (!active) return;
+        onCloneStatusRef.current(instance.id, false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [cachedRoot, instance.id]);
 
   const groupRef = useRef<THREE.Group>(null);
   useEffect(() => {
@@ -385,7 +672,7 @@ function Vec3Field({
   );
 }
 
-export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: StudioBackground3DProps) {
+export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose, onInsert }: StudioBackground3DProps) {
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
@@ -417,20 +704,85 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   const [modelLibraryStatus, setModelLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [isUploadingModel, setIsUploadingModel] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
+  const [isRestoringScene, setIsRestoringScene] = useState(false);
+  const [sceneRecoveryError, setSceneRecoveryError] = useState<string | null>(null);
+  const [failedCloneIds, setFailedCloneIds] = useState<Set<string>>(() => new Set());
+  const [readyCloneIds, setReadyCloneIds] = useState<Set<string>>(() => new Set());
+  const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
+    () => canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
+  );
+  const [deviceSignals, setDeviceSignals] = useState<StudioBg3dDeviceSignals>(() => collectDeviceSignals());
 
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
+  const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
+  const viewportHostRef = useRef<HTMLDivElement>(null);
   const primitiveObjectsRef = useRef<Map<string, THREE.Group>>(new Map());
   const [, setRefTick] = useState(0);
   const panelScrollRef = useRef<HTMLDivElement>(null);
-  // modelId -> 로드+오토핏 스케일까지 끝난 원본 루트(clone()의 소스). 같은 모델을 두 번째
-  // 배치할 때부터는 blob을 다시 파싱하지 않고 이 캐시에서 clone()만 한다.
-  const modelRootCacheRef = useRef<Map<string, THREE.Object3D>>(new Map());
+  // storage id는 이 두 Map과 검증 캐시 안에서만 쓰며 Studio 장면 문서에는 절대 직렬화하지 않는다.
+  const modelRootCacheRef = useRef<Map<string, ModelRootCacheEntry>>(new Map());
+  const modelLoadPendingRef = useRef<Map<string, Promise<ModelRootCacheEntry>>>(new Map());
+  const attachmentByStorageModelIdRef = useRef<Map<string, StudioBg3dModelAttachment>>(new Map());
+  const storageModelIdByAttachmentIdRef = useRef<Map<string, string>>(new Map());
+  const componentActiveRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const historyRef = useRef<{ primitives: BgPrimitive[]; customModels: BgCustomModelInstance[] }[]>([]);
   const historyIndexRef = useRef(-1);
   const isRestoringRef = useRef(false);
+
+  const deviceQuality = resolveStudioBg3dDeviceQuality({
+    document: sceneBaseDocument,
+    mode: isCapturing ? "capture" : "edit",
+    signals: deviceSignals,
+  });
+  const hasCloneFailure = customModels.some((model) => failedCloneIds.has(model.id));
+  const hasPendingClone = customModels.some(
+    (model) => !readyCloneIds.has(model.id) && !failedCloneIds.has(model.id)
+  );
+  const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone || isRestoringScene;
+
+  // 검증 로더가 성공 시점에 만든 자원 snapshot만 캐시가 소유한다. 언마운트/닫힘 때 loader.dispose를
+  // 호출하므로 공유 geometry/material/texture/ImageBitmap을 빠뜨리거나 두 번 해제하지 않는다.
+  useEffect(() => {
+    if (!open) return;
+    componentActiveRef.current = true;
+    const cache = modelRootCacheRef.current;
+    const pending = modelLoadPendingRef.current;
+    const attachmentByStorageId = attachmentByStorageModelIdRef.current;
+    const storageIdByAttachment = storageModelIdByAttachmentIdRef.current;
+    return () => {
+      componentActiveRef.current = false;
+      pending.clear();
+      disposeModelCache(cache);
+      attachmentByStorageId.clear();
+      storageIdByAttachment.clear();
+    };
+  }, [open]);
+
+  // CSS 뷰포트, DPR, 포인터, 데이터 절약/기기 성능 신호를 명시적으로 수집해 순수 품질 정책에 전달한다.
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const browserNavigator = navigator as BrowserNavigatorCapabilities;
+    const coarse = window.matchMedia?.("(pointer: coarse)");
+    const fine = window.matchMedia?.("(pointer: fine)");
+    const refresh = () => setDeviceSignals(collectDeviceSignals(viewportHostRef.current));
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(refresh) : null;
+    if (viewportHostRef.current) observer?.observe(viewportHostRef.current);
+    window.addEventListener("resize", refresh, { passive: true });
+    coarse?.addEventListener?.("change", refresh);
+    fine?.addEventListener?.("change", refresh);
+    browserNavigator.connection?.addEventListener?.("change", refresh);
+    refresh();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", refresh);
+      coarse?.removeEventListener?.("change", refresh);
+      fine?.removeEventListener?.("change", refresh);
+      browserNavigator.connection?.removeEventListener?.("change", refresh);
+    };
+  }, [open]);
 
   // 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다(VRM 포저의 listVrmLibraryEntries() 패턴과 동일).
   useEffect(() => {
@@ -444,89 +796,148 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
       .catch(() => setModelLibraryStatus("error"));
   }, [open]);
 
-  // 재편집 진입: initialDataUrl의 해시 프래그먼트에서 이전 장면(도형 + 커스텀 모델)을 복원한다
-  // (VRM 포저의 round-trip과 동일 계약). customModels 필드가 없는 레거시 해시(도형만 있던 과거
-  // 캡처)는 parseBg3dSceneWithModelsFromDataUrl이 customModels: []로 파싱해 하위 호환을 지킨다.
+  // 신규 장면 문서는 hash로 검증 레코드를 찾고, admission→Three 안전 파서를 모두 통과한 뒤 runtime
+  // 배열로 hydrate한다. 실패한 모델 노드는 절대 저장 시 조용히 제거하지 않고 업데이트 자체를 잠근다.
+  // initialScene이 없을 때만 과거 PNG fragment를 읽어 하위 호환한다.
   useEffect(() => {
     if (!open) return;
-    const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);
-    if (!parsed || (parsed.primitives.length === 0 && parsed.customModels.length === 0)) return;
-    setPrimitives(parsed.primitives);
-    setCustomModels(parsed.customModels);
-    if (parsed.customModels.length === 0) return;
-
-    // 복원된 각 modelId가 가리키는 레코드가 IndexedDB에 아직 있는지는 보장되지 않는다(사용자가 그
-    // 사이 라이브러리에서 삭제했을 수 있음) — ensureModelRootCached와 동일한 로드+오토핏+캐시 절차를
-    // 여기서도 거쳐야 복원된 인스턴스가 Canvas에 곧바로 렌더링된다. 다만 이 절차를 ensureModelRootCached
-    // 호출로 재사용하지 않고 아래에 인라인한 이유: ensureModelRootCached는 컴포넌트 스코프 함수라
-    // useEffect 의존성 배열에 넣으면(react-hooks/exhaustive-deps 요구) 매 렌더 재생성되는 참조라
-    // 이 effect가 무한 재실행될 위험이 있다 — getStoredBg3dModel/loadBg3dCustomModelFromBlob 등
-    // 모듈 수준 함수 + 안정적인 ref만 사용해 그 위험을 피한다. 못 찾거나 로드에 실패하면 조용히
-    // 씬에서 제거하고 에러 배너로 알린다(addCustomModelToScene과 동일한 원칙).
     let cancelled = false;
+    setIsRestoringScene(true);
+    setSceneRecoveryError(null);
+    setError(null);
+    setSelectedId(null);
+    setFailedCloneIds(new Set());
+    setReadyCloneIds(new Set());
+    disposeModelCache(modelRootCacheRef.current);
+    modelLoadPendingRef.current.clear();
+    attachmentByStorageModelIdRef.current.clear();
+    storageModelIdByAttachmentIdRef.current.clear();
+
     void (async () => {
-      const missingModelIds = new Set<string>();
-      await Promise.all(
-        parsed.customModels.map(async (inst) => {
-          if (modelRootCacheRef.current.has(inst.modelId)) return;
-          try {
-            const record = await getStoredBg3dModel(inst.modelId);
-            if (!record) {
-              missingModelIds.add(inst.modelId);
-              return;
-            }
-            const root = await loadBg3dCustomModelFromBlob(record.blob, record.format);
-            root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(root)));
-            modelRootCacheRef.current.set(inst.modelId, root);
-          } catch {
-            missingModelIds.add(inst.modelId);
-          }
-        })
-      );
-      if (cancelled) return;
-      if (missingModelIds.size > 0) {
-        setCustomModels((prev) => prev.filter((inst) => !missingModelIds.has(inst.modelId)));
-        setError("저장된 3D 모델을 찾지 못해 일부 배치를 씬에서 제거했습니다.");
-      } else {
-        // customModels 상태 자체는 이미 위에서 set 됐으므로, 여기서는 modelRootCacheRef(일반 ref라
-        // 갱신해도 리렌더를 유발하지 않음)가 새로 채워졌다는 사실만 리렌더로 반영한다.
-        setRefTick((n) => n + 1);
+      const canonicalInitial = canonicalSceneDocument(initialScene);
+      if (initialScene && !canonicalInitial) {
+        if (!cancelled) {
+          setPrimitives([]);
+          setCustomModels([]);
+          setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
+          setSceneRecoveryError("3D 장면 원본이 손상되어 안전하게 복원할 수 없습니다. 기존 PNG는 그대로 유지됩니다.");
+          setIsRestoringScene(false);
+        }
+        return;
       }
+
+      if (canonicalInitial) {
+        setSceneBaseDocument(canonicalInitial);
+        setTransparentInsert(
+          canonicalInitial.output.transparentBackground || canonicalInitial.background.mode === "transparent"
+        );
+        setSkyPresetId(canonicalInitial.background.skyPresetId);
+        pendingInitialCameraRef.current = canonicalInitial.camera;
+        viewportApiRef.current?.applyView(canonicalInitial.camera);
+
+        const quality = resolveDeviceQuality(canonicalInitial, viewportHostRef.current);
+        let cumulativeUsedBytes = 0;
+        let recoveryFailed = false;
+        for (const attachment of canonicalInitial.attachments) {
+          if (cancelled) return;
+          try {
+            const record = await getStoredBg3dModelByHash(attachment.hash);
+            if (!record || !attachmentMatchesRecord(attachment, record)) throw new Error("attachment-mismatch");
+            await admitAndCacheModel({
+              record,
+              document: canonicalInitial,
+              quality,
+              cumulativeUsedBytes,
+              cache: modelRootCacheRef.current,
+              pending: modelLoadPendingRef.current,
+              isActive: () => !cancelled && componentActiveRef.current,
+            });
+            if (!bindModelAttachment({
+              attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+              storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+            }, record, attachment)) {
+              throw new Error("attachment-binding");
+            }
+            cumulativeUsedBytes += attachment.byteSize;
+          } catch {
+            recoveryFailed = true;
+          }
+        }
+        const hydrated = hydrateStudioBg3dDocumentToRuntime({
+          document: canonicalInitial,
+          storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+        });
+        if (cancelled) return;
+        setPrimitives(hydrated.primitives);
+        setCustomModels(hydrated.customModels);
+        if (
+          recoveryFailed ||
+          !hydrated.ok ||
+          hydrated.diagnostics.length > 0 ||
+          hydrated.omittedDiagnosticCount > 0 ||
+          hydrated.counts.droppedCustomModels > 0
+        ) {
+          setSceneRecoveryError("일부 3D 모델의 원본 또는 무결성을 확인하지 못했습니다. 기존 PNG를 보존하기 위해 업데이트를 막았습니다.");
+        }
+        setRefTick((n) => n + 1);
+        isRestoringRef.current = true;
+        setIsRestoringScene(false);
+        return;
+      }
+
+      const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);
+      setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
+      setTransparentInsert(false);
+      setSkyPresetId(DEFAULT_SKY_PRESET_ID);
+      pendingInitialCameraRef.current = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
+      viewportApiRef.current?.applyView(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera);
+      const nextPrimitives = parsed?.primitives ?? [];
+      const nextModels = parsed?.customModels ?? [];
+      setPrimitives(nextPrimitives);
+      setCustomModels(nextModels);
+
+      if (nextModels.length > 0) {
+        const quality = resolveDeviceQuality(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, viewportHostRef.current);
+        let recoveryFailed = false;
+        const uniqueStorageIds = [...new Set(nextModels.map((model) => model.modelId))];
+        for (const storageId of uniqueStorageIds) {
+          if (cancelled) return;
+          try {
+            const record = await getStoredBg3dModel(storageId);
+            if (!record) throw new Error("missing-record");
+            const attachment = createStudioBg3dModelAttachment(record);
+            await admitAndCacheModel({
+              record,
+              document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+              quality,
+              cumulativeUsedBytes: sceneModelByteTotal(attachmentByStorageModelIdRef.current),
+              cache: modelRootCacheRef.current,
+              pending: modelLoadPendingRef.current,
+              isActive: () => !cancelled && componentActiveRef.current,
+            });
+            if (!bindModelAttachment({
+              attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+              storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+            }, record, attachment)) {
+              throw new Error("attachment-binding");
+            }
+          } catch {
+            recoveryFailed = true;
+          }
+        }
+        if (recoveryFailed) {
+          setSceneRecoveryError("이전 3D 배경의 모델 원본을 모두 검증하지 못했습니다. 기존 PNG를 보존하기 위해 업데이트를 막았습니다.");
+        }
+      }
+      if (cancelled) return;
+      setRefTick((n) => n + 1);
+      isRestoringRef.current = true;
+      setIsRestoringScene(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, initialDataUrl]);
-
-  // modelRootCacheRef가 소유한 로드된 루트들의 geometry/material은 §7(BgCustomModelMesh)에서 설명한
-  // 대로 인스턴스별로 dispose하면 안 되고, 모달이 닫힐 때 캐시 전체를 한 번에 해제해야 한다.
-  // 실제 호출부(StudioPage.tsx)는 `{bg3dOpen ? <StudioBackground3D open .../> : null}`로 열려있는
-  // 동안만 이 컴포넌트를 마운트하므로 — "open prop이 true→false로 바뀌는" 경로가 아니라 "컴포넌트가
-  // 통째로 언마운트되는" 경로가 실제 경로다. 그래서 이펙트 본문에서 곧바로 dispose하지 않고 cleanup
-  // 함수로 등록한다 — 언마운트 시 React가 cleanup을 호출해 주므로 이 실제 경로에서도 정확히
-  // 한 번 해제되고, 혹시 다른 호출부가 마운트 상태에서 open만 false로 바꾸는 경우에도(동일 cleanup
-  // 메커니즘이 effect 재실행 직전에도 호출되므로) 이중 dispose 없이 동일하게 처리된다.
-  useEffect(() => {
-    if (!open) return;
-    // cleanup 시점에 modelRootCacheRef.current를 다시 읽지 않고 지금 시점의 Map 참조를 클로저에
-    // 담아 둔다(react-hooks/exhaustive-deps가 "cleanup에서 ref.current를 다시 읽지 말라"고 요구함) —
-    // 이 ref는 컴포넌트 생애주기 동안 늘 같은 Map 인스턴스를 담고 있어(재할당 없이 mutate만 함)
-    // 동작 차이는 없다.
-    const cache = modelRootCacheRef.current;
-    return () => {
-      for (const root of cache.values()) {
-        root.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          if (!mesh.isMesh) return;
-          mesh.geometry.dispose();
-          for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-            mat.dispose();
-          }
-        });
-      }
-      cache.clear();
-    };
-  }, [open]);
+  }, [open, initialDataUrl, initialScene]);
 
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재 — VRM 포저의 undo 스택과 동일한 패턴.
   // 도형(primitives)과 커스텀 모델(customModels)을 하나의 타임라인 튜플로 묶어 "실행 취소 한 번 =
@@ -666,35 +1077,48 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   };
 
   // ── §6 커스텀 3D 모델 추가/업로드/삭제 핸들러 ─────────────────────────────────────────
-  async function ensureModelRootCached(modelId: string): Promise<THREE.Object3D | null> {
-    const cached = modelRootCacheRef.current.get(modelId);
-    if (cached) return cached;
-
+  async function ensureModelRootCached(modelId: string): Promise<Bg3dVerifiedStoredRecord | null> {
     const record = await getStoredBg3dModel(modelId);
     if (!record) return null;
-
-    const root = await loadBg3dCustomModelFromBlob(record.blob, record.format);
-    const autoFit = computeAutoFitScale(measureBg3dObjectSize(root));
-    root.scale.setScalar(autoFit); // 캐시에 이미 오토핏이 반영된 "기준 크기"로 저장
-    modelRootCacheRef.current.set(modelId, root);
-    return root;
+    const existingAttachment = attachmentByStorageModelIdRef.current.get(modelId);
+    const attachment = existingAttachment ?? createStudioBg3dModelAttachment(record);
+    const cumulativeUsedBytes = placedModelByteTotal(
+      customModels,
+      attachmentByStorageModelIdRef.current,
+      modelId
+    );
+    await admitAndCacheModel({
+      record,
+      document: sceneBaseDocument,
+      quality: deviceQuality,
+      cumulativeUsedBytes,
+      cache: modelRootCacheRef.current,
+      pending: modelLoadPendingRef.current,
+      isActive: () => componentActiveRef.current,
+    });
+    if (!bindModelAttachment({
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+    }, record, attachment)) {
+      return null;
+    }
+    return record;
   }
 
   async function addCustomModelToScene(modelId: string) {
+    setError(null);
     try {
-      const root = await ensureModelRootCached(modelId);
-      if (!root) {
-        setError("저장된 3D 모델을 찾지 못했습니다.");
-        return;
-      }
+      const record = await ensureModelRootCached(modelId);
+      if (!record) throw new Error("model-unavailable");
       // root.scale에 이미 오토핏이 반영돼 있으므로 인스턴스 자체의 scale은 [1,1,1]에서 시작한다
       // (오토핏 배율을 인스턴스 scale에 다시 곱하면 이중 적용된다 — 인스턴스 scale은 "오토핏 위에
       // 사용자가 추가로 조정한 배율"만 의미하게 한다).
       const next = createBgCustomModelInstance(modelId, customModels.length);
       setCustomModels((prev) => [...prev, next]);
       setSelectedId(next.id);
-    } catch (caughtError: unknown) {
-      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 불러오지 못했습니다.");
+      setRefTick((n) => n + 1);
+    } catch {
+      setError("3D 모델의 원본과 무결성을 확인하지 못해 장면에 추가하지 않았습니다.");
     }
   }
 
@@ -705,30 +1129,119 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
 
     setIsUploadingModel(true);
     setError(null);
+    const cacheIdsBefore = new Set(modelRootCacheRef.current.keys());
     try {
-      const saved = await Promise.all(files.map((file) => saveUploadedBg3dModel(file)));
+      const policy = deriveStudioBg3dGlbValidationPolicy(sceneBaseDocument, deviceQuality);
+      const imported = await importVerifiedBg3dModelsAtomically(files, {
+        profile: policy.profile,
+        budgets: policy.budgets,
+      });
+      const saved: Bg3dVerifiedStoredRecord[] = [];
+      for (const importedRecord of imported) {
+        const storedRecord = await getStoredBg3dModel(importedRecord.id);
+        if (
+          !storedRecord ||
+          storedRecord.contentHash !== importedRecord.contentHash ||
+          storedRecord.byteSize !== importedRecord.byteSize
+        ) {
+          throw new Error("stored-record-mismatch");
+        }
+        saved.push(storedRecord);
+      }
       setModelLibrary(await listBg3dModelLibraryEntries());
-      if (saved[0]) await addCustomModelToScene(saved[0].id);
-    } catch (caughtError: unknown) {
-      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 저장하지 못했습니다.");
+      const stagedAttachments = new Map<string, StudioBg3dModelAttachment>();
+      let cumulativeUsedBytes = placedModelByteTotal(customModels, attachmentByStorageModelIdRef.current);
+      const countedHashes = new Set(
+        customModels.flatMap((model) => {
+          const attachment = attachmentByStorageModelIdRef.current.get(model.modelId);
+          return attachment ? [attachment.hash] : [];
+        })
+      );
+      for (const record of saved) {
+        const existing = attachmentByStorageModelIdRef.current.get(record.id);
+        const attachment = existing ?? createStudioBg3dModelAttachment(record);
+        await admitAndCacheModel({
+          record,
+          document: sceneBaseDocument,
+          quality: deviceQuality,
+          cumulativeUsedBytes,
+          cache: modelRootCacheRef.current,
+          pending: modelLoadPendingRef.current,
+          isActive: () => componentActiveRef.current,
+        });
+        stagedAttachments.set(record.id, attachment);
+        if (!countedHashes.has(record.contentHash)) {
+          countedHashes.add(record.contentHash);
+          cumulativeUsedBytes += record.byteSize;
+        }
+      }
+
+      // 모든 업로드가 검증·파싱된 뒤에 임시 Map에서 충돌까지 검사하고, 그 다음에만 실제 매핑과
+      // 배치 배열을 한 번에 commit한다.
+      const nextAttachmentByStorageId = new Map(attachmentByStorageModelIdRef.current);
+      const nextStorageIdByAttachment = new Map(storageModelIdByAttachmentIdRef.current);
+      for (const record of saved) {
+        const attachment = stagedAttachments.get(record.id);
+        if (!attachment || !bindModelAttachment({
+          attachmentByStorageModelId: nextAttachmentByStorageId,
+          storageModelIdByAttachmentId: nextStorageIdByAttachment,
+        }, record, attachment)) {
+          throw new Error("attachment-binding");
+        }
+      }
+      attachmentByStorageModelIdRef.current.clear();
+      storageModelIdByAttachmentIdRef.current.clear();
+      for (const [id, attachment] of nextAttachmentByStorageId) {
+        attachmentByStorageModelIdRef.current.set(id, attachment);
+      }
+      for (const [attachmentId, id] of nextStorageIdByAttachment) {
+        storageModelIdByAttachmentIdRef.current.set(attachmentId, id);
+      }
+      const placements = saved.map((record, index) =>
+        createBgCustomModelInstance(record.id, customModels.length + index)
+      );
+      if (placements.length > 0) {
+        setCustomModels((prev) => [...prev, ...placements]);
+        setSelectedId(placements[placements.length - 1].id);
+        setRefTick((n) => n + 1);
+      }
+    } catch {
+      // 저장은 atomic import가 책임지고, 화면 배치는 별도 all-or-none이다. 이번 시도에서 처음 로드한
+      // 캐시만 되돌려 기존 장면 인스턴스가 공유 중인 자원은 건드리지 않는다.
+      for (const [id, entry] of modelRootCacheRef.current) {
+        if (cacheIdsBefore.has(id)) continue;
+        entry.dispose();
+        modelRootCacheRef.current.delete(id);
+      }
+      setError("선택한 GLB 중 하나가 안전 검사 또는 기기 복잡도 기준을 통과하지 못해 아무 모델도 배치하지 않았습니다.");
+      try {
+        setModelLibrary(await listBg3dModelLibraryEntries());
+      } catch {
+        setModelLibraryStatus("error");
+      }
     } finally {
       setIsUploadingModel(false);
     }
   }
 
   async function handleDeleteModelFromLibrary(id: string) {
-    // 씬에 이 모델의 인스턴스가 남아있으면 참조가 끊긴다(라운드트립 시 modelId가 404) — 삭제 전
-    // 씬에서도 함께 제거한다.
-    const inUse = customModels.some((inst) => inst.modelId === id);
-    if (inUse) {
-      setCustomModels((prev) => prev.filter((inst) => inst.modelId !== id));
-    }
     setDeletingModelId(id);
     try {
       await deleteStoredBg3dModel(id);
+      setCustomModels((prev) => prev.filter((inst) => inst.modelId !== id));
+      const attachment = attachmentByStorageModelIdRef.current.get(id);
+      attachmentByStorageModelIdRef.current.delete(id);
+      if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
+      const cacheEntry = modelRootCacheRef.current.get(id);
+      modelRootCacheRef.current.delete(id);
+      if (cacheEntry) requestAnimationFrame(() => cacheEntry.dispose());
+      if (customModels.some((model) => model.id === selectedId && model.modelId === id)) {
+        setSelectedId(null);
+      }
+      setRefTick((n) => n + 1);
       setModelLibrary(await listBg3dModelLibraryEntries());
-    } catch (caughtError: unknown) {
-      setError(caughtError instanceof Error ? caughtError.message : "3D 모델을 삭제하지 못했습니다.");
+    } catch {
+      setError("3D 모델을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setDeletingModelId(null);
     }
@@ -804,12 +1317,49 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
   };
 
   function handleInsert() {
+    if (insertBlocked) {
+      setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
+      return;
+    }
     const currentCapture = captureRef.current;
     if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera) {
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
       return;
     }
     const { gl, scene, camera } = currentCapture;
+    const sky = getSkyPreset(skyPresetId);
+    const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+    const currentBaseDocument: StudioBg3dSceneDocument = {
+      ...sceneBaseDocument,
+      camera: currentView,
+      background: {
+        ...sceneBaseDocument.background,
+        mode: transparentInsert ? "transparent" : "sky-preset",
+        color: sky.clearColor,
+        skyPresetId: sky.id as StudioBg3dSceneDocument["background"]["skyPresetId"],
+      },
+      output: {
+        ...sceneBaseDocument.output,
+        transparentBackground: transparentInsert,
+      },
+    };
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives,
+      customModels,
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      baseDocument: currentBaseDocument,
+    });
+    if (
+      adapted.diagnostics.length > 0 ||
+      adapted.omittedDiagnosticCount > 0 ||
+      adapted.counts.droppedPrimitives > 0 ||
+      adapted.counts.droppedCustomModels > 0 ||
+      adapted.counts.emittedPrimitives !== primitives.length ||
+      adapted.counts.emittedCustomModels !== customModels.length
+    ) {
+      setError("장면 원본을 손실 없이 저장할 수 없어 추가를 중단했습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
+      return;
+    }
 
     // 내보내기는 프리뷰 토글 상태와 무관하게 항상 선화 모드로 강제한다 — 도구의 목적 자체가
     // 트레이싱 참고선이지 셰이딩 미리보기 저장이 아니기 때문(설계 §4).
@@ -819,17 +1369,27 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
     // 오브젝트만 그린다(Canvas의 gl.alpha:true 가 있어야 실제로 캔버스 자체가 알파를 갖는다).
     // 캡처가 끝나면 즉시 원래 하늘색 프리셋으로 되돌린다 — 그러지 않으면 모달이 닫히기 전
     // 잠깐이라도 뷰포트가 투명하게 보여 다른 배경(페이지 배경색)이 비쳐 보이는 깜빡임이 생긴다.
-    if (transparentInsert) gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 0);
+    if (transparentInsert) gl.setClearColor(sky.clearColor, 0);
     requestAnimationFrame(() => {
-      gl.render(scene, camera);
-      const baseDataUrl = gl.domElement.toDataURL("image/png");
-      const { width, height } = roundExportSize(gl.domElement);
-      setIsCapturing(false);
-      if (transparentInsert) gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1);
-
-      const fullDataUrl = `${baseDataUrl}#${encodeBg3dSceneWithModelsHash(primitives, customModels)}`;
-      onInsert(fullDataUrl, width, height);
-      onClose(); // 모달이 곧 언마운트되므로 previewMode를 되돌릴 필요가 없다.
+      try {
+        gl.render(scene, camera);
+        // PNG와 편집 원본은 별도 필드다. data URL fragment에 장면·storage id를 다시 싣지 않는다.
+        const pngDataUrl = gl.domElement.toDataURL("image/png").split("#", 1)[0];
+        const { width, height } = roundExportSize(gl.domElement);
+        setSceneBaseDocument(adapted.document);
+        const accepted = onInsert({
+          pngDataUrl,
+          width,
+          height,
+          bg3dScene: adapted.document,
+        });
+        if (accepted !== false) onClose();
+      } catch {
+        setError("3D 장면을 PNG로 캡처하지 못했습니다. 브라우저 그래픽 상태를 확인해 주세요.");
+      } finally {
+        setIsCapturing(false);
+        if (transparentInsert) gl.setClearColor(sky.clearColor, 1);
+      }
     });
   }
 
@@ -869,21 +1429,55 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
         <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,44dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
           <section className="relative min-h-0 overflow-hidden bg-[oklch(0.98_0_0)] lg:min-h-0">
             <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(92vw,960px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
-              <div className="relative aspect-video h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-white shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[360px]">
+              <div
+                ref={viewportHostRef}
+                className="relative aspect-video h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-white shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[360px]"
+              >
                 <Canvas
-                  camera={{ fov: 50, position: DEFAULT_CAMERA_POSITION, near: 0.1, far: 200 }}
+                  camera={{
+                    fov: sceneBaseDocument.camera.fovDegrees,
+                    position: [...sceneBaseDocument.camera.position],
+                    near: 0.1,
+                    far: 200,
+                  }}
                   className="h-full w-full"
-                  dpr={[1, 2]}
-                  gl={{ antialias: true, preserveDrawingBuffer: true, alpha: true }}
-                  onCreated={({ gl }) => gl.setClearColor(0xffffff, 1)}
+                  dpr={deviceQuality.effectiveDpr}
+                  shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
+                  gl={{ antialias: sceneBaseDocument.render.antialias, preserveDrawingBuffer: true, alpha: true }}
+                  onCreated={({ gl }) => gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1)}
                   onPointerMissed={() => setSelectedId(null)}
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
-                  <BgViewportController onReady={(api) => (viewportApiRef.current = api)} />
+                  <BgViewportController
+                    onReady={(api) => {
+                      viewportApiRef.current = api;
+                      if (api && pendingInitialCameraRef.current) {
+                        api.applyView(pendingInitialCameraRef.current);
+                        pendingInitialCameraRef.current = null;
+                      }
+                    }}
+                  />
                   <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
-                  <ambientLight intensity={0.75} />
-                  <directionalLight position={[4, 6, 4]} intensity={1.1} />
-                  <directionalLight position={[-4, 3, -3]} intensity={0.35} />
+                  <ambientLight
+                    color={sceneBaseDocument.lighting.ambientColor}
+                    intensity={sceneBaseDocument.lighting.ambientIntensity}
+                  />
+                  <directionalLight
+                    castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.key.castsShadow}
+                    color={sceneBaseDocument.lighting.key.color}
+                    intensity={sceneBaseDocument.lighting.key.intensity}
+                    position={[...sceneBaseDocument.lighting.key.direction]}
+                    shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
+                    shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+                  />
+                  <directionalLight
+                    castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.fill.castsShadow}
+                    color={sceneBaseDocument.lighting.fill.color}
+                    intensity={sceneBaseDocument.lighting.fill.intensity}
+                    position={[...sceneBaseDocument.lighting.fill.direction]}
+                    shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
+                    shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+                  />
                   <BgGroundHelper visible={!lineArtPreview} />
                   {primitives.map((prim) => (
                     <BgPrimitiveMesh
@@ -898,9 +1492,23 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                     <BgCustomModelMesh
                       key={inst.id}
                       instance={inst}
-                      cachedRoot={modelRootCacheRef.current.get(inst.modelId)}
+                      cachedRoot={modelRootCacheRef.current.get(inst.modelId)?.root}
                       onSelect={setSelectedId}
                       registerRef={registerPrimitiveRef}
+                      onCloneStatus={(id, ok) => {
+                        setReadyCloneIds((prev) => {
+                          const next = new Set(prev);
+                          if (ok) next.add(id);
+                          else next.delete(id);
+                          return next;
+                        });
+                        setFailedCloneIds((prev) => {
+                          const next = new Set(prev);
+                          if (ok) next.delete(id);
+                          else next.add(id);
+                          return next;
+                        });
+                      }}
                     />
                   ))}
                   {selectedId && primitiveObjectsRef.current.get(selectedId) ? (
@@ -937,7 +1545,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                           aria-pressed={isActive}
                           title={m.title}
                           className={cx(
-                            "grid size-8 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                            "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
                             isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
                           )}
                           onClick={() => setTransformMode(m.id)}
@@ -1117,7 +1725,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                     <button
                       type="button"
                       className={cx(
-                        "rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors",
+                        "min-h-11 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors sm:min-h-0",
                         compositeCategory === null
                           ? "border-accent/60 bg-accent-soft text-accent"
                           : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
@@ -1131,7 +1739,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                         key={cat}
                         type="button"
                         className={cx(
-                          "rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors",
+                          "min-h-11 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors sm:min-h-0",
                           compositeCategory === cat
                             ? "border-accent/60 bg-accent-soft text-accent"
                             : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
@@ -1173,7 +1781,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                             type="button"
                             aria-label="복제"
                             title="복제"
-                            className={cx(ICON_BUTTON, "size-8")}
+                            className={ICON_BUTTON}
                             onClick={duplicateSelected}
                           >
                             <Copy size={14} aria-hidden />
@@ -1182,7 +1790,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                             type="button"
                             aria-label="삭제"
                             title="삭제 (Delete)"
-                            className={cx(ICON_BUTTON, "size-8 hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
+                            className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
                             onClick={deleteSelected}
                           >
                             <Trash2 size={14} aria-hidden />
@@ -1235,7 +1843,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                           type="color"
                           value={selectedPrimitive.color}
                           onChange={(e) => updateColor(selectedPrimitive.id, e.target.value)}
-                          className="h-7 w-10 cursor-pointer rounded border border-line bg-card"
+                          className="h-11 w-11 cursor-pointer rounded border border-line bg-card sm:h-7 sm:w-10"
                         />
                       </label>
                     </div>
@@ -1248,7 +1856,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                             type="button"
                             aria-label="복제"
                             title="복제"
-                            className={cx(ICON_BUTTON, "size-8")}
+                            className={ICON_BUTTON}
                             onClick={duplicateSelectedCustomModel}
                           >
                             <Copy size={14} aria-hidden />
@@ -1257,7 +1865,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                             type="button"
                             aria-label="삭제"
                             title="삭제 (Delete)"
-                            className={cx(ICON_BUTTON, "size-8 hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
+                            className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
                             onClick={deleteSelectedCustomModel}
                           >
                             <Trash2 size={14} aria-hidden />
@@ -1344,11 +1952,11 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                         <li key={prim.id}>
                           <div
                             className={cx(
-                              "flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                              "flex min-h-11 items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors sm:min-h-0",
                               isActive ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                             )}
                           >
-                            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setSelectedId(prim.id)}>
+                            <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left sm:min-h-0" onClick={() => setSelectedId(prim.id)}>
                               <span className="inline-block size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: prim.color }} aria-hidden />
                               <span className="truncate font-semibold">{rowLabel}</span>
                             </button>
@@ -1356,7 +1964,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                               type="button"
                               aria-label={`${rowLabel} 복제`}
                               title="복제"
-                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                               onClick={() => {
                                 setSelectedId(prim.id);
                                 const clone = duplicatePrimitive(prim);
@@ -1370,7 +1978,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                               type="button"
                               aria-label={`${rowLabel} 삭제`}
                               title="삭제"
-                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                               onClick={() => {
                                 setPrimitives((prev) => prev.filter((p) => p.id !== prim.id));
                                 if (isActive) setSelectedId(null);
@@ -1391,11 +1999,11 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                         <li key={inst.id}>
                           <div
                             className={cx(
-                              "flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                              "flex min-h-11 items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors sm:min-h-0",
                               isActive ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                             )}
                           >
-                            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setSelectedId(inst.id)}>
+                            <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left sm:min-h-0" onClick={() => setSelectedId(inst.id)}>
                               <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
                               <span className="truncate font-semibold">{rowLabel}</span>
                             </button>
@@ -1403,7 +2011,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                               type="button"
                               aria-label={`${rowLabel} 복제`}
                               title="복제"
-                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                               onClick={() => {
                                 setSelectedId(inst.id);
                                 const clone = duplicateBgCustomModelInstance(inst);
@@ -1417,7 +2025,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                               type="button"
                               aria-label={`${rowLabel} 삭제`}
                               title="삭제"
-                              className="grid size-6 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent"
+                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                               onClick={() => {
                                 setCustomModels((prev) => prev.filter((m) => m.id !== inst.id));
                                 if (isActive) setSelectedId(null);
@@ -1537,10 +2145,12 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                     <PackageOpen size={15} className="text-accent" aria-hidden />
                     3D 모델
                   </h3>
-                  <span className="text-[0.68rem] text-fg-3">{modelLibrary.length}개</span>
+                  <span className="text-[0.68rem] text-fg-3">
+                    {modelLibrary.length}개 · {deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"} 기준
+                  </span>
                 </div>
 
-                <input ref={fileInputRef} accept=".glb,.gltf,.obj" className="sr-only" multiple type="file" onChange={handleUploadModelFiles} />
+                <input ref={fileInputRef} accept=".glb,model/gltf-binary" className="sr-only" multiple type="file" onChange={handleUploadModelFiles} />
                 <button
                   type="button"
                   className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
@@ -1551,8 +2161,8 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                   3D 모델 업로드
                 </button>
                 <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                  SketchUp·Blender 등에서 내보낸 .glb·.gltf·.obj 파일을 배경에 배치할 수 있어요. 텍스처가
-                  분리된 .gltf보다는 하나의 파일로 묶인 .glb를 권장해요.
+                  모든 텍스처를 포함한 GLB 2.0만 등록할 수 있어요. 파일 구조·SHA-256·외부 참조·기기별
+                  삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다.
                 </p>
 
                 {modelLibraryStatus === "error" ? (
@@ -1569,7 +2179,7 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
 
                   {modelLibraryStatus === "ready" && modelLibrary.length === 0 ? (
                     <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-                      업로드한 3D 모델이 아직 없습니다. 위 버튼으로 .glb·.gltf·.obj 파일을 올려보세요.
+                      업로드한 3D 모델이 아직 없습니다. 위 버튼으로 하나의 파일에 리소스를 포함한 .glb를 올려보세요.
                     </div>
                   ) : null}
 
@@ -1579,7 +2189,9 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                       <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
                         <button
                           type="button"
-                          className="grid min-h-[5.5rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                          aria-describedby={`bg3d-model-status-${entry.id}`}
+                          className="grid min-h-[7.75rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
+                          disabled={!entry.canUse || isDeleting || isUploadingModel || isRestoringScene}
                           onClick={() => void addCustomModelToScene(entry.id)}
                         >
                           <span className="grid h-12 place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
@@ -1587,30 +2199,61 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
-                            <span className="mt-0.5 inline-flex rounded-full bg-raised px-1.5 py-0.5 text-[0.68rem] font-bold uppercase text-fg-3">
-                              {entry.format}
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              <span className="inline-flex rounded-full bg-raised px-1.5 py-0.5 text-[0.64rem] font-bold uppercase text-fg-3">
+                                {entry.format}
+                              </span>
+                              <span
+                                className={cx(
+                                  "inline-flex rounded-full px-1.5 py-0.5 text-[0.64rem] font-bold",
+                                  entry.commercialUse ? "bg-[oklch(0.80_0.15_150/0.14)] text-good" : "bg-raised text-fg-3"
+                                )}
+                              >
+                                {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
+                              </span>
+                            </span>
+                            <span id={`bg3d-model-status-${entry.id}`} className="mt-1 line-clamp-2 block text-[0.64rem] leading-snug text-fg-3">
+                              {entry.statusMessage}
                             </span>
                           </span>
                         </button>
 
-                        <button
-                          type="button"
-                          aria-label={`${entry.name} 삭제`}
-                          className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
-                          disabled={isDeleting}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleDeleteModelFromLibrary(entry.id);
-                          }}
-                        >
-                          {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
-                        </button>
+                        {entry.source === "indexed-db" ? (
+                          <button
+                            type="button"
+                            aria-label={`${entry.name} 삭제`}
+                            className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45 sm:size-7"
+                            disabled={isDeleting}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleDeleteModelFromLibrary(entry.id);
+                            }}
+                          >
+                            {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
+                          </button>
+                        ) : null}
                       </div>
                     );
                   })}
                 </div>
               </section>
             </div>
+
+            {sceneRecoveryError || hasCloneFailure ? (
+              <div role="alert" className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-bad/45 bg-[oklch(0.66_0.20_25/0.10)] px-3 py-2 text-xs leading-relaxed text-fg sm:mx-5">
+                <AlertTriangle className="mt-0.5 shrink-0 text-bad" size={14} aria-hidden />
+                <span>
+                  {sceneRecoveryError ?? "검증된 모델의 렌더 인스턴스를 만들지 못했습니다. 기존 PNG를 보존하기 위해 저장을 막았습니다."}
+                </span>
+              </div>
+            ) : null}
+
+            {isRestoringScene || hasPendingClone ? (
+              <div aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg-2 sm:mx-5">
+                <Loader2 className="shrink-0 animate-spin text-accent" size={14} aria-hidden />
+                {isRestoringScene ? "검증된 3D 장면 원본을 복원하는 중입니다." : "모델 렌더 인스턴스를 준비하는 중입니다."}
+              </div>
+            ) : null}
 
             {error ? (
               <div className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg-2 sm:mx-5">
@@ -1626,11 +2269,11 @@ export function StudioBackground3D({ open, initialDataUrl, onClose, onInsert }: 
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
-                disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing}
+                disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing || insertBlocked}
                 onClick={handleInsert}
               >
-                {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
-                이 배경으로 추가
+                {isCapturing || isRestoringScene || hasPendingClone ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+                {initialScene || initialDataUrl ? "3D 배경 업데이트" : "이 배경으로 추가"}
               </button>
             </footer>
           </aside>

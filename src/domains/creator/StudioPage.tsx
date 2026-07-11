@@ -760,6 +760,7 @@ import type {
   StudioAutoActionSet,
 } from "./studio-auto-actions";
 import type { AutoAdjust } from "./studio-auto-adjust";
+import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { BlurFx } from "./studio-blur";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
@@ -803,6 +804,7 @@ import type {
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
+import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
@@ -1403,6 +1405,8 @@ export interface ImageEl {
   builtinRasterAssetId?: StudioRasterAsset["id"];
   /** 고급 채우기가 선화 경계로 읽는 명시적 래스터 참조 레이어. */
   fillReference?: boolean;
+  /** 재편집 가능한 3D 장면 원본. PNG src와 분리하며 로컬 저장소 ID는 포함하지 않는다. */
+  bg3dScene?: StudioBg3dSceneDocument;
 }
 interface TextEl {
   id: string;
@@ -4564,6 +4568,9 @@ function StudioCuttoonEditor() {
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [bg3dOpen, setBg3dOpen] = useState(false);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
+  const [bg3dInitialScene, setBg3dInitialScene] = useState<StudioBg3dSceneDocument | undefined>(
+    undefined
+  );
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
 
   // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 localStorage에 분리하고,
@@ -7954,6 +7961,18 @@ function StudioCuttoonEditor() {
         sourceHeight: height,
       });
     addEl({ ...element, ...(aiProvenance ? { aiProvenance } : {}) });
+  }
+  function addBg3dRenderedImage(result: StudioBackground3DInsertResult) {
+    setError(null);
+    const element = createCanvasImageElement({
+      id: uid(),
+      src: result.pngDataUrl,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      sourceWidth: result.width,
+      sourceHeight: result.height,
+    });
+    addEl({ ...element, bg3dScene: result.bg3dScene });
   }
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
     if (builtinRasterBusyId) return;
@@ -13467,11 +13486,11 @@ function StudioCuttoonEditor() {
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
     try {
-      const [{ buildStudioProjectArchive }, { downloadBlob }] = await Promise.all([
-        import("./studio-project-archive"),
+      const [{ buildStudioProjectArchiveWithVerifiedBg3dModels }, { downloadBlob }] = await Promise.all([
+        import("./studio-bg3d-project-library"),
         import("./studio-export"),
       ]);
-      const result = await buildStudioProjectArchive({
+      const result = await buildStudioProjectArchiveWithVerifiedBg3dModels({
         project: currentStudioProjectSnapshot(),
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
@@ -13525,17 +13544,28 @@ function StudioCuttoonEditor() {
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
     try {
-      const { importStudioProjectArchive } = await import("./studio-project-archive");
+      const [{ importStudioProjectArchive }, { installStudioBg3dProjectArchiveModelsAndApply }] =
+        await Promise.all([
+          import("./studio-project-archive"),
+          import("./studio-bg3d-project-library"),
+        ]);
       const result = await importStudioProjectArchive(file, {
         rehydrateDataUrls: true,
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
-      applyStudioProjectSnapshot(result.project);
+      const installed = await installStudioBg3dProjectArchiveModelsAndApply(
+        result,
+        (project) => applyStudioProjectSnapshot(project),
+        {
+          limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+          verification: { profile: isMobile ? "mobile" : "desktop" },
+        }
+      );
       const warningCount = result.diagnostics.filter((item) => item.severity === "warning").length;
       setProjectArchiveStatus({
         tone: result.isSelfContained ? "good" : "warn",
         text: result.isSelfContained
-          ? `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${result.attachments.size}개를 복구했어요.`
+          ? `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${result.attachments.size}개를 복구했어요. 검증된 3D 모델 ${installed.records.length}개도 로컬 라이브러리에 원자적으로 설치했어요.`
           : `프로젝트를 복구했지만 외부 종속성 경고 ${warningCount}건이 있어 원본 자산 확인이 필요해요.`,
       });
       setError(null);
@@ -13770,7 +13800,7 @@ function StudioCuttoonEditor() {
               <Download size={14} /> 웹툰 연합 스크롤
             </button>
           )}
-          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="편집 중인 모든 레이아웃과 요소를 .json 파일로 PC에 저장">
+          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.">
             <Download size={14} /> 백업 (.json)
           </button>
           <button
@@ -13868,7 +13898,7 @@ function StudioCuttoonEditor() {
             data-project-keep-open
             onClick={() => projectImportInputRef.current?.click()}
             className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })}
-            title="백업해둔 .json 파일을 불러와 작업을 이어함"
+            title="빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."
           >
             <Upload size={14} /> 복구 (.json)
           </button>
@@ -14749,6 +14779,9 @@ function StudioCuttoonEditor() {
                 <button
                   type="button"
                   onClick={() => {
+                    setBg3dInitialScene(undefined);
+                    setBg3dInitialDataUrl(undefined);
+                    setBg3dInitialElementId(undefined);
                     setBg3dOpen(true);
                     setMenu(null);
                   }}
@@ -20414,11 +20447,12 @@ function StudioCuttoonEditor() {
                         <Sparkles size={14} /> 3D 재편집
                       </button>
                     )}
-                    {parseStudio3dTool(selected.src) === "bg3d" && (
+                    {(selected.bg3dScene !== undefined || parseStudio3dTool(selected.src) === "bg3d") && (
                       <button
                         type="button"
                         onClick={() => {
-                          setBg3dInitialDataUrl(selected.src);
+                          setBg3dInitialScene(selected.bg3dScene);
+                          setBg3dInitialDataUrl(selected.bg3dScene ? undefined : selected.src);
                           setBg3dInitialElementId(selected.id);
                           setBg3dOpen(true);
                         }}
@@ -21717,27 +21751,39 @@ function StudioCuttoonEditor() {
           <StudioBackground3D
             open
             initialDataUrl={bg3dInitialDataUrl}
+            initialScene={bg3dInitialScene}
             onClose={() => {
               setBg3dOpen(false);
               setBg3dInitialDataUrl(undefined);
+              setBg3dInitialScene(undefined);
               setBg3dInitialElementId(undefined);
             }}
-            onInsert={(src, w, h) => {
+            onInsert={(result) => {
+              if (pageEditLocked && !masterEditMode) {
+                setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 3D 장면을 삽입해 주세요.");
+                return false;
+              }
               if (bg3dInitialElementId) {
                 const targetEl = elementById.get(bg3dInitialElementId);
                 if (targetEl && targetEl.type === "image") {
+                  if (isEffectivelyLocked(targetEl, groups)) {
+                    setError("잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.");
+                    return false;
+                  }
                   const targetWidth = targetEl.width;
-                  const targetHeight = Math.round(targetWidth * (h / w));
+                  const targetHeight = Math.round(targetWidth * (result.height / result.width));
                   patchEl(bg3dInitialElementId, {
-                    src,
+                    src: result.pngDataUrl,
                     height: targetHeight,
+                    bg3dScene: result.bg3dScene,
                   });
                 } else {
-                  patchEl(bg3dInitialElementId, { src });
+                  addBg3dRenderedImage(result);
                 }
               } else {
-                addRenderedImage(src, w, h);
+                addBg3dRenderedImage(result);
               }
+              return true;
             }}
           />
         ) : null}
@@ -22138,12 +22184,14 @@ function StudioCuttoonEditor() {
                   <div className="my-1 h-px bg-line" />
                 </>
               )}
-              {contextMenuEl?.type === "image" && parseStudio3dTool(contextMenuEl.src) === "bg3d" && (
+              {contextMenuEl?.type === "image" &&
+                (contextMenuEl.bg3dScene !== undefined || parseStudio3dTool(contextMenuEl.src) === "bg3d") && (
                 <>
                   <button
                     type="button"
                     onClick={() => {
-                      setBg3dInitialDataUrl(contextMenuEl.src);
+                      setBg3dInitialScene(contextMenuEl.bg3dScene);
+                      setBg3dInitialDataUrl(contextMenuEl.bg3dScene ? undefined : contextMenuEl.src);
                       setBg3dInitialElementId(contextMenuEl.id);
                       setBg3dOpen(true);
                       setContextMenu((prev) => ({ ...prev, visible: false }));
