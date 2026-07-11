@@ -20,6 +20,12 @@ These are implementation evidence, not product mockups.
 | `review-pdf-profiles-mobile.png` | Internal-only review PDF profile selection with explicit private-metadata boundary |
 | `advanced-fill-mobile.png` | Browser-local Advanced Fill controls for scope, tolerance, expansion, and gap closing |
 | `advanced-fill-reference-mobile.png` | Separate line-art reference plus transparent color-layer preview with explicit apply/undo boundary |
+| `inspector-navigation-mobile.png` | Sticky four-tab mobile inspector with a short empty state and one-tap layer access |
+| `inspector-layer-actions-mobile.png` | 44px layer visibility and compact mobile action disclosure for lock, order, and delete |
+| `inspector-navigation-desktop.png` | Viewport-bounded desktop inspector aligned with the canvas workspace height |
+| `project-actions-mobile.png` | Two-column mobile project menu replacing the long horizontal project-action strip |
+| `project-actions-tablet.png` | Viewport-fixed three-column project menu at 768px, proving the scroll-header clipping boundary |
+| `project-actions-desktop.png` | Compact desktop project bar with backup, planning, review, and publish tools in one popover |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
@@ -68,3 +74,29 @@ Additional measured checks for this batch:
   expose a 44px calculation-cancel action. Pointer-up tap recognition ignored a >8px canvas drag without
   starting a fill, preserving one-finger long-canvas pan and two-finger pinch intent. Console warnings/errors
   were zero.
+- The workspace inspector retained zero horizontal overflow at 360 × 640, 375 × 812, 430 × 932,
+  1366 × 768, and 1440 × 900. Its four primary mobile tabs and close action measured 44px high;
+  the 360px layout kept four equal 75.49px-wide tabs and the 430px layout kept four equal 92.94px-wide
+  tabs. The desktop inspector uses the same `100dvh - 21rem` maximum height as the canvas viewport
+  (432px at 1366 × 768 and 564px at 1440 × 900) with `overflow-y: auto`, `overscroll-contain`, and a
+  sticky navigator instead of extending the Studio document.
+- The inspector's local, context-aware search reduced `미니맵` to one result and Enter moved directly to
+  `페이지 › 미니맵`. ArrowRight moved the selected primary tab from `페이지` to `게시`, while Home/End
+  and the reverse direction share the same roving-tab implementation. Consumed tab keys stop before the
+  canvas-wide shortcut handler, and the handler also rejects `defaultPrevented` events so a selected drawing
+  cannot be nudged by panel navigation. Escape and result activation return focus to the persistent search
+  toggle instead of leaving focus on an unmounted input. Search result counts are announced through a polite
+  live region, and Korean IME composition is ignored until composition completes.
+- Mobile layer rows expose only a 44 × 44px visibility action and a 44 × 44px more action alongside the
+  layer name. Expanding more revealed 44px lock, order, alpha/reference when applicable, and delete
+  actions without widening the document; desktop retains the compact direct-action row.
+- The top project bar now keeps only download, project, draft save, and publish visible. Fourteen less
+  frequent backup, restore, planning, review, production, and publish-package actions live in one bounded
+  project popover. At 375 × 812 every project action measured 167.5 × 44px, the menu measured 359 ×
+  418.6px, horizontal overflow remained zero, and opening Version closed the popover before presenting
+  its panel. The popover stays viewport-fixed through the tablet breakpoint so a horizontally scrolling
+  header cannot clip it; archive/file workflows remain open while busy or reporting diagnostics and expose
+  an explicit 44px close action. JSON, archive, and PSD file pickers use keyboard-focusable buttons rather
+  than unfocusable label-only triggers. At 768 × 1024 the fixed menu measured 752 × 329px, remained wholly
+  inside the viewport, and document horizontal overflow was zero. The only browser console errors were the
+  expected 502 responses from the intentionally absent local API proxy; no client runtime warning/error was emitted.

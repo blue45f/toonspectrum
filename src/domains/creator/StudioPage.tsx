@@ -66,6 +66,7 @@ import {
   LockOpen,
   MessageCircle,
   Minus,
+  MoreHorizontal,
   MousePointer2,
   PaintBucket,
   Pencil,
@@ -384,6 +385,13 @@ import {
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  loadStudioInspectorLayout,
+  navigateStudioInspector,
+  saveStudioInspectorLayout,
+  type StudioInspectorLayout,
+  type StudioInspectorRoute,
+} from "./studio-inspector-layout";
 import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
@@ -709,6 +717,7 @@ import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
 import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
+import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
 import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
@@ -3970,6 +3979,9 @@ function StudioCuttoonEditor() {
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
+    loadStudioInspectorLayout(studioQuickActionsStorage())
+  );
   // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
   const isMobile = useIsMobile();
   const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
@@ -4004,7 +4016,17 @@ function StudioCuttoonEditor() {
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
+  const mobileSheetAutofocusTargetRef = useRef<"default" | "publish-title">("default");
+  function changeInspectorLayout(next: StudioInspectorLayout) {
+    setInspectorLayout(next);
+    // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
+    globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
+  }
+  function openInspectorRoute(route: StudioInspectorRoute) {
+    changeInspectorLayout(navigateStudioInspector(inspectorLayout, route));
+  }
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
     if (!isMobile) {
@@ -4015,10 +4037,14 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     saveStudioQuickActionsPreferences(studioQuickActionsStorage(), quickActionsPreferences);
   }, [quickActionsPreferences]);
+  useEffect(() => {
+    saveStudioInspectorLayout(studioQuickActionsStorage(), inspectorLayout);
+  }, [inspectorLayout]);
   // 바텀시트 a11y: 열리면 시트 내부(닫기 버튼)로 포커스를 옮기고, 닫히면 트리거로 되돌린다.
   useEffect(() => {
     if (!isMobile) return;
     if (!mobileSheet) {
+      mobileSheetAutofocusTargetRef.current = "default";
       sheetReturnFocusRef.current?.focus?.();
       sheetReturnFocusRef.current = null;
       return;
@@ -4031,7 +4057,14 @@ function StudioCuttoonEditor() {
           : mobileSheet === "draw"
             ? drawSheetRef.current
             : propsSheetRef.current;
-      sheet?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      const preferredTarget =
+        mobileSheet === "props" && mobileSheetAutofocusTargetRef.current === "publish-title"
+          ? titleInputRef.current
+          : null;
+      (preferredTarget ?? sheet?.querySelector<HTMLElement>("[data-autofocus]"))?.focus({
+        preventScroll: preferredTarget !== null,
+      });
+      mobileSheetAutofocusTargetRef.current = "default";
     });
     return () => cancelAnimationFrame(id);
   }, [mobileSheet, isMobile]);
@@ -4075,6 +4108,7 @@ function StudioCuttoonEditor() {
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [layerActionMenuId, setLayerActionMenuId] = useState<string | null>(null);
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -4085,6 +4119,9 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (selectedId) setMarqueeIds([]);
   }, [selectedId]);
+  useEffect(() => {
+    setLayerActionMenuId(null);
+  }, [currentPageId, inspectorLayout.primary]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
@@ -5076,8 +5113,6 @@ function StudioCuttoonEditor() {
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
-  const publishRef = useRef<HTMLDivElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
   const drawingRef = useRef<DrawEl | null>(null);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
@@ -5630,6 +5665,7 @@ function StudioCuttoonEditor() {
   const [exportScale, setExportScale] = useState<number>(2);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const [exportTransparent, setExportTransparent] = useState(false);
+  const [projectActionsOpen, setProjectActionsOpen] = useState(false);
   // 선택한 플랫폼 내보내기 규격(없으면 null = 자유 배율).
   const [exportPresetId, setExportPresetId] = useState<string | null>(null);
   // 내보내기 워터마크/서명 — 세션 넘어 유지되게 localStorage에 저장.
@@ -5658,6 +5694,10 @@ function StudioCuttoonEditor() {
     }
   };
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const projectActionsRef = useRef<HTMLDivElement>(null);
+  const projectImportInputRef = useRef<HTMLInputElement>(null);
+  const projectArchiveImportInputRef = useRef<HTMLInputElement>(null);
+  const psdImportInputRef = useRef<HTMLInputElement>(null);
 
   // 내보내기 옵션 팝오버 바깥 클릭시 닫기
   useEffect(() => {
@@ -5668,6 +5708,27 @@ function StudioCuttoonEditor() {
     globalThis.addEventListener("pointerdown", handlePointerDown);
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [exportMenuOpen]);
+
+  useEffect(() => {
+    if (!projectActionsOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!projectActionsRef.current?.contains(event.target as Node)) {
+        setProjectActionsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setProjectActionsOpen(false);
+      projectActionsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    };
+    globalThis.addEventListener("pointerdown", handlePointerDown);
+    globalThis.addEventListener("keydown", handleKeyDown);
+    return () => {
+      globalThis.removeEventListener("pointerdown", handlePointerDown);
+      globalThis.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [projectActionsOpen]);
 
   // QuickShape 정지-감지 인터벌 — 언마운트 시(다른 페이지 이동 등) 타이머 잔존 방지.
   useEffect(() => {
@@ -7303,7 +7364,7 @@ function StudioCuttoonEditor() {
       <li
         key={el.id}
         className={cn(
-          "flex items-center gap-1 rounded-lg border px-1.5 py-1",
+          "flex min-h-11 flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1 lg:min-h-0",
           el.id === selectedId ? "border-accent/60 bg-accent-soft/40" : "border-line",
           dimmed && "opacity-50"
         )}
@@ -7321,7 +7382,7 @@ function StudioCuttoonEditor() {
             }
           }}
           className={cn(
-            "min-w-0 flex-1 truncate text-left text-xs select-none",
+            "flex min-h-11 min-w-0 flex-1 items-center truncate text-left text-xs select-none lg:min-h-0",
             el.hidden ? "text-fg-3/50 line-through" : el.locked ? "text-fg-3" : "text-fg-2"
           )}
           title={el.locked ? `${elementLabel(el)} (잠김) · 더블클릭하여 이름 변경` : `${elementLabel(el)} · 더블클릭하여 이름 변경`}
@@ -7337,7 +7398,7 @@ function StudioCuttoonEditor() {
             patchEl(el.id, { locked: willLock } as Partial<El>);
             if (willLock && selectedId === el.id) setSelectedId(null);
           }}
-          className={cn("grid size-6 place-items-center rounded hover:bg-raised", el.locked ? "text-accent" : "text-fg-3")}
+          className={cn("hidden size-6 place-items-center rounded hover:bg-raised lg:grid", el.locked ? "text-accent" : "text-fg-3")}
           aria-label={el.locked ? "레이어 잠금 해제" : "레이어 잠금"}
           title={el.locked ? "잠금 해제" : "잠금"}
         >
@@ -7347,7 +7408,7 @@ function StudioCuttoonEditor() {
           <button
             type="button"
             onClick={() => patchEl(el.id, { alphaLocked: !el.alphaLocked } as Partial<El>)}
-            className={cn("grid size-6 place-items-center rounded hover:bg-raised", el.alphaLocked ? "text-accent" : "text-fg-3")}
+            className={cn("hidden size-6 place-items-center rounded hover:bg-raised lg:grid", el.alphaLocked ? "text-accent" : "text-fg-3")}
             aria-label={el.alphaLocked ? "알파 락 해제" : "알파 락"}
             title={el.alphaLocked ? "알파 락 해제 — 투명 영역도 다시 칠할 수 있어요" : "알파 락 — 켜면 이 레이어의 불투명한 부분에만 칠해져요"}
           >
@@ -7359,7 +7420,7 @@ function StudioCuttoonEditor() {
             type="button"
             onClick={() => patchEl(el.id, { fillReference: !el.fillReference } as Partial<El>)}
             className={cn(
-              "hidden size-6 place-items-center rounded hover:bg-raised [@media(pointer:fine)]:grid",
+              "hidden size-6 place-items-center rounded hover:bg-raised lg:grid",
               el.fillReference ? "bg-accent-soft text-accent" : "text-fg-3",
             )}
             aria-pressed={el.fillReference === true}
@@ -7376,7 +7437,7 @@ function StudioCuttoonEditor() {
         <button
           type="button"
           onClick={() => patchEl(el.id, { hidden: !el.hidden } as Partial<El>)}
-          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
           aria-label={el.hidden ? "레이어 표시" : "레이어 숨김"}
           title={el.hidden ? "표시" : "숨김"}
         >
@@ -7386,7 +7447,7 @@ function StudioCuttoonEditor() {
           type="button"
           onClick={() => moveLayer(el.id, "up")}
           disabled={i === elements.length - 1}
-          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+          className="hidden size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30 lg:grid"
           aria-label="위로"
           title="위로"
         >
@@ -7396,7 +7457,7 @@ function StudioCuttoonEditor() {
           type="button"
           onClick={() => moveLayer(el.id, "down")}
           disabled={i === 0}
-          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30"
+          className="hidden size-6 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-30 lg:grid"
           aria-label="아래로"
           title="아래로"
         >
@@ -7405,12 +7466,96 @@ function StudioCuttoonEditor() {
         <button
           type="button"
           onClick={() => removeById(el.id)}
-          className="grid size-6 place-items-center rounded text-bad hover:bg-raised"
+          className="hidden size-6 place-items-center rounded text-bad hover:bg-raised lg:grid"
           aria-label="레이어 삭제"
           title="삭제"
         >
           <Trash2 size={13} />
         </button>
+        <button
+          type="button"
+          onClick={() => setLayerActionMenuId((current) => (current === el.id ? null : el.id))}
+          aria-expanded={layerActionMenuId === el.id}
+          aria-label={`${elementLabel(el)} 레이어 작업 더보기`}
+          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:hidden"
+        >
+          <MoreHorizontal size={17} aria-hidden />
+        </button>
+        {layerActionMenuId === el.id ? (
+          <div className="grid basis-full grid-cols-2 gap-1 border-t border-line/50 pt-1.5 lg:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                const willLock = !el.locked;
+                patchEl(el.id, { locked: willLock } as Partial<El>);
+                if (willLock && selectedId === el.id) setSelectedId(null);
+                setLayerActionMenuId(null);
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
+            >
+              {el.locked ? <LockOpen size={15} aria-hidden /> : <Lock size={15} aria-hidden />}
+              {el.locked ? "잠금 해제" : "잠금"}
+            </button>
+            {canAlphaLock(el) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  patchEl(el.id, { alphaLocked: !el.alphaLocked } as Partial<El>);
+                  setLayerActionMenuId(null);
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
+              >
+                {el.alphaLocked ? <Grid2x2X size={15} aria-hidden /> : <Grid2x2Check size={15} aria-hidden />}
+                {el.alphaLocked ? "알파 락 해제" : "알파 락"}
+              </button>
+            ) : null}
+            {el.type === "image" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  patchEl(el.id, { fillReference: !el.fillReference } as Partial<El>);
+                  setLayerActionMenuId(null);
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised"
+              >
+                <ScanLine size={15} aria-hidden />
+                {el.fillReference ? "참조 해제" : "채우기 참조"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                moveLayer(el.id, "up");
+                setLayerActionMenuId(null);
+              }}
+              disabled={i === elements.length - 1}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised disabled:opacity-35"
+            >
+              <ChevronUp size={15} aria-hidden /> 앞으로
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                moveLayer(el.id, "down");
+                setLayerActionMenuId(null);
+              }}
+              disabled={i === 0}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-fg-2 hover:bg-raised disabled:opacity-35"
+            >
+              <ChevronDown size={15} aria-hidden /> 뒤로
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                removeById(el.id);
+                setLayerActionMenuId(null);
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-left text-xs text-bad hover:bg-bad-soft/20"
+            >
+              <Trash2 size={15} aria-hidden /> 삭제
+            </button>
+          </div>
+        ) : null}
       </li>
     );
   };
@@ -7741,9 +7886,15 @@ function StudioCuttoonEditor() {
   function openPublishStep() {
     setTool("select");
     setMenu(null);
+    openInspectorRoute({ primary: "publish" });
+    setRightPanelOpen(true);
+    if (isMobile) {
+      mobileSheetAutofocusTargetRef.current = "publish-title";
+      setMobileSheet("props");
+    }
     dismissQuickStart();
     globalThis.requestAnimationFrame(() => {
-      publishRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      propsSheetRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       titleInputRef.current?.focus({ preventScroll: true });
     });
   }
@@ -8095,6 +8246,7 @@ function StudioCuttoonEditor() {
       setEyedropperActive(true);
       setMobileSheet(null);
     } else if (action === "properties") {
+      openInspectorRoute({ primary: "properties" });
       setMobileSheet("props");
     } else if (action === "duplicate") duplicateSelected();
     else if (action === "delete") removeSelected();
@@ -8103,6 +8255,7 @@ function StudioCuttoonEditor() {
     else if (action === "add-bubble") addBubble("speech");
     else if (action === "advanced-fill") {
       setTool("select");
+      openInspectorRoute({ primary: "properties", image: "fill" });
       setAdvancedFillActive(true);
       setAdvancedFillStatus("캔버스의 닫힌 영역을 탭하세요. 적용 전까지는 문서가 바뀌지 않습니다.");
       setMobileSheet(null);
@@ -8192,6 +8345,8 @@ function StudioCuttoonEditor() {
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
     shortcutRef.current = (e: KeyboardEvent) => {
+      // 탭·메뉴·캔버스 내부 위젯이 이미 소비한 키는 전역 원고 편집 명령으로 다시 실행하지 않는다.
+      if (e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing || editing) return;
@@ -10173,6 +10328,7 @@ function StudioCuttoonEditor() {
     }
     disarmAllPixelTools();
     setTool("select");
+    openInspectorRoute({ primary: "properties", image: "fill" });
     setAdvancedFillActive(true);
     setAdvancedFillStatus("캔버스의 닫힌 영역을 탭하세요. 적용 전까지는 문서가 바뀌지 않습니다.");
     setMobileSheet(null);
@@ -11830,6 +11986,7 @@ function StudioCuttoonEditor() {
     }
     if (!title.trim()) {
       setError("제목을 입력해주세요.");
+      openPublishStep();
       return;
     }
     if (
@@ -13062,6 +13219,7 @@ function StudioCuttoonEditor() {
               onClick={() => {
                 preloadStudioExportMenuPanel();
                 ensureWatermarkLoaded();
+                setProjectActionsOpen(false);
                 setExportMenuOpen((open) => !open);
               }}
               onMouseEnter={preloadStudioExportMenuPanel}
@@ -13106,6 +13264,62 @@ function StudioCuttoonEditor() {
               </Suspense>
             )}
           </div>
+          <div ref={projectActionsRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setExportMenuOpen(false);
+                setProjectActionsOpen((open) => !open);
+              }}
+              aria-haspopup="dialog"
+              aria-expanded={projectActionsOpen}
+              aria-controls="studio-project-actions-menu"
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+              })}
+              title="백업·복구·기획·검토·연재·게시 도구"
+            >
+              <Folder size={14} aria-hidden /> 프로젝트
+              <ChevronDown
+                size={13}
+                className={cn("transition-transform", projectActionsOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+            {projectActionsOpen ? (
+              <div
+                id="studio-project-actions-menu"
+                role="dialog"
+                aria-label="프로젝트 작업"
+                onClickCapture={(event) => {
+                  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
+                  if (button && !button.dataset.projectKeepOpen) {
+                    globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
+                  }
+                }}
+                className="fixed inset-x-2 top-20 z-[70] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+              >
+                <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
+                  <span>
+                    <span className="block text-xs font-bold text-fg">프로젝트 작업</span>
+                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">파일·기획·검토·게시 도구를 한곳에서 엽니다.</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="hidden rounded-full border border-line bg-card px-2 py-1 text-[0.6rem] font-semibold text-fg-3 min-[420px]:inline-flex">
+                      기능 유지 · 화면 절약
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setProjectActionsOpen(false)}
+                      aria-label="프로젝트 작업 닫기"
+                      className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                    >
+                      <X size={17} aria-hidden />
+                    </button>
+                  </span>
+                </div>
           {pages.length > 1 && (
             <button
               type="button"
@@ -13126,6 +13340,7 @@ function StudioCuttoonEditor() {
           <button
             type="button"
             onClick={() => void handleExportProjectArchive()}
+            data-project-keep-open
             disabled={projectArchiveBusy}
             className={buttonClass({
               size: "sm",
@@ -13212,31 +13427,51 @@ function StudioCuttoonEditor() {
           >
             <WandSparkles size={14} /> Auto Actions
           </button>
-          <label className={cn(buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }), "cursor-pointer")} title="백업해둔 .json 파일을 불러와 작업을 이어함">
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => projectImportInputRef.current?.click()}
+            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })}
+            title="백업해둔 .json 파일을 불러와 작업을 이어함"
+          >
             <Upload size={14} /> 복구 (.json)
-            <input type="file" accept=".json" className="hidden" onChange={handleImportProject} />
-          </label>
-          <label
+          </button>
+          <input
+            ref={projectImportInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(event) => {
+              const hasFile = Boolean(event.currentTarget.files?.[0]);
+              handleImportProject(event);
+              if (hasFile) setProjectActionsOpen(false);
+            }}
+          />
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => projectArchiveImportInputRef.current?.click()}
+            disabled={projectArchiveBusy}
             className={cn(
               buttonClass({
                 size: "sm",
                 variant: "quiet",
                 className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
               }),
-              "cursor-pointer",
-              projectArchiveBusy && "pointer-events-none opacity-60"
+              projectArchiveBusy && "cursor-wait opacity-60"
             )}
             title="무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"
           >
             <FileUp size={14} /> 아카이브 복구
-            <input
-              type="file"
-              accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-              className="hidden"
-              disabled={projectArchiveBusy}
-              onChange={(event) => void handleImportProjectArchive(event)}
-            />
-          </label>
+          </button>
+          <input
+            ref={projectArchiveImportInputRef}
+            type="file"
+            accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
+            className="hidden"
+            disabled={projectArchiveBusy}
+            onChange={(event) => void handleImportProjectArchive(event)}
+          />
           {projectArchiveStatus ? (
             <span
               role="status"
@@ -13252,24 +13487,28 @@ function StudioCuttoonEditor() {
               {projectArchiveStatus.text}
             </span>
           ) : null}
-          <label
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => psdImportInputRef.current?.click()}
+            disabled={psdImportBusy}
             className={cn(
               buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
-              "cursor-pointer",
-              psdImportBusy && "pointer-events-none opacity-60"
+              psdImportBusy && "cursor-wait opacity-60"
             )}
             title="포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"
           >
             {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
             PSD 가져오기
-            <input
-              type="file"
-              accept=".psd,image/vnd.adobe.photoshop"
-              className="hidden"
-              disabled={psdImportBusy}
-              onChange={(e) => void handleImportPsd(e)}
-            />
-          </label>
+          </button>
+          <input
+            ref={psdImportInputRef}
+            type="file"
+            accept=".psd,image/vnd.adobe.photoshop"
+            className="hidden"
+            disabled={psdImportBusy}
+            onChange={(event) => void handleImportPsd(event)}
+          />
           {psdImportStatus && (
             <span
               className={cn(
@@ -13339,6 +13578,9 @@ function StudioCuttoonEditor() {
           >
             <Files size={14} /> 게시 패키지
           </button>
+              </div>
+            ) : null}
+          </div>
           <button type="button" onClick={() => handleSave("draft")} disabled={saving} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap" })}>
             임시저장
           </button>
@@ -17505,11 +17747,12 @@ function StudioCuttoonEditor() {
           aria-label={isMobile ? "속성" : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
-            "flex flex-col gap-4",
+            "flex min-h-0 flex-col gap-3 overscroll-contain [scrollbar-gutter:stable]",
             // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
-            // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
-            "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
+            // 데스크톱: 뷰포트 안에서 독립 스크롤하는 고정 높이 도크. 사이드바가 문서 전체 높이를
+            // 밀어내지 않아 긴 웹툰 캔버스와 패널 스크롤이 서로 독립적이다.
+            "lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             !rightPanelOpen && "lg:hidden"
           )}
@@ -17519,18 +17762,9 @@ function StudioCuttoonEditor() {
               : { width: rightResize.width, minWidth: 248 }
           }
         >
-          {/* 모바일 시트 손잡이 + 닫기 */}
-          <div className="flex items-center justify-between lg:hidden">
+          {/* 모바일 시트 손잡이. 닫기는 스크롤해도 남는 작업 패널 헤더에 둔다. */}
+          <div className="flex items-center justify-center lg:hidden">
             <div className="mx-auto h-1 w-10 rounded-full bg-line" />
-            <button
-              type="button"
-              onClick={() => setMobileSheet(null)}
-              className="absolute right-3 rounded p-1 text-fg-3 hover:bg-raised"
-              aria-label="속성 시트 닫기"
-              data-autofocus
-            >
-              <X size={16} />
-            </button>
           </div>
           <div className="hidden justify-end lg:flex">
             <button
@@ -17542,7 +17776,25 @@ function StudioCuttoonEditor() {
               접기 <ChevronRight size={13} />
             </button>
           </div>
-          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+          <StudioInspectorNavigator
+            layout={inspectorLayout}
+            selectedType={selected?.type ?? null}
+            selectionLabel={selected ? elementLabel(selected) : null}
+            drawing={selected === null && tool === "draw"}
+            layerCount={elements.length}
+            onRequestClose={() => setMobileSheet(null)}
+            onChange={changeInspectorLayout}
+          />
+
+          <div
+            role="tabpanel"
+            aria-label="캔버스 설정"
+            hidden={
+              inspectorLayout.primary !== "document" ||
+              inspectorLayout.document !== "canvas"
+            }
+            className="rounded-xl border border-line bg-panel/40 p-3"
+          >
             <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
               배경색
@@ -17787,7 +18039,15 @@ function StudioCuttoonEditor() {
           </div>
 
           {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
-          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+          <div
+            role="tabpanel"
+            aria-label="페이지 색보정"
+            hidden={
+              inspectorLayout.primary !== "document" ||
+              inspectorLayout.document !== "grade"
+            }
+            className="rounded-xl border border-line bg-panel/40 p-3"
+          >
             {pageGradePanelOpen ? (
               <>
                 <div className="mb-2 flex justify-end">
@@ -17828,7 +18088,12 @@ function StudioCuttoonEditor() {
           </div>
 
           {selected && (
-            <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <div
+              role="tabpanel"
+              aria-label="선택 요소 속성"
+              hidden={inspectorLayout.primary !== "properties"}
+              className="rounded-xl border border-line bg-panel/40 p-3"
+            >
               <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
               {selected.type === "draw" && (
@@ -19378,42 +19643,57 @@ function StudioCuttoonEditor() {
 
               {selected.type === "image" && (
                 <>
-                  <StudioBgRemoveButton
-                    src={selected.src}
-                    onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                  />
-                  <StudioAiColorizePanel
-                    configured={isStudioAiConfigured(aiSettings)}
-                    prompt={aiColorizePrompt}
-                    onPromptChange={setAiColorizePrompt}
-                    busy={aiColorizeBusy}
-                    error={aiColorizeError}
-                    onColorize={onColorizeSelected}
-                  />
-                  {selected.stockImageCredit && (
-                    <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
-                      출처:{" "}
-                      <a
-                        href={selected.stockImageCredit.photographerProfileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-fg-2"
-                      >
-                        {selected.stockImageCredit.photographerName}
-                      </a>{" "}
-                      ·{" "}
-                      <a
-                        href={selected.stockImageCredit.unsplashPhotoPageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-fg-2"
-                      >
-                        Unsplash
-                      </a>
-                    </p>
-                  )}
-                  {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
-                  <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "quick"
+                    }
+                    className="space-y-3"
+                  >
+                      <StudioBgRemoveButton
+                        src={selected.src}
+                        onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                      />
+                      <StudioAiColorizePanel
+                        configured={isStudioAiConfigured(aiSettings)}
+                        prompt={aiColorizePrompt}
+                        onPromptChange={setAiColorizePrompt}
+                        busy={aiColorizeBusy}
+                        error={aiColorizeError}
+                        onColorize={onColorizeSelected}
+                      />
+                      {selected.stockImageCredit && (
+                        <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
+                          출처:{" "}
+                          <a
+                            href={selected.stockImageCredit.photographerProfileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-fg-2"
+                          >
+                            {selected.stockImageCredit.photographerName}
+                          </a>{" "}
+                          ·{" "}
+                          <a
+                            href={selected.stockImageCredit.unsplashPhotoPageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-fg-2"
+                          >
+                            Unsplash
+                          </a>
+                        </p>
+                      )}
+                      {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
+                      <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
+                  </div>
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "fill"
+                    }
+                    className="space-y-3"
+                  >
                   <StudioFloodFillPanel
                     active={advancedFillActive}
                     busy={advancedFillBusy}
@@ -19445,14 +19725,30 @@ function StudioCuttoonEditor() {
                     src={selected.src}
                     onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                   />
-                  <StudioImageAdjustmentsPanel
-                    selected={selected}
-                    filterClipboard={filterClipboard}
-                    onSetFilterClipboard={setFilterClipboard}
-                    onPatch={(patch) => patchEl(selected.id, patch)}
-                  />
-                  {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미/브러시로 선택해 부분 조정/삭제. */}
-                  <StudioSelectionToolsPanel
+                  </div>
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "quick"
+                    }
+                    className="space-y-3"
+                  >
+                    <StudioImageAdjustmentsPanel
+                      selected={selected}
+                      filterClipboard={filterClipboard}
+                      onSetFilterClipboard={setFilterClipboard}
+                      onPatch={(patch) => patchEl(selected.id, patch)}
+                    />
+                  </div>
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "retouch"
+                    }
+                    className="space-y-3"
+                  >
+                    {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미/브러시로 선택해 부분 조정/삭제. */}
+                    <StudioSelectionToolsPanel
                     selection={pixelSel}
                     activeTool={pixelTool === "wand" ? null : pixelTool}
                     combineMode={pixelCombine}
@@ -19525,7 +19821,7 @@ function StudioCuttoonEditor() {
                       healCloneOffsetRef.current = null;
                     }}
                   />
-                  <StudioHistoryBrushPanel
+                    <StudioHistoryBrushPanel
                     active={historyBrushActive}
                     radiusPx={historyBrushRadius}
                     hardness={historyBrushHardness}
@@ -19549,9 +19845,17 @@ function StudioCuttoonEditor() {
                       setHistoryBrushSourceIndex(null);
                       setHistoryBrushSourceSrc(null);
                     }}
-                    onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
-                  />
-                  <StudioLayerMaskPanel
+                      onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
+                    />
+                  </div>
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "mask"
+                    }
+                    className="space-y-3"
+                  >
+                    <StudioLayerMaskPanel
                     hasMask={!!selected.maskSrc}
                     enabled={selected.maskEnabled !== false}
                     paintActive={layerMaskPaintActive}
@@ -19575,10 +19879,18 @@ function StudioCuttoonEditor() {
                     onPaintModeChange={setLayerMaskPaintMode}
                     onRadiusChange={setLayerMaskRadius}
                     onHardnessChange={setLayerMaskHardness}
-                    onStrengthChange={setLayerMaskStrength}
-                  />
-                  {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
-                  <StudioCropPanel
+                      onStrengthChange={setLayerMaskStrength}
+                    />
+                  </div>
+                  <div
+                    hidden={
+                      inspectorLayout.primary !== "properties" ||
+                      inspectorLayout.image !== "transform"
+                    }
+                    className="space-y-3"
+                  >
+                    {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
+                    <StudioCropPanel
                     active={!!cropRect}
                     aspect={cropAspect}
                     busy={cropBusy}
@@ -19606,7 +19918,7 @@ function StudioCuttoonEditor() {
                   />
                   {/* 퍼펫 워프 — 핀을 놓고 드래그해 이미지를 관절 인형처럼 변형. 적용 전까지는 오버레이
                       미리보기만 갱신되고 원본 픽셀은 그대로다. */}
-                  <StudioPuppetWarpPanel
+                    <StudioPuppetWarpPanel
                     active={puppetWarpActive}
                     pins={puppetWarpPins}
                     busy={puppetWarpBusy}
@@ -19627,7 +19939,8 @@ function StudioCuttoonEditor() {
                       setPuppetWarpActive(false);
                       setPuppetWarpPins([]);
                     }}
-                  />
+                    />
+                  </div>
                 </>
               )}
 
@@ -19721,7 +20034,12 @@ function StudioCuttoonEditor() {
           )}
 
           {selected === null && tool === "draw" && (
-            <div className="rounded-2xl border border-line bg-panel/40 p-3 space-y-3">
+            <div
+              role="tabpanel"
+              aria-label="그리기 도구 설정"
+              hidden={inspectorLayout.primary !== "properties"}
+              className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
+            >
               <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
               
               {/* 모드 선택: 펜 / 지우개 / 도형 */}
@@ -20141,8 +20459,27 @@ function StudioCuttoonEditor() {
             </div>
           )}
 
+          {inspectorLayout.primary === "properties" && selected === null && tool !== "draw" ? (
+            <div
+              role="tabpanel"
+              aria-label="선택 요소 속성"
+              className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
+            >
+              <MousePointer2 size={22} className="mx-auto text-fg-3" aria-hidden />
+              <p className="mt-2 text-xs font-semibold text-fg-2">편집할 요소를 선택하세요</p>
+              <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
+                선택한 요소에 맞는 기본·전문 설정만 이곳에 표시됩니다.
+              </p>
+            </div>
+          ) : null}
+
           {elements.length > 0 && (
-            <div className="rounded-2xl border border-line bg-panel/40 p-3">
+            <div
+              role="tabpanel"
+              aria-label="레이어"
+              hidden={inspectorLayout.primary !== "layers"}
+              className="rounded-xl border border-line bg-panel/40 p-3"
+            >
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold text-fg-3">레이어 ({elements.length})</p>
                 <button
@@ -20158,11 +20495,11 @@ function StudioCuttoonEditor() {
                 {buildLayerTree(elements.slice().reverse(), groups).map((node) =>
                   node.kind === "group" ? (
                     <li key={node.group.id} className="rounded-lg border border-line/70 bg-card/30">
-                      <div className="flex items-center gap-1 px-1.5 py-1">
+                      <div className="flex min-h-11 items-center gap-1 px-1.5 py-1 lg:min-h-0">
                         <button
                           type="button"
                           onClick={() => toggleGroupFlag(node.group.id, "collapsed")}
-                          className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised"
+                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-5"
                           aria-label={node.group.collapsed ? "그룹 펼치기" : "그룹 접기"}
                           title={node.group.collapsed ? "펼치기" : "접기"}
                         >
@@ -20184,7 +20521,7 @@ function StudioCuttoonEditor() {
                         <button
                           type="button"
                           onClick={() => toggleGroupFlag(node.group.id, "hidden")}
-                          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
                           aria-label={node.group.hidden ? "그룹 표시" : "그룹 숨김"}
                           title={node.group.hidden ? "표시" : "숨김"}
                         >
@@ -20193,7 +20530,7 @@ function StudioCuttoonEditor() {
                         <button
                           type="button"
                           onClick={() => toggleGroupFlag(node.group.id, "locked")}
-                          className={cn("grid size-6 place-items-center rounded hover:bg-raised", node.group.locked ? "text-accent" : "text-fg-3")}
+                          className={cn("grid size-11 place-items-center rounded hover:bg-raised lg:size-6", node.group.locked ? "text-accent" : "text-fg-3")}
                           aria-label={node.group.locked ? "그룹 잠금 해제" : "그룹 잠금"}
                           title={node.group.locked ? "잠금 해제" : "잠금"}
                         >
@@ -20202,7 +20539,7 @@ function StudioCuttoonEditor() {
                         <button
                           type="button"
                           onClick={() => deleteLayerGroup(node.group.id)}
-                          className="grid size-6 place-items-center rounded text-fg-3 hover:bg-raised"
+                          className="grid size-11 place-items-center rounded text-fg-3 hover:bg-raised lg:size-6"
                           aria-label="그룹 해제"
                           title="그룹 해제 (레이어는 보존)"
                         >
@@ -20223,8 +20560,30 @@ function StudioCuttoonEditor() {
             </div>
           )}
 
+          {inspectorLayout.primary === "layers" && elements.length === 0 ? (
+            <div
+              role="tabpanel"
+              aria-label="레이어"
+              className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
+            >
+              <Layers size={22} className="mx-auto text-fg-3" aria-hidden />
+              <p className="mt-2 text-xs font-semibold text-fg-2">아직 레이어가 없습니다</p>
+              <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
+                이미지, 말풍선, 텍스트 또는 그리기를 추가하면 이곳에서 순서를 관리할 수 있습니다.
+              </p>
+            </div>
+          ) : null}
+
           {/* 미니맵 / 네비게이터 */}
-          <div className="rounded-2xl border border-line bg-panel/40 p-3">
+          <div
+            role="tabpanel"
+            aria-label="미니맵과 페이지 탐색"
+            hidden={
+              inspectorLayout.primary !== "document" ||
+              inspectorLayout.document !== "navigator"
+            }
+            className="rounded-xl border border-line bg-panel/40 p-3"
+          >
             <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">미니맵 / 네비게이터</p>
             <div className="flex justify-center bg-canvas/30 rounded-xl p-2 border border-line/50">
               <div
@@ -20309,7 +20668,12 @@ function StudioCuttoonEditor() {
             </div>
           </div>
 
-          <div ref={publishRef} className="rounded-2xl border border-line bg-panel/40 p-3">
+          <div
+            role="tabpanel"
+            aria-label="게시 정보"
+            hidden={inspectorLayout.primary !== "publish"}
+            className="rounded-xl border border-line bg-panel/40 p-3"
+          >
             <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
             <input
               ref={titleInputRef}
@@ -20364,7 +20728,10 @@ function StudioCuttoonEditor() {
             <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
             <button
               type="button"
-              onClick={() => setMobileSheet("props")}
+              onClick={() => {
+                openInspectorRoute({ primary: "properties" });
+                setMobileSheet("props");
+              }}
               className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised"
             >
               <SlidersHorizontal size={16} aria-hidden /> 속성
@@ -20904,12 +21271,19 @@ function StudioCuttoonEditor() {
               </button>
               <button
                 type="button"
-                onClick={() => setMobileSheet((s) => (s === "props" ? null : "props"))}
+                onClick={() => {
+                  if (mobileSheet === "props") {
+                    setMobileSheet(null);
+                    return;
+                  }
+                  openInspectorRoute({ primary: selected ? "properties" : "layers" });
+                  setMobileSheet("props");
+                }}
                 aria-pressed={mobileSheet === "props"}
                 className={mobileBarBtn(mobileSheet === "props")}
               >
                 <Layers size={17} aria-hidden />
-                <span>속성·레이어</span>
+                <span>작업 패널</span>
               </button>
               <div className="flex w-32 flex-none items-center justify-center">
                 <button

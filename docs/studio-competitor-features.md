@@ -8,7 +8,8 @@
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
 > 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR + 6방향 모바일 퀵 액션 + 브라우저 내장 대사 낭독
-> 검수 + 메타데이터 기반 내부 검수 PDF + 참조 레이어 기반 고급 채우기. 모바일 검증 캡처는
+> 검수 + 메타데이터 기반 내부 검수 PDF + 참조 레이어 기반 고급 채우기 + 탭형 작업공간 인스펙터·
+> 문맥 검색·프로젝트 메뉴 재배치. 모바일 검증 캡처는
 > `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
@@ -98,6 +99,76 @@
   Package는 브라우저 실제 다운로드 후 `unzip -t`, entry·hash manifest를 함께 확인했다.
 
 증거 캡처: [`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md).
+
+### 2026-07-11 작업공간 인스펙터·프로젝트 메뉴 재배치 배치 (현재 작업 트리 통합 완료)
+
+이번 배치는 기능을 삭제하거나 단순히 패딩을 줄이지 않고, 전문 기능을 계속 추가해도 우측 패널 높이가
+선형으로 늘지 않는 정보 구조를 먼저 만들었다. 공식 기준은 Clip Studio Paint의
+[팔레트 탭·도크](https://help.clip-studio.com/en-us/manual_en/690_interface/Palettes.htm),
+[Tool Property와 Sub Tool Detail](https://help.clip-studio.com/en-us/manual_en/150_tools/How_to_use_tools.htm),
+[태블릿 인터페이스](https://help.clip-studio.com/en-us/manual_en/090_tablet/Tablet_interface.htm) 및
+[워크스페이스](https://help.clip-studio.com/en-us/manual_en/690_interface/Register_and_manage_your_workspace.htm),
+Photoshop의 [Contextual Task Bar](https://helpx.adobe.com/photoshop/desktop/get-started/learn-the-basics/boost-workflows-with-the-contextual-task-bar.html)와
+[패널 아이콘 접기](https://helpx.adobe.com/photoshop/desktop/get-started/learn-the-basics/collapse-expand-icons.html),
+Procreate의 [최소 인터페이스](https://help.procreate.com/procreate/handbook/interface-gestures/interface)와
+[레이어 옵션](https://help.procreate.com/procreate/handbook/5.0/layers/layers-interface),
+ibisPaint의 [도구 선택 바](https://ibispaint.com/lecture/index.jsp?no=4)와
+[크기 조절형 Layer Window](https://ibispaint.com/lecture/index.jsp?no=156), MediBang의
+[모바일 도구·서브도구·명령 바 분리](https://medibangpaint.com/en/manual/android/screen-description-and/)로
+교차 확인했다. 경쟁 제품의 화면을 복제하지 않고 ToonSpectrum의 긴 세로 원고·모바일 하단 도크·기존
+도구 상태 모델에 맞춰 자체 구현했다.
+
+- **4개 기본 작업 탭**: 우측에 직렬로 쌓이던 캔버스, 색보정, 선택 속성, 그리기 도구, 레이어, 미니맵,
+  게시 정보를 `속성 / 레이어 / 페이지 / 게시`로 나눴다. 한 번에 한 작업면만 보이고 레이어 수 배지,
+  현재 문맥 요약, 명시적인 빈 상태를 제공한다. 페이지 탭은 다시 `캔버스 / 색보정 / 미니맵`으로 나뉜다.
+- **이미지 전문 도구 5개 문맥 탭**: 이미지 선택 시 `빠른 수정 / 채우기·선화 / 선택·리터치 / 마스크 /
+  변형`만 추가로 나타난다. 배경 제거·AI 채색·팔레트·23개 이미지 보정, 고급 채우기·선 정리, 픽셀
+  선택·마술봉·스머지·힐/복제·히스토리 브러시, 레이어 마스크, 크롭·퍼펫 워프가 더 이상 한 열에 전부
+  노출되지 않는다. 각 도구는 `hidden` 상태로 유지해 탭 이동만으로 진행 중 작업과 로컬 미리보기를
+  취소하지 않으며, 실제 다른 캔버스 제스처 도구를 켤 때만 기존 상호 배타 로직을 실행한다.
+- **로컬 문맥형 패널 검색**: 전역 작품 검색 API와 분리된 로컬 레지스트리에서 `채우기`, `마스크`,
+  `crop warp`, `미니맵` 같은 한·영 키워드를 찾고 올바른 탭과 하위 작업면으로 이동한다. 이미지 전용
+  도구는 이미지 선택 때만 결과에 포함하며 결과 수를 live region으로 알린다. Enter는 첫 결과로 이동하고
+  Escape는 검색을 닫으며 한국어 IME 조합 중 Enter/Escape는 실행하지 않는다.
+- **버전형 작업공간 선호**: 기본 탭, 마지막 이미지 전문 도구, 마지막 페이지 하위 탭을 프로젝트 문서와
+  분리된 v1 로컬 선호로 저장한다. 손상 JSON·알 수 없는 값·storage 접근 예외는 기본 작업공간으로
+  복구하고, 탭 전환 시 과거 장문 패널의 스크롤 위치를 이어받지 않는다.
+- **캔버스와 독립된 데스크톱 도크**: `lg:max-h-none lg:overflow-visible`을 제거하고 캔버스와 같은
+  `100dvh - 21rem` 최대 높이, sticky header, `overflow-y-auto`, `overscroll-contain`, stable scrollbar를
+  적용했다. 전문 옵션을 늘려도 인스펙터가 캔버스 작업행보다 길어지지 않는다.
+- **모바일 레이어 작업 재배치**: 24px 아이콘 6~7개를 한 행에 두던 방식을 이름, 표시, 더보기로 줄였다.
+  표시와 더보기는 44px이며 더보기 안에서 잠금, 알파 락, 채우기 참조, 앞/뒤 순서, 삭제를 44px 작업으로
+  제공한다. 데스크톱은 정밀 포인터에 적합한 기존 직접 액션을 유지한다. 그룹 행도 모바일 44px 계약을
+  따른다.
+- **상단 프로젝트 액션 압축**: 다운로드·프로젝트·임시저장·게시만 항상 표시한다. JSON/archive 백업·
+  복구, PSD, Writer Room, AI 이력, 캐릭터 바이블, 버전, Auto Actions, 제작 인사이트, 연재 운영, 게시
+  사전검사와 패키지는 2열 모바일·3열 데스크톱 프로젝트 메뉴로 이동했다. 기능은 삭제하지 않았고 메뉴
+  바깥 클릭과 일반 작업 실행 시 닫히며 내보내기 옵션과 상호 배타적으로 열린다. 파일 선택·archive처럼
+  진행 상태나 진단을 확인해야 하는 작업은 메뉴를 유지하고 명시적인 44px 닫기 동작을 제공한다. 태블릿
+  구간까지 viewport-fixed로 유지해 가로 스크롤 상단 행에 팝오버가 잘리지 않는다. JSON·archive·PSD
+  파일 선택은 숨은 입력을 호출하는 실제 버튼으로 제공해 Tab·Enter/Space에서도 접근할 수 있다.
+- **게시 진입 복구**: 빠른 시작의 `게시하기`와 제목이 비어 있는 저장 시도가 닫혀 있고 inert였던 모바일
+  속성 시트의 입력을 가리키던 문제를 수정했다. 이제 게시 탭을 선택하고 우측 도크를 펼치며 모바일은
+  작업 패널 시트를 연 뒤 제목 입력으로 이동한다. 게시 진입 포커스 목표를 시트 기본 autofocus와 같은
+  effect에서 결정해 닫기 버튼이 다음 프레임에 제목 포커스를 다시 빼앗지 않는다.
+- **키보드·모바일 접근성**: 탭은 `tablist/tab/tabpanel`, roving `tabIndex`, ArrowLeft/Right, Home/End를
+  지원한다. 닫기·검색·기본 탭·하위 탭·레이어 작업·프로젝트 메뉴 항목은 모바일에서 최소 44px이고,
+  시트 닫기 포커스 복귀와 기존 키보드 리사이즈 separator를 보존한다. 탭이 소비한 방향키는 전역 캔버스
+  단축키까지 전파하지 않고 전역 핸들러도 `defaultPrevented`를 존중해 패널 이동이 선택 원고를 1px
+  움직이는 이중 실행을 막는다. 검색을 Escape로 닫거나 결과를 실행하면 사라진 입력 대신 고정 검색
+  토글로 포커스를 복구한다.
+
+실제 브라우저에서 360×640, 375×812, 430×932, 1366×768, 1440×900을 확인했다. 모든 화면의 문서
+가로 overflow는 0이었다. 기본 탭은 모바일 44px, 레이어 표시·더보기와 펼친 작업도 44px였다. 프로젝트
+메뉴 14개 항목은 375px 화면에서 각각 167.5×44px이고 메뉴는 359×418.6px였다. 데스크톱 인스펙터
+최대 높이는 캔버스와 동일하게 1366×768에서 432px, 1440×900에서 564px이며 내부 스크롤만 사용한다.
+`미니맵` 검색→Enter 이동, Page 탭→ArrowRight→Publish, 프로젝트 메뉴→Version 패널 전환을 왕복했고
+추가 회귀 검증에서 768×1024 프로젝트 메뉴는 viewport-fixed 752×329px, 문서 가로 overflow 0을
+유지했다. JSON·archive·PSD는 모두 `BUTTON`/`tabIndex=0`이었고, 게시 진입 뒤 제목 입력이 최종 active
+요소였으며 검색 Escape/Enter 뒤에는 검색 토글로 포커스가 복구됐다. 선택 텍스트 X=250 상태에서 속성
+탭→ArrowRight→레이어 탭 이동 뒤에도 X=250으로 원고가 움직이지 않았다. 브라우저의 클라이언트 runtime
+warning/error는 0이었고 로컬 API를 일부러 띄우지 않아 발생한 두 502 proxy 응답만 확인됐다. 캡처는
+[`docs/screenshots/studio-commercial-suite/`](screenshots/studio-commercial-suite/README.md)에 남겼다.
 
 ### 2026-07-11 모바일 퀵 액션·대사 낭독 검수 배치 (현재 작업 트리 통합 완료)
 
