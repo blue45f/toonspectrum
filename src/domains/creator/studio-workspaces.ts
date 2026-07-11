@@ -60,6 +60,7 @@ export const STUDIO_MOBILE_CONTROL_SIDES = ["left", "right"] as const;
 export type StudioDefaultWorkspaceId = (typeof STUDIO_DEFAULT_WORKSPACE_IDS)[number];
 export type StudioMobileControlSide = (typeof STUDIO_MOBILE_CONTROL_SIDES)[number];
 export type StudioWorkspaceId = StudioDefaultWorkspaceId | string;
+export type StudioWorkspaceMoveDirection = "up" | "down";
 
 export interface StudioWorkspaceDesktopLayout {
   readonly leftPanelOpen: boolean;
@@ -1018,6 +1019,62 @@ function nextCustomId(workspaces: readonly StudioCustomWorkspace[]): string {
   return `custom-${sequence}`;
 }
 
+const DUPLICATE_NAME_SUFFIX_PATTERN = / 복사본(?: [1-9][0-9]*)?$/u;
+
+function workspaceNameCollisionKey(name: string): string {
+  return name.normalize("NFKC").toLowerCase();
+}
+
+/**
+ * Truncates by the model's code-point limit without cutting a user-perceived grapheme in half.
+ * The code-point fallback still preserves surrogate pairs in engines without Intl.Segmenter.
+ */
+function truncateWorkspaceNameBase(name: string, maximumCodePoints: number): string {
+  if (maximumCodePoints <= 0) return "";
+  if (typeof Intl.Segmenter !== "function") {
+    return Array.from(name).slice(0, maximumCodePoints).join("");
+  }
+
+  let result = "";
+  let codePointCount = 0;
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  for (const { segment } of segmenter.segment(name)) {
+    const segmentCodePoints = Array.from(segment).length;
+    if (codePointCount + segmentCodePoints > maximumCodePoints) break;
+    result += segment;
+    codePointCount += segmentCodePoints;
+  }
+  return result;
+}
+
+function duplicateWorkspaceName(
+  sourceName: string,
+  customWorkspaces: readonly StudioCustomWorkspace[]
+): string {
+  const occupiedNames = new Set(
+    [...STUDIO_DEFAULT_WORKSPACES, ...customWorkspaces].map((workspace) =>
+      workspaceNameCollisionKey(workspace.name)
+    )
+  );
+  const strippedBase = sourceName.replace(DUPLICATE_NAME_SUFFIX_PATTERN, "").trim();
+  const base = strippedBase || sourceName;
+
+  // There are at most 30 occupied built-in/custom names. Since every suffix is distinct,
+  // one more candidate than the occupied-key count guarantees a collision-free result.
+  for (let sequence = 1; sequence <= occupiedNames.size + 1; sequence += 1) {
+    const suffix = sequence === 1 ? " 복사본" : ` 복사본 ${sequence}`;
+    const availableBaseLength =
+      STUDIO_WORKSPACE_NAME_MAX_LENGTH - Array.from(suffix).length;
+    const candidate = normalizeStudioWorkspaceName(
+      `${truncateWorkspaceNameBase(base, availableBaseLength)}${suffix}`
+    );
+    if (!occupiedNames.has(workspaceNameCollisionKey(candidate))) return candidate;
+  }
+
+  // The finite catalog bound makes this unreachable, but fail closed if that invariant changes.
+  throw new RangeError("Unable to create a unique Studio workspace name.");
+}
+
 /** Captures the current live layout as a new custom workspace and activates it. */
 export function saveStudioWorkspace(
   state: StudioWorkspaceState,
@@ -1046,6 +1103,76 @@ function requireCustomWorkspaceIndex(state: StudioWorkspaceState, id: string): n
   const index = state.customWorkspaces.findIndex((workspace) => workspace.id === id);
   if (index < 0) throw new RangeError(`Unknown custom workspace: ${id}`);
   return index;
+}
+
+/**
+ * Duplicates a custom workspace's saved snapshot directly beside its source.
+ * Catalog duplication is intentionally non-destructive: the active id and current live (including
+ * dirty) layout are preserved. Use switchStudioWorkspace explicitly to activate the new copy.
+ */
+export function duplicateStudioWorkspace(
+  state: StudioWorkspaceState,
+  id: string
+): StudioWorkspaceState {
+  const normalized = normalizeStudioWorkspaceState(state);
+  const sourceIndex = requireCustomWorkspaceIndex(normalized, id);
+  if (normalized.customWorkspaces.length >= STUDIO_WORKSPACE_MAX_CUSTOM) {
+    throw new RangeError(`Studio supports at most ${STUDIO_WORKSPACE_MAX_CUSTOM} custom workspaces.`);
+  }
+
+  const source = normalized.customWorkspaces[sourceIndex]!;
+  const duplicate: StudioCustomWorkspace = Object.freeze({
+    id: nextCustomId(normalized.customWorkspaces),
+    name: duplicateWorkspaceName(source.name, normalized.customWorkspaces),
+    layout: freezeLayout(source.layout),
+  });
+  const customWorkspaces = [...normalized.customWorkspaces];
+  customWorkspaces.splice(sourceIndex + 1, 0, duplicate);
+  return createDerivedState(normalized, { ...normalized, customWorkspaces });
+}
+
+/**
+ * Moves a custom workspace to an exact final index in the custom-only catalog.
+ * Built-ins remain immutable and outside this index space. Active/live state is never changed.
+ */
+export function reorderStudioWorkspace(
+  state: StudioWorkspaceState,
+  id: string,
+  targetIndex: number
+): StudioWorkspaceState {
+  const normalized = normalizeStudioWorkspaceState(state);
+  const sourceIndex = requireCustomWorkspaceIndex(normalized, id);
+  if (!Number.isInteger(targetIndex)) {
+    throw new TypeError("Studio workspace target index must be an integer.");
+  }
+  if (targetIndex < 0 || targetIndex >= normalized.customWorkspaces.length) {
+    throw new RangeError(`Studio workspace target index is out of range: ${targetIndex}`);
+  }
+  if (targetIndex === sourceIndex) return normalized;
+
+  const customWorkspaces = [...normalized.customWorkspaces];
+  const workspace = customWorkspaces[sourceIndex]!;
+  customWorkspaces.splice(sourceIndex, 1);
+  customWorkspaces.splice(targetIndex, 0, workspace);
+  return createDerivedState(normalized, { ...normalized, customWorkspaces });
+}
+
+/** Moves a custom workspace by one position; first-up and last-down are canonical no-ops. */
+export function moveStudioWorkspace(
+  state: StudioWorkspaceState,
+  id: string,
+  direction: StudioWorkspaceMoveDirection
+): StudioWorkspaceState {
+  const normalized = normalizeStudioWorkspaceState(state);
+  const sourceIndex = requireCustomWorkspaceIndex(normalized, id);
+  if (direction !== "up" && direction !== "down") {
+    throw new TypeError(`Unknown Studio workspace move direction: ${String(direction)}`);
+  }
+  const targetIndex = sourceIndex + (direction === "up" ? -1 : 1);
+  if (targetIndex < 0 || targetIndex >= normalized.customWorkspaces.length) {
+    return normalized;
+  }
+  return reorderStudioWorkspace(normalized, id, targetIndex);
 }
 
 /** Replaces a custom workspace snapshot with the current live layout. */

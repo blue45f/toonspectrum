@@ -18,16 +18,19 @@ import {
   STUDIO_WORKSPACE_STORAGE_KEY,
   areStudioWorkspaceLayoutsEqual,
   deleteStudioWorkspace,
+  duplicateStudioWorkspace,
   isStudioWorkspaceDirty,
   listStudioWorkspaces,
   loadStudioWorkspacePersistence,
   loadStudioWorkspaceState,
   migrateLegacyStudioWorkspaceState,
+  moveStudioWorkspace,
   normalizeStudioWorkspaceLayout,
   normalizeStudioWorkspaceState,
   overwriteStudioWorkspace,
   reloadStudioWorkspace,
   renameStudioWorkspace,
+  reorderStudioWorkspace,
   resolveStudioWorkspace,
   saveStudioWorkspace,
   saveStudioWorkspaceState,
@@ -674,6 +677,174 @@ describe("Studio custom workspace lifecycle", () => {
     expect(() => switchStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "custom-404")).toThrow(
       RangeError
     );
+  });
+
+  it("duplicates a saved custom snapshot beside its source without changing active dirty work", () => {
+    const first = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "선화 집중");
+    const firstId = first.activeWorkspaceId;
+    const second = saveStudioWorkspace(first, "채색 집중");
+    const dirty = updateStudioWorkspaceLiveLayout(
+      second,
+      withInspector(second.liveLayout, "publish")
+    );
+    const sourceBefore = JSON.stringify(dirty);
+    const sourceWorkspace = resolveStudioWorkspace(dirty, firstId);
+    const duplicated = duplicateStudioWorkspace(dirty, firstId);
+    const duplicate = duplicated.customWorkspaces[1];
+
+    expect(duplicated.customWorkspaces.map((workspace) => workspace.id)).toEqual([
+      firstId,
+      duplicate?.id,
+      second.activeWorkspaceId,
+    ]);
+    expect(duplicate).toMatchObject({ name: "선화 집중 복사본" });
+    expect(duplicate?.layout).toEqual(sourceWorkspace?.layout);
+    expect(duplicate?.layout).not.toBe(sourceWorkspace?.layout);
+    expect(duplicated.activeWorkspaceId).toBe(dirty.activeWorkspaceId);
+    expect(duplicated.liveLayout).toEqual(dirty.liveLayout);
+    expect(isStudioWorkspaceDirty(duplicated)).toBe(true);
+    expect(JSON.stringify(dirty)).toBe(sourceBefore);
+    expect(Object.isFrozen(duplicated)).toBe(true);
+    expect(Object.isFrozen(duplicated.customWorkspaces)).toBe(true);
+    expect(Object.isFrozen(duplicate)).toBe(true);
+    expect(Object.isFrozen(duplicate?.layout)).toBe(true);
+  });
+
+  it("creates collision-free, grapheme-safe duplicate names within the 48-code-point limit", () => {
+    const artistEmoji = "🧑🏽‍🎨";
+    const longName = artistEmoji.repeat(12);
+    const source = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, longName);
+    const sourceId = source.activeWorkspaceId;
+    const firstCopy = duplicateStudioWorkspace(source, sourceId);
+    const firstCopyId = firstCopy.customWorkspaces.find(
+      (workspace) => workspace.id !== sourceId
+    )?.id;
+    const secondCopy = duplicateStudioWorkspace(firstCopy, sourceId);
+    const firstCopyName = secondCopy.customWorkspaces.find(
+      (workspace) => workspace.id === firstCopyId
+    )?.name;
+    const secondCopyName = secondCopy.customWorkspaces.find(
+      (workspace) => workspace.id !== sourceId && workspace.id !== firstCopyId
+    )?.name;
+
+    expect(firstCopyName?.endsWith(" 복사본")).toBe(true);
+    expect(secondCopyName?.endsWith(" 복사본 2")).toBe(true);
+    expect(firstCopyName).not.toBe(secondCopyName);
+    expect(Array.from(firstCopyName ?? "")).toHaveLength(
+      STUDIO_WORKSPACE_NAME_MAX_LENGTH
+    );
+    expect(Array.from(secondCopyName ?? "").length).toBeLessThanOrEqual(
+      STUDIO_WORKSPACE_NAME_MAX_LENGTH
+    );
+    expect(firstCopyName?.match(new RegExp(artistEmoji, "gu"))?.length).toBe(11);
+    expect(secondCopyName?.match(new RegExp(artistEmoji, "gu"))?.length).toBe(10);
+    expect(firstCopyName).not.toContain("\uFFFD");
+    expect(secondCopyName).not.toContain("\uFFFD");
+  });
+
+  it("rejects duplicate and reorder operations for built-ins, unknown ids, invalid targets, and capacity", () => {
+    expect(() => duplicateStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "lineart")).toThrow(
+      TypeError
+    );
+    expect(() => duplicateStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "custom-404")).toThrow(
+      RangeError
+    );
+    expect(() => reorderStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "review", 0)).toThrow(
+      TypeError
+    );
+    expect(() => moveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "custom-404", "up")).toThrow(
+      RangeError
+    );
+
+    const one = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "하나");
+    expect(() => reorderStudioWorkspace(one, one.activeWorkspaceId, -1)).toThrow(RangeError);
+    expect(() => reorderStudioWorkspace(one, one.activeWorkspaceId, 1)).toThrow(RangeError);
+    expect(() => reorderStudioWorkspace(one, one.activeWorkspaceId, 0.5)).toThrow(TypeError);
+    expect(() =>
+      moveStudioWorkspace(one, one.activeWorkspaceId, "sideways" as "up")
+    ).toThrow(TypeError);
+
+    let full: StudioWorkspaceState = DEFAULT_STUDIO_WORKSPACE_STATE;
+    for (let index = 0; index < STUDIO_WORKSPACE_MAX_CUSTOM; index += 1) {
+      full = saveStudioWorkspace(full, `가득 찬 공간 ${index + 1}`);
+    }
+    const fullBefore = JSON.stringify(full);
+    expect(() => duplicateStudioWorkspace(full, full.customWorkspaces[0]!.id)).toThrow(
+      RangeError
+    );
+    expect(JSON.stringify(full)).toBe(fullBefore);
+  });
+
+  it("reorders custom workspaces deterministically while preserving active/live state", () => {
+    const first = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "첫째");
+    const firstId = first.activeWorkspaceId;
+    const second = saveStudioWorkspace(first, "둘째");
+    const secondId = second.activeWorkspaceId;
+    const third = saveStudioWorkspace(second, "셋째");
+    const thirdId = third.activeWorkspaceId;
+    const dirtyActive = updateStudioWorkspaceLiveLayout(
+      third,
+      withLeftPanelWidth(third.liveLayout, 300)
+    );
+    const reordered = reorderStudioWorkspace(dirtyActive, thirdId, 0);
+    const movedDown = moveStudioWorkspace(reordered, thirdId, "down");
+    const movedBackUp = moveStudioWorkspace(movedDown, thirdId, "up");
+    const firstBoundary = moveStudioWorkspace(movedBackUp, thirdId, "up");
+    const lastBoundary = moveStudioWorkspace(reordered, secondId, "down");
+    const sameTarget = reorderStudioWorkspace(reordered, firstId, 1);
+
+    expect(reordered.customWorkspaces.map((workspace) => workspace.id)).toEqual([
+      thirdId,
+      firstId,
+      secondId,
+    ]);
+    expect(movedDown.customWorkspaces.map((workspace) => workspace.id)).toEqual([
+      firstId,
+      thirdId,
+      secondId,
+    ]);
+    expect(movedBackUp.customWorkspaces.map((workspace) => workspace.id)).toEqual([
+      thirdId,
+      firstId,
+      secondId,
+    ]);
+    expect(firstBoundary).toEqual(movedBackUp);
+    expect(lastBoundary).toEqual(reordered);
+    expect(sameTarget).toEqual(reordered);
+    for (const result of [reordered, movedDown, movedBackUp, firstBoundary, lastBoundary]) {
+      expect(result.activeWorkspaceId).toBe(thirdId);
+      expect(result.liveLayout).toEqual(dirtyActive.liveLayout);
+      expect(isStudioWorkspaceDirty(result)).toBe(true);
+      expect(Object.isFrozen(result)).toBe(true);
+      expect(Object.isFrozen(result.customWorkspaces)).toBe(true);
+    }
+  });
+
+  it("preserves owner provenance and the v2 envelope across duplicate and reorder saves", () => {
+    const storage = memoryStorage();
+    const ownerId = "workspace-manager-owner";
+    const loaded = loadStudioWorkspacePersistence(storage, ownerId);
+    const first = saveStudioWorkspace(loaded.state, "원본");
+    const duplicated = duplicateStudioWorkspace(first, first.activeWorkspaceId);
+    const copyId = duplicated.customWorkspaces.find(
+      (workspace) => workspace.id !== first.activeWorkspaceId
+    )!.id;
+    const reordered = reorderStudioWorkspace(duplicated, copyId, 0);
+    const saved = saveStudioWorkspaceState(storage, ownerId, reordered, {
+      sourceOwnerScope: loaded.ownerScope,
+    });
+    const persisted = loadStudioWorkspacePersistence(storage, ownerId);
+    const envelope = JSON.parse(
+      storage.values.get(studioWorkspaceStorageKey(ownerId)) ?? "null"
+    ) as { payloadVersion?: unknown };
+
+    expect(saved).toMatchObject({ status: "persisted", failure: null });
+    expect(persisted.state.customWorkspaces.map((workspace) => workspace.id)).toEqual([
+      copyId,
+      first.activeWorkspaceId,
+    ]);
+    expect(persisted.state.activeWorkspaceId).toBe(first.activeWorkspaceId);
+    expect(envelope.payloadVersion).toBe(STUDIO_WORKSPACE_PAYLOAD_VERSION);
   });
 });
 

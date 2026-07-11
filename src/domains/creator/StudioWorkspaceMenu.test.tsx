@@ -114,6 +114,11 @@ describe("StudioWorkspaceMenu custom workspace lifecycle", () => {
     expect(html).toContain("변경 저장");
     expect(html).toContain("다시 불러오기");
     expect(html).toContain("이름 변경");
+    expect(html).toContain("복제");
+    expect(html).toContain("위로 이동");
+    expect(html).toContain("아래로 이동");
+    expect(html).toContain('aria-keyshortcuts="Alt+ArrowUp"');
+    expect(html).toContain('aria-keyshortcuts="Alt+ArrowDown"');
     expect(html).toContain("작업공간 삭제");
     expect(html).toContain("원고 내용은 삭제되지 않아요.");
     expect(html).toContain('aria-current="true"');
@@ -158,6 +163,28 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
     expect(html).toContain("작업공간 이름 또는 용도 검색");
     expect(html).toContain("검색 결과 8개");
   });
+
+  it("separates quick switching from the workspace management and preferences views", () => {
+    const customState = saveStudioWorkspace(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      "야간 채색"
+    );
+    const html = renderMenu(customState);
+
+    expect(html).toContain('data-workspace-view="switch"');
+    expect(html).toContain('data-workspace-view="manage-catalog"');
+    expect(html).toContain('data-workspace-view="manage-preferences"');
+    expect(html).toContain("작업공간 관리");
+    expect(html).toContain('aria-label="빠른 작업공간 전환으로 돌아가기"');
+    expect(html).toContain('role="group" aria-label="작업공간 관리 보기"');
+    expect(html).toContain("내 작업공간");
+    expect(html).toContain("전환 설정");
+    expect(html).toContain('aria-controls="_R_0_-management-tabs"');
+    expect(html).toContain('id="_R_0_-quick-custom-list"');
+    expect(html).toContain('id="_R_0_-custom-list"');
+    expect(html).toContain('data-workspace-kind="custom-switch"');
+    expect(html).toContain("저장 배치 복제");
+  });
 });
 
 describe("StudioWorkspaceMenu responsive settings", () => {
@@ -186,7 +213,7 @@ describe("StudioWorkspaceMenu responsive settings", () => {
     expect(html).toContain("overscroll-contain");
     expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(12);
     expect(html).toContain("pointer-coarse:min-h-11");
-    expect(html).toContain("pointer-coarse:size-11");
+    expect(html.match(/size-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).not.toMatch(/text-\[0\.(?:5|6)[0-6]?rem\]/);
   });
 

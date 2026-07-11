@@ -1,7 +1,11 @@
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  Copy,
   LayoutPanelTop,
   LockKeyhole,
   MessageCircle,
@@ -37,7 +41,9 @@ import {
   STUDIO_WORKSPACE_MAX_CUSTOM,
   STUDIO_WORKSPACE_NAME_MAX_LENGTH,
   deleteStudioWorkspace,
+  duplicateStudioWorkspace,
   isStudioWorkspaceDirty,
+  moveStudioWorkspace,
   overwriteStudioWorkspace,
   reloadStudioWorkspace,
   renameStudioWorkspace,
@@ -49,6 +55,7 @@ import {
   type StudioDefaultWorkspaceId,
   type StudioWorkspaceId,
   type StudioWorkspaceLayout,
+  type StudioWorkspaceMoveDirection,
   type StudioWorkspacePersistenceFailure,
   type StudioWorkspaceSaveResult,
   type StudioWorkspaceState,
@@ -243,7 +250,12 @@ export function StudioWorkspaceMenu({
   const switchGuardReturnFocusRef = useRef<HTMLElement | null>(null);
   const newNameInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const manageEntryRef = useRef<HTMLButtonElement>(null);
+  const manageBackRef = useRef<HTMLButtonElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"switch" | "manage">("switch");
+  const [manageTab, setManageTab] = useState<"catalog" | "preferences">("catalog");
   const [query, setQuery] = useState("");
   const [builtinsExpanded, setBuiltinsExpanded] = useState(false);
   const [customExpanded, setCustomExpanded] = useState(
@@ -301,6 +313,11 @@ export function StudioWorkspaceMenu({
     : null;
   const builtinListExpanded = query.trim().length > 0 || builtinsExpanded;
   const customListExpanded = query.trim().length > 0 || customExpanded;
+  const reorderBlockedBySearch = query.trim().length > 0;
+  const searchResultCount =
+    view === "manage"
+      ? filteredCustom.length
+      : filteredBuiltins.length + filteredCustom.length;
   const effectivePersistence = persistence;
 
   function commitState(next: StudioWorkspaceState): StudioWorkspacePersistenceSnapshot {
@@ -331,9 +348,38 @@ export function StudioWorkspaceMenu({
 
   function closeMenu() {
     setOpen(false);
+    setView("switch");
+    setManageTab("catalog");
     setQuery("");
     resetTransientEditors();
     setError(null);
+  }
+
+  function openWorkspaceManager() {
+    setQuery("");
+    resetTransientEditors();
+    setCustomExpanded(true);
+    setManageTab("catalog");
+    setView("manage");
+    setNotice(null);
+    setError(null);
+    globalThis.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0 });
+      manageBackRef.current?.focus({ preventScroll: true });
+    });
+  }
+
+  function returnToWorkspaceSwitcher() {
+    setQuery("");
+    resetTransientEditors();
+    setManageTab("catalog");
+    setView("switch");
+    setNotice(null);
+    setError(null);
+    globalThis.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0 });
+      manageEntryRef.current?.focus({ preventScroll: true });
+    });
   }
 
   useEffect(() => {
@@ -415,6 +461,8 @@ export function StudioWorkspaceMenu({
       closeMenu();
       return;
     }
+    setView("switch");
+    setManageTab("catalog");
     setOpen(true);
     setNotice(null);
     setError(null);
@@ -579,12 +627,36 @@ export function StudioWorkspaceMenu({
       setQuery("");
       return;
     }
+    if (view === "manage") {
+      returnToWorkspaceSwitcher();
+      return;
+    }
     closeMenu();
   }
 
   function handleDialogKeyDownCapture(event: ReactKeyboardEvent<HTMLElement>) {
     // StudioPage also protects shortcut boundaries, but consuming here keeps the menu independently
-    // safe when embedded in another canvas host.
+    // safe when embedded in another canvas host. Row reordering is handled at this boundary before
+    // propagation is consumed, so the canvas never receives the same Alt+Arrow shortcut.
+    const shortcutTarget =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>("[data-workspace-manage-trigger]")
+        : null;
+    if (
+      shortcutTarget?.dataset.workspaceManageTrigger &&
+      event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      (event.key === "ArrowUp" || event.key === "ArrowDown")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      moveWorkspaceInCatalog(
+        shortcutTarget.dataset.workspaceManageTrigger,
+        event.key === "ArrowUp" ? "up" : "down"
+      );
+      return;
+    }
     event.stopPropagation();
     if (event.key === "Escape") {
       event.preventDefault();
@@ -667,6 +739,63 @@ export function StudioWorkspaceMenu({
       setRenameWorkspaceId(null);
       setRenameName("");
       announceCommitted("작업공간 이름을 변경했어요.", result);
+      setError(null);
+    } catch (actionError) {
+      setError(errorText(actionError));
+    }
+  }
+
+  function focusWorkspaceManagement(id: string) {
+    globalThis.requestAnimationFrame(() => {
+      const target = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>("[data-workspace-manage-trigger]") ?? []
+      ).find((element) => element.dataset.workspaceManageTrigger === id);
+      target?.focus({ preventScroll: true });
+    });
+  }
+
+  function duplicateWorkspace(id: string) {
+    try {
+      const previousIds = new Set(syncedState.customWorkspaces.map((workspace) => workspace.id));
+      const next = duplicateStudioWorkspace(syncedState, id);
+      const duplicate = next.customWorkspaces.find((workspace) => !previousIds.has(workspace.id));
+      const result = commitState(next);
+      announceCommitted(
+        `“${duplicate?.name ?? "작업공간 복사본"}”을 만들었어요.`,
+        result
+      );
+      if (duplicate) {
+        setActionsWorkspaceId(duplicate.id);
+        focusWorkspaceManagement(duplicate.id);
+      }
+      setConfirmDeleteId(null);
+      setRenameWorkspaceId(null);
+      setError(null);
+    } catch (actionError) {
+      setError(errorText(actionError));
+    }
+  }
+
+  function moveWorkspaceInCatalog(
+    id: string,
+    direction: StudioWorkspaceMoveDirection
+  ) {
+    if (reorderBlockedBySearch) {
+      setNotice("순서를 바꾸려면 검색어를 먼저 지워 주세요.");
+      setNoticeTone("neutral");
+      return;
+    }
+    try {
+      const workspace = resolveStudioWorkspace(syncedState, id);
+      const next = moveStudioWorkspace(syncedState, id, direction);
+      const result = commitState(next);
+      announceCommitted(
+        `“${workspace?.name ?? "내 작업공간"}”을 ${direction === "up" ? "위" : "아래"}로 옮겼어요.`,
+        result
+      );
+      focusWorkspaceManagement(id);
+      setConfirmDeleteId(null);
+      setRenameWorkspaceId(null);
       setError(null);
     } catch (actionError) {
       setError(errorText(actionError));
@@ -786,11 +915,24 @@ export function StudioWorkspaceMenu({
           )}
           aria-hidden={pendingWorkspaceId ? true : undefined}
         >
-          <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-3 py-3">
-            <div className="min-w-0">
+          <header className="flex shrink-0 items-start gap-2 border-b border-line px-3 py-3">
+            <button
+              ref={manageBackRef}
+              type="button"
+              hidden={view !== "manage"}
+              onClick={returnToWorkspaceSwitcher}
+              aria-label="빠른 작업공간 전환으로 돌아가기"
+              className={cn(
+                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+                focusClass
+              )}
+            >
+              <ChevronLeft size={18} aria-hidden />
+            </button>
+            <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <h2 id={titleId} className="truncate text-sm font-bold text-fg">
-                  작업공간
+                  {view === "manage" ? "작업공간 관리" : "작업공간"}
                 </h2>
                 <span
                   aria-label={dirty ? "저장된 작업공간 배치와 다름" : "저장된 작업공간 배치와 일치"}
@@ -803,7 +945,9 @@ export function StudioWorkspaceMenu({
                 </span>
               </div>
               <p id={descriptionId} className="mt-1 truncate text-[0.6875rem] text-fg-3">
-                {activeWorkspace?.name ?? "작업공간"} · 패널과 주요 도구 배치
+                {view === "manage"
+                  ? "저장·복제·순서·기기 설정"
+                  : `${activeWorkspace?.name ?? "작업공간"} · 패널과 주요 도구 배치`}
               </p>
             </div>
             <button
@@ -811,7 +955,7 @@ export function StudioWorkspaceMenu({
               onClick={closeMenu}
               aria-label="작업공간 메뉴 닫기"
               className={cn(
-                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:size-9",
+                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
                 focusClass
               )}
             >
@@ -819,7 +963,50 @@ export function StudioWorkspaceMenu({
             </button>
           </header>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-gutter:stable]">
+          <div
+            id={`${dialogId}-management-tabs`}
+            role="group"
+            aria-label="작업공간 관리 보기"
+            hidden={view !== "manage"}
+            className="grid shrink-0 grid-cols-2 gap-1.5 border-b border-line bg-card/50 px-3 py-2"
+          >
+            {([
+              ["catalog", "내 작업공간", LayoutPanelTop],
+              ["preferences", "전환 설정", Settings2],
+            ] as const).map(([tab, label, Icon]) => {
+              const selected = manageTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setManageTab(tab);
+                    setQuery("");
+                    resetTransientEditors();
+                    globalThis.requestAnimationFrame(() =>
+                      scrollRef.current?.scrollTo({ top: 0 })
+                    );
+                  }}
+                  className={cn(
+                    "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold",
+                    selected
+                      ? "border-accent bg-accent-soft text-accent"
+                      : "border-line bg-panel text-fg-2 hover:bg-raised",
+                    focusClass
+                  )}
+                >
+                  <Icon size={14} aria-hidden className="shrink-0" />
+                  <span className="truncate">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            ref={scrollRef}
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-gutter:stable]"
+          >
             <div aria-live="polite" aria-atomic="true">
               {error ? (
                 <p role="alert" className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
@@ -841,7 +1028,7 @@ export function StudioWorkspaceMenu({
               ) : null}
             </div>
 
-            <section aria-labelledby={`${titleId}-current`}>
+            <section hidden={view !== "switch"} aria-labelledby={`${titleId}-current`}>
               <h3 id={`${titleId}-current`} className="mb-1.5 text-[0.6875rem] font-bold text-fg-2">
                 현재 및 최근
               </h3>
@@ -918,7 +1105,10 @@ export function StudioWorkspaceMenu({
             </section>
 
             {showSearch ? (
-              <div role="search">
+              <div
+                role="search"
+                hidden={view === "manage" && manageTab !== "catalog"}
+              >
                 <label htmlFor={`${dialogId}-search`} className="sr-only">
                   작업공간 검색
                 </label>
@@ -956,12 +1146,12 @@ export function StudioWorkspaceMenu({
                   ) : null}
                 </div>
                 <p className="sr-only" role="status" aria-live="polite">
-                  검색 결과 {filteredBuiltins.length + filteredCustom.length}개
+                  검색 결과 {searchResultCount}개
                 </p>
               </div>
             ) : null}
 
-            <section aria-labelledby={`${titleId}-defaults`}>
+            <section hidden={view !== "switch"} aria-labelledby={`${titleId}-defaults`}>
               <h3 id={`${titleId}-defaults`}>
                 <button
                   type="button"
@@ -1030,7 +1220,93 @@ export function StudioWorkspaceMenu({
               </div>
             </section>
 
-            <section aria-labelledby={`${titleId}-custom`}>
+            <section
+              hidden={view !== "switch"}
+              aria-labelledby={`${titleId}-quick-custom`}
+              data-workspace-view="switch"
+            >
+              <h3 id={`${titleId}-quick-custom`}>
+                <button
+                  type="button"
+                  onClick={() => setCustomExpanded((current) => !current)}
+                  aria-expanded={customListExpanded}
+                  aria-controls={`${dialogId}-quick-custom-list`}
+                  className={cn(
+                    "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg",
+                    focusClass
+                  )}
+                >
+                  {customListExpanded ? (
+                    <ChevronDown size={15} aria-hidden />
+                  ) : (
+                    <ChevronRight size={15} aria-hidden />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">내 작업공간</span>
+                  <span className={cn("shrink-0 tabular-nums font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
+                    {query
+                      ? `${filteredCustom.length}/${syncedState.customWorkspaces.length}개`
+                      : `${syncedState.customWorkspaces.length}개`}
+                  </span>
+                </button>
+              </h3>
+              <div
+                id={`${dialogId}-quick-custom-list`}
+                hidden={!customListExpanded}
+                className="mt-1.5 space-y-1.5"
+              >
+                {syncedState.customWorkspaces.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
+                    저장한 작업공간이 없어요. 관리에서 현재 배치를 저장할 수 있어요.
+                  </p>
+                ) : filteredCustom.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
+                    일치하는 내 작업공간이 없어요.
+                  </p>
+                ) : (
+                  filteredCustom.map((workspace) => {
+                    const active = syncedState.activeWorkspaceId === workspace.id;
+                    return (
+                      <button
+                        key={workspace.id}
+                        type="button"
+                        onClick={(event) =>
+                          requestWorkspaceSwitch(workspace.id, event.currentTarget)
+                        }
+                        disabled={active}
+                        aria-current={active ? "true" : undefined}
+                        aria-label={`${workspace.name}${active ? ", 현재 작업공간" : ", 작업공간으로 전환"}`}
+                        data-workspace-kind="custom-switch"
+                        data-workspace-id={workspace.id}
+                        className={cn(
+                          "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
+                          active
+                            ? "border-accent/60 bg-accent-soft text-fg"
+                            : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised",
+                          "disabled:cursor-default disabled:opacity-100",
+                          focusClass
+                        )}
+                      >
+                        <LayoutPanelTop
+                          size={15}
+                          aria-hidden
+                          className={cn("shrink-0 text-fg-3", active && "text-accent")}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-xs font-bold">
+                          {workspace.name}
+                        </span>
+                        {active ? <Check size={14} aria-hidden className="shrink-0 text-accent" /> : null}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+
+            <section
+              hidden={view !== "manage" || manageTab !== "catalog"}
+              aria-labelledby={`${titleId}-custom`}
+              data-workspace-view="manage-catalog"
+            >
               <h3 id={`${titleId}-custom`}>
                 <button
                   type="button"
@@ -1053,6 +1329,11 @@ export function StudioWorkspaceMenu({
               </h3>
 
               <div id={`${dialogId}-custom-list`} hidden={!customListExpanded} className="mt-1.5">
+                {reorderBlockedBySearch && syncedState.customWorkspaces.length > 1 ? (
+                  <p role="status" className="mb-1.5 rounded-lg border border-line bg-raised px-3 py-2 text-[0.6875rem] text-fg-2">
+                    전체 순서를 바꾸려면 검색어를 지워 주세요.
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
@@ -1133,6 +1414,13 @@ export function StudioWorkspaceMenu({
                       const actionsOpen = actionsWorkspaceId === workspace.id;
                       const renaming = renameWorkspaceId === workspace.id;
                       const confirmingDelete = confirmDeleteId === workspace.id;
+                      const catalogIndex = syncedState.customWorkspaces.findIndex(
+                        (candidate) => candidate.id === workspace.id
+                      );
+                      const canMoveUp = catalogIndex > 0;
+                      const canMoveDown =
+                        catalogIndex >= 0 &&
+                        catalogIndex < syncedState.customWorkspaces.length - 1;
                       return (
                         <article
                           key={workspace.id}
@@ -1175,8 +1463,10 @@ export function StudioWorkspaceMenu({
                               aria-label={`${workspace.name} 관리`}
                               aria-expanded={actionsOpen}
                               aria-controls={`${dialogId}-${workspace.id}-actions`}
+                              aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                              data-workspace-manage-trigger={workspace.id}
                               className={cn(
-                                "grid size-11 shrink-0 place-items-center rounded-r-lg border-l border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:size-10",
+                                "grid size-11 shrink-0 place-items-center rounded-r-lg border-l border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg",
                                 actionsOpen && "bg-raised text-fg",
                                 focusClass
                               )}
@@ -1226,12 +1516,50 @@ export function StudioWorkspaceMenu({
                               </button>
                               <button
                                 type="button"
+                                onClick={() => duplicateWorkspace(workspace.id)}
+                                disabled={atCustomLimit}
+                                aria-label={`${workspace.name} 저장된 배치 복제`}
+                                className={cn(
+                                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
+                                  focusClass
+                                )}
+                              >
+                                <Copy size={13} aria-hidden className="shrink-0" /> 저장 배치 복제
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveWorkspaceInCatalog(workspace.id, "up")}
+                                disabled={!canMoveUp || reorderBlockedBySearch}
+                                aria-label={`${workspace.name} 위로 이동`}
+                                aria-keyshortcuts="Alt+ArrowUp"
+                                className={cn(
+                                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-raised px-2 text-[0.6875rem] font-bold text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-35",
+                                  focusClass
+                                )}
+                              >
+                                <ArrowUp size={13} aria-hidden className="shrink-0" /> 위로
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveWorkspaceInCatalog(workspace.id, "down")}
+                                disabled={!canMoveDown || reorderBlockedBySearch}
+                                aria-label={`${workspace.name} 아래로 이동`}
+                                aria-keyshortcuts="Alt+ArrowDown"
+                                className={cn(
+                                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-raised px-2 text-[0.6875rem] font-bold text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-35",
+                                  focusClass
+                                )}
+                              >
+                                <ArrowDown size={13} aria-hidden className="shrink-0" /> 아래로
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setConfirmDeleteId(workspace.id);
                                   setRenameWorkspaceId(null);
                                   setError(null);
                                 }}
-                                className={cn("inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-bad/10 px-2 text-center text-[0.6875rem] font-bold leading-tight text-bad hover:bg-bad/15", focusClass)}
+                                className={cn("col-span-2 inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-bad/10 px-2 text-center text-[0.6875rem] font-bold leading-tight text-bad hover:bg-bad/15", focusClass)}
                               >
                                 <Trash2 size={13} aria-hidden className="shrink-0" /> 삭제
                               </button>
@@ -1310,7 +1638,11 @@ export function StudioWorkspaceMenu({
               </div>
             </section>
 
-            <section aria-labelledby={`${titleId}-preferences`}>
+            <section
+              hidden={view !== "manage" || manageTab !== "preferences"}
+              aria-labelledby={`${titleId}-preferences`}
+              data-workspace-view="manage-preferences"
+            >
               <div className="mb-1.5 flex items-center gap-1.5 text-fg-2">
                 <Settings2 size={14} aria-hidden />
                 <h3 id={`${titleId}-preferences`} className="text-[0.6875rem] font-bold">
@@ -1391,7 +1723,7 @@ export function StudioWorkspaceMenu({
 
           <footer
             className={cn(
-              "shrink-0 border-t px-3 py-2.5",
+              "shrink-0 space-y-2 border-t px-3 py-2.5",
               effectivePersistence.status === "persisted"
                 ? "border-line bg-card/70"
                 : effectivePersistence.failure
@@ -1399,6 +1731,21 @@ export function StudioWorkspaceMenu({
                   : "border-line bg-card/70"
             )}
           >
+            <button
+              ref={manageEntryRef}
+              type="button"
+              hidden={view !== "switch"}
+              onClick={openWorkspaceManager}
+              aria-controls={`${dialogId}-management-tabs`}
+              className={cn(
+                "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-left text-xs font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
+                focusClass
+              )}
+            >
+              <Settings2 size={15} aria-hidden className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">작업공간 관리</span>
+              <ChevronRight size={15} aria-hidden className="shrink-0" />
+            </button>
             <p
               role="status"
               className={cn(
