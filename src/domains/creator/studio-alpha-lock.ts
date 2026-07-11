@@ -38,6 +38,62 @@ export function shouldClipToExistingAlpha(el: AlphaLockLayerLike): boolean {
   return canAlphaLock(el) && !!el.alphaLocked;
 }
 
+export interface AlphaLockedRasterPixels {
+  /** Edited RGB with alpha forced to the lock source. Always owns a new buffer. */
+  data: Uint8ClampedArray;
+  /** Pixels whose final RGBA differs from the immediately preceding preview/source. */
+  changedPixelCount: number;
+}
+
+/**
+ * Applies Alpha Lock exactly at pixel level for Advanced Fill.
+ *
+ * `lockSource` supplies the immutable alpha silhouette, `before` is the immediately preceding
+ * preview (for exact incremental diagnostics), and `edited` is the new fill result. Copying RGB
+ * directly avoids repeatedly source-atop blending partially transparent antialiased edges during
+ * continuous fills. Fully transparent pixels retain `before` verbatim so hidden RGB bytes do not
+ * create false changed-pixel counts.
+ */
+export function applyAlphaLockToRasterPixels(
+  lockSource: Uint8ClampedArray,
+  before: Uint8ClampedArray,
+  edited: Uint8ClampedArray,
+): AlphaLockedRasterPixels {
+  if (
+    lockSource.length !== before.length ||
+    lockSource.length !== edited.length ||
+    lockSource.length % 4 !== 0
+  ) {
+    throw new RangeError("Alpha Lock pixel buffers must be equal RGBA arrays.");
+  }
+
+  const data = new Uint8ClampedArray(edited.length);
+  let changedPixelCount = 0;
+  for (let offset = 0; offset < data.length; offset += 4) {
+    const lockedAlpha = lockSource[offset + 3]!;
+    if (lockedAlpha === 0) {
+      data[offset] = before[offset]!;
+      data[offset + 1] = before[offset + 1]!;
+      data[offset + 2] = before[offset + 2]!;
+      data[offset + 3] = before[offset + 3]!;
+    } else {
+      data[offset] = edited[offset]!;
+      data[offset + 1] = edited[offset + 1]!;
+      data[offset + 2] = edited[offset + 2]!;
+      data[offset + 3] = lockedAlpha;
+    }
+    if (
+      data[offset] !== before[offset] ||
+      data[offset + 1] !== before[offset + 1] ||
+      data[offset + 2] !== before[offset + 2] ||
+      data[offset + 3] !== before[offset + 3]
+    ) {
+      changedPixelCount += 1;
+    }
+  }
+  return { data, changedPixelCount };
+}
+
 /**
  * 알파 락 합성 — edited(편집 결과)를 original(편집 전 알파 모양) 밖으로 나가지 않게 오려낸다.
  * Porter-Duff "source-atop": 결과 알파 = original 알파 그대로(확장·축소 없음) — 이건 항상 정확히

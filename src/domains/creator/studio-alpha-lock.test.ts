@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha, type AlphaLockLayerLike } from "./studio-alpha-lock";
+import {
+  applyAlphaLockToRasterPixels,
+  canAlphaLock,
+  compositeAlphaLocked,
+  shouldClipToExistingAlpha,
+  type AlphaLockLayerLike,
+} from "./studio-alpha-lock";
 
 import type { MaskCanvasLike, MaskCtx2DLike, SelectionCanvasFactory } from "./studio-selection-tools";
 
@@ -93,6 +99,75 @@ describe("shouldClipToExistingAlpha", () => {
   it("방어적 — image 가 아닌 요소에 alphaLocked:true 가 붙어 있어도 무시(false)", () => {
     expect(shouldClipToExistingAlpha({ type: "text", alphaLocked: true })).toBe(false);
     expect(shouldClipToExistingAlpha({ alphaLocked: true })).toBe(false);
+  });
+});
+
+describe("applyAlphaLockToRasterPixels", () => {
+  it("forces the immutable alpha silhouette while copying edited RGB without source-atop reblending", () => {
+    const lockSource = new Uint8ClampedArray([
+      10, 20, 30, 128,
+      40, 50, 60, 255,
+    ]);
+    const before = new Uint8ClampedArray([
+      70, 80, 90, 128,
+      100, 110, 120, 255,
+    ]);
+    const edited = new Uint8ClampedArray([
+      200, 30, 40, 255,
+      20, 210, 50, 190,
+    ]);
+
+    expect(applyAlphaLockToRasterPixels(lockSource, before, edited)).toEqual({
+      data: new Uint8ClampedArray([
+        200, 30, 40, 128,
+        20, 210, 50, 255,
+      ]),
+      changedPixelCount: 2,
+    });
+  });
+
+  it("retains fully transparent prior bytes and counts only this continuous-fill increment", () => {
+    const lockSource = new Uint8ClampedArray([
+      1, 2, 3, 0,
+      4, 5, 6, 255,
+      7, 8, 9, 255,
+    ]);
+    const before = new Uint8ClampedArray([
+      11, 12, 13, 0,
+      210, 20, 30, 255,
+      40, 50, 60, 255,
+    ]);
+    const edited = new Uint8ClampedArray([
+      250, 250, 250, 255,
+      210, 20, 30, 255,
+      30, 220, 40, 255,
+    ]);
+
+    const result = applyAlphaLockToRasterPixels(lockSource, before, edited);
+
+    expect(result.data).toEqual(new Uint8ClampedArray([
+      11, 12, 13, 0,
+      210, 20, 30, 255,
+      30, 220, 40, 255,
+    ]));
+    expect(result.changedPixelCount).toBe(1);
+  });
+
+  it("rejects mismatched or non-RGBA buffers", () => {
+    expect(() =>
+      applyAlphaLockToRasterPixels(
+        new Uint8ClampedArray(4),
+        new Uint8ClampedArray(8),
+        new Uint8ClampedArray(4),
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      applyAlphaLockToRasterPixels(
+        new Uint8ClampedArray(3),
+        new Uint8ClampedArray(3),
+        new Uint8ClampedArray(3),
+      ),
+    ).toThrow(RangeError);
   });
 });
 

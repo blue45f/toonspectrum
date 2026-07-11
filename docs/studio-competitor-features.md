@@ -8,7 +8,7 @@
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
 > 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR + 6방향 모바일 퀵 액션 + 브라우저 내장 대사 낭독
-> 검수 + 메타데이터 기반 내부 검수 PDF. 모바일 검증 캡처는
+> 검수 + 메타데이터 기반 내부 검수 PDF + 참조 레이어 기반 고급 채우기. 모바일 검증 캡처는
 > `docs/screenshots/studio-commercial-suite/`) ·
 > 2026-07-10 갱신: 공식 자료 재벤치마크 + 서버 전용 Z.ai/DeepSeek 텍스트 transport +
 > 초안/비용/업로드 편집/autosave 안전성 + 캐릭터 바이블/연속성 검사/페이지 검토 잠금 + 실제 AI 취소/
@@ -166,6 +166,71 @@ Toon Boom Storyboard Pro는 [PDF Profile](https://docs.toonboom.com/help/storybo
 프로필 select 325×44px, 내부 전용 경고 44px, 가로 overflow 0을 측정하고 제작 전체 프로필의 포함 범위를
 확인했다. 이 모바일 퀵 액션·대사 낭독·검수 PDF 통합 체크포인트는 전체 회귀 251개 파일·4,394개 테스트,
 TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드까지 모두 통과했다.
+
+### 2026-07-11 참조 레이어 기반 고급 채우기 배치 (현재 작업 트리 통합 완료)
+
+공식 동작 기준은 Clip Studio Paint의 [Advanced Fill](https://help.clip-studio.com/en-us/manual_en/420_fill/Advanced_Fill.htm),
+[Fill Tool](https://help.clip-studio.com/en-us/manual_en/420_fill/Fill_Tool.htm),
+[Fill 설정](https://help.clip-studio.com/en-us/manual_en/810_subtools/F.htm), MediBang Paint의
+[Bucket Tool](https://medibangpaint.com/en/tutorial/pc/use-bucket/)과
+[확장·축소/틈 닫기 설명](https://medibangpaint.com/en/use/2022/11/bucket-tool-re/), ibisPaint의
+[Bucket](https://ibispaint.com/lecture/index.jsp?no=82) 및
+[Surrounding Fill](https://ibispaint.com/lecture/index.jsp?no=196), Procreate의
+[ColorDrop](https://help.procreate.com/procreate/handbook/colors/colors-interface)과
+[Reference Layer](https://help.procreate.com/procreate/handbook/5.1/layers/layers-options), Adobe Photoshop의
+[Paint Bucket](https://helpx.adobe.com/photoshop/desktop/apply-painting-techniques/fill-objects-selections-layers/fill-paint-bucket-tool.html)로
+교차 확인했다. 경쟁사의 화면이나 자산은 복제하지 않고 웹툰 긴 캔버스와 브라우저 메모리 제약에 맞춘
+자체 픽셀 엔진·참조 합성·미리보기 흐름으로 구현했다.
+
+- **메인 캔버스 직접 채우기**: 속성 패널의 작은 독립 미리보기에서 즉시 굽던 기존 방식을 제거했다.
+  데스크톱 도구막대, `G` 단축키, 모바일 선택 작업바와 6방향 Quick Actions에서 도구를 켜고 실제 캔버스를
+  탭한다. pointer-up까지 8px 이내인 단일 주 포인터만 채우기로 인정해 한 손가락 스크롤·두 손가락 핀치·
+  보조 버튼을 오인하지 않고, 무장 중 한 손가락 드래그는 긴 캔버스 viewport를 직접 이동한다. 회전·좌우/
+  상하 반전을 원본 픽셀 좌표로 역변환하며 대상 프레임 밖 탭은 가장자리로 강제하지 않고 무시한다.
+- **세 가지 경계 범위**: `현재 레이어`, 명시적으로 지정한 `참조 레이어`, `표시 래스터(편집 대상 제외)`를
+  지원한다. 참조 플래그는 래스터 이미지에만 저장하고 그룹을 포함한 effective hidden 상태를 존중한다.
+  다른 자연 해상도·위치·크기·회전·반전·opacity를 대상 자연 픽셀 좌표계로 affine 합성하며 교차하지 않는
+  레이어는 디코드 전에 제외한다. 참조 원본은 동시에 모두 디코드하지 않고 z-order 순서로 하나씩 합성해
+  모바일 메모리 급증을 줄인다.
+- **상용 채우기 설정**: 허용 오차 `0–255`, 연결 영역/같은 색 전체, 확장·축소 `-16…+16px`(0.5px 단위),
+  틈 닫기 `0–32px`, 4/8방향 연결 엔진, 알파 경계, 가장자리 부드럽게, 연속 채우기, 최대 면적 누수 보호,
+  캔버스 가장자리 정책을 제공한다. 현재 픽셀 선택이 있으면 반전·페더·이미지 반전을 반영한 allow mask로
+  채우기를 제한한다.
+- **투명 채색 레이어와 알파 락**: 엔진은 RGB만 바꾸지 않고 완전 투명 대상에도 지정 색의 alpha를 만든다.
+  알파 락은 원본 alpha를 픽셀 단위로 강제하고 직전 미리보기와 실제로 달라진 픽셀만 집계한다. 부분 투명
+  가장자리를 연속 채우기 때마다 다시 혼합하지 않으며, 원본 크기 불일치나 처리 실패는 결과를 통과시키지
+  않는 fail-closed 방식이다. 별도 선화 참조 아래/위의 투명 색칠 레이어도 실제 브라우저에서 정상 채워지는
+  것을 확인했다.
+- **비파괴 검수 경계**: 계산 결과는 문서 `src`에 즉시 쓰지 않고 실제 캔버스에만 미리보기로 올린다.
+  취소·Escape·선택/페이지/도구 전환·undo/redo는 진행 중 연산과 stale 결과를 폐기한다. 여러 영역을
+  같은 색으로 연속 탭하면 새로 바뀐 픽셀만 정확히 누적 집계하고, 색이나 설정을 바꾸면 진행 계산과 이전
+  미리보기를 취소해 통계를 섞지 않는다. `적용` 한 번이 히스토리 한 단계가 되며 실행 중 대상 ID·원본
+  `src`·run ID·히스토리 인덱스를 다시 확인해 오래된 비동기 응답이 다른 레이어를 덮지 않는다. 모든 문서
+  커밋·자동저장 복원·프로젝트 전체 교체·타임랩스 시작도 진행 계산과 미적용 미리보기를 먼저 폐기한다.
+- **긴 캔버스 누수·메모리 안전**: 기본 65% 면적 상한을 넘는 스캔/팽창은 결과를 버리고 조정 방법을
+  안내하며 적용 버튼을 만들지 않는다. 순수 엔진은 3,200만 픽셀 상한, abort checkpoints, 입력 불변성,
+  원자적 실패를 보장한다. 브라우저는 캔버스를 만들기 전에 데스크톱 1,677만 픽셀(4,096²), 모바일·저메모리
+  기기 838만 픽셀 상한을 적용하고 현재 크기와 해결 방법을 한국어로 안내한다. 대상·참조·선택 마스크·
+  알파 락 원본은 복사 없이 Vite 모듈 Worker로 transfer하며 flood scan, 형태학 처리, 가장자리 부드럽게,
+  알파 강제와 실제 변경 집계를 같은 Worker에서 끝낸다. ready handshake 전에는 소유권을 넘기지 않아
+  Worker 청크/CSP 로드 오류도 안전하게 폴백하고, Worker가 막힌 직접 실행은 419만 픽셀로 더 낮게 제한한다.
+  취소는 Worker 종료뿐 아니라 이미지 loader의 `src` 해제, 참조 합성 체크포인트, `toBlob`/`FileReader`
+  비동기 PNG 인코딩에 연결된다. 브라우저 래퍼와 참조 합성은 성공·오류·취소 모두 임시 캔버스 backing
+  store를 해제한다. 모든 처리는 브라우저 로컬이며 이미지·설정·선화가 서버나 AI 공급자로 전송되지 않는다.
+- **정직한 현재 경계**: `표시 래스터`는 벡터·텍스트가 아니라 보이는 래스터 원본만 포함한다. 필터·마스크·
+  기울임·clip/blend 결과와 애니메이션 프레임은 아직 참조 이미지에 굽지 않으며, UI에서 이 제한을 항상
+  표시한다. 전체 장면과 동일한 참조 결과가 필요한 벡터·텍스트·클리핑·혼합 모드는 통합 장면 래스터러가
+  준비된 뒤 확장할 범위이고, 현재 버전은 지원 범위를 과장하지 않는다.
+
+순수 엔진·설정·브라우저 래퍼·래스터 안전·Worker ready/transfer/abort/fallback·탭 제스처·이미지 로더
+취소·알파 락·affine 참조 합성·패널·히스토리·Quick Actions 집중 테스트 12개 파일·302개를 통과했다. 실제
+375×812 브라우저에서 투명 두 영역 연속 채우기→미리보기→한 번 적용→undo/redo, Escape 취소, 펜 전환 시
+도구 정리, 별도 선화 참조→투명 색칠 레이어 채우기, 65% 누수 차단을 왕복 검증했다. 360×640·375×812·
+430×932에서 문서/패널 가로 overflow는 모두 0이고, 375px의 핵심 입력·버튼은 297×44px 이상,
+체크박스 행은 297×52–53px였다. 3,840×2,160 래스터도 UI 응답성을 유지하며 누수 보호 결과를 반환했고,
+계산 취소는 44px 버튼으로 패널과 캔버스 상태바 양쪽에서 접근할 수 있다. 콘솔 warning/error는 0이었다.
+전체 회귀 260개 파일·4,604개 테스트, TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드도 통과했고
+`studio-advanced-fill.worker-*.js` 13.08kB 독립 Worker 청크 생성을 확인했다.
 
 ### 2026-07-11 통합 에셋 즐겨찾기 배치 (현재 작업 트리 통합 완료)
 

@@ -177,6 +177,19 @@ describe("describeHistoryStep — 요소 패치(이동/크기/내용 등)", () =
     expect(describeHistoryStep(before, styled)).toBe("텍스트 스타일 변경");
   });
 
+  it("래스터 픽셀 편집과 채우기 참조 지정 방향을 구분한다", () => {
+    const image = el("i1", { type: "image", src: "before", fillReference: false });
+    const before: HistorySnapshot = [page("p1", [image])];
+    expect(
+      describeHistoryStep(before, repage(before, "p1", { elements: [{ ...image, src: "after" }] })),
+    ).toBe("이미지 픽셀 편집");
+    const referenced: HistorySnapshot = [page("p1", [{ ...image, fillReference: true }])];
+    expect(describeHistoryStep(before, referenced)).toBe("이미지 채우기 참조 지정");
+    expect(
+      describeHistoryStep(referenced, [page("p1", [{ ...image, fillReference: false }])]),
+    ).toBe("이미지 채우기 참조 해제");
+  });
+
   it("변화 종류가 섞이면 '요소 N개 편집'", () => {
     const a = el("a1");
     const b = el("b1", { type: "image" });

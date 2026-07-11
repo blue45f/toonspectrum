@@ -109,6 +109,23 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import {
+  runStudioAdvancedFillInBrowser,
+  studioAdvancedFillResultMessage,
+  summarizeStudioAdvancedFillPreview,
+} from "./studio-advanced-fill-browser";
+import {
+  DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
+  loadStudioAdvancedFillSettings,
+  saveStudioAdvancedFillSettings,
+  type StudioAdvancedFillSettings,
+} from "./studio-advanced-fill-settings";
+import {
+  beginStudioAdvancedFillTap,
+  endStudioAdvancedFillTap,
+  moveStudioAdvancedFillTap,
+  type StudioAdvancedFillTapGesture,
+} from "./studio-advanced-fill-tap";
+import {
   colorizeLineArt,
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
@@ -145,7 +162,10 @@ import {
   type StudioAiObservableResult,
   type StudioAiPendingOperationInput,
 } from "./studio-ai-provenance-recorder";
-import { canAlphaLock, compositeAlphaLocked, shouldClipToExistingAlpha } from "./studio-alpha-lock";
+import {
+  canAlphaLock,
+  shouldClipToExistingAlpha,
+} from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
   globalFrameIndexAtElapsed,
@@ -319,6 +339,11 @@ import {
   type ExportFormat,
 } from "./studio-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
+import {
+  collectOverlappingStudioFillReferenceLayers,
+  composeStudioFillReferenceImage,
+  type StudioFillReferenceLayer,
+} from "./studio-fill-reference";
 import {
   clampFrameIndex,
   DEFAULT_FRAME_FPS,
@@ -699,6 +724,7 @@ import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 
+import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAsset } from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
@@ -1343,6 +1369,8 @@ export interface ImageEl {
   aiProvenance?: StudioPublishAiProvenance;
   /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */
   builtinRasterAssetId?: StudioRasterAsset["id"];
+  /** 고급 채우기가 선화 경계로 읽는 명시적 래스터 참조 레이어. */
+  fillReference?: boolean;
 }
 interface TextEl {
   id: string;
@@ -2724,12 +2752,36 @@ function createPixelEditCanvas(
 
 // 픽셀 편집용 원본 이미지 로드 — data: URL 이 아니면 CORS 를 요청해 캔버스 오염(taint)으로
 // toDataURL 이 막히는 것을 피한다(업로드/에셋은 대부분 data: 라 영향 없음).
-function loadPixelEditImage(src: string): Promise<HTMLImageElement> {
+function loadPixelEditImage(src: string, abort?: AbortSignal): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new globalThis.Image();
+    let settled = false;
+    const cleanup = () => abort?.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      img.src = "";
+      reject(new DOMException("이미지 픽셀 처리를 취소했습니다.", "AbortError"));
+    };
     if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("이미지 원본을 불러오지 못했습니다."));
+    img.onload = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(img);
+    };
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("이미지 원본을 불러오지 못했습니다."));
+    };
+    abort?.addEventListener("abort", onAbort, { once: true });
+    if (abort?.aborted) {
+      onAbort();
+      return;
+    }
     img.src = src;
   });
 }
@@ -3636,6 +3688,25 @@ function studioQuickActionsStorage(): Storage | null {
   }
 }
 
+function studioAdvancedFillStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+type StudioAdvancedFillPreview = {
+  targetId: string;
+  originalSrc: string;
+  historyIndex: number;
+  resultSrc: string;
+  diagnostics: AdvancedFillDiagnostics;
+  message: string;
+  paintedPixelCount: number;
+  regionCount: number;
+};
+
 export function StudioPage() {
   const [params] = useSearchParams();
   if (params.get("mode") === "upload") {
@@ -3671,6 +3742,8 @@ function StudioCuttoonEditor() {
     ],
   ]);
   const [pagesHi, setPagesHi] = useState(0);
+  const pagesHiRef = useRef(pagesHi);
+  pagesHiRef.current = pagesHi;
   const pages = pagesHistory[pagesHi];
 
   const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
@@ -3724,6 +3797,10 @@ function StudioCuttoonEditor() {
   const animTimeline = normalizeAnimationTimelineDoc(activePage.animTimeline);
   const elementById = new Map<string, El>();
   for (const element of elements) elementById.set(element.id, element);
+  // Long-running pixel jobs validate against the latest active elements rather than their render-time
+  // closure, preventing a stale fill result from overwriting an undo, page switch, or source edit.
+  const activeElementsRef = useRef(elements);
+  activeElementsRef.current = elements;
 
   const hi = pagesHi;
   const history = pagesHistory;
@@ -4837,6 +4914,7 @@ function StudioCuttoonEditor() {
       if (saved) {
         const parsed = saved.payload;
         if (parsed.pagesList.length > 0) {
+          resetAdvancedFillForDocumentReplacement();
           const restoredPages = parsed.pagesList as PageState[];
           setPagesHistory([restoredPages]);
           setPagesHi(0);
@@ -5076,6 +5154,26 @@ function StudioCuttoonEditor() {
   );
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
+  const [advancedFillActive, setAdvancedFillActive] = useState(false);
+  const [advancedFillBusy, setAdvancedFillBusy] = useState(false);
+  const [advancedFillSettings, setAdvancedFillSettings] = useState<StudioAdvancedFillSettings>(() =>
+    loadStudioAdvancedFillSettings(studioAdvancedFillStorage())
+  );
+  const [advancedFillPreview, setAdvancedFillPreview] = useState<StudioAdvancedFillPreview | null>(null);
+  const [advancedFillStatus, setAdvancedFillStatus] = useState<string | null>(null);
+  const advancedFillRunIdRef = useRef(0);
+  const advancedFillAbortRef = useRef<AbortController | null>(null);
+  const advancedFillApplyingRef = useRef(false);
+  const advancedFillTapGestureRef = useRef<StudioAdvancedFillTapGesture | null>(null);
+  const advancedFillTapPayloadRef = useRef<{
+    position: { x: number; y: number };
+    frame: SelectionFrame;
+  } | null>(null);
+  const advancedFillTouchPanRef = useRef<{
+    pointerId: number;
+    last: { x: number; y: number };
+  } | null>(null);
+  const advancedFillColorRef = useRef(color);
   const [pixelSel, setPixelSel] = useState<PixelSelection | null>(null);
   // "wand"는 이 파일에서만 쓰는 로컬 확장 — StudioSelectionToolsPanel의 activeTool prop은 여전히
   // SelectionToolKind만 받으므로(export 자체는 안 건드림), 그 패널에 넘길 때는 wand를 null로 좁힌다.
@@ -5134,6 +5232,57 @@ function StudioCuttoonEditor() {
     setPixelBusy(false);
     pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
   }, [selectedId]);
+  useEffect(() => {
+    saveStudioAdvancedFillSettings(studioAdvancedFillStorage(), advancedFillSettings);
+  }, [advancedFillSettings]);
+  useEffect(() => {
+    void activePage.id;
+    void selectedId;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    advancedFillTapGestureRef.current = null;
+    advancedFillTapPayloadRef.current = null;
+    advancedFillTouchPanRef.current = null;
+    setAdvancedFillActive(false);
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
+  }, [activePage.id, selectedId]);
+  useEffect(() => {
+    if (tool === "select" || (!advancedFillActive && !advancedFillBusy && !advancedFillPreview)) return;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    advancedFillTapGestureRef.current = null;
+    advancedFillTapPayloadRef.current = null;
+    advancedFillTouchPanRef.current = null;
+    setAdvancedFillActive(false);
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus("다른 도구로 전환해 고급 채우기 미리보기를 취소했습니다.");
+  }, [tool, advancedFillActive, advancedFillBusy, advancedFillPreview]);
+  useEffect(() => {
+    if (advancedFillColorRef.current === color) return;
+    advancedFillColorRef.current = color;
+    if (!advancedFillBusy && !advancedFillPreview) return;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus("채우기 색상이 바뀌어 이전 미리보기를 취소했습니다. 캔버스를 다시 탭하세요.");
+  }, [color, advancedFillBusy, advancedFillPreview]);
+  useEffect(
+    () => () => {
+      advancedFillRunIdRef.current += 1;
+      advancedFillAbortRef.current?.abort();
+      advancedFillTapGestureRef.current = null;
+      advancedFillTapPayloadRef.current = null;
+      advancedFillTouchPanRef.current = null;
+    },
+    []
+  );
   // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
   // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
@@ -5609,6 +5758,51 @@ function StudioCuttoonEditor() {
     setTool("select");
     setError(null);
   }
+  const advancedFillRasterLayers: StudioFillReferenceLayer[] = elements
+    .filter((element): element is ImageEl & El => element.type === "image")
+    .map((element) => ({
+      id: element.id,
+      name: element.name || elementLabel(element),
+      src: element.src,
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+      rotation: element.rotation,
+      flipped: element.flipped,
+      flippedY: element.flippedY,
+      opacity: element.opacity,
+      hidden: isEffectivelyHidden(element, groups),
+      fillReference: element.fillReference,
+    }));
+  const advancedFillVisibleRasterCount = selected
+    ? collectOverlappingStudioFillReferenceLayers(advancedFillRasterLayers, selected.id, "all-visible").length
+    : 0;
+  const advancedFillReferenceLayerCount = selected
+    ? collectOverlappingStudioFillReferenceLayers(advancedFillRasterLayers, selected.id, "reference").length
+    : 0;
+  const advancedFillUnsupportedReason =
+    masterEditMode
+      ? "마스터 편집을 끝낸 뒤 페이지 래스터를 채울 수 있어요."
+      : pageEditLocked
+        ? "검토 잠금을 해제한 뒤 채울 수 있어요."
+        : selected?.type !== "image"
+          ? "래스터 이미지 레이어를 먼저 선택하세요."
+          : isEffectivelyLocked(selected, groups)
+            ? "잠긴 레이어는 채울 수 없어요."
+            : isEffectivelyHidden(selected, groups)
+              ? "숨긴 레이어를 표시한 뒤 채울 수 있어요."
+              : selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1
+                ? "애니메이션 레이어는 현재 프레임을 정적 이미지로 만든 뒤 채울 수 있어요."
+                : timelinePlaying
+                  ? "타임라인 재생을 멈춘 뒤 채울 수 있어요."
+                  : advancedFillSettings.referenceScope === "reference" && advancedFillReferenceLayerCount === 0
+                    ? "표시 중인 다른 래스터를 채우기 참조로 지정하세요."
+                    : advancedFillSettings.referenceScope === "all-visible" && advancedFillVisibleRasterCount === 0
+                      ? "대상과 겹치는 다른 표시 래스터가 없어 현재 레이어 참조를 사용해야 해요."
+                      : null;
+  const advancedFillArmed =
+    advancedFillActive && tool === "select" && selected?.type === "image" && advancedFillUnsupportedReason === null;
   // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
   const pixelToolArmed = pixelTool !== null && selected?.type === "image";
@@ -5715,6 +5909,16 @@ function StudioCuttoonEditor() {
           publicationAnalytics?: unknown;
           publishPack?: unknown;
         };
+        advancedFillRunIdRef.current += 1;
+        advancedFillAbortRef.current?.abort();
+        advancedFillAbortRef.current = null;
+        advancedFillTapGestureRef.current = null;
+        advancedFillTapPayloadRef.current = null;
+        advancedFillTouchPanRef.current = null;
+        setAdvancedFillActive(false);
+        setAdvancedFillBusy(false);
+        setAdvancedFillPreview(null);
+        setAdvancedFillStatus(null);
         if (doc?.pagesList && doc.pagesList.length > 0) {
           setPagesHistory([doc.pagesList]);
           setPagesHi(0);
@@ -6785,6 +6989,9 @@ function StudioCuttoonEditor() {
       setError("이 페이지는 검토 잠금 상태예요. 페이지 검토에서 잠금을 해제한 뒤 편집해 주세요.");
       return;
     }
+    if (!advancedFillApplyingRef.current) {
+      invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
+    }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p));
     const h = pagesHistory.slice(0, pagesHi + 1);
@@ -6803,6 +7010,9 @@ function StudioCuttoonEditor() {
     if (pageEditLocked) {
       setError("이 페이지는 검토 잠금 상태예요. 페이지 검토에서 잠금을 해제한 뒤 편집해 주세요.");
       return;
+    }
+    if (!advancedFillApplyingRef.current) {
+      invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
@@ -6827,6 +7037,9 @@ function StudioCuttoonEditor() {
         setError("잠긴 페이지가 포함된 변경이에요. 페이지 검토에서 잠금을 해제한 뒤 다시 시도해 주세요.");
         return false;
       }
+    }
+    if (!advancedFillApplyingRef.current) {
+      invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
     coalesceKeyRef.current = null;
     const h = pagesHistory.slice(0, pagesHi + 1);
@@ -6859,11 +7072,21 @@ function StudioCuttoonEditor() {
     const nextElements = computeMagicResize(elements, from, to, magicResizeStrategy);
     commit(nextElements as El[], { canvasH: to.height });
   }
-  // 캔버스 제스처를 무장(armed)해 가로채는 도구 13종을 한꺼번에 끈다. 새 도구 하나를 켤 때마다
+  // 캔버스 제스처를 무장(armed)해 가로채는 도구를 한꺼번에 끈다. 새 도구 하나를 켤 때마다
   // 나머지를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
   // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    advancedFillTapGestureRef.current = null;
+    advancedFillTapPayloadRef.current = null;
+    advancedFillTouchPanRef.current = null;
+    setAdvancedFillActive(false);
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
     setCropRect(null);
     setPixelTool(null);
     setPanelSplitActive(false);
@@ -7129,6 +7352,25 @@ function StudioCuttoonEditor() {
             title={el.alphaLocked ? "알파 락 해제 — 투명 영역도 다시 칠할 수 있어요" : "알파 락 — 켜면 이 레이어의 불투명한 부분에만 칠해져요"}
           >
             {el.alphaLocked ? <Grid2x2Check size={13} /> : <Grid2x2X size={13} />}
+          </button>
+        )}
+        {el.type === "image" && (
+          <button
+            type="button"
+            onClick={() => patchEl(el.id, { fillReference: !el.fillReference } as Partial<El>)}
+            className={cn(
+              "hidden size-6 place-items-center rounded hover:bg-raised [@media(pointer:fine)]:grid",
+              el.fillReference ? "bg-accent-soft text-accent" : "text-fg-3",
+            )}
+            aria-pressed={el.fillReference === true}
+            aria-label={el.fillReference ? "채우기 참조 레이어 해제" : "채우기 참조 레이어로 지정"}
+            title={
+              el.fillReference
+                ? "채우기 참조 해제 — 고급 채우기가 이 레이어의 경계를 더 이상 읽지 않아요"
+                : "채우기 참조로 지정 — 선화 레이어를 따로 두고 아래 채색 레이어에 색을 넣을 수 있어요"
+            }
+          >
+            <ScanLine size={13} aria-hidden />
           </button>
         )}
         <button
@@ -7805,10 +8047,22 @@ function StudioCuttoonEditor() {
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
   const undo = () => {
     if (masterEditMode) return;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
     setPagesHi((i) => Math.max(0, i - 1));
   };
   const redo = () => {
     if (masterEditMode) return;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
     setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
   };
   function fitCanvasToWidth() {
@@ -7847,6 +8101,12 @@ function StudioCuttoonEditor() {
     else if (action === "bring-front") reorder("front");
     else if (action === "fit-width") fitCanvasToWidth();
     else if (action === "add-bubble") addBubble("speech");
+    else if (action === "advanced-fill") {
+      setTool("select");
+      setAdvancedFillActive(true);
+      setAdvancedFillStatus("캔버스의 닫힌 영역을 탭하세요. 적용 전까지는 문서가 바뀌지 않습니다.");
+      setMobileSheet(null);
+    }
   }
   const mobileHistoryGestureRef = useRef({ undo, redo });
   mobileHistoryGestureRef.current = { undo, redo };
@@ -7918,10 +8178,16 @@ function StudioCuttoonEditor() {
   // 히스토리 목록 점프 — undo/redo 와 동일하게 pagesHi 인덱스만 이동(스냅샷 배열은 그대로 유지).
   const jumpToHistoryIndex = (index: number) => {
     if (masterEditMode) return;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
     setPagesHi(Math.max(0, Math.min(pagesHistory.length - 1, index)));
   };
 
-  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
+  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · G 고급 채우기 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
@@ -7959,6 +8225,9 @@ function StudioCuttoonEditor() {
       } else if (mod && e.key === "0") {
         e.preventDefault();
         setZoom(1);
+      } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
+        e.preventDefault();
+        toggleAdvancedFill();
       } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
         // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
@@ -7978,6 +8247,10 @@ function StudioCuttoonEditor() {
           // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
           menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
           setMenu(null);
+        } else if (advancedFillPreview) {
+          cancelAdvancedFillPreview();
+        } else if (advancedFillActive) {
+          toggleAdvancedFill();
         } else if (cropRect) {
           // 크롭 모드를 먼저 종료(영역 폐기) — 다음 Esc 가 픽셀 선택/요소 선택을 해제한다.
           setCropRect(null);
@@ -9818,28 +10091,245 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // ── 페인트 통 결과 커밋 — 알파 락이면 편집 전 알파 모양 밖으로 못 나가게 오려낸 뒤 반영 ──
-  // floodFillImage 자체는 알파를 안 건드리지만(색만 칠함) 반투명 안티앨리어싱 가장자리로 색이
-  // 스며나가는 걸 막아 "이 레이어의 지금 모양 밖으로는 절대 안 나간다"를 보장한다. 잠금이 아니면
-  // 기존과 완전히 동일하게(추가 로드/합성 없이) 그대로 커밋한다.
-  async function commitFloodFillResult(dataUrl: string) {
-    if (selected?.type !== "image") return; // 방어적 — 페인트 통 패널은 이미지 선택 시에만 렌더된다.
-    const target = selected;
-    if (!shouldClipToExistingAlpha(target)) {
-      patchEl(target.id, { src: dataUrl } as Partial<El>);
+  function createAdvancedFillSelectionMask(
+    target: ImageEl & El,
+    width: number,
+    height: number,
+  ): AdvancedFillMaskLike | undefined {
+    if (!pixelSel || !isSelectionUsable(pixelSel)) return undefined;
+    const maskPlan = buildSelectionMaskPlan(pixelSel, width, height, {
+      featherScale: target.width > 0 ? width / target.width : 1,
+      flipX: target.flipped,
+      flipY: target.flippedY,
+    });
+    if (!maskPlan) return undefined;
+    const maskCanvas = rasterizeSelectionMask(maskPlan, createPixelEditCanvas) as HTMLCanvasElement | null;
+    if (!maskCanvas) throw new Error("선택 영역 마스크를 만들지 못했습니다.");
+    try {
+      const context = maskCanvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("선택 영역 마스크를 읽지 못했습니다.");
+      const rgba = context.getImageData(0, 0, width, height).data;
+      const data = new Uint8Array(width * height);
+      for (let position = 0; position < data.length; position++) data[position] = rgba[position * 4 + 3]!;
+      return { data, width, height };
+    } finally {
+      maskCanvas.width = 0;
+      maskCanvas.height = 0;
+    }
+  }
+
+  function clearAdvancedFillTapGesture() {
+    advancedFillTapGestureRef.current = null;
+    advancedFillTapPayloadRef.current = null;
+    advancedFillTouchPanRef.current = null;
+  }
+
+  function resetAdvancedFillForDocumentReplacement() {
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    clearAdvancedFillTapGesture();
+    setAdvancedFillActive(false);
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(null);
+  }
+
+  function invalidateAdvancedFillWork(message: string): boolean {
+    clearAdvancedFillTapGesture();
+    if (!advancedFillAbortRef.current && !advancedFillBusy && !advancedFillPreview) return false;
+    advancedFillRunIdRef.current += 1;
+    advancedFillAbortRef.current?.abort();
+    advancedFillAbortRef.current = null;
+    setAdvancedFillBusy(false);
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus(message);
+    return true;
+  }
+
+  function toggleAdvancedFill() {
+    if (advancedFillActive) {
+      const hadPendingCalculation = advancedFillBusy;
+      const hasReusablePreview = advancedFillPreview !== null;
+      advancedFillRunIdRef.current += 1;
+      advancedFillAbortRef.current?.abort();
+      advancedFillAbortRef.current = null;
+      clearAdvancedFillTapGesture();
+      setAdvancedFillActive(false);
+      setAdvancedFillBusy(false);
+      setAdvancedFillStatus(
+        hadPendingCalculation
+          ? hasReusablePreview
+            ? "새 계산을 취소했습니다. 이전 채우기 미리보기는 적용하거나 취소할 수 있어요."
+            : "고급 채우기 계산을 취소했습니다."
+          : "고급 채우기 도구를 해제했습니다.",
+      );
       return;
     }
-    const beforeSrc = target.src; // 이번 편집 전(잠긴 채 유지돼야 할) 알파 모양의 원본.
+    if (advancedFillUnsupportedReason) {
+      setAdvancedFillStatus(advancedFillUnsupportedReason);
+      setError(advancedFillUnsupportedReason);
+      return;
+    }
+    disarmAllPixelTools();
+    setTool("select");
+    setAdvancedFillActive(true);
+    setAdvancedFillStatus("캔버스의 닫힌 영역을 탭하세요. 적용 전까지는 문서가 바뀌지 않습니다.");
+    setMobileSheet(null);
+    setError(null);
+  }
+
+  function updateAdvancedFillSettings(next: StudioAdvancedFillSettings) {
+    setAdvancedFillSettings(next);
+    invalidateAdvancedFillWork(
+      advancedFillBusy
+        ? "설정이 바뀌어 진행 중인 계산과 이전 미리보기를 취소했습니다. 캔버스를 다시 탭하세요."
+        : "설정이 바뀌어 이전 채우기 미리보기를 취소했습니다. 캔버스를 다시 탭하세요.",
+    );
+  }
+
+  function cancelAdvancedFillPreview() {
+    const cancelledBusy = advancedFillAbortRef.current !== null || advancedFillBusy;
+    invalidateAdvancedFillWork(
+      cancelledBusy
+        ? "진행 중인 계산과 채우기 미리보기를 취소했습니다."
+        : "채우기 미리보기를 취소했습니다.",
+    );
+  }
+
+  function applyAdvancedFillPreview() {
+    const preview = advancedFillPreview;
+    if (!preview) return;
+    const current = activeElementsRef.current.find((element) => element.id === preview.targetId);
+    if (
+      pagesHiRef.current !== preview.historyIndex ||
+      !current ||
+      current.type !== "image" ||
+      current.src !== preview.originalSrc
+    ) {
+      setAdvancedFillPreview(null);
+      setAdvancedFillStatus("문서 또는 대상 레이어가 바뀌어 오래된 채우기 미리보기를 취소했습니다.");
+      return;
+    }
+    if (pageEditLocked || isEffectivelyLocked(current, groups)) {
+      const message = pageEditLocked
+        ? "검토 잠금을 해제한 뒤 채우기 미리보기를 적용하세요."
+        : "레이어 잠금을 해제한 뒤 채우기 미리보기를 적용하세요.";
+      setAdvancedFillStatus(message);
+      setError(message);
+      return;
+    }
+    advancedFillApplyingRef.current = true;
     try {
-      const [original, edited] = await Promise.all([loadPixelEditImage(beforeSrc), loadPixelEditImage(dataUrl)]);
-      const w = original.naturalWidth || original.width;
-      const h = original.naturalHeight || original.height;
-      const out = compositeAlphaLocked(original, edited, w, h, createPixelEditCanvas);
-      const src = out ? (out as HTMLCanvasElement).toDataURL("image/png") : dataUrl;
-      patchEl(target.id, { src } as Partial<El>);
+      patchEl(preview.targetId, { src: preview.resultSrc } as Partial<El>);
+    } finally {
+      advancedFillApplyingRef.current = false;
+    }
+    setAdvancedFillPreview(null);
+    setAdvancedFillStatus("고급 채우기를 적용했습니다. 실행취소 한 번으로 되돌릴 수 있어요.");
+    if (!advancedFillSettings.continuousFill) setAdvancedFillActive(false);
+    setError(null);
+  }
+
+  async function runAdvancedFillAt(pos: { x: number; y: number }, frame: SelectionFrame) {
+    if (advancedFillAbortRef.current || advancedFillBusy || !advancedFillArmed || selected?.type !== "image") return;
+    const displayPoint = canvasPointToNormalized(pos.x, pos.y, frame);
+    if (displayPoint.x < 0 || displayPoint.x > 1 || displayPoint.y < 0 || displayPoint.y > 1) {
+      setAdvancedFillStatus("선택한 래스터 레이어 안쪽을 탭하세요.");
+      return;
+    }
+    const target = selected;
+    const historyIndex = pagesHiRef.current;
+    const sourcePoint = flipNormalizedPoint(displayPoint, target.flipped ?? false, target.flippedY ?? false);
+    const previousPreview =
+      advancedFillPreview?.targetId === target.id &&
+      advancedFillPreview.originalSrc === target.src &&
+      advancedFillPreview.historyIndex === historyIndex
+        ? advancedFillPreview
+        : null;
+    const workingSrc = previousPreview?.resultSrc ?? target.src;
+    const runId = ++advancedFillRunIdRef.current;
+    const controller = new AbortController();
+    advancedFillAbortRef.current = controller;
+    setAdvancedFillBusy(true);
+    setAdvancedFillStatus("경계와 누수 가능성을 분석하고 있어요…");
+    try {
+      // Give React one paint opportunity so large source scans do not hide the busy state.
+      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+      if (
+        runId !== advancedFillRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex
+      ) return;
+      let referenceSrc: string | undefined;
+      if (advancedFillSettings.referenceScope !== "current") {
+        const layers = advancedFillRasterLayers.map((layer) =>
+          layer.id === target.id ? { ...layer, src: workingSrc } : layer
+        );
+        const composed = await composeStudioFillReferenceImage(
+          layers,
+          target.id,
+          advancedFillSettings.referenceScope,
+          undefined,
+          controller.signal,
+        );
+        referenceSrc = composed.dataUrl;
+      }
+      if (
+        runId !== advancedFillRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex
+      ) return;
+      const result = await runStudioAdvancedFillInBrowser({
+        targetSrc: workingSrc,
+        referenceSrc,
+        alphaLockSrc: shouldClipToExistingAlpha(target) ? target.src : undefined,
+        xRatio: sourcePoint.x,
+        yRatio: sourcePoint.y,
+        fillColor: color,
+        settings: advancedFillSettings,
+        createSelectionMask: (width, height) =>
+          createAdvancedFillSelectionMask(target, width, height),
+        abort: controller.signal,
+      });
+      if (
+        runId !== advancedFillRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex
+      ) return;
+      const current = activeElementsRef.current.find((element) => element.id === target.id);
+      if (!current || current.type !== "image" || current.src !== target.src) return;
+      const message = studioAdvancedFillResultMessage(result);
+      if (!result.changed) {
+        setAdvancedFillStatus(message);
+        if (result.blockedReason) setError(message);
+        return;
+      }
+      const diagnostics = result.diagnostics;
+      const previewSummary = summarizeStudioAdvancedFillPreview(message, diagnostics, previousPreview);
+      setAdvancedFillPreview({
+        targetId: target.id,
+        originalSrc: target.src,
+        historyIndex,
+        resultSrc: result.dataUrl,
+        diagnostics,
+        message: previewSummary.message,
+        paintedPixelCount: previewSummary.paintedPixelCount,
+        regionCount: previewSummary.regionCount,
+      });
+      setAdvancedFillStatus(previewSummary.message);
+      if (!advancedFillSettings.continuousFill) setAdvancedFillActive(false);
+      setError(null);
     } catch (err) {
-      console.error("Failed to apply alpha-locked composite:", err);
-      patchEl(target.id, { src: dataUrl } as Partial<El>); // 합성 실패 시 잠금 없이 원래 결과라도 반영.
+      if (runId !== advancedFillRunIdRef.current || controller.signal.aborted) return;
+      const message = err instanceof Error ? err.message : "고급 채우기에 실패했습니다.";
+      setAdvancedFillStatus(message);
+      setError(message);
+    } finally {
+      if (runId === advancedFillRunIdRef.current) {
+        setAdvancedFillBusy(false);
+        advancedFillAbortRef.current = null;
+      }
     }
   }
 
@@ -10042,6 +10532,7 @@ function StudioCuttoonEditor() {
       !nodeEditTool &&
       !smudgeActive &&
       !healCloneTool &&
+      !advancedFillActive &&
       !eyedropperActive &&
       !bubbleAnchorPickActive &&
       !pixelTool &&
@@ -10083,6 +10574,50 @@ function StudioCuttoonEditor() {
           patchEl(selected.id, { tailAnchorId: clickedId, tailAnchorPoint: undefined } as Partial<El>);
         } else {
           patchEl(selected.id, { tailAnchorPoint: { x: pos.x, y: pos.y }, tailAnchorId: undefined } as Partial<El>);
+        }
+      }
+      return;
+    }
+    // 고급 채우기 — pointerdown에서는 탭 후보만 보관한다. pointerup까지 8px 이내의 단일 주 포인터
+    // 탭일 때만 실행해 긴 캔버스 한 손가락 스크롤과 두 손가락 핀치를 채우기로 오인하지 않는다.
+    if (advancedFillArmed && selected?.type === "image") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos && !isSpacePressed && !(e.target.getParent() instanceof KonvaRuntime.Transformer)) {
+        const clientPoint = getClientPointFromKonvaEvent(e.evt);
+        const pointerEvent = e.evt as PointerEvent;
+        const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+        const frame: SelectionFrame = {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+        };
+        if (clientPoint) {
+          const gesture = beginStudioAdvancedFillTap(advancedFillTapGestureRef.current, {
+            pointerId,
+            point: clientPoint,
+            button: pointerEvent.button,
+            isPrimary: pointerEvent.isPrimary,
+          });
+          advancedFillTapGestureRef.current = gesture;
+          if (
+            pointerEvent.pointerType === "touch" &&
+            gesture.primaryPointerId === pointerId &&
+            gesture.activePointerIds.length === 1 &&
+            !gesture.blocked
+          ) {
+            advancedFillTouchPanRef.current = { pointerId, last: clientPoint };
+          } else if (gesture.activePointerIds.length > 1) {
+            advancedFillTouchPanRef.current = null;
+          }
+          if (
+            gesture.primaryPointerId === pointerId &&
+            gesture.activePointerIds.length === 1 &&
+            !gesture.blocked
+          ) {
+            advancedFillTapPayloadRef.current = { position: pos, frame };
+          }
         }
       }
       return;
@@ -10435,6 +10970,38 @@ function StudioCuttoonEditor() {
         }
       }
     }
+    if (advancedFillTapGestureRef.current) {
+      const clientPoint = getClientPointFromKonvaEvent(e.evt);
+      const pointerEvent = e.evt as PointerEvent;
+      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+      if (clientPoint) {
+        const gesture = moveStudioAdvancedFillTap(
+          advancedFillTapGestureRef.current,
+          pointerId,
+          clientPoint,
+        );
+        advancedFillTapGestureRef.current = gesture;
+        const pan = advancedFillTouchPanRef.current;
+        if (
+          pointerEvent.pointerType === "touch" &&
+          pan?.pointerId === pointerId &&
+          gesture.blocked &&
+          gesture.activePointerIds.length === 1
+        ) {
+          const wrap = wrapRef.current;
+          if (wrap) {
+            wrap.scrollLeft -= clientPoint.x - pan.last.x;
+            wrap.scrollTop -= clientPoint.y - pan.last.y;
+            updateScrollPos();
+          }
+        }
+        if (pan?.pointerId === pointerId) pan.last = clientPoint;
+      }
+      return;
+    }
+    // A cancelled scroll/pinch may still emit more pointermove events before the final pointerup.
+    // While the bucket remains armed, never let those events fall through to selection/drawing.
+    if (advancedFillArmed) return;
     // 크롭 드래그 중이면 rect 를 갱신한다(시작 시점 스냅샷 기준 — 증분 오차 없음, RAF 합침).
     if (cropDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -10799,7 +11366,20 @@ function StudioCuttoonEditor() {
     drawingRef.current = next;
     scheduleDraft(next);
   }
-  function onStageUp() {
+  function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    const current = advancedFillTapGestureRef.current;
+    if (!current) return;
+    const pointerEvent = e.evt as PointerEvent;
+    const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+    const outcome = endStudioAdvancedFillTap(current, pointerId, true);
+    advancedFillTapGestureRef.current = outcome.gesture;
+    if (advancedFillTouchPanRef.current?.pointerId === pointerId) {
+      advancedFillTouchPanRef.current = null;
+    }
+    if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
+  }
+
+  function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     stopQuickShapeTracking(); // 무조건 실행 — 어느 분기로 빠지든 인터벌이 새지 않게 한다.
     // 색상 휠 롱프레스 타이머가 아직 안 터졌는데 포인터를 뗐다 — 평범한 클릭/드래그였다는 뜻이니
     // 타이머만 정리한다(이미 열려 있었다면 오버레이가 이벤트를 가로채서 애초에 여기까지 안 온다).
@@ -10807,6 +11387,26 @@ function StudioCuttoonEditor() {
       clearTimeout(colorWheelTimerRef.current);
       colorWheelTimerRef.current = null;
     }
+    if (advancedFillTapGestureRef.current) {
+      const pointerEvent = e.evt as PointerEvent;
+      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+      const clientPoint = getClientPointFromKonvaEvent(e.evt);
+      const moved = clientPoint
+        ? moveStudioAdvancedFillTap(advancedFillTapGestureRef.current, pointerId, clientPoint)
+        : advancedFillTapGestureRef.current;
+      const outcome = endStudioAdvancedFillTap(moved, pointerId);
+      advancedFillTapGestureRef.current = outcome.gesture;
+      if (advancedFillTouchPanRef.current?.pointerId === pointerId) {
+        advancedFillTouchPanRef.current = null;
+      }
+      const payload = advancedFillTapPayloadRef.current;
+      if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
+      if (outcome.execute && payload && !advancedFillAbortRef.current) {
+        void runAdvancedFillAt(payload.position, payload.frame);
+      }
+      return;
+    }
+    if (advancedFillArmed) return;
     // 크롭 드래그 종료 — 마지막 RAF 대기분을 반영하고 세션만 닫는다(rect 는 적용 전까지 유지).
     if (cropDragRef.current) {
       cropDragRef.current = null;
@@ -11401,6 +12001,7 @@ function StudioCuttoonEditor() {
     quickActionsDisabledActions.add("bring-front");
     quickActionsDisabledActions.add("add-bubble");
   }
+  if (advancedFillUnsupportedReason) quickActionsDisabledActions.add("advanced-fill");
 
   async function handleDownload() {
     const watermarkForExport = ensureWatermarkLoaded();
@@ -11825,6 +12426,9 @@ function StudioCuttoonEditor() {
   }
 
   function handleTimelapseRecordingStart() {
+    invalidateAdvancedFillWork("타임랩스 캡처를 시작해 미적용 채우기 미리보기를 취소했습니다.");
+    clearAdvancedFillTapGesture();
+    setAdvancedFillActive(false);
     timelapseOriginalHiRef.current = pagesHi;
     timelapseOriginalPageIdRef.current = currentPageId;
     timelapseOriginalMasterEditModeRef.current = masterEditMode;
@@ -11959,6 +12563,7 @@ function StudioCuttoonEditor() {
 
   function applyStudioProjectSnapshot(projectData: StudioProjectFile) {
     const restoredPages = projectData.pagesList as PageState[];
+    resetAdvancedFillForDocumentReplacement();
     // 히스토리에 새 페이지 상태를 추가해 JSON/복구 지점 복원도 ⌘Z 흐름과 충돌하지 않게 한다.
     const nextHistory = pagesHistory.slice(0, pagesHi + 1);
     nextHistory.push(restoredPages);
@@ -13389,6 +13994,16 @@ function StudioCuttoonEditor() {
           aria-pressed={tool === "draw" && drawMode === "eraser"}
         >
           <Eraser size={14} /> 지우개
+        </button>
+        <button
+          type="button"
+          onClick={toggleAdvancedFill}
+          disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+          className={cn(toolBtn(advancedFillActive), "disabled:cursor-not-allowed disabled:opacity-40")}
+          aria-pressed={advancedFillActive}
+          title={advancedFillUnsupportedReason ?? "선택 래스터의 닫힌 영역을 참조 경계로 채우기 (G)"}
+        >
+          <PaintBucket size={14} /> 고급 채우기
         </button>
         <button
           type="button"
@@ -14866,6 +15481,64 @@ function StudioCuttoonEditor() {
             </div>
           )}
 
+          {(advancedFillBusy || advancedFillPreview) && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={cn(
+                "mb-2 flex min-h-12 flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm",
+                advancedFillPreview
+                  ? "border-good/35 bg-good-soft/20 text-fg"
+                  : "border-accent/35 bg-accent-soft/25 text-fg",
+              )}
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel/80 text-accent">
+                {advancedFillBusy ? (
+                  <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                ) : (
+                  <PaintBucket size={16} aria-hidden />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 leading-relaxed">
+                <strong className="block font-bold">
+                  {advancedFillBusy ? "고급 채우기 분석 중" : "채우기 미리보기"}
+                </strong>
+                <span className="text-fg-3">
+                  {advancedFillBusy
+                    ? "참조 경계와 누수 가능성을 확인하고 있어요."
+                    : `${advancedFillPreview?.message ?? ""}${advancedFillActive ? " · 다른 영역을 탭해 한 번의 적용으로 누적할 수 있어요." : ""}`}
+                </span>
+              </span>
+              {advancedFillPreview && !advancedFillBusy && (
+                <span className="ml-auto flex min-w-full gap-2 sm:min-w-0">
+                  <button
+                    type="button"
+                    onClick={cancelAdvancedFillPreview}
+                    className="min-h-11 flex-1 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyAdvancedFillPreview}
+                    className="min-h-11 flex-1 rounded-lg bg-accent px-4 font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
+                  >
+                    적용 · 실행취소 1회
+                  </button>
+                </span>
+              )}
+              {advancedFillBusy && (
+                <button
+                  type="button"
+                  onClick={toggleAdvancedFill}
+                  className="ml-auto min-h-11 min-w-24 rounded-lg border border-accent/35 bg-card px-3 font-bold text-accent transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  계산 취소
+                </button>
+              )}
+            </div>
+          )}
+
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
@@ -14890,6 +15563,7 @@ function StudioCuttoonEditor() {
               // top 275px + 하단바 111px = 386px ≈ 24.1rem, 로그인 배너 없는 상태에선 더 여유로움).
               // 데스크톱(lg): 좌/우 패널·줌 컨트롤이 있는 기존 레이아웃이라 21rem 차감 유지.
               "max-h-[calc(100dvh-26rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              advancedFillArmed && "cursor-crosshair",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
@@ -14906,7 +15580,9 @@ function StudioCuttoonEditor() {
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
+            onPointerCancel={onStagePointerCancel}
             onMouseLeave={() => {
+              clearAdvancedFillTapGesture();
               hideBrushCursor();
               hideSmudgeCursor();
               hideHealCloneCursors();
@@ -15020,6 +15696,7 @@ function StudioCuttoonEditor() {
                   !opts.asMask &&
                   tool === "select" &&
                   !locked &&
+                  !advancedFillArmed &&
                   !pixelToolArmed &&
                   !cropArmed &&
                   !panelSplitArmed &&
@@ -15037,6 +15714,7 @@ function StudioCuttoonEditor() {
                   ? () => {}
                   : () =>
                       tool === "select" &&
+                      !advancedFillArmed &&
                       !pixelToolArmed &&
                       !cropArmed &&
                       !panelSplitArmed &&
@@ -15087,7 +15765,16 @@ function StudioCuttoonEditor() {
                   // 이미 두 시스템을 UI 레벨에서 상호배제하지만(같은 요소는 frames.length>1 이면
                   // 트랙 추가가 애초에 막힘), 여기서도 방어적으로 한 번 더 가드한다.
                   const timelineOverride = isAnimTarget ? undefined : timelineComposite?.get(el.id);
-                  const effectiveEl = timelineOverride ? ({ ...el, src: timelineOverride.src } as ImageEl) : el;
+                  const advancedFillPreviewSrc =
+                    !timelapseCapturing &&
+                    advancedFillPreview?.targetId === el.id &&
+                    advancedFillPreview.historyIndex === pagesHi
+                      ? advancedFillPreview.resultSrc
+                      : undefined;
+                  // 사용자가 아직 적용하지 않은 채우기 미리보기가 가장 높은 우선순위다. 타임라인 재생
+                  // 중엔 도구 진입이 막히지만, 이미 만든 미리보기를 잃지 않고 적용/취소할 수는 있어야 한다.
+                  const effectiveSrc = advancedFillPreviewSrc ?? timelineOverride?.src;
+                  const effectiveEl = effectiveSrc ? ({ ...el, src: effectiveSrc } as ImageEl) : el;
                   // 패널 자동맞춤(studio-panel-autofit) — 이 이미지가 드래그 종료 시 자동맞춤을
                   // 시도해도 되는지 여기서 전부 판정해 autoFitFrames 하나로 UrlImage 에 넘긴다.
                   // null 이면 UrlImage 는 시도조차 하지 않고 기존과 완전히 동일하게 {x,y}만 패치한다.
@@ -18728,8 +19415,31 @@ function StudioCuttoonEditor() {
                   {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
                   <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
                   <StudioFloodFillPanel
-                    src={selected.src}
-                    onResult={(dataUrl) => void commitFloodFillResult(dataUrl)}
+                    active={advancedFillActive}
+                    busy={advancedFillBusy}
+                    fillColor={color}
+                    settings={advancedFillSettings}
+                    referenceLayerCount={advancedFillReferenceLayerCount}
+                    visibleRasterCount={advancedFillVisibleRasterCount}
+                    selectedIsReference={selected.fillReference === true}
+                    targetUnsupportedReason={advancedFillUnsupportedReason}
+                    statusMessage={advancedFillStatus}
+                    diagnostics={advancedFillPreview?.diagnostics}
+                    onToggleActive={toggleAdvancedFill}
+                    onFillColorChange={setColor}
+                    onSettingsChange={updateAdvancedFillSettings}
+                    onToggleSelectedReference={() => {
+                      setAdvancedFillPreview(null);
+                      patchEl(selected.id, { fillReference: !selected.fillReference } as Partial<El>);
+                      setAdvancedFillStatus(
+                        selected.fillReference
+                          ? "채우기 참조 지정을 해제했습니다."
+                          : "이 래스터를 채우기 참조 선화로 지정했습니다.",
+                      );
+                    }}
+                    onResetSettings={() =>
+                      updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
+                    }
                   />
                   <StudioLineCleanupPanel
                     src={selected.src}
@@ -19659,6 +20369,20 @@ function StudioCuttoonEditor() {
             >
               <SlidersHorizontal size={16} aria-hidden /> 속성
             </button>
+            {selected?.type === "image" && marqueeIds.length === 0 ? (
+              <button
+                type="button"
+                onClick={toggleAdvancedFill}
+                disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+                aria-pressed={advancedFillActive}
+                className={cn(
+                  "flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  advancedFillActive ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised",
+                )}
+              >
+                <PaintBucket size={16} aria-hidden /> 채우기
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={duplicateSelected}

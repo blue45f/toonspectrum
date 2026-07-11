@@ -18,6 +18,8 @@ These are implementation evidence, not product mockups.
 | `quick-actions-mobile-customize.png` | Per-direction assignment sheet exposing all twelve quick actions |
 | `dialogue-read-aloud-mobile.png` | Browser-native dialogue proofing queue, voice/rate controls, and row-level playback |
 | `review-pdf-profiles-mobile.png` | Internal-only review PDF profile selection with explicit private-metadata boundary |
+| `advanced-fill-mobile.png` | Browser-local Advanced Fill controls for scope, tolerance, expansion, and gap closing |
+| `advanced-fill-reference-mobile.png` | Separate line-art reference plus transparent color-layer preview with explicit apply/undo boundary |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
@@ -55,3 +57,14 @@ Additional measured checks for this batch:
 - The internal review PDF profile select measured 325 × 44px and its privacy boundary notice exactly
   44px tall at 375 × 812. Selecting the full production profile kept document overflow at zero and made
   the page/review/panel/dialogue scope visible without exposing the profile in the public manifest.
+- Advanced Fill retained zero document and panel overflow at 360 × 640, 375 × 812, and 430 × 932.
+  At 375px, its primary button, color row, scope select, sliders, disclosure, reset, and reference action
+  all measured 297 × 44px or larger; checkbox rows measured 297 × 52–53px. A transparent two-cell PNG
+  was filled directly on the main canvas, accumulated across two taps, previewed without a history write,
+  applied as one undo step, undone/redone, and cancelled with Escape. A second transparent color layer
+  used a separately flagged line-art layer as its composite boundary, while a fully transparent current
+  layer was stopped by the 65% leak guard with no preview or apply action. A 3,840 × 2,160 source also
+  completed its leak-guard analysis while the UI stayed responsive; both the panel and canvas status bar
+  expose a 44px calculation-cancel action. Pointer-up tap recognition ignored a >8px canvas drag without
+  starting a fill, preserving one-finger long-canvas pan and two-finger pinch intent. Console warnings/errors
+  were zero.

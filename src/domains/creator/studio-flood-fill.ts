@@ -7,12 +7,36 @@
 // BFS 자체는 여기 한 곳에만 존재한다(중복 금지).
 import { hexToRgb } from "./studio-filters";
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(src: string, abort?: AbortSignal): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    let settled = false;
+    const cleanup = () => abort?.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      img.src = "";
+      reject(new DOMException("이미지 불러오기를 취소했습니다.", "AbortError"));
+    };
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+    img.onload = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(img);
+    };
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("이미지를 불러오지 못했습니다."));
+    };
+    abort?.addEventListener("abort", onAbort, { once: true });
+    if (abort?.aborted) {
+      onAbort();
+      return;
+    }
     img.src = src;
   });
 }

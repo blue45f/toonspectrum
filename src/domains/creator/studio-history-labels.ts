@@ -26,6 +26,8 @@ export interface HistoryElementLike {
   groupId?: unknown;
   name?: unknown;
   opacity?: unknown;
+  src?: unknown;
+  fillReference?: unknown;
 }
 
 // StudioPage 의 PageState 와 구조 호환되는 최소 형태.
@@ -107,6 +109,8 @@ type ElementChangeKind =
   | "group"
   | "rename"
   | "opacity"
+  | "pixels"
+  | "fill-reference"
   | "style";
 
 // points 배열 비교 — 동일 / 평행이동(모든 점이 같은 dx,dy) / 형태 변화.
@@ -152,6 +156,8 @@ function classifyElementChange(prev: HistoryElementLike, next: HistoryElementLik
   if (prev.groupId !== next.groupId) return "group";
   if (prev.name !== next.name) return "rename";
   if (prev.opacity !== next.opacity) return "opacity";
+  if (prev.fillReference !== next.fillReference) return "fill-reference";
+  if (prev.src !== next.src) return "pixels";
   // 추적 필드가 모두 같음 — 참조만 새것(무변화 재구성)이면 변화 아님,
   // 아니면 색/폰트 등 스타일 계열 패치로 간주.
   return shallowEqualElementRecords(prev, next) ? null : "style";
@@ -173,7 +179,7 @@ function shallowEqualElementRecords(a: HistoryElementLike, b: HistoryElementLike
 }
 
 // 변화 종류 → 술어(주어 뒤에 붙는 말). visibility/lock 은 방향에 따라 별도 처리.
-const CHANGE_KIND_PHRASES: Record<Exclude<ElementChangeKind, "visibility" | "lock">, string> = {
+const CHANGE_KIND_PHRASES: Record<Exclude<ElementChangeKind, "visibility" | "lock" | "fill-reference">, string> = {
   text: "내용 수정",
   resize: "크기 조절",
   rotate: "회전",
@@ -182,6 +188,7 @@ const CHANGE_KIND_PHRASES: Record<Exclude<ElementChangeKind, "visibility" | "loc
   group: "그룹 변경",
   rename: "이름 변경",
   opacity: "불투명도 변경",
+  pixels: "픽셀 편집",
   style: "스타일 변경",
 };
 
@@ -268,6 +275,12 @@ function diffElements(
     const allLocked = changed.every((el) => el.locked === true);
     const allUnlocked = changed.every((el) => el.locked !== true);
     const phrase = allLocked ? "잠금" : allUnlocked ? "잠금 해제" : "잠금 전환";
+    return { label: `${subject} ${phrase}`, onlyTextEdits: false, onlyGroupEdits: false };
+  }
+  if (kind === "fill-reference") {
+    const allEnabled = changed.every((el) => el.fillReference === true);
+    const allDisabled = changed.every((el) => el.fillReference !== true);
+    const phrase = allEnabled ? "채우기 참조 지정" : allDisabled ? "채우기 참조 해제" : "채우기 참조 전환";
     return { label: `${subject} ${phrase}`, onlyTextEdits: false, onlyGroupEdits: false };
   }
   return {

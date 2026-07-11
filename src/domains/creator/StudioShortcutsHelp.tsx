@@ -22,6 +22,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘⇧Z · ⌘Y", label: "다시실행" },
       { keys: "⌘D", label: "선택 요소 복제" },
       { keys: "⌘V", label: "클립보드 이미지 붙여넣기" },
+      { keys: "G", label: "고급 채우기 켜기·끄기" },
       { keys: "Delete · ⌫", label: "선택 요소 삭제" },
       { keys: "Esc", label: "선택 해제" },
     ],

@@ -29,6 +29,7 @@ export const QUICK_ACTION_IDS = [
   "bring-front",
   "fit-width",
   "add-bubble",
+  "advanced-fill",
 ] as const;
 
 export type StudioQuickActionId = (typeof QUICK_ACTION_IDS)[number];

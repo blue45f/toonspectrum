@@ -59,6 +59,7 @@ describe("studio quick actions preferences", () => {
       "bring-front",
       "fit-width",
       "add-bubble",
+      "advanced-fill",
     ]);
   });
 

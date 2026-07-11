@@ -7,6 +7,7 @@ import {
   MousePointer2,
   Move,
   PenTool,
+  PaintBucket,
   Pipette,
   Redo2,
   Settings2,
@@ -67,6 +68,7 @@ const ACTION_PRESENTATION: Record<
   "bring-front": { label: "맨 앞으로", Icon: BringToFront },
   "fit-width": { label: "폭 맞춤", Icon: Maximize2 },
   "add-bubble": { label: "말풍선 추가", Icon: MessageCirclePlus },
+  "advanced-fill": { label: "고급 채우기", Icon: PaintBucket },
 };
 
 export interface StudioQuickActionsMenuProps {
