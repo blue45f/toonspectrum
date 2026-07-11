@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+import { deriveStudioBg3dGlbBudgetProfiles } from "./studio-bg3d-device-quality";
+import {
+  validateStudioBg3dGlb,
+  type StudioBg3dGlbBudgetProfiles,
+  type StudioBg3dGlbValidationSuccess,
+} from "./studio-bg3d-glb-validation";
+import {
+  STUDIO_BG3D_GLB_MIME,
+  STUDIO_BG3D_PRIMITIVE_KINDS,
+  STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
+  migrateStudioBg3dSceneDocument,
+  parseStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+  type StudioBg3dModelAttachment,
+} from "./studio-bg3d-scene-document";
 import {
   buildStudioPackageArchiveBlob,
   StudioPackageArchiveError,
@@ -20,7 +35,8 @@ import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project
  */
 
 export const STUDIO_PROJECT_ARCHIVE_SCHEMA = "toonspectrum.studio-project-archive" as const;
-export const STUDIO_PROJECT_ARCHIVE_VERSION = 1 as const;
+/** Current writer version. Import remains compatible with the original version-1 manifest. */
+export const STUDIO_PROJECT_ARCHIVE_VERSION = 2 as const;
 export const STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX = "toonspectrum-asset://sha256/" as const;
 export const STUDIO_PROJECT_ARCHIVE_MIME = "application/vnd.toonspectrum.project+zip" as const;
 
@@ -125,6 +141,12 @@ export interface StudioProjectArchiveDocumentReference {
   /** RFC 6901 JSON Pointer into canonical project.json. The pointed value must already exist. */
   pointer: string;
   usage: StudioProjectArchiveAttachmentKind;
+  /**
+   * `asset-uri` replaces the pointed value with a content-addressed archive URI (legacy/default).
+   * `sha256-prefixed` authenticates an existing `sha256:<hex>` value without rewriting it, which
+   * keeps canonical scene-document hashes valid while still binding them to archive bytes.
+   */
+  mode?: "asset-uri" | "sha256-prefixed";
 }
 
 export interface StudioProjectArchiveAttachmentInput {
@@ -132,7 +154,7 @@ export interface StudioProjectArchiveAttachmentInput {
   data: StudioPackageArchiveSource;
   /** Used only for type validation. Original names are intentionally not persisted. */
   mimeType?: string;
-  /** Optional project locations replaced with a content-addressed asset URI. */
+  /** Optional project locations rewritten to an asset URI or authenticated in-place by hash. */
   documentReferences?: readonly StudioProjectArchiveDocumentReference[];
 }
 
@@ -140,6 +162,25 @@ export interface BuildStudioProjectArchiveInput {
   /** Current v2 or legacy input accepted by parseStudioProjectFile. */
   project: unknown;
   attachments?: readonly StudioProjectArchiveAttachmentInput[];
+}
+
+export interface StudioBg3dProjectArchiveAttachmentPlan {
+  /** Raw lowercase digest used by the archive attachment map/path (without `sha256:`). */
+  sha256: string;
+  byteSize: number;
+  mimeType: "model/gltf-binary";
+  /** First canonical scene metadata record for UI/resolver context; storage ids are never present. */
+  attachment: StudioBg3dModelAttachment;
+  /** Strict intersection of every referencing scene and the product validator defaults. */
+  validationBudgets: StudioBg3dGlbBudgetProfiles;
+  documentReferences: StudioProjectArchiveDocumentReference[];
+}
+
+export interface StudioBg3dProjectArchivePlan {
+  project: StudioProjectFile;
+  attachments: StudioBg3dProjectArchiveAttachmentPlan[];
+  totalAttachmentBytes: number;
+  referenceCount: number;
 }
 
 export interface StudioProjectArchiveOptions {
@@ -165,7 +206,7 @@ export interface StudioProjectArchiveManifestAttachment {
 
 export interface StudioProjectArchiveManifest {
   schema: typeof STUDIO_PROJECT_ARCHIVE_SCHEMA;
-  version: typeof STUDIO_PROJECT_ARCHIVE_VERSION;
+  version: 1 | typeof STUDIO_PROJECT_ARCHIVE_VERSION;
   project: StudioProjectArchiveManifestProject;
   attachments: StudioProjectArchiveManifestAttachment[];
   totals: {
@@ -226,45 +267,76 @@ const textEncoder = new TextEncoder();
 const fatalTextDecoder = new TextDecoder("utf-8", { fatal: true });
 
 const AttachmentKindSchema = z.enum(STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS);
-const DocumentReferenceSchema = z
+const DocumentReferenceInputSchema = z
+  .object({
+    pointer: z.string().min(1).max(2_048),
+    usage: AttachmentKindSchema,
+    mode: z.enum(["asset-uri", "sha256-prefixed"]).optional(),
+  })
+  .strict();
+const DocumentReferenceSchemaV1 = z
   .object({
     pointer: z.string().min(1).max(2_048),
     usage: AttachmentKindSchema,
   })
   .strict();
-const ManifestAttachmentSchema = z
+const DocumentReferenceSchemaV2 = z
   .object({
-    path: z.string().min(1).max(512),
-    mimeType: z.string().regex(MIME_PATTERN).max(120),
-    byteSize: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachmentBytes),
+    pointer: z.string().min(1).max(2_048),
+    usage: AttachmentKindSchema,
+    mode: z.enum(["asset-uri", "sha256-prefixed"]),
+  })
+  .strict();
+const ManifestProjectSchema = z
+  .object({
+    path: z.literal("project.json"),
+    mimeType: z.literal("application/json"),
+    byteSize: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxProjectBytes),
     sha256: z.string().regex(SHA256_PATTERN),
-    kinds: z.array(AttachmentKindSchema).min(1).max(STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS.length),
-    documentReferences: z.array(DocumentReferenceSchema).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxReferences),
   })
   .strict();
-const ManifestSchema = z
+const ManifestTotalsSchema = z
   .object({
-    schema: z.literal(STUDIO_PROJECT_ARCHIVE_SCHEMA),
-    version: z.literal(STUDIO_PROJECT_ARCHIVE_VERSION),
-    project: z
-      .object({
-        path: z.literal("project.json"),
-        mimeType: z.literal("application/json"),
-        byteSize: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxProjectBytes),
-        sha256: z.string().regex(SHA256_PATTERN),
-      })
-      .strict(),
-    attachments: z.array(ManifestAttachmentSchema).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments),
-    totals: z
-      .object({
-        entryCount: z.number().int().min(2).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments + 2),
-        attachmentCount: z.number().int().nonnegative().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments),
-        attachmentBytes: z.number().int().nonnegative().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxTotalAttachmentBytes),
-        contentBytes: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxArchiveBytes),
-      })
-      .strict(),
+    entryCount: z.number().int().min(2).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments + 2),
+    attachmentCount: z.number().int().nonnegative().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments),
+    attachmentBytes: z.number().int().nonnegative().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxTotalAttachmentBytes),
+    contentBytes: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxArchiveBytes),
   })
   .strict();
+const ManifestAttachmentBaseShape = {
+  path: z.string().min(1).max(512),
+  mimeType: z.string().regex(MIME_PATTERN).max(120),
+  byteSize: z.number().int().positive().max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachmentBytes),
+  sha256: z.string().regex(SHA256_PATTERN),
+  kinds: z.array(AttachmentKindSchema).min(1).max(STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS.length),
+} as const;
+const ManifestAttachmentSchemaV1 = z
+  .object({
+    ...ManifestAttachmentBaseShape,
+    documentReferences: z.array(DocumentReferenceSchemaV1).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxReferences),
+  })
+  .strict();
+const ManifestAttachmentSchemaV2 = z
+  .object({
+    ...ManifestAttachmentBaseShape,
+    documentReferences: z.array(DocumentReferenceSchemaV2).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxReferences),
+  })
+  .strict();
+const ManifestSchemaV1 = z.object({
+  schema: z.literal(STUDIO_PROJECT_ARCHIVE_SCHEMA),
+  version: z.literal(1),
+  project: ManifestProjectSchema,
+  attachments: z.array(ManifestAttachmentSchemaV1).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments),
+  totals: ManifestTotalsSchema,
+}).strict();
+const ManifestSchemaV2 = z.object({
+  schema: z.literal(STUDIO_PROJECT_ARCHIVE_SCHEMA),
+  version: z.literal(STUDIO_PROJECT_ARCHIVE_VERSION),
+  project: ManifestProjectSchema,
+  attachments: z.array(ManifestAttachmentSchemaV2).max(STUDIO_PROJECT_ARCHIVE_LIMITS.maxAttachments),
+  totals: ManifestTotalsSchema,
+}).strict();
+const ManifestSchema = z.discriminatedUnion("version", [ManifestSchemaV1, ManifestSchemaV2]);
 
 interface MutableAttachment {
   sha256: string;
@@ -280,6 +352,7 @@ interface CanonicalizeContext {
   diagnostics: StudioProjectArchiveDiagnostic[];
   limits: StudioProjectArchiveLimits;
   nodes: number;
+  minimumJsonBytes?: number;
 }
 
 interface BuildContext {
@@ -287,9 +360,169 @@ interface BuildContext {
   diagnostics: StudioProjectArchiveDiagnostic[];
   attachments: Map<string, MutableAttachment>;
   pointerOwners: Map<string, string>;
+  pointerModes: Map<string, "asset-uri" | "sha256-prefixed">;
   attachmentCandidates: number;
   processedAttachmentBytes: number;
   references: number;
+}
+
+function documentReferenceMode(
+  reference: StudioProjectArchiveDocumentReference
+): "asset-uri" | "sha256-prefixed" {
+  return reference.mode ?? "asset-uri";
+}
+
+function sha256Prefixed(sha256: string): string {
+  return `sha256:${sha256}`;
+}
+
+function intersectBg3dGlbBudgets(
+  left: StudioBg3dGlbBudgetProfiles,
+  right: StudioBg3dGlbBudgetProfiles
+): StudioBg3dGlbBudgetProfiles {
+  const profile = (name: "mobile" | "desktop") => ({
+    complexity: {
+      maxModelBytes: Math.min(left[name].complexity.maxModelBytes, right[name].complexity.maxModelBytes),
+      maxNodes: Math.min(left[name].complexity.maxNodes, right[name].complexity.maxNodes),
+      maxTriangles: Math.min(left[name].complexity.maxTriangles, right[name].complexity.maxTriangles),
+      maxDrawCalls: Math.min(left[name].complexity.maxDrawCalls, right[name].complexity.maxDrawCalls),
+      maxMaterials: Math.min(left[name].complexity.maxMaterials, right[name].complexity.maxMaterials),
+      maxLights: Math.min(left[name].complexity.maxLights, right[name].complexity.maxLights),
+    },
+    textures: {
+      maxTextures: Math.min(left[name].textures.maxTextures, right[name].textures.maxTextures),
+      maxTotalBytes: Math.min(left[name].textures.maxTotalBytes, right[name].textures.maxTotalBytes),
+      maxDimension: Math.min(left[name].textures.maxDimension, right[name].textures.maxDimension),
+    },
+  });
+  return { mobile: profile("mobile"), desktop: profile("desktop") };
+}
+
+/**
+ * Collect every canonical BG3D model hash and its in-document integrity pointers before bytes are
+ * resolved from IndexedDB/archive/bundled storage. Equal hashes dedupe across pages and master
+ * elements; conflicting size, MIME, or rights declarations fail closed instead of picking one
+ * silently. Optional archive limits let mobile callers preflight with the same budget as build.
+ */
+export function collectStudioBg3dProjectArchivePlan(
+  rawProject: unknown,
+  options: Pick<StudioProjectArchiveOptions, "limits"> = {}
+): StudioBg3dProjectArchivePlan {
+  const limits = resolveLimits(options.limits);
+  const boundedProject = canonicalizeProjectValue(rawProject, "", 0, {
+    seen: new WeakSet(),
+    diagnostics: [],
+    limits,
+    nodes: 0,
+  });
+  let project: StudioProjectFile;
+  try {
+    project = parseStudioProjectFile(boundedProject);
+  } catch {
+    fail("PROJECT_INVALID", "3D 배경 archive 계획을 만들 수 없는 프로젝트입니다.");
+  }
+  const boundedParsedProject = canonicalizeProjectValue(project, "", 0, {
+    seen: new WeakSet(),
+    diagnostics: [],
+    limits,
+    nodes: 0,
+  });
+  if (
+    textEncoder.encode(canonicalJson(boundedParsedProject)).byteLength
+    > limits.maxProjectBytes
+  ) {
+    fail("PROJECT_SIZE_LIMIT", "3D 배경 archive 계획의 project.json 크기가 안전 한도를 넘었습니다.");
+  }
+  try {
+    project = parseStudioProjectFile(boundedParsedProject);
+  } catch {
+    fail("PROJECT_INVALID", "3D 배경 archive 계획의 canonical 프로젝트를 만들 수 없습니다.");
+  }
+  const byHash = new Map<string, StudioBg3dProjectArchiveAttachmentPlan>();
+  let totalAttachmentBytes = 0;
+  let referenceCount = 0;
+
+  const visitElements = (elements: readonly unknown[], basePointer: string): void => {
+    for (let elementIndex = 0; elementIndex < elements.length; elementIndex += 1) {
+      const element = elements[elementIndex];
+      if (!isRecord(element) || element.type !== "image" || element.bg3dScene === undefined) continue;
+      const serialized = serializeStudioBg3dSceneDocument(element.bg3dScene);
+      const scene = serialized ? parseStudioBg3dSceneDocument(serialized) : null;
+      if (!scene) fail("PROJECT_INVALID", "프로젝트의 3D 배경 장면이 canonical 형식이 아닙니다.");
+      const sceneValidationBudgets = deriveStudioBg3dGlbBudgetProfiles(scene);
+      for (let attachmentIndex = 0; attachmentIndex < scene.attachments.length; attachmentIndex += 1) {
+        const attachment = scene.attachments[attachmentIndex];
+        const sha256 = attachment.hash.slice("sha256:".length);
+        const reference: StudioProjectArchiveDocumentReference = {
+          pointer: `${basePointer}/${elementIndex}/bg3dScene/attachments/${attachmentIndex}/hash`,
+          usage: "glb",
+          mode: "sha256-prefixed",
+        };
+        referenceCount += 1;
+        if (referenceCount > limits.maxReferences) {
+          fail("REFERENCE_LIMIT", "프로젝트의 3D 배경 모델 참조 수가 archive 안전 한도를 넘었습니다.");
+        }
+        const existing = byHash.get(sha256);
+        if (existing) {
+          const rightsMatch =
+            existing.attachment.rights.status === attachment.rights.status
+            && existing.attachment.rights.commercialUse === attachment.rights.commercialUse
+            && existing.attachment.rights.attributionRequired === attachment.rights.attributionRequired
+            && existing.attachment.rights.attribution === attachment.rights.attribution
+            && existing.attachment.rights.licenseName === attachment.rights.licenseName;
+          if (
+            existing.byteSize !== attachment.byteSize
+            || existing.mimeType !== attachment.mime
+            || !rightsMatch
+          ) {
+            fail("DOCUMENT_REFERENCE_CONFLICT", "같은 3D 모델 해시에 서로 다른 크기, MIME 또는 이용 권리가 선언되었습니다.", {
+              pointer: reference.pointer,
+            });
+          }
+          existing.validationBudgets = intersectBg3dGlbBudgets(
+            existing.validationBudgets,
+            sceneValidationBudgets
+          );
+          existing.documentReferences.push(reference);
+          continue;
+        }
+        if (byHash.size >= limits.maxAttachments) {
+          fail("ATTACHMENT_COUNT_LIMIT", "프로젝트의 3D 배경 모델 수가 archive 안전 한도를 넘었습니다.");
+        }
+        if (attachment.byteSize > limits.maxAttachmentBytes) {
+          fail("ATTACHMENT_SIZE_LIMIT", "3D 배경 모델 하나의 크기가 archive 안전 한도를 넘었습니다.", {
+            pointer: reference.pointer,
+          });
+        }
+        totalAttachmentBytes += attachment.byteSize;
+        if (totalAttachmentBytes > limits.maxTotalAttachmentBytes) {
+          fail("ATTACHMENT_SIZE_LIMIT", "프로젝트의 3D 배경 모델 합계가 archive 안전 한도를 넘었습니다.");
+        }
+        byHash.set(sha256, {
+          sha256,
+          byteSize: attachment.byteSize,
+          mimeType: attachment.mime,
+          attachment,
+          validationBudgets: sceneValidationBudgets,
+          documentReferences: [reference],
+        });
+      }
+    }
+  };
+
+  project.pagesList.forEach((page, pageIndex) => {
+    visitElements(page.elements, `/pagesList/${pageIndex}/elements`);
+  });
+  if (isRecord(project.master) && Array.isArray(project.master.elements)) {
+    visitElements(project.master.elements, "/master/elements");
+  }
+  const attachments = [...byHash.values()]
+    .map((item) => ({
+      ...item,
+      documentReferences: item.documentReferences.slice().sort(compareReferences),
+    }))
+    .sort((left, right) => compareText(left.sha256, right.sha256));
+  return { project, attachments, totalAttachmentBytes, referenceCount };
 }
 
 interface ZipReader {
@@ -441,6 +674,37 @@ function resolveLimits(value: Partial<StudioProjectArchiveLimits> | undefined): 
   };
 }
 
+/** JSON.parse output has no cycles; check it iteratively before any recursive canonical traversal. */
+function assertDecodedProjectWithinLimits(
+  value: unknown,
+  limits: StudioProjectArchiveLimits
+): void {
+  const pending: Array<{ readonly value: unknown; readonly depth: number }> = [{ value, depth: 0 }];
+  let nodes = 1;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    if (current.depth > limits.maxDepth) {
+      fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 중첩 깊이가 안전 한도를 넘었습니다.");
+    }
+    const children = Array.isArray(current.value)
+      ? current.value
+      : isRecord(current.value)
+        ? Object.values(current.value)
+        : [];
+    if (children.length > 0 && current.depth >= limits.maxDepth) {
+      fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 중첩 깊이가 안전 한도를 넘었습니다.");
+    }
+    for (const child of children) {
+      nodes += 1;
+      if (nodes > limits.maxJsonNodes) {
+        fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 노드 수가 안전 한도를 넘었습니다.");
+      }
+      pending.push({ value: child, depth: current.depth + 1 });
+    }
+  }
+}
+
 function pointerSegment(value: string): string {
   return value.replace(/~/gu, "~0").replace(/\//gu, "~1");
 }
@@ -454,16 +718,38 @@ function credentialShapedKey(key: string): boolean {
   return compact === "apikey"
     || compact.endsWith("apikey")
     || compact === "authorization"
+    || compact === "authorizationcode"
     || compact === "accesstoken"
     || compact === "refreshtoken"
     || compact === "authtoken"
+    || compact === "sessiontoken"
+    || compact === "idtoken"
+    || compact === "bearertoken"
+    || compact === "secret"
+    || compact === "secretkey"
+    || compact === "apisecret"
     || compact === "clientsecret"
+    || compact === "webhooksecret"
+    || compact === "signingsecret"
+    || compact === "providerkey"
     || compact === "privatekey"
     || compact === "password"
     || compact === "rawprompt"
     || compact === "rawrevisedprompt"
     || compact === "prompttext"
     || compact === "revisedprompttext";
+}
+
+function addMinimumCanonicalJsonBytes(
+  context: CanonicalizeContext,
+  amount: number,
+  pointer: string
+): void {
+  const current = context.minimumJsonBytes ?? 0;
+  if (!Number.isSafeInteger(amount) || amount < 0 || current > context.limits.maxProjectBytes - amount) {
+    fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 크기가 안전 한도를 넘었습니다.", { pointer });
+  }
+  context.minimumJsonBytes = current + amount;
 }
 
 function canonicalizeProjectValue(
@@ -480,11 +766,23 @@ function canonicalizeProjectValue(
   if (depth > context.limits.maxDepth) {
     fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 중첩 깊이가 안전 한도를 넘었습니다.", { pointer });
   }
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (value === null) {
+    addMinimumCanonicalJsonBytes(context, 4, pointer);
+    return value;
+  }
+  if (typeof value === "string") {
+    addMinimumCanonicalJsonBytes(context, value.length + 2, pointer);
+    return value;
+  }
+  if (typeof value === "boolean") {
+    addMinimumCanonicalJsonBytes(context, value ? 4 : 5, pointer);
+    return value;
+  }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
       fail("PROJECT_INVALID", "프로젝트에 유한하지 않은 숫자가 포함되어 있습니다.", { pointer });
     }
+    addMinimumCanonicalJsonBytes(context, String(value).length, pointer);
     return Object.is(value, -0) ? 0 : value;
   }
   if (value === undefined || typeof value === "function" || typeof value === "symbol") {
@@ -500,12 +798,27 @@ function canonicalizeProjectValue(
   context.seen.add(object);
   try {
     if (Array.isArray(value)) {
+      if (depth >= context.limits.maxDepth && value.length > 0) {
+        fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 중첩 깊이가 안전 한도를 넘었습니다.", { pointer });
+      }
+      if (context.nodes > context.limits.maxJsonNodes - value.length) {
+        fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 노드 수가 안전 한도를 넘었습니다.", { pointer });
+      }
+      addMinimumCanonicalJsonBytes(context, 2 + Math.max(0, value.length - 1), pointer);
       return value.map((item, index) =>
         canonicalizeProjectValue(item, childPointer(pointer, String(index)), depth + 1, context, true)
       );
     }
     const output: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    for (const key of Object.keys(value).sort()) {
+    const keys = Object.keys(value).sort();
+    if (depth >= context.limits.maxDepth && keys.length > 0) {
+      fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 중첩 깊이가 안전 한도를 넘었습니다.", { pointer });
+    }
+    if (context.nodes > context.limits.maxJsonNodes - keys.length) {
+      fail("PROJECT_SIZE_LIMIT", "프로젝트 JSON 노드 수가 안전 한도를 넘었습니다.", { pointer });
+    }
+    addMinimumCanonicalJsonBytes(context, 2 + Math.max(0, keys.length - 1), pointer);
+    for (const key of keys) {
       const nextPointer = childPointer(pointer, key);
       if (credentialShapedKey(key)) {
         warning(
@@ -516,6 +829,7 @@ function canonicalizeProjectValue(
         );
         continue;
       }
+      addMinimumCanonicalJsonBytes(context, key.length + 3, nextPointer);
       const normalized = canonicalizeProjectValue(value[key], nextPointer, depth + 1, context);
       if (normalized !== undefined) output[key] = normalized;
     }
@@ -736,7 +1050,9 @@ function inspectGltfExternalDependencies(
     const collection = document[collectionName];
     if (!Array.isArray(collection)) continue;
     for (const candidate of collection) {
-      if (!isRecord(candidate) || typeof candidate.uri !== "string" || isSelfContainedUri(candidate.uri)) continue;
+      // A nested data URI carries its own bytes. A toonspectrum-asset URI is not self-contained
+      // until a future glTF resource manifest explicitly binds that hash to an archive attachment.
+      if (!isRecord(candidate) || typeof candidate.uri !== "string" || candidate.uri.startsWith("data:")) continue;
       warning(
         diagnostics,
         "EXTERNAL_ATTACHMENT_DEPENDENCY",
@@ -953,24 +1269,148 @@ async function extractEmbeddedAssets(
   return value;
 }
 
+/**
+ * Older Studio builds appended a percent-encoded BG3D JSON fragment to a PNG data URL. Convert
+ * primitive-only payloads to the current separate scene field before raster extraction. Legacy
+ * custom models contain only local IndexedDB keys, so archiving them without an explicit binary
+ * resolver would be lossy; those projects fail with an actionable boundary instead.
+ */
+function migrateLegacyBg3dImageFragments(project: Record<string, unknown>): void {
+  const primitiveKinds = new Set<string>(STUDIO_BG3D_PRIMITIVE_KINDS);
+  const finiteVec3Within = (candidate: unknown, minimum: number, maximum: number): boolean =>
+    Array.isArray(candidate)
+    && candidate.length === 3
+    && candidate.every((component) =>
+      typeof component === "number"
+      && Number.isFinite(component)
+      && component >= minimum
+      && component <= maximum
+    );
+  const primitivePreservesTransform = (candidate: unknown): boolean =>
+    isRecord(candidate)
+    && typeof candidate.kind === "string"
+    && primitiveKinds.has(candidate.kind)
+    && finiteVec3Within(candidate.position, -10_000, 10_000)
+    && finiteVec3Within(candidate.rotation, -Number.MAX_VALUE, Number.MAX_VALUE)
+    && finiteVec3Within(candidate.scale, 0.001, 1_000)
+    && typeof candidate.color === "string"
+    && /^#[a-f0-9]{6}$/iu.test(candidate.color);
+  const visitElements = (value: unknown, basePointer: string): void => {
+    if (!Array.isArray(value)) return;
+    for (let index = 0; index < value.length; index += 1) {
+      const element = value[index];
+      if (!isRecord(element) || element.type !== "image" || typeof element.src !== "string") continue;
+      const separator = element.src.indexOf("#");
+      if (separator < 0) continue;
+      const pointer = `${basePointer}/${index}/src`;
+      const baseDataUrl = element.src.slice(0, separator);
+      const encodedFragment = element.src.slice(separator + 1);
+      if (!/^data:image\/(?:png|jpeg|gif|webp);base64,/iu.test(baseDataUrl)) continue;
+      if (
+        element.bg3dScene !== undefined
+        || encodedFragment.length === 0
+        || textEncoder.encode(encodedFragment).byteLength
+          > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES * 3
+      ) {
+        fail("PROJECT_INVALID", "레거시 3D 배경 fragment를 안전하게 변환할 수 없습니다.", { pointer });
+      }
+      let decodedFragment: string;
+      let decoded: unknown;
+      try {
+        decodedFragment = decodeURIComponent(encodedFragment);
+        decoded = JSON.parse(decodedFragment) as unknown;
+      } catch {
+        fail("PROJECT_INVALID", "레거시 3D 배경 fragment를 해석할 수 없습니다.", { pointer });
+      }
+      if (
+        !isRecord(decoded)
+        || decoded.tool !== "bg3d"
+        || !Array.isArray(decoded.primitives)
+      ) {
+        fail("PROJECT_INVALID", "지원하지 않는 레거시 이미지 fragment입니다.", { pointer });
+      }
+      if (Array.isArray(decoded.customModels) && decoded.customModels.length > 0) {
+        fail(
+          "PROJECT_INVALID",
+          "레거시 3D 모델을 먼저 Studio에서 다시 열어 GLB attachment로 저장해 주세요.",
+          { pointer }
+        );
+      }
+      if (!decoded.primitives.every(primitivePreservesTransform)) {
+        fail(
+          "PROJECT_INVALID",
+          "레거시 3D 배경 요소의 위치·회전·크기를 손실 없이 변환할 수 없습니다.",
+          { pointer }
+        );
+      }
+      const migrated = migrateStudioBg3dSceneDocument(decodedFragment);
+      if (!migrated || migrated.nodes.length !== decoded.primitives.length) {
+        fail("PROJECT_INVALID", "레거시 3D 배경 요소를 손실 없이 변환할 수 없습니다.", { pointer });
+      }
+      const canonicalSceneJson = serializeStudioBg3dSceneDocument(migrated);
+      if (!canonicalSceneJson) {
+        fail("PROJECT_INVALID", "레거시 3D 배경 장면을 canonical 형식으로 저장할 수 없습니다.", {
+          pointer,
+        });
+      }
+      value[index] = {
+        ...element,
+        src: baseDataUrl,
+        bg3dScene: JSON.parse(canonicalSceneJson) as unknown,
+      };
+    }
+  };
+
+  const pages = project.pagesList;
+  if (Array.isArray(pages)) {
+    pages.forEach((page, pageIndex) => {
+      if (isRecord(page)) visitElements(page.elements, `/pagesList/${pageIndex}/elements`);
+    });
+  }
+  if (isRecord(project.master)) visitElements(project.master.elements, "/master/elements");
+}
+
 function addDocumentReference(
   context: BuildContext,
   attachment: MutableAttachment,
   reference: StudioProjectArchiveDocumentReference
 ): void {
+  const mode = documentReferenceMode(reference);
+  const canonicalReference: StudioProjectArchiveDocumentReference = {
+    pointer: reference.pointer,
+    usage: reference.usage,
+    mode,
+  };
+  const key = `${reference.pointer}\u0000${reference.usage}\u0000${mode}`;
+  if (attachment.references.has(key)) return;
+  const existingReference = [...attachment.references.values()].find(
+    (candidate) => candidate.pointer === reference.pointer
+  );
+  if (
+    existingReference
+    && (
+      existingReference.usage !== reference.usage
+      || documentReferenceMode(existingReference) !== mode
+    )
+  ) {
+    fail("DOCUMENT_REFERENCE_CONFLICT", "하나의 프로젝트 위치에 서로 다른 attachment 용도가 선언되었습니다.", {
+      pointer: reference.pointer,
+    });
+  }
   context.references += 1;
   if (context.references > context.limits.maxReferences) {
     fail("REFERENCE_LIMIT", "프로젝트 attachment 문서 참조 수가 안전 한도를 넘었습니다.");
   }
-  const key = `${reference.pointer}\u0000${reference.usage}`;
   const owner = context.pointerOwners.get(reference.pointer);
-  if (owner && owner !== attachment.sha256) {
+  const existingMode = context.pointerModes.get(reference.pointer);
+  if (owner && (owner !== attachment.sha256 || existingMode !== mode)) {
     fail("DOCUMENT_REFERENCE_CONFLICT", "하나의 프로젝트 위치가 서로 다른 attachment를 참조합니다.", {
       pointer: reference.pointer,
     });
   }
   context.pointerOwners.set(reference.pointer, attachment.sha256);
-  attachment.references.set(key, reference);
+  context.pointerModes.set(reference.pointer, mode);
+  attachment.references.set(key, canonicalReference);
 }
 
 function decodePointerSegment(value: string): string {
@@ -1047,7 +1487,12 @@ function scanExternalProjectDependencies(
 ): void {
   if (typeof value === "string") {
     if (isSelfContainedUri(value)) return;
-    if (/^(?:https?:|blob:)/iu.test(value) || (value.startsWith("/") && probableAssetField(pointer))) {
+    const probableAsset = probableAssetField(pointer);
+    const hasUriScheme = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value);
+    if (
+      /^(?:https?:|blob:)/iu.test(value)
+      || (probableAsset && (value.startsWith("/") || hasUriScheme))
+    ) {
       warning(
         diagnostics,
         "EXTERNAL_PROJECT_DEPENDENCY",
@@ -1105,11 +1550,81 @@ function assertProjectAssetUrisCovered(
   }
 }
 
+interface Bg3dArchiveAttachmentEvidence {
+  readonly byteSize: number;
+  readonly mimeType: string;
+  readonly kinds: readonly StudioProjectArchiveAttachmentKind[];
+  readonly documentReferences: readonly StudioProjectArchiveDocumentReference[];
+}
+
+function assertBg3dIntegrityReferencesCovered(
+  project: unknown,
+  attachmentsByHash: ReadonlyMap<string, Bg3dArchiveAttachmentEvidence>,
+  limits: StudioProjectArchiveLimits
+): StudioBg3dProjectArchivePlan {
+  const plan = collectStudioBg3dProjectArchivePlan(project, { limits });
+  for (const attachment of plan.attachments) {
+    const evidence = attachmentsByHash.get(attachment.sha256);
+    if (!evidence) {
+      fail("ATTACHMENT_MISSING", "3D 배경 장면의 GLB 바이트가 프로젝트 archive에 없습니다.");
+    }
+    if (evidence.byteSize !== attachment.byteSize) {
+      fail("DOCUMENT_REFERENCE_MISMATCH", "3D 배경 장면의 모델 크기가 archive GLB 바이트와 다릅니다.");
+    }
+    if (
+      evidence.mimeType !== STUDIO_BG3D_GLB_MIME
+      || !evidence.kinds.includes("glb")
+    ) {
+      fail("MIME_MISMATCH", "3D 배경 장면은 검증 가능한 GLB attachment만 참조할 수 있습니다.");
+    }
+    for (const reference of attachment.documentReferences) {
+      const matched = evidence.documentReferences.some((candidate) =>
+        candidate.pointer === reference.pointer
+        && candidate.usage === "glb"
+        && documentReferenceMode(candidate) === "sha256-prefixed"
+      );
+      if (!matched) {
+        fail("ATTACHMENT_MISSING", "3D 배경 장면 해시가 archive GLB attachment와 연결되지 않았습니다.", {
+          pointer: reference.pointer,
+        });
+      }
+    }
+  }
+  return plan;
+}
+
+async function validateBg3dArchiveGlb(
+  attachment: StudioBg3dProjectArchiveAttachmentPlan,
+  bytes: Uint8Array,
+  usedBytes: number,
+  maximumBytes: number
+): Promise<StudioBg3dGlbValidationSuccess> {
+  const result = await validateStudioBg3dGlb(bytes, {
+    declared: {
+      byteSize: attachment.byteSize,
+      sha256: attachment.sha256,
+      mimeType: attachment.mimeType,
+    },
+    cumulative: { usedBytes, maximumBytes },
+    profile: "desktop",
+    budgets: attachment.validationBudgets,
+  });
+  if (!result.ok) {
+    fail(
+      "MIME_SIGNATURE_MISMATCH",
+      "3D 배경 GLB가 무결성·내장 리소스·복잡도 안전 검사를 통과하지 못했습니다."
+    );
+  }
+  return result;
+}
+
 function compareReferences(
   left: StudioProjectArchiveDocumentReference,
   right: StudioProjectArchiveDocumentReference
 ): number {
-  return compareText(left.pointer, right.pointer) || compareText(left.usage, right.usage);
+  return compareText(left.pointer, right.pointer)
+    || compareText(left.usage, right.usage)
+    || compareText(documentReferenceMode(left), documentReferenceMode(right));
 }
 
 function compareText(left: string, right: string): number {
@@ -1132,7 +1647,13 @@ function finalizeManifestAttachment(attachment: MutableAttachment): StudioProjec
     byteSize: attachment.byteSize,
     sha256: attachment.sha256,
     kinds: [...attachment.kinds].sort(compareKinds),
-    documentReferences: [...attachment.references.values()].sort(compareReferences),
+    documentReferences: [...attachment.references.values()]
+      .map((reference) => ({
+        pointer: reference.pointer,
+        usage: reference.usage,
+        mode: documentReferenceMode(reference),
+      }))
+      .sort(compareReferences),
   };
 }
 
@@ -1143,6 +1664,7 @@ function validateCanonicalManifest(manifest: StudioProjectArchiveManifest, limit
   const paths = new Set<string>();
   const hashes = new Set<string>();
   const pointers = new Map<string, string>();
+  const pointerModes = new Map<string, "asset-uri" | "sha256-prefixed">();
   let attachmentBytes = 0;
   let references = 0;
   let previousPath = "";
@@ -1171,24 +1693,36 @@ function validateCanonicalManifest(manifest: StudioProjectArchiveManifest, limit
     let previousReference = "";
     for (const reference of attachment.documentReferences) {
       references += 1;
+      if (
+        (manifest.version === 1 && reference.mode !== undefined)
+        || (manifest.version === STUDIO_PROJECT_ARCHIVE_VERSION && reference.mode === undefined)
+      ) {
+        fail("MANIFEST_INVALID", "manifest 버전에 맞는 문서 참조 mode가 아닙니다.", {
+          path: attachment.path,
+          pointer: reference.pointer,
+        });
+      }
       if (!kindSet.has(reference.usage)) {
         fail("MANIFEST_INVALID", "manifest 문서 참조 usage가 attachment 종류와 연결되지 않습니다.", {
           path: attachment.path,
           pointer: reference.pointer,
         });
       }
-      const key = `${reference.pointer}\u0000${reference.usage}`;
+      const mode = documentReferenceMode(reference);
+      const key = `${reference.pointer}\u0000${reference.usage}\u0000${mode}`;
       if (key <= previousReference) {
         fail("MANIFEST_INVALID", "manifest 문서 참조가 canonical 순서가 아닙니다.", { path: attachment.path });
       }
       previousReference = key;
       const owner = pointers.get(reference.pointer);
-      if (owner && owner !== attachment.sha256) {
+      const existingMode = pointerModes.get(reference.pointer);
+      if (owner && (owner !== attachment.sha256 || existingMode !== mode)) {
         fail("DOCUMENT_REFERENCE_CONFLICT", "manifest의 한 문서 위치가 여러 attachment를 참조합니다.", {
           pointer: reference.pointer,
         });
       }
       pointers.set(reference.pointer, attachment.sha256);
+      pointerModes.set(reference.pointer, mode);
     }
   }
   if (references > limits.maxReferences) fail("REFERENCE_LIMIT", "manifest 문서 참조 수가 안전 한도를 넘었습니다.");
@@ -1215,9 +1749,15 @@ export async function buildStudioProjectArchive(
   }
   const limits = resolveLimits(options.limits);
   const diagnostics: StudioProjectArchiveDiagnostic[] = [];
+  const boundedInput = canonicalizeProjectValue(input.project, "", 0, {
+    seen: new WeakSet(),
+    diagnostics,
+    limits,
+    nodes: 0,
+  });
   let parsedProject: StudioProjectFile;
   try {
-    parsedProject = parseStudioProjectFile(input.project);
+    parsedProject = parseStudioProjectFile(boundedInput);
   } catch {
     fail("PROJECT_INVALID", "올바르지 않은 ToonSpectrum 프로젝트라 archive를 만들 수 없습니다.");
   }
@@ -1228,11 +1768,13 @@ export async function buildStudioProjectArchive(
     nodes: 0,
   });
   if (!isRecord(canonicalProjectValue)) fail("PROJECT_INVALID", "프로젝트 JSON 루트가 올바르지 않습니다.");
+  migrateLegacyBg3dImageFragments(canonicalProjectValue);
   const context: BuildContext = {
     limits,
     diagnostics,
     attachments: new Map(),
     pointerOwners: new Map(),
+    pointerModes: new Map(),
     attachmentCandidates: 0,
     processedAttachmentBytes: 0,
     references: 0,
@@ -1258,12 +1800,11 @@ export async function buildStudioProjectArchive(
       );
     }
     for (const reference of references) {
-      if (!isRecord(reference)
-        || typeof reference.pointer !== "string"
-        || !STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS.includes(reference.usage as StudioProjectArchiveAttachmentKind)) {
+      const parsedReference = DocumentReferenceInputSchema.safeParse(reference);
+      if (!parsedReference.success) {
         fail("DOCUMENT_REFERENCE_MISSING", "attachment 문서 참조 형식이 올바르지 않습니다.");
       }
-      const documentReference = reference as unknown as StudioProjectArchiveDocumentReference;
+      const documentReference: StudioProjectArchiveDocumentReference = parsedReference.data;
       if (documentReference.usage !== attachmentInput.kind) {
         fail("DOCUMENT_REFERENCE_CONFLICT", "attachment reference usage와 attachment kind가 다릅니다.", {
           pointer: documentReference.pointer,
@@ -1276,15 +1817,23 @@ export async function buildStudioProjectArchive(
         });
       }
       const currentHash = studioProjectArchiveAssetSha256(current.value);
-      if (currentHash && currentHash !== attachment.sha256) {
-        fail("DOCUMENT_REFERENCE_CONFLICT", "프로젝트 위치에 이미 다른 attachment가 연결되어 있습니다.", {
-          pointer: documentReference.pointer,
-        });
-      }
-      if (!setPointer(canonicalProjectValue, documentReference.pointer, assetUri(attachment.sha256))) {
-        fail("DOCUMENT_REFERENCE_MISSING", "attachment 프로젝트 위치를 갱신하지 못했습니다.", {
-          pointer: documentReference.pointer,
-        });
+      if (documentReferenceMode(documentReference) === "sha256-prefixed") {
+        if (current.value !== sha256Prefixed(attachment.sha256)) {
+          fail("DOCUMENT_REFERENCE_MISMATCH", "프로젝트의 SHA-256 참조가 attachment 바이트와 일치하지 않습니다.", {
+            pointer: documentReference.pointer,
+          });
+        }
+      } else {
+        if (currentHash && currentHash !== attachment.sha256) {
+          fail("DOCUMENT_REFERENCE_CONFLICT", "프로젝트 위치에 이미 다른 attachment가 연결되어 있습니다.", {
+            pointer: documentReference.pointer,
+          });
+        }
+        if (!setPointer(canonicalProjectValue, documentReference.pointer, assetUri(attachment.sha256))) {
+          fail("DOCUMENT_REFERENCE_MISSING", "attachment 프로젝트 위치를 갱신하지 못했습니다.", {
+            pointer: documentReference.pointer,
+          });
+        }
       }
       addDocumentReference(context, attachment, documentReference);
     }
@@ -1295,6 +1844,31 @@ export async function buildStudioProjectArchive(
     context.pointerOwners,
     new Set(context.attachments.keys())
   );
+  const bg3dPlan = assertBg3dIntegrityReferencesCovered(
+    canonicalProjectValue,
+    new Map([...context.attachments].map(([sha256, attachment]) => [sha256, {
+      byteSize: attachment.byteSize,
+      mimeType: canonicalAttachmentMime(attachment),
+      kinds: [...attachment.kinds],
+      documentReferences: [...attachment.references.values()],
+    }])),
+    limits
+  );
+  let bg3dCumulativeBytes = 0;
+  for (const planned of bg3dPlan.attachments) {
+    const source = context.attachments.get(planned.sha256);
+    if (!source) fail("ATTACHMENT_MISSING", "3D 배경 GLB 바이트를 찾지 못했습니다.");
+    const result = await validateBg3dArchiveGlb(
+      planned,
+      new Uint8Array(await source.blob.arrayBuffer()),
+      bg3dCumulativeBytes,
+      limits.maxTotalAttachmentBytes
+    );
+    source.blob = new Blob([result.verifiedBytes.slice().buffer as ArrayBuffer], {
+      type: STUDIO_BG3D_GLB_MIME,
+    });
+    bg3dCumulativeBytes = result.cumulativeBytesAfter;
+  }
 
   const canonicalProject = parseStudioProjectFile(canonicalProjectValue);
   scanExternalProjectDependencies(canonicalProject, "", diagnostics);
@@ -1604,7 +2178,12 @@ function parseCanonicalJson<T>(
   return parsed.data;
 }
 
-function parseCanonicalProject(bytes: Uint8Array): { stored: StudioProjectFile; value: Record<string, unknown> } {
+function parseCanonicalProject(
+  bytes: Uint8Array,
+  limits: StudioProjectArchiveLimits,
+  diagnostics: StudioProjectArchiveDiagnostic[],
+  manifestVersion: StudioProjectArchiveManifest["version"]
+): { stored: StudioProjectFile; value: Record<string, unknown> } {
   let text: string;
   let decoded: unknown;
   try {
@@ -1613,16 +2192,50 @@ function parseCanonicalProject(bytes: Uint8Array): { stored: StudioProjectFile; 
   } catch {
     fail("PROJECT_INVALID", "project.json을 해석하지 못했습니다.");
   }
-  if (!isRecord(decoded) || canonicalJson(decoded) !== text) {
+  if (!isRecord(decoded)) {
     fail("CANONICAL_JSON_REQUIRED", "project.json이 canonical JSON 형식이 아닙니다.");
+  }
+  assertDecodedProjectWithinLimits(decoded, limits);
+  if (canonicalJson(decoded) !== text) {
+    fail("CANONICAL_JSON_REQUIRED", "project.json이 canonical JSON 형식이 아닙니다.");
+  }
+  const sanitized = canonicalizeProjectValue(decoded, "", 0, {
+    seen: new WeakSet(),
+    diagnostics,
+    limits,
+    nodes: 0,
+  });
+  if (!isRecord(sanitized) || canonicalJson(sanitized) !== text) {
+    fail(
+      "PROJECT_INVALID",
+      "project.json에 writer가 허용하지 않는 비공개 또는 비정규 필드가 포함되어 있습니다."
+    );
   }
   let stored: StudioProjectFile;
   try {
-    stored = parseStudioProjectFile(decoded);
+    stored = parseStudioProjectFile(sanitized);
   } catch {
     fail("PROJECT_INVALID", "project.json이 ToonSpectrum 프로젝트 schema와 맞지 않습니다.");
   }
-  return { stored, value: decoded };
+  const writerCanonical = canonicalizeProjectValue(stored, "", 0, {
+    seen: new WeakSet(),
+    diagnostics,
+    limits,
+    nodes: 0,
+  });
+  if (
+    !isRecord(writerCanonical)
+    || (
+      manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
+      && canonicalJson(writerCanonical) !== text
+    )
+  ) {
+    fail(
+      "PROJECT_INVALID",
+      "project.json이 현재 writer의 canonical 프로젝트 구조와 일치하지 않습니다."
+    );
+  }
+  return { stored, value: sanitized };
 }
 
 function manifestMimeAllowed(mimeType: string, kinds: readonly StudioProjectArchiveAttachmentKind[]): boolean {
@@ -1676,21 +2289,38 @@ export async function importStudioProjectArchive(
   if (await sha256Bytes(projectBytes) !== manifest.project.sha256) {
     fail("HASH_MISMATCH", "project.json SHA-256 무결성 검사가 실패했습니다.", { path: manifest.project.path });
   }
-  const parsedProject = parseCanonicalProject(projectBytes);
+  const parsedProject = parseCanonicalProject(
+    projectBytes,
+    limits,
+    diagnostics,
+    manifest.version
+  );
   const canonicalProject = parsedProject.stored;
   const rehydratedValue = JSON.parse(canonicalJson(parsedProject.value)) as Record<string, unknown>;
   const importedAttachments = new Map<string, StudioProjectArchiveImportedAttachment>();
-  const manifestPointerOwners = new Map<string, string>();
+  const manifestAssetPointerOwners = new Map<string, string>();
   for (const attachment of manifest.attachments) {
     for (const reference of attachment.documentReferences) {
-      manifestPointerOwners.set(reference.pointer, attachment.sha256);
+      if (documentReferenceMode(reference) === "asset-uri") {
+        manifestAssetPointerOwners.set(reference.pointer, attachment.sha256);
+      }
     }
   }
   assertProjectAssetUrisCovered(
     parsedProject.value,
-    manifestPointerOwners,
+    manifestAssetPointerOwners,
     new Set(manifest.attachments.map(({ sha256 }) => sha256))
   );
+  const bg3dPlan = assertBg3dIntegrityReferencesCovered(
+    parsedProject.stored,
+    new Map(manifest.attachments.map((attachment) => [attachment.sha256, attachment])),
+    limits
+  );
+  const bg3dPlanByHash = new Map(bg3dPlan.attachments.map((attachment) => [
+    attachment.sha256,
+    attachment,
+  ]));
+  let bg3dCumulativeBytes = 0;
 
   for (const metadata of manifest.attachments) {
     const entry = byPath.get(metadata.path);
@@ -1719,14 +2349,19 @@ export async function importStudioProjectArchive(
     let rehydratedDataUrl: string | undefined;
     for (const reference of metadata.documentReferences) {
       const current = getPointer(rehydratedValue, reference.pointer);
-      if (!current.found || current.value !== assetUri(metadata.sha256)) {
+      const mode = documentReferenceMode(reference);
+      const expected = mode === "sha256-prefixed"
+        ? sha256Prefixed(metadata.sha256)
+        : assetUri(metadata.sha256);
+      if (!current.found || current.value !== expected) {
         fail("DOCUMENT_REFERENCE_MISMATCH", "project.json의 attachment 참조가 manifest와 다릅니다.", {
           path: metadata.path,
           pointer: reference.pointer,
         });
       }
       if (
-        options.rehydrateDataUrls !== false
+        mode === "asset-uri"
+        && options.rehydrateDataUrls !== false
         && (reference.usage === "raster" || reference.usage === "mask" || reference.usage === "reference")
         && !setPointer(
           rehydratedValue,
@@ -1740,9 +2375,23 @@ export async function importStudioProjectArchive(
         });
       }
     }
+    const plannedBg3d = bg3dPlanByHash.get(metadata.sha256);
+    let importedBlob = reader.slice(entry.dataOffset, entry.uncompressedBytes, metadata.mimeType);
+    if (plannedBg3d) {
+      const result = await validateBg3dArchiveGlb(
+        plannedBg3d,
+        bytes,
+        bg3dCumulativeBytes,
+        limits.maxTotalAttachmentBytes
+      );
+      importedBlob = new Blob([result.verifiedBytes.slice().buffer as ArrayBuffer], {
+        type: STUDIO_BG3D_GLB_MIME,
+      });
+      bg3dCumulativeBytes = result.cumulativeBytesAfter;
+    }
     importedAttachments.set(metadata.sha256, {
       metadata,
-      blob: reader.slice(entry.dataOffset, entry.uncompressedBytes, metadata.mimeType),
+      blob: importedBlob,
     });
   }
 

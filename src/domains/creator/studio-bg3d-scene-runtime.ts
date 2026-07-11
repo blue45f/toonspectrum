@@ -10,6 +10,7 @@ import {
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
   normalizeStudioBg3dGlbAttachment,
+  normalizeStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dModelAttachment,
@@ -195,6 +196,11 @@ function strictRoundTrip(raw: unknown): StrictRoundTrip | null {
   return { document, serialized };
 }
 
+/** Internal runtime arrays are editor state, so sanitize them explicitly before persistence. */
+function normalizedRuntimeRoundTrip(raw: unknown): StrictRoundTrip | null {
+  return strictRoundTrip(normalizeStudioBg3dSceneDocument(raw));
+}
+
 function settingsOnlyDocument(
   base: StudioBg3dSceneDocument,
   attachments: readonly StudioBg3dModelAttachment[],
@@ -330,7 +336,7 @@ function fitPendingNodes(
       nodes.flatMap((node) => node.kind === "model" ? [node.attachmentId] : [])
     );
     const attachments = orderedAttachments.filter((attachment) => referenced.has(attachment.id));
-    const roundTrip = strictRoundTrip(settingsOnlyDocument(base, attachments, nodes));
+    const roundTrip = normalizedRuntimeRoundTrip(settingsOnlyDocument(base, attachments, nodes));
     if (roundTrip && nodesMatchPrefix(pending, count, roundTrip.document)) {
       best = { roundTrip, count };
       lower = count + 1;
@@ -339,7 +345,9 @@ function fitPendingNodes(
     }
   }
   if (best) return best;
-  const empty = strictRoundTrip(settingsOnlyDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, [], []));
+  const empty = normalizedRuntimeRoundTrip(
+    settingsOnlyDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, [], [])
+  );
   if (!empty) throw new Error("Invalid internal Studio BG3D runtime adapter defaults.");
   return { roundTrip: empty, count: 0 };
 }

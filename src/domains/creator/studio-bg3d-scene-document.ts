@@ -499,6 +499,29 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
+/**
+ * Compares detached JSON graphs without depending on object-key insertion order. Persistence uses
+ * this after normalization so a current-version document is accepted only when normalization is
+ * lossless: unknown keys, missing nested fields, invalid children, duplicate ids/hashes, clamped
+ * values, and byte-budget truncation all fail closed instead of being silently rewritten.
+ */
+function jsonStructuresEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((item, index) => jsonStructuresEqual(item, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    const key = leftKeys[index];
+    if (key !== rightKeys[index] || !jsonStructuresEqual(left[key], right[key])) return false;
+  }
+  return true;
+}
+
 function boundedNumber(
   value: unknown,
   fallback: number,
@@ -609,6 +632,9 @@ function normalizedDirection(value: unknown, fallback: StudioBg3dVec3): StudioBg
     const fallbackLength = Math.hypot(fallback[0], fallback[1], fallback[2]);
     return [fallback[0] / fallbackLength, fallback[1] / fallbackLength, fallback[2] / fallbackLength];
   }
+  // Canonical documents already contain unit directions. Dividing a nearly-unit IEEE-754 vector
+  // on every parse introduces last-bit drift, so preserve it once it is within a strict tolerance.
+  if (Math.abs(length - 1) <= 1e-12) return direction;
   return [direction[0] / length, direction[1] / length, direction[2] / length];
 }
 
@@ -1055,7 +1081,9 @@ function normalizeDecodedCurrentDocument(
     attachments,
     nodes: normalizeNodes(value.nodes, attachmentIds, budgets.complexity.maxNodes),
   };
-  return deepFreeze(fitNormalizedDocumentToByteBudget(normalized));
+  const fitted = fitNormalizedDocumentToByteBudget(normalized);
+  if (!fitted || (rootMode === "strict" && !jsonStructuresEqual(value, fitted))) return null;
+  return deepFreeze(fitted);
 }
 
 function legacyPrimitiveNode(value: unknown): Record<string, unknown> | null {
@@ -1170,8 +1198,9 @@ export function normalizeStudioBg3dSceneDocument(raw: unknown): StudioBg3dSceneD
 }
 
 /**
- * Parses only complete current-version roots, rejecting missing/mistyped root sections, oversized
- * input, legacy payloads, and unknown schema markers.
+ * Parses only canonical, complete current-version graphs. Any lossy normalization (including
+ * unknown or missing nested fields, invalid/duplicate children, value clamping, and truncation),
+ * oversized input, legacy payload, or unknown schema marker is rejected.
  */
 export function parseStudioBg3dSceneDocument(raw: string): StudioBg3dSceneDocument | null {
   return normalizeDecodedCurrentDocument(decodeBoundedJson(raw), "strict");
@@ -1208,8 +1237,9 @@ export function migrateStudioBg3dSceneDocument(
 }
 
 /**
- * Canonical current-version JSON serialization. Incomplete current and legacy roots are rejected;
- * callers must migrate legacy input explicitly. Every non-null result is UTF-8 bounded to 256 KiB.
+ * Canonical current-version JSON serialization. Only already-canonical current documents are
+ * accepted; callers must use the lenient editor normalizer or explicit legacy migration before
+ * reaching this persistence boundary. Every non-null result is UTF-8 bounded to 256 KiB.
  */
 export function serializeStudioBg3dSceneDocument(raw: unknown): string | null {
   const document = normalizeDecodedCurrentDocument(decodeBoundedJson(raw), "strict");

@@ -4,6 +4,12 @@ import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
+import {
+  parseStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
+
+const STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER = 10_000;
 
 const OptionalAiProvenanceSchema = z
   .unknown()
@@ -60,12 +66,53 @@ const LegacyProjectSchema = z
 
 export type StudioProjectFile = z.infer<typeof ProjectV2Schema>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * `elements` intentionally remains open-ended for the large Studio element union, but canonical
+ * BG3D metadata is a persistence/security boundary of its own. Validate that one optional field
+ * without cloning or narrowing unrelated element data. Invalid current/future versions fail the
+ * project import rather than silently removing a scene the creator expects to re-edit.
+ */
+function canonicalizeBg3dSceneElement(value: unknown): unknown {
+  if (!isRecord(value) || value.type !== "image" || value.bg3dScene === undefined) {
+    return value;
+  }
+  const serialized = serializeStudioBg3dSceneDocument(value.bg3dScene);
+  const scene = serialized ? parseStudioBg3dSceneDocument(serialized) : null;
+  if (!scene) {
+    throw new Error("3D 배경 장면 데이터가 손상되었거나 지원하지 않는 버전입니다.");
+  }
+  return { ...value, bg3dScene: scene };
+}
+
+function canonicalizeBg3dSceneElements(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  if (value.length > STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER) {
+    throw new Error("마스터 요소 수가 프로젝트 안전 한도를 넘었습니다.");
+  }
+  return value.map(canonicalizeBg3dSceneElement);
+}
+
+function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjectFile {
+  const pagesList = project.pagesList.map((page) => ({
+    ...page,
+    elements: page.elements.map(canonicalizeBg3dSceneElement),
+  }));
+  const master = isRecord(project.master) && Array.isArray(project.master.elements)
+    ? { ...project.master, elements: canonicalizeBg3dSceneElements(project.master.elements) }
+    : project.master;
+  return { ...project, pagesList, master };
+}
+
 export function parseStudioProjectFile(value: unknown): StudioProjectFile {
   const current = ProjectV2Schema.safeParse(value);
-  if (current.success) return current.data;
+  if (current.success) return canonicalizeProjectBg3dScenes(current.data);
   const legacy = LegacyProjectSchema.safeParse(value);
   if (!legacy.success) throw new Error("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");
-  return {
+  return canonicalizeProjectBg3dScenes({
     version: 2,
     title: legacy.data.title,
     description: "",
@@ -77,7 +124,7 @@ export function parseStudioProjectFile(value: unknown): StudioProjectFile {
     currentPageId: legacy.data.pages[0].id,
     webtoonTheme: "classic",
     panelGutter: 24,
-  };
+  });
 }
 
 /** Serializes an importable project using the same bounded, hash-only provenance policy. */

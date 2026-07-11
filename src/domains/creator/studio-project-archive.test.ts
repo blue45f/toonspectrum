@@ -5,14 +5,20 @@ import {
   createEmptyStudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
 import {
+  STUDIO_BG3D_GLB_MIME,
+  createDefaultStudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
+import {
   buildStudioPackageArchiveBlob,
 } from "./studio-package-archive";
 import {
   buildStudioProjectArchive,
+  collectStudioBg3dProjectArchivePlan,
   importStudioProjectArchive,
   resolveStudioProjectArchiveAttachment,
   STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX,
   STUDIO_PROJECT_ARCHIVE_MIME,
+  STUDIO_PROJECT_ARCHIVE_VERSION,
   StudioProjectArchiveError,
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveManifest,
@@ -42,6 +48,12 @@ function projectWith(elements: unknown[] = [], extra: Record<string, unknown> = 
   };
 }
 
+function nestedObject(depth: number): unknown {
+  let value: unknown = "leaf";
+  for (let index = 0; index < depth; index += 1) value = { child: value };
+  return value;
+}
+
 function pngBytes(seed = 1): Uint8Array {
   return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, seed]);
 }
@@ -50,13 +62,9 @@ function gifBytes(seed = 1): Uint8Array {
   return Uint8Array.from([...encoder.encode("GIF89a"), seed]);
 }
 
-function glbBytes(seed = 0, externalImage = false): Uint8Array {
-  const document = JSON.stringify({
-    asset: { version: "2.0" },
-    extras: { seed },
-    ...(externalImage ? { images: [{ uri: "external-texture.png" }] } : {}),
-  });
-  const encoded = encoder.encode(document);
+function glbDocumentBytes(document: Record<string, unknown>): Uint8Array {
+  const serialized = JSON.stringify(document);
+  const encoded = encoder.encode(serialized);
   const jsonLength = Math.ceil(encoded.length / 4) * 4;
   const bytes = new Uint8Array(12 + 8 + jsonLength);
   bytes.set(encoder.encode("glTF"), 0);
@@ -67,6 +75,32 @@ function glbBytes(seed = 0, externalImage = false): Uint8Array {
   view.setUint32(16, 0x4e4f_534a, true);
   bytes.fill(0x20, 20);
   bytes.set(encoded, 20);
+  return bytes;
+}
+
+function glbBytes(seed = 0, externalImage = false): Uint8Array {
+  return glbDocumentBytes({
+    asset: { version: "2.0" },
+    extras: { seed },
+    ...(externalImage ? { images: [{ uri: "external-texture.png" }] } : {}),
+  });
+}
+
+function glbWithDuplicateJsonChunks(): Uint8Array {
+  const encoded = encoder.encode(JSON.stringify({ asset: { version: "2.0" } }));
+  const jsonLength = Math.ceil(encoded.length / 4) * 4;
+  const chunkLength = 8 + jsonLength;
+  const bytes = new Uint8Array(12 + chunkLength * 2);
+  bytes.set(encoder.encode("glTF"), 0);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, bytes.byteLength, true);
+  for (const offset of [12, 12 + chunkLength]) {
+    view.setUint32(offset, jsonLength, true);
+    view.setUint32(offset + 4, 0x4e4f_534a, true);
+    bytes.fill(0x20, offset + 8, offset + 8 + jsonLength);
+    bytes.set(encoded, offset + 8);
+  }
   return bytes;
 }
 
@@ -249,6 +283,32 @@ async function manualRasterArchive(options: ManualArchiveOptions): Promise<Blob>
   return buildStudioPackageArchiveBlob(entries);
 }
 
+async function manualProjectOnlyArchive(project: unknown): Promise<Blob> {
+  const projectJson = canonicalJson(project);
+  const projectBytes = encoder.encode(projectJson);
+  const manifest: StudioProjectArchiveManifest = {
+    schema: "toonspectrum.studio-project-archive",
+    version: 2,
+    project: {
+      path: "project.json",
+      mimeType: "application/json",
+      byteSize: projectBytes.byteLength,
+      sha256: await sha256(projectBytes),
+    },
+    attachments: [],
+    totals: {
+      entryCount: 2,
+      attachmentCount: 0,
+      attachmentBytes: 0,
+      contentBytes: projectBytes.byteLength,
+    },
+  };
+  return buildStudioPackageArchiveBlob([
+    { path: "manifest.json", data: encoder.encode(canonicalJson(manifest)) },
+    { path: "project.json", data: projectBytes },
+  ]);
+}
+
 function retainedProvenance() {
   return appendStudioAiOperation(
     createEmptyStudioAiProvenanceDocument(),
@@ -285,6 +345,11 @@ describe("studio-project-archive", () => {
         }],
         {
           deepseekApiKey: "must-not-survive",
+          integration: {
+            secret: "integration-secret-value",
+            sessionToken: "session-token-value",
+            providerKey: "provider-key-value",
+          },
           aiProvenance: retainedProvenance(),
         }
       ),
@@ -305,6 +370,9 @@ describe("studio-project-archive", () => {
     ]);
     expect(result.canonicalProjectJson).not.toContain("data:image");
     expect(result.canonicalProjectJson).not.toContain("must-not-survive");
+    expect(result.canonicalProjectJson).not.toContain("integration-secret-value");
+    expect(result.canonicalProjectJson).not.toContain("session-token-value");
+    expect(result.canonicalProjectJson).not.toContain("provider-key-value");
     expect(result.canonicalProjectJson).not.toContain("비공개 원문 프롬프트");
     expect(result.diagnostics.map(({ code }) => code)).toEqual(expect.arrayContaining([
       "PRIVACY_FIELD_REMOVED",
@@ -398,6 +466,291 @@ describe("studio-project-archive", () => {
     expect(imported.diagnostics.filter(({ code }) => code === "EXTERNAL_ATTACHMENT_DEPENDENCY")).toHaveLength(3);
   });
 
+  it("generic glTF 내부의 연결되지 않은 asset URI를 self-contained로 오인하지 않는다", async () => {
+    const nestedAssetUri = `${STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX}${"a".repeat(64)}`;
+    const glb = glbDocumentBytes({
+      asset: { version: "2.0" },
+      images: [{ uri: nestedAssetUri }],
+    });
+    const project = projectWith([{
+      id: "generic-glb",
+      type: "custom",
+      glb: "pending",
+    }]);
+    const built = await buildStudioProjectArchive({
+      project,
+      attachments: [{
+        kind: "glb",
+        data: glb,
+        mimeType: STUDIO_BG3D_GLB_MIME,
+        documentReferences: [{ pointer: "/pagesList/0/elements/0/glb", usage: "glb" }],
+      }],
+    });
+
+    expect(built.isSelfContained).toBe(false);
+    expect(built.diagnostics.map(({ code }) => code)).toContain("EXTERNAL_ATTACHMENT_DEPENDENCY");
+    const imported = await importStudioProjectArchive(built.blob);
+    expect(imported.isSelfContained).toBe(false);
+    expect(imported.diagnostics.map(({ code }) => code)).toContain(
+      "EXTERNAL_ATTACHMENT_DEPENDENCY"
+    );
+  });
+
+  it("canonical 3D 장면의 sha256 필드를 바꾸지 않고 GLB archive 바이트와 무결성 연결한다", async () => {
+    const glb = glbBytes(17);
+    const glbHash = await sha256(glb);
+    const scene = {
+      ...createDefaultStudioBg3dSceneDocument(),
+      attachments: [{
+        id: "scene-model-1",
+        name: "검증된 배경.glb",
+        mime: STUDIO_BG3D_GLB_MIME,
+        byteSize: glb.byteLength,
+        hash: `sha256:${glbHash}`,
+        rights: {
+          status: "owned" as const,
+          commercialUse: true,
+          attributionRequired: false,
+        },
+        source: "upload" as const,
+      }],
+    };
+    const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
+    const project = projectWith([{
+      id: "bg3d-render-1",
+      type: "image",
+      src: "render-pending",
+      bg3dScene: scene,
+    }]);
+    const attachment: StudioProjectArchiveAttachmentInput = {
+      kind: "glb",
+      data: glb,
+      mimeType: STUDIO_BG3D_GLB_MIME,
+      documentReferences: [{ pointer, usage: "glb", mode: "sha256-prefixed" }],
+    };
+
+    const built = await buildStudioProjectArchive({ project, attachments: [attachment] });
+    expect(STUDIO_PROJECT_ARCHIVE_VERSION).toBe(2);
+    expect(built.manifest.version).toBe(2);
+    expect(built.manifest.attachments).toHaveLength(1);
+    expect(built.manifest.attachments[0]?.documentReferences).toEqual([{
+      pointer,
+      usage: "glb",
+      mode: "sha256-prefixed",
+    }]);
+    expect(built.canonicalProjectJson).toContain(`"hash":"sha256:${glbHash}"`);
+    expect(built.canonicalProjectJson).not.toContain(`${STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX}${glbHash}`);
+    expect(built.isSelfContained).toBe(true);
+
+    const imported = await importStudioProjectArchive(built.blob);
+    const importedElement = imported.project.pagesList[0]?.elements[0] as {
+      bg3dScene: { attachments: Array<{ hash: string }> };
+    };
+    expect(importedElement.bg3dScene.attachments[0]?.hash).toBe(`sha256:${glbHash}`);
+    expect(imported.attachments.get(glbHash)?.blob.type).toBe(STUDIO_BG3D_GLB_MIME);
+    expect(new Uint8Array(await imported.attachments.get(glbHash)!.blob.arrayBuffer())).toEqual(glb);
+
+    await expectArchiveError(
+      buildStudioProjectArchive({ project }),
+      "ATTACHMENT_MISSING"
+    );
+
+    const detachedManifest = structuredClone(built.manifest);
+    detachedManifest.attachments[0]!.documentReferences = [];
+    const detachedArchive = await buildStudioPackageArchiveBlob([
+      { path: "manifest.json", data: encoder.encode(canonicalJson(detachedManifest)) },
+      { path: "project.json", data: encoder.encode(built.canonicalProjectJson) },
+      { path: detachedManifest.attachments[0]!.path, data: glb },
+    ]);
+    await expectArchiveError(
+      importStudioProjectArchive(detachedArchive),
+      "ATTACHMENT_MISSING"
+    );
+
+    const mismatchedProject = structuredClone(project);
+    const mismatchedScene = (mismatchedProject.pagesList[0]!.elements[0] as {
+      bg3dScene: { attachments: Array<{ hash: string }> };
+    }).bg3dScene;
+    mismatchedScene.attachments[0]!.hash = `sha256:${"f".repeat(64)}`;
+    await expectArchiveError(
+      buildStudioProjectArchive({ project: mismatchedProject, attachments: [attachment] }),
+      "DOCUMENT_REFERENCE_MISMATCH"
+    );
+  });
+
+  it("3D 장면의 GLB 해시를 다른 종류·MIME·크기의 attachment로 대체하지 못한다", async () => {
+    const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
+    const sceneFor = (digest: string, byteSize: number) => ({
+      ...createDefaultStudioBg3dSceneDocument(),
+      attachments: [{
+        id: "scene-model-guard",
+        name: "무결성 모델.glb",
+        mime: STUDIO_BG3D_GLB_MIME,
+        byteSize,
+        hash: `sha256:${digest}`,
+        rights: { status: "owned" as const, commercialUse: true, attributionRequired: false },
+        source: "upload" as const,
+      }],
+    });
+    const projectFor = (scene: ReturnType<typeof sceneFor>) => projectWith([{
+      id: "bg3d-integrity-guard",
+      type: "image",
+      src: "render-pending",
+      bg3dScene: scene,
+    }]);
+
+    const glb = glbBytes(31);
+    const glbHash = await sha256(glb);
+    await expectArchiveError(
+      buildStudioProjectArchive({
+        project: projectFor(sceneFor(glbHash, glb.byteLength + 1)),
+        attachments: [{
+          kind: "glb",
+          data: glb,
+          mimeType: STUDIO_BG3D_GLB_MIME,
+          documentReferences: [{ pointer, usage: "glb", mode: "sha256-prefixed" }],
+        }],
+      }),
+      "DOCUMENT_REFERENCE_MISMATCH"
+    );
+
+    const png = pngBytes(32);
+    const pngHash = await sha256(png);
+    await expectArchiveError(
+      buildStudioProjectArchive({
+        project: projectFor(sceneFor(pngHash, png.byteLength)),
+        attachments: [{
+          kind: "raster",
+          data: png,
+          mimeType: "image/png",
+          documentReferences: [{ pointer, usage: "raster", mode: "sha256-prefixed" }],
+        }],
+      }),
+      "MIME_MISMATCH"
+    );
+
+    await expectArchiveError(
+      buildStudioProjectArchive({
+        project: projectFor(sceneFor(glbHash, glb.byteLength)),
+        attachments: [{
+          kind: "vrm",
+          data: glb,
+          mimeType: "model/vrm",
+          documentReferences: [{ pointer, usage: "vrm", mode: "sha256-prefixed" }],
+        }],
+      }),
+      "MIME_MISMATCH"
+    );
+
+    for (const unsafeGlb of [glbBytes(33, true), glbWithDuplicateJsonChunks()]) {
+      const unsafeHash = await sha256(unsafeGlb);
+      await expectArchiveError(
+        buildStudioProjectArchive({
+          project: projectFor(sceneFor(unsafeHash, unsafeGlb.byteLength)),
+          attachments: [{
+            kind: "glb",
+            data: unsafeGlb,
+            mimeType: STUDIO_BG3D_GLB_MIME,
+            documentReferences: [{ pointer, usage: "glb", mode: "sha256-prefixed" }],
+          }],
+        }),
+        "MIME_SIGNATURE_MISMATCH"
+      );
+    }
+
+    const overSceneBudget = glbDocumentBytes({
+      asset: { version: "2.0" },
+      nodes: [{}, {}],
+    });
+    const overSceneBudgetHash = await sha256(overSceneBudget);
+    const constrainedScene = {
+      ...sceneFor(overSceneBudgetHash, overSceneBudget.byteLength),
+      budgets: {
+        ...createDefaultStudioBg3dSceneDocument().budgets,
+        complexity: {
+          ...createDefaultStudioBg3dSceneDocument().budgets.complexity,
+          maxNodes: 1,
+        },
+      },
+    };
+    await expectArchiveError(buildStudioProjectArchive({
+      project: projectFor(constrainedScene),
+      attachments: [{
+        kind: "glb",
+        data: overSceneBudget,
+        mimeType: STUDIO_BG3D_GLB_MIME,
+        documentReferences: [{ pointer, usage: "glb", mode: "sha256-prefixed" }],
+      }],
+    }), "MIME_SIGNATURE_MISMATCH");
+  });
+
+  it("페이지와 마스터의 동일 GLB를 해시로 중복 제거한 deterministic archive 계획을 만든다", async () => {
+    const firstHash = "1".repeat(64);
+    const secondHash = "2".repeat(64);
+    const scene = (id: string, hash: string, byteSize = 128) => ({
+      ...createDefaultStudioBg3dSceneDocument(),
+      attachments: [{
+        id,
+        name: `${id}.glb`,
+        mime: STUDIO_BG3D_GLB_MIME,
+        byteSize,
+        hash: `sha256:${hash}`,
+        rights: {
+          status: "owned" as const,
+          commercialUse: true,
+          attributionRequired: false,
+        },
+        source: "upload" as const,
+      }],
+    });
+    const project = {
+      ...projectWith(),
+      pagesList: [
+        minimalPage([{ id: "page-a", type: "image", src: "render-a", bg3dScene: scene("page-model-a", secondHash) }]),
+        { ...minimalPage([{ id: "page-b", type: "image", src: "render-b", bg3dScene: scene("page-model-b", firstHash) }]), id: "page-2" },
+      ],
+      master: {
+        elements: [{ id: "master-a", type: "image", src: "render-master", bg3dScene: scene("master-model", secondHash) }],
+      },
+    };
+
+    const plan = collectStudioBg3dProjectArchivePlan(project);
+
+    expect(plan.attachments.map(({ sha256 }) => sha256)).toEqual([firstHash, secondHash]);
+    expect(plan.attachments[1]?.documentReferences.map(({ pointer }) => pointer)).toEqual([
+      "/master/elements/0/bg3dScene/attachments/0/hash",
+      "/pagesList/0/elements/0/bg3dScene/attachments/0/hash",
+    ]);
+    expect(plan.attachments.every(({ documentReferences }) =>
+      documentReferences.every((reference) => reference.mode === "sha256-prefixed")
+    )).toBe(true);
+    expect(plan.totalAttachmentBytes).toBe(256);
+    expect(plan.referenceCount).toBe(3);
+    expect(JSON.stringify(plan)).not.toContain("storageKey");
+
+    const conflicting = structuredClone(project);
+    const conflictingAttachment = ((conflicting.master as { elements: Array<{
+      bg3dScene: { attachments: Array<{ byteSize: number }> };
+    }> }).elements[0]!.bg3dScene.attachments[0]!);
+    conflictingAttachment.byteSize = 129;
+    expect(() => collectStudioBg3dProjectArchivePlan(conflicting)).toThrow(
+      expect.objectContaining({ code: "DOCUMENT_REFERENCE_CONFLICT" })
+    );
+
+    const rightsConflict = structuredClone(project);
+    const rights = ((rightsConflict.master as { elements: Array<{
+      bg3dScene: { attachments: Array<{ rights: Record<string, unknown> }> };
+    }> }).elements[0]!.bg3dScene.attachments[0]!.rights);
+    rights.status = "unknown";
+    rights.commercialUse = false;
+    expect(() => collectStudioBg3dProjectArchivePlan(rightsConflict)).toThrow(
+      expect.objectContaining({ code: "DOCUMENT_REFERENCE_CONFLICT" })
+    );
+    expect(() => collectStudioBg3dProjectArchivePlan(project, {
+      limits: { maxAttachmentBytes: 127 },
+    })).toThrow(expect.objectContaining({ code: "ATTACHMENT_SIZE_LIMIT" }));
+  });
+
   it("연결되지 않은 attachment와 외부 프로젝트 의존성을 내용 노출 없는 diagnostic으로 남긴다", async () => {
     const result = await buildStudioProjectArchive({
       project: projectWith([], { referenceAssetUrl: "/external/reference.png" }),
@@ -408,6 +761,21 @@ describe("studio-project-archive", () => {
       expect.objectContaining({ code: "EXTERNAL_PROJECT_DEPENDENCY", severity: "warning" }),
     ]));
     expect(JSON.stringify(result.diagnostics)).not.toContain("reference.png");
+
+    for (const externalUrl of [
+      "file:///Users/private/reference.png",
+      "ftp://assets.example.test/reference.png",
+      "ipfs://example-content/reference.png",
+    ]) {
+      const external = await buildStudioProjectArchive({
+        project: projectWith([], { referenceAssetUrl: externalUrl }),
+      });
+      expect(external.isSelfContained).toBe(false);
+      expect(external.diagnostics.map(({ code }) => code)).toContain(
+        "EXTERNAL_PROJECT_DEPENDENCY"
+      );
+      expect(JSON.stringify(external.diagnostics)).not.toContain(externalUrl);
+    }
   });
 
   it("legacy studio-project-file 입력을 v2 canonical 경계로 변환해 왕복한다", async () => {
@@ -417,6 +785,119 @@ describe("studio-project-archive", () => {
     const imported = await importStudioProjectArchive(built.blob);
     expect(imported.project).toMatchObject({ version: 2, title: "과거", currentPageId: "page-1" });
     expect(imported.manifest.attachments).toEqual([]);
+  });
+
+  it("레거시 PNG 3D fragment를 분리 장면으로 무손실 변환하고 미해결 모델 키는 거부한다", async () => {
+    const raster = pngBytes(40);
+    const primitivePayload = {
+      tool: "bg3d",
+      primitives: [{
+        id: "legacy-box",
+        kind: "box",
+        position: [1, 0.5, 2],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        color: "#123456",
+      }],
+      customModels: [],
+      skyPresetId: "sunset",
+    };
+    const legacySrc = `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify(primitivePayload))}`;
+    const legacyProject = {
+      version: "1.0",
+      title: "레거시 3D",
+      pages: [minimalPage([{ id: "legacy-bg", type: "image", src: legacySrc }])],
+    };
+
+    const built = await buildStudioProjectArchive({ project: legacyProject });
+    const imported = await importStudioProjectArchive(built.blob);
+    const image = imported.project.pagesList[0]?.elements[0] as {
+      src: string;
+      bg3dScene: { nodes: Array<{ id: string; kind: string }> };
+    };
+    expect(image.src).toBe(dataUrl("image/png", raster));
+    expect(image.src).not.toContain("#");
+    expect(image.bg3dScene.nodes).toEqual([
+      expect.objectContaining({ id: "legacy-box", kind: "primitive" }),
+    ]);
+
+    const unresolved = {
+      ...primitivePayload,
+      primitives: [],
+      customModels: [{
+        id: "legacy-model",
+        modelId: "local-indexeddb-key",
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      }],
+    };
+    await expectArchiveError(buildStudioProjectArchive({
+      project: {
+        ...legacyProject,
+        pages: [minimalPage([{
+          id: "legacy-model-bg",
+          type: "image",
+          src: `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify(unresolved))}`,
+        }])],
+      },
+    }), "PROJECT_INVALID");
+
+    const clampedPrimitive = {
+      ...primitivePayload,
+      primitives: [{
+        ...primitivePayload.primitives[0],
+        position: [999_999, 0, 0],
+        scale: [0, 1, 1],
+      }],
+    };
+    await expectArchiveError(buildStudioProjectArchive({
+      project: {
+        ...legacyProject,
+        pages: [minimalPage([{
+          id: "legacy-clamped-bg",
+          type: "image",
+          src: `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify(clampedPrimitive))}`,
+        }])],
+      },
+    }), "PROJECT_INVALID");
+  });
+
+  it("기존 v1 manifest를 읽고 신규 writer는 mode가 명시된 v2만 출력한다", async () => {
+    const legacy = await importStudioProjectArchive(await manualRasterArchive({
+      bytes: pngBytes(41),
+    }));
+    expect(legacy.manifest.version).toBe(1);
+    expect(legacy.manifest.attachments[0]?.documentReferences).toEqual([{
+      pointer: "/pagesList/0/bg",
+      usage: "raster",
+    }]);
+
+    const source = pngBytes(42);
+    const pointer = "/pagesList/0/elements/0/src";
+    const project = projectWith([{ id: "image-v2", type: "image", src: "pending" }]);
+    const implicit: StudioProjectArchiveAttachmentInput = {
+      kind: "raster",
+      data: source,
+      mimeType: "image/png",
+      documentReferences: [{ pointer, usage: "raster" }],
+    };
+    const explicit: StudioProjectArchiveAttachmentInput = {
+      ...implicit,
+      documentReferences: [{ pointer, usage: "raster", mode: "asset-uri" }],
+    };
+    const first = await buildStudioProjectArchive({ project, attachments: [implicit, explicit] });
+    const second = await buildStudioProjectArchive({ project, attachments: [explicit, implicit] });
+
+    expect(first.manifest.version).toBe(2);
+    expect(first.manifest.attachments[0]?.documentReferences).toEqual([{
+      pointer,
+      usage: "raster",
+      mode: "asset-uri",
+    }]);
+    expect(new Uint8Array(await first.blob.arrayBuffer())).toEqual(
+      new Uint8Array(await second.blob.arrayBuffer())
+    );
   });
 
   it("해시와 schema가 맞아도 canonical이 아닌 project.json은 거부한다", async () => {
@@ -447,6 +928,18 @@ describe("studio-project-archive", () => {
     await expectArchiveError(importStudioProjectArchive(archive), "CANONICAL_JSON_REQUIRED");
   });
 
+  it("canonical ZIP이어도 비공개 키나 writer 기본값이 빠진 v2 project.json은 거부한다", async () => {
+    await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
+      ...projectWith(),
+      apiKey: "must-not-be-retained",
+    })), "PROJECT_INVALID");
+
+    await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
+      version: 2,
+      pagesList: [minimalPage()],
+    })), "PROJECT_INVALID");
+  });
+
   it("명시한 문서 참조가 없거나 서로 다른 attachment가 같은 위치를 차지하면 거부한다", async () => {
     await expectArchiveError(buildStudioProjectArchive({
       project: projectWith([], {
@@ -460,6 +953,33 @@ describe("studio-project-archive", () => {
         kind: "audio",
         data: wavBytes(),
         documentReferences: [{ pointer: "/pagesList/0/missing", usage: "audio" }],
+      }],
+    }), "DOCUMENT_REFERENCE_MISSING");
+
+    await expectArchiveError(buildStudioProjectArchive({
+      project: projectWith([{ id: "x", type: "custom", asset: "pending" }]),
+      attachments: [{
+        kind: "audio",
+        data: wavBytes(),
+        documentReferences: [{
+          pointer: "/pagesList/0/elements/0/asset",
+          usage: "audio",
+          mode: "replace-with-url",
+        } as never],
+      }],
+    }), "DOCUMENT_REFERENCE_MISSING");
+
+    await expectArchiveError(buildStudioProjectArchive({
+      project: projectWith([{ id: "x", type: "custom", asset: "pending" }]),
+      attachments: [{
+        kind: "raster",
+        data: pngBytes(3),
+        documentReferences: [{
+          pointer: "/pagesList/0/elements/0/asset",
+          usage: "raster",
+          mode: "asset-uri",
+          unexpected: true,
+        } as never],
       }],
     }), "DOCUMENT_REFERENCE_MISSING");
 
@@ -500,6 +1020,33 @@ describe("studio-project-archive", () => {
     await expectArchiveError(importStudioProjectArchive(built.blob, {
       limits: { maxArchiveBytes: built.blob.size - 1 },
     }), "ARCHIVE_SIZE_LIMIT");
+
+    const deepProject = projectWith([], { boundedUnknownMetadata: nestedObject(24) });
+    const deepBuilt = await buildStudioProjectArchive({ project: deepProject });
+    await expectArchiveError(importStudioProjectArchive(deepBuilt.blob, {
+      limits: { maxDepth: 12 },
+    }), "PROJECT_SIZE_LIMIT");
+    await expectArchiveError(importStudioProjectArchive(deepBuilt.blob, {
+      limits: { maxJsonNodes: 12 },
+    }), "PROJECT_SIZE_LIMIT");
+    expect(() => collectStudioBg3dProjectArchivePlan(deepProject, {
+      limits: { maxDepth: 12 },
+    })).toThrow(expect.objectContaining({ code: "PROJECT_SIZE_LIMIT" }));
+    expect(() => collectStudioBg3dProjectArchivePlan(projectWith(), {
+      limits: { maxProjectBytes: 32 },
+    })).toThrow(expect.objectContaining({ code: "PROJECT_SIZE_LIMIT" }));
+    await expectArchiveError(buildStudioProjectArchive(
+      { project: projectWith() },
+      { limits: { maxProjectBytes: 32 } }
+    ), "PROJECT_SIZE_LIMIT");
+
+    const wideArchive = await manualProjectOnlyArchive({
+      ...projectWith(),
+      boundedWideMetadata: Array.from({ length: 10_000 }, () => 0),
+    });
+    await expectArchiveError(importStudioProjectArchive(wideArchive, {
+      limits: { maxJsonNodes: 12 },
+    }), "PROJECT_SIZE_LIMIT");
   });
 
   it("path traversal, 중복 경로, 숨은 압축 폭탄 선언을 중앙 디렉터리 사용 전에 차단한다", async () => {

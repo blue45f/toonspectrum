@@ -69,6 +69,16 @@ function currentDocument(overrides: Record<string, unknown> = {}): Record<string
 }
 
 describe("Studio BG3D scene document defaults", () => {
+  it("keeps the canonical default byte-for-byte stable across repeated parse and serialize cycles", () => {
+    const original = createDefaultStudioBg3dSceneDocument();
+    const serialized = serializeStudioBg3dSceneDocument(original);
+    const parsed = serialized ? parseStudioBg3dSceneDocument(serialized) : null;
+
+    expect(serialized).not.toBeNull();
+    expect(parsed).toEqual(original);
+    expect(serializeStudioBg3dSceneDocument(parsed)).toBe(serialized);
+  });
+
   it("provides a complete, deeply frozen, engine-neutral default", () => {
     const document = createDefaultStudioBg3dSceneDocument();
 
@@ -415,7 +425,7 @@ describe("Studio BG3D scene document normalization", () => {
     });
   });
 
-  it("bounds the normalized UTF-8 output for 512 nodes with 80 emoji names", () => {
+  it("bounds lenient normalization for 512 sparse nodes without letting strict persistence truncate", () => {
     const nodes = Array.from({ length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES }, (_, index) => ({
       id: `emoji-${index}`,
       name: "😀".repeat(80),
@@ -434,20 +444,52 @@ describe("Studio BG3D scene document normalization", () => {
         nodes,
       })
     );
-    const parsed = parseStudioBg3dSceneDocument(raw);
-    const serialized = serializeStudioBg3dSceneDocument(parsed);
+    const normalized = normalizeStudioBg3dSceneDocument(raw);
+    const serialized = serializeStudioBg3dSceneDocument(normalized);
 
     expect(new TextEncoder().encode(raw).byteLength).toBeLessThanOrEqual(
       STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
     );
-    expect(parsed).not.toBeNull();
-    expect(parsed?.nodes.length).toBeLessThan(STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES);
+    expect(parseStudioBg3dSceneDocument(raw)).toBeNull();
+    expect(normalized.nodes.length).toBeLessThan(STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES);
     expect(serialized).not.toBeNull();
     expect(new TextEncoder().encode(serialized ?? "").byteLength).toBeLessThanOrEqual(
       STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
     );
-    expect(serializeStudioBg3dSceneDocument(parseStudioBg3dSceneDocument(raw))).toBe(serialized);
-    expect(parseStudioBg3dSceneDocument(serialized ?? "")).toEqual(parsed);
+    expect(parseStudioBg3dSceneDocument(serialized ?? "")).toEqual(normalized);
+  });
+
+  it("rejects every lossy nested rewrite at the strict persistence boundary", () => {
+    const canonicalAttachment = attachment(1);
+    const modelNode = {
+      id: "model-node-1",
+      name: "검증 모델",
+      kind: "model",
+      attachmentId: "model-1",
+      transform: {
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      },
+      visible: true,
+      castsShadow: true,
+      receivesShadow: true,
+    };
+    const cases = [
+      currentDocument({ attachments: [attachment(1, { hash: "sha256:broken" })], nodes: [modelNode] }),
+      currentDocument({ attachments: [attachment(1, { rights: { status: "licensed", commercialUse: true, attributionRequired: false } })] }),
+      currentDocument({ attachments: [canonicalAttachment, attachment(2, { id: "model-1" })] }),
+      currentDocument({ attachments: [canonicalAttachment], nodes: [{ ...modelNode, attachmentId: "missing" }] }),
+      currentDocument({ nodes: [primitiveNode(1), { ...primitiveNode(2), id: "node-1" }] }),
+      currentDocument({ render: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.render, toneMapping: "invalid" } }),
+      currentDocument({ camera: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera, fovDegrees: 999 } }),
+      currentDocument({ runtimeUrl: "blob:https://private.invalid/model" }),
+    ];
+
+    for (const candidate of cases) {
+      expect(parseStudioBg3dSceneDocument(JSON.stringify(candidate))).toBeNull();
+      expect(serializeStudioBg3dSceneDocument(candidate)).toBeNull();
+    }
   });
 
   it("does not retain prototype-pollution or credential-like unknown properties", () => {

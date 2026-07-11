@@ -4,6 +4,7 @@ import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
+import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
@@ -119,5 +120,112 @@ describe("studio project file", () => {
   it("페이지가 없거나 페이지 구조가 손상된 파일을 거부한다", () => {
     expect(() => parseStudioProjectFile({ version: 2, title: "빈 파일", pagesList: [] })).toThrow(/프로젝트/);
     expect(() => parseStudioProjectFile({ version: 2, pagesList: [{ id: "p1" }] })).toThrow(/프로젝트/);
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: [page],
+      master: { elements: Array.from({ length: 10_001 }, (_, index) => ({ id: `m-${index}` })) },
+    })).toThrow(/마스터 요소 수/);
+  });
+
+  it("페이지와 마스터의 canonical 3D 배경 장면을 별도 메타데이터로 왕복한다", () => {
+    const scene = createDefaultStudioBg3dSceneDocument();
+    const image = {
+      id: "image-1",
+      type: "image",
+      src: "data:image/png;base64,iVBORw0KGgo=",
+      bg3dScene: scene,
+    };
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, elements: [image] }],
+      master: { elements: [{ ...image, id: "master-image" }] },
+    });
+    const pageImage = parsed.pagesList[0].elements[0] as typeof image;
+    const masterImage = (parsed.master as { elements: typeof image[] }).elements[0];
+
+    expect(pageImage.src).not.toContain("#");
+    expect(pageImage.bg3dScene).toEqual(scene);
+    expect(masterImage.bg3dScene).toEqual(scene);
+    expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].elements[0].bg3dScene).toEqual(scene);
+  });
+
+  it("3D 장면의 알 수 없는 런타임 필드를 조용히 제거하지 않고 가져오기를 거부한다", () => {
+    const scene = {
+      ...createDefaultStudioBg3dSceneDocument(),
+      runtimeUrl: "blob:https://private.invalid/model",
+      storageKey: "private-indexed-db-key",
+    };
+    const input = {
+      version: 2,
+      pagesList: [{
+        ...page,
+        elements: [{ id: "image-1", type: "image", src: "data:image/png;base64,AA==", bg3dScene: scene }],
+      }],
+    };
+    expect(() => parseStudioProjectFile(input)).toThrow(/3D 배경 장면/);
+    expect(scene).toHaveProperty("runtimeUrl");
+    expect(scene).toHaveProperty("storageKey");
+  });
+
+  it("손상되거나 미래 버전인 canonical 3D 장면은 조용히 유실시키지 않고 프로젝트 가져오기를 거부한다", () => {
+    const withScene = (bg3dScene: unknown) => ({
+      version: 2,
+      pagesList: [{
+        ...page,
+        elements: [{ id: "image-1", type: "image", src: "data:image/png;base64,AA==", bg3dScene }],
+      }],
+    });
+
+    expect(() => parseStudioProjectFile(withScene({
+      ...createDefaultStudioBg3dSceneDocument(),
+      version: 99,
+    }))).toThrow(/3D 배경 장면/);
+    expect(() => parseStudioProjectFile(withScene({
+      kind: "toonspectrum.bg3d-scene",
+      version: 1,
+      nodes: [],
+      attachments: [],
+    }))).toThrow(/3D 배경 장면/);
+    expect(() => parseStudioProjectFile(withScene({
+      tool: "bg3d",
+      primitives: [],
+    }))).toThrow(/3D 배경 장면/);
+    expect(() => parseStudioProjectFile(withScene({
+      ...createDefaultStudioBg3dSceneDocument(),
+      attachments: [{
+        id: "broken-model",
+        name: "broken.glb",
+        mime: "model/gltf-binary",
+        byteSize: 48,
+        hash: "sha256:broken",
+        rights: { status: "owned", commercialUse: true, attributionRequired: false },
+        source: "upload",
+      }],
+      nodes: [{
+        id: "broken-node",
+        name: "손상 모델",
+        kind: "model",
+        attachmentId: "broken-model",
+        transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        visible: true,
+        castsShadow: true,
+        receivesShadow: true,
+      }],
+    }))).toThrow(/3D 배경 장면/);
+  });
+
+  it("레거시 PNG fragment는 기존 호환 경로를 위해 그대로 보존한다", () => {
+    const src = "data:image/png;base64,AA==#%7B%22tool%22%3A%22bg3d%22%2C%22primitives%22%3A%5B%5D%7D";
+    const parsed = parseStudioProjectFile({
+      version: "1.0",
+      pages: [{
+        ...page,
+        elements: [{ id: "legacy-bg", type: "image", src }],
+      }],
+    });
+    const image = parsed.pagesList[0].elements[0] as Record<string, unknown>;
+
+    expect(image.src).toBe(src);
+    expect(image).not.toHaveProperty("bg3dScene");
   });
 });
