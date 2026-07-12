@@ -185,11 +185,20 @@ function RouteFallback() {
 // 되어 자손의 position: fixed를 뷰포트가 아닌 이 요소(라우트 전체 콘텐츠) 기준으로 배치해버린다.
 function RouteStage({ pathname, children }: { pathname: string; children: ReactNode }) {
   const [settled, setSettled] = useState(false);
+  const instantEditorEntry = pathname === "/studio";
   const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
     if (e.animationName === "route-stage-in") setSettled(true);
   };
   return (
-    <div key={pathname} className={cn("route-stage", settled && "route-stage--settled")} onAnimationEnd={onAnimationEnd}>
+    <div
+      key={pathname}
+      className={cn(
+        "route-stage",
+        (settled || instantEditorEntry) && "route-stage--settled",
+        instantEditorEntry && "route-stage--instant"
+      )}
+      onAnimationEnd={onAnimationEnd}
+    >
       {children}
     </div>
   );

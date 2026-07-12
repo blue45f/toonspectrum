@@ -20,6 +20,7 @@ const creatorService = {
   listSharedWorks: vi.fn(),
   getSharedWorkDocument: vi.fn(),
   getSharedWorkDocumentMeta: vi.fn(),
+  getWorkRevisionComparison: vi.fn(),
   saveSharedWorkDocument: vi.fn(),
   listWorkTeamInvitations: vi.fn(),
   getWorkTeamActivity: vi.fn(),
@@ -113,6 +114,7 @@ describe("CreatorController collaboration collection endpoints", () => {
     creatorService.listSharedWorks.mockReset();
     creatorService.getSharedWorkDocument.mockReset();
     creatorService.getSharedWorkDocumentMeta.mockReset();
+    creatorService.getWorkRevisionComparison.mockReset();
     creatorService.saveSharedWorkDocument.mockReset();
     creatorService.listWorkTeamInvitations.mockReset();
     creatorService.getWorkTeamActivity.mockReset();
@@ -127,6 +129,27 @@ describe("CreatorController collaboration collection endpoints", () => {
       createController().listWorkTeamInvitations({ limit: 12 }, "invitee")
     ).resolves.toBe(invitations);
     expect(creatorService.listWorkTeamInvitations).toHaveBeenCalledWith("invitee", 12);
+  });
+
+  it("revision 비교 endpoint는 인증 소유자 범위와 검증된 경로 값만 전달한다", async () => {
+    const response = { revision: 7, snapshot: { title: "1화" } };
+    creatorService.getWorkRevisionComparison.mockResolvedValue(response);
+
+    await expect(
+      createController().getWorkRevisionComparison(
+        { id: "work-1", revision: 7 },
+        "owner"
+      )
+    ).resolves.toBe(response);
+    expect(creatorService.getWorkRevisionComparison).toHaveBeenCalledWith(
+      "owner",
+      "work-1",
+      7
+    );
+
+    await expect(
+      createController().getWorkRevisionComparison({ id: "work-1", revision: 7 })
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("활동 조회는 인증 사용자·작품·limit 범위를 그대로 서비스에 전달한다", async () => {

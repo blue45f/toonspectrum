@@ -5,13 +5,16 @@ export function Container({
   children,
   className,
   size = "default",
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
   size?: "default" | "wide" | "prose";
+  style?: React.CSSProperties;
 }) {
   return (
     <div
+      style={style}
       className={cx(
         "mx-auto w-full px-4 sm:px-6",
         size === "wide" && "max-w-[1320px]",

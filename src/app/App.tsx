@@ -10,6 +10,7 @@ import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
+import { useUi } from "@/lib/ui-store";
 
 const BackToTop = lazy(() =>
   import("@/components/back-to-top").then((mod) => ({
@@ -119,6 +120,7 @@ function WebFloatingControls() {
 export default function App() {
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
   const [showCompatModal, setShowCompatModal] = useState(false);
+  const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
 
   useKmasEntryMerge();
 
@@ -140,13 +142,17 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppShell
-        header={<SiteHeader />}
-        footer={<DeferredFooter />}
-        floatingControls={<WebFloatingControls />}
+        header={studioImmersive ? null : <SiteHeader />}
+        footer={studioImmersive ? null : <DeferredFooter />}
+        floatingControls={studioImmersive ? null : <WebFloatingControls />}
         chromeOverlay={
           <>
-            <DeferredBackToTop />
-            <DeskCloudHost />
+            {!studioImmersive ? (
+              <>
+                <DeferredBackToTop />
+                <DeskCloudHost />
+              </>
+            ) : null}
             {compatResult && (
               <BrowserCompatModal
                 isOpen={showCompatModal}

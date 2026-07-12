@@ -56,7 +56,10 @@ const COLS: { title: string; links: { label: string; href: string }[] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25">
+    <footer
+      data-site-chrome="footer"
+      className="relative mt-24 border-t border-line/60 bg-gradient-to-b from-card/60 to-card/25"
+    >
       {/* 시그니처 스펙트럼 헤어라인 — 히어로 상단 스트립과 호응해 페이지를 양 끝에서 닫는다. */}
       <span
         aria-hidden

@@ -102,6 +102,17 @@ export class CreatorController {
     return this.creatorService.getWorkRevision(uid, params.id, params.revision);
   }
 
+  @Get("/creator/works/:id/revisions/:revision/comparison")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async getWorkRevisionComparison(
+    @Param(new ZodValidationPipe(CreatorWorkRevisionParamsDto))
+    params: CreatorWorkRevisionParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getWorkRevisionComparison(uid, params.id, params.revision);
+  }
+
   @Post("/creator/works/:id/revisions/:revision/restore")
   async restoreWorkRevision(
     @Param() params: CreatorWorkRevisionParamsDto,

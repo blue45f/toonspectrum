@@ -23,12 +23,14 @@ import {
   CREATOR_WORK_REVISION_RETENTION,
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
+  createCreatorWorkRevisionComparisonSnapshot,
   createCreatorWorkRevisionSnapshot,
   creatorWorkRevisionRetentionCutoff,
   parseCreatorWorkRevision,
 } from "./creator-work-revisions";
 
 import type {
+  CreatorWorkRevisionComparisonSnapshot,
   CreatorWorkRevisionSnapshot,
   CreatorWorkRevisionSnapshotSource,
 } from "./creator-work-revisions";
@@ -122,6 +124,10 @@ export interface CreatorWorkRevisionSummary {
 
 export interface CreatorWorkRevisionDetail extends CreatorWorkRevisionSummary {
   snapshot: CreatorWorkRevisionSnapshot;
+}
+
+export interface CreatorWorkRevisionComparisonDetail extends CreatorWorkRevisionSummary {
+  snapshot: CreatorWorkRevisionComparisonSnapshot;
 }
 
 export interface CreatorWorkComment {
@@ -1169,6 +1175,38 @@ export async function getWorkRevision(
     restoredFromRevision: row.restoredFromRevision ?? null,
     createdAt: safeDate(row.createdAt),
     snapshot: createCreatorWorkRevisionSnapshot(row.snapshot as CreatorWorkRevisionSnapshotSource),
+  };
+}
+
+/**
+ * Owner-only semantic comparison payload. The full revision endpoint remains available for restore
+ * workflows, while this projection deliberately keeps rendered cover/page data URLs off the wire.
+ */
+export async function getWorkRevisionComparison(
+  userId: string,
+  workId: string,
+  revisionValue: unknown
+): Promise<CreatorWorkRevisionComparisonDetail> {
+  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
+  await assertRevisionOwner(userId, workId);
+  const revision = parseCreatorWorkRevision(revisionValue);
+  const [row] = await db
+    .select({
+      revision: creatorWorkRevisions.revision,
+      // PostgreSQL performs the heavy-field omission before sending JSONB to the API process.
+      snapshot: sql<CreatorWorkRevisionSnapshotSource>`${creatorWorkRevisions.snapshot} - 'cover' - 'pages'`,
+      restoredFromRevision: creatorWorkRevisions.restoredFromRevision,
+      createdAt: creatorWorkRevisions.createdAt,
+    })
+    .from(creatorWorkRevisions)
+    .where(and(eq(creatorWorkRevisions.workId, workId), eq(creatorWorkRevisions.revision, revision)))
+    .limit(1);
+  if (!row) throw new CreatorWorkRevisionNotFoundError();
+  return {
+    revision: row.revision,
+    restoredFromRevision: row.restoredFromRevision ?? null,
+    createdAt: safeDate(row.createdAt),
+    snapshot: await createCreatorWorkRevisionComparisonSnapshot(row.snapshot),
   };
 }
 

@@ -26,6 +26,7 @@ import {
   getCreatorPublicProfile,
   getSeries,
   getWork,
+  getWorkRevisionComparison,
   getWorkRevision,
   listChallenges,
   listComments,
@@ -60,6 +61,7 @@ import {
   CreatorSharedDocumentResponseSchema,
   CreatorSharedDocumentSaveResponseSchema,
   CreatorSharedWorksResponseSchema,
+  CreatorWorkRevisionComparisonResponseSchema,
   UpdateCreatorSharedDocumentSchema,
 } from "./creator.dto";
 
@@ -154,6 +156,19 @@ export class CreatorService {
         throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
       }
       throw new BadRequestException("작품 revision을 불러올 수 없습니다.");
+    }
+  }
+
+  async getWorkRevisionComparison(userId: string, id: string, revision: number) {
+    try {
+      return CreatorWorkRevisionComparisonResponseSchema.parse(
+        await getWorkRevisionComparison(userId, id, revision)
+      );
+    } catch (error) {
+      if (error instanceof CreatorWorkRevisionNotFoundError) {
+        throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
+      }
+      throw new BadRequestException("작품 revision 비교 정보를 불러올 수 없습니다.");
     }
   }
 

@@ -28,6 +28,7 @@ const INVITATION_ID = "5f6f6d5c-58f1-4e2c-a228-4b670f470e2b";
 
 const {
   getWork,
+  getWorkRevisionComparison,
   getWorkRevision,
   listWorkRevisions,
   restoreWorkRevision,
@@ -36,6 +37,7 @@ const {
   generateImageAsset,
 } = vi.hoisted(() => ({
   getWork: vi.fn(),
+  getWorkRevisionComparison: vi.fn(),
   getWorkRevision: vi.fn(),
   listWorkRevisions: vi.fn(),
   restoreWorkRevision: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock("../../../../../lib/server/creator", () => ({
   getCreatorPublicProfile: vi.fn(),
   getSeries: vi.fn(),
   getWork,
+  getWorkRevisionComparison,
   getWorkRevision,
   listChallenges: vi.fn(),
   listComments: vi.fn(),
@@ -98,6 +101,7 @@ function createService(): CreatorService {
 describe("CreatorService safety gates", () => {
   beforeEach(() => {
     getWork.mockReset();
+    getWorkRevisionComparison.mockReset();
     getWorkRevision.mockReset();
     listWorkRevisions.mockReset();
     restoreWorkRevision.mockReset();
@@ -171,6 +175,40 @@ describe("CreatorService safety gates", () => {
     await expect(createService().getWorkRevision("reader", "private-work", 1)).rejects.toBeInstanceOf(
       NotFoundException
     );
+  });
+
+  it("owner-only revision 비교 projection을 검증하고 렌더 에셋 없이 반환한다", async () => {
+    getWorkRevisionComparison.mockResolvedValue({
+      revision: 4,
+      restoredFromRevision: null,
+      createdAt: "2026-07-13T00:00:00.000Z",
+      snapshot: {
+        titleId: null,
+        title: "1화",
+        description: "설명",
+        tags: ["판타지"],
+        format: "cuttoon",
+        doc: { pagesList: [] },
+        status: "draft",
+        seriesId: null,
+        episodeNo: null,
+        challengeId: null,
+        remixFromId: null,
+      },
+    });
+
+    const response = await createService().getWorkRevisionComparison("owner", "work-1", 4);
+
+    expect(getWorkRevisionComparison).toHaveBeenCalledWith("owner", "work-1", 4);
+    expect(response.snapshot).not.toHaveProperty("cover");
+    expect(response.snapshot).not.toHaveProperty("pages");
+  });
+
+  it("revision 비교 projection도 작품 없음과 타인 작품을 같은 404로 닫는다", async () => {
+    getWorkRevisionComparison.mockRejectedValue(new CreatorWorkRevisionNotFoundError());
+    await expect(
+      createService().getWorkRevisionComparison("reader", "private-work", 1)
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("복원 충돌도 현재 revision만 담은 409로 변환한다", async () => {

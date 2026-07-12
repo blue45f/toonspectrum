@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildStudioHref, parseStudioSearchParams } from "./creator-studio-links";
+import {
+  buildStudioHref,
+  parseStudioSearchParams,
+  studioCreationLinkParams,
+} from "./creator-studio-links";
 
 describe("creator-studio-links", () => {
   it("builds studio href with optional query params", () => {
@@ -24,5 +28,24 @@ describe("creator-studio-links", () => {
       challengeId: "c1",
       mode: "upload",
     });
+  });
+
+  it("uses query relationships only for creation and never replays them onto an existing work", () => {
+    expect(studioCreationLinkParams({
+      workId: null,
+      titleId: "new-title",
+      seriesId: "new-series",
+      challengeId: "new-challenge",
+    })).toEqual({
+      titleId: "new-title",
+      seriesId: "new-series",
+      challengeId: "new-challenge",
+    });
+    expect(studioCreationLinkParams({
+      workId: "existing-work",
+      titleId: "stale-title-from-url",
+      seriesId: "stale-series-from-url",
+      challengeId: "stale-challenge-from-url",
+    })).toEqual({ titleId: null, seriesId: null, challengeId: null });
   });
 });

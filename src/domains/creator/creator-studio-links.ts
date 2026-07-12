@@ -9,6 +9,22 @@ export type StudioLinkParams = {
   mode?: "upload" | null;
 };
 
+export function studioCreationLinkParams(
+  params: Pick<StudioLinkParams, "workId" | "titleId" | "seriesId" | "challengeId">
+): Pick<StudioLinkParams, "titleId" | "seriesId" | "challengeId"> {
+  // Query relationship aliases are an intent for creating a new work. Once an existing work is
+  // opened, its server document (including a restored revision) is authoritative; replaying a
+  // stale deep-link alias on the next content save could silently undo that restore.
+  if (params.workId) {
+    return { titleId: null, seriesId: null, challengeId: null };
+  }
+  return {
+    titleId: params.titleId ?? null,
+    seriesId: params.seriesId ?? null,
+    challengeId: params.challengeId ?? null,
+  };
+}
+
 export function buildStudioHref(params: StudioLinkParams = {}): string {
   const search = new URLSearchParams();
   if (params.workId) search.set("id", params.workId);

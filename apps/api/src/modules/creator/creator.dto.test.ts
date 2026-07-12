@@ -11,6 +11,7 @@ import {
   CreatorSharedDocumentSaveResponseSchema,
   CreatorSharedWorksResponseSchema,
   CreatorWorkRevisionListQuerySchema,
+  CreatorWorkRevisionComparisonResponseSchema,
   CreatorWorkRevisionParamsSchema,
   InviteCreatorTeamMemberSchema,
   RespondCreatorTeamInvitationSchema,
@@ -48,6 +49,41 @@ describe("creator work zod contracts", () => {
     expect(CreatorWorkRevisionListQuerySchema.safeParse({ limit: 21 }).success).toBe(false);
     expect(RestoreCreatorWorkRevisionSchema.safeParse({ baseRevision: 3 }).success).toBe(true);
     expect(RestoreCreatorWorkRevisionSchema.safeParse({ baseRevision: "3" }).success).toBe(false);
+  });
+
+  it("revision 비교 응답은 의미 필드만 허용하고 cover·pages를 strict 거부한다", () => {
+    const response = {
+      revision: 7,
+      restoredFromRevision: null,
+      createdAt: "2026-07-13T00:00:00.000Z",
+      snapshot: {
+        titleId: "title-1",
+        title: "1화",
+        description: "설명",
+        tags: ["판타지"],
+        format: "cuttoon",
+        doc: { pagesList: [{ id: "page-1" }] },
+        status: "draft",
+        seriesId: "series-1",
+        episodeNo: 1,
+        challengeId: null,
+        remixFromId: null,
+      },
+    };
+
+    expect(CreatorWorkRevisionComparisonResponseSchema.parse(response)).toEqual(response);
+    expect(
+      CreatorWorkRevisionComparisonResponseSchema.safeParse({
+        ...response,
+        snapshot: { ...response.snapshot, cover: "data:image/webp;base64,secret" },
+      }).success
+    ).toBe(false);
+    expect(
+      CreatorWorkRevisionComparisonResponseSchema.safeParse({
+        ...response,
+        snapshot: { ...response.snapshot, pages: ["data:image/webp;base64,secret"] },
+      }).success
+    ).toBe(false);
   });
 
   it("팀 초대는 정규화된 사용자 ID와 할당 가능한 역할만 허용한다", () => {

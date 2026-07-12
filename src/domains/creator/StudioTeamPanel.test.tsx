@@ -150,6 +150,7 @@ describe("StudioTeamPanel shell and first-use states", () => {
     );
 
     expect(html).toContain("bottom-[calc(7rem+env(safe-area-inset-bottom))]");
+    expect(html).toContain("z-[90]");
     expect(html).toContain("w-[100dvw]");
     expect(html).toContain("max-h-[min(72dvh,calc(100dvh-7.75rem-env(safe-area-inset-top)))]");
     expect(html).toContain("sm:inset-y-0");

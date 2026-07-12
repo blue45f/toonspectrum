@@ -140,6 +140,26 @@ export const CreatorSharedDocumentSaveResponseSchema = z
   })
   .strict();
 
+/**
+ * Owner-only revision comparison contract. Rendered cover/pages are intentionally absent so large
+ * data URLs cannot be returned by this endpoint even if the persisted revision snapshot has them.
+ */
+export const CreatorWorkRevisionComparisonSnapshotSchema = CreatorWorkMutableFieldsSchema.omit({
+  cover: true,
+  pages: true,
+})
+  .extend({ episodeNo: z.number().int().min(1).max(2_147_483_647).nullable() })
+  .strict();
+
+export const CreatorWorkRevisionComparisonResponseSchema = z
+  .object({
+    revision: CreatorWorkRevisionSchema,
+    restoredFromRevision: CreatorWorkRevisionSchema.nullable(),
+    createdAt: CreatorIsoDateTimeSchema,
+    snapshot: CreatorWorkRevisionComparisonSnapshotSchema,
+  })
+  .strict();
+
 export const CreatorWorkRevisionParamsSchema = z
   .object({
     id: z.string().trim().min(1).max(160),

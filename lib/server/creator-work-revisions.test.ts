@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL } from "../revision-comparison-projection";
+
 import {
   CREATOR_WORK_REVISION_RETENTION,
   CreatorWorkRevisionConflictError,
+  createCreatorWorkRevisionComparisonSnapshot,
   createCreatorWorkRevisionSnapshot,
   creatorWorkRevisionRetentionCutoff,
   parseCreatorWorkRevision,
@@ -55,6 +58,81 @@ describe("creator work revision helpers", () => {
     for (const invalid of [0, -1, 1.5, Number.NaN, 2_147_483_648, "x", null]) {
       expect(() => parseCreatorWorkRevision(invalid)).toThrow(/정수/);
     }
+  });
+
+  it("비교 projection은 렌더 에셋을 제거하고 doc 내부 리소스 URL도 토큰화한다", async () => {
+    const comparison = await createCreatorWorkRevisionComparisonSnapshot({
+      titleId: "title-1",
+      title: "1화",
+      description: "설명",
+      cover: "data:image/webp;base64,private-cover",
+      tags: ["판타지"],
+      format: "cuttoon",
+      pages: ["data:image/webp;base64,private-page"],
+      doc: {
+        pagesList: [{ id: "page-1", src: "data:image/png;base64,private-doc-image" }],
+        previewUrl: "blob:https://studio.example/private-preview",
+        aiProvenance: {
+          operations: [
+            {
+              prompt: { sha256: "a".repeat(64), raw: "private-opt-in-prompt" },
+              requestId: "private-provider-request",
+              status: "succeeded",
+            },
+          ],
+        },
+      },
+      status: "draft",
+      seriesId: "series-1",
+      episodeNo: 3,
+      challengeId: "challenge-1",
+      remixFromId: "origin-1",
+    });
+
+    expect(comparison).toEqual({
+      titleId: "title-1",
+      title: "1화",
+      description: "설명",
+      tags: ["판타지"],
+      format: "cuttoon",
+      doc: {
+        pagesList: [
+          {
+            id: "page-1",
+            src: expect.stringMatching(
+              /^toonspectrum:resource-sha256:v1:\d+:[0-9a-f]{64}$/u
+            ),
+          },
+        ],
+        previewUrl: expect.stringMatching(
+          /^toonspectrum:resource-sha256:v1:\d+:[0-9a-f]{64}$/u
+        ),
+        aiProvenance: {
+          operations: [
+            {
+              id: "revision-comparison-operation-000001",
+              prompt: { sha256: REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL },
+              createdAt: "1970-01-01T00:00:00.000Z",
+              status: "succeeded",
+            },
+          ],
+        },
+      },
+      status: "draft",
+      seriesId: "series-1",
+      episodeNo: 3,
+      challengeId: "challenge-1",
+      remixFromId: "origin-1",
+    });
+    expect(comparison).not.toHaveProperty("cover");
+    expect(comparison).not.toHaveProperty("pages");
+    expect(JSON.stringify(comparison)).not.toContain("private-cover");
+    expect(JSON.stringify(comparison)).not.toContain("private-page");
+    expect(JSON.stringify(comparison)).not.toContain("private-doc-image");
+    expect(JSON.stringify(comparison)).not.toContain("private-preview");
+    expect(JSON.stringify(comparison)).not.toContain("private-opt-in-prompt");
+    expect(JSON.stringify(comparison)).not.toContain("private-provider-request");
+    expect(JSON.stringify(comparison)).not.toContain("a".repeat(64));
   });
 
   it("손상된 snapshot의 상태·포맷 값은 복원 가능한 허용값으로 닫아 둔다", () => {

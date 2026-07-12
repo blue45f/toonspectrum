@@ -34,6 +34,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  Minimize2,
   ChevronUp,
   Circle,
   Command,
@@ -104,6 +105,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
+import { studioCreationLinkParams } from "./creator-studio-links";
 import {
   runStudioAdvancedFillInBrowser,
   studioAdvancedFillResultMessage,
@@ -267,9 +269,10 @@ import {
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
 import {
-  createStudioCheckpoint,
-  deleteStudioCheckpoint,
-  listStudioCheckpoints,
+  createDurableStudioCheckpoint,
+  deleteDurableStudioCheckpoint,
+  listDurableStudioCheckpoints,
+  studioServerRestoreCheckpointName,
   studioCheckpointKey,
   type StudioCheckpoint,
 } from "./studio-checkpoints";
@@ -300,6 +303,7 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
+import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
   applyCropAspect,
   beginCropDrag,
@@ -487,6 +491,11 @@ import {
   withMasterElements,
   type DocumentMaster,
 } from "./studio-master-page";
+import {
+  saveStudioMobileImmersivePreference,
+  shouldStartStudioMobileImmersive,
+  studioMobileImmersiveSessionStorage,
+} from "./studio-mobile-immersive";
 import {
   beginNodeDrag,
   decimateStrokeHandles,
@@ -861,6 +870,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { lazyRetry } from "@/lib/lazy-retry";
+import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
@@ -3898,11 +3908,19 @@ function StudioCuttoonEditor() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
+  const acquireImmersiveSurface = useUi((state) => state.acquireImmersiveSurface);
+  const releaseImmersiveSurface = useUi((state) => state.releaseImmersiveSurface);
   const workId = params.get("id");
   const remixId = params.get("remix");
-  const linkedTitleId = params.get("titleId");
-  const linkedSeriesId = params.get("seriesId");
-  const linkedChallengeId = params.get("challengeId");
+  const creationLinks = studioCreationLinkParams({
+    workId,
+    titleId: params.get("titleId"),
+    seriesId: params.get("seriesId"),
+    challengeId: params.get("challengeId"),
+  });
+  const linkedTitleId = creationLinks.titleId;
+  const linkedSeriesId = creationLinks.seriesId;
+  const linkedChallengeId = creationLinks.challengeId;
   const studioAuthUserId = session?.user?.id ?? null;
   const studioSessionToken = session?.token ?? null;
   // Factory identity controls the lifetime of the external Socket.IO resource. Keep it stable
@@ -3989,6 +4007,9 @@ function StudioCuttoonEditor() {
   currentStudioDocumentScopeRef.current = { authScopeKey: studioAuthUserId, workId };
   const editorMountedRef = useRef(true);
   const documentSaveInFlightRef = useRef(false);
+  // Monotonic snapshot token dedicated to revision review. Unlike async mutation tickets, this
+  // also advances for provenance bookkeeping that changes persisted project data.
+  const studioRevisionProjectGenerationRef = useRef(0);
   const sharedDocumentSaveAbortRef = useRef<AbortController | null>(null);
   const sharedDocumentRestoreAbortRef = useRef<AbortController | null>(null);
   const ownerDetailAbortRef = useRef<AbortController | null>(null);
@@ -4045,6 +4066,7 @@ function StudioCuttoonEditor() {
       }
       return false;
     }
+    studioRevisionProjectGenerationRef.current += 1;
     const current = collaborationAccessRef.current;
     collaborationAccessRef.current = {
       ...current,
@@ -4132,6 +4154,7 @@ function StudioCuttoonEditor() {
   // It is saved in the document, but must not invalidate its own source-generation ticket.
   const setAiProvenanceOperationState = (next: Parameters<typeof setAiProvenanceState>[0]) => {
     if (documentSaveInFlightRef.current) return;
+    studioRevisionProjectGenerationRef.current += 1;
     setAiProvenanceState(next);
   };
   const [studioComments, setStudioCommentsState] = useState<StudioCommentsDocument>(() =>
@@ -4349,6 +4372,21 @@ function StudioCuttoonEditor() {
   const autoActionAbortRef = useRef<AbortController | null>(null);
   // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때 owner-only revision까지 보존한다.
   const [loadedWork, setLoadedWork] = useState<WorkDetail | null>(null);
+  const displayLinkedTitleId = workId
+    ? sharedDocument
+      ? sharedDocument.document.titleId
+      : loadedWork?.titleId ?? null
+    : linkedTitleId;
+  const publishContextSeriesId = workId
+    ? sharedDocument
+      ? sharedDocument.document.seriesId
+      : loadedWork?.seriesId ?? null
+    : linkedSeriesId;
+  const publishContextChallengeId = workId
+    ? sharedDocument
+      ? sharedDocument.document.challengeId
+      : loadedWork?.challengeId ?? null
+    : linkedChallengeId;
   const serverCurrentRevision =
     sharedDocument?.role === "owner" ? sharedDocument.revision : loadedWork?.revision;
   const [characterBibleOpen, setCharacterBibleOpen] = useState(false);
@@ -4393,13 +4431,24 @@ function StudioCuttoonEditor() {
   const serverRevisionRequestRef = useRef(0);
   useEffect(() => {
     if (!checkpointPanelOpen) return;
-    setCheckpoints(listStudioCheckpoints(globalThis.localStorage, checkpointKey));
+    let checkpointLoadActive = true;
+    void listDurableStudioCheckpoints(globalThis.localStorage, checkpointKey)
+      .then((storedCheckpoints) => {
+        if (checkpointLoadActive) setCheckpoints(storedCheckpoints);
+      })
+      .catch((cause) => {
+        if (checkpointLoadActive) {
+          setCheckpointError(cause instanceof Error ? cause.message : "복구 지점을 불러오지 못했어요.");
+        }
+      });
     setCheckpointError(null);
     if (!workId || !studioAuthUserId || !serverCurrentRevision || sharedDocument?.role !== "owner" || !loggedIn) {
       setServerRevisions([]);
       setServerRevisionError(null);
       setServerRevisionLoading(false);
-      return;
+      return () => {
+        checkpointLoadActive = false;
+      };
     }
     const controller = new AbortController();
     const requestId = serverRevisionRequestRef.current + 1;
@@ -4431,7 +4480,10 @@ function StudioCuttoonEditor() {
           setServerRevisionLoading(false);
         }
       });
-    return () => controller.abort();
+    return () => {
+      checkpointLoadActive = false;
+      controller.abort();
+    };
   }, [checkpointKey, checkpointPanelOpen, loggedIn, serverCurrentRevision, sharedDocument?.role, studioAuthUserId, workId]);
   useEffect(() => {
     const availableIds = new Set(pages.map((page) => page.id));
@@ -4479,6 +4531,10 @@ function StudioCuttoonEditor() {
   );
   // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
   const isMobile = useIsMobile();
+  const [mobileImmersiveEnabled, setMobileImmersiveEnabled] = useState(() =>
+    shouldStartStudioMobileImmersive(studioMobileImmersiveSessionStorage())
+  );
+  const mobileImmersive = isMobile && mobileImmersiveEnabled;
   const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
   useEffect(() => {
     if (!isMobile || !globalThis.visualViewport) {
@@ -4580,10 +4636,32 @@ function StudioCuttoonEditor() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
   const [maximized, setMaximized] = useState(false);
+  // 데스크톱 브라우저 맞춤 상태로 창 폭을 모바일 경계 아래로 줄이면 해당 복원 버튼이
+  // 모바일 툴바에서 사라진다. 경계 진입 commit 전에 상태를 내려 터치 화면을 고정 셸에 가두지 않는다.
+  useLayoutEffect(() => {
+    if (isMobile && maximized) setMaximized(false);
+  }, [isMobile, maximized]);
+  // 모바일 컷툰 편집기는 사이트 크롬 대신 자체 앱 셸을 소유한다. App이 헤더·푸터·전역
+  // 플로팅 컨트롤을 실제로 언마운트하므로 시각적으로 가려진 링크가 Tab 순서에 남지 않는다.
+  useLayoutEffect(() => {
+    if (!mobileImmersive || typeof document === "undefined") return;
+    const root = document.documentElement;
+    const previousMode = root.getAttribute("data-studio-mobile-immersive");
+    root.setAttribute("data-studio-mobile-immersive", "true");
+    acquireImmersiveSurface("studio");
+    return () => {
+      releaseImmersiveSurface("studio");
+      if (previousMode === null) {
+        root.removeAttribute("data-studio-mobile-immersive");
+      } else {
+        root.setAttribute("data-studio-mobile-immersive", previousMode);
+      }
+    };
+  }, [acquireImmersiveSurface, mobileImmersive, releaseImmersiveSurface]);
   // 전체화면/브라우저 맞춤은 저장된 작업공간을 바꾸지 않는 일시적인 프레젠테이션 상태다.
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
-  const presentationPanelsHidden = isFullscreen || maximized;
+  const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive;
   const visibleLeftPanelOpen = leftPanelOpen && !presentationPanelsHidden;
   const visibleRightPanelOpen = rightPanelOpen && !presentationPanelsHidden;
   const liveWorkspaceLayout = normalizeStudioWorkspaceLayout(
@@ -4913,6 +4991,11 @@ function StudioCuttoonEditor() {
   // 브라우저 창 최대화 토글 — 저장된 패널 상태는 보존하고 화면에서만 잠시 숨긴다.
   function toggleMaximize() {
     setMaximized((current) => !current);
+  }
+  function changeMobileImmersiveMode(enabled: boolean) {
+    saveStudioMobileImmersivePreference(studioMobileImmersiveSessionStorage(), enabled);
+    setMobileImmersiveEnabled(enabled);
+    if (enabled) setMaximized(false);
   }
   // 최대화 상태에서 ESC로 빠져나오면 일시적으로 가렸던 패널이 저장된 레이아웃 그대로 돌아온다.
   useEffect(() => {
@@ -5523,7 +5606,7 @@ function StudioCuttoonEditor() {
     const el = wrapRef.current;
     // 컨테이너 폭에 맞춰 캔버스를 채운다. 전체화면이면 초광폭 모니터도 채우게 상한을 4배로 올린다.
     // ResizeObserver로 패널 접기·전체화면 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
-    const cap = isFullscreen || maximized ? 4 : 2.5;
+    const cap = isFullscreen || maximized || mobileImmersive ? 4 : 2.5;
     const measure = () => {
       const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
       setScale(Math.min(cap, Math.max(0.1, w / CANVAS_W)));
@@ -5539,7 +5622,7 @@ function StudioCuttoonEditor() {
       ro?.disconnect();
       globalThis.removeEventListener("resize", measure);
     };
-  }, [isFullscreen, maximized]);
+  }, [isFullscreen, maximized, mobileImmersive]);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
@@ -5694,7 +5777,15 @@ function StudioCuttoonEditor() {
 
   useEffect(() => {
     updateScrollPosRef.current();
-  }, [canvasH, effScale, visibleLeftPanelOpen, visibleRightPanelOpen, isFullscreen, maximized]);
+  }, [
+    canvasH,
+    effScale,
+    visibleLeftPanelOpen,
+    visibleRightPanelOpen,
+    isFullscreen,
+    maximized,
+    mobileImmersive,
+  ]);
 
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
@@ -7069,10 +7160,12 @@ function StudioCuttoonEditor() {
           setError("업로드형 작품은 컷툰 편집기로 열 수 없어요. 업로드 편집 화면에서 수정해 주세요.");
           return;
         }
+        const hydratedProject = creatorWorkSnapshotToStudioProject(w);
         // Server hydration is one canonical document replacement. Advance the async mutation
         // barrier once, then use the raw React setters so this route-scoped effect does not depend
         // on render-local guarded setter identities (and cannot re-run on every document render).
         const hydrationGeneration = collaborationAccessRef.current;
+        studioRevisionProjectGenerationRef.current += 1;
         collaborationAccessRef.current = {
           ...hydrationGeneration,
           documentGeneration: hydrationGeneration.documentGeneration + 1,
@@ -7123,22 +7216,15 @@ function StudioCuttoonEditor() {
         setAdvancedFillBusy(false);
         setAdvancedFillPreview(null);
         setAdvancedFillStatus(null);
-        if (doc?.pagesList && doc.pagesList.length > 0) {
-          setPagesHistoryState([doc.pagesList]);
-          setPagesHiState(0);
-          setCurrentPageId(doc.currentPageId || doc.pagesList[0].id);
-        } else {
-          const legacyPage: PageState = {
-            id: uid(),
-            elements: doc?.elements || [],
-            bg: doc?.bg || "#ffffff",
-            bgGrad: doc?.bgGrad || null,
-            canvasH: doc?.height || 1080,
-          };
-          setPagesHistoryState([[legacyPage]]);
-          setPagesHiState(0);
-          setCurrentPageId(legacyPage.id);
-        }
+        const hydratedPages = hydratedProject.pagesList as PageState[];
+        setPagesHistoryState([hydratedPages]);
+        setPagesHiState(0);
+        setCurrentPageId(
+          hydratedProject.currentPageId &&
+          hydratedPages.some((page) => page.id === hydratedProject.currentPageId)
+            ? hydratedProject.currentPageId
+            : hydratedPages[0].id
+        );
         // 문서 마스터(공통 요소) — 과거 문서(master 미존재)는 빈 마스터로(하위호환). 리믹스도 마스터를 승계한다.
         setMasterState(normalizeDocumentMaster(doc?.master) as DocumentMaster<El>);
         setCharacterBibleState(normalizeStudioCharacterBible(doc?.characterBible));
@@ -7193,7 +7279,7 @@ function StudioCuttoonEditor() {
 
   // 시리즈·챌린지 딥링크로 들어온 경우 게시 맥락 배너를 채운다.
   useEffect(() => {
-    if (!linkedSeriesId && !linkedChallengeId) {
+    if (!publishContextSeriesId && !publishContextChallengeId) {
       setPublishContext({});
       return;
     }
@@ -7201,10 +7287,10 @@ function StudioCuttoonEditor() {
     const controller = new AbortController();
     async function loadPublishContext() {
       const next: PublishContext = {};
-      if (linkedSeriesId) {
+      if (publishContextSeriesId) {
         try {
           const { getSeries } = await import("@/src/infrastructure/creator-client");
-          const series = await getSeries(linkedSeriesId, controller.signal);
+          const series = await getSeries(publishContextSeriesId, controller.signal);
           if (!alive) return;
           const maxEpisode = series.episodeList.reduce(
             (max, episode) => Math.max(max, episode.episodeNo ?? 0),
@@ -7219,10 +7305,10 @@ function StudioCuttoonEditor() {
           // 맥락 로드 실패 시 배너만 생략.
         }
       }
-      if (linkedChallengeId) {
+      if (publishContextChallengeId) {
         try {
           const { getChallenge } = await import("@/src/infrastructure/creator-client");
-          const challenge = await getChallenge(linkedChallengeId, controller.signal);
+          const challenge = await getChallenge(publishContextChallengeId, controller.signal);
           if (!alive) return;
           next.challenge = {
             id: challenge.id,
@@ -7240,7 +7326,7 @@ function StudioCuttoonEditor() {
       alive = false;
       controller.abort();
     };
-  }, [linkedSeriesId, linkedChallengeId]);
+  }, [publishContextChallengeId, publishContextSeriesId]);
 
   useEffect(() => {
     studioOptionalAssetsMountedRef.current = true;
@@ -13681,7 +13767,6 @@ function StudioCuttoonEditor() {
           title: payload.title,
           description: payload.description,
           tags: payload.tags,
-          ...(sharedDocument.role === "owner" && linkedTitleId ? { titleId: linkedTitleId } : {}),
           cover: payload.cover,
           pages: payload.pages,
           doc: payload.doc,
@@ -13720,7 +13805,6 @@ function StudioCuttoonEditor() {
                     title: payload.title,
                     description: payload.description,
                     tags: payload.tags,
-                    ...(sharedDocument.role === "owner" && linkedTitleId ? { titleId: linkedTitleId } : {}),
                     cover: payload.cover,
                     pages: payload.pages,
                     doc: payload.doc,
@@ -14554,11 +14638,11 @@ function StudioCuttoonEditor() {
     );
   }
 
-  function saveNamedCheckpoint(name: string): boolean {
+  async function saveNamedCheckpoint(name: string): Promise<boolean> {
     if (!ensureSharedDocumentAvailableForExport()) return false;
     try {
       setCheckpoints(
-        createStudioCheckpoint(globalThis.localStorage, checkpointKey, {
+        await createDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, {
           name,
           payload: currentStudioProjectSnapshot(),
         })
@@ -14572,7 +14656,7 @@ function StudioCuttoonEditor() {
   }
 
   function createNamedCheckpoint(name: string) {
-    saveNamedCheckpoint(name);
+    void saveNamedCheckpoint(name);
   }
 
   function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
@@ -14588,59 +14672,16 @@ function StudioCuttoonEditor() {
     }
   }
 
-  function removeNamedCheckpoint(checkpoint: StudioCheckpoint) {
+  async function removeNamedCheckpoint(checkpoint: StudioCheckpoint) {
     if (!globalThis.confirm(`'${checkpoint.name}' 복구 지점을 삭제할까요?`)) return;
     try {
-      setCheckpoints(deleteStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id));
+      setCheckpoints(
+        await deleteDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id)
+      );
       setCheckpointError(null);
     } catch (error) {
       setCheckpointError(error instanceof Error ? error.message : "복구 지점을 삭제하지 못했어요.");
     }
-  }
-
-  function workDetailToStudioProject(work: WorkDetail): StudioProjectFile {
-    const doc = work.doc && typeof work.doc === "object" ? work.doc : {};
-    const rawPages = Array.isArray(doc.pagesList) && doc.pagesList.length > 0
-      ? doc.pagesList
-      : [
-          {
-            id: uid(),
-            elements: Array.isArray(doc.elements) ? doc.elements : [],
-            bg: typeof doc.bg === "string" ? doc.bg : "#ffffff",
-            bgGrad: Array.isArray(doc.bgGrad) ? doc.bgGrad : null,
-            canvasH:
-              typeof doc.height === "number" && Number.isFinite(doc.height) && doc.height > 0
-                ? doc.height
-                : 1080,
-          },
-        ];
-    const currentId =
-      typeof doc.currentPageId === "string" && rawPages.some((page) => {
-        return Boolean(page && typeof page === "object" && "id" in page && page.id === doc.currentPageId);
-      })
-        ? doc.currentPageId
-        : undefined;
-    const theme = doc.webtoonTheme;
-    const gutter = doc.panelGutter;
-    return parseStudioProjectFile({
-      version: 2,
-      savedAt: new Date().toISOString(),
-      title: work.title,
-      description: work.description,
-      tagsText: (work.tags ?? []).join(", "),
-      pagesList: rawPages,
-      ...(currentId ? { currentPageId: currentId } : {}),
-      ...(theme === "classic" || theme === "soft" || theme === "vivid" ? { webtoonTheme: theme } : {}),
-      ...(typeof gutter === "number" && Number.isFinite(gutter) ? { panelGutter: gutter } : {}),
-      master: doc.master,
-      characterBible: doc.characterBible,
-      writerRoom: doc.writerRoom,
-      aiProvenance: doc.aiProvenance,
-      comments: doc.comments,
-      releaseSchedule: doc.releaseSchedule,
-      publicationAnalytics: doc.publicationAnalytics,
-      publishPack: doc.publishPack,
-    });
   }
 
   async function openOwnerFxPanel() {
@@ -14723,22 +14764,41 @@ function StudioCuttoonEditor() {
     }
   }
 
-  async function restoreServerRevision(revision: WorkRevisionSummary) {
-    if (!workId || !serverCurrentRevision || sharedDocument?.role !== "owner" || serverRevisionLoading) return;
+  async function restoreServerRevision(
+    revision: WorkRevisionSummary,
+    comparedBaseRevision: number
+  ): Promise<boolean> {
+    if (!workId || !serverCurrentRevision || sharedDocument?.role !== "owner" || serverRevisionLoading) {
+      return false;
+    }
+    if (revision.revision === serverCurrentRevision) {
+      setServerRevisionError("현재 서버 revision은 다시 복원할 필요가 없어요.");
+      return false;
+    }
+    if (comparedBaseRevision !== serverCurrentRevision) {
+      setServerRevisionError("서버 revision이 변경 검토 후 달라졌어요. 최신 목록에서 다시 비교해 주세요.");
+      return false;
+    }
     const restoreWorkId = workId;
     const restoreAuthScopeKey = studioAuthUserId;
-    if (
-      !globalThis.confirm(
-        `서버 버전 ${revision.revision}을 복원할까요? 현재 서버 내용은 새 자동 버전으로 보존됩니다.`
-      )
-    ) {
-      return;
-    }
     if (documentSaveInFlightRef.current) {
       setServerRevisionError("다른 저장 또는 복원 작업이 끝난 뒤 다시 시도해 주세요.");
-      return;
+      return false;
     }
-    if (!markStudioDocumentChanged()) return;
+    const restorePreparationGeneration = studioRevisionProjectGenerationRef.current;
+    if (!(await saveNamedCheckpoint(studioServerRestoreCheckpointName(revision.revision)))) {
+      setServerRevisionError(
+        "현재 편집본을 브라우저 복구 지점에 보관하지 못해 서버 복원을 시작하지 않았어요. 오래된 지점을 정리하거나 JSON 백업 후 다시 시도해 주세요."
+      );
+      return false;
+    }
+    if (studioRevisionProjectGenerationRef.current !== restorePreparationGeneration) {
+      setServerRevisionError(
+        "브라우저 복구 지점을 저장하는 동안 원고가 변경되어 서버 복원을 시작하지 않았어요. 최신 상태로 다시 비교해 주세요."
+      );
+      return false;
+    }
+    if (!markStudioDocumentChanged()) return false;
     documentSaveInFlightRef.current = true;
     const restoreMutationTicket = captureStudioMutationTicket();
     let serverRestoreCommitted = false;
@@ -14765,15 +14825,23 @@ function StudioCuttoonEditor() {
       if (
         !restoreScopeStillCurrent() ||
         !canApplyStudioMutation(restoreMutationTicket, { allowDuringSave: true })
-      ) return;
-      await restoreWorkRevision(
+      ) return false;
+      const committedRestore = await restoreWorkRevision(
         restoreWorkId,
         revision.revision,
-        serverCurrentRevision,
+        comparedBaseRevision,
         restoreController.signal
       );
+      const committedRevision = committedRestore.revision;
+      if (
+        typeof committedRevision !== "number" ||
+        !Number.isSafeInteger(committedRevision) ||
+        committedRevision < 1
+      ) {
+        throw new Error("서버가 복원 커밋 버전을 반환하지 않아 안전하게 적용할 수 없어요.");
+      }
       serverRestoreCommitted = true;
-      if (!restoreScopeStillCurrent()) return;
+      if (!restoreScopeStillCurrent()) return false;
       const [restoredWork, restoredShared] = await Promise.all([
         getWork(restoreWorkId, restoreController.signal),
         getStudioSharedDocument(restoreWorkId, restoreController.signal),
@@ -14786,34 +14854,81 @@ function StudioCuttoonEditor() {
           currentStudioDocumentScopeRef.current
         )
       ) {
-        return;
+        return false;
       }
       if (!canApplyStudioMutation(restoreMutationTicket, { allowDuringSave: true })) {
         lockStudioMutationsNow();
         setDocumentReloadRequired(true);
         setServerRevisionError("서버 복원은 완료됐지만 로컬 상태가 달라 자동 적용하지 않았어요. 페이지를 다시 불러와 주세요.");
-        return;
+        return false;
       }
-      if (restoredWork.revision !== restoredShared.revision) {
-        throw new Error("복원 직후 서버 문서 revision이 달라졌어요. 공동 문서를 다시 열어 주세요.");
+      if (
+        restoredWork.revision !== committedRevision ||
+        restoredShared.revision !== committedRevision
+      ) {
+        throw new Error(
+          `복원은 서버 버전 r${committedRevision}로 기록됐지만 그 직후 공동 원고가 다시 변경됐어요. 최신 원고를 다시 열어 확인해 주세요.`
+        );
+      }
+      if (!isStudioCuttoonSourceFormat(restoredWork.format)) {
+        throw new Error("복원된 작품 형식은 컷툰 편집기와 호환되지 않아 자동 적용하지 않았어요.");
       }
       documentSaveInFlightRef.current = false;
-      applyStudioProjectSnapshot(workDetailToStudioProject(restoredWork));
+      applyStudioProjectSnapshot(creatorWorkSnapshotToStudioProject(restoredWork));
       setLoadedWork(restoredWork);
       setSharedDocumentScope({
         authScopeKey: restoreAuthScopeKey,
         workId: restoreWorkId,
         value: restoredShared,
       });
+      // The pre-restore browser checkpoint now owns the old local state. Keeping the older
+      // autosave (whose sourceRevision is the just-replaced base) would immediately surface a
+      // false revision-mismatch banner and prevent the restored rN state from being autosaved.
+      try {
+        globalThis.localStorage.removeItem(autosaveKey);
+      } catch {
+        // The restore already committed and the named checkpoint succeeded; storage cleanup is
+        // best-effort, while the server/baseRevision guarantees remain authoritative.
+      }
+      setHasAutosave(false);
+      setAutosaveRestoreBlockedReason(null);
+      setAutosaveChecked(true);
       await reloadServerRevisions();
+      return true;
     } catch (cause) {
       if (restoreScopeStillCurrent()) {
-        if (serverRestoreCommitted) {
+        const isRevisionConflict =
+          cause instanceof Error &&
+          cause.name === "WorkRevisionConflictError" &&
+          typeof (cause as { currentRevision?: unknown }).currentRevision === "number";
+        if (isRevisionConflict && !serverRestoreCommitted) {
+          try {
+            const { getStudioSharedDocument } = await import("./studio-shared-document-client");
+            const latestShared = await getStudioSharedDocument(restoreWorkId, restoreController.signal);
+            if (restoreScopeStillCurrent() && restoreAuthScopeKey) {
+              setSharedDocumentScope({
+                authScopeKey: restoreAuthScopeKey,
+                workId: restoreWorkId,
+                value: latestShared,
+              });
+              setServerRevisionError(
+                `다른 창이 서버 버전 r${latestShared.revision}을 먼저 저장했어요. 로컬 편집본은 보존했으며 최신 버전을 기준으로 다시 검토해 주세요.`
+              );
+            }
+          } catch {
+            lockStudioMutationsNow();
+            setDocumentReloadRequired(true);
+            setServerRevisionError("서버 버전 충돌 후 최신 원고를 확인하지 못해 편집을 잠갔어요. 페이지를 다시 불러와 주세요.");
+          }
+        } else if (serverRestoreCommitted) {
           lockStudioMutationsNow();
           setDocumentReloadRequired(true);
+          setServerRevisionError(cause instanceof Error ? cause.message : "서버 복원 후 최신 상태를 확인하지 못했어요.");
+        } else {
+          setServerRevisionError(cause instanceof Error ? cause.message : "서버 버전을 복원하지 못했어요.");
         }
-        setServerRevisionError(cause instanceof Error ? cause.message : "서버 버전을 복원하지 못했어요.");
       }
+      return false;
     } finally {
       if (sharedDocumentRestoreAbortRef.current === restoreController) {
         sharedDocumentRestoreAbortRef.current = null;
@@ -15152,20 +15267,54 @@ function StudioCuttoonEditor() {
     >
     <div
       ref={studioRootRef}
+      data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       className={cn(
         isFullscreen && "min-h-screen overflow-y-auto bg-canvas",
-        maximized && "fixed inset-0 z-[60] overflow-y-auto bg-canvas"
+        maximized && !isMobile && !mobileImmersive &&
+          "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
+        mobileImmersive &&
+          "fixed inset-0 z-[75] h-[100dvh] overflow-hidden overscroll-none bg-canvas"
+      )}
+      style={
+        mobileImmersive
+          ? {
+              paddingTop: "env(safe-area-inset-top)",
+              paddingLeft: "env(safe-area-inset-left)",
+              paddingRight: "env(safe-area-inset-right)",
+            }
+          : undefined
+      }
+    >
+    <Container
+      size="wide"
+      style={mobileImmersive ? { padding: "0.25rem" } : undefined}
+      className={cn(
+        "py-3 lg:py-6",
+        !(isFullscreen || maximized || mobileImmersive) &&
+          "xl:max-w-[1700px] 2xl:max-w-[2200px]",
+        (isFullscreen || maximized || mobileImmersive) && "max-w-none",
+        maximized && !mobileImmersive && "px-3 py-3",
+        mobileImmersive && "flex h-full min-h-0 flex-col px-1 py-1"
       )}
     >
-    <Container size="wide" className={cn("py-3 lg:py-6", !(isFullscreen || maximized) && "xl:max-w-[1700px] 2xl:max-w-[2200px]", (isFullscreen || maximized) && "max-w-none", maximized && "px-3 py-3")}>
-      <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4">
-        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2.5">
+      <div
+        className={cn(
+          "mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4",
+          mobileImmersive && "mb-1.5 block shrink-0"
+        )}
+      >
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-wrap items-end gap-2.5",
+            mobileImmersive && "hidden"
+          )}
+        >
           <div className="min-w-0">
             {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
             <h1 className="text-lg font-bold tracking-tight lg:text-2xl">창작 스튜디오</h1>
             <p className="mt-1 hidden text-sm text-fg-3 lg:block">
               이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
-              {linkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
+              {displayLinkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
             </p>
           </div>
           {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
@@ -15193,12 +15342,64 @@ function StudioCuttoonEditor() {
           ) : null}
         </div>
         {/* 모바일: 액션 버튼을 한 줄 가로 스크롤로 압축(모든 기능 유지하되 세로를 잡아먹지 않게). 데스크톱은 wrap. */}
-        <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:overflow-visible">
+        <div
+          className={cn(
+            "flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:overflow-visible",
+            mobileImmersive && "w-full gap-1"
+          )}
+        >
+          {isMobile ? (
+            <button
+              type="button"
+              onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
+              aria-pressed={mobileImmersive}
+              aria-label={
+                mobileImmersive
+                  ? "모바일 집중 드로잉 모드 종료"
+                  : "모바일 집중 드로잉 모드 시작"
+              }
+              data-studio-mobile-app-mode
+              className={cn(
+                buttonClass({
+                  size: "sm",
+                  variant: mobileImmersive ? "solid" : "quiet",
+                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                }),
+                "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
+              )}
+              title={
+                mobileImmersive
+                  ? "사이트 화면으로 복원 — 원고·선택·실행취소 상태는 유지됩니다"
+                  : "사이트 헤더와 푸터를 숨기고 전체 화면을 캔버스로 사용"
+              }
+            >
+              {mobileImmersive ? (
+                <Minimize2 size={15} aria-hidden />
+              ) : (
+                <Maximize2 size={15} aria-hidden />
+              )}
+              {mobileImmersive ? "앱 모드 종료" : "집중 드로잉"}
+            </button>
+          ) : null}
+          {mobileImmersive ? (
+            <>
+              <h1 className="sr-only">창작 스튜디오 모바일 집중 드로잉 모드</h1>
+              <span
+                className="min-w-24 max-w-40 shrink-0 truncate px-1 text-xs font-semibold text-fg-2"
+                title={`${title.trim() || "새 작품"} · ${pageDisplayName(activePage, activePageIndex)}`}
+              >
+                {title.trim() || "새 작품"} · {pageDisplayName(activePage, activePageIndex)}
+              </span>
+            </>
+          ) : null}
           <div ref={exportMenuRef} className="relative flex shrink-0 items-center">
             <button
               type="button"
               onClick={() => handleDownload()}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" })}
+              className={cn(
+                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
+                isMobile && "min-h-11"
+              )}
               title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
             >
               <Download size={14} /> 다운로드
@@ -15218,7 +15419,10 @@ function StudioCuttoonEditor() {
               onFocus={preloadStudioExportMenuPanel}
               aria-expanded={exportMenuOpen}
               aria-label="내보내기 옵션"
-              className={buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" })}
+              className={cn(
+                buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
+                isMobile && "min-h-11 min-w-11"
+              )}
               title="내보내기 옵션 (배율·포맷·투명 배경)"
             >
               <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
@@ -15291,7 +15495,7 @@ function StudioCuttoonEditor() {
                     globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
                   }
                 }}
-                className="fixed inset-x-2 top-20 z-[70] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+                className="fixed inset-x-2 top-20 z-[70] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] lg:pb-2 [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
               >
                 <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
                   <span>
@@ -15588,7 +15792,10 @@ function StudioCuttoonEditor() {
             onClick={() => handleSave("draft")}
             disabled={saving || collaborationDocumentLocked}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "현재 원고를 임시저장"}
-            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
+            className={cn(
+              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+              isMobile && "min-h-11"
+            )}
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
             {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
@@ -15599,7 +15806,10 @@ function StudioCuttoonEditor() {
               onClick={() => handleSave("published")}
               disabled={saving || collaborationDocumentLocked}
               title={collaborationDocumentLocked ? collaborationLockMessage() : "게시 상태로 저장"}
-              className={buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
+              className={cn(
+                buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+                isMobile && "min-h-11"
+              )}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
               {workId ? "수정 게시" : "게시하기"}
@@ -15608,64 +15818,73 @@ function StudioCuttoonEditor() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
-      )}
-      {expectsSharedDocument ? (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-busy={!workHydrated}
-          className={cn(
-            "mb-3 flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm",
-            collaborationDocumentLocked
-              ? "border-warn/40 bg-warn/10 text-fg"
-              : "border-good/35 bg-good/10 text-fg"
-          )}
-        >
-          {collaborationDocumentLocked ? (
-            <Lock size={17} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-          ) : (
-            <UsersRound size={17} className="mt-0.5 shrink-0 text-good" aria-hidden />
-          )}
-          <span className="min-w-0 flex-1">
-            <strong className="block text-sm font-semibold">
-              {!sharedDocument
-                ? workHydrated
-                  ? "공동 문서를 열지 못했어요"
-                  : "공동 문서 권한을 확인하고 있어요"
-                : collaborationReadOnly
-                  ? `${collaborationRoleLabel()} · 읽기 전용`
-                  : `${collaborationRoleLabel()} · 공동 편집 가능`}
-            </strong>
-            <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
-              {collaborationDocumentLocked
-                ? collaborationLockMessage()
-                : sharedDocumentNotice ??
-                  `서버 revision ${sharedDocument?.revision ?? "—"}을 기준으로 안전하게 저장합니다.`}
+      <div
+        data-studio-global-status-rail
+        className={cn(
+          mobileImmersive
+            ? "max-h-[min(24dvh,10rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+            : "contents"
+        )}
+      >
+        {error && (
+          <div className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
+        )}
+        {expectsSharedDocument && (!mobileImmersive || collaborationDocumentLocked) ? (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy={!workHydrated}
+            className={cn(
+              "mb-3 flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm",
+              collaborationDocumentLocked
+                ? "border-warn/40 bg-warn/10 text-fg"
+                : "border-good/35 bg-good/10 text-fg"
+            )}
+          >
+            {collaborationDocumentLocked ? (
+              <Lock size={17} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+            ) : (
+              <UsersRound size={17} className="mt-0.5 shrink-0 text-good" aria-hidden />
+            )}
+            <span className="min-w-0 flex-1">
+              <strong className="block text-sm font-semibold">
+                {!sharedDocument
+                  ? workHydrated
+                    ? "공동 문서를 열지 못했어요"
+                    : "공동 문서 권한을 확인하고 있어요"
+                  : collaborationReadOnly
+                    ? `${collaborationRoleLabel()} · 읽기 전용`
+                    : `${collaborationRoleLabel()} · 공동 편집 가능`}
+              </strong>
+              <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
+                {collaborationDocumentLocked
+                  ? collaborationLockMessage()
+                  : sharedDocumentNotice ??
+                    `서버 revision ${sharedDocument?.revision ?? "—"} 기준으로 안전하게 저장합니다.`}
+              </span>
             </span>
-          </span>
-          {sharedDocument ? (
-            <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.6875rem] font-semibold tabular-nums text-fg-2">
-              r{sharedDocument.revision}
-            </span>
-          ) : workHydrated ? (
-            <button
-              type="button"
-              onClick={() => globalThis.location.reload()}
-              className="min-h-11 shrink-0 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-            >
-              다시 시도
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {!loggedIn && (
-        <div className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
-          만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
-        </div>
-      )}
-      <StudioPublishContextBanner context={publishContext} />
+            {sharedDocument ? (
+              <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.6875rem] font-semibold tabular-nums text-fg-2">
+                r{sharedDocument.revision}
+              </span>
+            ) : workHydrated ? (
+              <button
+                type="button"
+                onClick={() => globalThis.location.reload()}
+                className="min-h-11 shrink-0 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                다시 시도
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {!loggedIn && !mobileImmersive && (
+          <div className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
+            만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
+          </div>
+        )}
+        <StudioPublishContextBanner context={publishContext} />
+      </div>
 
       {/* 툴바 */}
       {/* 데스크톱: wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록).
@@ -15673,7 +15892,12 @@ function StudioCuttoonEditor() {
           이때 각 메뉴 팝오버는 모바일에서 fixed 로 뜨므로 overflow 스크롤에 잘리지 않는다(아래 메뉴들 참조). */}
       {/* 모바일은 backdrop-blur 를 빼고 불투명 bg-panel 을 쓴다 — backdrop-filter 는 fixed 자식의 containing block 을 만들어
           메뉴 팝오버(fixed)가 이 가로 스크롤 도구막대 안에 갇혀(overflow 클리핑) 안 보이게 되기 때문. 데스크톱은 기존 blur 유지. */}
-      <div className="sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur">
+      <div
+        className={cn(
+          "sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur",
+          mobileImmersive && "top-1 mb-1.5 shrink-0 rounded-xl p-1"
+        )}
+      >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-2 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel/80 to-transparent lg:hidden" />
         <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
@@ -17281,7 +17505,10 @@ function StudioCuttoonEditor() {
             type="button"
             onClick={toggleMaximize}
             aria-pressed={maximized}
-            className={cn(toolBtn(maximized), "h-8 px-2 text-[10px] font-semibold")}
+            className={cn(
+              toolBtn(maximized),
+              "hidden h-8 px-2 text-[10px] font-semibold lg:inline-flex"
+            )}
             title="브라우저 맞춤 — 브라우저 창을 꽉 채워 작업 (ESC로 복원)"
           >
             {maximized ? "복원" : "브라우저 맞춤"}
@@ -17290,7 +17517,10 @@ function StudioCuttoonEditor() {
             type="button"
             onClick={toggleFullscreen}
             aria-pressed={isFullscreen}
-            className={cn(toolBtn(isFullscreen), "h-8 px-2 text-[10px] font-semibold")}
+            className={cn(
+              toolBtn(isFullscreen),
+              "hidden h-8 px-2 text-[10px] font-semibold lg:inline-flex"
+            )}
             title="전체화면 — 창작 스튜디오를 모니터 전체로 (ESC로 종료)"
           >
             {isFullscreen ? "창 모드" : "전체화면"}
@@ -17303,7 +17533,11 @@ function StudioCuttoonEditor() {
       {pageEditLocked && !masterEditMode ? (
         <div
           role="status"
-          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs text-warning"
+          className={cn(
+            "mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs text-warning",
+            mobileImmersive &&
+              "max-h-[min(20dvh,7rem)] shrink-0 overflow-y-auto overscroll-contain"
+          )}
         >
           <span className="inline-flex items-center gap-1.5 font-semibold">
             <Lock size={13} aria-hidden /> 현재 페이지는 검토 잠금 상태라 콘텐츠 변경이 차단됩니다.
@@ -17318,7 +17552,12 @@ function StudioCuttoonEditor() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0">
+      <div
+        className={cn(
+          "flex flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0",
+          mobileImmersive && "min-h-0 flex-1 gap-0 overflow-hidden"
+        )}
+      >
         {/* 모바일 바텀시트 백드롭 — 탭하면 닫힘 */}
         {isMobile && mobileSheet && (
           <button
@@ -17349,7 +17588,7 @@ function StudioCuttoonEditor() {
           className={cn(
             "flex flex-col gap-2 border border-line p-3",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(6.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
             "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
@@ -17682,7 +17921,21 @@ function StudioCuttoonEditor() {
         )}
 
         {/* 중앙: 캔버스 영역 (editor shell) */}
-        <div className="relative flex-1 min-w-0 lg:min-w-[22rem]" data-studio-logical-w={CANVAS_W}>
+        <div
+          className={cn(
+            "relative min-w-0 flex-1 lg:min-w-[22rem]",
+            mobileImmersive && "flex min-h-0 flex-col overflow-hidden"
+          )}
+          data-studio-logical-w={CANVAS_W}
+        >
+          <div
+            data-studio-canvas-status-rail
+            className={cn(
+              mobileImmersive
+                ? "max-h-[min(30dvh,12rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+                : "contents"
+            )}
+          >
           {/* 임시저장 복구 배너 */}
           {hasAutosave && (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
@@ -17895,6 +18148,7 @@ function StudioCuttoonEditor() {
               )}
             </div>
           )}
+          </div>
 
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
@@ -17902,6 +18156,7 @@ function StudioCuttoonEditor() {
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
           <div
             ref={wrapRef}
+            data-studio-canvas-viewport
             // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
             // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}
@@ -17914,12 +18169,10 @@ function StudioCuttoonEditor() {
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
-              // 모바일: 실측 기준 상단 UI(제목+액션바+로그인안내+도구모음 ≈ 17rem) + 하단 스튜디오
-              // 도구막대(safe-area 포함 ≈ 7rem) = 약 24rem을 차감해야 캔버스가 뷰포트 안에 들어온다.
-              // 13rem은 이 합계를 과소평가해 캔버스가 하단 도구막대 뒤로 넘쳐 숨는 버그였다(실측:
-              // top 275px + 하단바 111px = 386px ≈ 24.1rem, 로그인 배너 없는 상태에선 더 여유로움).
-              // 데스크톱(lg): 좌/우 패널·줌 컨트롤이 있는 기존 레이아웃이라 21rem 차감 유지.
-              "relative max-h-[calc(100dvh-26rem)] min-h-[15rem] overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              "relative overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              mobileImmersive
+                ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
+                : "max-h-[calc(100dvh-26rem)] min-h-[15rem]",
               advancedFillArmed && "cursor-crosshair",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
@@ -19965,7 +20218,7 @@ function StudioCuttoonEditor() {
           className={cn(
             "flex min-h-0 flex-col gap-3 overscroll-contain [scrollbar-gutter:stable]",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(6.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
             // 데스크톱: 뷰포트 안에서 독립 스크롤하는 고정 높이 도크. 사이드바가 문서 전체 높이를
             // 밀어내지 않아 긴 웹툰 캔버스와 패널 스크롤이 서로 독립적이다.
             "lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
@@ -23022,9 +23275,9 @@ function StudioCuttoonEditor() {
         {showMobileHint && !mobileSheet && !quickActionsOpen && (
           <div
             role="status"
-            className="fixed inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-300 lg:hidden"
+            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-300 lg:hidden"
             style={{
-              bottom: `calc(6.5rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
             }}
           >
             <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -23058,14 +23311,14 @@ function StudioCuttoonEditor() {
             aria-label="브러시 설정"
             aria-modal={false}
             className={cn(
-              "fixed inset-x-0 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-h-[44vh] max-w-[34rem] overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-h-[44vh] max-w-[34rem] overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
               mobileSheet === "draw"
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
             )}
             inert={mobileSheet === "draw" ? undefined : true}
             style={{
-              bottom: `calc(6.25rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
             }}
           >
             <div className="mb-2 flex items-center justify-between">
@@ -24021,8 +24274,23 @@ function StudioCuttoonEditor() {
             serverCurrentRevision={sharedDocument?.role === "owner" ? serverCurrentRevision : undefined}
             serverLoading={serverRevisionLoading}
             serverError={serverRevisionError}
+            serverWorkId={workId ?? undefined}
+            getCurrentProject={() => parseStudioProjectFile(currentStudioProjectSnapshot())}
+            getCurrentProjectGeneration={() => studioRevisionProjectGenerationRef.current}
             onReloadServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn ? () => void reloadServerRevisions() : undefined}
-            onRestoreServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn ? (revision) => void restoreServerRevision(revision) : undefined}
+            onRestoreServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn
+              ? restoreServerRevision
+              : undefined}
+            onNavigateServerChange={({ pageId, elementId }) => {
+              const targetPage = pages.find((page) => page.id === pageId);
+              if (!targetPage) return;
+              setCurrentPageId(pageId);
+              setSelectedId(
+                elementId && targetPage.elements.some((element) => element.id === elementId)
+                  ? elementId
+                  : null
+              );
+            }}
           />
         ) : null}
       </Suspense>

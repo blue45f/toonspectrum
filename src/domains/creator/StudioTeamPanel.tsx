@@ -1516,7 +1516,7 @@ export function StudioTeamPanel({
   const panel = (
     // 닫기는 Escape와 명시적 버튼으로도 제공된다. 이 핸들러는 포인터 백드롭 전용이다.
     <div
-      className="fixed inset-y-0 left-0 z-[70] w-[100dvw] bg-[oklch(0.08_0.01_70/0.72)] backdrop-blur-[2px]"
+      className="fixed inset-y-0 left-0 z-[90] w-[100dvw] bg-[oklch(0.08_0.01_70/0.72)] backdrop-blur-[2px]"
       data-testid="studio-team-panel-backdrop"
       onPointerDown={handleBackdropPointerDown}
     >

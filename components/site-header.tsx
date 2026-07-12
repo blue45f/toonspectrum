@@ -115,7 +115,10 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-line/70 bg-gradient-to-b from-panel/90 to-panel/80 backdrop-blur-xl">
+      <header
+        data-site-chrome="header"
+        className="sticky top-0 z-50 border-b border-line/70 bg-gradient-to-b from-panel/90 to-panel/80 backdrop-blur-xl"
+      >
         <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 px-4 sm:px-6">
           {/* 로고 */}
           <Link href="/" className="group flex shrink-0 items-center gap-2.5 whitespace-nowrap pr-2">

@@ -1,6 +1,7 @@
 import { Check, Info, X } from "lucide-react";
 
 import { useToastStore, type ToastTone } from "@/lib/toast-store";
+import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 
 const toneIcon: Record<ToastTone, typeof Check> = {
@@ -20,12 +21,19 @@ const toneClass: Record<ToastTone, string> = {
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
+  const studioImmersive = useUi((state) => state.immersiveSurface === "studio");
 
   if (toasts.length === 0) return null;
 
   return (
     <div
+      data-studio-immersive-offset={studioImmersive ? "true" : "false"}
       className="pointer-events-none fixed inset-x-0 bottom-4 z-[95] flex flex-col items-center gap-2 px-4 max-md:bottom-20"
+      style={
+        studioImmersive
+          ? { bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }
+          : undefined
+      }
       role="status"
       aria-live="polite"
     >

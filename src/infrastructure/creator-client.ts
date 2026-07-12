@@ -3,6 +3,7 @@
 // 공유 ky 클라이언트(api)의 beforeRequest 훅이 x-user-id 를 자동 주입하므로 호출부는 헤더를 안 넘긴다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
 import { ensureArray } from "@/lib/http-safe";
+import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/src/compat/auth-session-store";
 import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
 
@@ -110,6 +111,33 @@ export interface WorkRevisionDetail extends WorkRevisionSummary {
   snapshot: Record<string, unknown>;
 }
 
+export interface WorkRevisionComparisonSnapshot extends Record<string, unknown> {
+  titleId: string | null;
+  title: string;
+  description: string;
+  tags: string[];
+  format: WorkFormat;
+  doc: Record<string, unknown>;
+  status: "draft" | "published";
+  seriesId: string | null;
+  episodeNo: number | null;
+  challengeId: string | null;
+  remixFromId: string | null;
+}
+
+export interface WorkRevisionComparisonDetail extends WorkRevisionSummary {
+  snapshot: WorkRevisionComparisonSnapshot;
+}
+
+export class WorkRevisionResponseContractError extends Error {
+  constructor() {
+    // Do not retain the response, a cause, or field values here. Revision snapshots are private
+    // owner data and a malformed response must not make that payload observable through logs/UI.
+    super("작품 버전 응답 형식이 올바르지 않습니다.");
+    this.name = "WorkRevisionResponseContractError";
+  }
+}
+
 export class WorkRevisionConflictError extends Error {
   readonly currentRevision: number;
 
@@ -120,21 +148,206 @@ export class WorkRevisionConflictError extends Error {
   }
 }
 
+const MAX_WORK_REVISION = 2_147_483_647;
+const ISO_DATE_TIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/u;
+
+function workRevision(value: unknown): number | null {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_WORK_REVISION
+    ? value
+    : null;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function normalizedIsoDate(value: unknown): string | null {
+  if (typeof value !== "string" || !ISO_DATE_TIME_PATTERN.test(value)) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  try {
+    return new Date(timestamp).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWorkRevisionSummary(value: unknown): WorkRevisionSummary | null {
+  if (!isPlainRecord(value)) return null;
+  const revision = workRevision(value.revision);
+  const rawRestoredFromRevision = value.restoredFromRevision;
+  const restoredFromRevision = rawRestoredFromRevision === null
+    ? null
+    : workRevision(rawRestoredFromRevision);
+  const createdAt = normalizedIsoDate(value.createdAt);
+  const restoredFromRevisionIsValid =
+    rawRestoredFromRevision === null || restoredFromRevision !== null;
+  if (!revision || !restoredFromRevisionIsValid || !createdAt) {
+    return null;
+  }
+  return { revision, restoredFromRevision, createdAt };
+}
+
+function normalizeWorkRevisionList(value: unknown): WorkRevisionSummary[] {
+  if (!Array.isArray(value)) throw new WorkRevisionResponseContractError();
+  const revisions: WorkRevisionSummary[] = [];
+  for (const item of value) {
+    const revision = normalizeWorkRevisionSummary(item);
+    if (!revision) throw new WorkRevisionResponseContractError();
+    revisions.push(revision);
+  }
+  return revisions;
+}
+
+function normalizeWorkRevisionDetail(value: unknown): WorkRevisionDetail {
+  const summary = normalizeWorkRevisionSummary(value);
+  if (!summary || !isPlainRecord(value) || !isPlainRecord(value.snapshot)) {
+    throw new WorkRevisionResponseContractError();
+  }
+  // Return a fresh ordinary object so a null-prototype JSON-compatible record cannot leak its
+  // unusual prototype into editor code. Nested document data is validated at the Studio parser.
+  return { ...summary, snapshot: { ...value.snapshot } };
+}
+
+const WORK_REVISION_COMPARISON_RESPONSE_KEYS = [
+  "revision",
+  "restoredFromRevision",
+  "createdAt",
+  "snapshot",
+] as const;
+const WORK_REVISION_COMPARISON_SNAPSHOT_KEYS = [
+  "titleId",
+  "title",
+  "description",
+  "tags",
+  "format",
+  "doc",
+  "status",
+  "seriesId",
+  "episodeNo",
+  "challengeId",
+  "remixFromId",
+] as const;
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === keys.length && keys.every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return Boolean(descriptor && "value" in descriptor && descriptor.enumerable);
+  });
+}
+
+function isWorkRevisionTags(value: unknown): value is string[] {
+  if (!Array.isArray(value) || value.length > 8 || Object.getOwnPropertySymbols(value).length > 0) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  if (keys.length !== value.length) return false;
+  return keys.every((key, index) => {
+    if (key !== String(index)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return Boolean(
+      descriptor &&
+      "value" in descriptor &&
+      typeof descriptor.value === "string" &&
+      descriptor.value.length <= 24
+    );
+  });
+}
+
+function nullableReferenceId(value: unknown): value is string | null {
+  return value === null ||
+    (typeof value === "string" &&
+      value.length >= 1 &&
+      value.length <= 160 &&
+      value.trim() === value);
+}
+
+async function normalizeWorkRevisionComparisonDetail(
+  value: unknown
+): Promise<WorkRevisionComparisonDetail> {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, WORK_REVISION_COMPARISON_RESPONSE_KEYS)
+  ) {
+    throw new WorkRevisionResponseContractError();
+  }
+  const summary = normalizeWorkRevisionSummary(value);
+  if (!summary || !isPlainRecord(value.snapshot)) {
+    throw new WorkRevisionResponseContractError();
+  }
+  const snapshot = value.snapshot;
+  if (!hasExactKeys(snapshot, WORK_REVISION_COMPARISON_SNAPSHOT_KEYS)) {
+    throw new WorkRevisionResponseContractError();
+  }
+  const tags = snapshot.tags;
+  const episodeNo = snapshot.episodeNo;
+  if (
+    typeof snapshot.title !== "string" ||
+    snapshot.title.length > 120 ||
+    typeof snapshot.description !== "string" ||
+    snapshot.description.length > 2_000 ||
+    !isWorkRevisionTags(tags) ||
+    (snapshot.format !== "cuttoon" && snapshot.format !== "upload") ||
+    !isPlainRecord(snapshot.doc) ||
+    (snapshot.status !== "draft" && snapshot.status !== "published") ||
+    !nullableReferenceId(snapshot.titleId) ||
+    !nullableReferenceId(snapshot.seriesId) ||
+    !nullableReferenceId(snapshot.challengeId) ||
+    !nullableReferenceId(snapshot.remixFromId) ||
+    !(
+      episodeNo === null ||
+      (typeof episodeNo === "number" &&
+        Number.isInteger(episodeNo) &&
+        episodeNo >= 1 &&
+        episodeNo <= MAX_WORK_REVISION)
+    )
+  ) {
+    throw new WorkRevisionResponseContractError();
+  }
+
+  let projectedDoc: unknown;
+  try {
+    // Defense in depth: downstream editor code never receives a raw resource URL even if an older
+    // server accidentally violates the new projection contract.
+    projectedDoc = await projectRevisionComparisonValue(snapshot.doc);
+  } catch {
+    throw new WorkRevisionResponseContractError();
+  }
+  if (!isPlainRecord(projectedDoc)) throw new WorkRevisionResponseContractError();
+
+  return {
+    ...summary,
+    snapshot: {
+      titleId: snapshot.titleId,
+      title: snapshot.title,
+      description: snapshot.description,
+      tags: [...tags],
+      format: snapshot.format,
+      doc: projectedDoc,
+      status: snapshot.status,
+      seriesId: snapshot.seriesId,
+      episodeNo,
+      challengeId: snapshot.challengeId,
+      remixFromId: snapshot.remixFromId,
+    },
+  };
+}
+
 function revisionConflictFrom(error: unknown): WorkRevisionConflictError | null {
   if (!isHttpError(error) || error.response.status !== 409) return null;
   const payload = error.data;
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   const record = payload as Record<string, unknown>;
   if (record.code !== "creator_work_revision_conflict") return null;
-  const currentRevision = record.currentRevision;
-  if (
-    typeof currentRevision !== "number" ||
-    !Number.isInteger(currentRevision) ||
-    currentRevision < 1 ||
-    currentRevision > 2_147_483_647
-  ) {
-    return null;
-  }
+  const currentRevision = workRevision(record.currentRevision);
+  if (!currentRevision) return null;
   return new WorkRevisionConflictError(currentRevision);
 }
 
@@ -233,7 +446,7 @@ export async function listWorkRevisions(
     () => api.get<unknown>(`${BASE}/works/${encodeURIComponent(id)}/revisions`, { params: { limit }, signal }),
     "작품 버전 목록을 불러오지 못했습니다."
   );
-  return ensureArray<WorkRevisionSummary>(data);
+  return normalizeWorkRevisionList(data);
 }
 
 export async function getWorkRevision(
@@ -241,13 +454,29 @@ export async function getWorkRevision(
   revision: number,
   signal?: AbortSignal
 ): Promise<WorkRevisionDetail> {
-  return callOrThrow(
-    () => api.get<WorkRevisionDetail>(
+  const data = await callOrThrow(
+    () => api.get<unknown>(
       `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}`,
       { signal }
     ),
     "작품 버전을 불러오지 못했습니다."
   );
+  return normalizeWorkRevisionDetail(data);
+}
+
+export async function getWorkRevisionComparison(
+  id: string,
+  revision: number,
+  signal?: AbortSignal
+): Promise<WorkRevisionComparisonDetail> {
+  const data = await callOrThrow(
+    () => api.get<unknown>(
+      `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}/comparison`,
+      { signal }
+    ),
+    "작품 버전 비교 정보를 불러오지 못했습니다."
+  );
+  return normalizeWorkRevisionComparisonDetail(data);
 }
 
 export async function restoreWorkRevision(

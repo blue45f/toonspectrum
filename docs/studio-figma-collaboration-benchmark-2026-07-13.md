@@ -20,8 +20,8 @@ documentation for [multiplayer tools](https://help.figma.com/hc/en-us/sections/3
 | Persistent multiplayer independent of panels | Closing team management must not disconnect the editing room | Implemented: `StudioLiveCollaborationProvider` owns the room; the team panel owns only screen-capture/WebRTC lifetime |
 | Late screen-share discovery | A reviewer opening the team panel after sharing started must still find the host | Implemented: the late controller sends a bounded authenticated discovery signal; the host replays share metadata without granting media access |
 | Explicit recovery/fallback | Do not silently change the collaboration trust boundary | Implemented: authenticated server retry and user-selected same-origin local-tab fallback remain distinct; missing credentials fail closed and terminal ACL revocation disables fallback |
-| Named versions and compare | Compare episode revisions before restoration | Partially available: server revisions/checkpoints exist; semantic before/after comparison and named versions remain planned |
-| Branch/review/merge | Let an assistant propose a lettering or coloring pass without overwriting main | Planned after semantic diff and server review comments; snapshot-only pseudo-branches would not provide safe merge semantics |
+| Named versions and compare | Compare episode revisions before restoration | Semantic compare implemented: the owner reviews selected revision→local and current server→local separately, with bounded page/layer details, canvas navigation, Worker execution, stale-base rejection and an automatic pre-restore IndexedDB checkpoint. Durable named server versions remain planned |
+| Branch/review/merge | Let an assistant propose a lettering or coloring pass without overwriting main | Planned after durable named versions and server review comments; snapshot-only pseudo-branches would not provide safe merge semantics |
 
 ## Deliberate safety boundaries
 
@@ -48,5 +48,5 @@ documentation for [multiplayer tools](https://help.figma.com/hc/en-us/sections/3
 1. Resource-correlated authoritative lock acquisition and hierarchical resource conflicts.
 2. Drag/transform/text/pixel-tool mutation guards with Konva rollback on denial.
 3. Server editorial comment threads with commenter permission, mentions and realtime events.
-4. Semantic and visual revision comparison, then named versions.
+4. Durable named server versions and visual overlay comparison (semantic comparison is implemented).
 5. Durable operation stream or CRDT foundation, followed by three-way branch review and merge.

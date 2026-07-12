@@ -12,6 +12,7 @@ import {
   dbClient,
   users,
 } from "../db";
+import { REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL } from "../revision-comparison-projection";
 import {
   SEED_CHALLENGES,
   challengeStateOf,
@@ -21,6 +22,7 @@ import {
   ensureCreatorCommunitySchema,
   getSeries,
   getWork,
+  getWorkRevisionComparison,
   getWorkRevision,
   addComment,
   listComments,
@@ -195,11 +197,26 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
     if (!dbAvailable) return ctx.skip();
     const owner = await createCreatorTestUser("revision 소유자", "revision-owner-");
     const reader = await createCreatorTestUser("revision 외부인", "revision-reader-");
+    const embeddedDataUrl = "data:image/png;base64,private-doc-resource";
+    const privatePrompt = "server comparison에 노출하면 안 되는 opt-in prompt";
+    const privateRequestId = "private-provider-request-id";
     const created = await createWork(owner, {
       title: "revision 원고",
       status: "published",
       pages: ["data:image/png;base64,AA=="],
-      doc: { versionLabel: "initial", privateNote: "owner only" },
+      doc: {
+        versionLabel: "initial",
+        privateNote: "owner only",
+        embedded: { src: embeddedDataUrl },
+        aiProvenance: {
+          operations: [
+            {
+              prompt: { sha256: "c".repeat(64), raw: privatePrompt },
+              requestId: privateRequestId,
+            },
+          ],
+        },
+      },
     });
     createdWorkIds.add(created.id);
     expect(created.revision).toBe(1);
@@ -212,7 +229,39 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
     );
 
     const baseline = await getWorkRevision(owner, created.id, 1);
-    expect(baseline.snapshot.doc).toEqual({ versionLabel: "initial", privateNote: "owner only" });
+    expect(baseline.snapshot.doc).toEqual({
+      versionLabel: "initial",
+      privateNote: "owner only",
+      embedded: { src: embeddedDataUrl },
+      aiProvenance: {
+        operations: [
+          {
+            prompt: { sha256: "c".repeat(64), raw: privatePrompt },
+            requestId: privateRequestId,
+          },
+        ],
+      },
+    });
+    const comparison = await getWorkRevisionComparison(owner, created.id, 1);
+    expect(comparison.snapshot).not.toHaveProperty("cover");
+    expect(comparison.snapshot).not.toHaveProperty("pages");
+    expect(JSON.stringify(comparison)).not.toContain(embeddedDataUrl);
+    expect(JSON.stringify(comparison)).not.toContain(privatePrompt);
+    expect(JSON.stringify(comparison)).not.toContain(privateRequestId);
+    expect(comparison.snapshot.doc).toMatchObject({
+      aiProvenance: {
+        operations: [
+          { prompt: { sha256: REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL } },
+        ],
+      },
+    });
+    expect(JSON.stringify(comparison)).not.toContain("c".repeat(64));
+    expect(JSON.stringify(comparison)).toMatch(
+      /toonspectrum:resource-sha256:v1:\d+:[0-9a-f]{64}/u
+    );
+    await expect(
+      getWorkRevisionComparison(reader, created.id, 1)
+    ).rejects.toBeInstanceOf(CreatorWorkRevisionNotFoundError);
 
     const updated = await updateWork(owner, created.id, {
       doc: { versionLabel: "updated", privateNote: "still owner only" },

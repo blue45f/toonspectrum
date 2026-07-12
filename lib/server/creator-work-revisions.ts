@@ -1,3 +1,5 @@
+import { projectRevisionComparisonValue } from "../revision-comparison-projection";
+
 export const CREATOR_WORK_REVISION_RETENTION = 20;
 export const CREATOR_WORK_REVISION_MAX = 2_147_483_647;
 
@@ -16,6 +18,16 @@ export interface CreatorWorkRevisionSnapshot {
   challengeId: string | null;
   remixFromId: string | null;
 }
+
+/**
+ * Studio's semantic comparison does not need the rendered publication assets. Keeping this as a
+ * separate type prevents a caller from accidentally returning cover/page data URLs through the
+ * lightweight comparison API.
+ */
+export type CreatorWorkRevisionComparisonSnapshot = Omit<
+  CreatorWorkRevisionSnapshot,
+  "cover" | "pages"
+>;
 
 export interface CreatorWorkRevisionSnapshotSource {
   titleId?: unknown;
@@ -66,6 +78,18 @@ export function createCreatorWorkRevisionSnapshot(
     episodeNo: nullableInteger(source.episodeNo),
     challengeId: nullableText(source.challengeId),
     remixFromId: nullableText(source.remixFromId),
+  };
+}
+
+/** Owner-only comparison projection without rendered assets or private AI/resource payloads. */
+export async function createCreatorWorkRevisionComparisonSnapshot(
+  source: CreatorWorkRevisionSnapshotSource
+): Promise<CreatorWorkRevisionComparisonSnapshot> {
+  const { cover: _cover, pages: _pages, ...comparison } =
+    createCreatorWorkRevisionSnapshot(source);
+  return {
+    ...comparison,
+    doc: await projectRevisionComparisonValue(comparison.doc),
   };
 }
 
