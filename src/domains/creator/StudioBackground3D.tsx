@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Boxes,
   Camera,
+  ChevronDown,
   CircleDashed,
   Cone,
   Copy,
@@ -18,11 +19,14 @@ import {
   Maximize2,
   Move,
   PackageOpen,
+  PencilLine,
   Pill,
   Pyramid,
   Redo2,
   RectangleHorizontal,
   RotateCw,
+  Save,
+  ScanLine,
   Scaling,
   Trash2,
   Triangle,
@@ -34,7 +38,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 
@@ -75,7 +79,6 @@ import {
   duplicatePrimitive,
   makeGeometry,
   PRIMITIVE_DEFS,
-  roundExportSize,
   type BgPrimitive,
   type BgPrimitiveKind,
 } from "./studio-background-3d-primitives";
@@ -91,14 +94,48 @@ import {
   type StudioBg3dDeviceSignals,
   type StudioBg3dResolvedDeviceQuality,
 } from "./studio-bg3d-device-quality";
+import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
+import {
+  EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
+  createStudioBg3dLtUserPreset,
+  deleteStudioBg3dLtUserPreset,
+  renameStudioBg3dLtUserPreset,
+  upsertStudioBg3dLtUserPreset,
+  type StudioBg3dLtUserPresetMutationFailureReason,
+  type StudioBg3dLtUserPresetMutationResult,
+  type StudioBg3dLtUserPresetMutationSuccess,
+} from "./studio-bg3d-lt-preset-library";
+import {
+  loadStudioBg3dLtUserPresetsFromStorage,
+  saveStudioBg3dLtUserPresetsToStorage,
+  type StudioBg3dLtPresetStorage,
+} from "./studio-bg3d-lt-preset-storage";
+import {
+  STUDIO_BG3D_LT_BUILT_IN_PRESETS,
+  STUDIO_BG3D_LT_PRESET_MAX_COUNT,
+  STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH,
+  STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH,
+  applyStudioBg3dLtPreset,
+  type StudioBg3dLtPreset,
+  type StudioBg3dLtPresetPayload,
+} from "./studio-bg3d-lt-presets";
+import {
+  renderStudioBg3dLtLayers,
+  STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
+  type StudioBg3dLtRasterLayer,
+  type StudioBg3dLtRasterLayerRole,
+} from "./studio-bg3d-lt-render";
+import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dCameraSettings,
+  type StudioBg3dLineOutputSettings,
   type StudioBg3dModelAttachment,
   type StudioBg3dSceneBudgets,
   type StudioBg3dSceneDocument,
+  type StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
 import {
   adaptStudioBg3dRuntimeToDocument,
@@ -106,10 +143,21 @@ import {
 } from "./studio-bg3d-scene-runtime";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 
-export interface StudioBackground3DInsertResult {
+export interface StudioBackground3DLtLayer {
+  readonly role: StudioBg3dLtRasterLayerRole;
   readonly pngDataUrl: string;
   readonly width: number;
   readonly height: number;
+}
+
+export interface StudioBackground3DInsertResult {
+  readonly kind: "separated";
+  readonly width: number;
+  readonly height: number;
+  /** Back-to-front paint order: tone, texture line, main line. */
+  readonly layers: readonly StudioBackground3DLtLayer[];
+  /** Flattened fallback for document surfaces that intentionally do not support layer groups. */
+  readonly compositePngDataUrl: string;
   readonly bg3dScene: StudioBg3dSceneDocument;
 }
 
@@ -122,7 +170,14 @@ export interface StudioBackground3DProps {
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
-type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "models";
+type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
+type LtEditorSection = "line" | "tone";
+type LtUserPresetLibraryStatus = "idle" | "ready" | "recovered" | "unavailable";
+type LtUserPresetNoticeTone = "info" | "success" | "error";
+type LtUserPresetNotice = {
+  readonly tone: LtUserPresetNoticeTone;
+  readonly message: string;
+};
 type CaptureState = { gl: THREE.WebGLRenderer | null; scene: THREE.Scene | null; camera: THREE.Camera | null };
 type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose"> & {
   readonly record: Bg3dVerifiedStoredRecord;
@@ -136,9 +191,306 @@ const ICON_BUTTON =
   "inline-grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 const VIEWPORT_BTN =
   "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
+const DEFAULT_LT_USER_PRESET_DESCRIPTION = "현재 장면에서 저장한 LT 선화·톤 설정입니다.";
+
+let fallbackLtUserPresetIdSequence = 0;
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function getBrowserLtPresetStorage(): StudioBg3dLtPresetStorage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackLtUserPresetToken(): string {
+  fallbackLtUserPresetIdSequence += 1;
+  const randomWords = Array.from({ length: 4 }, () =>
+    Math.floor(Math.random() * 0x1_0000_0000).toString(16).padStart(8, "0")
+  ).join("");
+  return `fallback-${randomWords}-${fallbackLtUserPresetIdSequence.toString(36)}`;
+}
+
+/**
+ * Generates a caller-owned stable id. Web Crypto is preferred; the non-security fallback combines
+ * random words with a monotonic sequence and verifies every candidate against current ids. It
+ * never derives identity from a mutable display name or from wall-clock time alone.
+ */
+function generateLtUserPresetId(payload: StudioBg3dLtPresetPayload): string | null {
+  const occupied = new Set([
+    ...STUDIO_BG3D_LT_BUILT_IN_PRESETS.map((preset) => preset.id),
+    ...payload.presets.map((preset) => preset.id),
+  ]);
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    let token: string | null = null;
+    try {
+      const cryptoApi = globalThis.crypto;
+      if (typeof cryptoApi?.randomUUID === "function") {
+        token = cryptoApi.randomUUID();
+      } else if (typeof cryptoApi?.getRandomValues === "function") {
+        const bytes = new Uint8Array(16);
+        cryptoApi.getRandomValues(bytes);
+        token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+    } catch {
+      token = null;
+    }
+    const id = `user.${token ?? fallbackLtUserPresetToken()}`;
+    if (id.length <= 80 && !occupied.has(id)) return id;
+  }
+  return null;
+}
+
+function ltUserPresetFailureMessage(
+  reason: StudioBg3dLtUserPresetMutationFailureReason
+): string {
+  switch (reason) {
+    case "built-in-id":
+      return "기본 프리셋과 같은 ID는 사용할 수 없습니다.";
+    case "duplicate-id":
+      return "같은 사용자 프리셋 ID가 이미 있습니다.";
+    case "max-count":
+      return `사용자 프리셋은 최대 ${STUDIO_BG3D_LT_PRESET_MAX_COUNT}개까지 저장할 수 있습니다.`;
+    case "not-found":
+      return "선택한 사용자 프리셋을 찾을 수 없습니다. 목록을 다시 열어 주세요.";
+    case "invalid-name":
+      return "이름은 앞뒤 공백이나 제어 문자 없이 입력해 주세요.";
+    case "invalid-payload":
+      return "프리셋 라이브러리 상태가 올바르지 않아 저장하지 않았습니다.";
+    case "invalid-preset":
+      return "이름·설명과 현재 LT 설정을 확인해 주세요.";
+    case "serialization-failed":
+      return "프리셋을 안전한 저장 형식으로 만들지 못했습니다.";
+  }
+}
+
+function waitForStudioBg3dPaintFrame(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+function readStudioBg3dCaptureRgba(
+  sourceCanvas: HTMLCanvasElement,
+  width: number,
+  height: number
+): Uint8ClampedArray {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("2D capture context unavailable.");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.clearRect(0, 0, width, height);
+  context.drawImage(sourceCanvas, 0, 0, width, height);
+  return new Uint8ClampedArray(context.getImageData(0, 0, width, height).data);
+}
+
+function encodeStudioBg3dLtLayers(
+  layers: readonly StudioBg3dLtRasterLayer[]
+): { readonly layers: readonly StudioBackground3DLtLayer[]; readonly compositePngDataUrl: string } {
+  if (layers.length === 0) throw new Error("LT layers are empty.");
+  const width = layers[0]?.width ?? 0;
+  const height = layers[0]?.height ?? 0;
+  if (width < 1 || height < 1 || layers.some((layer) => layer.width !== width || layer.height !== height)) {
+    throw new Error("LT layer dimensions do not match.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("2D PNG context unavailable.");
+  const compositeCanvas = document.createElement("canvas");
+  compositeCanvas.width = width;
+  compositeCanvas.height = height;
+  const compositeContext = compositeCanvas.getContext("2d");
+  if (!compositeContext) throw new Error("2D composite context unavailable.");
+  const encodedLayers = layers.map((layer) => {
+    const imageData = context.createImageData(width, height);
+    imageData.data.set(layer.data);
+    context.clearRect(0, 0, width, height);
+    context.putImageData(imageData, 0, 0);
+    compositeContext.drawImage(canvas, 0, 0);
+    const pngDataUrl = canvas.toDataURL("image/png").split("#", 1)[0];
+    if (!pngDataUrl.startsWith("data:image/png;base64,")) {
+      throw new Error("LT layer PNG encoding failed.");
+    }
+    return Object.freeze({
+      role: layer.role,
+      pngDataUrl,
+      width,
+      height,
+    });
+  });
+  const compositePngDataUrl = compositeCanvas.toDataURL("image/png").split("#", 1)[0];
+  if (!compositePngDataUrl.startsWith("data:image/png;base64,")) {
+    throw new Error("LT composite PNG encoding failed.");
+  }
+  return Object.freeze({
+    layers: Object.freeze(encodedLayers),
+    compositePngDataUrl,
+  });
+}
+
+interface LtRangeControlProps {
+  readonly id: string;
+  readonly label: string;
+  readonly max: number;
+  readonly min: number;
+  readonly onChange: (value: number) => void;
+  readonly step: number;
+  readonly value: number;
+  readonly valueText: string;
+  readonly disabled?: boolean;
+}
+
+function LtRangeControl({
+  id,
+  label,
+  max,
+  min,
+  onChange,
+  step,
+  value,
+  valueText,
+  disabled = false,
+}: LtRangeControlProps) {
+  return (
+    <label
+      htmlFor={id}
+      className={cx(
+        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-line/70 py-1.5 last:border-b-0",
+        disabled && "opacity-45"
+      )}
+    >
+      <span className="text-xs font-semibold text-fg-2">{label}</span>
+      <output htmlFor={id} className="min-w-12 text-right text-[0.68rem] tabular-nums text-fg-3">
+        {valueText}
+      </output>
+      <input
+        id={id}
+        type="range"
+        aria-valuetext={valueText}
+        className="col-span-2 h-11 w-full cursor-pointer accent-accent disabled:cursor-not-allowed sm:h-8"
+        disabled={disabled}
+        max={max}
+        min={min}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+interface LtToggleRowProps {
+  readonly checked: boolean;
+  readonly label: string;
+  readonly onChange: (checked: boolean) => void;
+  readonly disabled?: boolean;
+}
+
+function LtToggleRow({ checked, label, onChange, disabled = false }: LtToggleRowProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-line/70 py-2 text-left text-xs font-semibold text-fg-2 transition-colors last:border-b-0 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+    >
+      <span>{label}</span>
+      <span
+        aria-hidden
+        className={cx(
+          "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
+          checked ? "border-accent bg-accent" : "border-line-strong bg-raised"
+        )}
+      >
+        <span
+          className={cx(
+            "absolute top-0.5 size-3.5 rounded-full bg-fg transition-transform",
+            checked ? "translate-x-[1.05rem]" : "translate-x-0.5"
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ltOutputFingerprint(
+  line: StudioBg3dLineOutputSettings,
+  tone: StudioBg3dToneOutputSettings
+): string {
+  return JSON.stringify([line, tone]);
+}
+
+function matchingLtPreset(
+  line: StudioBg3dLineOutputSettings,
+  tone: StudioBg3dToneOutputSettings,
+  userPayload: StudioBg3dLtPresetPayload,
+  preferredId: string | null
+): StudioBg3dLtPreset | null {
+  const fingerprint = ltOutputFingerprint(line, tone);
+  const matches = (preset: StudioBg3dLtPreset) =>
+    ltOutputFingerprint(preset.line, preset.tone) === fingerprint;
+  if (preferredId) {
+    const preferred = STUDIO_BG3D_LT_BUILT_IN_PRESETS.find((preset) => preset.id === preferredId)
+      ?? userPayload.presets.find((preset) => preset.id === preferredId);
+    if (preferred && matches(preferred)) return preferred;
+  }
+  return STUDIO_BG3D_LT_BUILT_IN_PRESETS.find(matches)
+    ?? userPayload.presets.find(matches)
+    ?? null;
+}
+
+function ltTonePreviewStyle(tone: StudioBg3dToneOutputSettings): CSSProperties {
+  if (tone.mode === "none") {
+    return { backgroundColor: "var(--color-card)", opacity: 0.45 };
+  }
+
+  const spacing = Math.max(4, Math.min(18, Math.round(360 / tone.frequency)));
+  const angle = `${tone.angleDegrees}deg`;
+  const base: CSSProperties = {
+    backgroundColor: "var(--color-card)",
+    color: "var(--color-fg-2)",
+    opacity: tone.opacity,
+  };
+  if (tone.type === "grayscale" && tone.mode !== "screentone") {
+    const stop = Math.round(100 / Math.max(2, tone.levels));
+    return {
+      ...base,
+      backgroundImage: `repeating-linear-gradient(${angle}, currentColor 0 ${stop}%, transparent ${stop}% ${stop * 2}%)`,
+    };
+  }
+  if (tone.pattern === "line") {
+    return {
+      ...base,
+      backgroundImage: `repeating-linear-gradient(${angle}, currentColor 0 1px, transparent 1px ${spacing}px)`,
+    };
+  }
+  if (tone.pattern === "crosshatch") {
+    return {
+      ...base,
+      backgroundImage: `repeating-linear-gradient(${angle}, currentColor 0 1px, transparent 1px ${spacing}px), repeating-linear-gradient(${tone.angleDegrees + 90}deg, currentColor 0 1px, transparent 1px ${spacing}px)`,
+    };
+  }
+  if (tone.pattern === "noise") {
+    return {
+      ...base,
+      backgroundImage: "radial-gradient(circle at 25% 30%, currentColor 0 1px, transparent 1.5px), radial-gradient(circle at 70% 68%, currentColor 0 1px, transparent 1.5px)",
+      backgroundSize: `${spacing}px ${spacing}px, ${spacing + 3}px ${spacing + 3}px`,
+    };
+  }
+  return {
+    ...base,
+    backgroundImage: "radial-gradient(circle, currentColor 0 1px, transparent 1.5px)",
+    backgroundSize: `${spacing}px ${spacing}px`,
+  };
 }
 
 const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; hint: string }> = [
@@ -146,6 +498,7 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "templates", label: "템플릿", icon: LayoutTemplate, hint: "교실·거리·카페처럼 완성된 공간을 한 번에 추가" },
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
+  { id: "lt", label: "LT", icon: ScanLine, hint: "선화 · 질감선 · 톤 출력 설정" },
   { id: "models", label: "모델", icon: PackageOpen, hint: "업로드 · 배치 · 삭제" },
 ];
 
@@ -180,6 +533,22 @@ const CAMERA_PRESETS: Record<string, { label: string; position: [number, number,
   top: { label: "위에서", position: [0, 10, 0.001], target: [0, 0, 0] },
   side: { label: "측면", position: [9, 1.6, 0], target: [0, 0.9, 0] },
 };
+
+const LT_TONE_MODE_LABELS: Record<StudioBg3dToneOutputSettings["mode"], string> = {
+  none: "톤 없음",
+  flat: "평면 명암",
+  cel: "셀 명암",
+  screentone: "스크린톤",
+};
+
+const LT_TONE_PATTERN_LABELS: Record<StudioBg3dToneOutputSettings["pattern"], string> = {
+  dot: "도트",
+  line: "평행선",
+  crosshatch: "교차선",
+  noise: "노이즈",
+};
+
+const LT_EXPORT_HEIGHTS = [640, 1_080, 1_440, 2_160, 4_096] as const;
 
 type BrowserNavigatorCapabilities = Navigator & {
   readonly connection?: {
@@ -402,9 +771,8 @@ function CaptureBridge({ onCaptureUpdate }: { onCaptureUpdate: (state: CaptureSt
   return null;
 }
 
-/* 뷰포트 하늘색 프리셋 적용 — clearColor는 캡처/내보내기에 무관한 순수 화면 장식이라
-   BgSceneState/undo 히스토리 밖 로컬 state로 관리하고, 여기서만 명령형으로 gl에 반영한다
-   (CaptureBridge와 동일하게 useThree 로 Canvas 내부 gl을 꺼내 쓰는 다리 컴포넌트). */
+/* 뷰포트 하늘색 프리셋 적용. 화면과 비투명 LT 톤 입력에 같은 색을 쓰되, 장면 문서에는 캡처 직전
+   canonical background 설정으로 반영한다. CaptureBridge와 동일하게 Canvas 내부 gl을 잇는 다리다. */
 function SkyClearColorController({ clearColor }: { clearColor: string }) {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
@@ -511,6 +879,7 @@ function BgGroundHelper({ visible }: { visible: boolean }) {
 interface BgPrimitiveMeshProps {
   prim: BgPrimitive;
   lineArt: boolean;
+  showEdges: boolean;
   onSelect: (id: string) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
 }
@@ -520,7 +889,7 @@ interface BgPrimitiveMeshProps {
    바꾸는 게 핵심: 깊이쓰기가 계속 켜져 있어 (1) 가려진 도형의 엣지가 앞 도형에 정확히 가려지는
    hidden-line-removal이 유지되고 (2) three.js/R3F가 invisible 오브젝트는 레이캐스트에서 제외하므로
    라인아트 미리보기 중에도 클릭 선택이 계속 동작한다. */
-function BgPrimitiveMesh({ prim, lineArt, onSelect, registerRef }: BgPrimitiveMeshProps) {
+function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: BgPrimitiveMeshProps) {
   const geometry = useMemo(() => makeGeometry(prim.kind), [prim.kind]);
   // BoxGeometry의 각 면은 삼각형 2장(동일 평면)이라 임계각이 낮으면 면 대각선에 가짜 엣지가 그려진다.
   // 20°는 그 가짜 대각선은 없애면서 상자 모서리·원기둥 캡 테두리 같은 실제 크리스는 모두 살린다.
@@ -560,9 +929,11 @@ function BgPrimitiveMesh({ prim, lineArt, onSelect, registerRef }: BgPrimitiveMe
           <meshStandardMaterial color={prim.color} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         )}
       </mesh>
-      <lineSegments geometry={edges}>
-        <lineBasicMaterial color="#000000" />
-      </lineSegments>
+      {showEdges ? (
+        <lineSegments geometry={edges}>
+          <lineBasicMaterial color="#000000" />
+        </lineSegments>
+      ) : null}
     </group>
   );
 }
@@ -681,6 +1052,20 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>("shapes");
+  const [ltEditorSection, setLtEditorSection] = useState<LtEditorSection>("line");
+  const [ltUserPresetPayload, setLtUserPresetPayload] = useState<StudioBg3dLtPresetPayload>(
+    EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD
+  );
+  const [ltUserPresetLibraryStatus, setLtUserPresetLibraryStatus] =
+    useState<LtUserPresetLibraryStatus>("idle");
+  const [ltUserPresetNotice, setLtUserPresetNotice] = useState<LtUserPresetNotice | null>(null);
+  const [ltPreferredPresetId, setLtPreferredPresetId] = useState<string | null>(null);
+  const [ltManagedUserPresetId, setLtManagedUserPresetId] = useState<string | null>(null);
+  const [ltDeleteConfirmId, setLtDeleteConfirmId] = useState<string | null>(null);
+  const [ltUserPresetName, setLtUserPresetName] = useState("");
+  const [ltUserPresetDescription, setLtUserPresetDescription] = useState(
+    DEFAULT_LT_USER_PRESET_DESCRIPTION
+  );
   const [viewportHinted, setViewportHinted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -759,6 +1144,52 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       attachmentByStorageId.clear();
       storageIdByAttachment.clear();
     };
+  }, [open]);
+
+  // 사용자 LT 프리셋은 장면 문서와 분리된 로컬 라이브러리다. 저장소가 차단되거나 손상돼도
+  // 3D 장면 복원/캡처를 막지 않고, 검증된 빈 payload로만 폴백한다.
+  useEffect(() => {
+    if (!open) return;
+    const storage = getBrowserLtPresetStorage();
+    setLtPreferredPresetId(null);
+    setLtManagedUserPresetId(null);
+    setLtDeleteConfirmId(null);
+    setLtUserPresetName("");
+    setLtUserPresetDescription(DEFAULT_LT_USER_PRESET_DESCRIPTION);
+    if (!storage) {
+      setLtUserPresetPayload(EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD);
+      setLtUserPresetLibraryStatus("unavailable");
+      setLtUserPresetNotice({
+        tone: "error",
+        message: "브라우저 저장소를 사용할 수 없어 사용자 프리셋을 불러오지 못했습니다.",
+      });
+      return;
+    }
+
+    const loaded = loadStudioBg3dLtUserPresetsFromStorage(storage);
+    setLtUserPresetPayload(loaded.payload);
+    if (loaded.status === "unavailable") {
+      setLtUserPresetLibraryStatus("unavailable");
+      setLtUserPresetNotice({
+        tone: "error",
+        message: "브라우저 저장소 읽기가 차단되어 사용자 프리셋을 안전한 빈 상태로 열었습니다.",
+      });
+      return;
+    }
+    if (loaded.status === "recovered") {
+      setLtUserPresetLibraryStatus("recovered");
+      setLtUserPresetNotice({
+        tone: loaded.rewritten ? "info" : "error",
+        message: loaded.rewritten
+          ? loaded.quarantined
+            ? "손상된 프리셋 저장값을 격리하고 빈 라이브러리로 복구했습니다."
+            : "손상된 프리셋 저장값을 초기화했지만 백업 사본은 남기지 못했습니다."
+          : "손상된 프리셋은 무시했지만 저장소 복구가 완료되지 않았습니다.",
+      });
+      return;
+    }
+    setLtUserPresetLibraryStatus("ready");
+    setLtUserPresetNotice(null);
   }, [open]);
 
   // CSS 뷰포트, DPR, 포인터, 데이터 절약/기기 성능 신호를 명시적으로 수집해 순수 품질 정책에 전달한다.
@@ -1252,6 +1683,198 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   };
 
+  function reportLtUserPresetMutationFailure(
+    result: StudioBg3dLtUserPresetMutationResult
+  ): result is StudioBg3dLtUserPresetMutationSuccess {
+    if (result.ok) return true;
+    setLtUserPresetNotice({
+      tone: "error",
+      message: ltUserPresetFailureMessage(result.reason),
+    });
+    return false;
+  }
+
+  function persistLtUserPresetMutation(
+    result: StudioBg3dLtUserPresetMutationSuccess,
+    successMessage: string
+  ): boolean {
+    const storage = getBrowserLtPresetStorage();
+    if (!storage || !saveStudioBg3dLtUserPresetsToStorage(storage, result.canonicalJson)) {
+      setLtUserPresetLibraryStatus("unavailable");
+      setLtUserPresetNotice({
+        tone: "error",
+        message: "브라우저 저장소에 프리셋을 기록하지 못했습니다. 저장 공간과 사이트 권한을 확인해 주세요.",
+      });
+      return false;
+    }
+    setLtUserPresetPayload(result.payload);
+    setLtUserPresetLibraryStatus("ready");
+    setLtUserPresetNotice({ tone: "success", message: successMessage });
+    return true;
+  }
+
+  function currentLtUserPresetDraft(id: string) {
+    return {
+      id,
+      name: ltUserPresetName,
+      description: ltUserPresetDescription,
+      line: sceneBaseDocument.output.line,
+      tone: sceneBaseDocument.output.tone,
+    };
+  }
+
+  function saveCurrentLtAsUserPreset() {
+    const id = generateLtUserPresetId(ltUserPresetPayload);
+    if (!id) {
+      setLtUserPresetNotice({
+        tone: "error",
+        message: "충돌하지 않는 안전한 프리셋 ID를 만들지 못했습니다. 다시 시도해 주세요.",
+      });
+      return;
+    }
+    const result = createStudioBg3dLtUserPreset(
+      ltUserPresetPayload,
+      currentLtUserPresetDraft(id)
+    );
+    if (!reportLtUserPresetMutationFailure(result)) return;
+    if (!persistLtUserPresetMutation(result, `“${result.preset?.name ?? ltUserPresetName}” 프리셋을 저장했습니다.`)) return;
+    setLtManagedUserPresetId(id);
+    setLtPreferredPresetId(id);
+    setLtDeleteConfirmId(null);
+  }
+
+  function updateManagedLtUserPreset() {
+    if (
+      !ltManagedUserPresetId ||
+      !ltUserPresetPayload.presets.some((preset) => preset.id === ltManagedUserPresetId)
+    ) {
+      setLtUserPresetNotice({ tone: "error", message: "업데이트할 사용자 프리셋을 먼저 선택해 주세요." });
+      return;
+    }
+    const result = upsertStudioBg3dLtUserPreset(
+      ltUserPresetPayload,
+      currentLtUserPresetDraft(ltManagedUserPresetId)
+    );
+    if (!reportLtUserPresetMutationFailure(result)) return;
+    if (!persistLtUserPresetMutation(result, `“${result.preset?.name ?? ltUserPresetName}”에 현재 LT 설정을 반영했습니다.`)) return;
+    setLtPreferredPresetId(ltManagedUserPresetId);
+    setLtDeleteConfirmId(null);
+  }
+
+  function renameManagedLtUserPreset() {
+    if (!ltManagedUserPresetId) {
+      setLtUserPresetNotice({ tone: "error", message: "이름을 바꿀 사용자 프리셋을 먼저 선택해 주세요." });
+      return;
+    }
+    const result = renameStudioBg3dLtUserPreset(
+      ltUserPresetPayload,
+      ltManagedUserPresetId,
+      ltUserPresetName
+    );
+    if (!reportLtUserPresetMutationFailure(result)) return;
+    if (!persistLtUserPresetMutation(result, `프리셋 이름을 “${result.preset?.name ?? ltUserPresetName}”(으)로 변경했습니다.`)) return;
+    setLtPreferredPresetId(ltManagedUserPresetId);
+    setLtDeleteConfirmId(null);
+  }
+
+  function deleteManagedLtUserPreset() {
+    if (!ltManagedUserPresetId) {
+      setLtUserPresetNotice({ tone: "error", message: "삭제할 사용자 프리셋을 먼저 선택해 주세요." });
+      return;
+    }
+    if (ltDeleteConfirmId !== ltManagedUserPresetId) {
+      setLtDeleteConfirmId(ltManagedUserPresetId);
+      setLtUserPresetNotice({
+        tone: "info",
+        message: "삭제 버튼을 한 번 더 누르면 이 프리셋이 로컬 라이브러리에서 삭제됩니다.",
+      });
+      return;
+    }
+    const deletingName = ltUserPresetPayload.presets.find(
+      (preset) => preset.id === ltManagedUserPresetId
+    )?.name;
+    const result = deleteStudioBg3dLtUserPreset(
+      ltUserPresetPayload,
+      ltManagedUserPresetId
+    );
+    if (!reportLtUserPresetMutationFailure(result)) return;
+    if (!persistLtUserPresetMutation(result, `“${deletingName ?? "사용자 프리셋"}”을 삭제했습니다.`)) return;
+    setLtManagedUserPresetId(null);
+    setLtPreferredPresetId(null);
+    setLtDeleteConfirmId(null);
+    setLtUserPresetName("");
+    setLtUserPresetDescription(DEFAULT_LT_USER_PRESET_DESCRIPTION);
+  }
+
+  function applyLtPreset(presetId: string) {
+    const applied = applyStudioBg3dLtPreset(
+      sceneBaseDocument,
+      presetId,
+      ltUserPresetPayload
+    );
+    if (!applied) {
+      setError("LT 프리셋을 장면 원본에 안전하게 적용하지 못했습니다.");
+      return;
+    }
+    const userPreset = ltUserPresetPayload.presets.find((preset) => preset.id === presetId);
+    const builtInPreset = STUDIO_BG3D_LT_BUILT_IN_PRESETS.find((preset) => preset.id === presetId);
+    setSceneBaseDocument(applied);
+    setLineArtPreview(applied.output.line.enabled);
+    setLtPreferredPresetId(presetId);
+    setLtDeleteConfirmId(null);
+    if (userPreset) {
+      setLtManagedUserPresetId(userPreset.id);
+      setLtUserPresetName(userPreset.name);
+      setLtUserPresetDescription(userPreset.description);
+    } else {
+      setLtManagedUserPresetId(null);
+      if (builtInPreset) {
+        setLtUserPresetName(`${builtInPreset.name} 사본`);
+        setLtUserPresetDescription(builtInPreset.description);
+      }
+    }
+    setError(null);
+  }
+
+  function updateLtLineSettings(patch: Partial<StudioBg3dLineOutputSettings>) {
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        output: {
+          ...current.output,
+          line: { ...current.output.line, ...patch },
+        },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
+  function updateLtToneSettings(patch: Partial<StudioBg3dToneOutputSettings>) {
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        output: {
+          ...current.output,
+          tone: { ...current.output.tone, ...patch },
+        },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
+  function updateLtExportHeight(exportHeight: number) {
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        output: { ...current.output, exportHeight },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
   // 키보드 핸들러가 항상 최신 콜백을 참조하도록 ref로 동기화(렌더 후 매번 갱신).
   const selectedIdRef = useRef(selectedId);
   const undoRef = useRef(doUndo);
@@ -1316,7 +1939,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }
   };
 
-  function handleInsert() {
+  async function handleInsert() {
+    if (isCapturing) return;
     if (insertBlocked) {
       setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
       return;
@@ -1361,43 +1985,117 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       return;
     }
 
-    // 내보내기는 프리뷰 토글 상태와 무관하게 항상 선화 모드로 강제한다 — 도구의 목적 자체가
-    // 트레이싱 참고선이지 셰이딩 미리보기 저장이 아니기 때문(설계 §4).
-    setLineArtPreview(true);
+    // LT 검출은 깨끗한 셰이딩 캡처를 입력으로 삼는다. 캡처 중에는 그리드·변환 핸들·프리미티브의
+    // 뷰포트용 edge overlay를 숨기고, 순수 래스터 단계가 주선·재질선·톤을 독립적으로 계산한다.
+    const previousLineArtPreview = lineArtPreview;
+    const previousClearColor = new THREE.Color();
+    gl.getClearColor(previousClearColor);
+    const previousClearAlpha = gl.getClearAlpha();
+    setLineArtPreview(false);
     setIsCapturing(true);
-    // 투명 삽입: 캡처 프레임 딱 한 번만 clearColor의 알파를 0으로 낮춰 하늘색/배경을 비우고
-    // 오브젝트만 그린다(Canvas의 gl.alpha:true 가 있어야 실제로 캔버스 자체가 알파를 갖는다).
-    // 캡처가 끝나면 즉시 원래 하늘색 프리셋으로 되돌린다 — 그러지 않으면 모달이 닫히기 전
-    // 잠깐이라도 뷰포트가 투명하게 보여 다른 배경(페이지 배경색)이 비쳐 보이는 깜빡임이 생긴다.
-    if (transparentInsert) gl.setClearColor(sky.clearColor, 0);
-    requestAnimationFrame(() => {
-      try {
-        gl.render(scene, camera);
-        // PNG와 편집 원본은 별도 필드다. data URL fragment에 장면·storage id를 다시 싣지 않는다.
-        const pngDataUrl = gl.domElement.toDataURL("image/png").split("#", 1)[0];
-        const { width, height } = roundExportSize(gl.domElement);
-        setSceneBaseDocument(adapted.document);
-        const accepted = onInsert({
-          pngDataUrl,
-          width,
-          height,
-          bg3dScene: adapted.document,
-        });
-        if (accepted !== false) onClose();
-      } catch {
-        setError("3D 장면을 PNG로 캡처하지 못했습니다. 브라우저 그래픽 상태를 확인해 주세요.");
-      } finally {
-        setIsCapturing(false);
-        if (transparentInsert) gl.setClearColor(sky.clearColor, 1);
+    try {
+      // React/R3F가 캡처 전용 visibility와 셰이딩 상태를 반영할 시간을 보장한다.
+      await waitForStudioBg3dPaintFrame();
+      await waitForStudioBg3dPaintFrame();
+      if (!componentActiveRef.current || captureRef.current.gl !== gl) return;
+
+      gl.setClearColor(sky.clearColor, transparentInsert ? 0 : 1);
+      gl.render(scene, camera);
+      const captureSize = resolveStudioBg3dLtCaptureSize({
+        sourceWidth: gl.domElement.width,
+        sourceHeight: gl.domElement.height,
+        requestedHeight: adapted.document.output.exportHeight,
+        maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
+      });
+      if (!captureSize) {
+        throw new Error("LT capture size admission failed.");
       }
-    });
+      const rgba = readStudioBg3dCaptureRgba(
+        gl.domElement,
+        captureSize.width,
+        captureSize.height
+      );
+      const depth = adapted.document.output.line.depthEnabled
+        ? captureStudioBg3dThreeDepth({
+            renderer: gl,
+            scene,
+            camera,
+            width: captureSize.width,
+            height: captureSize.height,
+          })
+        : undefined;
+      const rendered = renderStudioBg3dLtLayers(
+        {
+          width: captureSize.width,
+          height: captureSize.height,
+          rgba,
+          ...(depth ? { depth } : {}),
+        },
+        { line: adapted.document.output.line, tone: adapted.document.output.tone }
+      );
+      if (rendered.layers.length === 0) {
+        setError("현재 LT 설정에서는 보이는 선화나 톤이 만들어지지 않습니다. 선화 또는 톤을 켜 주세요.");
+        return;
+      }
+      const encoded = encodeStudioBg3dLtLayers(rendered.layers);
+      setSceneBaseDocument(adapted.document);
+      const accepted = onInsert({
+        kind: "separated",
+        width: rendered.width,
+        height: rendered.height,
+        layers: encoded.layers,
+        compositePngDataUrl: encoded.compositePngDataUrl,
+        bg3dScene: adapted.document,
+      });
+      if (accepted !== false) onClose();
+    } catch {
+      setError("3D 장면을 LT 레이어로 변환하지 못했습니다. 출력 해상도와 브라우저 그래픽 상태를 확인해 주세요.");
+    } finally {
+      if (componentActiveRef.current) {
+        gl.setClearColor(previousClearColor, previousClearAlpha);
+        setLineArtPreview(previousLineArtPreview);
+        setIsCapturing(false);
+      }
+    }
   }
 
   // 선택된 것이 도형(primitives)인지 커스텀 모델(customModels)인지는 배타적이다 — 둘 다 같은
   // selectedId/primitiveObjectsRef를 공유하므로(§4) "primitives에 있으면 도형, 아니면 모델"로 분기한다.
   const selectedPrimitive = primitives.find((p) => p.id === selectedId) ?? null;
   const selectedCustomModel = customModels.find((m) => m.id === selectedId) ?? null;
+  const ltLineSettings = sceneBaseDocument.output.line;
+  const ltToneSettings = sceneBaseDocument.output.tone;
+  const appliedLtPreset = matchingLtPreset(
+    ltLineSettings,
+    ltToneSettings,
+    ltUserPresetPayload,
+    ltPreferredPresetId
+  );
+  const appliedLtPresetId = appliedLtPreset?.id ?? "custom";
+  const managedLtUserPreset = ltManagedUserPresetId
+    ? ltUserPresetPayload.presets.find((preset) => preset.id === ltManagedUserPresetId) ?? null
+    : null;
+  const ltCaptureSizePreview = resolveStudioBg3dLtCaptureSize({
+    sourceWidth: deviceQuality.renderWidth,
+    sourceHeight: deviceQuality.renderHeight,
+    requestedHeight: sceneBaseDocument.output.exportHeight,
+    maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
+  });
   const hideOnTab = (tab: BgPanelTab) => activePanelTab !== tab;
+
+  // 저장소 로드 뒤 현재 장면과 정확히 일치하는 사용자 프리셋이 있으면 관리 폼도 그 항목을 따른다.
+  // 수동 조정으로 사용자 설정 상태가 된 뒤에는 ltManagedUserPresetId를 유지해 "현재 값으로 업데이트"
+  // 작업이 끊기지 않게 한다.
+  useEffect(() => {
+    if (!open || ltManagedUserPresetId || !appliedLtPreset) return;
+    const exactUserPreset = ltUserPresetPayload.presets.find(
+      (preset) => preset.id === appliedLtPreset.id
+    );
+    if (!exactUserPreset) return;
+    setLtManagedUserPresetId(exactUserPreset.id);
+    setLtUserPresetName(exactUserPreset.name);
+    setLtUserPresetDescription(exactUserPreset.description);
+  }, [appliedLtPreset, ltManagedUserPresetId, ltUserPresetPayload, open]);
 
   if (!open) return null;
 
@@ -1478,12 +2176,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
                     shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
                   />
-                  <BgGroundHelper visible={!lineArtPreview} />
+                  <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
                   {primitives.map((prim) => (
                     <BgPrimitiveMesh
                       key={prim.id}
                       prim={prim}
                       lineArt={lineArtPreview}
+                      showEdges={!isCapturing}
                       onSelect={setSelectedId}
                       registerRef={registerPrimitiveRef}
                     />
@@ -1511,7 +2210,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       }}
                     />
                   ))}
-                  {selectedId && primitiveObjectsRef.current.get(selectedId) ? (
+                  {!isCapturing && selectedId && primitiveObjectsRef.current.get(selectedId) ? (
                     <TransformControls
                       object={primitiveObjectsRef.current.get(selectedId)}
                       mode={transformMode}
@@ -1651,7 +2350,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           </section>
 
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
-            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
+            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
               {BG_PANEL_TABS.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activePanelTab === tab.id;
@@ -2092,7 +2791,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <span className="block text-xs font-bold text-fg">
                       선화로 보기
                       <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                        추가 시 항상 이 상태로 캡처됩니다 — 미리보기만 셰이딩/선화를 오갈 수 있어요.
+                        화면용 선화 미리보기입니다. 실제 추가 시에는 LT 탭 설정으로 톤·재질선·주선을
+                        각각 계산해 별도 레이어로 만듭니다.
                       </span>
                     </span>
                   </label>
@@ -2104,10 +2804,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       className="mt-0.5 size-4 accent-accent"
                     />
                     <span className="block text-xs font-bold text-fg">
-                      배경 없이 오브젝트만 추가
+                      오브젝트 바깥을 투명하게 추출
                       <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                        하늘색·바닥 그리드를 빼고 건물·나무·도형만 투명 배경 PNG로 추가해요 — 다른 배경
-                        이미지 위에 자유롭게 겹쳐 쓸 수 있어요.
+                        하늘색을 LT 입력에서 빼고 건물·나무·도형의 알파 외곽을 또렷하게 잡습니다. 분리된
+                        선·톤을 다른 배경 위에 겹칠 때 적합해요.
                       </span>
                     </span>
                   </label>
@@ -2116,8 +2816,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <div className="mt-5 border-t border-line pt-4">
                   <h3 className="mb-2 text-sm font-bold text-fg">뷰포트 하늘색</h3>
                   <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    작업 화면의 분위기만 바꿉니다. 위 "배경 없이 오브젝트만 추가"를 켜지 않으면 내보내기는
-                    항상 이 하늘색이 그대로 캡처돼요(항상 흰 배경은 아니에요).
+                    작업 화면 분위기와 LT 입력 배경색입니다. 위 투명 추출을 끄고 톤을 출력하면 하늘색의
+                    명암도 톤 레이어에 포함되며, 주선·질감선 레이어 자체는 계속 투명합니다.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {BG_SKY_PRESETS.map((sky) => (
@@ -2136,6 +2836,579 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       </button>
                     ))}
                   </div>
+                </div>
+              </section>
+
+              <section hidden={hideOnTab("lt")}>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                    <ScanLine size={15} className="text-accent" aria-hidden />
+                    LT 변환
+                  </h3>
+                  <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-semibold text-fg-3">
+                    장면 설정 v1
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
+                  3D 배경의 선화와 톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 좁혀 조정하세요.
+                </p>
+
+                <label htmlFor="bg3d-lt-preset" className="mt-3 block text-xs font-semibold text-fg-2">
+                  변환 프리셋
+                  <select
+                    id="bg3d-lt-preset"
+                    value={appliedLtPresetId}
+                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                    onChange={(event) => {
+                      if (event.target.value !== "custom") applyLtPreset(event.target.value);
+                    }}
+                  >
+                    <option value="custom" disabled>
+                      사용자 설정
+                    </option>
+                    <optgroup label="기본 프리셋">
+                      {STUDIO_BG3D_LT_BUILT_IN_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {ltUserPresetPayload.presets.length > 0 ? (
+                      <optgroup label={`내 프리셋 · ${ltUserPresetPayload.presets.length}개`}>
+                        {ltUserPresetPayload.presets.map((preset) => (
+                          <option key={preset.id} value={preset.id}>
+                            {preset.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </select>
+                </label>
+                <p className="mt-2 min-h-8 text-[0.68rem] leading-relaxed text-fg-3">
+                  {appliedLtPreset?.description ?? "프리셋을 기준으로 값을 직접 조정한 사용자 설정입니다."}
+                </p>
+                <p aria-live="polite" aria-atomic="true" className="sr-only">
+                  {appliedLtPreset ? `${appliedLtPreset.name} 프리셋 적용됨` : "LT 사용자 설정 적용됨"}
+                </p>
+
+                <details className="group mt-3 rounded-xl border border-line bg-card/45">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                    <span className="flex items-center gap-1.5">
+                      <Save size={14} className="text-accent" aria-hidden />
+                      내 프리셋
+                    </span>
+                    <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
+                      {ltUserPresetPayload.presets.length}/{STUDIO_BG3D_LT_PRESET_MAX_COUNT}
+                      {ltUserPresetLibraryStatus === "idle" ? " · 불러오는 중" : ""}
+                      <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
+                    </span>
+                  </summary>
+                  <div className="border-t border-line/70 px-3 py-3">
+                    <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                      {managedLtUserPreset
+                        ? `“${managedLtUserPreset.name}”을 관리 중입니다. 현재 LT 값을 덮어쓰거나 이름만 바꿀 수 있어요.`
+                        : "현재 선화·톤 값을 새 사용자 프리셋으로 저장합니다."}
+                    </p>
+                    <label htmlFor="bg3d-lt-user-preset-name" className="mt-3 block text-xs font-semibold text-fg-2">
+                      이름
+                      <input
+                        id="bg3d-lt-user-preset-name"
+                        type="text"
+                        required
+                        maxLength={STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}
+                        value={ltUserPresetName}
+                        className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                        placeholder="예: 야간 골목 선화"
+                        onChange={(event) => {
+                          setLtUserPresetName(event.target.value);
+                          setLtDeleteConfirmId(null);
+                        }}
+                      />
+                    </label>
+                    <label htmlFor="bg3d-lt-user-preset-description" className="mt-3 block text-xs font-semibold text-fg-2">
+                      설명
+                      <textarea
+                        id="bg3d-lt-user-preset-description"
+                        required
+                        rows={2}
+                        maxLength={STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}
+                        value={ltUserPresetDescription}
+                        className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/25"
+                        placeholder="어떤 장면과 작업 단계에 쓰는 설정인지 기록하세요."
+                        onChange={(event) => {
+                          setLtUserPresetDescription(event.target.value);
+                          setLtDeleteConfirmId(null);
+                        }}
+                      />
+                    </label>
+                    <div className="mt-1 flex justify-end gap-3 text-[0.62rem] tabular-nums text-fg-3">
+                      <span>이름 {Array.from(ltUserPresetName).length}/{STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}</span>
+                      <span>설명 {Array.from(ltUserPresetDescription).length}/{STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}</span>
+                    </div>
+
+                    {managedLtUserPreset ? (
+                      <div className="mt-3 space-y-2">
+                        <button
+                          type="button"
+                          className={cx(CONTROL_BUTTON, "w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
+                          disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                          onClick={updateManagedLtUserPreset}
+                        >
+                          <Save size={14} aria-hidden />
+                          현재 설정으로 업데이트
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")}
+                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                            onClick={renameManagedLtUserPreset}
+                          >
+                            <PencilLine size={14} aria-hidden />
+                            이름만 변경
+                          </button>
+                          <button
+                            type="button"
+                            className={cx(
+                              CONTROL_BUTTON,
+                              ltDeleteConfirmId === managedLtUserPreset.id
+                                ? "border-bad/60 bg-[oklch(0.66_0.20_25/0.12)] text-bad"
+                                : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-bad"
+                            )}
+                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                            onClick={deleteManagedLtUserPreset}
+                          >
+                            <Trash2 size={14} aria-hidden />
+                            {ltDeleteConfirmId === managedLtUserPreset.id ? "삭제 확인" : "삭제"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={cx(CONTROL_BUTTON, "mt-3 w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
+                        disabled={
+                          ltUserPresetLibraryStatus === "idle" ||
+                          ltUserPresetLibraryStatus === "unavailable" ||
+                          ltUserPresetPayload.presets.length >= STUDIO_BG3D_LT_PRESET_MAX_COUNT
+                        }
+                        onClick={saveCurrentLtAsUserPreset}
+                      >
+                        <Save size={14} aria-hidden />
+                        현재 설정을 새 프리셋으로 저장
+                      </button>
+                    )}
+                  </div>
+                </details>
+
+                {ltUserPresetNotice ? (
+                  <p
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className={cx(
+                      "mt-2 rounded-lg border px-3 py-2 text-[0.68rem] leading-relaxed",
+                      ltUserPresetNotice.tone === "success" && "border-good/35 bg-[oklch(0.80_0.15_150/0.08)] text-good",
+                      ltUserPresetNotice.tone === "error" && "border-bad/35 bg-[oklch(0.66_0.20_25/0.08)] text-bad",
+                      ltUserPresetNotice.tone === "info" && "border-line bg-card/55 text-fg-2"
+                    )}
+                  >
+                    {ltUserPresetNotice.message}
+                  </p>
+                ) : null}
+
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
+                  <div className="min-w-0">
+                    <label htmlFor="bg3d-lt-export-height" className="block text-xs font-bold text-fg">
+                      출력 해상도
+                    </label>
+                    <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
+                      {ltCaptureSizePreview
+                        ? `${ltCaptureSizePreview.width.toLocaleString()}×${ltCaptureSizePreview.height.toLocaleString()} px${ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : ""}`
+                        : "현재 기기에서 안전한 출력 크기를 계산할 수 없습니다."}
+                    </p>
+                  </div>
+                  <select
+                    id="bg3d-lt-export-height"
+                    aria-label="LT 출력 높이"
+                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                    value={sceneBaseDocument.output.exportHeight}
+                    onChange={(event) => updateLtExportHeight(Number(event.target.value))}
+                  >
+                    {!LT_EXPORT_HEIGHTS.includes(sceneBaseDocument.output.exportHeight as (typeof LT_EXPORT_HEIGHTS)[number]) ? (
+                      <option value={sceneBaseDocument.output.exportHeight}>
+                        {sceneBaseDocument.output.exportHeight.toLocaleString()} px
+                      </option>
+                    ) : null}
+                    {LT_EXPORT_HEIGHTS.map((height) => (
+                      <option key={height} value={height}>{height.toLocaleString()} px</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div
+                  role="group"
+                  className="mt-3 rounded-xl border border-line bg-card/55 p-3"
+                  aria-label={`LT 출력 의도: ${ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"}, ${LT_TONE_MODE_LABELS[ltToneSettings.mode]}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-fg">출력 의도 미리보기</span>
+                    <button
+                      type="button"
+                      aria-pressed={lineArtPreview}
+                      className={cx(
+                        "min-h-11 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
+                        lineArtPreview
+                          ? "border-accent/60 bg-accent-soft text-accent"
+                          : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-fg"
+                      )}
+                      onClick={() => setLineArtPreview((visible) => !visible)}
+                    >
+                      캔버스 선화 {lineArtPreview ? "켜짐" : "꺼짐"}
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2" aria-hidden>
+                    <div className="relative h-12 overflow-hidden rounded-lg border border-line/80 bg-panel">
+                      {ltLineSettings.enabled ? (
+                        <>
+                          <span
+                            className="absolute inset-x-3 top-[38%] rounded-full"
+                            style={{
+                              backgroundColor: ltLineSettings.color,
+                              height: `${Math.max(1, Math.min(8, ltLineSettings.widthPx * 1.6))}px`,
+                              opacity: ltLineSettings.strength,
+                            }}
+                          />
+                          {ltLineSettings.textureLineEnabled ? (
+                            <span
+                              className="absolute inset-x-5 top-[66%] border-t border-dashed"
+                              style={{
+                                borderColor: ltLineSettings.color,
+                                opacity: ltLineSettings.textureLineStrength,
+                              }}
+                            />
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화 꺼짐</span>
+                      )}
+                    </div>
+                    <div className="relative h-12 overflow-hidden rounded-lg border border-line/80" style={ltTonePreviewStyle(ltToneSettings)}>
+                      {ltToneSettings.mode === "none" ? (
+                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">톤 없음</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[0.64rem] leading-relaxed text-fg-3">
+                    <div>
+                      <dt className="sr-only">선화 설정</dt>
+                      <dd>
+                        선 {ltLineSettings.enabled ? `${round(ltLineSettings.widthPx, 2)}px · ${Math.round(ltLineSettings.strength * 100)}%` : "없음"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="sr-only">톤 설정</dt>
+                      <dd>{LT_TONE_MODE_LABELS[ltToneSettings.mode]}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
+                  결과는 톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제 벡터
+                  경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.
+                </p>
+
+                <div role="group" aria-label="LT 세부 설정" className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-card p-1">
+                  {(["line", "tone"] as const).map((section) => {
+                    const active = ltEditorSection === section;
+                    return (
+                      <button
+                        key={section}
+                        type="button"
+                        aria-pressed={active}
+                        className={cx(
+                          "min-h-11 rounded-lg border px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
+                          active
+                            ? "border-accent/55 bg-accent-soft text-accent"
+                            : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
+                        )}
+                        onClick={() => setLtEditorSection(section)}
+                      >
+                        {section === "line" ? "선화" : "톤"}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div hidden={ltEditorSection !== "line"} className="mt-3">
+                  <LtToggleRow
+                    checked={ltLineSettings.enabled}
+                    label="선화 출력"
+                    onChange={(enabled) => {
+                      updateLtLineSettings({ enabled });
+                      setLineArtPreview(enabled);
+                    }}
+                  />
+                  <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-2 text-xs">
+                    <span className="font-semibold text-fg-2">레이어 의도</span>
+                    <span className="text-right text-[0.68rem] text-fg-3">
+                      {ltLineSettings.layerType === "vector" ? "벡터 요청 · 래스터 변환" : "래스터 PNG"}
+                    </span>
+                  </div>
+                  <label htmlFor="bg3d-lt-line-color" className={cx(
+                    "flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs",
+                    !ltLineSettings.enabled && "opacity-45"
+                  )}>
+                    <span className="font-semibold text-fg-2">선 색상</span>
+                    <span className="ml-auto font-mono text-[0.68rem] uppercase text-fg-3">{ltLineSettings.color}</span>
+                    <input
+                      id="bg3d-lt-line-color"
+                      type="color"
+                      aria-label="LT 선 색상"
+                      className="size-11 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed sm:size-9"
+                      disabled={!ltLineSettings.enabled}
+                      value={ltLineSettings.color}
+                      onChange={(event) => updateLtLineSettings({ color: event.target.value })}
+                    />
+                  </label>
+                  <LtRangeControl
+                    id="bg3d-lt-line-width"
+                    label="선 굵기"
+                    min={0.25}
+                    max={8}
+                    step={0.05}
+                    value={ltLineSettings.widthPx}
+                    valueText={`${round(ltLineSettings.widthPx, 2)} px`}
+                    disabled={!ltLineSettings.enabled}
+                    onChange={(widthPx) => updateLtLineSettings({ widthPx })}
+                  />
+                  <LtRangeControl
+                    id="bg3d-lt-line-strength"
+                    label="선 강도"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={ltLineSettings.strength}
+                    valueText={`${Math.round(ltLineSettings.strength * 100)}%`}
+                    disabled={!ltLineSettings.enabled}
+                    onChange={(strength) => updateLtLineSettings({ strength })}
+                  />
+
+                  <details className="group border-b border-line/70">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                      정밀 선 검출
+                      <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
+                        모서리 · 깊이 · 질감
+                        <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
+                      </span>
+                    </summary>
+                    <div className="border-t border-line/60 pl-2">
+                      <LtRangeControl
+                        id="bg3d-lt-line-accuracy"
+                        label="검출 정밀도"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={ltLineSettings.accuracy}
+                        valueText={`${Math.round(ltLineSettings.accuracy * 100)}%`}
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(accuracy) => updateLtLineSettings({ accuracy })}
+                      />
+                      <LtRangeControl
+                        id="bg3d-lt-line-exterior"
+                        label="외곽선 강조"
+                        min={0}
+                        max={2}
+                        step={0.05}
+                        value={ltLineSettings.exteriorOutlineStrength}
+                        valueText={`${round(ltLineSettings.exteriorOutlineStrength, 2)}×`}
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(exteriorOutlineStrength) => updateLtLineSettings({ exteriorOutlineStrength })}
+                      />
+                      <LtRangeControl
+                        id="bg3d-lt-line-smoothing"
+                        label="선 다듬기"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={ltLineSettings.smoothing}
+                        valueText={`${Math.round(ltLineSettings.smoothing * 100)}%`}
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(smoothing) => updateLtLineSettings({ smoothing })}
+                      />
+                      <LtRangeControl
+                        id="bg3d-lt-line-crease"
+                        label="모서리 각도"
+                        min={0}
+                        max={180}
+                        step={1}
+                        value={ltLineSettings.creaseAngleDegrees}
+                        valueText={`${Math.round(ltLineSettings.creaseAngleDegrees)}°`}
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(creaseAngleDegrees) => updateLtLineSettings({ creaseAngleDegrees })}
+                      />
+                      <LtToggleRow
+                        checked={ltLineSettings.scaleAwareAccuracy}
+                        label="화면 크기 보정"
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(scaleAwareAccuracy) => updateLtLineSettings({ scaleAwareAccuracy })}
+                      />
+                      <LtToggleRow
+                        checked={ltLineSettings.hiddenLineRemoval}
+                        label="가려진 선 제거"
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(hiddenLineRemoval) => updateLtLineSettings({ hiddenLineRemoval })}
+                      />
+                      <LtToggleRow
+                        checked={ltLineSettings.depthEnabled}
+                        label="깊이선 검출"
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(depthEnabled) => updateLtLineSettings({ depthEnabled })}
+                      />
+                      {ltLineSettings.depthEnabled ? (
+                        <>
+                          <LtRangeControl
+                            id="bg3d-lt-line-depth"
+                            label="깊이선 강도"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={ltLineSettings.depthStrength}
+                            valueText={`${Math.round(ltLineSettings.depthStrength * 100)}%`}
+                            disabled={!ltLineSettings.enabled}
+                            onChange={(depthStrength) => updateLtLineSettings({ depthStrength })}
+                          />
+                          <LtToggleRow
+                            checked={ltLineSettings.depthOutlineOnly}
+                            label="깊이 외곽선만"
+                            disabled={!ltLineSettings.enabled}
+                            onChange={(depthOutlineOnly) => updateLtLineSettings({ depthOutlineOnly })}
+                          />
+                        </>
+                      ) : null}
+                      <LtToggleRow
+                        checked={ltLineSettings.textureLineEnabled}
+                        label="재질선 검출"
+                        disabled={!ltLineSettings.enabled}
+                        onChange={(textureLineEnabled) => updateLtLineSettings({ textureLineEnabled })}
+                      />
+                      {ltLineSettings.textureLineEnabled ? (
+                        <LtRangeControl
+                          id="bg3d-lt-line-texture"
+                          label="재질선 강도"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={ltLineSettings.textureLineStrength}
+                          valueText={`${Math.round(ltLineSettings.textureLineStrength * 100)}%`}
+                          disabled={!ltLineSettings.enabled}
+                          onChange={(textureLineStrength) => updateLtLineSettings({ textureLineStrength })}
+                        />
+                      ) : null}
+                    </div>
+                  </details>
+                </div>
+
+                <div hidden={ltEditorSection !== "tone"} className="mt-3">
+                  <label htmlFor="bg3d-lt-tone-mode" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
+                    톤 방식
+                    <select
+                      id="bg3d-lt-tone-mode"
+                      value={ltToneSettings.mode}
+                      className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                      onChange={(event) => updateLtToneSettings({ mode: event.target.value as StudioBg3dToneOutputSettings["mode"] })}
+                    >
+                      {Object.entries(LT_TONE_MODE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {ltToneSettings.mode === "none" ? (
+                    <p className="py-4 text-center text-[0.68rem] leading-relaxed text-fg-3">
+                      톤이 꺼져 있습니다. 위에서 명암 또는 스크린톤 방식을 선택하면 세부 조절이 열립니다.
+                    </p>
+                  ) : (
+                    <>
+                      <label htmlFor="bg3d-lt-tone-type" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
+                        출력 유형
+                        <select
+                          id="bg3d-lt-tone-type"
+                          value={ltToneSettings.type}
+                          className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                          onChange={(event) => updateLtToneSettings({ type: event.target.value as StudioBg3dToneOutputSettings["type"] })}
+                        >
+                          <option value="grayscale">그레이스케일</option>
+                          <option value="pattern">패턴</option>
+                        </select>
+                      </label>
+                      {ltToneSettings.type === "pattern" || ltToneSettings.mode === "screentone" ? (
+                        <label htmlFor="bg3d-lt-tone-pattern" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
+                          패턴
+                          <select
+                            id="bg3d-lt-tone-pattern"
+                            value={ltToneSettings.pattern}
+                            className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                            onChange={(event) => updateLtToneSettings({ pattern: event.target.value as StudioBg3dToneOutputSettings["pattern"] })}
+                          >
+                            {Object.entries(LT_TONE_PATTERN_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                      <LtRangeControl
+                        id="bg3d-lt-tone-levels"
+                        label="명암 단계"
+                        min={2}
+                        max={8}
+                        step={1}
+                        value={ltToneSettings.levels}
+                        valueText={`${ltToneSettings.levels}단계`}
+                        onChange={(levels) => updateLtToneSettings({ levels })}
+                      />
+                      <LtRangeControl
+                        id="bg3d-lt-tone-opacity"
+                        label="톤 농도"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={ltToneSettings.opacity}
+                        valueText={`${Math.round(ltToneSettings.opacity * 100)}%`}
+                        onChange={(opacity) => updateLtToneSettings({ opacity })}
+                      />
+                      <details className="group border-b border-line/70">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                          스크린 정밀 설정
+                          <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
+                            선수 · 각도
+                            <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
+                          </span>
+                        </summary>
+                        <div className="border-t border-line/60 pl-2">
+                          <LtRangeControl
+                            id="bg3d-lt-tone-frequency"
+                            label="패턴 선수"
+                            min={1}
+                            max={200}
+                            step={1}
+                            value={ltToneSettings.frequency}
+                            valueText={`${Math.round(ltToneSettings.frequency)} LPI`}
+                            onChange={(frequency) => updateLtToneSettings({ frequency })}
+                          />
+                          <LtRangeControl
+                            id="bg3d-lt-tone-angle"
+                            label="패턴 각도"
+                            min={-180}
+                            max={180}
+                            step={1}
+                            value={ltToneSettings.angleDegrees}
+                            valueText={`${Math.round(ltToneSettings.angleDegrees)}°`}
+                            onChange={(angleDegrees) => updateLtToneSettings({ angleDegrees })}
+                          />
+                        </div>
+                      </details>
+                    </>
+                  )}
                 </div>
               </section>
 

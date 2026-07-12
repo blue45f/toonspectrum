@@ -300,10 +300,10 @@ const BUILT_IN_PRESET_INPUTS = [
     id: "clean-architecture-lineart",
     version: 1,
     name: "깔끔한 건축 선화",
-    description: "직선 구조와 모서리를 또렷하게 살리는 정밀 벡터 선화 설정입니다.",
+    description: "직선 구조와 모서리를 또렷하게 살리는 정밀 래스터 선화 설정입니다.",
     line: {
       enabled: true,
-      layerType: "vector",
+      layerType: "raster",
       color: "#000000",
       widthPx: 0.8,
       strength: 0.95,
@@ -336,7 +336,7 @@ const BUILT_IN_PRESET_INPUTS = [
     description: "강한 윤곽과 도트 스크린톤으로 인쇄 만화풍 명암을 만드는 설정입니다.",
     line: {
       enabled: true,
-      layerType: "vector",
+      layerType: "raster",
       color: "#000000",
       widthPx: 1.1,
       strength: 1,
@@ -402,7 +402,7 @@ const BUILT_IN_PRESET_INPUTS = [
     description: "채색 위에서 과하게 튀지 않는 얇고 부드러운 청회색 보조 선화입니다.",
     line: {
       enabled: true,
-      layerType: "vector",
+      layerType: "raster",
       color: "#334155",
       widthPx: 0.75,
       strength: 0.55,

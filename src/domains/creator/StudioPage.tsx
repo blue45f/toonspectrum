@@ -202,6 +202,12 @@ import {
   studioAutosaveKey,
 } from "./studio-autosave";
 import { parseStudio3dTool } from "./studio-background-3d-primitives";
+import {
+  planStudioBg3dLtLayers,
+  preserveStudioBg3dLtSceneAnchorAfterRemoval,
+  type StudioBg3dLtLayerRole,
+  type StudioBg3dLtRenderMode,
+} from "./studio-bg3d-lt-layer-plan";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
   BRUSH_PRESETS,
@@ -1407,6 +1413,12 @@ export interface ImageEl {
   fillReference?: boolean;
   /** 재편집 가능한 3D 장면 원본. PNG src와 분리하며 로컬 저장소 ID는 포함하지 않는다. */
   bg3dScene?: StudioBg3dSceneDocument;
+  /** 분리된 3D LT 레이어를 같은 원본 장면으로 다시 묶는 안정 식별자. */
+  bg3dLtBundleId?: string;
+  /** 톤·재질선·주선 중 이 래스터 레이어의 역할. */
+  bg3dLtRole?: StudioBg3dLtLayerRole;
+  /** 레거시 단일 PNG인지 분리 출력인지 구분하는 재편집 메타데이터. */
+  bg3dLtRenderMode?: StudioBg3dLtRenderMode;
 }
 interface TextEl {
   id: string;
@@ -6234,6 +6246,25 @@ function StudioCuttoonEditor() {
   const puppetWarpArmed =
     puppetWarpActive && selected?.type === "image" && !selectedContentMutationLocked;
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
+  function resolveBg3dEditSource(element: El | null): {
+    readonly scene?: StudioBg3dSceneDocument;
+    readonly legacyDataUrl?: string;
+  } | null {
+    if (!element || element.type !== "image") return null;
+    if (element.bg3dScene) return { scene: element.bg3dScene };
+    if (element.bg3dLtBundleId) {
+      const anchor = elements.find(
+        (candidate): candidate is ImageEl =>
+          candidate.type === "image" &&
+          candidate.bg3dLtBundleId === element.bg3dLtBundleId &&
+          candidate.bg3dScene !== undefined
+      );
+      if (anchor?.bg3dScene) return { scene: anchor.bg3dScene };
+    }
+    return parseStudio3dTool(element.src) === "bg3d" ? { legacyDataUrl: element.src } : null;
+  }
+  const selectedBg3dEditSource = resolveBg3dEditSource(selected);
+  const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
   const showQuickStart = !menu && (
     quickStartOpen ||
     (workHydrated && !hasAutosave && elements.length === 0 && !quickStartDismissed)
@@ -7962,17 +7993,86 @@ function StudioCuttoonEditor() {
       });
     addEl({ ...element, ...(aiProvenance ? { aiProvenance } : {}) });
   }
-  function addBg3dRenderedImage(result: StudioBackground3DInsertResult) {
+  function applyBg3dRenderedImage(
+    result: StudioBackground3DInsertResult,
+    targetElementId?: string
+  ): boolean {
     setError(null);
-    const element = createCanvasImageElement({
+    const anchorLayer = result.layers.at(-1);
+    if (!anchorLayer) {
+      setError("삽입할 3D LT 레이어가 없습니다.");
+      return false;
+    }
+
+    // 문서 마스터는 의도적으로 그룹을 지원하지 않는다. 이 표면에서는 분리 레이어를 거짓으로
+    // 그룹화하지 않고 같은 LT 결과의 투명 합성 PNG를 사용하며, 장면 원본은 계속 재편집 가능하다.
+    if (masterEditMode) {
+      if (targetElementId) {
+        const target = elementById.get(targetElementId);
+        if (!target || target.type !== "image") {
+          setError("다시 적용할 3D 배경 이미지를 찾지 못했습니다.");
+          return false;
+        }
+        if (isEffectivelyLocked(target, groups)) {
+          setError("잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.");
+          return false;
+        }
+        patchEl(targetElementId, {
+          src: result.compositePngDataUrl,
+          height: Math.max(1, Math.round(target.width * (result.height / result.width))),
+          bg3dScene: result.bg3dScene,
+          bg3dLtBundleId: undefined,
+          bg3dLtRole: undefined,
+          bg3dLtRenderMode: undefined,
+          name: "3D LT 배경 · 병합",
+        });
+      } else {
+        const masterImage = createCanvasImageElement({
+          id: uid(),
+          src: result.compositePngDataUrl,
+          canvasWidth: CANVAS_W,
+          canvasHeight: canvasH,
+          sourceWidth: result.width,
+          sourceHeight: result.height,
+        });
+        addEl({ ...masterImage, name: "3D LT 배경 · 병합", bg3dScene: result.bg3dScene });
+      }
+      return true;
+    }
+
+    const template = createCanvasImageElement({
       id: uid(),
-      src: result.pngDataUrl,
+      src: anchorLayer.pngDataUrl,
       canvasWidth: CANVAS_W,
       canvasHeight: canvasH,
       sourceWidth: result.width,
       sourceHeight: result.height,
     });
-    addEl({ ...element, bg3dScene: result.bg3dScene });
+    const plan = planStudioBg3dLtLayers<El, StudioBg3dSceneDocument>({
+      elements,
+      groups,
+      render: result,
+      targetElementId,
+      pageLocked: pageEditLocked,
+      allocations: {
+        bundleId: uid(),
+        groupId: uid(),
+        elementIds: {
+          tone: uid(),
+          "texture-line": uid(),
+          "main-line": uid(),
+        },
+      },
+      newElementTemplate: template,
+    });
+    if (!plan.ok) {
+      setError(plan.message);
+      return false;
+    }
+    commit(plan.nextElements, { groups: plan.nextGroups });
+    setSelectedId(plan.anchorElementId);
+    setTool("select");
+    return true;
   }
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
     if (builtinRasterBusyId) return;
@@ -8316,8 +8416,12 @@ function StudioCuttoonEditor() {
       (document, id) => removeTrack(document, id),
       animTimeline
     );
+    const nextItems = preserveStudioBg3dLtSceneAnchorAfterRemoval<El, StudioBg3dSceneDocument>(
+      elements,
+      removal.items
+    );
     commit(
-      removal.items,
+      nextItems,
       trackedDeleted.length > 0 ? { animTimeline: nextTimeline } : undefined
     );
     if (selectedId && idSet.has(selectedId)) setSelectedId(null);
@@ -8335,6 +8439,48 @@ function StudioCuttoonEditor() {
     if (next === elements) return;
     commit(next);
   }
+  function detachStudioBg3dLtCopy(element: El): El {
+    if (element.type !== "image" || !element.bg3dLtBundleId) return element;
+    return {
+      ...element,
+      groupId: undefined,
+      bg3dScene: undefined,
+      bg3dLtBundleId: undefined,
+      bg3dLtRole: undefined,
+      bg3dLtRenderMode: undefined,
+      name: `${element.name?.trim() || "3D LT 레이어"} · 복사본`,
+    };
+  }
+  function remapStudioBg3dLtCopiedBundles(copies: El[], snapshotOnly: boolean): El[] {
+    const anchorCounts = new Map<string, number>();
+    for (const element of copies) {
+      if (element.type !== "image" || !element.bg3dLtBundleId) continue;
+      if (element.bg3dScene !== undefined) {
+        anchorCounts.set(
+          element.bg3dLtBundleId,
+          (anchorCounts.get(element.bg3dLtBundleId) ?? 0) + 1
+        );
+      }
+    }
+    const bundleIdMap = new Map<string, string>();
+    return copies.map((element) => {
+      if (element.type !== "image" || !element.bg3dLtBundleId) return element;
+      if (
+        snapshotOnly ||
+        !element.groupId ||
+        anchorCounts.get(element.bg3dLtBundleId) !== 1
+      ) {
+        return detachStudioBg3dLtCopy(element);
+      }
+      const sourceBundleId = element.bg3dLtBundleId;
+      let bundleId = bundleIdMap.get(sourceBundleId);
+      if (!bundleId) {
+        bundleId = uid();
+        bundleIdMap.set(sourceBundleId, bundleId);
+      }
+      return { ...element, bg3dLtBundleId: bundleId };
+    });
+  }
   function duplicateSelected() {
     if (marqueeIds.length > 0) {
       const mv = new Set(marqueeIds);
@@ -8346,9 +8492,9 @@ function StudioCuttoonEditor() {
         newIds.push(id);
         copies.set(
           e.id,
-          e.type === "draw"
+          detachStudioBg3dLtCopy(e.type === "draw"
             ? { ...e, id, points: e.points.map((v) => v + 16), hidden: false, locked: false }
-            : ({ ...e, id, x: (e as { x: number }).x + 16, y: (e as { y: number }).y + 16, hidden: false, locked: false } as El)
+            : ({ ...e, id, x: (e as { x: number }).x + 16, y: (e as { y: number }).y + 16, hidden: false, locked: false } as El))
         );
       }
       if (copies.size > 0) {
@@ -8367,10 +8513,11 @@ function StudioCuttoonEditor() {
       return;
     }
     if (!selected) return;
-    const copy: El =
+    const copy: El = detachStudioBg3dLtCopy(
       selected.type === "draw"
         ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16), hidden: false, locked: false }
-        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16, hidden: false, locked: false } as El);
+        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16, hidden: false, locked: false } as El)
+    );
     const nextTimeline = duplicateAnimationTracks(
       animTimeline,
       new Map([[selected.id, copy.id]]),
@@ -8817,9 +8964,10 @@ function StudioCuttoonEditor() {
         if (plan) {
           e.preventDefault();
           const plannedElements = plan.els as unknown as El[];
-          const insertedElements = masterEditMode
-            ? plannedElements.map((element) => ({ ...element, groupId: undefined } as El))
-            : plannedElements;
+          const insertedElements = remapStudioBg3dLtCopiedBundles(
+            plannedElements,
+            masterEditMode
+          );
           const pastedGroups = masterEditMode
             ? []
             : missingLayerGroupIds(insertedElements, groups).map((groupId, index) =>
@@ -10127,9 +10275,7 @@ function StudioCuttoonEditor() {
       return { ...shiftEl(e, cx - 120, cy - 120), id: uid(), groupId, hidden: false, locked: false };
     });
     if (newEls.length === 0) return;
-    const insertedElements = masterEditMode
-      ? newEls.map((element) => ({ ...element, groupId: undefined } as El))
-      : newEls;
+    const insertedElements = remapStudioBg3dLtCopiedBundles(newEls, masterEditMode);
     const clipGroups = masterEditMode
       ? []
       : missingLayerGroupIds(insertedElements, groups).map((groupId, index) =>
@@ -20447,12 +20593,12 @@ function StudioCuttoonEditor() {
                         <Sparkles size={14} /> 3D 재편집
                       </button>
                     )}
-                    {(selected.bg3dScene !== undefined || parseStudio3dTool(selected.src) === "bg3d") && (
+                    {selectedBg3dEditSource && (
                       <button
                         type="button"
                         onClick={() => {
-                          setBg3dInitialScene(selected.bg3dScene);
-                          setBg3dInitialDataUrl(selected.bg3dScene ? undefined : selected.src);
+                          setBg3dInitialScene(selectedBg3dEditSource.scene);
+                          setBg3dInitialDataUrl(selectedBg3dEditSource.legacyDataUrl);
                           setBg3dInitialElementId(selected.id);
                           setBg3dOpen(true);
                         }}
@@ -21758,33 +21904,7 @@ function StudioCuttoonEditor() {
               setBg3dInitialScene(undefined);
               setBg3dInitialElementId(undefined);
             }}
-            onInsert={(result) => {
-              if (pageEditLocked && !masterEditMode) {
-                setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 3D 장면을 삽입해 주세요.");
-                return false;
-              }
-              if (bg3dInitialElementId) {
-                const targetEl = elementById.get(bg3dInitialElementId);
-                if (targetEl && targetEl.type === "image") {
-                  if (isEffectivelyLocked(targetEl, groups)) {
-                    setError("잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.");
-                    return false;
-                  }
-                  const targetWidth = targetEl.width;
-                  const targetHeight = Math.round(targetWidth * (result.height / result.width));
-                  patchEl(bg3dInitialElementId, {
-                    src: result.pngDataUrl,
-                    height: targetHeight,
-                    bg3dScene: result.bg3dScene,
-                  });
-                } else {
-                  addBg3dRenderedImage(result);
-                }
-              } else {
-                addBg3dRenderedImage(result);
-              }
-              return true;
-            }}
+            onInsert={(result) => applyBg3dRenderedImage(result, bg3dInitialElementId)}
           />
         ) : null}
       </Suspense>
@@ -22184,14 +22304,13 @@ function StudioCuttoonEditor() {
                   <div className="my-1 h-px bg-line" />
                 </>
               )}
-              {contextMenuEl?.type === "image" &&
-                (contextMenuEl.bg3dScene !== undefined || parseStudio3dTool(contextMenuEl.src) === "bg3d") && (
+              {contextMenuEl?.type === "image" && contextMenuBg3dEditSource && (
                 <>
                   <button
                     type="button"
                     onClick={() => {
-                      setBg3dInitialScene(contextMenuEl.bg3dScene);
-                      setBg3dInitialDataUrl(contextMenuEl.bg3dScene ? undefined : contextMenuEl.src);
+                      setBg3dInitialScene(contextMenuBg3dEditSource.scene);
+                      setBg3dInitialDataUrl(contextMenuBg3dEditSource.legacyDataUrl);
                       setBg3dInitialElementId(contextMenuEl.id);
                       setBg3dOpen(true);
                       setContextMenu((prev) => ({ ...prev, visible: false }));

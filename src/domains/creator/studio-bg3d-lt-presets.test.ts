@@ -60,6 +60,9 @@ describe("Studio BG3D LT built-in presets", () => {
       expect(Object.isFrozen(preset)).toBe(true);
       expect(Object.isFrozen(preset.line)).toBe(true);
       expect(Object.isFrozen(preset.tone)).toBe(true);
+      // The current LT exporter produces editable, separated raster PNG layers. Keep built-ins
+      // truthful until a real vector-path exporter is connected end to end.
+      expect(preset.line.layerType).toBe("raster");
       const applied = applyStudioBg3dLtPreset(
         DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
         preset.id
