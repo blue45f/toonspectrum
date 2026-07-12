@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreateCreatorWorkSchema,
+  CreatorTeamListQuerySchema,
   CreatorTeamMemberParamsSchema,
   CreatorTeamWorkParamsSchema,
   CreatorWorkRevisionListQuerySchema,
@@ -82,6 +83,18 @@ describe("creator work zod contracts", () => {
     });
     expect(CreatorTeamWorkParamsSchema.safeParse({ id: " " }).success).toBe(false);
     expect(CreatorTeamMemberParamsSchema.safeParse({ id: "work-1", userId: "x".repeat(161) }).success).toBe(
+      false
+    );
+  });
+
+  it("팀 초대함·활동 목록 limit은 기본 20, 1..50 정수만 허용한다", () => {
+    expect(CreatorTeamListQuerySchema.parse({})).toEqual({ limit: 20 });
+    expect(CreatorTeamListQuerySchema.parse({ limit: "1" })).toEqual({ limit: 1 });
+    expect(CreatorTeamListQuerySchema.parse({ limit: "50" })).toEqual({ limit: 50 });
+    expect(CreatorTeamListQuerySchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(CreatorTeamListQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
+    expect(CreatorTeamListQuerySchema.safeParse({ limit: 1.5 }).success).toBe(false);
+    expect(CreatorTeamListQuerySchema.safeParse({ limit: 20, cursor: "forged" }).success).toBe(
       false
     );
   });

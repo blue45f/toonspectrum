@@ -76,6 +76,8 @@ vi.mock("../../../../../lib/server/creator", () => ({
 
 const collaborationRepository = {
   getTeam: vi.fn(),
+  listInvitations: vi.fn(),
+  getActivity: vi.fn(),
   invite: vi.fn(),
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
@@ -98,6 +100,8 @@ describe("CreatorService safety gates", () => {
     bumpViews.mockReset();
     generateImageAsset.mockReset();
     collaborationRepository.getTeam.mockReset();
+    collaborationRepository.listInvitations.mockReset();
+    collaborationRepository.getActivity.mockReset();
     collaborationRepository.invite.mockReset();
     collaborationRepository.updateMemberRole.mockReset();
     collaborationRepository.removeMember.mockReset();
@@ -190,19 +194,32 @@ describe("CreatorService safety gates", () => {
       members: [],
     };
     collaborationRepository.getTeam.mockResolvedValue(snapshot);
+    collaborationRepository.listInvitations.mockResolvedValue([]);
+    collaborationRepository.getActivity.mockResolvedValue([]);
     collaborationRepository.invite.mockResolvedValue(snapshot);
     collaborationRepository.updateMemberRole.mockResolvedValue(snapshot);
     collaborationRepository.removeMember.mockResolvedValue(snapshot);
-    collaborationRepository.respondToInvitation.mockResolvedValue(snapshot);
+    const invitationResponse = {
+      workId: "work-team",
+      role: "editor",
+      status: "active",
+    };
+    collaborationRepository.respondToInvitation.mockResolvedValue(invitationResponse);
     const service = createService();
 
     await expect(service.getWorkTeam("owner", "work-team")).resolves.toBe(snapshot);
+    await service.listWorkTeamInvitations("artist", 12);
+    await service.getWorkTeamActivity("owner", "work-team", 9);
     await service.inviteWorkTeamMember("owner", "work-team", "artist", "editor");
     await service.updateWorkTeamMemberRole("owner", "work-team", "artist", "commenter");
     await service.removeWorkTeamMember("owner", "work-team", "artist");
-    await service.respondToWorkTeamInvitation("artist", "work-team", "accept", INVITATION_ID);
+    await expect(
+      service.respondToWorkTeamInvitation("artist", "work-team", "accept", INVITATION_ID)
+    ).resolves.toBe(invitationResponse);
 
     expect(collaborationRepository.getTeam).toHaveBeenCalledWith("owner", "work-team");
+    expect(collaborationRepository.listInvitations).toHaveBeenCalledWith("artist", 12);
+    expect(collaborationRepository.getActivity).toHaveBeenCalledWith("owner", "work-team", 9);
     expect(collaborationRepository.invite).toHaveBeenCalledWith("owner", "work-team", "artist", "editor");
     expect(collaborationRepository.updateMemberRole).toHaveBeenCalledWith(
       "owner",

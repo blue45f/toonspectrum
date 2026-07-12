@@ -56,6 +56,10 @@ export const CreatorWorkRevisionListQuerySchema = z
   .object({ limit: z.coerce.number().int().min(1).max(20).default(20) })
   .strict();
 
+export const CreatorTeamListQuerySchema = z
+  .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
+  .strict();
+
 export const RestoreCreatorWorkRevisionSchema = z
   .object({ baseRevision: CreatorWorkRevisionSchema })
   .strict();
@@ -89,6 +93,7 @@ export class UpdateCreatorWorkDto extends createZodDto(UpdateCreatorWorkSchema) 
 export class CreatorWorkRevisionParamsDto extends createZodDto(CreatorWorkRevisionParamsSchema) {}
 export class CreatorWorkRevisionListParamsDto extends createZodDto(CreatorWorkRevisionListParamsSchema) {}
 export class CreatorWorkRevisionListQueryDto extends createZodDto(CreatorWorkRevisionListQuerySchema) {}
+export class CreatorTeamListQueryDto extends createZodDto(CreatorTeamListQuerySchema) {}
 export class RestoreCreatorWorkRevisionDto extends createZodDto(RestoreCreatorWorkRevisionSchema) {}
 export class CreatorTeamWorkParamsDto extends createZodDto(CreatorTeamWorkParamsSchema) {}
 export class CreatorTeamMemberParamsDto extends createZodDto(CreatorTeamMemberParamsSchema) {}

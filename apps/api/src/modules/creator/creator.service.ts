@@ -166,6 +166,18 @@ export class CreatorService {
     );
   }
 
+  async listWorkTeamInvitations(userId: string, limit: number) {
+    return this.runCreatorCollaborationOperation("list_invitations", "inbox", () =>
+      this.creatorCollaborationRepository.listInvitations(userId, limit)
+    );
+  }
+
+  async getWorkTeamActivity(userId: string, workId: string, limit: number) {
+    return this.runCreatorCollaborationOperation("get_activity", workId, () =>
+      this.creatorCollaborationRepository.getActivity(userId, workId, limit)
+    );
+  }
+
   async inviteWorkTeamMember(
     userId: string,
     workId: string,

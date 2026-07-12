@@ -15,6 +15,7 @@ import {
 
 import {
   CreateCreatorWorkDto,
+  CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
   CreatorTeamWorkParamsDto,
   CreatorWorkRevisionListParamsDto,
@@ -120,6 +121,27 @@ export class CreatorController {
   ) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.getWorkTeam(uid, params.id);
+  }
+
+  @Get("/creator/team/invitations")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listWorkTeamInvitations(
+    @Query() query: CreatorTeamListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.listWorkTeamInvitations(uid, query.limit);
+  }
+
+  @Get("/creator/works/:id/team/activity")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getWorkTeamActivity(
+    @Param() params: CreatorTeamWorkParamsDto,
+    @Query() query: CreatorTeamListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getWorkTeamActivity(uid, params.id, query.limit);
   }
 
   @Post("/creator/works/:id/team")

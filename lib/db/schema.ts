@@ -473,6 +473,84 @@ export const creatorWorkCollaborators = pgTable(
   ]
 );
 
+// 팀 변경 이력은 멤버십 행과 달리 append-only로 보존한다. 개인정보 이름·초대 동의 토큰은
+// 저장하지 않고, 조회 시 현재 사용자 행을 조인한다. 사용자 hard delete 뒤 FK는 SET NULL이 된다.
+// UUID는 공개 식별자, sequence는 동일 시각/clock skew에도 안정적인 DB 삽입 순서다.
+export const creatorWorkCollaborationEvents = pgTable(
+  "creator_work_collaboration_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    actorUserId: text("actorUserId").references(() => users.id, { onDelete: "set null" }),
+    targetUserId: text("targetUserId").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    beforeState: jsonb("beforeState").$type<{ role: string; status: string } | null>(),
+    afterState: jsonb("afterState").$type<{ role: string; status: string } | null>(),
+    sequence: bigint("sequence", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_collaboration_event_work_sequence").on(
+      t.workId,
+      t.sequence.desc()
+    ),
+    index("idx_creator_work_collaboration_event_target_created").on(
+      t.targetUserId,
+      t.createdAt.desc()
+    ),
+    index("idx_creator_work_collaboration_event_actor_created").on(
+      t.actorUserId,
+      t.createdAt.desc()
+    ),
+    check(
+      "creator_work_collaboration_event_action_check",
+      sql`${t.action} in ('invite', 'reinvite', 'accept', 'decline', 'role_change', 'remove')`
+    ),
+    check(
+      "creator_work_collaboration_event_before_state_check",
+      sql`(${t.beforeState} is null or (
+        jsonb_typeof(${t.beforeState}) = 'object'
+        and ${t.beforeState} ?& array['role', 'status']
+        and ${t.beforeState} - array['role', 'status'] = '{}'::jsonb
+        and ${t.beforeState}->>'role' in ('admin', 'editor', 'commenter', 'viewer')
+        and ${t.beforeState}->>'status' in ('pending', 'active', 'declined')
+      )) is true`
+    ),
+    check(
+      "creator_work_collaboration_event_after_state_check",
+      sql`(${t.afterState} is null or (
+        jsonb_typeof(${t.afterState}) = 'object'
+        and ${t.afterState} ?& array['role', 'status']
+        and ${t.afterState} - array['role', 'status'] = '{}'::jsonb
+        and ${t.afterState}->>'role' in ('admin', 'editor', 'commenter', 'viewer')
+        and ${t.afterState}->>'status' in ('pending', 'active', 'declined')
+      )) is true`
+    ),
+    check(
+      "creator_work_collaboration_event_transition_check",
+      sql`((
+        (${t.action} = 'invite' and ${t.beforeState} is null and ${t.afterState}->>'status' = 'pending')
+        or (${t.action} = 'reinvite' and ${t.beforeState}->>'status' = 'declined' and ${t.afterState}->>'status' = 'pending')
+        or (${t.action} in ('accept', 'decline')
+          and ${t.beforeState}->>'status' = 'pending'
+          and ${t.afterState}->>'status' = case when ${t.action} = 'accept' then 'active' else 'declined' end
+          and ${t.beforeState}->>'role' = ${t.afterState}->>'role')
+        or (${t.action} = 'role_change'
+          and ${t.beforeState}->>'status' in ('pending', 'active')
+          and ${t.beforeState}->>'status' = ${t.afterState}->>'status'
+          and ${t.beforeState}->>'role' <> ${t.afterState}->>'role')
+        or (${t.action} = 'remove'
+          and ${t.beforeState}->>'status' in ('pending', 'active')
+          and ${t.afterState} is null)
+      )) is true`
+    ),
+  ]
+);
+
 // ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
 // author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
 export const creatorSeries = pgTable("creator_series", {

@@ -2,12 +2,21 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  StudioTeamInvitationStaleError,
+  isStudioTeamRequestScopeCurrent,
+  nextStudioTeamInboxFocusTarget,
+  removeAcknowledgedStudioTeamInvitation,
+  shouldReloadStudioTeamInvitation,
+  shouldRequestStudioTeamActivity,
+  type StudioTeamActivityItem,
+  type StudioTeamInvitationSummary,
+  type StudioTeamSnapshot,
+} from "./studio-team-client";
+import {
   StudioTeamPanel,
   StudioTeamPanelView,
   type StudioTeamPanelViewProps,
 } from "./StudioTeamPanel";
-
-import type { StudioTeamSnapshot } from "./studio-team-client";
 
 const noop = () => {
   // Node SSR 회귀 테스트에서는 이벤트를 실행하지 않는다.
@@ -44,19 +53,53 @@ function teamSnapshot(overrides: Partial<StudioTeamSnapshot["viewer"]> = {}): St
   };
 }
 
+function teamInvitation(): StudioTeamInvitationSummary {
+  return {
+    workId: "invited/work-1",
+    workTitle: "별빛 아래 우리",
+    owner: { name: "하린" },
+    role: "editor",
+    invitationId: "11111111-1111-4111-8111-111111111111",
+    invitedAt: "2026-07-12T01:30:00.000Z",
+  };
+}
+
+function teamActivity(): StudioTeamActivityItem {
+  return {
+    id: "activity-1",
+    action: "role_change",
+    actor: { userId: "owner-1", name: "서윤" },
+    target: { userId: "editor/1", name: "민호" },
+    before: { role: "viewer", status: "active" },
+    after: { role: "editor", status: "active" },
+    createdAt: "2026-07-12T02:00:00.000Z",
+  };
+}
+
 function renderView(overrides: Partial<StudioTeamPanelViewProps> = {}): string {
   const props: StudioTeamPanelViewProps = {
     actionError: null,
     busyAction: null,
     confirmRemoveUserId: null,
+    activity: [],
+    activityError: null,
+    activityLoading: false,
     inviteRole: "editor",
     inviteUserId: "",
+    invitations: [],
+    invitationsError: null,
+    invitationsLoading: false,
+    inboxFocusTarget: null,
     loadError: null,
     loading: false,
     loggedIn: true,
     notice: null,
     snapshot: teamSnapshot(),
     workId: "work-1",
+    onActivityOpenChange: noop,
+    onActivityRefresh: noop,
+    onInboxFocusHandled: noop,
+    onInboxInvitationRespond: noop,
     onInvitationRespond: noop,
     onInvite: noop,
     onInviteRoleChange: noop,
@@ -64,6 +107,7 @@ function renderView(overrides: Partial<StudioTeamPanelViewProps> = {}): string {
     onRemoveCancel: noop,
     onRemoveConfirm: noop,
     onRemoveRequest: noop,
+    onInvitationsRetry: noop,
     onRetry: noop,
     onRoleChange: noop,
     ...overrides,
@@ -74,7 +118,7 @@ function renderView(overrides: Partial<StudioTeamPanelViewProps> = {}): string {
 describe("StudioTeamPanel shell and first-use states", () => {
   it("로그아웃 상태에서 인증 안내와 접근 가능한 dialog 구조를 제공한다", () => {
     const html = renderToStaticMarkup(
-      <StudioTeamPanel loggedIn={false} open workId="work-1" onClose={noop} />
+      <StudioTeamPanel authScopeKey={null} loggedIn={false} open workId="work-1" onClose={noop} />
     );
 
     expect(html).toContain('role="dialog"');
@@ -88,22 +132,25 @@ describe("StudioTeamPanel shell and first-use states", () => {
     expect(html).toContain("서버 권한");
   });
 
-  it("저장되지 않은 원고에서 서버 저장 선행 조건을 설명한다", () => {
+  it("저장되지 않은 원고에서 저장 선행 조건과 받은 초대 로딩 상태를 함께 설명한다", () => {
     const html = renderToStaticMarkup(
-      <StudioTeamPanel loggedIn open workId={null} onClose={noop} />
+      <StudioTeamPanel authScopeKey="account-a" loggedIn open workId={null} onClose={noop} />
     );
 
     expect(html).toContain("작품을 먼저 저장해 주세요");
-    expect(html).toContain("아직 서버에 저장되지 않은 원고예요");
+    expect(html).toContain("현재 원고는 아직 서버에 저장되지 않았어요");
+    expect(html).toContain("내 팀 초대");
+    expect(html).toContain('aria-label="받은 팀 초대 불러오는 중"');
     expect(html).not.toContain("사용자 ID");
   });
 
   it("모바일 시트가 하단 도구막대 위에서 독립 스크롤하고 데스크톱 우측 패널로 전환된다", () => {
     const html = renderToStaticMarkup(
-      <StudioTeamPanel loggedIn={false} open workId="work-1" onClose={noop} />
+      <StudioTeamPanel authScopeKey={null} loggedIn={false} open workId="work-1" onClose={noop} />
     );
 
     expect(html).toContain("bottom-[calc(7rem+env(safe-area-inset-bottom))]");
+    expect(html).toContain("w-[100dvw]");
     expect(html).toContain("max-h-[min(72dvh,calc(100dvh-7.75rem-env(safe-area-inset-top)))]");
     expect(html).toContain("sm:inset-y-0");
     expect(html).toContain("sm:w-[26rem]");
@@ -114,9 +161,65 @@ describe("StudioTeamPanel shell and first-use states", () => {
 
   it("닫힌 상태에서는 dialog를 렌더링하지 않는다", () => {
     const html = renderToStaticMarkup(
-      <StudioTeamPanel loggedIn open={false} workId="work-1" onClose={noop} />
+      <StudioTeamPanel authScopeKey="account-a" loggedIn open={false} workId="work-1" onClose={noop} />
     );
     expect(html).toBe("");
+  });
+});
+
+describe("StudioTeamPanelView unsaved invitation inbox", () => {
+  it("로딩·오류·빈 초대 상태에 각각 이해 가능한 안내와 복구 경로가 있다", () => {
+    const loadingHtml = renderView({
+      workId: null,
+      snapshot: null,
+      invitationsLoading: true,
+    });
+    expect(loadingHtml).toContain('aria-label="받은 팀 초대 불러오는 중"');
+
+    const errorHtml = renderView({
+      workId: null,
+      snapshot: null,
+      invitationsError: "네트워크 연결을 확인해 주세요.",
+    });
+    expect(errorHtml).toContain('role="alert"');
+    expect(errorHtml).toContain("초대 목록을 열지 못했어요");
+    expect(errorHtml).toContain("다시 시도");
+
+    const emptyHtml = renderView({ workId: null, snapshot: null });
+    expect(emptyHtml).toContain("도착한 초대가 없어요");
+    expect(emptyHtml).toContain("새 초대를 받으면");
+  });
+
+  it("작품·소유자·역할·시간과 44px 수락/거절 컨트롤을 표시하되 초대 식별자는 노출하지 않는다", () => {
+    const invitation = teamInvitation();
+    const html = renderView({
+      workId: null,
+      snapshot: null,
+      invitations: [invitation],
+    });
+
+    expect(html).toContain("별빛 아래 우리");
+    expect(html).toContain("하린 · 작품 소유자");
+    expect(html).toContain("편집자");
+    expect(html).toContain('aria-label="별빛 아래 우리 팀 초대 수락"');
+    expect(html).toContain('aria-label="별빛 아래 우리 팀 초대 거절"');
+    expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).not.toContain(invitation.invitationId);
+    expect(html).not.toContain("<img");
+  });
+
+  it("초대 처리 중인 버튼을 보조 기술에 알리고 안정적인 포커스 대상으로 유지한다", () => {
+    const invitation = teamInvitation();
+    const html = renderView({
+      workId: null,
+      snapshot: null,
+      invitations: [invitation],
+      busyAction: `inbox:${invitation.workId}:accept`,
+    });
+
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('aria-label="별빛 아래 우리 팀 초대 수락 처리 중"');
+    expect(html).toContain('aria-label="별빛 아래 우리 팀 초대 거절"');
   });
 });
 
@@ -150,7 +253,7 @@ describe("StudioTeamPanelView permissions", () => {
   });
 
   it("manageMembers 권한이 있는 소유자·관리자에게만 초대와 역할 관리 UI를 제공한다", () => {
-    const html = renderView();
+    const html = renderView({ activity: [teamActivity()] });
 
     expect(html).toContain("팀원 초대");
     expect(html).toContain('id="studio-team-invite-user-id"');
@@ -158,9 +261,28 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).toContain('<strong class="font-semibold text-fg-2">편집자</strong>');
     expect(html).toContain("공동 저장 연결에 사용할 편집 역할입니다");
     expect(html).toContain('data-team-manage-controls="true"');
+    expect(html).toContain('data-team-members-heading="true"');
+    expect(html).toContain('tabindex="-1"');
     expect(html).toContain('aria-label="민호 역할"');
     expect(html).toContain('aria-label="민호 팀에서 내보내기"');
     expect(html).not.toContain('aria-label="서윤 팀에서 내보내기"');
+    expect(html).toContain('data-team-activity="manager-only"');
+    expect(html).toContain("최근 팀 변경 기록");
+    expect(html).toContain("역할 변경");
+    expect(html).toContain("열람자 · 참여 중");
+    expect(html).toContain("편집자 · 참여 중");
+    expect(html).toContain('aria-label="팀 변경 기록 새로고침"');
+    expect(html.match(/group-open:rotate-180/g)?.length).toBe(2);
+  });
+
+  it("서버가 구형 이미지 URL을 포함해도 팀원은 이니셜만 표시한다", () => {
+    const snapshot = teamSnapshot();
+    snapshot.members[1].image = "https://private.example/member-avatar.png";
+    const html = renderView({ snapshot });
+
+    expect(html).toContain(">민<");
+    expect(html).not.toContain("private.example");
+    expect(html).not.toContain("<img");
   });
 
   it("관리 권한이 없는 편집자에게 초대·변경·삭제 컨트롤을 노출하지 않는다", () => {
@@ -180,6 +302,8 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).toContain("내 역할 · 편집자");
     expect(html).toContain("소유자와 내 정보");
     expect(html).toContain("역할별 서버 권한 안내");
+    expect(html).not.toContain('data-team-activity="manager-only"');
+    expect(html).not.toContain("최근 팀 변경 기록");
   });
 
   it("active 관리자에게 manageMembers capability가 있으면 멤버 관리 UI를 제공한다", () => {
@@ -209,12 +333,14 @@ describe("StudioTeamPanelView permissions", () => {
 
     expect(html).not.toContain("팀원 초대");
     expect(html).not.toContain('data-team-manage-controls="true"');
+    expect(html).not.toContain('data-team-activity="manager-only"');
   });
 
   it("로딩·오류·빈 멤버 상태에 각각 안내와 복구 경로가 있다", () => {
     expect(renderView({ loading: true })).toContain('aria-label="팀 작업 공간 불러오는 중"');
     const errorHtml = renderView({ loadError: "네트워크 연결을 확인하세요.", snapshot: null });
     expect(errorHtml).toContain('role="alert"');
+    expect(errorHtml).toContain('data-team-retry="true"');
     expect(errorHtml).toContain("다시 시도");
 
     const emptyHtml = renderView({ snapshot: { ...teamSnapshot(), members: [] } });
@@ -228,5 +354,90 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).not.toContain("온라인");
     expect(html).not.toContain("접속 중");
     expect(html).not.toContain("실시간");
+  });
+});
+
+describe("StudioTeamPanel request and state decisions", () => {
+  const managerDecision = {
+    open: true,
+    loggedIn: true,
+    authScopeKey: "account-a",
+    workId: "work-1",
+    canManageMembers: true,
+    loadedScope: null,
+    requestScope: null,
+  } as const;
+
+  it("관리자가 변경 기록을 처음 펼칠 때 한 번만 요청하고 비관리자는 요청하지 않는다", () => {
+    expect(shouldRequestStudioTeamActivity(managerDecision)).toBe(true);
+    expect(
+      shouldRequestStudioTeamActivity({
+        ...managerDecision,
+        requestScope: { authScopeKey: "account-a", workId: "work-1" },
+      })
+    ).toBe(false);
+    expect(
+      shouldRequestStudioTeamActivity({
+        ...managerDecision,
+        loadedScope: { authScopeKey: "account-a", workId: "work-1" },
+      })
+    ).toBe(false);
+    expect(
+      shouldRequestStudioTeamActivity({ ...managerDecision, canManageMembers: false })
+    ).toBe(false);
+  });
+
+  it("작품 또는 계정 범위가 바뀌면 이전 비동기 응답을 현재 상태에 적용하지 않는다", () => {
+    const requestScope = { authScopeKey: "account-a", workId: "work-1" };
+    expect(
+      isStudioTeamRequestScopeCurrent(requestScope, {
+        authScopeKey: "account-a",
+        workId: "work-1",
+      })
+    ).toBe(true);
+    expect(
+      isStudioTeamRequestScopeCurrent(requestScope, {
+        authScopeKey: "account-b",
+        workId: "work-1",
+      })
+    ).toBe(false);
+    expect(
+      isStudioTeamRequestScopeCurrent(requestScope, {
+        authScopeKey: "account-a",
+        workId: "work-2",
+      })
+    ).toBe(false);
+    expect(
+      isStudioTeamRequestScopeCurrent(requestScope, { authScopeKey: null, workId: "work-1" })
+    ).toBe(false);
+  });
+
+  it("409 초대 충돌만 자동 재조회 대상으로 분류한다", () => {
+    expect(shouldReloadStudioTeamInvitation(new StudioTeamInvitationStaleError())).toBe(true);
+    expect(shouldReloadStudioTeamInvitation(new Error("network"))).toBe(false);
+  });
+
+  it("성공한 초대 카드 하나만 제거하고 다음 카드 또는 새로고침으로 포커스를 보낸다", () => {
+    const first = teamInvitation();
+    const second: StudioTeamInvitationSummary = {
+      ...teamInvitation(),
+      workId: "work-2",
+      workTitle: "두 번째 작품",
+      invitationId: "22222222-2222-4222-8222-222222222222",
+    };
+    const invitations = [first, second];
+
+    expect(removeAcknowledgedStudioTeamInvitation(invitations, first)).toEqual([second]);
+    expect(
+      removeAcknowledgedStudioTeamInvitation(invitations, {
+        workId: first.workId,
+        invitationId: "33333333-3333-4333-8333-333333333333",
+      })
+    ).toEqual(invitations);
+    expect(nextStudioTeamInboxFocusTarget(invitations, first)).toEqual({
+      kind: "invitation",
+      workId: second.workId,
+    });
+    expect(nextStudioTeamInboxFocusTarget([first], first)).toEqual({ kind: "refresh" });
   });
 });

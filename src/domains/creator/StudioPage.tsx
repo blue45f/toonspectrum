@@ -22235,7 +22235,9 @@ function StudioCuttoonEditor() {
       <Suspense fallback={null}>
         {teamPanelOpen ? (
           <StudioTeamPanel
+            key={studioAuthUserId ?? "guest"}
             open
+            authScopeKey={studioAuthUserId}
             onClose={() => setTeamPanelOpen(false)}
             workId={workId}
             loggedIn={loggedIn}
