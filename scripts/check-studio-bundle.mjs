@@ -8,9 +8,9 @@ const studioEntry = "src/domains/creator/StudioPage.tsx";
 const appEntry = "index.html";
 
 const budgets = {
-  // Measured 2026-07-13 after SVG/PSD lazy loading: 2,948,329 raw / 893,614 gzip.
-  studio: { raw: 3_050_000, gzip: 930_000 },
-  // Measured after moving the optional WebGL intro behind import(): 442,894 raw / 143,863 gzip.
+  // Measured 2026-07-13 after the 3D runtime split: 2,224,408 raw / 710,282 gzip.
+  studio: { raw: 2_350_000, gzip: 750_000 },
+  // Measured after the same build: 443,257 raw / 143,949 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
 
@@ -85,6 +85,14 @@ if (!fs.existsSync(manifestPath)) {
     );
     if (eagerDocumentEngines.length > 0) {
       fail(`SVG/PSD engines returned to the Studio static graph: ${eagerDocumentEngines.join(", ")}`);
+    }
+
+    const eager3dRuntime = matchingEntries(
+      studioKeys,
+      /(?:studio-background-3d-primitives|StudioBackground3D|react-three-fiber|three\.module)/,
+    );
+    if (eager3dRuntime.length > 0) {
+      fail(`optional 3D runtime returned to the Studio static graph: ${eager3dRuntime.join(", ")}`);
     }
 
     const eagerWebglIntro = matchingEntries(appKeys, /(?:IntroSplash|three\.module)/);

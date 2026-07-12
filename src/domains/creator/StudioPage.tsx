@@ -209,7 +209,11 @@ import {
   studioAutosaveKey,
   studioSharedAutosaveCompatibility,
 } from "./studio-autosave";
-import { parseStudio3dTool } from "./studio-background-3d-primitives";
+import {
+  loadStudioBackground3DModule,
+  preloadStudioBackground3D,
+} from "./studio-background-3d-loader";
+import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
@@ -1030,7 +1034,7 @@ const StudioVrmPoser = lazyRetry(
   "StudioVrmPoser"
 );
 const StudioBackground3D = lazyRetry(
-  () => import("./StudioBackground3D").then((mod) => ({ default: mod.StudioBackground3D })),
+  () => loadStudioBackground3DModule().then((mod) => ({ default: mod.StudioBackground3D })),
   "StudioBackground3D"
 );
 const StudioTimelapsePanel = lazyRetry(
@@ -16722,6 +16726,9 @@ function StudioCuttoonEditor() {
                     setBg3dOpen(true);
                     setMenu(null);
                   }}
+                  onPointerEnter={preloadStudioBackground3D}
+                  onPointerDown={preloadStudioBackground3D}
+                  onFocus={preloadStudioBackground3D}
                   title="3D 배경 블록아웃 만들기"
                   className={groupTabBtn(false)}
                 >
@@ -22577,6 +22584,9 @@ function StudioCuttoonEditor() {
                           setBg3dInitialElementId(selected.id);
                           setBg3dOpen(true);
                         }}
+                        onPointerEnter={preloadStudioBackground3D}
+                        onPointerDown={preloadStudioBackground3D}
+                        onFocus={preloadStudioBackground3D}
                         className={buttonClass({ size: "sm", variant: "solid", className: "gap-1 font-semibold" })}
                         title="3D 배경 재편집"
                       >
@@ -24518,6 +24528,9 @@ function StudioCuttoonEditor() {
                       setBg3dOpen(true);
                       setContextMenu((prev) => ({ ...prev, visible: false }));
                     }}
+                    onPointerEnter={preloadStudioBackground3D}
+                    onPointerDown={preloadStudioBackground3D}
+                    onFocus={preloadStudioBackground3D}
                     className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
                   >
                     <Boxes size={12} />

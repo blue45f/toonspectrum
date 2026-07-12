@@ -13,15 +13,24 @@
    `pointerenter`·`pointerdown`·`focus` 또는 실행 시점에 한 번만 불러온다.
 3. 한 스트로크를 한 `pointerId`에 귀속하고, coalesced 하드웨어 샘플과 preview-only predicted
    샘플을 분리해 빠른 펜 이동의 꼬리·필압·기울기를 보존한다.
+4. 저장된 3D 장면을 판별하는 문자열 메타데이터 파서를 Three.js 무의존 모듈로 분리했다. 실제
+   Three/R3F 편집기는 3D 배경 버튼의 `pointerenter`·`pointerdown`·`focus` 또는 활성화 시점에만
+   한 번 불러온다.
 
 프로덕션 Vite manifest의 정적 import 폐쇄를 같은 방식으로 측정한 결과, Studio 초기 JavaScript는
 3,264,770B raw / 988,919B gzip에서 2,948,329B / 893,614B로 줄었다. 각각 316,441B(9.7%)와
 95,305B(9.6%) 감소다. SVG/PSD 엔진은 이 정적 폐쇄에 남지 않는다.
 
-선택형 WebGL 인트로의 Three.js도 앱 공통 엔트리에서 분리했다. 앱 엔트리는 1,171,388B raw에서
-442,894B로, gzip은 329,246B에서 143,863B로 줄었다. 동적 인트로 청크 로드가 실패하면 이미 엔트리에
-있는 정적 스플래시로 복구한다. Studio 자체는 3D 배경 primitive 경로가 Three.js를 아직 정적으로
-요구하므로, 이 엔트리 절감과 Studio 경로 절감을 혼동하지 않는다.
+이어 3D 런타임 경계를 분리한 동일 방식의 production manifest 측정에서 Studio 정적 폐쇄는
+2,948,329B raw / 893,614B gzip에서 **2,224,408B / 710,282B**로 줄었다. 직전 기준 대비
+723,921B raw(24.6%)와 183,332B gzip(20.5%) 감소이며, 첫 측정 3,264,770B / 988,919B와 비교하면
+총 1,040,362B raw(31.9%)와 278,637B gzip(28.2%)를 줄였다. `StudioBackground3D`, R3F,
+`three.module`, primitive 생성기는 이제 Studio 정적 import 폐쇄에 남지 않는다.
+
+선택형 WebGL 인트로의 Three.js도 앱 공통 엔트리에서 분리했다. 앱 엔트리는 최초 1,171,388B raw /
+329,246B gzip에서 현재 **443,257B / 143,949B**가 됐다. 동적 인트로 청크 로드가 실패하면 이미
+엔트리에 있는 정적 스플래시로 복구한다. Studio 3D 편집기 역시 intent preload 실패를 활성화 실패로
+고정하지 않고, 실제 활성화 시 다시 시도할 수 있는 별도 dynamic import 경계를 사용한다.
 
 ## 공식 제품 동작에서 가져온 설계 원칙
 
@@ -69,18 +78,26 @@ W3C [Pointer Events Level 3](https://www.w3.org/TR/pointerevents3/)의 coalesced
 
 `vite.config.ts`가 production manifest를 만들고 `pnpm run check:studio-bundle`이 다음을 검사한다.
 
-- Studio 정적 JS: 3,050,000B raw / 930,000B gzip 이하
+- Studio 정적 JS: 2,350,000B raw / 750,000B gzip 이하
 - 앱 공통 엔트리: 500,000B raw / 170,000B gzip 이하
 - SVG export, PSD export/import가 Studio 정적 폐쇄에 포함되지 않음
+- `studio-background-3d-primitives`, `StudioBackground3D`, `react-three-fiber`, `three.module`이
+  Studio 정적 폐쇄에 포함되지 않음
 - `IntroSplash`와 `three.module`이 앱 공통 엔트리에 포함되지 않음
 
-예산은 현재 측정값보다 작은 자연 변동 여유를 두되, SVG/PSD 또는 WebGL 인트로가 다시 정적 import되면
-실패하도록 잡았다. 로컬 `ci`와 GitHub Actions 모두 production build 직후 이 검사를 실행한다.
+Studio 예산은 현재 측정값보다 raw 125,592B(5.6%), gzip 39,718B(5.6%) 여유를 두되, SVG/PSD,
+3D 편집 런타임 또는 WebGL 인트로가 다시 정적 import되면 이름 검사에서도 즉시 실패하도록 잡았다.
+로컬 `ci`와 GitHub Actions 모두 production build 직후 이 검사를 실행한다.
 
 ## 다음 우선순위
 
-현재 Studio 정적 폐쇄에서 가장 큰 선택 가능 후보는 `studio-background-3d-primitives`가 당기는
-`three.module` 약 723.5KB raw / 183.2KB gzip이다. 다음 배치에서는 문자열 3D 도구 파서를 Three.js
-무의존 모듈로 분리하고 실제 primitive 생성만 3D 패널의 literal dynamic import 경계로 옮긴다. 그 뒤
-게시 package/schedule/preflight, AI runtime, 연속성 메타데이터 편집기의 조건부 패널 추출을 순서대로
-검토한다. 각 단계는 기능 삭제가 아니라 intent preload와 오류 복구를 유지한 조건부 로딩으로 진행한다.
+3D 런타임 분리는 완료됐다. 다음 번들 후보는 게시 package/schedule/preflight, AI runtime, 연속성
+메타데이터 편집기의 조건부 패널이다. 각 단계는 기능 삭제가 아니라 intent preload와 오류 복구를
+유지한 조건부 로딩으로 진행한다.
+
+WebGPU는 엔진 이름만 교체하지 않는다. 현재 프로덕션은 Three/R3F를 사용 시점에 로드하는 경로를
+유지하고, 렌더러와 무관한 비동기 캡처 어댑터와 WebGL 기준 pixel diff를 먼저 만든 뒤 대표 장면에서
+Three WebGPU 경로를 단계적으로 비교한다. Babylon.js는 기존 실측 ADR의 이중 엔진 비용 때문에
+프로덕션 의존성에 넣지 않고 lab-only 후보로 유지한다. 상세 수치와 공식 근거는
+[3D 런타임 지연 로딩·WebGPU 단계 도입 벤치마크](./studio-3d-runtime-loading-benchmark-2026-07-13.md)에
+분리해 기록했다.
