@@ -1057,6 +1057,8 @@ export type FullVrmState = {
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
   materialFx?: VrmMaterialFx;
+  /** VRoid형 비파괴 얼굴·헤어·체형 조형 상태. 구버전 저장본과 호환되는 선택 필드. */
+  avatarForge?: unknown;
   /** 원본 VRM의 머리·피부·의상 재질에 적용한 비파괴 색상 오버라이드. */
   customColors?: Record<string, string>;
 };
@@ -1078,6 +1080,7 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
     env: state.env,
     fingerOverrides: state.fingerOverrides,
     materialFx: state.materialFx,
+    avatarForge: state.avatarForge,
     customColors: state.customColors,
   };
 }
@@ -1146,6 +1149,7 @@ export function planFullStateRestore(state: FullVrmState): {
   propsItems?: unknown;
   physics?: unknown;
   materialFx?: VrmMaterialFx;
+  avatarForge?: unknown;
   customColors?: Record<string, string>;
 } {
   return {
@@ -1161,6 +1165,7 @@ export function planFullStateRestore(state: FullVrmState): {
     propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
     physics: state.physics,
     materialFx: state.materialFx,
+    avatarForge: state.avatarForge,
     customColors: state.customColors,
   };
 }
@@ -1186,8 +1191,11 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       lighting: poseData.lighting,
       env: poseData.env,
       costume: poseData.costume,
+      wardrobe: poseData.wardrobe,
       props: poseData.props ?? (poseData.vrmProps ? { items: parseVrmProps(poseData.vrmProps).items } : undefined),
       physics: poseData.physics,
+      materialFx: poseData.materialFx,
+      avatarForge: poseData.avatarForge,
       customColors: poseData.customColors,
     };
   } catch {

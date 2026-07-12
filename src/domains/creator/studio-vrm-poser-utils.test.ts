@@ -6,6 +6,7 @@ import {
   applyPoserVisualState,
   applyFullState,
   planFullStateRestore,
+  buildFullVrmStateFromSharedDataUrl,
   applyVrmMaterialFx,
   hasVrmMToonMaterial,
   DEFAULT_VRM_MATERIAL_FX,
@@ -180,6 +181,8 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       costume: { hidden: ["x"] },
       props: { items: [{ uid: "p1" }] },
       physics: { stiffnessScale: 1.1 },
+      materialFx: { rimIntensity: 0.35 },
+      avatarForge: { version: 1, presetId: "hero" },
       customColors: { face: "#123456", body: "#123456" },
     } as any;
 
@@ -195,7 +198,26 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect((plan.costume as any)?.hidden).toContain("x");
     expect((plan.propsItems as any)?.[0]?.uid).toBe("p1");
     expect((plan.physics as any)?.stiffnessScale).toBe(1.1);
+    expect(plan.materialFx?.rimIntensity).toBe(0.35);
+    expect(plan.avatarForge).toEqual({ version: 1, presetId: "hero" });
     expect(plan.customColors?.face).toBe("#123456");
+  });
+
+  it("restores wardrobe, material effects and avatar forge state from shared PNG metadata", () => {
+    const metadata = {
+      bones: { hips: { rotation: [0, 0, 0] } },
+      yOffset: 0.04,
+      wardrobe: { version: 1, slots: { top: { itemId: "lab-coat" } } },
+      materialFx: { rimIntensity: 0.42 },
+      avatarForge: { version: 1, presetId: "soft-hero" },
+    };
+    const state = buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`
+    );
+
+    expect(state?.wardrobe).toEqual(metadata.wardrobe);
+    expect(state?.materialFx).toEqual(metadata.materialFx);
+    expect(state?.avatarForge).toEqual(metadata.avatarForge);
   });
 });
 

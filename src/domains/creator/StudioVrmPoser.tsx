@@ -6,6 +6,12 @@ import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
+import {
+  createAvatarForgeState,
+  parseAvatarForgeState,
+  serializeAvatarForgeState,
+  type AvatarForgeState,
+} from "./studio-vrm-avatar-forge";
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
@@ -133,6 +139,8 @@ import {
   type TrackingChannels,
   type VrmTrackingData,
 } from "./studio-vrm-webcam-tracking";
+import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
+import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
 import {
   deleteStoredVrmModel,
   getStoredVrmModel,
@@ -536,14 +544,15 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; h
   { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
 ];
 
-type CharacterPanelSection = "recipes" | "library" | "appearance" | "wardrobe";
+type CharacterPanelSection = "recipes" | "library" | "forge" | "appearance" | "wardrobe";
 const CHARACTER_PANEL_SECTIONS: Array<{
   id: CharacterPanelSection;
   label: string;
   icon: typeof UserRound;
 }> = [
-  { id: "recipes", label: "시작 캐릭터", icon: UserRound },
+  { id: "recipes", label: "시작", icon: UserRound },
   { id: "library", label: "모델", icon: Upload },
+  { id: "forge", label: "조형", icon: Sparkles },
   { id: "appearance", label: "체형·색", icon: Sliders },
   { id: "wardrobe", label: "의상", icon: Shirt },
 ];
@@ -2657,6 +2666,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
   // early decl for new features used in effects
   const [bodyScale, setBodyScale] = useState<BodyScale>({ height: 1, width: 1 });
+  const [avatarForgeState, setAvatarForgeState] = useState<AvatarForgeState>(() => createAvatarForgeState());
+  const detectedOriginalHairCount = useMemo(() => countDetectedVrmHairMeshes(vrm), [vrm]);
   const [fingerEdits, setFingerEdits] = useState<FingerRotationMap>({});
   const [lighting, setLighting] = useState<LightingParams>({ intensity: 1.2, colorTemp: 0.5, directionDeg: 45 });
   const [envVariant, setEnvVariant] = useState<EnvVariant>("none");
@@ -2815,8 +2826,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         fingerOverrides: fingerEdits,
         customColors,
         materialFx,
+        avatarForge: serializeAvatarForgeState(avatarForgeState),
       }),
-    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx]
+    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
   );
 
   const restoreHistoryAt = (index: number) => {
@@ -3015,6 +3027,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     fingerOverrides?: FingerRotationMap;
     lighting?: LightingParams;
     env?: EnvVariant;
+    avatarForge?: unknown;
   }
 
   const pendingPoseDataRef = useRef<PendingPoseData | null>(null);
@@ -3582,7 +3595,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 풀 스테이트 copy/paste + local save/load (새 기능)
   function handleCopyFullState() {
     try {
-      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx });
+      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState) });
       const json = JSON.stringify(full);
       navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
@@ -3598,7 +3611,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function handleSaveFullLocal() {
     const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
-    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx});
+    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState)});
     const next = { ...savedFullStates, [name]: full };
     setSavedFullStates(next);
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
@@ -3627,6 +3640,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     // 눌어붙지 않게 한다).
     setMaterialFx(plan.materialFx ?? DEFAULT_VRM_MATERIAL_FX);
     setCustomColors({ ...restoredColors });
+    setAvatarForgeState(parseAvatarForgeState(plan.avatarForge));
 
     if (vrm) {
       const meshes = collectCostumeMeshes(vrm);
@@ -3789,6 +3803,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         fingerOverrides: fingerEdits,
         lighting,
         env: envVariant,
+        avatarForge: serializeAvatarForgeState(avatarForgeState),
         // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
@@ -3999,6 +4014,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         props: pending.vrmProps,
         physics: pending.physics,
         materialFx: pending.materialFx,
+        avatarForge: pending.avatarForge,
         customColors: pending.customColors,
       };
       commitFullStateRestore(pendingFull, nextVrm);
@@ -4014,6 +4030,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setBodyRotation(0);
       setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
       setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
+      setAvatarForgeState(createAvatarForgeState());
       applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits, bodyScale });
       applyExpressionWeightsToVrm(nextVrm, {});
       applyVrmCustomColors(nextVrm, DEFAULT_VRM_CUSTOM_COLORS);
@@ -4621,6 +4638,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         materialFx: materialFx,
         modelName: modelName,
         modelId: activeModelId,
+        bodyScale,
+        fingerOverrides: fingerEdits,
+        lighting,
+        env: envVariant,
+        avatarForge: serializeAvatarForgeState(avatarForgeState),
         vrmProps: serializeVrmProps(vrmPropItems),
         costume: serializeCostume(costumeState),
         wardrobe: serializeWardrobe(wardrobeState),
@@ -4710,6 +4732,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       bodyScale={bodyScale}
                     />
                   ) : null}
+                  {vrm ? <StudioVrmAvatarForge vrm={vrm} state={avatarForgeState} /> : null}
                   {vrm
                     ? vrmPropItems.map((item) => <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} />)
                     : null}
@@ -4896,7 +4919,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
               {activePanelTab === "character" ? (
                 <div className="sticky -top-4 z-20 -mx-4 -mt-4 border-b border-line bg-panel/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-4 gap-1">
+                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-5 gap-1">
                     {CHARACTER_PANEL_SECTIONS.map((section) => {
                       const SectionIcon = section.icon;
                       const selected = activeCharacterSection === section.id;
@@ -5143,11 +5166,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 <details className="group mt-3 rounded-xl border border-line bg-card/60 p-3">
                   <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
                     <Paintbrush size={13} className="text-accent" aria-hidden />
-                    VRoid Studio에서 원본 모델 만들기
+                    더 깊은 원본 모델 제작 · VRoid 가져오기
                     <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                   </summary>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
-                    VRoid Studio는 코딩이나 모델링 지식 없이도 얼굴, 헤어, 의상 등을 마우스 클릭과 드래그로 자유롭게 디자인할 수 있는 무료 3D 아바타 제작 도구입니다.
+                    ToonSpectrum의 조형 탭은 현재 VRM 리그를 보존한 빠른 비파괴 편집에 적합합니다. 새 스킨 메시·직접 그린 텍스처·VRM 파일 내보내기까지 필요하면 VRoid Studio에서 원본을 만든 뒤 가져오세요.
                   </p>
                   
                   <div className="mt-2.5 rounded-lg border border-line bg-panel p-2 text-[0.68rem] text-fg-3 space-y-1.5">
@@ -5282,6 +5305,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     처음 {LIBRARY_BATCH_SIZE}명만 보기
                   </button>
                 ) : null}
+              </section>
+
+              <section
+                id="vrm-character-section-forge"
+                role="tabpanel"
+                aria-labelledby="vrm-character-subtab-forge"
+                hidden={hideOnCharacterSection("forge")}
+              >
+                <StudioVrmAvatarForgePanel
+                  state={avatarForgeState}
+                  disabled={!vrm}
+                  detectedOriginalHairCount={detectedOriginalHairCount}
+                  onChange={setAvatarForgeState}
+                />
               </section>
 
               <section hidden={hideOnTab("face")}>
