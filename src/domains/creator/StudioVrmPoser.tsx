@@ -74,19 +74,28 @@ import {
   type FullVrmState,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
+import { applyVrmTwoBoneGrip } from "./studio-vrm-prop-ik";
 import {
-  PROP_ATTACH_BONES,
-  PROP_BONE_LABELS,
-  PROP_CATEGORY_LABELS as VRM_PROP_CATEGORY_LABELS,
-  propsByCategory,
+  createAutoGripFingerOverrides,
+  DEFAULT_VRM_PROP_RIG_METRICS,
+  measureVrmPropRigMetrics,
+  resolvePropAttachment,
+  resolveSecondaryPropTarget,
+  type VrmPropRigMetrics,
+} from "./studio-vrm-prop-rig";
+import {
   createPropInstance,
+  parseVrmProps,
   serializeVrmProps,
   buildPropObject,
   propDefById,
   type PropInstance,
-  type PropAttachBone,
-  type PropCategory,
 } from "./studio-vrm-props";
+import {
+  parseSceneProps,
+  serializeSceneProps,
+  type ScenePropAttachmentConfig as PropAttachmentConfig,
+} from "./studio-vrm-scene-props";
 import {
   applyCalibration,
   CALIBRATION_STORAGE_KEY,
@@ -141,6 +150,7 @@ import {
 } from "./studio-vrm-webcam-tracking";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
+import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import {
   deleteStoredVrmModel,
   getStoredVrmModel,
@@ -798,6 +808,7 @@ const SCENE_PROPS: ScenePropDef[] = [
 ];
 
 const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };
+const SCENE_PROP_IDS = new Set(SCENE_PROPS.map((prop) => prop.id));
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -1990,17 +2001,6 @@ const PROP_COMPONENTS: Record<string, React.FC<{ scale: number }>> = {
   rainbow: PropRainbow, bubbles: PropBubbles, leaves: PropLeaves, feather: PropFeather,
 };
 
-type PropAttachmentConfig = {
-  bone: VRMHumanBoneName | "none";
-  offsetX: number;
-  offsetY: number;
-  offsetZ: number;
-  rotX: number;
-  rotY: number;
-  rotZ: number;
-  scale: number;
-};
-
 const DEFAULT_BONE_OFFSETS: Record<string, Partial<Record<VRMHumanBoneName, Partial<PropAttachmentConfig>>>> = {
   sword: {
     rightHand: { offsetX: 0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: -20, scale: 0.75 },
@@ -2108,16 +2108,52 @@ function SceneProp3D({
     );
   }
 
+  const worldX = defaultPosition[0] + (config?.offsetX ?? 0);
+  const worldY = defaultPosition[1] + (config?.offsetY ?? 0);
+  const worldZ = defaultPosition[2] + (config?.offsetZ ?? 0);
+  const worldRotation: [number, number, number] = [
+    THREE.MathUtils.degToRad(config?.rotX ?? 0),
+    THREE.MathUtils.degToRad(config?.rotY ?? 0),
+    THREE.MathUtils.degToRad(config?.rotZ ?? 0),
+  ];
+  const worldScale = (config?.scale ?? 1) * defaultScale;
   return (
-    <group position={[defaultPosition[0], defaultPosition[1], defaultPosition[2]]}>
-      <Comp scale={defaultScale} />
+    <group position={[worldX, worldY, worldZ]} rotation={worldRotation}>
+      <Comp scale={worldScale} />
     </group>
   );
 }
 
-/** 본 부착 소품(studio-vrm-props) 한 인스턴스를 humanoid 본에 포털로 부착한다. */
-function VrmPropAttachment({ vrm, instance }: { vrm: VRM; instance: PropInstance }) {
+function disposePropObject(object: THREE.Object3D) {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    mesh.geometry?.dispose?.();
+    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    materials.forEach((material) => material.dispose());
+  });
+  object.removeFromParent();
+}
+
+/**
+ * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
+ * 렌더해 body/head 비균일 스케일의 shear를 피하고, 실제 geometry anchor를 측정된 소켓에 맞춘다.
+ */
+function VrmPropAttachment({
+  vrm,
+  instance,
+  metrics,
+}: {
+  vrm: VRM;
+  instance: PropInstance;
+  metrics: VrmPropRigMetrics;
+}) {
   const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
+  const smartGroupRef = useRef<THREE.Group | null>(null);
+  const localPositionRef = useRef(new THREE.Vector3());
+  const boneWorldQuaternionRef = useRef(new THREE.Quaternion());
+  const localQuaternionRef = useRef(new THREE.Quaternion());
+  const anchorWorldOffsetRef = useRef(new THREE.Vector3());
+  const secondaryWorldTargetRef = useRef(new THREE.Vector3());
 
   useEffect(() => {
     const node = vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
@@ -2129,19 +2165,79 @@ function VrmPropAttachment({ vrm, instance }: { vrm: VRM; instance: PropInstance
     if (!def) return null;
     return buildPropObject(THREE as unknown as Parameters<typeof buildPropObject>[0], def, instance.color) as unknown as THREE.Object3D;
   }, [instance.color, instance.propId]);
+  const definition = propDefById(instance.propId);
+  const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
+  const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
 
   useEffect(() => {
     if (!object) return;
-    object.position.set(instance.position[0], instance.position[1], instance.position[2]);
-    object.rotation.set(
-      THREE.MathUtils.degToRad(instance.rotationDeg[0]),
-      THREE.MathUtils.degToRad(instance.rotationDeg[1]),
-      THREE.MathUtils.degToRad(instance.rotationDeg[2])
-    );
-    object.scale.setScalar(instance.scale);
-  }, [object, instance.position, instance.rotationDeg, instance.scale]);
+    if (instance.rig) {
+      object.position.set(0, 0, 0);
+      object.rotation.set(0, 0, 0);
+      object.scale.setScalar(1);
+    } else {
+      object.position.set(instance.position[0], instance.position[1], instance.position[2]);
+      object.rotation.set(
+        THREE.MathUtils.degToRad(instance.rotationDeg[0]),
+        THREE.MathUtils.degToRad(instance.rotationDeg[1]),
+        THREE.MathUtils.degToRad(instance.rotationDeg[2])
+      );
+      object.scale.setScalar(instance.scale);
+    }
+  }, [object, instance.position, instance.rig, instance.rotationDeg, instance.scale]);
+
+  useEffect(() => {
+    if (!object) return;
+    return () => disposePropObject(object);
+  }, [object]);
+
+  useFrame(() => {
+    const group = smartGroupRef.current;
+    if (!group || !boneNode || !resolved?.usesSmartRig) return;
+
+    boneNode.updateWorldMatrix(true, false);
+    // socket만 bone matrix로 world 변환하고, geometry anchor 보정은 scale이 제거된 rigid world
+    // quaternion으로 계산한다. 부모의 비균일 body/head scale이 소품을 찌그러뜨리거나 접점을
+    // 밀어내지 않으면서도 손바닥 위치 자체는 체형 변화를 정확히 따라간다.
+    const socketWorldPosition = localPositionRef.current.set(...resolved.socketPosition);
+    boneNode.localToWorld(socketWorldPosition);
+    const boneWorldQuaternion = boneNode.getWorldQuaternion(boneWorldQuaternionRef.current);
+    const localQuaternion = localQuaternionRef.current.setFromEuler(new THREE.Euler(
+      THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
+      THREE.MathUtils.degToRad(resolved.rotationDeg[1]),
+      THREE.MathUtils.degToRad(resolved.rotationDeg[2]),
+      "XYZ"
+    ));
+    group.quaternion.copy(boneWorldQuaternion).multiply(localQuaternion).normalize();
+    group.scale.setScalar(resolved.scale);
+    const anchorWorldOffset = anchorWorldOffsetRef.current
+      .set(...resolved.anchor.position)
+      .multiplyScalar(resolved.scale)
+      .applyQuaternion(group.quaternion);
+    group.position.copy(socketWorldPosition).sub(anchorWorldOffset);
+    group.updateMatrixWorld(true);
+
+    if (secondary) {
+      const target = secondaryWorldTargetRef.current.set(...secondary.anchor.position);
+      group.localToWorld(target);
+      applyVrmTwoBoneGrip(
+        vrm,
+        secondary.bone === "leftHand" ? "left" : "right",
+        target,
+        secondary.influence,
+        secondary.elbowHint
+      );
+    }
+  });
 
   if (!boneNode || !object) return null;
+  if (resolved?.usesSmartRig) {
+    return (
+      <group ref={smartGroupRef}>
+        <primitive object={object} />
+      </group>
+    );
+  }
   return createPortal(<primitive object={object} />, boneNode);
 }
 
@@ -2694,6 +2790,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 실장착 워드로브(studio-vrm-wardrobe) — 슬롯별 장착 + 모델 실측 치수.
   const [wardrobeState, setWardrobeState] = useState<WardrobeState>({});
   const [wardrobeMetrics, setWardrobeMetrics] = useState<WardrobeMetrics | null>(null);
+  const [propRigMetrics, setPropRigMetrics] = useState<VrmPropRigMetrics>(DEFAULT_VRM_PROP_RIG_METRICS);
   const [wardrobeAutoHide, setWardrobeAutoHide] = useState(true);
   // 물리(studio-vrm-physics) — 스프링본 설정 + 미리보기/조인트 수.
   const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
@@ -2818,7 +2915,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         expressionWeights,
         costume: costumeState,
         wardrobe: serializeWardrobe(wardrobeState),
-        props: { items: vrmPropItems },
+        props: serializeVrmProps(vrmPropItems),
+        sceneProps: serializeSceneProps(activeProps, propAttachments),
         physics: vrmPhysics,
         bodyScale,
         lighting,
@@ -2828,7 +2926,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         materialFx,
         avatarForge: serializeAvatarForgeState(avatarForgeState),
       }),
-    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
+    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
   );
 
   const restoreHistoryAt = (index: number) => {
@@ -2965,8 +3063,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
-  // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
-  // Removed duplicate here to prevent double application on every render.
+  // 소품 그립은 저장되는 수동 손가락 편집을 오염시키지 않고 파생한다. 사용자가 명시적으로
+  // 조정한 손가락 값은 마지막에 병합해 자동 그립보다 항상 우선한다.
+  const effectiveFingerEdits: FingerRotationMap = {
+    ...(createAutoGripFingerOverrides(vrmPropItems) as FingerRotationMap),
+    ...fingerEdits,
+  };
 
   const onCaptureUpdate = useCallback((state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => {
     if (cleanupGl) {
@@ -3019,6 +3121,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     modelId?: string;
     modelName?: string;
     vrmProps?: unknown;
+    sceneProps?: unknown;
     costume?: unknown;
     wardrobe?: unknown;
     physics?: unknown;
@@ -3595,7 +3698,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 풀 스테이트 copy/paste + local save/load (새 기능)
   function handleCopyFullState() {
     try {
-      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState) });
+      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: serializeVrmProps(vrmPropItems), sceneProps: serializeSceneProps(activeProps, propAttachments), physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState) });
       const json = JSON.stringify(full);
       navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
@@ -3611,7 +3714,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function handleSaveFullLocal() {
     const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
-    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState)});
+    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:serializeVrmProps(vrmPropItems), sceneProps:serializeSceneProps(activeProps, propAttachments), physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState)});
     const next = { ...savedFullStates, [name]: full };
     setSavedFullStates(next);
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
@@ -3632,7 +3735,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     // 의상·워드로브는 무조건 반영 — undo/redo에서 장착/숨김 변화도 되돌리고 이전 값이
     // 눌어붙지 않게 한다. 새 VRM 메시를 알아야 하는 자동 숨김은 아래 vrm 분기에서 합성한다.
     setWardrobeState(restoredWardrobe);
-    if (plan.propsItems) setVrmPropItems(plan.propsItems as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    setVrmPropItems(plan.propsItems);
+    const restoredSceneProps = parseSceneProps(plan.sceneProps, SCENE_PROP_IDS);
+    setActiveProps(restoredSceneProps.active);
+    setPropAttachments(restoredSceneProps.attachments);
+    setSelectedPropId(null);
     if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     // materialFx 는 별도 저장/공유 payload에 담기지만(poseMetadata.materialFx), FullVrmState 경로
     // (undo/redo·저장한 포즈 불러오기·공유 데이터URL 붙여넣기)에서 빠지면 재질 효과가 조용히
@@ -3656,7 +3763,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       applyFullState(vrm, s, {
         applyPose: (b, y) => applyPoseToVrm(vrm, b, y),
         applyExpr: (w) => applyExpressionWeightsToVrm(vrm, w),
-        applyProps: (p: any) => { if (p?.items) { setVrmPropItems(p.items); } }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        applyProps: (p) => setVrmPropItems(parseVrmProps(p).items),
+        applySceneProps: (p) => {
+          const next = parseSceneProps(p, SCENE_PROP_IDS);
+          setActiveProps(next.active);
+          setPropAttachments(next.attachments);
+        },
         applyPhysics: (p: any) => { if (p) { setVrmPhysics(p as any); if (countSpringBoneJoints(vrm)) { applyVrmSpringBonePhysics(vrm, p as any); settleVrmPhysics(vrm); } } }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyMaterialFx: (fx) => applyVrmMaterialFx(vrm, fx),
         applyCustomColors: (colors) => applyVrmCustomColors(vrm, colors),
@@ -3806,6 +3918,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         avatarForge: serializeAvatarForgeState(avatarForgeState),
         // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
         vrmProps: serializeVrmProps(vrmPropItems),
+        sceneProps: serializeSceneProps(activeProps, propAttachments),
         costume: serializeCostume(costumeState),
         wardrobe: serializeWardrobe(wardrobeState),
         physics: vrmPhysics,
@@ -3884,6 +3997,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setSelectedCostumeKey(null);
     setWardrobeState({});
     setWardrobeMetrics(null);
+    setPropRigMetrics(DEFAULT_VRM_PROP_RIG_METRICS);
     setVrmPhysics(DEFAULT_VRM_PHYSICS);
     setPhysicsPreview(false);
     setSpringJointCount(0);
@@ -3991,6 +4105,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setActiveModelId(nextModelId);
     // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
     setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
+    setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));
 
     const pending = pendingPoseDataRef.current;
     if (pending) {
@@ -4012,6 +4127,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         costume: pending.costume,
         wardrobe: pending.wardrobe,
         props: pending.vrmProps,
+        sceneProps: pending.sceneProps,
         physics: pending.physics,
         materialFx: pending.materialFx,
         avatarForge: pending.avatarForge,
@@ -4644,6 +4760,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         env: envVariant,
         avatarForge: serializeAvatarForgeState(avatarForgeState),
         vrmProps: serializeVrmProps(vrmPropItems),
+        sceneProps: serializeSceneProps(activeProps, propAttachments),
         costume: serializeCostume(costumeState),
         wardrobe: serializeWardrobe(wardrobeState),
         physics: vrmPhysics,
@@ -4728,13 +4845,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       webcamActive={webcamActive}
                       trackingDataRef={trackingDataRef}
                       idleAnimation={idleAnimation}
-                      fingerEdits={fingerEdits}
+                      fingerEdits={effectiveFingerEdits}
                       bodyScale={bodyScale}
                     />
                   ) : null}
                   {vrm ? <StudioVrmAvatarForge vrm={vrm} state={avatarForgeState} /> : null}
                   {vrm
-                    ? vrmPropItems.map((item) => <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} />)
+                    ? vrmPropItems.map((item) => (
+                        <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={propRigMetrics} />
+                      ))
                     : null}
                   {vrm && wardrobeMetrics
                     ? WARDROBE_SLOTS.map((slot) => {
@@ -6383,163 +6502,21 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </details>
 
               {/* ── 본 부착 소품(손/머리/몸) ───────────────────────────── */}
-              <section hidden={hideOnTab("props")} className="mt-4 rounded-xl border border-line bg-card/45 p-3">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
-                  <Sparkles size={15} className="text-accent" aria-hidden />
-                  소품 부착 (손·머리·몸)
-                </h3>
-                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                  캐릭터의 손·머리·몸 관절에 소품을 부착합니다. 포즈를 바꿔도 관절을 따라 움직여요.
-                </p>
-                {(["hand", "head", "body"] as PropCategory[]).map((cat) => (
-                  <div key={cat} className="mb-3">
-                    <p className="mb-1.5 text-[0.65rem] font-bold text-fg-2">{VRM_PROP_CATEGORY_LABELS[cat]}</p>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {propsByCategory(cat).map((def) => (
-                        <button
-                          key={def.id}
-                          type="button"
-                          disabled={!vrm}
-                          title={def.hint}
-                          className="flex flex-col items-center gap-0.5 rounded-lg border border-line bg-card px-1 py-1.5 text-center text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40 transition-colors"
-                          onClick={() => addVrmProp(def.id)}
-                        >
-                          <span className="text-[0.68rem] font-semibold leading-tight">{def.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {vrmPropItems.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
-                    부착된 소품이 없습니다. 위에서 소품을 눌러 추가하세요.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[0.65rem] font-bold text-fg-2">부착된 소품 ({vrmPropItems.length})</p>
-                      <button
-                        type="button"
-                        className="text-[0.68rem] text-fg-3 hover:underline"
-                        onClick={() => {
-                          setVrmPropItems([]);
-                          setSelectedVrmPropUid(null);
-                        }}
-                      >
-                        전체 제거
-                      </button>
-                    </div>
-                    {vrmPropItems.map((item) => {
-                      const def = propDefById(item.propId);
-                      const isOpen = selectedVrmPropUid === item.uid;
-                      return (
-                        <div key={item.uid} className="rounded-lg border border-line bg-card/60">
-                          <div className="flex items-center gap-1.5 px-2 py-1.5">
-                            <button
-                              type="button"
-                              className="flex-1 text-left text-[0.68rem] font-semibold text-fg"
-                              onClick={() => setSelectedVrmPropUid(isOpen ? null : item.uid)}
-                            >
-                              {def?.label ?? item.propId}
-                              <span className="ml-1 text-[0.64rem] font-normal text-fg-3">
-                                · {PROP_BONE_LABELS[item.bone]}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className="rounded p-1 text-fg-3 hover:bg-raised hover:text-bad"
-                              title="제거"
-                              onClick={() => removeVrmProp(item.uid)}
-                            >
-                              <Trash2 size={13} aria-hidden />
-                            </button>
-                          </div>
-                          {isOpen && (
-                            <div className="space-y-2.5 border-t border-line/40 px-2.5 py-2.5">
-                              <div>
-                                <label htmlFor={`vrm-prop-bone-${item.uid}`} className="mb-1 block text-[0.68rem] font-semibold text-fg-2">부착 부위</label>
-                                <select
-                                  id={`vrm-prop-bone-${item.uid}`}
-                                  className="w-full rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] text-fg"
-                                  value={item.bone}
-                                  onChange={(e) => updateVrmProp(item.uid, { bone: e.target.value as PropAttachBone })}
-                                >
-                                  {PROP_ATTACH_BONES.map((b) => (
-                                    <option key={b} value={b}>{PROP_BONE_LABELS[b]}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <p className="mb-1 text-[0.66rem] font-semibold text-fg-3">위치 (X / Y / Z)</p>
-                                <div className="grid grid-cols-3 gap-2">
-                                  {([0, 1, 2] as const).map((axis) => (
-                                    <label key={axis} className="block text-[0.68rem] text-fg-3">
-                                      {"XYZ"[axis]}: {item.position[axis].toFixed(2)}
-                                      <input
-                                        type="range" min="-0.5" max="0.5" step="0.01"
-                                        className="w-full accent-accent h-2"
-                                        value={item.position[axis]}
-                                        onChange={(e) => {
-                                          const next = [...item.position] as [number, number, number];
-                                          next[axis] = Number(e.target.value);
-                                          updateVrmProp(item.uid, { position: next });
-                                        }}
-                                      />
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="mb-1 text-[0.66rem] font-semibold text-fg-3">회전 (도)</p>
-                                <div className="grid grid-cols-3 gap-2">
-                                  {([0, 1, 2] as const).map((axis) => (
-                                    <label key={axis} className="block text-[0.68rem] text-fg-3">
-                                      {"XYZ"[axis]}: {Math.round(item.rotationDeg[axis])}°
-                                      <input
-                                        type="range" min="-180" max="180"
-                                        className="w-full accent-accent h-2"
-                                        value={item.rotationDeg[axis]}
-                                        onChange={(e) => {
-                                          const next = [...item.rotationDeg] as [number, number, number];
-                                          next[axis] = Number(e.target.value);
-                                          updateVrmProp(item.uid, { rotationDeg: next });
-                                        }}
-                                      />
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <label className="flex-1 text-[0.66rem] text-fg-3">
-                                  크기 {item.scale.toFixed(1)}x
-                                  <input
-                                    type="range" min="0.2" max="4" step="0.1"
-                                    className="w-full accent-accent h-2"
-                                    value={item.scale}
-                                    onChange={(e) => updateVrmProp(item.uid, { scale: Number(e.target.value) })}
-                                  />
-                                </label>
-                                {item.color !== null && (
-                                  <label className="flex flex-col items-center gap-0.5 text-[0.68rem] text-fg-3">
-                                    색상
-                                    <input
-                                      type="color"
-                                      value={item.color}
-                                      onChange={(e) => updateVrmProp(item.uid, { color: e.target.value })}
-                                      className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
-                                    />
-                                  </label>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
+              <div hidden={hideOnTab("props")} className="mt-4">
+                <StudioVrmPropPanel
+                  vrmReady={Boolean(vrm)}
+                  items={vrmPropItems}
+                  selectedUid={selectedVrmPropUid}
+                  onSelect={setSelectedVrmPropUid}
+                  onAdd={addVrmProp}
+                  onUpdate={updateVrmProp}
+                  onRemove={removeVrmProp}
+                  onClear={() => {
+                    setVrmPropItems([]);
+                    setSelectedVrmPropUid(null);
+                  }}
+                />
+              </div>
 
               {/* ── 의상 분리 토글 / 리컬러 ─────────────────────────────── */}
               <details hidden={hideOnCharacterSection("appearance")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
@@ -7163,16 +7140,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 )}
               </details>
 
-              <section hidden={hideOnTab("props")} className="mt-4">
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+              <details hidden={hideOnTab("props")} className="group mt-3 rounded-xl border border-line bg-card/35">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 px-3 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sparkles size={15} className="text-accent" aria-hidden />
-                  3D 소품 · 동물 배치
-                </h3>
-                <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                  캐릭터 주변에 귀여운 동물이나 소품을 추가해 보세요. 여러 개를 동시에 배치할 수 있습니다.
-                </p>
+                  주변 장면 오브젝트
+                  {activeProps.length > 0 && <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.62rem] text-accent">{activeProps.length}</span>}
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                </summary>
+                <div className="border-t border-line/40 px-3 pb-3 pt-2.5">
+                  <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
+                    동물·효과·장면 장식을 월드에 놓거나 본에 연결합니다. 손에 쥐는 소품은 위의 스마트 그립을 사용하세요.
+                  </p>
                 {(["animal", "item", "effect"] as const).map((cat) => {
-                  const items = SCENE_PROPS.filter((p) => p.category === cat);
+                  const items = SCENE_PROPS.filter((p) => p.category === cat && !(cat === "item" && propDefById(p.id)));
                   if (items.length === 0) return null;
                   return (
                     <div key={cat} className="mb-3">
@@ -7185,6 +7165,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <button
                               key={prop.id}
                               type="button"
+                              aria-pressed={isActive}
+                              aria-label={`${prop.label}${isActive ? " 편집" : " 추가"}`}
                               className={cx(
                                 "flex flex-col items-center gap-0.5 rounded-lg border px-1 py-1.5 text-center transition-colors relative",
                                 isActive
@@ -7194,24 +7176,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                                   : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
                               )}
                               onClick={() => {
-                                setActiveProps((prev) => {
-                                  const wasActive = prev.includes(prop.id);
-                                  if (wasActive) {
-                                    if (selectedPropId === prop.id) setSelectedPropId(null);
-                                    return prev.filter((id) => id !== prop.id);
-                                  } else {
-                                    setSelectedPropId(prop.id);
-                                    return [...prev, prop.id];
-                                  }
-                                });
+                                setActiveProps((prev) => prev.includes(prop.id) ? prev : [...prev, prop.id]);
+                                setSelectedPropId(prop.id);
                               }}
                             >
-                              <span className="text-base leading-none">{prop.emoji}</span>
+                              <span className="text-base leading-none" aria-hidden>{prop.emoji}</span>
                               <span className="text-[0.68rem] font-semibold leading-tight">{prop.label}</span>
                               {isActive && (
                                 <span 
                                   className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-accent"
-                                  title="클릭하여 장착/위치 세부설정"
+                                  aria-hidden
                                 />
                               )}
                             </button>
@@ -7256,19 +7230,31 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   };
 
                   return (
-                    <div className="mt-3 rounded-xl border border-accent/40 bg-accent-soft/20 p-3 space-y-3 animate-fade-in">
+                    <div className="mt-3 space-y-3 rounded-xl border border-accent/40 bg-accent-soft/20 p-3 animate-fade-in motion-reduce:animate-none">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-accent flex items-center gap-1">
-                          <span>{prop.emoji}</span>
+                        <span className="flex items-center gap-1 text-xs font-bold text-accent">
+                          <span aria-hidden>{prop.emoji}</span>
                           <span>{prop.label} 장착 및 위치 설정</span>
                         </span>
-                        <button
-                          type="button"
-                          className="text-[0.68rem] text-fg-3 hover:underline"
-                          onClick={() => setSelectedPropId(null)}
-                        >
-                          설정 닫기
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="min-h-9 rounded px-2 text-[0.68rem] text-bad hover:bg-bad/10 pointer-coarse:min-h-11"
+                            onClick={() => {
+                              setActiveProps((prev) => prev.filter((id) => id !== selectedPropId));
+                              setSelectedPropId(null);
+                            }}
+                          >
+                            제거
+                          </button>
+                          <button
+                            type="button"
+                            className="min-h-9 rounded px-2 text-[0.68rem] text-fg-3 hover:bg-raised pointer-coarse:min-h-11"
+                            onClick={() => setSelectedPropId(null)}
+                          >
+                            닫기
+                          </button>
+                        </div>
                       </div>
 
                       <div>
@@ -7301,7 +7287,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         </select>
                       </div>
 
-                      {config.bone !== "none" && (
+                      {(
                         <div className="space-y-2.5">
                           <div className="border-t border-line/40 pt-2.5">
                             <p className="text-[0.68rem] font-semibold text-fg-3 mb-1.5">위치 미세조정 (X / Y / Z)</p>
@@ -7407,7 +7393,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     </div>
                   );
                 })()}
-              </section>
+                </div>
+              </details>
             </div>
 
             <footer className="sticky bottom-0 z-20 flex shrink-0 items-center justify-between gap-2 border-t border-line bg-panel/95 px-4 py-3 backdrop-blur sm:px-5">

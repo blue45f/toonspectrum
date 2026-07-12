@@ -165,6 +165,17 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(calls).toContain("colors:#123456");
   });
 
+  it("applyFullState sends an empty normalized prop collection when props are absent", () => {
+    const { vrm } = createMinimalVrm();
+    let received: unknown = null;
+    applyFullState(vrm, { version: 2, bones: {}, yOffset: 0 }, {
+      applyPose: () => undefined,
+      applyExpr: () => undefined,
+      applyProps: (props) => { received = props; },
+    });
+    expect(received).toEqual(expect.objectContaining({ items: [] }));
+  });
+
   it("planFullStateRestore returns complete plan with stripped bones for maximal AC2 input", () => {
     const input: FullVrmState = {
       version: 2,
@@ -179,7 +190,23 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       env: "floor",
       fingerOverrides: { leftIndexProximal: [0, 0, 0.3] },
       costume: { hidden: ["x"] },
-      props: { items: [{ uid: "p1" }] },
+      props: {
+        version: 1,
+        items: [{
+          uid: "p1",
+          propId: "book",
+          bone: "leftHand",
+          position: [0.02, 0.01, 0.04],
+          rotationDeg: [60, 0, 0],
+          scale: 1,
+          color: "#7a3b3b",
+        }],
+      },
+      sceneProps: {
+        version: 1,
+        active: ["cat"],
+        attachments: { cat: { bone: "none", offsetX: 0.1, offsetY: 0, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 1 } },
+      },
       physics: { stiffnessScale: 1.1 },
       materialFx: { rimIntensity: 0.35 },
       avatarForge: { version: 1, presetId: "hero" },
@@ -197,10 +224,33 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(plan.fingerOverrides?.leftIndexProximal?.[2]).toBeCloseTo(0.3);
     expect((plan.costume as any)?.hidden).toContain("x");
     expect((plan.propsItems as any)?.[0]?.uid).toBe("p1");
+    expect(plan.sceneProps.active).toEqual(["cat"]);
     expect((plan.physics as any)?.stiffnessScale).toBe(1.1);
     expect(plan.materialFx?.rimIntensity).toBe(0.35);
     expect(plan.avatarForge).toEqual({ version: 1, presetId: "hero" });
     expect(plan.customColors?.face).toBe("#123456");
+  });
+
+  it("normalizes corrupted props and clears stale props when the field is absent", () => {
+    const corrupted = planFullStateRestore({
+      version: 2,
+      bones: {},
+      yOffset: 0,
+      props: {
+        version: 1,
+        items: [
+          { propId: "ghost" },
+          { uid: "valid", propId: "book", bone: "tail", position: [999, 0, 0] },
+        ],
+      },
+    });
+    expect(corrupted.propsItems).toHaveLength(1);
+    expect(corrupted.propsItems[0]?.bone).toBe("leftHand");
+    expect(corrupted.propsItems[0]?.position[0]).toBe(1);
+
+    const absent = planFullStateRestore({ version: 2, bones: {}, yOffset: 0 });
+    expect(absent.propsItems).toEqual([]);
+    expect(absent.sceneProps.active).toEqual([]);
   });
 
   it("restores wardrobe, material effects and avatar forge state from shared PNG metadata", () => {
@@ -208,6 +258,11 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       bones: { hips: { rotation: [0, 0, 0] } },
       yOffset: 0.04,
       wardrobe: { version: 1, slots: { top: { itemId: "lab-coat" } } },
+      sceneProps: {
+        version: 1,
+        active: ["cat"],
+        attachments: { cat: { bone: "none", offsetX: 0, offsetY: 0, offsetZ: 0, rotX: 0, rotY: 0, rotZ: 0, scale: 1 } },
+      },
       materialFx: { rimIntensity: 0.42 },
       avatarForge: { version: 1, presetId: "soft-hero" },
     };
@@ -216,6 +271,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     );
 
     expect(state?.wardrobe).toEqual(metadata.wardrobe);
+    expect(state?.sceneProps).toEqual(metadata.sceneProps);
     expect(state?.materialFx).toEqual(metadata.materialFx);
     expect(state?.avatarForge).toEqual(metadata.avatarForge);
   });

@@ -6,7 +6,7 @@
 //  - 부착 본은 VRM humanoid 표준 본 이름만 사용(StudioVrmPoser의 본 집합과 호환).
 //  - 직렬화는 옵셔널·버전 필드 → 기존 스튜디오 문서 하위호환.
 
-export const VRM_PROPS_VERSION = 1 as const;
+export const VRM_PROPS_VERSION = 2 as const;
 
 /** 부착 가능한 humanoid 본(three-vrm humanoid 표준 이름). */
 export type PropAttachBone =
@@ -48,6 +48,42 @@ export const PROP_CATEGORY_LABELS: Record<PropCategory, string> = {
 
 export type Vec3 = readonly [number, number, number];
 
+export type PropAnchorRole = "primary" | "secondary" | "support" | "surface";
+
+/**
+ * 소품 geometry의 의미 있는 접촉점. position/forward/up은 소품 로컬 공간 기준이다.
+ * renderer는 이 basis를 캐릭터 소켓 basis에 맞춰 geometry 원점과 무관하게 정렬한다.
+ */
+export interface PropAnchorDef {
+  id: string;
+  role: PropAnchorRole;
+  position: Vec3;
+  forward: Vec3;
+  up: Vec3;
+  gripRadius?: number;
+}
+
+export type PropGripKind = "cylinder" | "handle" | "flat" | "pinch" | "support" | "wear";
+
+/** 손가락 자동 그립을 만들 때 사용하는 소품 접촉 단면. */
+export interface PropGripProfile {
+  kind: PropGripKind;
+  /** 손이 감싸는 반경(미터). flat/pinch는 두께의 절반에 해당한다. */
+  radius: number;
+  fingerCurlDeg: number;
+  thumbOppositionDeg: number;
+}
+
+export type PropFitReference = "hand" | "avatarHeight" | "head" | "eyeDistance" | "shoulder" | "hip" | "none";
+
+/** 모델 실측값 대비 소품 자동 배율을 계산하기 위한 제작 기준 치수. */
+export interface PropFitProfile {
+  reference: PropFitReference;
+  designReference: number;
+  minScale: number;
+  maxScale: number;
+}
+
 export interface PropDef {
   id: string;
   label: string;
@@ -64,11 +100,19 @@ export interface PropDef {
   defaultColor: string | null;
   /** 짧은 사용 설명. */
   hint: string;
+  /** geometry 원점 대신 실제 접촉점을 표현하는 V2 소켓. */
+  anchors: readonly PropAnchorDef[];
+  /** 손 소품의 자동 손가락 포즈 프로필. */
+  grip?: PropGripProfile;
+  /** 모델별 자동 맞춤 프로필. */
+  fit: PropFitProfile;
 }
+
+type LegacyPropDef = Omit<PropDef, "anchors" | "grip" | "fit">;
 
 /* ── 소품 카탈로그(현대·판타지·의료 직업 소품) ──────────────────────── */
 
-export const VRM_PROPS: readonly PropDef[] = [
+const VRM_PROP_BASES = [
   // 손 소품
   { id: "smartphone", label: "스마트폰", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0.03], defaultRotationDeg: [10, 0, 0], defaultScale: 1, defaultColor: "#1c1c22", hint: "셀카·통화 컷에. 회전으로 화면 각도를 잡으세요." },
   { id: "mug", label: "머그컵", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e8e2d6", hint: "카페·일상 컷. 손 안쪽으로 당겨 쥐게 보정하세요." },
@@ -110,7 +154,156 @@ export const VRM_PROPS: readonly PropDef[] = [
   { id: "backwing", label: "작은 날개", category: "body", defaultBone: "chest", defaultPosition: [0, 0.05, -0.12], defaultRotationDeg: [10, 0, 0], defaultScale: 0.8, defaultColor: "#a5b4fc", hint: "요정·소악마." },
   { id: "gloves", label: "장갑", category: "body", defaultBone: "leftHand", defaultPosition: [0.01, -0.02, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "액션·정장." },
   { id: "choker", label: "초커", category: "head", defaultBone: "neck", defaultPosition: [0, -0.02, 0.06], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#111827", hint: "패션 장식." },
-] as const;
+] as const satisfies readonly LegacyPropDef[];
+
+export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
+
+type PropProfile = Pick<PropDef, "anchors" | "fit"> & { grip?: PropGripProfile };
+
+const FORWARD: Vec3 = [0, 0, 1];
+const UP: Vec3 = [0, 1, 0];
+
+function anchor(id: string, role: PropAnchorRole, position: Vec3, forward: Vec3 = FORWARD, up: Vec3 = UP): PropAnchorDef {
+  return { id, role, position, forward, up };
+}
+
+function handAnchor(id: string, role: "primary" | "secondary", position: Vec3, gripRadius: number): PropAnchorDef {
+  return { ...anchor(id, role, position), gripRadius };
+}
+
+function grip(kind: PropGripKind, radius: number, fingerCurlDeg: number, thumbOppositionDeg: number): PropGripProfile {
+  return { kind, radius, fingerCurlDeg, thumbOppositionDeg };
+}
+
+function fit(reference: PropFitReference, designReference: number, minScale = 0.65, maxScale = 1.65): PropFitProfile {
+  return { reference, designReference, minScale, maxScale };
+}
+
+/**
+ * geometry와 같은 로컬 좌표로 기록한 접촉점 카탈로그.
+ * Record<VrmPropId, ...>를 사용해 소품 추가 시 프로필 누락을 컴파일 단계에서 막는다.
+ */
+const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
+  smartphone: {
+    anchors: [handAnchor("primary", "primary", [0, -0.02, -0.006], 0.009)],
+    grip: grip("flat", 0.009, 38, 34),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  mug: {
+    anchors: [handAnchor("primary", "primary", [0.045, 0, 0], 0.008)],
+    grip: grip("handle", 0.008, 58, 42),
+    fit: fit("hand", 0.075, 0.72, 1.45),
+  },
+  sword: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.37, 0], 0.014),
+      handAnchor("secondary", "secondary", [0, -0.315, 0], 0.014),
+    ],
+    grip: grip("cylinder", 0.014, 64, 48),
+    fit: fit("avatarHeight", 1.65, 0.72, 1.45),
+  },
+  staff: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.2, 0], 0.012),
+      handAnchor("secondary", "secondary", [0, -0.06, 0], 0.012),
+    ],
+    grip: grip("cylinder", 0.012, 62, 46),
+    fit: fit("avatarHeight", 1.65, 0.72, 1.5),
+  },
+  mic: {
+    anchors: [handAnchor("primary", "primary", [0, -0.025, 0], 0.012)],
+    grip: grip("cylinder", 0.012, 58, 44),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  book: {
+    anchors: [
+      handAnchor("primary", "primary", [-0.07, -0.045, 0], 0.015),
+      handAnchor("secondary", "secondary", [0.07, -0.045, 0], 0.015),
+    ],
+    grip: grip("support", 0.015, 22, 24),
+    fit: fit("hand", 0.075, 0.72, 1.45),
+  },
+  fan: {
+    anchors: [handAnchor("primary", "primary", [0, -0.1, 0], 0.008)],
+    grip: grip("pinch", 0.008, 42, 38),
+    fit: fit("hand", 0.075, 0.72, 1.5),
+  },
+  bouquet: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.045, 0], 0.025),
+      handAnchor("secondary", "secondary", [0, 0.015, 0], 0.025),
+    ],
+    grip: grip("cylinder", 0.025, 55, 42),
+    fit: fit("hand", 0.075, 0.72, 1.5),
+  },
+  clipboard: {
+    anchors: [
+      handAnchor("primary", "primary", [-0.0725, -0.055, 0], 0.012),
+      handAnchor("secondary", "secondary", [0.0725, -0.055, 0], 0.012),
+    ],
+    grip: grip("support", 0.012, 24, 28),
+    fit: fit("hand", 0.075, 0.72, 1.45),
+  },
+  syringe: {
+    anchors: [handAnchor("primary", "primary", [0, -0.075, 0], 0.014)],
+    grip: grip("pinch", 0.014, 34, 36),
+    fit: fit("hand", 0.075, 0.68, 1.4),
+  },
+  medicalBag: {
+    anchors: [handAnchor("primary", "primary", [0, 0.09, 0], 0.012)],
+    grip: grip("handle", 0.012, 60, 44),
+    fit: fit("hand", 0.075, 0.72, 1.45),
+  },
+  cap: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  beret: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  glasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  sunglasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  crown: { anchors: [anchor("surface", "surface", [0, -0.055, 0])], fit: fit("head", 0.18, 0.68, 1.55) },
+  ribbon: { anchors: [anchor("surface", "surface", [-0.05, 0, 0])], fit: fit("head", 0.18, 0.68, 1.55) },
+  surgicalCap: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  faceMask: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  backpack: { anchors: [anchor("surface", "surface", [0, 0, 0.06], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
+  shoulderbag: { anchors: [anchor("surface", "surface", [0, 0.06, 0])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
+  cape: { anchors: [anchor("surface", "surface", [0, 0, 0.01], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.6) },
+  wings: { anchors: [anchor("surface", "surface", [0, 0, 0], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.65, 1.65) },
+  stethoscope: { anchors: [anchor("surface", "surface", [0, 0.105, 0])], fit: fit("none", 1, 0.72, 1.45) },
+  idBadge: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("shoulder", 0.32, 0.72, 1.45) },
+  umbrella: {
+    anchors: [
+      handAnchor("primary", "primary", [-0.03, -0.35, 0], 0.008),
+      handAnchor("secondary", "secondary", [0, -0.24, 0], 0.008),
+    ],
+    grip: grip("handle", 0.008, 60, 44),
+    fit: fit("avatarHeight", 1.65, 0.72, 1.5),
+  },
+  flute: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.08, 0], 0.008),
+      handAnchor("secondary", "secondary", [0, 0.08, 0], 0.008),
+    ],
+    grip: grip("pinch", 0.008, 36, 34),
+    fit: fit("hand", 0.075, 0.7, 1.45),
+  },
+  wand: {
+    anchors: [handAnchor("primary", "primary", [0, -0.1, 0], 0.006)],
+    grip: grip("cylinder", 0.006, 52, 40),
+    fit: fit("hand", 0.075, 0.68, 1.5),
+  },
+  headphones: { anchors: [anchor("surface", "surface", [0, -0.04, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  headband: { anchors: [anchor("surface", "surface", [0, -0.04, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  flowerCrown: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  scarf: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("none", 1, 0.72, 1.5) },
+  holster: { anchors: [anchor("surface", "surface", [0, 0.07, 0])], fit: fit("hip", 0.18, 0.68, 1.55) },
+  belt: { anchors: [anchor("surface", "surface", [0, 0, -0.14])], fit: fit("hip", 0.18, 0.68, 1.55) },
+  backwing: { anchors: [anchor("surface", "surface", [0, 0, 0], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.6) },
+  gloves: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("hand", 0.075, 0.72, 1.4) },
+  choker: { anchors: [anchor("surface", "surface", [0, 0, -0.065])], fit: fit("none", 1, 0.72, 1.45) },
+};
+
+export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def) => ({
+  ...def,
+  ...PROP_PROFILES[def.id],
+}));
 
 export function propDefById(id: string): PropDef | undefined {
   return VRM_PROPS.find((p) => p.id === id);
@@ -122,6 +315,34 @@ export function propsByCategory(category: PropCategory): PropDef[] {
 
 /* ── 부착 인스턴스(직렬화 대상) ──────────────────────────────────────── */
 
+export type PropRigMode = "auto" | "custom";
+export type PropHandBone = "rightHand" | "leftHand";
+
+export interface PropRigSecondary {
+  enabled: boolean;
+  anchorId: string;
+  bone: PropHandBone;
+  /** 원래 포즈와 보조 손 IK 결과의 혼합 비율. */
+  influence: number;
+  elbowHint?: Vec3;
+}
+
+/**
+ * V2 자동 맞춤 정보. 기존 position/rotationDeg/scale은 그대로 남겨 V1 문서를 한 값도
+ * 재해석하지 않는다. V2 renderer는 자동 소켓 결과 위에 delta* 필드만 추가 적용한다.
+ */
+export interface PropRigV2 {
+  version: 2;
+  mode: PropRigMode;
+  anchorId: string;
+  autoScale: boolean;
+  autoFingerPose: boolean;
+  deltaPosition: Vec3;
+  deltaRotationDeg: Vec3;
+  deltaScale: number;
+  secondary?: PropRigSecondary;
+}
+
 export interface PropInstance {
   /** 인스턴스 고유 id(같은 소품 복수 부착 허용). */
   uid: string;
@@ -131,6 +352,8 @@ export interface PropInstance {
   rotationDeg: Vec3;
   scale: number;
   color: string | null;
+  /** 없으면 기존 V1 절대 transform renderer를 사용한다. */
+  rig?: PropRigV2;
 }
 
 export interface SerializedVrmProps {
@@ -149,6 +372,7 @@ export function nextPropUid(seed?: string): string {
 export function createPropInstance(propId: string, uid?: string): PropInstance | null {
   const def = propDefById(propId);
   if (!def) return null;
+  const primaryAnchor = def.anchors.find((candidate) => candidate.role === "primary" || candidate.role === "surface")!;
   return {
     uid: uid ?? nextPropUid(propId),
     propId: def.id,
@@ -157,6 +381,16 @@ export function createPropInstance(propId: string, uid?: string): PropInstance |
     rotationDeg: def.defaultRotationDeg,
     scale: def.defaultScale,
     color: def.defaultColor,
+    rig: {
+      version: VRM_PROPS_VERSION,
+      mode: "auto",
+      anchorId: primaryAnchor.id,
+      autoScale: true,
+      autoFingerPose: Boolean(def.grip),
+      deltaPosition: [0, 0, 0],
+      deltaRotationDeg: [0, 0, 0],
+      deltaScale: 1,
+    },
   };
 }
 
@@ -184,12 +418,74 @@ function isAttachBone(value: unknown): value is PropAttachBone {
   return typeof value === "string" && (PROP_ATTACH_BONES as readonly string[]).includes(value);
 }
 
+function isHandBone(value: unknown): value is PropHandBone {
+  return value === "rightHand" || value === "leftHand";
+}
+
+function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function clamp(value: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function primaryAnchorOf(def: PropDef): PropAnchorDef {
+  return def.anchors.find((candidate) => candidate.role === "primary" || candidate.role === "surface") ?? def.anchors[0];
+}
+
+function parseV2Rig(raw: unknown, def: PropDef, primaryBone: PropAttachBone): PropRigV2 | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const value = raw as Partial<Record<keyof PropRigV2, unknown>>;
+  if (value.version !== VRM_PROPS_VERSION) return undefined;
+
+  const fallbackAnchor = primaryAnchorOf(def);
+  const requestedAnchor = typeof value.anchorId === "string"
+    ? def.anchors.find((candidate) => candidate.id === value.anchorId && candidate.role !== "secondary")
+    : undefined;
+  const secondaryAnchor = def.anchors.find((candidate) => candidate.role === "secondary");
+
+  let secondary: PropRigSecondary | undefined;
+  if (secondaryAnchor && isHandBone(primaryBone) && value.secondary && typeof value.secondary === "object") {
+    const input = value.secondary as Partial<Record<keyof PropRigSecondary, unknown>>;
+    const oppositeHand: PropHandBone = primaryBone === "leftHand" ? "rightHand" : "leftHand";
+    const requestedBone = isHandBone(input.bone) && input.bone !== primaryBone ? input.bone : oppositeHand;
+    const requestedSecondaryAnchor = typeof input.anchorId === "string"
+      ? def.anchors.find((candidate) => candidate.id === input.anchorId && candidate.role === "secondary")
+      : undefined;
+    secondary = {
+      enabled: bool(input.enabled, false),
+      anchorId: (requestedSecondaryAnchor ?? secondaryAnchor).id,
+      bone: requestedBone,
+      influence: clamp(input.influence, 1, 0, 1),
+      ...(Array.isArray(input.elbowHint)
+        ? { elbowHint: vec3(input.elbowHint, [0, 0, 0], POS_LIMIT) }
+        : {}),
+    };
+  }
+
+  return {
+    version: VRM_PROPS_VERSION,
+    mode: value.mode === "custom" ? "custom" : "auto",
+    anchorId: (requestedAnchor ?? fallbackAnchor).id,
+    autoScale: bool(value.autoScale, true),
+    autoFingerPose: bool(value.autoFingerPose, Boolean(def.grip)),
+    deltaPosition: vec3(value.deltaPosition, [0, 0, 0], POS_LIMIT),
+    deltaRotationDeg: vec3(value.deltaRotationDeg, [0, 0, 0], ROT_LIMIT),
+    deltaScale: clamp(value.deltaScale, 1, SCALE_MIN, SCALE_MAX),
+    ...(secondary ? { secondary } : {}),
+  };
+}
+
 /** 임의 입력(직렬화 문서)을 안전한 부착 인스턴스 배열로 정규화한다(알 수 없는 propId는 제거). */
 export function parseVrmProps(raw: unknown): SerializedVrmProps {
   const empty: SerializedVrmProps = { version: VRM_PROPS_VERSION, items: [] };
   if (!raw || typeof raw !== "object") return empty;
   const itemsRaw = (raw as { items?: unknown }).items;
   if (!Array.isArray(itemsRaw)) return empty;
+  // version이 없거나 V1이면 item 안에 우연히 rig 키가 있어도 절대 새 의미로 해석하지 않는다.
+  const parseRig = (raw as { version?: unknown }).version === VRM_PROPS_VERSION;
 
   const items: PropInstance[] = [];
   for (const entry of itemsRaw) {
@@ -197,14 +493,17 @@ export function parseVrmProps(raw: unknown): SerializedVrmProps {
     const e = entry as Partial<Record<keyof PropInstance, unknown>>;
     const def = propDefById(String(e.propId ?? ""));
     if (!def) continue;
+    const bone = isAttachBone(e.bone) ? e.bone : def.defaultBone;
+    const rig = parseRig ? parseV2Rig(e.rig, def, bone) : undefined;
     items.push({
       uid: typeof e.uid === "string" && e.uid ? e.uid : nextPropUid(def.id),
       propId: def.id,
-      bone: isAttachBone(e.bone) ? e.bone : def.defaultBone,
+      bone,
       position: vec3(e.position, def.defaultPosition, POS_LIMIT),
       rotationDeg: vec3(e.rotationDeg, def.defaultRotationDeg, ROT_LIMIT),
       scale: Math.min(SCALE_MAX, Math.max(SCALE_MIN, num(e.scale, def.defaultScale, SCALE_MAX))),
       color: def.defaultColor === null ? null : normalizeColor(e.color, def.defaultColor),
+      ...(rig ? { rig } : {}),
     });
   }
   return { version: VRM_PROPS_VERSION, items };
@@ -315,7 +614,11 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
     }
     case "fan": {
       const blade = mesh(new three.CylinderGeometry(0.12, 0.12, 0.004, 24, 1, false, 0, Math.PI), mat(0.6));
+      blade.rotation.set(Math.PI / 2, 0, 0);
       group.add(blade);
+      const fanHandle = mesh(new three.CylinderGeometry(0.008, 0.011, 0.1, 12), mat(0.62, 0.08, "#6b3e26"));
+      fanHandle.position.set(0, -0.1, 0);
+      group.add(fanHandle);
       break;
     }
     case "bouquet": {

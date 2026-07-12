@@ -2,7 +2,8 @@ import * as THREE from "three";
 
 import { POSER_FINGER_BONES } from "./studio-pose-presets";
 import { classifyMeshName } from "./studio-vrm-costume";
-import { parseVrmProps } from "./studio-vrm-props";
+import { parseVrmProps, type PropInstance } from "./studio-vrm-props";
+import { parseSceneProps, type SerializedSceneProps } from "./studio-vrm-scene-props";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -1051,6 +1052,8 @@ export type FullVrmState = {
   /** 실장착 워드로브(studio-vrm-wardrobe SerializedWardrobe) — 옵셔널 하위호환. */
   wardrobe?: unknown;
   props?: unknown;
+  /** 캐릭터 주변 월드/본 배치 동물·이펙트 상태. */
+  sceneProps?: unknown;
   physics?: unknown;
   bodyScale?: BodyScale;
   lighting?: LightingParams;
@@ -1074,6 +1077,7 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
     costume: state.costume,
     wardrobe: state.wardrobe,
     props: state.props,
+    sceneProps: state.sceneProps,
     physics: state.physics,
     bodyScale: state.bodyScale,
     lighting: state.lighting,
@@ -1091,6 +1095,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   applyCostume?: (c: unknown) => void;
   applyWardrobe?: (w: unknown) => void;
   applyProps?: (p: unknown) => void;
+  applySceneProps?: (p: unknown) => void;
   applyPhysics?: (p: unknown) => void;
   applyMaterialFx?: (fx: VrmMaterialFx) => void;
   applyCustomColors?: (colors: Record<string, string>) => void;
@@ -1101,7 +1106,10 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   if (state.fingerOverrides) applyFingerRotations(vrm, state.fingerOverrides);
   if (state.costume && applyers.applyCostume) applyers.applyCostume(state.costume);
   if (state.wardrobe && applyers.applyWardrobe) applyers.applyWardrobe(state.wardrobe);
-  if (state.props && applyers.applyProps) applyers.applyProps(state.props);
+  // Full-state 복원은 authoritative 하다. props 필드가 없더라도 빈 배열을 전달해 이전 장착물이
+  // 다음 문서에 눌어붙지 않게 하고, 외부/구버전 입력은 반드시 동일 parser를 통과시킨다.
+  if (applyers.applyProps) applyers.applyProps(parseVrmProps(state.props));
+  if (applyers.applySceneProps) applyers.applySceneProps(parseSceneProps(state.sceneProps));
   if (state.physics && applyers.applyPhysics) applyers.applyPhysics(state.physics);
   if (state.materialFx && applyers.applyMaterialFx) applyers.applyMaterialFx(state.materialFx);
   if (state.customColors && applyers.applyCustomColors) applyers.applyCustomColors(state.customColors);
@@ -1146,7 +1154,9 @@ export function planFullStateRestore(state: FullVrmState): {
   fingerOverrides?: FingerRotationMap;
   costume?: unknown;
   wardrobe?: unknown;
-  propsItems?: unknown;
+  /** 항상 정규화된 소품 목록. props가 없는 authoritative 상태는 빈 목록으로 복원한다. */
+  propsItems: PropInstance[];
+  sceneProps: SerializedSceneProps;
   physics?: unknown;
   materialFx?: VrmMaterialFx;
   avatarForge?: unknown;
@@ -1162,7 +1172,8 @@ export function planFullStateRestore(state: FullVrmState): {
     fingerOverrides: state.fingerOverrides,
     costume: state.costume,
     wardrobe: state.wardrobe,
-    propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
+    propsItems: parseVrmProps(state.props).items,
+    sceneProps: parseSceneProps(state.sceneProps),
     physics: state.physics,
     materialFx: state.materialFx,
     avatarForge: state.avatarForge,
@@ -1192,7 +1203,12 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       env: poseData.env,
       costume: poseData.costume,
       wardrobe: poseData.wardrobe,
-      props: poseData.props ?? (poseData.vrmProps ? { items: parseVrmProps(poseData.vrmProps).items } : undefined),
+      props: poseData.props != null
+        ? parseVrmProps(poseData.props)
+        : poseData.vrmProps != null
+          ? parseVrmProps(poseData.vrmProps)
+          : undefined,
+      sceneProps: poseData.sceneProps != null ? parseSceneProps(poseData.sceneProps) : undefined,
       physics: poseData.physics,
       materialFx: poseData.materialFx,
       avatarForge: poseData.avatarForge,
