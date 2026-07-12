@@ -9,8 +9,10 @@ import {
   getPropFitStatus,
   measureVrmPropRigMetrics,
   resolvePropAttachment,
+  resolveSecondaryHandConstraint,
   resolveSecondaryPropTarget,
   sanitizeVrmPropRigMetrics,
+  scaleVrmPropRigMetrics,
   type VrmPropMetricBone,
 } from "./studio-vrm-prop-rig";
 import {
@@ -125,6 +127,23 @@ describe("VRM 소품 리그 실측", () => {
     expect(sanitized.head).toBeGreaterThan(0);
     expect(sanitized.handSockets.leftHand.source).toBe("fallback");
   });
+
+  it("체형의 높이·너비 변경을 자동 핏 실측값에 합성한다", () => {
+    const scaled = scaleVrmPropRigMetrics(DEFAULT_VRM_PROP_RIG_METRICS, {
+      height: 1.4,
+      width: 0.8,
+    });
+
+    expect(scaled.avatarHeight).toBeCloseTo(DEFAULT_VRM_PROP_RIG_METRICS.avatarHeight * 1.4, 6);
+    expect(scaled.shoulder).toBeCloseTo(DEFAULT_VRM_PROP_RIG_METRICS.shoulder * 0.8, 6);
+    expect(scaled.eyeDistance).toBeCloseTo(DEFAULT_VRM_PROP_RIG_METRICS.eyeDistance * 0.8, 6);
+    expect(scaled.hand).toBeCloseTo(
+      DEFAULT_VRM_PROP_RIG_METRICS.hand * Math.sqrt(1.4 * 0.8),
+      6
+    );
+    // hand socket은 hand bone 로컬 좌표이므로 루트 스케일과 중복 적용하지 않는다.
+    expect(scaled.handSockets).toEqual(DEFAULT_VRM_PROP_RIG_METRICS.handSockets);
+  });
 });
 
 describe("스마트 anchor wrapper", () => {
@@ -182,6 +201,19 @@ describe("스마트 anchor wrapper", () => {
     expect(result.scale).toBe(instance.scale);
   });
 
+  it("검은 legacy 회전은 보존하면서 palm socket 전용 기본 방향을 사용한다", () => {
+    const def = propDefById("sword")!;
+    const smart = createPropInstance("sword", "smart-sword")!;
+    const legacy: PropInstance = { ...smart, uid: "legacy-sword", rig: undefined };
+
+    const smartResult = resolvePropAttachment(def, smart, DEFAULT_VRM_PROP_RIG_METRICS);
+    const legacyResult = resolvePropAttachment(def, legacy, DEFAULT_VRM_PROP_RIG_METRICS);
+
+    expect(def.smartRotationDeg).toEqual([0, 0, 0]);
+    expect(smartResult.rotationDeg[2]).toBeCloseTo(0, 6);
+    expect(legacyResult.rotationDeg).toEqual([0, 0, -90]);
+  });
+
   it("오른손 프리셋을 왼손에 붙이면 delta와 회전이 좌우 미러된다", () => {
     const def = propDefById("sword")!;
     const instance = createPropInstance("sword", "left-sword")!;
@@ -189,10 +221,6 @@ describe("스마트 anchor wrapper", () => {
     instance.rig = { ...instance.rig!, deltaPosition: [0.02, 0.01, 0], deltaRotationDeg: [5, 10, 20] };
     const result = resolvePropAttachment(def, instance, measureVrmPropRigMetrics(createMeasuredVrm()));
     expect(result.mirrored).toBe(true);
-    expect(result.socketPosition[0]).toBeCloseTo(
-      result.socketPosition[0],
-      6
-    );
     // mirrored delta는 해당 손의 실측 socket X에서 음의 방향으로 더해진다.
     const socketX = measureVrmPropRigMetrics(createMeasuredVrm()).handSockets.leftHand.position[0];
     expect(result.socketPosition[0]).toBeCloseTo(socketX - 0.02, 6);
@@ -232,7 +260,103 @@ describe("자동 손 그립과 양손 보조 target", () => {
     expect(overrides.leftMiddleProximal).toBeDefined();
 
     const target = resolveSecondaryPropTarget(def, item);
-    expect(target).toMatchObject({ enabled: true, bone: "leftHand", anchorId: "secondary", influence: 1 });
+    expect(target).toMatchObject({ enabled: true, bone: "leftHand", anchorId: "secondary", influence: 0.82 });
+  });
+
+  it("secondary influence를 보조 손가락 그립 강도에도 동일하게 적용한다", () => {
+    const def = propDefById("sword")!;
+    const item = createPropInstance("sword", "weighted-two-hand")!;
+    item.rig = {
+      ...item.rig!,
+      secondary: { ...createDefaultSecondaryRig(def, item.bone)!, influence: 0.5 },
+    };
+    const half = createAutoGripFingerOverrides([item]);
+    item.rig = {
+      ...item.rig,
+      secondary: { ...item.rig.secondary!, influence: 1 },
+    };
+    const full = createAutoGripFingerOverrides([item]);
+
+    expect(Math.abs(half.leftMiddleIntermediate[2])).toBeCloseTo(
+      Math.abs(full.leftMiddleIntermediate[2]) * 0.5,
+      6
+    );
+
+    item.rig = {
+      ...item.rig,
+      secondary: { ...item.rig.secondary!, influence: 0 },
+    };
+    const zero = createAutoGripFingerOverrides([item]);
+    expect(zero.leftMiddleIntermediate).toBeUndefined();
+    expect(zero.rightMiddleIntermediate).toBeDefined();
+  });
+
+  it("실제 소품 반경과 자동 배율이 커지면 손가락을 덜 감는다", () => {
+    const normal = createPropInstance("mug", "normal-radius")!;
+    const large = createPropInstance("mug", "large-radius")!;
+    large.rig = { ...large.rig!, autoScale: false, deltaScale: 2 };
+
+    const normalGrip = createAutoGripFingerOverrides([normal]);
+    const largeGrip = createAutoGripFingerOverrides([large]);
+
+    expect(Math.abs(largeGrip.rightMiddleIntermediate[2])).toBeLessThan(
+      Math.abs(normalGrip.rightMiddleIntermediate[2])
+    );
+  });
+
+  it("secondary anchor에서 손바닥 오프셋을 빼 손목 목표를 계산한다", () => {
+    const def = propDefById("sword")!;
+    const secondaryAnchor = def.anchors.find((candidate) => candidate.role === "secondary")!;
+    const groupQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, -0.35, 0.6));
+    const socketQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.1, 0.25, 0.15));
+    const handSocket = {
+      position: [0.01, 0.04, -0.005] as Vec3,
+      rotationQuaternion: [
+        socketQuaternion.x,
+        socketQuaternion.y,
+        socketQuaternion.z,
+        socketQuaternion.w,
+      ] as const,
+      rotationDeg: [0, 0, 0] as Vec3,
+      source: "measured" as const,
+    };
+    const result = resolveSecondaryHandConstraint(
+      secondaryAnchor,
+      [0.5, 1.1, -0.2],
+      [groupQuaternion.x, groupQuaternion.y, groupQuaternion.z, groupQuaternion.w],
+      1.25,
+      handSocket,
+      [1.1, 0.9, 1.1]
+    )!;
+
+    const targetHandQuaternion = new THREE.Quaternion(...result.targetHandWorldQuaternion);
+    const reconstructedPalm = new THREE.Vector3(...result.wristWorldPosition).add(
+      new THREE.Vector3(...handSocket.position)
+        .multiply(new THREE.Vector3(1.1, 0.9, 1.1))
+        .applyQuaternion(targetHandQuaternion)
+    );
+
+    expectVecClose(
+      [reconstructedPalm.x, reconstructedPalm.y, reconstructedPalm.z],
+      result.anchorWorldPosition,
+      6
+    );
+    expect(
+      new THREE.Vector3(...result.wristWorldPosition).distanceTo(
+        new THREE.Vector3(...result.anchorWorldPosition)
+      )
+    ).toBeGreaterThan(0.02);
+  });
+
+  it("손상된 secondary world transform은 안전하게 거부한다", () => {
+    const anchor = propDefById("book")!.anchors.find((candidate) => candidate.role === "secondary")!;
+    expect(resolveSecondaryHandConstraint(
+      anchor,
+      [0, 0, 0],
+      [0, 0, 0, 1],
+      Number.NaN,
+      DEFAULT_VRM_PROP_RIG_METRICS.handSockets.rightHand
+    )).toBeNull();
   });
 
   it("autoFingerPose가 꺼졌거나 손 본이 아니면 override를 만들지 않는다", () => {

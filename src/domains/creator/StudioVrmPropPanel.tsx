@@ -25,6 +25,7 @@ import {
   type PropAttachBone,
   type PropCategory,
   type PropDef,
+  type PropGripKind,
   type PropHandBone,
   type PropInstance,
   type PropRigSecondary,
@@ -79,6 +80,18 @@ const TRANSFORM_SECTIONS: readonly {
 ];
 
 const AXIS_LABELS = ["X", "Y", "Z"] as const;
+
+const GRIP_KIND_LABELS: Record<PropGripKind, string> = {
+  cylinder: "원통형",
+  handle: "손잡이형",
+  flat: "평면형",
+  pinch: "집게형",
+  support: "받침형",
+  wear: "착용형",
+};
+
+const DECIMAL_DRAFT_PATTERN = /^-?(?:\d+(?:[.,]\d*)?|[.,]\d*)?$/;
+const CLEAR_CONFIRMATION_TIMEOUT_MS = 5_000;
 
 const FOCUS_RING =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -138,7 +151,7 @@ function defaultSecondary(
     enabled: false,
     anchorId: anchor.id,
     bone: oppositeHand(primaryBone),
-    influence: 1,
+    influence: Math.min(1, Math.max(0, definition.secondaryGripInfluence ?? 0.75)),
   };
 }
 
@@ -163,6 +176,89 @@ function fitReferenceLabel(definition: PropDef): string {
 
 function formattedNumber(value: number, precision: number, suffix: string): string {
   return `${value.toFixed(precision)}${suffix}`;
+}
+
+function editableNumber(value: number, precision: number): string {
+  return String(Number(value.toFixed(precision)));
+}
+
+interface NumericDraftInputProps {
+  readonly disabled: boolean;
+  readonly label: string;
+  readonly max: number;
+  readonly min: number;
+  readonly onCommit: (value: number) => void;
+  readonly precision: number;
+  readonly step: number;
+  readonly value: number;
+}
+
+function NumericDraftInput({
+  disabled,
+  label,
+  max,
+  min,
+  onCommit,
+  precision,
+  step,
+  value,
+}: NumericDraftInputProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const displayedValue = draft ?? editableNumber(value, precision);
+
+  function restore(): void {
+    setDraft(null);
+  }
+
+  function commit(): void {
+    if (draft === null) return;
+    const normalizedDraft = draft.trim().replace(",", ".");
+    if (!/\d/.test(normalizedDraft)) {
+      restore();
+      return;
+    }
+    const next = Number(normalizedDraft);
+    if (!Number.isFinite(next)) {
+      restore();
+      return;
+    }
+    onCommit(Math.min(max, Math.max(min, next)));
+    restore();
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      spellCheck={false}
+      value={displayedValue}
+      disabled={disabled}
+      aria-label={label}
+      data-min={min}
+      data-max={max}
+      data-step={step}
+      className={cn(
+        "min-h-11 w-full rounded-lg border border-line bg-panel px-1.5 text-right text-[0.68rem] tabular-nums text-fg disabled:cursor-not-allowed disabled:opacity-45",
+        FOCUS_RING
+      )}
+      onFocus={() => setDraft(editableNumber(value, precision))}
+      onChange={(event) => {
+        const nextDraft = event.target.value;
+        if (DECIMAL_DRAFT_PATTERN.test(nextDraft)) setDraft(nextDraft);
+      }}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          restore();
+        }
+      }}
+    />
+  );
 }
 
 interface AxisFieldProps {
@@ -213,22 +309,15 @@ function AxisField({
         className="h-11 min-w-0 cursor-pointer touch-pan-y accent-accent disabled:cursor-not-allowed disabled:opacity-45"
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      <input
-        type="number"
+      <NumericDraftInput
         min={min}
         max={max}
         step={step}
-        value={Number(value.toFixed(precision))}
+        precision={precision}
+        value={value}
         disabled={disabled}
-        aria-label={`${accessibleLabel} 직접 입력`}
-        className={cn(
-          "min-h-11 w-full rounded-lg border border-line bg-panel px-1.5 text-right text-[0.68rem] tabular-nums text-fg disabled:cursor-not-allowed disabled:opacity-45",
-          FOCUS_RING
-        )}
-        onChange={(event) => {
-          const next = Number(event.target.value);
-          if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
-        }}
+        label={`${accessibleLabel} 직접 입력`}
+        onCommit={onChange}
       />
     </div>
   );
@@ -278,22 +367,15 @@ function ScalarField({
           onChange={(event) => onChange(Number(event.target.value))}
         />
       </div>
-      <input
-        type="number"
+      <NumericDraftInput
         min={min}
         max={max}
         step={step}
-        value={Number(value.toFixed(precision))}
+        precision={precision}
+        value={value}
         disabled={disabled}
-        aria-label={`${label} 직접 입력`}
-        className={cn(
-          "min-h-11 w-full rounded-lg border border-line bg-panel px-1.5 text-right text-[0.68rem] tabular-nums text-fg disabled:cursor-not-allowed disabled:opacity-45",
-          FOCUS_RING
-        )}
-        onChange={(event) => {
-          const next = Number(event.target.value);
-          if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
-        }}
+        label={`${label} 직접 입력`}
+        onCommit={onChange}
       />
     </div>
   );
@@ -314,11 +396,15 @@ function ToggleRow({
   label,
   onChange,
 }: ToggleRowProps) {
+  const descriptionId = useId();
+
   return (
     <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/60 py-1.5 last:border-b-0">
       <div className="min-w-0">
         <p className="text-xs font-semibold text-fg-2">{label}</p>
-        <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">{description}</p>
+        <p id={descriptionId} className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
+          {description}
+        </p>
       </div>
       <button
         type="button"
@@ -326,6 +412,7 @@ function ToggleRow({
         aria-checked={checked}
         disabled={disabled}
         aria-label={label}
+        aria-describedby={descriptionId}
         className={cn(
           "relative min-h-11 min-w-11 shrink-0 rounded-full disabled:cursor-not-allowed disabled:opacity-45",
           FOCUS_RING
@@ -409,7 +496,6 @@ function SelectedEditor({
   const rotation = rig?.deltaRotationDeg ?? item.rotationDeg;
   const scale = rig?.deltaScale ?? item.scale;
   const smartAvailable = Boolean(definition && primaryAnchorId(definition));
-  const mode = rig?.mode ?? "custom";
 
   function updateRig(patch: Partial<PropRigV2>): void {
     const base = item.rig ?? (definition ? createSmartRig(definition) : null);
@@ -417,21 +503,12 @@ function SelectedEditor({
     onUpdate(item.uid, { rig: { ...base, ...patch } });
   }
 
-  function setMode(nextMode: PropRigV2["mode"]): void {
-    if (nextMode === "auto" && !item.rig) {
-      const nextRig = definition ? createSmartRig(definition) : null;
-      if (!nextRig) return;
-      onUpdate(item.uid, { rig: nextRig });
-      onStatus(`${definition?.label ?? item.propId}을 스마트 맞춤으로 전환했습니다.`);
-      return;
-    }
-    if (!item.rig || item.rig.mode === nextMode) return;
-    updateRig({ mode: nextMode });
-    onStatus(
-      `${definition?.label ?? item.propId}의 맞춤 방식을 ${
-        nextMode === "auto" ? "스마트" : "직접 조정"
-      }으로 바꿨습니다.`
-    );
+  function enableSmartSocket(): void {
+    if (item.rig || !definition) return;
+    const nextRig = createSmartRig(definition);
+    if (!nextRig) return;
+    onUpdate(item.uid, { rig: nextRig });
+    onStatus(`${definition.label}을 스마트 소켓에 연결했습니다.`);
   }
 
   function updateBone(bone: PropAttachBone): void {
@@ -486,7 +563,7 @@ function SelectedEditor({
       scale: definition.defaultScale,
       rig: nextRig,
     });
-    onStatus(`${definition.label}의 스마트 맞춤을 기본값으로 되돌렸습니다.`);
+    onStatus(`${definition.label}의 스마트 소켓 맞춤을 기본값으로 되돌렸습니다.`);
   }
 
   function handleTransformTabKeyDown(event: KeyboardEvent<HTMLButtonElement>): void {
@@ -541,53 +618,48 @@ function SelectedEditor({
               : "border-line bg-card text-fg-3"
           )}
         >
-          {rig ? "V2 소켓" : "기존 방식"}
+          {rig ? "스마트 소켓" : "기존 부착"}
         </span>
       </div>
 
       <div
-        role="group"
-        aria-label="소품 맞춤 방식"
-        className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-card p-1"
+        role="note"
+        aria-label="소품 부착 안내"
+        className="mt-3 rounded-lg border border-line/70 bg-card/55 p-2.5"
       >
-        <button
-          type="button"
-          aria-pressed={mode === "auto"}
-          disabled={disabled || !smartAvailable}
-          className={cn(
-            "min-h-11 rounded-lg border px-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-45",
-            FOCUS_RING,
-            mode === "auto"
-              ? "border-accent/55 bg-accent-soft text-accent"
-              : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
-          )}
-          onClick={() => setMode("auto")}
-        >
-          스마트 맞춤
-        </button>
-        <button
-          type="button"
-          aria-pressed={mode === "custom"}
-          disabled={disabled}
-          className={cn(
-            "min-h-11 rounded-lg border px-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-45",
-            FOCUS_RING,
-            mode === "custom"
-              ? "border-accent/55 bg-accent-soft text-accent"
-              : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
-          )}
-          onClick={() => setMode("custom")}
-        >
-          직접 조정
-        </button>
-      </div>
-
-      {!rig ? (
-        <p className="mt-2 rounded-lg border border-line bg-card/70 px-2.5 py-2 text-[0.64rem] leading-relaxed text-fg-3">
-          기존 소품입니다. 스마트 맞춤을 선택하면 현재 원본 값은 보존한 채 소켓 기반 미세 조정으로
-          전환합니다.
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-bold text-fg-2">
+            {rig ? "스마트 소켓으로 부착됨" : "기존 관절 기준으로 부착됨"}
+          </p>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-1 text-[0.62rem] font-bold",
+              rig ? "bg-accent-soft text-accent" : "bg-raised text-fg-3"
+            )}
+          >
+            {rig ? "정밀 조정 가능" : "변환 가능"}
+          </span>
+        </div>
+        <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
+          {rig
+            ? "캐릭터의 접촉점을 따라 자동 배치하며, 아래 위치·회전·모양 값은 그 결과에 더하는 정밀 보정입니다."
+            : "현재 값은 그대로 유지됩니다. 스마트 소켓을 사용하면 캐릭터 크기와 접촉점을 기준으로 배치한 뒤 정밀하게 보정할 수 있습니다."}
         </p>
-      ) : null}
+        {!rig ? (
+          <button
+            type="button"
+            disabled={disabled || !smartAvailable}
+            className={cn(
+              "mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-bold text-accent transition-colors hover:border-accent/65 disabled:cursor-not-allowed disabled:opacity-45",
+              FOCUS_RING
+            )}
+            onClick={enableSmartSocket}
+          >
+            <Sparkles size={14} aria-hidden />
+            스마트 소켓 사용
+          </button>
+        ) : null}
+      </div>
 
       <label
         htmlFor={boneSelectId}
@@ -627,7 +699,7 @@ function SelectedEditor({
             label="손가락 자동 그립"
             description={
               definition.grip && isHandBone(item.bone)
-                ? `${definition.grip.kind} 그립 프로필로 손가락을 소품 두께에 맞춥니다.`
+                ? `${GRIP_KIND_LABELS[definition.grip.kind]} 그립으로 손가락을 소품 두께에 맞춥니다.`
                 : "손 부착과 그립 프로필이 모두 있는 소품에서 사용할 수 있습니다."
             }
             onChange={(autoFingerPose) => updateRig({ autoFingerPose })}
@@ -813,7 +885,7 @@ function SelectedEditor({
       >
         <ScalarField
           disabled={disabled}
-          label={rig ? "스마트 맞춤 추가 배율" : "크기 배율"}
+          label={rig ? "자동 맞춤 추가 배율" : "크기 배율"}
           min={0.2}
           max={4}
           step={0.05}
@@ -844,18 +916,20 @@ function SelectedEditor({
         )}
       </div>
 
-      <button
-        type="button"
-        disabled={disabled || !definition || !smartAvailable}
-        className={cn(
-          "mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
-          FOCUS_RING
-        )}
-        onClick={resetSmartFit}
-      >
-        <RotateCcw size={14} aria-hidden />
-        스마트 맞춤 초기화
-      </button>
+      {rig ? (
+        <button
+          type="button"
+          disabled={disabled || !definition}
+          className={cn(
+            "mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
+            FOCUS_RING
+          )}
+          onClick={resetSmartFit}
+        >
+          <RotateCcw size={14} aria-hidden />
+          스마트 소켓 맞춤 초기화
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -873,7 +947,12 @@ export function StudioVrmPropPanel({
   const headingId = useId();
   const catalogContentId = useId();
   const selectedEditorId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const currentItemsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
   const selectedEditorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const itemButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pendingFocusFrameRef = useRef<number | null>(null);
   const previousSelectedUidRef = useRef(selectedUid);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CatalogCategory>("all");
@@ -911,6 +990,42 @@ export function StudioVrmPropPanel({
     return () => cancelAnimationFrame(frame);
   }, [selectedUid]);
 
+  useEffect(() => {
+    if (!clearConfirmation) return;
+    const timeout = window.setTimeout(() => {
+      setClearConfirmation(false);
+      setStatusMessage("전체 제거 확인 시간이 지나 취소되었습니다.");
+      if (pendingFocusFrameRef.current !== null) {
+        cancelAnimationFrame(pendingFocusFrameRef.current);
+      }
+      pendingFocusFrameRef.current = requestAnimationFrame(() => {
+        pendingFocusFrameRef.current = null;
+        clearButtonRef.current?.focus();
+      });
+    }, CLEAR_CONFIRMATION_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [clearConfirmation]);
+
+  useEffect(
+    () => () => {
+      if (pendingFocusFrameRef.current !== null) {
+        cancelAnimationFrame(pendingFocusFrameRef.current);
+      }
+    },
+    []
+  );
+
+  function scheduleListFocus(uid: string | null): void {
+    if (pendingFocusFrameRef.current !== null) {
+      cancelAnimationFrame(pendingFocusFrameRef.current);
+    }
+    pendingFocusFrameRef.current = requestAnimationFrame(() => {
+      pendingFocusFrameRef.current = null;
+      const itemButton = uid ? itemButtonRefs.current.get(uid) : null;
+      (itemButton ?? currentItemsHeadingRef.current ?? headingRef.current)?.focus();
+    });
+  }
+
   function handleAdd(definition: PropDef): void {
     if (!vrmReady) return;
     setRecentPropIds((current) => [
@@ -935,22 +1050,39 @@ export function StudioVrmPropPanel({
 
   function handleRemove(item: PropInstance): void {
     const label = propDefById(item.propId)?.label ?? item.propId;
+    const removedIndex = items.findIndex((candidate) => candidate.uid === item.uid);
+    const nextFocusUid =
+      items[removedIndex + 1]?.uid ?? items[removedIndex - 1]?.uid ?? null;
     if (selectedUid === item.uid) onSelect(null);
     setClearConfirmation(false);
     setStatusMessage(`${label}을 제거했습니다.`);
     onRemove(item.uid);
+    scheduleListFocus(nextFocusUid);
+  }
+
+  function handleCancelClear(): void {
+    setClearConfirmation(false);
+    setStatusMessage("전체 제거를 취소했습니다.");
+    if (pendingFocusFrameRef.current !== null) {
+      cancelAnimationFrame(pendingFocusFrameRef.current);
+    }
+    pendingFocusFrameRef.current = requestAnimationFrame(() => {
+      pendingFocusFrameRef.current = null;
+      clearButtonRef.current?.focus();
+    });
   }
 
   function handleClear(): void {
     if (!clearConfirmation) {
       setClearConfirmation(true);
-      setStatusMessage("전체 제거 버튼을 한 번 더 누르면 장착된 모든 소품을 제거합니다.");
+      setStatusMessage("5초 안에 전체 제거 확인을 누르면 장착된 모든 소품을 제거합니다.");
       return;
     }
     onSelect(null);
     onClear();
     setClearConfirmation(false);
     setStatusMessage("장착된 모든 소품을 제거했습니다.");
+    scheduleListFocus(null);
   }
 
   return (
@@ -960,7 +1092,12 @@ export function StudioVrmPropPanel({
     >
       <div className="flex min-h-11 items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 id={headingId} className="flex items-center gap-1.5 text-sm font-bold text-fg">
+          <h3
+            ref={headingRef}
+            id={headingId}
+            tabIndex={-1}
+            className="flex items-center gap-1.5 text-sm font-bold text-fg outline-none"
+          >
             <Sparkles size={15} className="shrink-0 text-accent" aria-hidden />
             소품 부착
           </h3>
@@ -985,24 +1122,46 @@ export function StudioVrmPropPanel({
 
       <div className="mt-3">
         <div className="mb-1.5 flex min-h-11 items-center justify-between gap-2">
-          <p className="text-xs font-bold text-fg-2">현재 장착</p>
+          <h4
+            ref={currentItemsHeadingRef}
+            tabIndex={-1}
+            className="text-xs font-bold text-fg-2 outline-none"
+          >
+            현재 장착
+          </h4>
           {items.length > 0 ? (
-            <button
-              type="button"
-              aria-label={
-                clearConfirmation ? "장착된 모든 소품 제거 확인" : "장착된 모든 소품 제거"
-              }
-              className={cn(
-                "min-h-11 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors",
-                FOCUS_RING,
-                clearConfirmation
-                  ? "border-bad/50 bg-bad/10 text-bad"
-                  : "border-line bg-card text-fg-3 hover:bg-raised hover:text-bad"
-              )}
-              onClick={handleClear}
-            >
-              {clearConfirmation ? "전체 제거 확인" : "전체 제거"}
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                ref={clearButtonRef}
+                type="button"
+                aria-label={
+                  clearConfirmation ? "장착된 모든 소품 제거 확인" : "장착된 모든 소품 제거"
+                }
+                className={cn(
+                  "min-h-11 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors",
+                  FOCUS_RING,
+                  clearConfirmation
+                    ? "border-bad/50 bg-bad/10 text-bad"
+                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-bad"
+                )}
+                onClick={handleClear}
+              >
+                {clearConfirmation ? "5초 내 제거" : "전체 제거"}
+              </button>
+              {clearConfirmation ? (
+                <button
+                  type="button"
+                  aria-label="장착된 모든 소품 제거 취소"
+                  className={cn(
+                    "min-h-11 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+                    FOCUS_RING
+                  )}
+                  onClick={handleCancelClear}
+                >
+                  취소
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -1028,6 +1187,10 @@ export function StudioVrmPropPanel({
                 >
                   <div className="flex min-h-11 items-stretch gap-1.5 p-1">
                     <button
+                      ref={(node) => {
+                        if (node) itemButtonRefs.current.set(item.uid, node);
+                        else itemButtonRefs.current.delete(item.uid);
+                      }}
                       type="button"
                       aria-expanded={selected}
                       aria-controls={selected ? selectedEditorId : undefined}
@@ -1045,7 +1208,7 @@ export function StudioVrmPropPanel({
                           {definition?.label ?? item.propId}
                         </span>
                         <span className="shrink-0 text-[0.62rem] font-normal text-fg-3">
-                          {PROP_BONE_LABELS[item.bone]} · {item.rig ? "스마트" : "기존"}
+                          {PROP_BONE_LABELS[item.bone]} · {item.rig ? "스마트 소켓" : "기존 부착"}
                         </span>
                       </span>
                     </button>

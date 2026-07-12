@@ -74,13 +74,19 @@ import {
   type FullVrmState,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
-import { applyVrmTwoBoneGrip } from "./studio-vrm-prop-ik";
+import {
+  applyVrmTwoBoneGrip,
+  createVrmTwoBoneGripState,
+  releaseVrmTwoBoneGripState,
+} from "./studio-vrm-prop-ik";
 import {
   createAutoGripFingerOverrides,
   DEFAULT_VRM_PROP_RIG_METRICS,
   measureVrmPropRigMetrics,
   resolvePropAttachment,
+  resolveSecondaryHandConstraint,
   resolveSecondaryPropTarget,
+  scaleVrmPropRigMetrics,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
 import {
@@ -2124,15 +2130,39 @@ function SceneProp3D({
   );
 }
 
+const pendingPropDisposals = new WeakMap<THREE.Object3D, object>();
+
 function disposePropObject(object: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
   object.traverse((child) => {
     const mesh = child as THREE.Mesh;
-    mesh.geometry?.dispose?.();
-    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    materials.forEach((material) => material.dispose());
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    const meshMaterials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+    meshMaterials.forEach((material) => materials.add(material));
   });
-  object.removeFromParent();
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
 }
+
+/** StrictMode의 setup→cleanup→setup 재생에서는 두 번째 setup이 같은 object의 폐기를 취소한다. */
+function cancelScheduledPropDisposal(object: THREE.Object3D) {
+  pendingPropDisposals.delete(object);
+}
+
+function schedulePropDisposal(object: THREE.Object3D) {
+  const token = {};
+  pendingPropDisposals.set(object, token);
+  queueMicrotask(() => {
+    if (pendingPropDisposals.get(object) !== token) return;
+    pendingPropDisposals.delete(object);
+    disposePropObject(object);
+  });
+}
+
+const VRM_FRAME_BASE_PRIORITY = -3;
+const VRM_FRAME_PROP_PRIORITY = -2;
+const VRM_FRAME_COMMIT_PRIORITY = -1;
 
 /**
  * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
@@ -2154,6 +2184,12 @@ function VrmPropAttachment({
   const localQuaternionRef = useRef(new THREE.Quaternion());
   const anchorWorldOffsetRef = useRef(new THREE.Vector3());
   const secondaryWorldTargetRef = useRef(new THREE.Vector3());
+  const secondaryTargetQuaternionRef = useRef(new THREE.Quaternion());
+  const groupWorldPositionRef = useRef(new THREE.Vector3());
+  const groupWorldQuaternionRef = useRef(new THREE.Quaternion());
+  const groupWorldScaleRef = useRef(new THREE.Vector3());
+  const handWorldScaleRef = useRef(new THREE.Vector3());
+  const [secondaryGripState] = useState(createVrmTwoBoneGripState);
 
   useEffect(() => {
     const node = vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
@@ -2168,6 +2204,19 @@ function VrmPropAttachment({
   const definition = propDefById(instance.propId);
   const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
   const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
+  const secondaryActive = Boolean(secondary && secondary.influence > 0);
+  const secondaryBone = secondary?.bone ?? null;
+
+  useEffect(() => {
+    if (!secondaryActive) {
+      releaseVrmTwoBoneGripState(secondaryGripState);
+      return;
+    }
+    return () => {
+      releaseVrmTwoBoneGripState(secondaryGripState);
+      vrm.scene.updateMatrixWorld(true);
+    };
+  }, [secondaryActive, secondaryBone, secondaryGripState, vrm]);
 
   useEffect(() => {
     if (!object) return;
@@ -2188,7 +2237,8 @@ function VrmPropAttachment({
 
   useEffect(() => {
     if (!object) return;
-    return () => disposePropObject(object);
+    cancelScheduledPropDisposal(object);
+    return () => schedulePropDisposal(object);
   }, [object]);
 
   useFrame(() => {
@@ -2217,18 +2267,41 @@ function VrmPropAttachment({
     group.position.copy(socketWorldPosition).sub(anchorWorldOffset);
     group.updateMatrixWorld(true);
 
-    if (secondary) {
-      const target = secondaryWorldTargetRef.current.set(...secondary.anchor.position);
-      group.localToWorld(target);
+    if (secondary && secondary.influence > 0) {
+      const secondaryHandNode = vrm.humanoid?.getNormalizedBoneNode(secondary.bone) ?? null;
+      if (!secondaryHandNode) {
+        releaseVrmTwoBoneGripState(secondaryGripState);
+        return;
+      }
+      secondaryHandNode.updateWorldMatrix(true, false);
+      const groupWorldPosition = group.getWorldPosition(groupWorldPositionRef.current);
+      const groupWorldQuaternion = group.getWorldQuaternion(groupWorldQuaternionRef.current);
+      const groupWorldScale = group.getWorldScale(groupWorldScaleRef.current);
+      const handWorldScale = secondaryHandNode.getWorldScale(handWorldScaleRef.current);
+      const constraint = resolveSecondaryHandConstraint(
+        secondary.anchor,
+        [groupWorldPosition.x, groupWorldPosition.y, groupWorldPosition.z],
+        [groupWorldQuaternion.x, groupWorldQuaternion.y, groupWorldQuaternion.z, groupWorldQuaternion.w],
+        groupWorldScale.x,
+        metrics.handSockets[secondary.bone],
+        [handWorldScale.x, handWorldScale.y, handWorldScale.z]
+      );
+      if (!constraint) {
+        releaseVrmTwoBoneGripState(secondaryGripState);
+        return;
+      }
+      const target = secondaryWorldTargetRef.current.set(...constraint.wristWorldPosition);
+      const targetQuaternion = secondaryTargetQuaternionRef.current.set(...constraint.targetHandWorldQuaternion);
       applyVrmTwoBoneGrip(
         vrm,
         secondary.bone === "leftHand" ? "left" : "right",
         target,
         secondary.influence,
-        secondary.elbowHint
+        secondary.elbowHint,
+        { targetQuaternion, state: secondaryGripState }
       );
     }
-  });
+  }, VRM_FRAME_PROP_PRIORITY);
 
   if (!boneNode || !object) return null;
   if (resolved?.usesSmartRig) {
@@ -2441,7 +2514,6 @@ function VrmActor({
   vrm,
   customColors,
   materialFx,
-  physicsPreview,
   webcamActive,
   trackingDataRef,
   idleAnimation,
@@ -2455,7 +2527,6 @@ function VrmActor({
   vrm: VRM;
   customColors: Record<string, string>;
   materialFx: VrmMaterialFx;
-  physicsPreview: boolean;
   webcamActive: boolean;
   trackingDataRef: React.RefObject<VrmTrackingData | null>;
   idleAnimation: boolean;
@@ -2594,14 +2665,29 @@ function VrmActor({
       }
     }
 
-    // 흔들림 미리보기·웹캠 트래킹 중: 매 프레임 스프링본을 갱신(델타 상한으로 탭 복귀 폭주 방지)
-    // — 머리 회전에 머리카락/의상 물리가 자연스럽게 따라온다.
-    // 정지 모드: delta 0으로 표정/제약만 동기화하고 스프링본은 정착 프레임에서 멈춘다.
-    const springDelta = webcamActive || physicsPreview ? Math.min(dVal, PHYSICS_PREVIEW_MAX_DELTA) : 0;
-    vrm.update(springDelta);
-  });
+  }, VRM_FRAME_BASE_PRIORITY);
 
   return <primitive object={vrm.scene} />;
+}
+
+/** base pose/tracking과 모든 소품 IK가 끝난 뒤 normalized pose를 raw VRM에 한 번만 전달한다. */
+function VrmRuntimeCommit({
+  vrm,
+  physicsPreview,
+  webcamActive,
+}: {
+  vrm: VRM;
+  physicsPreview: boolean;
+  webcamActive: boolean;
+}) {
+  useFrame((_, delta) => {
+    // 흔들림 미리보기·웹캠 트래킹 중에만 스프링본을 전진시키고, 탭 복귀 폭주는 상한 처리한다.
+    const springDelta = webcamActive || physicsPreview
+      ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA)
+      : 0;
+    vrm.update(springDelta);
+  }, VRM_FRAME_COMMIT_PRIORITY);
+  return null;
 }
 
 type LightingTone = "morning" | "sunset" | "night" | "studio";
@@ -2791,6 +2877,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [wardrobeState, setWardrobeState] = useState<WardrobeState>({});
   const [wardrobeMetrics, setWardrobeMetrics] = useState<WardrobeMetrics | null>(null);
   const [propRigMetrics, setPropRigMetrics] = useState<VrmPropRigMetrics>(DEFAULT_VRM_PROP_RIG_METRICS);
+  const effectivePropRigMetrics = scaleVrmPropRigMetrics(propRigMetrics, bodyScale);
   const [wardrobeAutoHide, setWardrobeAutoHide] = useState(true);
   // 물리(studio-vrm-physics) — 스프링본 설정 + 미리보기/조인트 수.
   const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
@@ -3066,7 +3153,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 소품 그립은 저장되는 수동 손가락 편집을 오염시키지 않고 파생한다. 사용자가 명시적으로
   // 조정한 손가락 값은 마지막에 병합해 자동 그립보다 항상 우선한다.
   const effectiveFingerEdits: FingerRotationMap = {
-    ...(createAutoGripFingerOverrides(vrmPropItems) as FingerRotationMap),
+    ...(createAutoGripFingerOverrides(vrmPropItems, propDefById, effectivePropRigMetrics) as FingerRotationMap),
     ...fingerEdits,
   };
 
@@ -3731,7 +3818,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (plan.bodyScale) setBodyScale(plan.bodyScale);
     if (plan.lighting) setLighting(plan.lighting);
     if (plan.env) setEnvVariant(plan.env);
-    if (plan.fingerOverrides) setFingerEdits(plan.fingerOverrides);
+    setFingerEdits(plan.fingerOverrides ?? {});
     // 의상·워드로브는 무조건 반영 — undo/redo에서 장착/숨김 변화도 되돌리고 이전 값이
     // 눌어붙지 않게 한다. 새 VRM 메시를 알아야 하는 자동 숨김은 아래 vrm 분기에서 합성한다.
     setWardrobeState(restoredWardrobe);
@@ -4781,7 +4868,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       aria-modal="true"
       aria-labelledby={dialogTitleId}
       aria-describedby={dialogDescriptionId}
-      className="fixed inset-0 z-[80] isolate overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_button]:min-w-11 pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-6 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11 sm:p-4"
+      className="fixed inset-0 z-[80] isolate overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_button]:min-w-11 pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-11 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11 sm:p-4"
       data-studio-vrm-dialog="true"
       role="dialog"
       tabIndex={-1}
@@ -4841,7 +4928,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       vrm={vrm}
                       customColors={customColors}
                       materialFx={materialFx}
-                      physicsPreview={physicsPreview}
                       webcamActive={webcamActive}
                       trackingDataRef={trackingDataRef}
                       idleAnimation={idleAnimation}
@@ -4852,9 +4938,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   {vrm ? <StudioVrmAvatarForge vrm={vrm} state={avatarForgeState} /> : null}
                   {vrm
                     ? vrmPropItems.map((item) => (
-                        <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={propRigMetrics} />
+                        <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={effectivePropRigMetrics} />
                       ))
                     : null}
+                  {vrm ? (
+                    <VrmRuntimeCommit
+                      vrm={vrm}
+                      physicsPreview={physicsPreview}
+                      webcamActive={webcamActive}
+                    />
+                  ) : null}
                   {vrm && wardrobeMetrics
                     ? WARDROBE_SLOTS.map((slot) => {
                         const equip = wardrobeState[slot];
@@ -7204,7 +7297,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       setSelectedPropId(null);
                     }}
                   >
-                    모든 소품 제거
+                    주변 오브젝트 모두 제거
                   </button>
                 )}
 

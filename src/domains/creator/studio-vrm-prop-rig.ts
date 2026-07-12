@@ -244,6 +244,35 @@ export function sanitizeVrmPropRigMetrics(raw: unknown): VrmPropRigMetrics {
   };
 }
 
+/** 루트 비균일 체형 스케일을 rest-pose 실측값에 합성해 현재 화면 기준 자동 핏을 만든다. */
+export function scaleVrmPropRigMetrics(
+  rawMetrics: VrmPropRigMetrics,
+  bodyScale: { height: number; width: number }
+): VrmPropRigMetrics {
+  const metrics = sanitizeVrmPropRigMetrics(rawMetrics);
+  const height = clamp(finite(bodyScale?.height) ?? 1, 0.5, 1.6);
+  const width = clamp(finite(bodyScale?.width) ?? 1, 0.5, 1.6);
+  // 손은 모델마다 종축 방향이 달라 한 축만 택하면 T/A 포즈에 따라 튄다. 두 축의 기하평균은
+  // 비균일 루트 스케일에서도 회전 방향과 무관한 안정적인 대표 길이를 제공한다.
+  const handScale = Math.sqrt(height * width);
+  const scalePosition = (value: Vec3): Vec3 => [value[0] * width, value[1] * height, value[2] * width];
+
+  return sanitizeVrmPropRigMetrics({
+    ...metrics,
+    avatarHeight: metrics.avatarHeight * height,
+    hand: metrics.hand * handScale,
+    leftHand: metrics.leftHand * handScale,
+    rightHand: metrics.rightHand * handScale,
+    head: metrics.head * height,
+    eyeDistance: metrics.eyeDistance * width,
+    shoulder: metrics.shoulder * width,
+    hip: metrics.hip * width,
+    boneWorldPositions: Object.fromEntries(
+      Object.entries(metrics.boneWorldPositions).map(([bone, position]) => [bone, scalePosition(position)])
+    ),
+  });
+}
+
 export const DEFAULT_VRM_PROP_RIG_METRICS: VrmPropRigMetrics = sanitizeVrmPropRigMetrics(null);
 
 function distance(a: Vec3 | undefined, b: Vec3 | undefined): number | null {
@@ -667,7 +696,7 @@ export function resolvePropAttachment(
     ? new THREE.Quaternion(...handSocket.rotationQuaternion).normalize()
     : new THREE.Quaternion();
   let adjustedDeltaPosition: Vec3 = [...deltaPosition];
-  let userRotationDeg = addVec3(def.defaultRotationDeg, deltaRotation);
+  let userRotationDeg = addVec3(def.smartRotationDeg ?? def.defaultRotationDeg, deltaRotation);
   if (mirrored) {
     adjustedDeltaPosition = mirrorPosition(adjustedDeltaPosition);
     userRotationDeg = mirrorEulerDeg(userRotationDeg);
@@ -730,6 +759,15 @@ export interface ResolvedSecondaryPropTarget {
   elbowHint?: Vec3;
 }
 
+export interface ResolvedSecondaryHandConstraint {
+  /** 소품의 secondary anchor가 놓인 정확한 world-space 접촉점. */
+  anchorWorldPosition: Vec3;
+  /** IK가 맞춰야 하는 hand bone(손목) world-space 위치. */
+  wristWorldPosition: Vec3;
+  /** 손바닥 소켓 basis가 소품 anchor basis와 일치하도록 하는 hand bone world 회전. */
+  targetHandWorldQuaternion: Quat4;
+}
+
 /** 양손 IK renderer가 소비할 보조 anchor/손 정보만 계산한다. 팔 IK 자체는 호출자가 담당한다. */
 export function resolveSecondaryPropTarget(
   def: PropDef,
@@ -750,6 +788,73 @@ export function resolveSecondaryPropTarget(
   };
 }
 
+/**
+ * 보조 손의 손목 목표를 계산한다.
+ *
+ * 팔 IK의 endpoint는 hand bone 원점(손목)이지만 창작자가 기대하는 접촉점은 실측된 손바닥
+ * 소켓이다. 따라서 소품 anchor의 world transform에서 손바닥의 회전·스케일된 로컬 오프셋을
+ * 빼야 손목을 소품 안에 파묻지 않고 정확한 접촉점을 만들 수 있다.
+ */
+export function resolveSecondaryHandConstraint(
+  anchor: PropAnchorDef,
+  groupWorldPositionRaw: Vec3,
+  groupWorldQuaternionRaw: Quat4,
+  propScaleRaw: number,
+  handSocket: VrmPropHandSocket,
+  handWorldScaleRaw: Vec3 = [1, 1, 1]
+): ResolvedSecondaryHandConstraint | null {
+  const groupWorldPosition = vec3(groupWorldPositionRaw);
+  const groupWorldQuaternionTuple = quaternionTuple(groupWorldQuaternionRaw);
+  const anchorPosition = vec3(anchor.position);
+  const socketPosition = vec3(handSocket.position);
+  const socketQuaternionTuple = quaternionTuple(handSocket.rotationQuaternion);
+  const handWorldScale = vec3(handWorldScaleRaw);
+  const propScale = finite(propScaleRaw);
+  if (
+    !groupWorldPosition
+    || !groupWorldQuaternionTuple
+    || !anchorPosition
+    || !socketPosition
+    || !socketQuaternionTuple
+    || !handWorldScale
+    || propScale === null
+    || propScale <= 0
+  ) {
+    return null;
+  }
+
+  const groupWorldQuaternion = new THREE.Quaternion(...groupWorldQuaternionTuple).normalize();
+  const anchorWorldQuaternion = groupWorldQuaternion.clone()
+    .multiply(anchorBasisQuaternion(anchor))
+    .normalize();
+  const socketLocalQuaternion = new THREE.Quaternion(...socketQuaternionTuple).normalize();
+  const targetHandWorldQuaternion = anchorWorldQuaternion.clone()
+    .multiply(socketLocalQuaternion.invert())
+    .normalize();
+
+  const anchorWorldPosition = new THREE.Vector3(...anchorPosition)
+    .multiplyScalar(propScale)
+    .applyQuaternion(groupWorldQuaternion)
+    .add(new THREE.Vector3(...groupWorldPosition));
+  const palmWorldOffset = new THREE.Vector3(...socketPosition)
+    .multiply(new THREE.Vector3(...handWorldScale))
+    .applyQuaternion(targetHandWorldQuaternion);
+  const wristWorldPosition = anchorWorldPosition.clone().sub(palmWorldOffset);
+
+  if (
+    ![anchorWorldPosition.x, anchorWorldPosition.y, anchorWorldPosition.z].every(Number.isFinite)
+    || ![wristWorldPosition.x, wristWorldPosition.y, wristWorldPosition.z].every(Number.isFinite)
+  ) {
+    return null;
+  }
+
+  return {
+    anchorWorldPosition: [anchorWorldPosition.x, anchorWorldPosition.y, anchorWorldPosition.z],
+    wristWorldPosition: [wristWorldPosition.x, wristWorldPosition.y, wristWorldPosition.z],
+    targetHandWorldQuaternion: quaternionToTuple(targetHandWorldQuaternion),
+  };
+}
+
 export type AutoGripFingerOverrides = Record<string, Vec3>;
 
 const FINGERS = ["Index", "Middle", "Ring", "Little"] as const;
@@ -763,13 +868,20 @@ function gripWeight(kind: PropGripKind, finger: (typeof FINGERS)[number]): numbe
   return 1;
 }
 
-function fingerPoseForGrip(side: PropHandBone, grip: PropGripProfile): AutoGripFingerOverrides {
+function fingerPoseForGrip(
+  side: PropHandBone,
+  grip: PropGripProfile,
+  strength = 1
+): AutoGripFingerOverrides {
   if (grip.kind === "wear") return {};
   const prefix = side === "leftHand" ? "left" : "right";
   const sign = side === "leftHand" ? -1 : 1;
+  const poseStrength = clamp(finite(strength) ?? 1, 0, 1.25);
   const result: AutoGripFingerOverrides = {};
   for (const finger of FINGERS) {
-    const curl = THREE.MathUtils.degToRad(grip.fingerCurlDeg * gripWeight(grip.kind, finger));
+    const curl = THREE.MathUtils.degToRad(
+      grip.fingerCurlDeg * gripWeight(grip.kind, finger) * poseStrength
+    );
     for (let index = 0; index < FINGER_SEGMENTS.length; index += 1) {
       const segment = FINGER_SEGMENTS[index];
       const segmentWeight = index === 0 ? 0.82 : index === 1 ? 1 : 0.88;
@@ -777,7 +889,7 @@ function fingerPoseForGrip(side: PropHandBone, grip: PropGripProfile): AutoGripF
     }
   }
 
-  const thumb = THREE.MathUtils.degToRad(grip.thumbOppositionDeg);
+  const thumb = THREE.MathUtils.degToRad(grip.thumbOppositionDeg * poseStrength);
   result[`${prefix}ThumbMetacarpal`] = [0, sign * thumb * 0.35, sign * thumb * 0.2];
   result[`${prefix}ThumbProximal`] = [0, sign * thumb, sign * thumb * 0.7];
   result[`${prefix}ThumbDistal`] = [0, 0, sign * thumb * 0.55];
@@ -786,14 +898,32 @@ function fingerPoseForGrip(side: PropHandBone, grip: PropGripProfile): AutoGripF
 
 export type PropDefinitionResolver = (propId: string) => PropDef | undefined;
 
+function gripStrengthForHand(
+  definition: PropDef,
+  item: PropInstance,
+  hand: PropHandBone,
+  metrics: VrmPropRigMetrics
+): number {
+  if (!definition.grip) return 1;
+  const resolved = resolvePropAttachment(definition, item, metrics);
+  const handSize = hand === "leftHand" ? metrics.leftHand : metrics.rightHand;
+  if (!(handSize > 1e-6)) return 1;
+  const normalizedRadius = definition.grip.radius * resolved.scale / handSize;
+  // 손 길이의 약 16% 반경을 카탈로그 중립값으로 삼는다. 굵은 손잡이는 덜 감고,
+  // 가는 손잡이는 더 감되 과도한 관절 접힘은 안전 범위로 제한한다.
+  return clamp(1 + (0.16 - normalizedRadius) * 1.4, 0.72, 1.18);
+}
+
 /**
  * 자동 그립이 켜진 손 소품을 FingerRotationMap 호환 레코드로 변환한다.
  * 사용자 수동 손가락 편집은 호출자가 이 결과 뒤에 merge해 우선권을 주어야 한다.
  */
 export function createAutoGripFingerOverrides(
   items: readonly PropInstance[],
-  resolveDefinition: PropDefinitionResolver = propDefById
+  resolveDefinition: PropDefinitionResolver = propDefById,
+  rawMetrics: VrmPropRigMetrics = DEFAULT_VRM_PROP_RIG_METRICS
 ): AutoGripFingerOverrides {
+  const metrics = sanitizeVrmPropRigMetrics(rawMetrics);
   const result: AutoGripFingerOverrides = {};
   for (const item of items) {
     if ((item.rig?.autoFingerPose ?? false) !== true) continue;
@@ -801,10 +931,13 @@ export function createAutoGripFingerOverrides(
     if (!side) continue;
     const definition = resolveDefinition(item.propId);
     if (!definition?.grip) continue;
-    Object.assign(result, fingerPoseForGrip(side, definition.grip));
+    const primaryStrength = gripStrengthForHand(definition, item, side, metrics);
+    Object.assign(result, fingerPoseForGrip(side, definition.grip, primaryStrength));
     const secondary = item.rig?.secondary;
-    if (secondary?.enabled && secondary.bone !== item.bone) {
-      Object.assign(result, fingerPoseForGrip(secondary.bone, definition.grip));
+    if (secondary?.enabled && secondary.bone !== item.bone && secondary.influence > 0) {
+      const secondaryStrength = gripStrengthForHand(definition, item, secondary.bone, metrics)
+        * clamp(secondary.influence, 0, 1);
+      Object.assign(result, fingerPoseForGrip(secondary.bone, definition.grip, secondaryStrength));
     }
   }
   return result;
@@ -819,6 +952,6 @@ export function createDefaultSecondaryRig(def: PropDef, primaryBone: PropAttachB
     enabled: true,
     anchorId: secondaryAnchor.id,
     bone: hand === "leftHand" ? "rightHand" : "leftHand",
-    influence: 1,
+    influence: clamp(finite(def.secondaryGripInfluence) ?? 0.75, 0, 1),
   };
 }

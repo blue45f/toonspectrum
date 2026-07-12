@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { applyVrmTwoBoneGrip, solveTwoBoneTarget } from "./studio-vrm-prop-ik";
+import {
+  applyVrmTwoBoneGrip,
+  createVrmTwoBoneGripState,
+  releaseVrmTwoBoneGripState,
+  solveTwoBoneTarget,
+} from "./studio-vrm-prop-ik";
 
 import type { VRM } from "@pixiv/three-vrm";
 
@@ -14,6 +19,10 @@ function expectVectorClose(actual: THREE.Vector3, expected: THREE.Vector3, preci
 function expectFiniteQuaternion(quaternion: THREE.Quaternion) {
   expect([quaternion.x, quaternion.y, quaternion.z, quaternion.w].every(Number.isFinite)).toBe(true);
   expect(quaternion.length()).toBeCloseTo(1, 5);
+}
+
+function expectRotationClose(actual: THREE.Quaternion, expected: THREE.Quaternion, precision = 7) {
+  expect(Math.abs(actual.dot(expected))).toBeCloseTo(1, precision);
 }
 
 describe("solveTwoBoneTarget", () => {
@@ -198,19 +207,138 @@ describe("applyVrmTwoBoneGrip", () => {
     expect(Math.abs(actualWorld.dot(targetQuaternion))).toBeCloseTo(1, 5);
   });
 
-  it("부분 influence 반복 호출이 폭주하지 않고 목표로 수렴한다", () => {
+  it("재사용 state로 부분 influence를 반복해도 첫 25% 혼합을 누적하지 않는다", () => {
     const fixture = createArmFixture();
     const target = new THREE.Vector3(0.8, 1.25, 0.2);
+    const state = createVrmTwoBoneGripState();
+
+    expect(applyVrmTwoBoneGrip(
+      fixture.vrm,
+      "left",
+      target,
+      0.25,
+      [0, 0, 1],
+      { state }
+    )).toBe(true);
+    fixture.scene.updateMatrixWorld(true);
+    const firstRotations = [
+      fixture.upperArm.quaternion.clone(),
+      fixture.lowerArm.quaternion.clone(),
+      fixture.hand.quaternion.clone(),
+    ];
+    const firstHandWorld = fixture.hand.getWorldPosition(new THREE.Vector3());
 
     for (let index = 0; index < 40; index += 1) {
-      expect(applyVrmTwoBoneGrip(fixture.vrm, "left", target, 0.25, [0, 0, 1])).toBe(true);
+      expect(applyVrmTwoBoneGrip(
+        fixture.vrm,
+        "left",
+        target,
+        0.25,
+        [0, 0, 1],
+        { state }
+      )).toBe(true);
       expectFiniteQuaternion(fixture.upperArm.quaternion);
       expectFiniteQuaternion(fixture.lowerArm.quaternion);
     }
 
     fixture.scene.updateMatrixWorld(true);
     const handWorld = fixture.hand.getWorldPosition(new THREE.Vector3());
-    expect(handWorld.distanceTo(target)).toBeLessThan(0.003);
+    expectVectorClose(handWorld, firstHandWorld, 7);
+    expectRotationClose(fixture.upperArm.quaternion, firstRotations[0]);
+    expectRotationClose(fixture.lowerArm.quaternion, firstRotations[1]);
+    expectRotationClose(fixture.hand.quaternion, firstRotations[2]);
+    expect(handWorld.distanceTo(target)).toBeGreaterThan(0.1);
+  });
+
+  it("트래킹이 다시 쓴 authored pose를 새 기준으로 감지한다", () => {
+    const fixture = createArmFixture();
+    const reference = createArmFixture();
+    const target = new THREE.Vector3(0.7, 1.15, 0.3);
+    const state = createVrmTwoBoneGripState();
+
+    expect(applyVrmTwoBoneGrip(
+      fixture.vrm,
+      "left",
+      target,
+      0.25,
+      [0, 0, 1],
+      { state }
+    )).toBe(true);
+
+    const authoredRotations = [
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0.1, -0.2, 0.25)),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, 0.05, -0.2)),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0.12, -0.04)),
+    ] as const;
+    [fixture, reference].forEach((arm) => {
+      arm.upperArm.quaternion.copy(authoredRotations[0]);
+      arm.lowerArm.quaternion.copy(authoredRotations[1]);
+      arm.hand.quaternion.copy(authoredRotations[2]);
+      arm.scene.updateMatrixWorld(true);
+    });
+
+    expect(applyVrmTwoBoneGrip(
+      fixture.vrm,
+      "left",
+      target,
+      0.25,
+      [0, 0, 1],
+      { state }
+    )).toBe(true);
+    expect(applyVrmTwoBoneGrip(
+      reference.vrm,
+      "left",
+      target,
+      0.25,
+      [0, 0, 1],
+      { state: createVrmTwoBoneGripState() }
+    )).toBe(true);
+
+    expectRotationClose(fixture.upperArm.quaternion, reference.upperArm.quaternion);
+    expectRotationClose(fixture.lowerArm.quaternion, reference.lowerArm.quaternion);
+    expectRotationClose(fixture.hand.quaternion, reference.hand.quaternion);
+  });
+
+  it("release는 authored base를 복원하고 이후 외부 포즈는 덮어쓰지 않는다", () => {
+    const fixture = createArmFixture();
+    const state = createVrmTwoBoneGripState();
+    fixture.upperArm.rotation.set(0.1, 0.2, 0.3);
+    fixture.lowerArm.rotation.set(-0.2, 0.1, 0.15);
+    fixture.hand.rotation.set(0.05, -0.08, 0.12);
+    fixture.scene.updateMatrixWorld(true);
+    const authored = [
+      fixture.upperArm.quaternion.clone(),
+      fixture.lowerArm.quaternion.clone(),
+      fixture.hand.quaternion.clone(),
+    ];
+
+    expect(applyVrmTwoBoneGrip(
+      fixture.vrm,
+      "left",
+      new THREE.Vector3(0.9, 1.1, 0.2),
+      0.25,
+      [0, 0, 1],
+      { state }
+    )).toBe(true);
+    expect(releaseVrmTwoBoneGripState(state)).toBe(true);
+    expectRotationClose(fixture.upperArm.quaternion, authored[0]);
+    expectRotationClose(fixture.lowerArm.quaternion, authored[1]);
+    expectRotationClose(fixture.hand.quaternion, authored[2]);
+
+    expect(applyVrmTwoBoneGrip(
+      fixture.vrm,
+      "left",
+      new THREE.Vector3(0.9, 1.1, 0.2),
+      0.25,
+      [0, 0, 1],
+      { state }
+    )).toBe(true);
+    const external = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.4, 0.2, 0.1));
+    fixture.upperArm.quaternion.copy(external);
+    fixture.scene.updateMatrixWorld(true);
+
+    expect(releaseVrmTwoBoneGripState(state)).toBe(false);
+    expectRotationClose(fixture.upperArm.quaternion, external);
   });
 
   it("influence 0은 quaternion과 matrix를 변경하지 않는다", () => {

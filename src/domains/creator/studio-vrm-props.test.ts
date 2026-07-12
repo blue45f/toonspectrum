@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PROP_ATTACH_BONES,
@@ -117,8 +117,8 @@ describe("VRM 소품 카탈로그", () => {
 
   it("핵심 소품 앵커가 geometry의 실제 접촉점과 일치한다", () => {
     expect(propDefById("sword")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0, -0.37, 0]);
-    expect(propDefById("mug")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0.045, 0, 0]);
-    expect(propDefById("medicalBag")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0, 0.09, 0]);
+    expect(propDefById("mug")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0.07, 0, 0]);
+    expect(propDefById("medicalBag")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([0, 0.155, 0]);
     expect(propDefById("umbrella")!.anchors.find((candidate) => candidate.id === "primary")!.position).toEqual([-0.03, -0.35, 0]);
   });
 });
@@ -153,6 +153,40 @@ describe("부착 인스턴스 생성·직렬화", () => {
   it("직렬화 문서는 V2 버전을 명시한다", () => {
     expect(serializeVrmProps([createPropInstance("mug", "v2")!])?.version).toBe(VRM_PROPS_VERSION);
     expect(VRM_PROPS_VERSION).toBe(2);
+  });
+
+  it("저장 후 앱을 다시 연 다음 같은 소품을 추가해도 uid가 충돌하지 않는다", async () => {
+    vi.resetModules();
+    const beforeReload = await import("./studio-vrm-props");
+    const saved = beforeReload.serializeVrmProps([beforeReload.createPropInstance("mug")!])!;
+
+    vi.resetModules();
+    const afterReload = await import("./studio-vrm-props");
+    const loaded = afterReload.parseVrmProps(saved);
+    const added = afterReload.createPropInstance("mug")!;
+
+    expect(loaded.items[0].uid).toBe(saved.items[0].uid);
+    expect(added.uid).not.toBe(loaded.items[0].uid);
+  });
+
+  it("중복·빈 직렬화 uid를 고유한 값으로 재발급하고 첫 유효 uid는 보존한다", () => {
+    const parsed = parseVrmProps({
+      version: VRM_PROPS_VERSION,
+      items: [
+        { propId: "mug", uid: "shared" },
+        { propId: "book", uid: "shared" },
+        { propId: "sword", uid: "" },
+        { propId: "cap", uid: "   " },
+        { propId: "crown", uid: "keep-me" },
+      ],
+    });
+    const uids = parsed.items.map((item) => item.uid);
+
+    expect(uids[0]).toBe("shared");
+    expect(uids[1]).not.toBe("shared");
+    expect(uids[4]).toBe("keep-me");
+    expect(uids.every((uid) => uid.trim().length > 0)).toBe(true);
+    expect(new Set(uids).size).toBe(uids.length);
   });
 
   it("직렬화 라운드트립이 값을 보존한다", () => {
@@ -299,6 +333,30 @@ describe("부착 인스턴스 생성·직렬화", () => {
         elbowHint: [1, -1, 0],
       },
     });
+  });
+
+  it("양손 소품의 누락된 영향도와 스마트 회전을 소품별 안전 기본값으로 복구한다", () => {
+    const parsed = parseVrmProps({
+      version: 2,
+      items: [{
+        uid: "book-safe-defaults",
+        propId: "book",
+        bone: "leftHand",
+        rig: {
+          version: 2,
+          mode: "auto",
+          anchorId: "primary",
+          secondary: {
+            enabled: true,
+            anchorId: "secondary",
+            bone: "rightHand",
+          },
+        },
+      }],
+    });
+
+    expect(parsed.items[0].rig?.secondary?.influence).toBe(0.65);
+    expect(propDefById("book")?.smartRotationDeg).toEqual([0, 0, 90]);
   });
 
   it("V2가 아닌 item rig와 secondary 미지원 소품의 보조점은 제거한다", () => {

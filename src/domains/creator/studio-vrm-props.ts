@@ -94,6 +94,10 @@ export interface PropDef {
   defaultPosition: Vec3;
   /** 기본 회전(오일러, 도). */
   defaultRotationDeg: Vec3;
+  /** V2 palm socket 기준 기본 회전. 없으면 legacy 기본 회전을 그대로 사용한다. */
+  smartRotationDeg?: Vec3;
+  /** 보조 손 IK를 처음 켤 때의 소품별 안전 영향도. */
+  secondaryGripInfluence?: number;
   /** 기본 스케일(배율). */
   defaultScale: number;
   /** 기본 색상(hex). 색상 변경 비대상 소품은 null. */
@@ -116,7 +120,7 @@ const VRM_PROP_BASES = [
   // 손 소품
   { id: "smartphone", label: "스마트폰", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0.03], defaultRotationDeg: [10, 0, 0], defaultScale: 1, defaultColor: "#1c1c22", hint: "셀카·통화 컷에. 회전으로 화면 각도를 잡으세요." },
   { id: "mug", label: "머그컵", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e8e2d6", hint: "카페·일상 컷. 손 안쪽으로 당겨 쥐게 보정하세요." },
-  { id: "sword", label: "검", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1, defaultColor: "#c8ccd4", hint: "액션 컷. 회전 Z로 칼끝 방향을 조절하세요." },
+  { id: "sword", label: "검", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1, defaultColor: "#c8ccd4", hint: "액션 컷. 손바닥 방향에 맞춰 자동 정렬되며 회전 보정으로 칼끝을 다듬을 수 있습니다." },
   { id: "staff", label: "지팡이", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0, 0], defaultRotationDeg: [0, 0, 5], defaultScale: 1, defaultColor: "#8a6a3c", hint: "판타지·마법사 컷에." },
   { id: "mic", label: "마이크", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.02], defaultRotationDeg: [25, 0, 0], defaultScale: 1, defaultColor: "#26262c", hint: "무대·노래 컷. 입 쪽으로 기울이세요." },
   { id: "book", label: "책", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.01, 0.04], defaultRotationDeg: [60, 0, 0], defaultScale: 1, defaultColor: "#7a3b3b", hint: "학원물·독서 컷. 두 손에 각각 얹어도 좋아요." },
@@ -158,7 +162,11 @@ const VRM_PROP_BASES = [
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
 
-type PropProfile = Pick<PropDef, "anchors" | "fit"> & { grip?: PropGripProfile };
+type PropProfile = Pick<PropDef, "anchors" | "fit"> & {
+  grip?: PropGripProfile;
+  smartRotationDeg?: Vec3;
+  secondaryGripInfluence?: number;
+};
 
 const FORWARD: Vec3 = [0, 0, 1];
 const UP: Vec3 = [0, 1, 0];
@@ -190,7 +198,8 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     fit: fit("hand", 0.075, 0.72, 1.4),
   },
   mug: {
-    anchors: [handAnchor("primary", "primary", [0.045, 0, 0], 0.008)],
+    // 손바닥을 고리의 빈 중심이 아니라 바깥쪽 튜브 중심선에 맞춰 컵 본체 관통을 줄인다.
+    anchors: [handAnchor("primary", "primary", [0.07, 0, 0], 0.008)],
     grip: grip("handle", 0.008, 58, 42),
     fit: fit("hand", 0.075, 0.72, 1.45),
   },
@@ -201,6 +210,9 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("cylinder", 0.014, 64, 48),
     fit: fit("avatarHeight", 1.65, 0.72, 1.45),
+    // legacy 본 좌표의 -90° Z 회전은 palm basis에서는 칼날을 카메라 깊이로 향하게 한다.
+    smartRotationDeg: [0, 0, 0],
+    secondaryGripInfluence: 0.82,
   },
   staff: {
     anchors: [
@@ -209,6 +221,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("cylinder", 0.012, 62, 46),
     fit: fit("avatarHeight", 1.65, 0.72, 1.5),
+    secondaryGripInfluence: 0.8,
   },
   mic: {
     anchors: [handAnchor("primary", "primary", [0, -0.025, 0], 0.012)],
@@ -222,6 +235,8 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("support", 0.015, 22, 24),
     fit: fit("hand", 0.075, 0.72, 1.45),
+    smartRotationDeg: [0, 0, 90],
+    secondaryGripInfluence: 0.65,
   },
   fan: {
     anchors: [handAnchor("primary", "primary", [0, -0.1, 0], 0.008)],
@@ -235,6 +250,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("cylinder", 0.025, 55, 42),
     fit: fit("hand", 0.075, 0.72, 1.5),
+    secondaryGripInfluence: 0.7,
   },
   clipboard: {
     anchors: [
@@ -243,6 +259,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("support", 0.012, 24, 28),
     fit: fit("hand", 0.075, 0.72, 1.45),
+    secondaryGripInfluence: 0.65,
   },
   syringe: {
     anchors: [handAnchor("primary", "primary", [0, -0.075, 0], 0.014)],
@@ -250,7 +267,8 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     fit: fit("hand", 0.075, 0.68, 1.4),
   },
   medicalBag: {
-    anchors: [handAnchor("primary", "primary", [0, 0.09, 0], 0.012)],
+    // 반원 손잡이의 빈 중심이 아니라 실제 상단 손잡이 튜브 중심선에 손바닥을 둔다.
+    anchors: [handAnchor("primary", "primary", [0, 0.155, 0], 0.012)],
     grip: grip("handle", 0.012, 60, 44),
     fit: fit("hand", 0.075, 0.72, 1.45),
   },
@@ -275,6 +293,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("handle", 0.008, 60, 44),
     fit: fit("avatarHeight", 1.65, 0.72, 1.5),
+    secondaryGripInfluence: 0.8,
   },
   flute: {
     anchors: [
@@ -283,6 +302,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     ],
     grip: grip("pinch", 0.008, 36, 34),
     fit: fit("hand", 0.075, 0.7, 1.45),
+    secondaryGripInfluence: 0.75,
   },
   wand: {
     anchors: [handAnchor("primary", "primary", [0, -0.1, 0], 0.006)],
@@ -362,10 +382,41 @@ export interface SerializedVrmProps {
 }
 
 let uidCounter = 0;
-/** 결정성 불필요한 UI 인스턴스 키 — 시간+카운터(테스트에서 주입 가능하도록 분리). */
+const issuedPropUids = new Set<string>();
+
+function isValidPropUid(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function secureRandomUuid(): string | null {
+  try {
+    return typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : null;
+  } catch {
+    // 일부 임베디드 WebView는 crypto를 노출해도 호출 시 예외를 던질 수 있다.
+    return null;
+  }
+}
+
+function propUidCandidate(seed?: string): string {
+  uidCounter = (uidCounter + 1) % Number.MAX_SAFE_INTEGER;
+  const prefix = seed?.trim() || "prop";
+  const counter = uidCounter.toString(36);
+  const uuid = secureRandomUuid();
+  if (uuid) return `${prefix}-${uuid}-${counter}`;
+
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 12).padEnd(10, "0");
+  return `${prefix}-${timestamp}-${counter}-${random}`;
+}
+
+/** 저장·재실행 뒤에도 충돌하기 어려운 UI 인스턴스 키(테스트에서는 uid를 직접 주입할 수 있다). */
 export function nextPropUid(seed?: string): string {
-  uidCounter += 1;
-  return seed ? `${seed}-${uidCounter}` : `prop-${Date.now().toString(36)}-${uidCounter}`;
+  let candidate = propUidCandidate(seed);
+  while (issuedPropUids.has(candidate)) candidate = propUidCandidate(seed);
+  issuedPropUids.add(candidate);
+  return candidate;
 }
 
 /** 카탈로그 기본값으로 부착 인스턴스를 생성한다. */
@@ -373,8 +424,10 @@ export function createPropInstance(propId: string, uid?: string): PropInstance |
   const def = propDefById(propId);
   if (!def) return null;
   const primaryAnchor = def.anchors.find((candidate) => candidate.role === "primary" || candidate.role === "surface")!;
+  const instanceUid = uid ?? nextPropUid(propId);
+  if (isValidPropUid(instanceUid)) issuedPropUids.add(instanceUid);
   return {
-    uid: uid ?? nextPropUid(propId),
+    uid: instanceUid,
     propId: def.id,
     bone: def.defaultBone,
     position: def.defaultPosition,
@@ -458,7 +511,7 @@ function parseV2Rig(raw: unknown, def: PropDef, primaryBone: PropAttachBone): Pr
       enabled: bool(input.enabled, false),
       anchorId: (requestedSecondaryAnchor ?? secondaryAnchor).id,
       bone: requestedBone,
-      influence: clamp(input.influence, 1, 0, 1),
+      influence: clamp(input.influence, def.secondaryGripInfluence ?? 0.75, 0, 1),
       ...(Array.isArray(input.elbowHint)
         ? { elbowHint: vec3(input.elbowHint, [0, 0, 0], POS_LIMIT) }
         : {}),
@@ -487,7 +540,17 @@ export function parseVrmProps(raw: unknown): SerializedVrmProps {
   // version이 없거나 V1이면 item 안에 우연히 rig 키가 있어도 절대 새 의미로 해석하지 않는다.
   const parseRig = (raw as { version?: unknown }).version === VRM_PROPS_VERSION;
 
+  // 유효한 기존 UID를 모두 먼저 예약한다. 앞쪽 빈/중복 항목의 재발급 UID가
+  // 뒤쪽 정상 항목의 UID를 선점하지 않게 하면서, 각 UID의 첫 항목은 그대로 보존한다.
+  for (const entry of itemsRaw) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Partial<Record<keyof PropInstance, unknown>>;
+    if (!propDefById(String(e.propId ?? "")) || !isValidPropUid(e.uid)) continue;
+    issuedPropUids.add(e.uid);
+  }
+
   const items: PropInstance[] = [];
+  const seenDocumentUids = new Set<string>();
   for (const entry of itemsRaw) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Partial<Record<keyof PropInstance, unknown>>;
@@ -495,8 +558,11 @@ export function parseVrmProps(raw: unknown): SerializedVrmProps {
     if (!def) continue;
     const bone = isAttachBone(e.bone) ? e.bone : def.defaultBone;
     const rig = parseRig ? parseV2Rig(e.rig, def, bone) : undefined;
+    const preservedUid = isValidPropUid(e.uid) && !seenDocumentUids.has(e.uid) ? e.uid : undefined;
+    const uid = preservedUid ?? nextPropUid(def.id);
+    seenDocumentUids.add(uid);
     items.push({
-      uid: typeof e.uid === "string" && e.uid ? e.uid : nextPropUid(def.id),
+      uid,
       propId: def.id,
       bone,
       position: vec3(e.position, def.defaultPosition, POS_LIMIT),

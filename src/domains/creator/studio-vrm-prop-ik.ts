@@ -5,6 +5,7 @@ import type { VRM } from "@pixiv/three-vrm";
 
 const VECTOR_EPSILON = 1e-8;
 const LENGTH_EPSILON = 1e-6;
+const ROTATION_MATCH_EPSILON = 1e-7;
 
 export type TwoBoneLengths = readonly [upper: number, lower: number];
 
@@ -28,6 +29,45 @@ export interface TwoBoneTargetSolution {
 export interface VrmTwoBoneGripOptions {
   /** 보조 손의 최종 world quaternion. 생략하면 현재 손 local rotation을 보존한다. */
   targetQuaternion?: THREE.Quaternion;
+  /**
+   * 부분 influence를 프레임마다 적용할 때 기준 포즈를 보존하는 재사용 상태.
+   * 같은 제약의 수명 동안 하나를 유지하고, 비활성화·unmount 시 releaseVrmTwoBoneGripState를 호출한다.
+   */
+  state?: VrmTwoBoneGripState;
+}
+
+type GripLocalRotations = readonly [THREE.Quaternion, THREE.Quaternion, THREE.Quaternion];
+
+interface GripBoneBinding {
+  upperArm: THREE.Object3D;
+  lowerArm: THREE.Object3D;
+  hand: THREE.Object3D;
+}
+
+interface VrmTwoBoneGripStateInternal {
+  binding: GripBoneBinding | null;
+  baseRotations: GripLocalRotations | null;
+  appliedRotations: GripLocalRotations | null;
+}
+
+declare const VRM_TWO_BONE_GRIP_STATE_BRAND: unique symbol;
+
+/** createVrmTwoBoneGripState로만 생성하는 불투명한 프레임 지속 상태다. */
+export interface VrmTwoBoneGripState {
+  readonly [VRM_TWO_BONE_GRIP_STATE_BRAND]: true;
+}
+
+const gripStateInternals = new WeakMap<VrmTwoBoneGripState, VrmTwoBoneGripStateInternal>();
+
+/** 부분 influence 제약 하나당 하나씩 생성해 프레임 사이에 재사용한다. */
+export function createVrmTwoBoneGripState(): VrmTwoBoneGripState {
+  const state = {} as VrmTwoBoneGripState;
+  gripStateInternals.set(state, {
+    binding: null,
+    baseRotations: null,
+    appliedRotations: null,
+  });
+  return state;
 }
 
 function isFiniteVector(vector: THREE.Vector3 | null | undefined): vector is THREE.Vector3 {
@@ -194,11 +234,107 @@ function restoreLocalRotations(
   upperArm: THREE.Object3D,
   lowerArm: THREE.Object3D,
   hand: THREE.Object3D,
-  rotations: readonly [THREE.Quaternion, THREE.Quaternion, THREE.Quaternion]
+  rotations: GripLocalRotations
 ) {
   upperArm.quaternion.copy(rotations[0]);
   lowerArm.quaternion.copy(rotations[1]);
   hand.quaternion.copy(rotations[2]);
+}
+
+function captureLocalRotations(binding: GripBoneBinding): GripLocalRotations {
+  return [
+    binding.upperArm.quaternion.clone(),
+    binding.lowerArm.quaternion.clone(),
+    binding.hand.quaternion.clone(),
+  ];
+}
+
+function isSameRotation(left: THREE.Quaternion, right: THREE.Quaternion): boolean {
+  if (!isFiniteQuaternion(left) || !isFiniteQuaternion(right)) return false;
+  const normalizedDot = Math.abs(left.dot(right)) / Math.sqrt(left.lengthSq() * right.lengthSq());
+  return normalizedDot >= 1 - ROTATION_MATCH_EPSILON;
+}
+
+function rotationsMatch(left: GripLocalRotations, right: GripLocalRotations): boolean {
+  return left.every((rotation, index) => isSameRotation(rotation, right[index]));
+}
+
+function bindingMatches(left: GripBoneBinding | null, right: GripBoneBinding): boolean {
+  return left?.upperArm === right.upperArm
+    && left.lowerArm === right.lowerArm
+    && left.hand === right.hand;
+}
+
+/**
+ * 제약이 마지막으로 쓴 포즈가 그대로 남아 있을 때만 기준 포즈를 복원한다.
+ * 그 사이 트래킹·키프레임 시스템이 포즈를 다시 썼다면 최신 외부 포즈를 덮어쓰지 않는다.
+ * 반환값은 실제 기준 포즈를 복원했는지 여부다. 상태 객체는 이후 다시 사용할 수 있다.
+ */
+export function releaseVrmTwoBoneGripState(state: VrmTwoBoneGripState): boolean {
+  const internal = gripStateInternals.get(state);
+  if (!internal) return false;
+
+  let restored = false;
+  if (internal.binding && internal.baseRotations && internal.appliedRotations) {
+    const current = captureLocalRotations(internal.binding);
+    if (rotationsMatch(current, internal.appliedRotations)) {
+      restoreLocalRotations(
+        internal.binding.upperArm,
+        internal.binding.lowerArm,
+        internal.binding.hand,
+        internal.baseRotations
+      );
+      internal.binding.upperArm.updateWorldMatrix(true, true);
+      restored = true;
+    }
+  }
+
+  internal.binding = null;
+  internal.baseRotations = null;
+  internal.appliedRotations = null;
+  return restored;
+}
+
+function resolveGripBaseRotations(
+  state: VrmTwoBoneGripState,
+  binding: GripBoneBinding,
+  current: GripLocalRotations
+): GripLocalRotations | null {
+  const internal = gripStateInternals.get(state);
+  if (!internal) return null;
+
+  if (!bindingMatches(internal.binding, binding)) {
+    releaseVrmTwoBoneGripState(state);
+    internal.binding = binding;
+  }
+
+  // 현재 값이 직전 제약 출력과 같으면 프레임 사이에 보존한 authored base를 재사용한다.
+  if (
+    internal.baseRotations
+    && internal.appliedRotations
+    && rotationsMatch(current, internal.appliedRotations)
+  ) {
+    return internal.baseRotations;
+  }
+
+  // 트래킹/키프레임이 먼저 쓴 새 포즈는 다음 혼합의 새로운 authored base로 승격한다.
+  internal.baseRotations = [
+    current[0].clone(),
+    current[1].clone(),
+    current[2].clone(),
+  ];
+  internal.appliedRotations = null;
+  return internal.baseRotations;
+}
+
+function recordGripOutput(
+  state: VrmTwoBoneGripState | undefined,
+  binding: GripBoneBinding
+) {
+  if (!state) return;
+  const internal = gripStateInternals.get(state);
+  if (!internal || !bindingMatches(internal.binding, binding)) return;
+  internal.appliedRotations = captureLocalRotations(binding);
 }
 
 /**
@@ -222,23 +358,33 @@ export function applyVrmTwoBoneGrip(
   const hand = vrm.humanoid.getNormalizedBoneNode(`${side}Hand`) as THREE.Object3D | null;
   if (!upperArm || !lowerArm || !hand) return false;
 
+  const binding = { upperArm, lowerArm, hand };
+  const original = captureLocalRotations(binding);
+  const base = options.state
+    ? resolveGripBaseRotations(options.state, binding, original) ?? original
+    : original;
+
+  restoreLocalRotations(upperArm, lowerArm, hand, base);
+
   vrm.scene.updateMatrixWorld(true);
   const start = upperArm.getWorldPosition(new THREE.Vector3());
   const currentElbow = lowerArm.getWorldPosition(new THREE.Vector3());
   const currentEnd = hand.getWorldPosition(new THREE.Vector3());
   const pole = vectorFromTuple(elbowHint);
   const solution = solveTwoBoneTarget(start, currentElbow, currentEnd, targetWorld, pole);
-  if (!solution) return false;
-
-  const original = [
-    upperArm.quaternion.clone(),
-    lowerArm.quaternion.clone(),
-    hand.quaternion.clone(),
-  ] as const;
+  if (!solution) {
+    restoreLocalRotations(upperArm, lowerArm, hand, original);
+    vrm.scene.updateMatrixWorld(true);
+    return false;
+  }
 
   try {
     const fullUpper = aimedLocalQuaternion(upperArm, start, currentElbow, solution.elbow);
-    if (!fullUpper || !isFiniteQuaternion(fullUpper)) return false;
+    if (!fullUpper || !isFiniteQuaternion(fullUpper)) {
+      restoreLocalRotations(upperArm, lowerArm, hand, original);
+      vrm.scene.updateMatrixWorld(true);
+      return false;
+    }
     upperArm.quaternion.copy(fullUpper);
     vrm.scene.updateMatrixWorld(true);
 
@@ -253,7 +399,7 @@ export function applyVrmTwoBoneGrip(
     lowerArm.quaternion.copy(fullLower);
     vrm.scene.updateMatrixWorld(true);
 
-    let fullHand = original[2].clone();
+    let fullHand = base[2].clone();
     if (isFiniteQuaternion(options.targetQuaternion)) {
       fullHand = localQuaternionForWorld(hand, options.targetQuaternion.clone().normalize());
     }
@@ -263,12 +409,13 @@ export function applyVrmTwoBoneGrip(
       return false;
     }
 
-    // full 해를 구하기 위해 임시 변형한 뒤 원래 포즈에서 weight만큼 혼합한다.
-    restoreLocalRotations(upperArm, lowerArm, hand, original);
+    // full 해를 구하기 위해 임시 변형한 뒤 authored base에서 weight만큼 한 번만 혼합한다.
+    restoreLocalRotations(upperArm, lowerArm, hand, base);
     upperArm.quaternion.slerp(fullUpper, weight).normalize();
     lowerArm.quaternion.slerp(fullLower, weight).normalize();
     if (isFiniteQuaternion(options.targetQuaternion)) hand.quaternion.slerp(fullHand, weight).normalize();
     vrm.scene.updateMatrixWorld(true);
+    recordGripOutput(options.state, binding);
     return true;
   } catch {
     restoreLocalRotations(upperArm, lowerArm, hand, original);
