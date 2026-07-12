@@ -8820,6 +8820,7 @@ function StudioCuttoonEditor() {
         bundleId: uid(),
         groupId: uid(),
         elementIds: {
+          color: uid(),
           tone: uid(),
           "texture-line": uid(),
           "main-line": uid(),

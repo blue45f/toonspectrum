@@ -154,7 +154,7 @@ export interface StudioBackground3DInsertResult {
   readonly kind: "separated";
   readonly width: number;
   readonly height: number;
-  /** Back-to-front paint order: tone, texture line, main line. */
+  /** Back-to-front paint order: color/tone, texture line, main line. */
   readonly layers: readonly StudioBackground3DLtLayer[];
   /** Flattened fallback for document surfaces that intentionally do not support layer groups. */
   readonly compositePngDataUrl: string;
@@ -460,6 +460,14 @@ function ltTonePreviewStyle(tone: StudioBg3dToneOutputSettings): CSSProperties {
     color: "var(--color-fg-2)",
     opacity: tone.opacity,
   };
+  if (tone.type === "color") {
+    return {
+      ...base,
+      backgroundColor: "var(--color-card)",
+      backgroundImage:
+        "linear-gradient(135deg, var(--color-accent-soft), var(--color-cool))",
+    };
+  }
   if (tone.type === "grayscale" && tone.mode !== "screentone") {
     const stop = Math.round(100 / Math.max(2, tone.levels));
     return {
@@ -498,7 +506,7 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "templates", label: "템플릿", icon: LayoutTemplate, hint: "교실·거리·카페처럼 완성된 공간을 한 번에 추가" },
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
-  { id: "lt", label: "LT", icon: ScanLine, hint: "선화 · 질감선 · 톤 출력 설정" },
+  { id: "lt", label: "LT", icon: ScanLine, hint: "컬러 · 선화 · 톤 출력 설정" },
   { id: "models", label: "모델", icon: PackageOpen, hint: "업로드 · 배치 · 삭제" },
 ];
 
@@ -535,10 +543,16 @@ const CAMERA_PRESETS: Record<string, { label: string; position: [number, number,
 };
 
 const LT_TONE_MODE_LABELS: Record<StudioBg3dToneOutputSettings["mode"], string> = {
-  none: "톤 없음",
-  flat: "평면 명암",
+  none: "베이스 없음 (선만)",
+  flat: "원본 렌더",
   cel: "셀 명암",
   screentone: "스크린톤",
+};
+
+const LT_TONE_TYPE_LABELS: Record<StudioBg3dToneOutputSettings["type"], string> = {
+  color: "재질색 보존",
+  grayscale: "그레이스케일",
+  pattern: "패턴",
 };
 
 const LT_TONE_PATTERN_LABELS: Record<StudioBg3dToneOutputSettings["pattern"], string> = {
@@ -2065,6 +2079,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedCustomModel = customModels.find((m) => m.id === selectedId) ?? null;
   const ltLineSettings = sceneBaseDocument.output.line;
   const ltToneSettings = sceneBaseDocument.output.tone;
+  const hasFilledOutput = ltToneSettings.mode !== "none" && ltToneSettings.opacity > 0;
   const appliedLtPreset = matchingLtPreset(
     ltLineSettings,
     ltToneSettings,
@@ -2117,7 +2132,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               3D 배경
             </p>
             <h2 className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 배경 블록아웃 만들기</h2>
-            <p className="mt-1 line-clamp-1 text-xs text-fg-3">상자·원기둥·평면으로 구조를 잡고 선화로 추출해 패널에 추가</p>
+            <p className="mt-1 line-clamp-1 text-xs text-fg-3">상자·모델로 구조를 잡고 컬러·선화 레이어로 추출해 패널에 추가</p>
           </div>
           <button type="button" aria-label="닫기" title="닫기 (Esc)" className={ICON_BUTTON} onClick={onClose}>
             <X size={17} aria-hidden />
@@ -2843,14 +2858,14 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <ScanLine size={15} className="text-accent" aria-hidden />
-                    LT 변환
+                    렌더/LT 변환
                   </h3>
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-semibold text-fg-3">
                     장면 설정 v1
                   </span>
                 </div>
                 <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
-                  3D 배경의 선화와 톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 좁혀 조정하세요.
+                  3D 배경의 컬러·선화·톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 조정하세요.
                 </p>
 
                 <label htmlFor="bg3d-lt-preset" className="mt-3 block text-xs font-semibold text-fg-2">
@@ -3048,7 +3063,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <div
                   role="group"
                   className="mt-3 rounded-xl border border-line bg-card/55 p-3"
-                  aria-label={`LT 출력 의도: ${ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"}, ${LT_TONE_MODE_LABELS[ltToneSettings.mode]}`}
+                  aria-label={`LT 출력 의도: ${ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"}, ${LT_TONE_MODE_LABELS[ltToneSettings.mode]}, ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-fg">출력 의도 미리보기</span>
@@ -3094,7 +3109,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     </div>
                     <div className="relative h-12 overflow-hidden rounded-lg border border-line/80" style={ltTonePreviewStyle(ltToneSettings)}>
                       {ltToneSettings.mode === "none" ? (
-                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">톤 없음</span>
+                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화만</span>
                       ) : null}
                     </div>
                   </div>
@@ -3106,15 +3121,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       </dd>
                     </div>
                     <div>
-                      <dt className="sr-only">톤 설정</dt>
-                      <dd>{LT_TONE_MODE_LABELS[ltToneSettings.mode]}</dd>
+                      <dt className="sr-only">컬러·톤 설정</dt>
+                      <dd>
+                        {LT_TONE_MODE_LABELS[ltToneSettings.mode]}
+                        {ltToneSettings.mode !== "none" ? ` · ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}` : ""}
+                      </dd>
                     </div>
                   </dl>
                 </div>
 
                 <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
-                  결과는 톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제 벡터
-                  경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.
+                  결과는 컬러/톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제
+                  벡터 경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.
                 </p>
 
                 <div role="group" aria-label="LT 세부 설정" className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-card p-1">
@@ -3133,7 +3151,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         )}
                         onClick={() => setLtEditorSection(section)}
                       >
-                        {section === "line" ? "선화" : "톤"}
+                        {section === "line" ? "선화" : "컬러·톤"}
                       </button>
                     );
                   })}
@@ -3310,12 +3328,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
                 <div hidden={ltEditorSection !== "tone"} className="mt-3">
                   <label htmlFor="bg3d-lt-tone-mode" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                    톤 방식
+                    베이스 방식
                     <select
                       id="bg3d-lt-tone-mode"
                       value={ltToneSettings.mode}
                       className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
-                      onChange={(event) => updateLtToneSettings({ mode: event.target.value as StudioBg3dToneOutputSettings["mode"] })}
+                      onChange={(event) => {
+                        const mode = event.target.value as StudioBg3dToneOutputSettings["mode"];
+                        updateLtToneSettings({
+                          mode,
+                          ...(mode === "screentone" ? { type: "pattern" as const } : {}),
+                        });
+                      }}
                     >
                       {Object.entries(LT_TONE_MODE_LABELS).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
@@ -3325,7 +3349,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
                   {ltToneSettings.mode === "none" ? (
                     <p className="py-4 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                      톤이 꺼져 있습니다. 위에서 명암 또는 스크린톤 방식을 선택하면 세부 조절이 열립니다.
+                      베이스가 꺼져 선만 출력됩니다. 위에서 원본 렌더·셀 명암·스크린톤을 선택하면 채움
+                      레이어 설정이 열립니다.
                     </p>
                   ) : (
                     <>
@@ -3337,8 +3362,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                           className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
                           onChange={(event) => updateLtToneSettings({ type: event.target.value as StudioBg3dToneOutputSettings["type"] })}
                         >
-                          <option value="grayscale">그레이스케일</option>
-                          <option value="pattern">패턴</option>
+                          {Object.entries(LT_TONE_TYPE_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
                         </select>
                       </label>
                       {ltToneSettings.type === "pattern" || ltToneSettings.mode === "screentone" ? (
@@ -3368,7 +3394,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       />
                       <LtRangeControl
                         id="bg3d-lt-tone-opacity"
-                        label="톤 농도"
+                        label="베이스 농도"
                         min={0}
                         max={1}
                         step={0.01}
@@ -3528,6 +3554,28 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               </div>
             ) : null}
 
+            {!hasFilledOutput && !isRestoringScene ? (
+              <div
+                role="status"
+                className="mx-4 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warn/45 bg-[oklch(0.82_0.15_80/0.08)] px-3 py-2 text-xs leading-relaxed text-fg sm:mx-5"
+              >
+                <span className="flex min-w-0 flex-1 items-start gap-2">
+                  <AlertTriangle className="mt-0.5 shrink-0 text-warn" size={14} aria-hidden />
+                  <span>현재 설정은 재질색과 명암을 빼고 선화만 추가합니다.</span>
+                </span>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-lg border border-warn/55 bg-panel px-3 text-xs font-bold text-warn transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
+                  onClick={() => {
+                    updateLtToneSettings({ mode: "flat", type: "color", opacity: 1 });
+                    setLtEditorSection("tone");
+                  }}
+                >
+                  컬러 렌더 켜기
+                </button>
+              </div>
+            ) : null}
+
             {error ? (
               <div className="mx-4 mb-2 flex items-start gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg-2 sm:mx-5">
                 <AlertTriangle className="mt-0.5 shrink-0 text-accent" size={14} aria-hidden />
@@ -3546,7 +3594,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 onClick={handleInsert}
               >
                 {isCapturing || isRestoringScene || hasPendingClone ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
-                {initialScene || initialDataUrl ? "3D 배경 업데이트" : "이 배경으로 추가"}
+                {initialScene || initialDataUrl
+                  ? "3D 배경 업데이트"
+                  : !hasFilledOutput
+                    ? "선화만 추가"
+                    : ltToneSettings.type === "color"
+                      ? "컬러 배경 추가"
+                      : "톤 배경 추가"}
               </button>
             </footer>
           </aside>

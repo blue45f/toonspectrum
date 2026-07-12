@@ -53,7 +53,7 @@ describe("Studio BG3D LT built-in presets", () => {
       "깔끔한 건축 선화",
       "흑백 만화",
       "거친 펜",
-      "컬러 웹툰 밑선",
+      "컬러 웹툰 배경",
     ]);
     expect(Object.isFrozen(STUDIO_BG3D_LT_BUILT_IN_PRESETS)).toBe(true);
     for (const preset of STUDIO_BG3D_LT_BUILT_IN_PRESETS) {
@@ -70,6 +70,10 @@ describe("Studio BG3D LT built-in presets", () => {
       expect(applied?.output.line).toEqual(preset.line);
       expect(applied?.output.tone).toEqual(preset.tone);
     }
+    expect(STUDIO_BG3D_LT_BUILT_IN_PRESETS.at(-1)?.tone).toMatchObject({
+      mode: "flat",
+      type: "color",
+    });
   });
 
   it("returns stable built-in identities and never allows a user payload to shadow them", () => {

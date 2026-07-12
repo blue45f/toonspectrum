@@ -38,7 +38,7 @@ export type StudioBg3dSkyPresetId = "blank" | "clear_day" | "sunset" | "night";
 export type StudioBg3dToneMapping = "none" | "neutral" | "aces";
 export type StudioBg3dToneMode = "none" | "flat" | "cel" | "screentone";
 export type StudioBg3dLineLayerType = "raster" | "vector";
-export type StudioBg3dToneOutputType = "grayscale" | "pattern";
+export type StudioBg3dToneOutputType = "color" | "grayscale" | "pattern";
 export type StudioBg3dTonePattern = "dot" | "line" | "crosshatch" | "noise";
 export type StudioBg3dAttachmentSource = "upload" | "local-library" | "bundled";
 export type StudioBg3dRightsStatus = "owned" | "licensed" | "public-domain" | "unknown";
@@ -314,7 +314,7 @@ const SKY_PRESET_SET = new Set<string>(["blank", "clear_day", "sunset", "night"]
 const TONE_MAPPING_SET = new Set<string>(["none", "neutral", "aces"]);
 const TONE_MODE_SET = new Set<string>(["none", "flat", "cel", "screentone"]);
 const LINE_LAYER_TYPE_SET = new Set<string>(["raster", "vector"]);
-const TONE_OUTPUT_TYPE_SET = new Set<string>(["grayscale", "pattern"]);
+const TONE_OUTPUT_TYPE_SET = new Set<string>(["color", "grayscale", "pattern"]);
 const TONE_PATTERN_SET = new Set<string>(["dot", "line", "crosshatch", "noise"]);
 const ATTACHMENT_SOURCE_SET = new Set<string>(["upload", "local-library", "bundled"]);
 const RIGHTS_STATUS_SET = new Set<string>(["owned", "licensed", "public-domain", "unknown"]);
@@ -401,8 +401,12 @@ const DEFAULT_RAW_DOCUMENT = {
       hiddenLineRemoval: true,
     },
     tone: {
-      mode: "none",
-      type: "grayscale",
+      // A 3D background should look like the shaded viewport when it is first inserted. Earlier
+      // defaults disabled this layer, so the LT exporter truthfully emitted only edge rasters and
+      // users saw an apparently broken wireframe. Dedicated line-art presets can still opt into
+      // `none`; the general-purpose default preserves the rendered material colors.
+      mode: "flat",
+      type: "color",
       pattern: "dot",
       levels: 4,
       opacity: 1,
@@ -775,8 +779,8 @@ function normalizeOutput(value: unknown): StudioBg3dOutputSettings {
       hiddenLineRemoval: normalizedBoolean(line.hiddenLineRemoval, true),
     },
     tone: {
-      mode: normalizedEnum(tone.mode, TONE_MODE_SET, "none"),
-      type: normalizedEnum(tone.type, TONE_OUTPUT_TYPE_SET, "grayscale"),
+      mode: normalizedEnum(tone.mode, TONE_MODE_SET, "flat"),
+      type: normalizedEnum(tone.type, TONE_OUTPUT_TYPE_SET, "color"),
       pattern: normalizedEnum(tone.pattern, TONE_PATTERN_SET, "dot"),
       levels: boundedInteger(tone.levels, 4, 2, 8),
       opacity: boundedNumber(tone.opacity, 1, 0, 1),

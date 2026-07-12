@@ -33,6 +33,7 @@ interface TestOther extends StudioBg3dLtPageElementLike {
 type TestElement = TestImage | TestOther;
 
 const PNG = {
+  color: "data:image/png;base64,Q09MT1I=",
   main: "data:image/png;base64,TUFJTg==",
   texture: "data:image/png;base64,VEVYVA==",
   tone: "data:image/png;base64,VE9ORQ==",
@@ -66,6 +67,7 @@ function separated(
   height = 500
 ): StudioBg3dLtRenderOutput<TestScene> {
   const srcByRole: Record<StudioBg3dLtLayerRole, string> = {
+    color: PNG.color,
     "main-line": PNG.main,
     "texture-line": PNG.texture,
     tone: PNG.tone,
@@ -92,6 +94,7 @@ function allocations(overrides: {
     bundleId: "bundle-new",
     groupId: "group-new",
     elementIds: {
+      color: "layer-color-new",
       tone: "layer-tone-new",
       "texture-line": "layer-texture-new",
       "main-line": "layer-main-new",
@@ -127,6 +130,7 @@ function bundleImage(
   overrides: Partial<TestImage> = {}
 ): TestImage {
   const srcByRole: Record<StudioBg3dLtLayerRole, string> = {
+    color: PNG.color,
     "main-line": PNG.main,
     "texture-line": PNG.texture,
     tone: PNG.tone,
@@ -174,6 +178,33 @@ describe("3D LT PNG persistence boundary", () => {
 });
 
 describe("planStudioBg3dLtLayers insertion and fallback", () => {
+  it("keeps the shaded color render behind LT lines and classifies it as a color layer", () => {
+    const result = unwrap(
+      planStudioBg3dLtLayers<TestElement, TestScene>({
+        elements: [],
+        groups: [],
+        render: separated(["main-line", "color", "texture-line"]),
+        allocations: allocations(),
+        newElementTemplate: template(),
+      })
+    );
+
+    expect(result.layers.map((layer) => layer.role)).toEqual([
+      "color",
+      "texture-line",
+      "main-line",
+    ]);
+    expect(result.nextElements.map((element) => element.id)).toEqual([
+      "layer-color-new",
+      "layer-texture-new",
+      "layer-main-new",
+    ]);
+    expect((result.nextElements[0] as TestImage).layerRole).toBe("color");
+    expect((result.nextElements[0] as TestImage).name).toBe(
+      STUDIO_BG3D_LT_LAYER_NAMES.color
+    );
+  });
+
   it("inserts separated layers in deterministic back-to-front order with one scene anchor", () => {
     const unrelated = other("unrelated");
     const unrelatedGroup = group("unrelated-group", "대사");

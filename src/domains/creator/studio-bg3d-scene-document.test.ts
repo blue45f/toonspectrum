@@ -95,6 +95,7 @@ describe("Studio BG3D scene document defaults", () => {
     expect(document.quality.mobile.targetFps).toBe(30);
     expect(document.output.line.layerType).toBe("raster");
     expect(document.output.line.hiddenLineRemoval).toBe(true);
+    expect(document.output.tone).toMatchObject({ mode: "flat", type: "color", opacity: 1 });
     expect(document.budgets.complexity.maxNodes).toBe(256);
     expect(Object.isFrozen(document)).toBe(true);
     expect(Object.isFrozen(document.camera.position)).toBe(true);
@@ -114,6 +115,30 @@ describe("Studio BG3D scene document defaults", () => {
 });
 
 describe("Studio BG3D scene document normalization", () => {
+  it("round-trips the material-color output type without degrading it to grayscale", () => {
+    const candidate = currentDocument({
+      output: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output,
+        tone: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone,
+          mode: "cel",
+          type: "color",
+          levels: 5,
+        },
+      },
+    });
+    const serialized = serializeStudioBg3dSceneDocument(
+      candidate as unknown as StudioBg3dSceneDocument
+    );
+
+    expect(serialized).not.toBeNull();
+    expect(parseStudioBg3dSceneDocument(serialized!)?.output.tone).toMatchObject({
+      mode: "cel",
+      type: "color",
+      levels: 5,
+    });
+  });
+
   it("round-trips all current engine-neutral settings and strips unknown fields", () => {
     const normalized = normalizeStudioBg3dSceneDocument(
       currentDocument({
@@ -307,7 +332,7 @@ describe("Studio BG3D scene document normalization", () => {
       creaseAngleDegrees: 0,
     });
     expect(normalized.output.tone).toMatchObject({
-      type: "grayscale",
+      type: "color",
       pattern: "dot",
       levels: 8,
       opacity: 0,

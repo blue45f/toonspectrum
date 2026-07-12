@@ -398,8 +398,8 @@ const BUILT_IN_PRESET_INPUTS = [
   {
     id: "color-webtoon-underdrawing",
     version: 1,
-    name: "컬러 웹툰 밑선",
-    description: "채색 위에서 과하게 튀지 않는 얇고 부드러운 청회색 보조 선화입니다.",
+    name: "컬러 웹툰 배경",
+    description: "3D 재질색과 조명을 보존하고 얇은 청회색 선을 더하는 컬러 배경 설정입니다.",
     line: {
       enabled: true,
       layerType: "raster",
@@ -419,8 +419,8 @@ const BUILT_IN_PRESET_INPUTS = [
       hiddenLineRemoval: true,
     },
     tone: {
-      mode: "none",
-      type: "grayscale",
+      mode: "flat",
+      type: "color",
       pattern: "dot",
       levels: 4,
       opacity: 1,

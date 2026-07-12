@@ -17,7 +17,7 @@ import type {
 
 export const STUDIO_BG3D_LT_RENDER_MAX_PIXELS = 8_388_608;
 
-export type StudioBg3dLtRasterLayerRole = "main-line" | "texture-line" | "tone";
+export type StudioBg3dLtRasterLayerRole = "color" | "main-line" | "texture-line" | "tone";
 
 export interface StudioBg3dLtRasterInput {
   readonly width: number;
@@ -74,7 +74,7 @@ interface ValidatedRgbaShape {
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/u;
 const LINE_LAYER_TYPE_SET = new Set(["raster", "vector"]);
 const TONE_MODE_SET = new Set(["none", "flat", "cel", "screentone"]);
-const TONE_TYPE_SET = new Set(["grayscale", "pattern"]);
+const TONE_TYPE_SET = new Set(["color", "grayscale", "pattern"]);
 const TONE_PATTERN_SET = new Set(["dot", "line", "crosshatch", "noise"]);
 
 function isByteArray(value: unknown): value is Uint8Array | Uint8ClampedArray {
@@ -546,7 +546,7 @@ function patternRank(
   return Math.min(1, Math.PI * (dx * dx + dy * dy));
 }
 
-function renderToneLayer(
+function renderFillLayer(
   input: ValidatedInput,
   luminance: Float32Array,
   tone: StudioBg3dToneOutputSettings
@@ -567,6 +567,26 @@ function renderToneLayer(
       if (sourceAlpha === 0) continue;
       const gray = quantizedLuminance(luminance[index], tone);
       const offset = index * 4;
+      if (tone.type === "color") {
+        const alpha = Math.round(sourceAlpha * tone.opacity);
+        if (alpha < 1) continue;
+        if (tone.mode === "cel") {
+          // Quantize lightness while retaining the captured material hue. Scaling all channels by
+          // the same factor avoids the RGB channel posterization that tends to create false hues.
+          const sourceLuminance = Math.max(1 / 255, luminance[index]);
+          const lightnessScale = gray / sourceLuminance;
+          data[offset] = Math.round(clamp01((byteAt(input.rgba, index, 0) / 255) * lightnessScale) * 255);
+          data[offset + 1] = Math.round(clamp01((byteAt(input.rgba, index, 1) / 255) * lightnessScale) * 255);
+          data[offset + 2] = Math.round(clamp01((byteAt(input.rgba, index, 2) / 255) * lightnessScale) * 255);
+        } else {
+          data[offset] = byteAt(input.rgba, index, 0);
+          data[offset + 1] = byteAt(input.rgba, index, 1);
+          data[offset + 2] = byteAt(input.rgba, index, 2);
+        }
+        data[offset + 3] = alpha;
+        hasTone = true;
+        continue;
+      }
       if (tone.type === "grayscale") {
         const grayByte = Math.round(gray * 255);
         const alpha = Math.round(sourceAlpha * tone.opacity);
@@ -589,7 +609,9 @@ function renderToneLayer(
       hasTone = true;
     }
   }
-  return hasTone ? { role: "tone", width: input.width, height: input.height, data } : null;
+  return hasTone
+    ? { role: tone.type === "color" ? "color" : "tone", width: input.width, height: input.height, data }
+    : null;
 }
 
 /**
@@ -625,9 +647,11 @@ export function renderStudioBg3dLtLayers(
     }
   }
 
-  const toneLayer = renderToneLayer(input, luminance, settings.tone);
+  const fillLayer = renderFillLayer(input, luminance, settings.tone);
   const layers: StudioBg3dLtRasterLayer[] = [];
-  if (toneLayer) layers.push(toneLayer);
+  // The base render is always the backmost layer. A color output deliberately uses its own role so
+  // Studio can classify it as editable color rather than misleadingly labelling it as screentone.
+  if (fillLayer) layers.push(fillLayer);
   if (textureLayer) layers.push(textureLayer);
   if (mainLayer) layers.push(mainLayer);
   return { width: input.width, height: input.height, layers };

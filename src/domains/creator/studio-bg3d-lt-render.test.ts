@@ -135,7 +135,14 @@ function settings(
       textureLineEnabled: false,
       ...line,
     },
-    tone: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone, ...tone },
+    // Most tests exercise an isolated line/tone branch. Opt out of the product default color
+    // base unless the case explicitly requests it.
+    tone: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone,
+      mode: "none",
+      type: "grayscale",
+      ...tone,
+    },
   };
 }
 
@@ -170,7 +177,7 @@ function alphaCount(data: Uint8ClampedArray): number {
 
 function layerData(
   result: ReturnType<typeof renderStudioBg3dLtLayers>,
-  role: "main-line" | "texture-line" | "tone"
+  role: "color" | "main-line" | "texture-line" | "tone"
 ): Uint8ClampedArray {
   const layer = result.layers.find((candidate) => candidate.role === role);
   if (!layer) throw new Error(`Expected ${role} layer.`);
@@ -178,6 +185,46 @@ function layerData(
 }
 
 describe("renderStudioBg3dLtLayers", () => {
+  it("preserves the shaded material capture as the default backmost color layer", () => {
+    const input = image(2, 1, (x) =>
+      x === 0 ? [214, 86, 52, 255] : [48, 126, 184, 128]
+    );
+    const result = renderStudioBg3dLtLayers(input, {
+      line: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.line, enabled: false },
+      tone: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone,
+    });
+
+    expect(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone).toMatchObject({
+      mode: "flat",
+      type: "color",
+      opacity: 1,
+    });
+    expect(result.layers.map((layer) => layer.role)).toEqual(["color"]);
+    expect(layerData(result, "color")).toEqual(input.rgba);
+    expect(layerData(result, "color")).not.toBe(input.rgba);
+  });
+
+  it("keeps color hue and source alpha while applying cel lightness and opacity", () => {
+    const input = image(2, 1, (x) =>
+      x === 0 ? [180, 60, 30, 200] : [30, 90, 180, 100]
+    );
+    const result = renderStudioBg3dLtLayers(
+      input,
+      settings(
+        { enabled: false },
+        { mode: "cel", type: "color", levels: 3, opacity: 0.5 }
+      )
+    );
+    const output = layerData(result, "color");
+
+    expect(output[3]).toBe(100);
+    expect(output[7]).toBe(50);
+    expect(output[0]).toBeGreaterThan(output[1]);
+    expect(output[1]).toBeGreaterThan(output[2]);
+    expect(output[6]).toBeGreaterThan(output[5]);
+    expect(output[5]).toBeGreaterThan(output[4]);
+  });
+
   it("returns a deterministic main line for a luminance boundary", () => {
     const input = splitImage();
     const options = settings({ strength: 1, accuracy: 1, smoothing: 0 });

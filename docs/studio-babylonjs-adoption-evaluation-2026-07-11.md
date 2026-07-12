@@ -21,7 +21,7 @@ Babylon.js는 WebGPU, 성능 계측, AssetContainer, 다양한 로더와 대규�
 
 - 프리미티브, 복합 오브젝트, 완성형 씬 템플릿
 - 위치/회전/크기 기즈모, 카메라 프리셋, 선화 미리보기
-- `.glb`, `.gltf`, `.obj` 업로드와 IndexedDB 모델 라이브러리
+- 신규 사용자 업로드는 외부 참조가 없는 자체 포함 `.glb` 2.0만 허용하며, 검증을 통과한 모델을 IndexedDB 라이브러리에 저장
 - 동일 모델 재배치 시 씬그래프만 복제하고 geometry/material을 공유하는 캐시
 - 도형과 커스텀 모델을 함께 다루는 undo/redo
 - 투명 PNG 캡처와 PNG hash에 씬 메타데이터를 넣는 재편집 round-trip
@@ -42,7 +42,7 @@ Babylon 문서의 VRM 통합은 [community extension과 외부 `babylon-vrm-load
 
 ### 로딩 구조
 
-`StudioPage.tsx`는 `StudioBackground3D`와 `StudioVrmPoser`를 각각 `lazyRetry()`로 지연 로드한다. GLTF/OBJ/three-vrm도 사용 시점에 동적 import한다. 다만 `IntroSplash.tsx`가 Three.js를 정적 import하므로 Three 코어의 상당 부분은 현재 앱 진입 chunk에 포함된다. Babylon을 3D 배경에만 도입하면 VRM과 인트로 때문에 Three를 제거할 수 없고, 두 엔진의 코드/파싱/캐시 비용이 공존한다.
+`StudioPage.tsx`는 `StudioBackground3D`와 `StudioVrmPoser`를 각각 `lazyRetry()`로 지연 로드한다. 내부 호환 코드에 GLTF/OBJ loader가 남아 있어도 현재 검증된 신규 업로드 UI는 자체 포함 GLB 2.0만 노출하며, three-vrm은 사용 시점에 동적 import한다. 다만 `IntroSplash.tsx`가 Three.js를 정적 import하므로 Three 코어의 상당 부분은 현재 앱 진입 chunk에 포함된다. Babylon을 3D 배경에만 도입하면 VRM과 인트로 때문에 Three를 제거할 수 없고, 두 엔진의 코드/파싱/캐시 비용이 공존한다.
 
 ## 공식 기능 적합성
 

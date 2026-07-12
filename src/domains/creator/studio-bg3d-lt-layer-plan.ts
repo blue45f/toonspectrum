@@ -9,7 +9,7 @@
 
 import { createLayerGroup, type LayerGroup } from "./studio-layers";
 
-export const STUDIO_BG3D_LT_LAYER_ROLES = ["tone", "texture-line", "main-line"] as const;
+export const STUDIO_BG3D_LT_LAYER_ROLES = ["color", "tone", "texture-line", "main-line"] as const;
 
 /** Back-to-front order. The last available role is the editable-scene anchor. */
 export type StudioBg3dLtLayerRole = (typeof STUDIO_BG3D_LT_LAYER_ROLES)[number];
@@ -18,6 +18,7 @@ export const STUDIO_BG3D_LT_GROUP_NAME = "3D LT 배경";
 
 export const STUDIO_BG3D_LT_LAYER_NAMES: Readonly<Record<StudioBg3dLtLayerRole, string>> =
   Object.freeze({
+    color: "3D LT · 컬러 렌더",
     "main-line": "3D LT · 주선",
     "texture-line": "3D LT · 질감선",
     tone: "3D LT · 톤",
@@ -545,7 +546,7 @@ function makeLayerElement<
   setOptionalTransform(next, "skewY", geometry.skewY, 0);
   next.groupId = groupId;
   next.name = STUDIO_BG3D_LT_LAYER_NAMES[layer.role];
-  next.layerRole = layer.role === "tone" ? "tone" : "lineart";
+  next.layerRole = layer.role === "color" ? "color" : layer.role === "tone" ? "tone" : "lineart";
   next.bg3dLtBundleId = bundleId;
   next.bg3dLtRole = layer.role;
   next.bg3dLtRenderMode = mode;
