@@ -25,7 +25,17 @@
  * 콜러(StudioPage) 몫이다. 사용자 노출 문자열은 한글.
  */
 
-import { gpenSegmentWidths, processFreehandPoints, processPencilPoints, screentoneDotRadius, screentoneDotsForStroke } from "./studio-brush";
+import {
+  buildCalligraphySegments,
+  gpenSegmentWidths,
+  processFreehandPoints,
+  processPencilPoints,
+  resampleStrokePressures,
+  screentoneDotRadius,
+  screentoneDotsForStroke,
+  type CalligraphyStylusInput,
+  type CalligraphyTipSettings,
+} from "./studio-brush";
 import {
   bubblePathData,
   bubblePathDataMulti,
@@ -203,6 +213,10 @@ export interface SvgDrawElLike extends SvgElMeta {
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
+  tiltXs?: number[];
+  tiltYs?: number[];
+  twists?: number[];
+  brushTip?: CalligraphyTipSettings;
   strokeStyle?: StrokeStyle;
   shapeParams?: ShapeParams;
   symmetry?: {
@@ -729,6 +743,38 @@ function serializeFreehand(
 ): string {
   const brush = el.brush ?? "pen";
 
+  if (brush === "calligraphy") {
+    const smoothed = processFreehandPoints(points);
+    if (smoothed.length < 2) return "";
+    const sourcePointCount = Math.floor(points.length / 2);
+    const sampleCount = Math.min(
+      sourcePointCount,
+      Math.max(el.tiltXs?.length ?? 0, el.tiltYs?.length ?? 0, el.twists?.length ?? 0)
+    );
+    const stylusSamples: CalligraphyStylusInput[] = Array.from(
+      { length: sampleCount },
+      (_, sampleIndex) => ({
+        pointerType: "pen",
+        tiltX: el.tiltXs?.[sampleIndex],
+        tiltY: el.tiltYs?.[sampleIndex],
+        twist: el.twists?.[sampleIndex],
+      })
+    );
+    const segments = buildCalligraphySegments(
+      smoothed,
+      el.pressures,
+      stylusSamples,
+      strokeWidth,
+      el.brushTip
+    );
+    if (segments.length === 0) {
+      return `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.5, strokeWidth * 0.18))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+    }
+    return `<g${opacityAttr}>${segments.map((segment) => (
+      `<path d="M ${fmt(segment.x0)} ${fmt(segment.y0)} L ${fmt(segment.x1)} ${fmt(segment.y1)}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(segment.width)}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    )).join("")}</g>`;
+  }
+
   if (brush === "brush") {
     // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
     const smoothed = processFreehandPoints(points);
@@ -758,11 +804,7 @@ function serializeFreehand(
     const smoothed = processFreehandPoints(points);
     const segmentCount = Math.floor(smoothed.length / 2);
     const rawPressures = el.pressures ?? [];
-    const sampled = Array.from({ length: segmentCount }, (_, i) => {
-      if (rawPressures.length === 0) return 0.6;
-      const idx = segmentCount <= 1 ? 0 : Math.round((i / (segmentCount - 1)) * (rawPressures.length - 1));
-      return rawPressures[idx] ?? 0.6;
-    });
+    const sampled = resampleStrokePressures(rawPressures, segmentCount, 0.6);
     const widths = gpenSegmentWidths(sampled, strokeWidth);
     const segs: string[] = [];
     for (let i = 2; i < smoothed.length; i += 2) {
@@ -803,9 +845,10 @@ function serializeFreehand(
   const smoothed = processFreehandPoints(points);
   const pressures = el.pressures;
   if (pressures && pressures.length > 0 && smoothed.length >= 4) {
+    const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
     const segs: string[] = [];
     for (let i = 2; i < smoothed.length; i += 2) {
-      const p = pressures[Math.floor(i / 2)] ?? 0.5;
+      const p = sampledPressures[Math.floor(i / 2)] ?? 0.5;
       const w = Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
       segs.push(
         `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`

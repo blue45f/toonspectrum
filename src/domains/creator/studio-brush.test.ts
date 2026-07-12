@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   BRUSH_PRESETS,
   STABILIZER_MAX,
+  buildCalligraphySegments,
   gpenSegmentWidths,
+  normalizeCalligraphyStylusInput,
   polylineLength,
   processFreehandPoints,
   processPencilPoints,
+  resampleStrokePressures,
+  resolveBrushPressureSample,
+  sanitizeCalligraphyTipSettings,
   screentoneDotRadius,
   screentoneDotsForStroke,
   shouldAppendStrokePoint,
@@ -15,12 +20,17 @@ import {
 } from "./studio-brush";
 
 describe("BRUSH_PRESETS", () => {
-  it("includes the new G-pen and screentone brushes while keeping legacy ids", () => {
+  it("includes G-pen, tilt calligraphy and screentone while keeping legacy ids", () => {
     const ids = BRUSH_PRESETS.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const required of ["pen", "gpen", "marker", "highlighter", "brush", "pencil", "screentone"]) {
+    for (const required of ["pen", "gpen", "calligraphy", "marker", "highlighter", "brush", "pencil", "screentone"]) {
       expect(ids).toContain(required);
     }
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "calligraphy")).toMatchObject({
+      name: "캘리그래피(펜 기울기)",
+      defaultWidth: 12,
+      defaultOpacity: 1,
+    });
   });
 
   it("defines sane defaults for every preset", () => {
@@ -30,6 +40,204 @@ describe("BRUSH_PRESETS", () => {
       expect(preset.defaultOpacity).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("캘리그래피 스타일러스 정규화", () => {
+  it("clamps pen tilt/twist to finite PointerEvent ranges", () => {
+    expect(
+      normalizeCalligraphyStylusInput({ pointerType: "PEN", tiltX: 120, tiltY: -140, twist: 720 })
+    ).toEqual({
+      pointerType: "pen",
+      tiltX: 90,
+      tiltY: -90,
+      twist: 359,
+      hasTilt: true,
+    });
+    expect(normalizeCalligraphyStylusInput({ pointerType: "pen", tiltX: Number.NaN, twist: Infinity })).toEqual({
+      pointerType: "pen",
+      tiltX: 0,
+      tiltY: 0,
+      twist: 0,
+      hasTilt: false,
+    });
+  });
+
+  it("preserves valid hardware tilt and twist", () => {
+    expect(normalizeCalligraphyStylusInput({ pointerType: "pen", tiltX: 30, tiltY: 40, twist: 123 })).toEqual({
+      pointerType: "pen",
+      tiltX: 30,
+      tiltY: 40,
+      twist: 123,
+      hasTilt: true,
+    });
+  });
+
+  it("uses a safe no-tilt fallback for mouse, touch and unsupported input", () => {
+    const fallback = { tiltX: 0, tiltY: 0, twist: 0, hasTilt: false };
+    expect(normalizeCalligraphyStylusInput({ pointerType: "mouse", tiltX: 50, tiltY: 20, twist: 90 })).toEqual({
+      pointerType: "mouse",
+      ...fallback,
+    });
+    expect(normalizeCalligraphyStylusInput({ pointerType: "touch", tiltX: -20 })).toEqual({
+      pointerType: "touch",
+      ...fallback,
+    });
+    expect(normalizeCalligraphyStylusInput(undefined)).toEqual({ pointerType: "unknown", ...fallback });
+  });
+
+  it("sanitizes manual tip fallback settings", () => {
+    expect(sanitizeCalligraphyTipSettings({ tiltEnabled: false, angleDeg: -45, roundness: 5 })).toEqual({
+      tiltEnabled: false,
+      angleDeg: 315,
+      roundness: 1,
+    });
+    const malformed = sanitizeCalligraphyTipSettings({ angleDeg: Number.NaN, roundness: Number.NaN });
+    expect(malformed).toEqual({ tiltEnabled: true, angleDeg: 45, roundness: 0.32 });
+  });
+});
+
+describe("resolveBrushPressureSample", () => {
+  it.each([0.2, 0.5, 0.9])("prioritizes valid pen hardware pressure %s over velocity fallback", (pressure) => {
+    expect(
+      resolveBrushPressureSample({
+        pointerType: "pen",
+        rawPressure: pressure,
+        distance: 28,
+        velocityFallbackEnabled: true,
+        velocitySensitivity: 1,
+        pressureCurve: 1,
+      })
+    ).toBeCloseTo(pressure, 10);
+  });
+
+  it("does not mistake the conventional mouse 0.5 for hardware pressure", () => {
+    expect(
+      resolveBrushPressureSample({
+        pointerType: "mouse",
+        rawPressure: 0.5,
+        distance: 28,
+        velocityFallbackEnabled: true,
+        velocitySensitivity: 1,
+        pressureCurve: 1,
+      })
+    ).toBeCloseTo(0.25, 10);
+  });
+
+  it("falls back safely for NaN/out-of-range pressure and clamps the result", () => {
+    const invalidSamples = [Number.NaN, Infinity, -0.1, 1.1];
+    for (const rawPressure of invalidSamples) {
+      const result = resolveBrushPressureSample({
+        pointerType: "pen",
+        rawPressure,
+        distance: 14,
+        velocityFallbackEnabled: true,
+        velocitySensitivity: 0.8,
+      });
+      expect(result).toBeCloseTo(0.7, 10);
+      expect(Number.isFinite(result)).toBe(true);
+    }
+    expect(resolveBrushPressureSample({ pointerType: "touch", fallbackPressure: 9 })).toBe(1);
+  });
+
+  it("applies the pressure curve only after resolving and clamping the base sample", () => {
+    expect(resolveBrushPressureSample({ pointerType: "pen", rawPressure: 0.5, pressureCurve: 2 })).toBeCloseTo(0.25, 10);
+    expect(resolveBrushPressureSample({ pointerType: "mouse", fallbackPressure: 0.5, pressureCurve: 0.5 })).toBeCloseTo(
+      Math.sqrt(0.5),
+      10
+    );
+  });
+});
+
+describe("resampleStrokePressures", () => {
+  it("linearly resamples monotonically while preserving endpoints", () => {
+    const result = resampleStrokePressures([0.1, 0.5, 0.9], 5);
+    expect(result).toHaveLength(5);
+    for (const [index, expected] of [0.1, 0.3, 0.5, 0.7, 0.9].entries()) {
+      expect(result[index]).toBeCloseTo(expected, 10);
+    }
+    expect(result[0]).toBe(0.1);
+    expect(result.at(-1)).toBe(0.9);
+    for (let i = 1; i < result.length; i++) expect(result[i]!).toBeGreaterThanOrEqual(result[i - 1]!);
+  });
+
+  it("returns exactly the requested length and sanitizes malformed values", () => {
+    expect(resampleStrokePressures([Number.NaN, 2, -1, Infinity], 4, 0.4)).toEqual([0.4, 1, 0, 0.4]);
+    expect(resampleStrokePressures([], 3, Number.NaN)).toEqual([0.5, 0.5, 0.5]);
+    expect(resampleStrokePressures([0.25], 3)).toEqual([0.25, 0.25, 0.25]);
+    expect(resampleStrokePressures([0.2, 0.8], 0)).toEqual([]);
+    expect(resampleStrokePressures([0.2, 0.8], Number.NaN)).toEqual([]);
+  });
+});
+
+describe("buildCalligraphySegments", () => {
+  const manualTip = { tiltEnabled: false, angleDeg: 0, roundness: 0.2 };
+
+  it("projects an elliptical nib against travel direction", () => {
+    const horizontal = buildCalligraphySegments([0, 0, 100, 0], [0.5, 0.5], [], 10, manualTip)[0]!;
+    const vertical = buildCalligraphySegments([0, 0, 0, 100], [0.5, 0.5], [], 10, manualTip)[0]!;
+    expect(vertical.width).toBeGreaterThan(horizontal.width * 4);
+    expect(horizontal.tipAngleRad).toBe(0);
+    expect(horizontal.roundness).toBe(0.2);
+  });
+
+  it("makes higher pressure thicker on the same route", () => {
+    const low = buildCalligraphySegments([0, 0, 0, 100], [0.1], [], 10, manualTip)[0]!;
+    const high = buildCalligraphySegments([0, 0, 0, 100], [0.9], [], 10, manualTip)[0]!;
+    expect(high.width).toBeGreaterThan(low.width);
+  });
+
+  it("uses hardware tilt direction, magnitude and twist when enabled", () => {
+    const fallback = buildCalligraphySegments(
+      [0, 0, 100, 0],
+      [0.5],
+      [],
+      10,
+      { tiltEnabled: true, angleDeg: 45, roundness: 0.8 }
+    )[0]!;
+    const hardware = buildCalligraphySegments(
+      [0, 0, 100, 0],
+      [0.5],
+      [{ pointerType: "pen", tiltX: 45, tiltY: 0, twist: 90 }],
+      10,
+      { tiltEnabled: true, angleDeg: 45, roundness: 0.8 }
+    )[0]!;
+    expect(hardware.tipAngleRad).toBeCloseTo(Math.PI / 2, 10);
+    expect(hardware.roundness).toBeLessThan(fallback.roundness);
+    expect(hardware.width).not.toBeCloseTo(fallback.width, 5);
+  });
+
+  it("uses barrel twist even when a vertical pen reports zero tilt", () => {
+    const segment = buildCalligraphySegments(
+      [0, 0, 100, 0],
+      [0.5],
+      [{ pointerType: "pen", tiltX: 0, tiltY: 0, twist: 90 }],
+      10,
+      { tiltEnabled: true, angleDeg: 0, roundness: 0.2 }
+    )[0]!;
+    expect(segment.tipAngleRad).toBeCloseTo(Math.PI / 2, 10);
+  });
+
+  it("proportionally samples mismatched arrays and is finite/deterministic for malformed data", () => {
+    const args = [
+      [0, 0, 20, Number.NaN, Infinity, 30, 60, 40],
+      [0.1, Number.NaN, 0.9],
+      [{ pointerType: "pen", tiltX: Number.NaN, tiltY: 25, twist: 999 }],
+      Number.NaN,
+      { tiltEnabled: true, angleDeg: Number.NaN, roundness: Number.NaN },
+    ] as const;
+    const first = buildCalligraphySegments(...args);
+    const second = buildCalligraphySegments(...args);
+    expect(first).toEqual(second);
+    expect(first).toHaveLength(3);
+    for (const segment of first) {
+      expect(Object.values(segment).every(Number.isFinite)).toBe(true);
+      expect(segment.width).toBeGreaterThan(0);
+      expect(segment.roundness).toBeGreaterThan(0);
+      expect(segment.roundness).toBeLessThanOrEqual(1);
+    }
+    expect(buildCalligraphySegments([], [], [], 10, manualTip)).toEqual([]);
+    expect(buildCalligraphySegments([1, 2], [], [], 10, manualTip)).toEqual([]);
   });
 });
 

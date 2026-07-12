@@ -208,6 +208,28 @@ describe("도형 직렬화", () => {
     expect(svg).toContain("mix-blend-mode:multiply");
   });
 
+  it("캘리그래피 — 포인트별 필압·틸트·회전을 가변 굵기 벡터 선분으로 보존한다", () => {
+    const calligraphy = rectEl({
+      id: "calligraphy-1",
+      kind: "freehand",
+      brush: "calligraphy",
+      points: [0, 0, 20, 0, 40, 20, 40, 50],
+      pressures: [0.2, 0.45, 0.7, 0.95],
+      tiltXs: [40, 35, 20, 10],
+      tiltYs: [0, 10, 25, 40],
+      twists: [0, 15, 30, 45],
+      brushTip: { tiltEnabled: true, angleDeg: -30, roundness: 0.24 },
+      strokeWidth: 12,
+    });
+    const first = exportPageToSvg(page([calligraphy]));
+    const second = exportPageToSvg(page([calligraphy]));
+    expect(first.svg).toBe(second.svg);
+    expect((first.svg.match(/stroke-linecap="round"/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    const widths = Array.from(first.svg.matchAll(/stroke-width="([0-9.]+)"/g), (match) => match[1]);
+    expect(new Set(widths).size).toBeGreaterThan(1);
+    expect(first.skipped).toEqual([]);
+  });
+
   it("스크린톤 브러시 — 결정적 망점을 원(circle)으로 그대로 재현한다", () => {
     const tone = rectEl({ id: "st1", kind: "freehand", brush: "screentone", points: [0, 0, 40, 0], strokeWidth: 22 });
     const { svg } = exportPageToSvg(page([tone]));

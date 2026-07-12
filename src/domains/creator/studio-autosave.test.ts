@@ -64,6 +64,29 @@ describe("studio autosave", () => {
     expect(parsed?.publishPack).toEqual({ profile: "tapas", aiUsage: "none", disclosure: "" });
   });
 
+  it("캘리그래피 획의 필압·틸트·회전·펜촉 설정을 자동저장 왕복에서 보존한다", () => {
+    const stroke = {
+      id: "calligraphy-1",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      brush: "calligraphy",
+      points: [0, 0, 10, 10],
+      pressures: [0.25, 0.8],
+      tiltXs: [20, 35],
+      tiltYs: [-10, 15],
+      twists: [5, 40],
+      brushTip: { tiltEnabled: true, angleDeg: -30, roundness: 0.24 },
+    };
+    const serialized = serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-07-12T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [stroke] }],
+    });
+    const parsed = parseStudioAutosave(serialized);
+    expect(parsed?.pagesList[0]?.elements?.[0]).toEqual(stroke);
+  });
+
   it("캐릭터 바이블만 작성한 문서도 복구 대상으로 보존한다", () => {
     const characterBible = { version: 1, characters: [{ id: "hero", name: "윤슬" }] };
     const parsed = parseStudioAutosave(

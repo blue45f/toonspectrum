@@ -1,0 +1,106 @@
+# ToonSpectrum Studio — 웹 드로잉·협업 도구 벤치마크
+
+조사일: 2026-07-12
+
+대상: Clip Studio Paint Companion/Simple Mode, Photopea, Kleki, Magma, Pixlr
+
+원칙: 공식 제품 문서와 공식 도움말에서 확인되는 동작만 기능 근거로 사용한다. 경쟁사의 화면이나 명칭을
+복제하지 않고, 웹툰 작가의 반복 작업·입력 품질·모바일 조작성·협업·파일 호환성 문제를 해결하는 방향으로
+ToonSpectrum의 문서 모델과 UI에 번역한다.
+
+## 제품별로 가져올 장점
+
+| 제품 | 공식 문서에서 확인한 장점 | ToonSpectrum 적용 방향 |
+| --- | --- | --- |
+| Clip Studio Paint | 설치형 본 앱의 pressure/tilt/velocity 브러시 입력, Simple/Studio 모드, Companion의 Quick Access·색상환·제스처·참조·세로 웹툰 미리보기, 페이지 단위 Teamwork | 실제 펜 입력을 마우스 폴백보다 우선하고, Simple/Full/Focus UI와 향후 제한 권한의 휴대폰 보조 세션으로 확장 |
+| Photopea | 브라우저 로컬 처리, PSD 중심 문서, 중첩 레이어·래스터/벡터 마스크·조정 레이어·클리핑·스마트 필터·레이어 스타일 | PSD 구조 보존도를 높이고 현재 이미지별 보정 엔진을 재정렬 가능한 조정 레이어/스마트 필터 스택으로 승격 |
+| Kleki | 설치 없는 즉시 시작, 작은 화면 UI, 터치 제스처, 필압 크기/불투명도, 간단한 레이어·보정·PSD 출력 | 초보용 Simple 모드와 빠른 첫 획, 모바일에서 핵심 도구 우선, 고급 기능은 검색·전체 화면 시트로 접근 |
+| Magma | 브라우저 공동 드로잉, 최대 30명 실시간 커서·채팅, 역할·권한·레이어 소유권·댓글·버전, Super Simple/Simple/Full, pressure/tilt 기반 팁 동역학 | 서버 역할·초대·댓글→presence/remote cursor→soft lock→요소 operation 순으로 협업을 구축하고, tilt/twist 캘리그래피를 먼저 제공 |
+| Pixlr | 웹/모바일 사진 편집, 레이어·마스크, 밝기/대비·커브·레벨·색상·LUT/HDR 계열 보정, 템플릿 중심 빠른 결과 | 이미 넓은 보정 기능을 새 필터 수보다 비파괴 스택·검색·즐겨찾기·최근 사용 UX로 정리 |
+
+> Clip Studio Companion은 독립 브라우저 편집기가 아니라 설치형 Clip Studio Paint를 스마트폰에서
+> 보조 조작하는 연결 모드라는 것이 공식 연결 절차와 지원 플랫폼을 종합한 결론이다. 따라서 브라우저
+> 엔진으로 모사하기보다 ToonSpectrum의 향후 협업 세션 transport 위에 제한 권한 controller로 설계한다.
+
+## 공식 근거
+
+- Clip Studio Paint:
+  [Companion Mode](https://help.clip-studio.com/en-us/manual_en/840_options/Companion_Mode.htm),
+  [Simple/Studio Mode](https://help.clip-studio.com/en-us/manual_en/090_tablet/Simple_Mode_and_Studio_Mode.htm),
+  [브러시 입력 설정](https://help.clip-studio.com/en-us/manual_en/240_brushes/Customizing_brush_tools.htm),
+  [Teamwork](https://help.clip-studio.com/en-us/manual_en/570_pages/Teamwork.htm),
+  [웹툰 미리보기·분할 출력](https://help.clip-studio.com/en-us/manual_en/540_comic/Webtoons.htm)
+- Photopea:
+  [공식 Learn](https://www.photopea.com/learn/),
+  [브러시·스타일러스 필압](https://www.photopea.com/learn/brush-tools),
+  [PSD 열기·저장](https://www.photopea.com/learn/opening-saving),
+  [마스크](https://www.photopea.com/learn/masks),
+  [조정·스마트 필터](https://www.photopea.com/learn/adjustments-filters),
+  [레이어 스타일](https://www.photopea.com/learn/layer-styles)
+- Kleki:
+  [소개·로드맵](https://kleki.com/about/),
+  [공식 도움말](https://kleki.com/help/),
+  [변경 내역](https://kleki.com/changelog-summary/)
+- Magma:
+  [제품 소개](https://help.magma.com/en/articles/6383647-what-is-magma),
+  [실시간 공동 작업](https://help.magma.com/en/articles/6613957-first-steps),
+  [필압 설정](https://help.magma.com/en/articles/6413264-setting-up-pen-pressure-sensitivity),
+  [브러시 tilt 동역학](https://help.magma.com/en/articles/6871478-brush),
+  [레이아웃 모드](https://help.magma.com/en/articles/10586978-magma-layout-modes),
+  [역할·권한](https://help.magma.com/en/articles/13713941-managing-your-canvas-permissions-roles-and-participants),
+  [채팅·통화·댓글](https://help.magma.com/en/articles/8422203-how-to-chat-with-others-calls-chats-and-comments)
+- Pixlr:
+  [제품 페이지](https://pixlr.com/),
+  [Pixlr Editor](https://pixlr.com/editor/),
+  [필압 브러시 공식 글](https://pixlr.com/blog/get-creative-with-pixlrs-brand-new-brush-feature/),
+  [모바일](https://pixlr.com/mobile/),
+  [레이어 PSD 지원 제품군](https://pixlr.com/tools/pixlr-suite/)
+
+Pixlr의 필압 근거는 2022년 공식 게시물이므로 현재 브라우저·기기 조합별 런타임 검증을 계속 유지한다.
+Photopea·Kleki·Pixlr의 tilt 및 실시간 역할 기반 협업은 조사한 공식 문서에서 확인하지 못했으며, 기능이
+절대 없다고 단정하지 않는다.
+
+## 현재 ToonSpectrum의 강점과 확인된 격차
+
+이미 제공하는 강점:
+
+- PointerEvent 하드웨어 필압, coalesced event, 손떨림 보정, 속도 기반 마우스 폴백
+- 펜/G펜/마커/형광펜/붓/연필/스크린톤과 사용자 브러시 JSON 라이브러리
+- 레이어·그룹·블렌드·클리핑·알파 잠금·이미지 마스크
+- 커브·레벨·색상 균형·채널 믹서·Selective HSL·그라디언트 맵·하프톤 등 광범위한 보정
+- 모바일 하단 도크, visual viewport·safe area, 두/세 손가락 제스처, Quick Actions
+- 웹툰 목적지별 자동 분할·검증, PNG/JPEG/WebP/PDF/PSD/SVG 출력
+
+우선 격차:
+
+1. Magma 수준의 서버 역할·초대·댓글·presence·remote cursor·soft lock
+2. Photopea 수준의 PSD 중첩 그룹·마스크·편집 가능한 텍스트·스마트 오브젝트 왕복
+3. 공통 마스크를 가진 조정 레이어와 재정렬 가능한 스마트 필터 스택
+4. Clip Studio/Magma/Kleki식 Simple/Full/Focus UI 밀도
+5. 레이어·마스크 썸네일, 병합/평탄화, 효과 검색·즐겨찾기·최근 사용
+
+실시간 공동 편집은 전체 문서 JSON을 매 포인터 이동마다 전송하지 않는다. 먼저
+`owner/admin/editor/commenter/viewer` ACL과 서버 댓글을 만들고, presence와 원격 커서, 페이지/요소 soft
+lock, 요소 add/update/delete operation stream, 필요한 요소에만 세밀한 충돌 해결을 순차 적용한다.
+
+## 2026-07-12 구현 체크포인트
+
+- `calligraphy` 브러시 프리셋 추가
+- coalesced PointerEvent마다 pressure, `tiltX`, `tiltY`, `twist`를 포인트와 같은 길이로 저장
+- 타원형 펜촉의 이동 방향·각도·원형도·필압·tilt 강도·barrel twist를 반영하는 결정적 선분 엔진
+- 마우스·터치·tilt 미지원 기기는 저장된 기본 촉 각도/원형도로 동일 결과 재현
+- 실제 `pointerType=pen`의 0.2/0.5/0.9 필압을 속도 폴백보다 항상 우선
+- 속도 필압을 “마우스 속도 필압”으로 명시하고 실제 스타일러스 필압이 없을 때만 사용
+- 스무딩/포인트 솎기 뒤 필압을 출력 포인트 수에 선형 재표본화해 좌표·필압 인덱스 정렬
+- `pointercancel`에서 미완성 획·원근/아이소메트릭 락·QuickShape 임시 상태 정리
+- 브러시 라이브러리 JSON v2에 `tiltEnabled`, `tipAngle`, `tipRoundness` 저장 및 v1 자동 마이그레이션
+- 캔버스, SVG 벡터 출력, 자동저장에서 같은 펜촉 결과와 스타일러스 메타데이터 보존
+- 데스크톱 검사기와 모바일 독립 스크롤 시트에 캘리그래피 설정 제공
+
+검증 범위:
+
+- 관련 순수 로직·라이브러리·SVG·자동저장 테스트 150개 통과
+- 합성 pen PointerEvent 5개 입력 후 point/pressure/tiltX/tiltY/twist 각 5개 자동저장 확인
+- `pointercancel` 입력은 문서에 커밋되지 않음 확인
+- 375×812 모바일 시트가 하단 도크와 겹치지 않고 독립 스크롤됨을 확인
+- 브라우저 콘솔 오류·경고 0건

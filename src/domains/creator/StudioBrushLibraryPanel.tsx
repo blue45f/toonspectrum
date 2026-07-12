@@ -253,6 +253,11 @@ export function StudioBrushLibraryPanel({ currentSnapshot, onApplyBrush }: Studi
                   <span className="numeral block">
                     {b.strokeWidth}px · {Math.round(b.brushOpacity * 100)}%
                   </span>
+                  {b.brushId === "calligraphy" ? (
+                    <span className="numeral block">
+                      촉 {Math.round(b.tipAngle)}° · 원형도 {Math.round(b.tipRoundness * 100)}%
+                    </span>
+                  ) : null}
                 </span>
               </button>
             </div>

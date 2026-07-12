@@ -38,6 +38,9 @@ const validSnapshot: StudioBrushSnapshot = {
   pressureCurve: 1.8,
   useVelocityPressure: true,
   velocitySensitivity: 0.5,
+  tiltEnabled: true,
+  tipAngle: -35,
+  tipRoundness: 0.3,
 };
 
 const brush = (id: string, createdAt = 1): StudioSavedBrush => ({
@@ -62,6 +65,9 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toContain("brushId");
     expect(adjustedFields).toContain("color");
     expect(adjustedFields).toContain("useVelocityPressure");
+    expect(adjustedFields).toContain("tiltEnabled");
+    expect(adjustedFields).toContain("tipAngle");
+    expect(adjustedFields).toContain("tipRoundness");
   });
 
   it("알 수 없는 brushId는 pen으로 대체한다", () => {
@@ -116,6 +122,19 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toEqual(["useVelocityPressure"]);
   });
 
+  it("펜촉 틸트 설정을 타입과 안전 범위로 정규화한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      tiltEnabled: "yes",
+      tipAngle: 999,
+      tipRoundness: 0,
+    });
+    expect(snapshot.tiltEnabled).toBe(true);
+    expect(snapshot.tipAngle).toBe(180);
+    expect(snapshot.tipRoundness).toBe(0.08);
+    expect(adjustedFields).toEqual(["tipAngle", "tipRoundness", "tiltEnabled"]);
+  });
+
   it("무관한 필드에 순환 참조가 있어도 던지거나 멈추지 않는다(필드별 단순 읽기만 하므로 재귀 순회 없음)", () => {
     const circular: Record<string, unknown> = { ...validSnapshot };
     circular.selfRef = circular;
@@ -165,6 +184,20 @@ describe("listBrushes", () => {
       [BRUSH_LIBRARY_KEY]: JSON.stringify([brush("a"), { id: "x" }, brush("b")]),
     });
     expect(listBrushes(s).map((b) => b.id)).toEqual(["a", "b"]);
+  });
+
+  it("이전 저장 브러시에 펜촉 필드가 없어도 안전 기본값으로 마이그레이션한다", () => {
+    const legacy = brush("legacy") as Partial<StudioSavedBrush>;
+    delete legacy.tiltEnabled;
+    delete legacy.tipAngle;
+    delete legacy.tipRoundness;
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
+    expect(listBrushes(s)[0]).toMatchObject({
+      id: "legacy",
+      tiltEnabled: true,
+      tipAngle: -30,
+      tipRoundness: 0.24,
+    });
   });
 });
 
@@ -252,6 +285,9 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.kind).toBe(BRUSH_EXPORT_KIND);
     expect(parsed.name).toBe("브러시 a");
     expect(parsed.brushId).toBe("gpen");
+    expect(parsed.tiltEnabled).toBe(true);
+    expect(parsed.tipAngle).toBe(-35);
+    expect(parsed.tipRoundness).toBe(0.3);
   });
 
   it("왕복하면 같은 스냅샷을 얻는다(adjustedFields 없음)", () => {

@@ -34,6 +34,12 @@ export interface StudioBrushSnapshot {
   useVelocityPressure: boolean;
   /** StudioPage의 `velocitySensitivity` state에 대응(0.1~1.0). */
   velocitySensitivity: number;
+  /** 스타일러스 tiltX/tiltY/twist를 캘리그래피 펜촉에 반영할지 여부. */
+  tiltEnabled: boolean;
+  /** 틸트 입력이 없을 때 사용할 캘리그래피 펜촉 기본 각도(도). */
+  tipAngle: number;
+  /** 캘리그래피 펜촉의 단축/장축 비율(0.08=납작한 촉, 1=원형 촉). */
+  tipRoundness: number;
 }
 
 export interface StudioSavedBrush extends StudioBrushSnapshot {
@@ -56,6 +62,8 @@ export const BRUSH_STROKE_WIDTH_RANGE = [1, 48] as const;
 export const BRUSH_OPACITY_RANGE = [0.1, 1] as const;
 export const BRUSH_PRESSURE_CURVE_RANGE = [0.3, 3] as const;
 export const BRUSH_VELOCITY_SENSITIVITY_RANGE = [0.1, 1] as const;
+export const BRUSH_TIP_ANGLE_RANGE = [-180, 180] as const;
+export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
 
 const DEFAULT_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
@@ -66,6 +74,9 @@ const DEFAULT_SNAPSHOT: StudioBrushSnapshot = {
   pressureCurve: 1.0,
   useVelocityPressure: true,
   velocitySensitivity: 0.65,
+  tiltEnabled: true,
+  tipAngle: -30,
+  tipRoundness: 0.24,
 };
 
 function isKnownBrushId(id: unknown): id is string {
@@ -140,6 +151,22 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     DEFAULT_SNAPSHOT.velocitySensitivity,
     adjustedFields
   );
+  const tipAngle = clampedNumberField(
+    o,
+    "tipAngle",
+    BRUSH_TIP_ANGLE_RANGE[0],
+    BRUSH_TIP_ANGLE_RANGE[1],
+    DEFAULT_SNAPSHOT.tipAngle,
+    adjustedFields
+  );
+  const tipRoundness = clampedNumberField(
+    o,
+    "tipRoundness",
+    BRUSH_TIP_ROUNDNESS_RANGE[0],
+    BRUSH_TIP_ROUNDNESS_RANGE[1],
+    DEFAULT_SNAPSHOT.tipRoundness,
+    adjustedFields
+  );
 
   let useVelocityPressure: boolean;
   if (typeof o.useVelocityPressure === "boolean") {
@@ -147,6 +174,14 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   } else {
     adjustedFields.push("useVelocityPressure");
     useVelocityPressure = DEFAULT_SNAPSHOT.useVelocityPressure;
+  }
+
+  let tiltEnabled: boolean;
+  if (typeof o.tiltEnabled === "boolean") {
+    tiltEnabled = o.tiltEnabled;
+  } else {
+    adjustedFields.push("tiltEnabled");
+    tiltEnabled = DEFAULT_SNAPSHOT.tiltEnabled;
   }
 
   const normalizedColor = typeof o.color === "string" ? normalizeHexColor(o.color) : null;
@@ -159,28 +194,44 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   }
 
   return {
-    snapshot: { brushId, strokeWidth, brushOpacity, color, stabilizer, pressureCurve, useVelocityPressure, velocitySensitivity },
+    snapshot: {
+      brushId,
+      strokeWidth,
+      brushOpacity,
+      color,
+      stabilizer,
+      pressureCurve,
+      useVelocityPressure,
+      velocitySensitivity,
+      tiltEnabled,
+      tipAngle,
+      tipRoundness,
+    },
     adjustedFields,
   };
 }
 
-function isStudioSavedBrush(v: unknown): v is StudioSavedBrush {
-  if (!v || typeof v !== "object") return false;
+function normalizeStoredBrush(v: unknown): StudioSavedBrush | null {
+  if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.name === "string" &&
-    typeof o.createdAt === "number" &&
-    typeof o.updatedAt === "number" &&
-    typeof o.brushId === "string" &&
-    typeof o.strokeWidth === "number" &&
-    typeof o.brushOpacity === "number" &&
-    typeof o.color === "string" &&
-    typeof o.stabilizer === "number" &&
-    typeof o.pressureCurve === "number" &&
-    typeof o.useVelocityPressure === "boolean" &&
-    typeof o.velocitySensitivity === "number"
-  );
+  if (
+    typeof o.id !== "string"
+    || typeof o.name !== "string"
+    || typeof o.createdAt !== "number"
+    || !Number.isFinite(o.createdAt)
+    || typeof o.updatedAt !== "number"
+    || !Number.isFinite(o.updatedAt)
+  ) {
+    return null;
+  }
+  const { snapshot } = sanitizeBrushSnapshot(o);
+  return {
+    id: o.id,
+    name: o.name,
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+    ...snapshot,
+  };
 }
 
 // ── 저장소 CRUD (studio-palette-library.ts와 동일한 패턴) ──────────────
@@ -193,7 +244,10 @@ export function listBrushes(storage: BrushLibraryStorage | null | undefined): St
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isStudioSavedBrush);
+    return parsed.flatMap((value) => {
+      const brush = normalizeStoredBrush(value);
+      return brush ? [brush] : [];
+    });
   } catch {
     return [];
   }
@@ -249,7 +303,7 @@ export function createBrush(name: string, snapshot: StudioBrushSnapshot): Studio
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
 export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
-export const BRUSH_EXPORT_VERSION = 1;
+export const BRUSH_EXPORT_VERSION = 2;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
@@ -265,6 +319,9 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     pressureCurve: brush.pressureCurve,
     useVelocityPressure: brush.useVelocityPressure,
     velocitySensitivity: brush.velocitySensitivity,
+    tiltEnabled: brush.tiltEnabled,
+    tipAngle: brush.tipAngle,
+    tipRoundness: brush.tipRoundness,
   };
   return JSON.stringify(payload, null, 2);
 }
