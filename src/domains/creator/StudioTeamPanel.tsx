@@ -52,7 +52,10 @@ import {
   type StudioTeamSnapshot,
   type StudioTeamStatus,
 } from "./studio-team-client";
+import { StudioLiveCollaborationPanel } from "./StudioLiveCollaborationPanel";
 import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
+
+import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -63,6 +66,8 @@ export interface StudioTeamPanelProps {
   workId: string | null;
   loggedIn: boolean;
   authScopeKey: string | null;
+  /** Authenticated server adapter may be injected; omitted uses same-origin local tabs only. */
+  liveTransportFactory?: StudioLiveTransportFactory;
 }
 
 const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> = {
@@ -996,7 +1001,8 @@ export function StudioTeamPanelView({
 
       <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
         공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다.
-        서버 앵커 댓글·접속 상태·페이지/레이어 잠금은 다음 단계에서 연결됩니다.
+        위 같이 보기는 같은 출처 로컬 탭 전용입니다. 서버 앵커 댓글·인터넷 팀 접속 상태·페이지/레이어
+        잠금은 별도 서버 연결에서 권한을 다시 확인합니다.
       </p>
     </div>
   );
@@ -1019,6 +1025,7 @@ export function StudioTeamPanel({
   workId,
   loggedIn,
   authScopeKey,
+  liveTransportFactory,
 }: StudioTeamPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -1568,6 +1575,15 @@ export function StudioTeamPanel({
             refreshKey={sharedWorksRefreshKey}
             onOpenWork={() => onClose()}
           />
+          {workId &&
+          visibleSnapshot?.viewer.status === "active" &&
+          visibleSnapshot.viewer.capabilities.view ? (
+            <StudioLiveCollaborationPanel
+              snapshot={visibleSnapshot}
+              transportFactory={liveTransportFactory}
+              workId={workId}
+            />
+          ) : null}
           <StudioTeamPanelView
             activity={visibleActivity}
             activityError={visibleActivityError}

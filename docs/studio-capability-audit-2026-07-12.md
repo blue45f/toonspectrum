@@ -1,0 +1,230 @@
+# ToonSpectrum Studio 기능 완성도 감사
+
+- 기준일: 2026-07-12
+- 감사 범위: 첨부 요구사항, 최근 대화 요청, 상용 드로잉·웹툰·3D·협업 제품의 공식 기능
+- 판정 원칙: UI가 보이는 것만으로 완료로 세지 않고, 실행 경로·저장/복원·권한·오류 처리·테스트까지 연결되어야 완료로 판정한다.
+
+## 결론
+
+첨부 요구사항의 모든 기능이 구현된 상태는 아니다. 현재 제품은 다음 영역에서 강한 실사용 기반을 갖는다.
+
+- 세로 웹툰 페이지·패널·말풍선·대사 자동 배치
+- 압력·기울기·배럴 회전을 반영하는 브라우저 드로잉
+- 패턴·스크린톤·고급 채우기·색 보정·PSD 레이어 입출력
+- 플랫폼별 긴 웹툰 분할 출력과 모바일 스크롤 미리보기
+- AI 세계관·시나리오·구도·대사·번역·팔레트 보조
+- reference image와 캐릭터 바이블을 사용한 장면 연속성 보조
+- VRM 포즈·표정·손가락·조명·spring bone·웹캠 추적
+- GLB 2.0 기반 3D 배경, 카메라·조명·객체 변형, 컬러/톤/선화 분리 삽입
+- 서버 팀 역할·초대·활동 이력·revision 충돌 방지·복원
+
+다음 영역은 아직 부분 구현이거나 제품 실행 경로에 연결되지 않았다.
+
+- 의미 영역 분할과 색 힌트를 사용하는 AI 자동 채색
+- 인증된 Socket.IO 서버와 Studio UI의 실제 adapter 연결
+- 캔버스 원격 커서, 선택 영역, 실제 편집 mutation을 막는 서버 권위 잠금
+- CRDT/OT 또는 요소 operation stream 기반 동시 편집
+- 움직이는 배경·인물의 transform tween, parallax, 본/카메라 트랙
+- WebGPU 제품 런타임
+- VRM/3D 모델 전체 라이브러리의 사전 생성 썸네일
+- AI 텍스트/이미지→3D mesh 생성·repair·리깅
+- Clip Studio Paint 3D의 다중 선택·계층·접지·스냅·사면도·파노라마·BVH·texture painting
+- Google Drive·Dropbox·Notion 같은 외부 클라우드 연동
+- Firefly·D5·Artbreeder 등 특정 상용 서비스의 직접 API·라이선스 보증
+
+## 판정 기호
+
+- `완료`: 제품 UI부터 실행·저장/복원·오류 경계까지 연결됨
+- `부분`: 유의미한 구현은 있으나 벤치마크 제품과 동등하다고 볼 수 없음
+- `기반`: 독립 코어나 서버가 있으나 실제 Studio 작업 흐름에 아직 연결되지 않음
+- `미구현`: 실행 가능한 제품 코드가 없음
+- `외부 필요`: 브라우저만으로 끝나지 않고 서버·모델·OAuth·라이선스가 필요함
+
+## 1. 웹툰 제작·드로잉
+
+| 기능 | 판정 | 현재 범위와 남은 차이 |
+| --- | --- | --- |
+| 패널·컷 템플릿 | 완료 | 프레임과 말풍선을 함께 구성하는 패널 레이아웃, 세로 3~6컷 템플릿 제공 |
+| 대사 스크립트→말풍선 | 완료 | `이름: 대사`와 지문을 파싱해 좌우·세로 배치 |
+| 말풍선·효과음·배경 소재 | 부분 | 다양한 내장 소재와 편집은 있으나 Clip Studio Assets/Canva 규모의 온라인 생태계는 아님 |
+| 압력·기울기·twist | 완료 | PointerEvent pressure, tiltX/Y, twist, coalesced event 사용 |
+| Procreate/Krita/MediBang식 브러시 | 부분 | G펜·마커·붓·연필·톤, 안정화, QuickShape, 대칭, 원근 보조 제공. 브러시 팁 저작·고급 혼색·벡터 선 수정은 격차 |
+| Photopea/Photoshop식 보정 | 부분 | 커브·레벨·색상 균형·채널 믹서·Selective HSL·그라디언트 맵·마스크·클리핑 제공. 스마트 오브젝트/스마트 필터·완전한 조정 레이어는 미완성 |
+| PSD 왕복 | 부분 | 레이어 입출력은 되지만 텍스트·조정 레이어·스마트 오브젝트의 완전한 편집성은 보존하지 못함 |
+| 긴 세로 원고·플랫폼 분할 | 완료 | 네이버·WEBTOON Canvas·카카오·레진·SNS 프리셋과 순차 다운로드 |
+| 모바일 세로 스크롤 미리보기 | 완료 | 독립 스크롤, 폭 선택, 현재 페이지 이동 |
+| 사용자 매크로·전용 컨트롤러 | 미구현 | 단축키는 있으나 Stream Deck/TourBox 프로필, 매크로 녹화 API는 없음 |
+
+상세 근거는 [웹 드로잉 벤치마크](./studio-web-drawing-benchmark-2026-07-12.md)와 [경쟁 기능 목록](./studio-competitor-features.md)에 유지한다.
+
+## 2. AI 제작 기능
+
+| 기능 | 판정 | 현재 범위와 안전 경계 |
+| --- | --- | --- |
+| Z.ai↔DeepSeek 잔액 부족 전환 | 완료·텍스트 전용 | 문서화된 잔액/패키지 소진 또는 HTTP 402만 안전한 failover로 분류. 일반 429·네트워크 실패는 이중 과금 위험 때문에 무조건 재호출하지 않음 |
+| 세계관·시놉시스·콘티 | 완료/강한 부분 | Writer Room, 캐릭터 바이블, 장면 분할, 구도·대사·번역·팔레트 제공 |
+| 한 프롬프트→2~10 세로 장면 | 부분 | 장면 JSON, 대사, 세로 배치, reference image 흐름 제공. 생성 결과 검토·승인을 거침 |
+| 캐릭터 일관성 | 부분 | 캐릭터 바이블 고정 필드와 이전 컷 reference image 사용. LoRA/IP-Adapter 수준 동일 인물 보장은 아님 |
+| BYOK 이미지 생성·편집 | 부분 | OpenAI 호환 Images API와 CORS/응답 형식을 지원하는 공급자에서 사용 가능 |
+| 서버 AI 에셋 생성 | 부분·외부 필요 | 기능 플래그와 서버 이미지 모델 키가 있을 때 생성→저장→삽입. 텍스트 전용 Z.ai/DeepSeek를 이미지 모델로 오표시하지 않음 |
+| AI 자동 채색 | 부분 | 선택 이미지 전체를 one-shot edit하는 흐름. 색 힌트 scribble·semantic mask·영역별 재채색은 없음 |
+| AI 표정·동작·3D 포즈 추천 | 미구현 | 정적 프리셋은 있으나 대사 의미를 3D pose/expression으로 추천·적용하는 실행 경로 없음 |
+| AI 3D mesh 생성 | 미구현·외부 필요 | Hunyuan3D/TRELLIS/TripoSR/Meshy/Rodin 계열 추론·mesh repair·리깅 파이프라인 없음 |
+| Firefly 상업 안전 보증 | 미구현·라이선스 필요 | Adobe credential·Content Credentials·정책 연동 없이 같은 보증을 주장할 수 없음 |
+
+API 키는 저장소·브라우저 번들·문서에 넣지 않는다. 대화에 노출된 키는 폐기·재발급하고 서버 환경변수로만 주입해야 한다.
+
+## 3. 팀·실시간 협업
+
+### 완료된 서버 협업 기반
+
+- owner/admin/editor/commenter/viewer 역할과 capability ACL
+- 초대 수락/거절, 멤버 역할 변경, append-only 활동 이력
+- 공유 문서 GET/PATCH, `baseRevision` 충돌 감지, revision snapshot·복원
+- 팀 작품 목록과 모바일 독립 스크롤
+
+### 이번 체크포인트의 로컬 실시간 기반
+
+- 같은 출처 탭 전용 `BroadcastChannel` transport
+- strict envelope, 작품 범위·크기·시각·순번·target 검증
+- 탭 presence와 active/idle, 정규화 커서 코어, lease soft-lock 코어
+- 사용자가 직접 누를 때만 시작하는 Screen Capture API
+- 오디오를 요청하지 않는 WebRTC 화면 스트림
+- 시청 요청별 호스트 승인/거절, 승인 전 offer·영상 track 전송 금지
+- 승인 대기 8건·동시 시청자 4명 상한과 호스트의 개별 시청 종료
+- offer 전 ICE queue, 동시 캡처 generation guard, 늦은 참가자 presence 응답·공유 재안내
+- SDP/ICE 메모리 전용 signaling과 종료 시 track/peer cleanup
+- 로컬 모드를 `인터넷 팀 접속`으로 오표시하지 않는 제품 UI
+
+### 이번 체크포인트의 Socket.IO 서버 코어
+
+- `/studio-live` namespace, 작품 ACL join, presence snapshot/update/leave
+- 정규화 커서 relay, editor 전용 5~30초 lease soft-lock
+- 화면 공유 상태와 대상 지정 offer/answer/ICE/bye relay
+- Socket.IO namespace middleware에서 연결 허용 전에 세션 인증 완료
+- 세션 principal의 만료·sessionVersion 재검증과 권한 회수 cleanup
+- 작품 전환 중 지연 ACL 결과가 다른 작품 권한으로 사용되지 않도록 participant generation 확인
+- 허용되지 않은 WebSocket `Origin`의 upgrade를 `allowRequest`에서 거부
+- 로컬 Vite `/socket.io` WebSocket proxy
+
+실제 두 Socket.IO 클라이언트 E2E에서 즉시 인증 참가, 참가자 2명 snapshot, 커서 전달, 잠금 경쟁 거부, 화면 상태, 대상 signaling, 잠금 해제, 내부 DB user ID 비노출을 검증했다. 임의 Origin의 upgrade도 거부됐다.
+
+### 아직 완료가 아닌 부분
+
+| 기능 | 판정 | 이유 |
+| --- | --- | --- |
+| Studio UI↔Socket.IO adapter | 기반 | 서버 이벤트와 로컬 envelope 계약이 다르며 실제 adapter가 아직 없음 |
+| 원격 커서 overlay | 기반 | room 코어는 있으나 Konva Stage에 렌더하지 않음 |
+| 실제 mutation 잠금 | 기반 | soft-lock 상태가 HTTP 공유 문서 저장이나 요소 편집 guard를 강제하지 않음 |
+| operation stream/CRDT | 미구현 | 현재 저장은 revision 기반 전체 문서 snapshot |
+| 서버 앵커 댓글 | 미구현 | 현재 Studio 댓글은 문서 포함 local-first 데이터 |
+| 인터넷 WebRTC 안정성 | 외부 필요 | STUN/TURN 단기 자격 증명과 운영 장기 실행 Socket.IO 호스트가 필요 |
+| 다중 API 인스턴스 | 외부 필요 | Redis adapter, 분산 presence, 원자적 Redis lease가 필요 |
+| 음성·영상 회의·채팅 | 미구현 | 화면 영상만 범위에 포함하고 오디오는 의도적으로 제외 |
+
+현재 Vercel serverless 함수는 장기 WebSocket 업그레이드 서버가 아니다. 운영 실시간 협업은 OCI 등 장기 실행 Nest 서버 또는 별도 realtime 서비스와 리버스 프록시가 필요하다.
+
+## 4. 움직이는 웹툰
+
+| 기능 | 판정 | 현재 범위 |
+| --- | --- | --- |
+| 다중 레이어 타임라인 | 부분 | 페이지별 트랙·held frame·재생·onion skin 제공 |
+| transform tween·easing | 미구현 | 현재 프레임 데이터는 이미지 교체 중심이며 위치·회전·스케일 보간 없음 |
+| 본·VRM motion track | 미구현 | 포저의 숨쉬기·깜빡임·spring bone 미리보기는 최종 정적 PNG 삽입으로 끝남 |
+| 스크롤 등장·강조·파티클 | 부분/완료 | IntersectionObserver·Web Animations·비/눈/벚꽃·BGM/SFX 제공 |
+| 실제 배경 parallax | 미구현 | 레이어 depth, camera 이동, loop/tween 저작과 독자 뷰어 재생 없음 |
+| WebM 출력 | 부분 | canvas captureStream + MediaRecorder. 일부 오디오/overlay 합성 제한을 UI에 고지 |
+
+## 5. VRM 캐릭터·소품
+
+| 기능 | 판정 | 현재 범위 |
+| --- | --- | --- |
+| VRM 0/1·pose·finger·expression | 완료/강한 부분 | humanoid pose, 손가락, look-at, 재질, 조명, spring bone 제공 |
+| 연령·성별 표현·직업 recipe | 부분 | 고령·청년·여성·남성·중성 표현과 의료진 시작 recipe 제공 |
+| 소품 결합 | 부분 | rigid follower, geometry anchor, 보조 손 two-bone IK. collision·penetration·물리 grasp는 없음 |
+| Avatar Forge | 부분 | 기존 VRM 리그 보존형 비파괴 조형. 새 mesh/texture/rig/VRM export를 만드는 VRoid Studio 대체가 아님 |
+| 번들 캐릭터 썸네일 | 부분 | 활성 모델 썸네일은 생성하지만 미방문 모델은 기본 아이콘이며 전체 poster coverage가 없음 |
+| AI 캐릭터/VRM 생성 | 미구현·외부 필요 | mesh 생성, topology repair, rigging, blendshape, VRM export 파이프라인 필요 |
+
+## 6. Clip Studio Paint 3D 공식 기능 비교
+
+비교 기준은 CELSYS의 [3D 기능 사용법](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/660_3d.htm), [3D 데이터 종류](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/3D_%EB%8D%B0%EC%9D%B4%ED%84%B0_%EC%A2%85%EB%A5%98.htm), [3D 파일 가져오기](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/3D_%ED%8C%8C%EC%9D%BC_%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0.htm)다.
+
+| Clip Studio 3D 기능군 | ToonSpectrum | 구현 가능성/격차 |
+| --- | --- | --- |
+| GLB/glTF/OBJ/FBX 등 import | 부분 | 제품 신규 업로드는 공격면과 외부 참조를 줄이기 위해 embedded GLB 2.0만 허용 |
+| VRM 0/1 | 완료/강한 부분 | 별도 VRM 포저 제공 |
+| CSP 전용 cs3c/cs3o/cs3s | 미구현 | 공개 사양·라이선스 없이는 동일 호환을 보장할 수 없음 |
+| 객체 이동·회전·크기 | 완료 | TransformControls·수치 입력·undo/redo |
+| camera orbit/pan/zoom/FOV/preset | 완료/부분 | perspective camera 제공. orthographic와 고급 lens는 없음 |
+| 다중 선택·part 선택 | 미구현 | 현재 단일 선택 중심 |
+| 표시/잠금·부모 자식 hierarchy | 미구현/부분 | Studio layer 기능과 별개로 3D scene object authoring이 부족 |
+| 접지·이동/회전/object snap | 미구현 | grid 표시는 있으나 solver 없음 |
+| 선택 대상 focus | 미구현 | model bounds 기반 focus selected 없음 |
+| 광원·그림자 | 완료/부분 | ambient/key/fill directional light와 shadow 제공. fog는 없음 |
+| 기본 도형·복합 배경 템플릿 | 완료/부분 | 블록아웃과 웹툰용 장면 템플릿 제공 |
+| texture/UV/normal map | 미구현 | 사용자 texture upload와 UV/normal authoring 없음 |
+| 3D에 직접 그리기 | 미구현 | texture/projective painting 없음 |
+| 두상·체형·포즈·손가락 | 부분/강한 부분 | VRM 조형·pose는 강하지만 CSP 데생 인형/두상 모델과 동형은 아님 |
+| BVH pose sequence | 미구현 | BVH import·frame range 없음 |
+| panorama/360° | 미구현 | panorama projection authoring 없음 |
+| 사면도 | 미구현 | perspective/정면/측면/상단 동기화 없음 |
+| LT 선화·톤 분리 | 완료/부분 | 컬러·톤·텍스처 선·주선을 별도 raster PNG로 삽입. 진짜 vector LT는 아님 |
+| 재사용 3D 소재 생태계 | 부분 | 로컬 scene/model library는 있으나 CSP Assets식 권리·태그·공유 생태계는 아님 |
+
+표준 포맷 확대, 다중 선택, hierarchy, snapping, orthographic/four-view, panorama, texture painting, BVH는 브라우저로 구현할 수 있다. Blender 수준 modeling/sculpting/UV/rigging도 기술적으로 불가능한 것은 아니지만 별도 DCC 제품 규모이며, 웹툰 제작 시간을 줄이는 순서로 나누어야 한다.
+
+3D 구현·테스트 상세는 [3D 상용 기능 벤치마크](./studio-3d-commercial-benchmark-2026-07-12.md)를 따른다.
+
+## 7. WebGL·WebGPU·Babylon.js
+
+- 3D 배경과 VRM은 Three.js + React Three Fiber의 WebGL 제품 경로다.
+- WebGPU 제품 렌더러는 아직 없다.
+- Babylon.js 병행 도입은 VRM의 Three 생태계를 제거하지 못하면서 별도 엔진 비용을 만든다.
+- WebGPU는 Babylon에 종속되지 않는다. Three WebGPU renderer를 격리된 대표 장면에서 WebGL fallback과 비교하는 편이 현재 구조에 맞다.
+- 결정과 번들 측정은 [Babylon.js 도입 평가](./studio-babylonjs-adoption-evaluation-2026-07-11.md)에 기록한다.
+
+## 8. 브라우저로 가능한 범위와 외부 의존성
+
+### 브라우저와 현재 서버로 구현 가능
+
+- Socket.IO presence·remote cursor·soft-lock
+- 사용자 동의 기반 Screen Capture API·WebRTC
+- GLB/glTF/OBJ/FBX import와 scene hierarchy
+- orthographic camera, four-view, panorama, snapping
+- texture painting, BVH playback, transform/camera timeline
+- WebGPU renderer + WebGL fallback
+- parallax·레이어 animation·VRM motion clip
+
+### 별도 인프라가 사실상 필요한 영역
+
+- semantic segmentation 자동 채색 모델
+- LoRA/IP-Adapter급 캐릭터 일관성
+- 고품질 AI 3D mesh 생성·repair·rigging
+- 인터넷 WebRTC TURN relay
+- 다중 인스턴스 CRDT/operation persistence·Redis lease
+- Google Drive·Dropbox·Notion OAuth
+- Firefly·D5·Artbreeder 등 특정 상용 API
+
+### 그대로 보장할 수 없는 요구
+
+- 사용자 동의 없이 자동 화면 공유 시작
+- 비공개 CSP 형식과 유료 Assets의 무허가 복제
+- 범용 생성 모델 결과에 Adobe Firefly와 같은 상업 안전성 자동 보증
+- reference image edit만으로 동일 캐릭터 100% 보장
+- Photoshop·Blender·Clip Studio의 모든 기능을 하나의 완료 항목으로 취급
+
+## 9. 다음 구현 우선순위
+
+1. 인증된 Socket.IO frontend adapter와 서버 participant identity 연결
+2. 캔버스 원격 커서 overlay와 follow viewport
+3. 서버 lease ack를 실제 selection/drag/text mutation guard에 연결
+4. deployment-owned TURN 단기 credential과 운영 장기 실행 realtime host
+5. VRM·3D 모델 전체 poster thumbnail 사전 생성
+6. 색 힌트 scribble + semantic mask 기반 AI 자동 채색
+7. transform tween·parallax·camera/VRM motion track 기반 동적 웹툰
+8. 3D multi-select, visibility/lock, grounding/snapping, focus selected
+9. orthographic/four-view, panorama, BVH, texture painting
+10. WebGPU 격리 벤치마크와 WebGL fallback
+
+이 문서는 기능을 많이 보이게 만드는 목록이 아니라, 완료를 과장하지 않고 다음 상용화 순서를 고정하는 제품 계약으로 유지한다.

@@ -236,9 +236,10 @@ Clip Studio Teamwork의 **참여 작품을 별도 목록에서 찾아 여는 흐
 - [Magma 역할·참가자 권한](https://help.magma.com/en/articles/13713941-managing-your-canvas-permissions-roles-and-participants)
 - [Magma 레이어 제어](https://help.magma.com/en/articles/6413262-creating-a-layer-and-layer-controls)
 
-현재 `commenter`는 **검토 전용 원본 열람 역할**이며 서버 앵커 댓글을 제공한다고 표시하지 않는다. 실제
-서버 리뷰 스레드, presence, 페이지/레이어 soft lock, 원격 커서, operation stream은 다음 체크포인트에서
-각각의 권한 predicate·만료·복구 테스트를 연결한 뒤에만 제공 기능으로 표시한다.
+현재 `commenter`는 **검토 전용 원본 열람 역할**이며 서버 앵커 댓글을 제공한다고 표시하지 않는다. 서버
+presence·cursor relay·lease soft-lock 코어는 아래 체크포인트에서 추가됐지만, Socket.IO frontend adapter와
+캔버스 overlay/mutation guard가 연결되기 전에는 온라인 공동 편집 기능으로 표시하지 않는다. 서버 리뷰
+스레드와 operation stream도 각각의 권한 predicate·만료·복구 테스트를 연결한 뒤에만 제공 기능으로 표시한다.
 
 검증 범위:
 
@@ -254,3 +255,31 @@ Clip Studio Teamwork의 **참여 작품을 별도 목록에서 찾아 여는 흐
   `700px`, 도구막대 상단 `700.40625px`, 겹침 `0px` 확인
 - 모바일 업로드 저장 도크를 작품 정보와 겹치지 않는 상단 sticky 방식으로 재배치하고 입력/도크 겹침
   `0px`, 브라우저 콘솔 오류 `0건` 확인
+
+## 2026-07-12 로컬 같이 보기·Socket.IO 서버 코어 체크포인트
+
+Magma/Figma식 인터넷 공동 편집 전체를 한 번에 주장하지 않고, 개인정보 범위가 작은 로컬 탭 화면 공유와
+권한을 강제하는 서버 실시간 코어를 분리해 구축했다.
+
+- 팀 패널의 **같이 보기**는 기본적으로 같은 출처 `BroadcastChannel` 탭만 연결하며 `로컬 탭 미리보기`,
+  `같은 출처 탭 연결`로 표시한다. 인증된 서버 transport가 주입되지 않은 상태를 인터넷 팀 세션으로 표시하지 않는다.
+- 로컬 protocol은 작품 범위, exact key, 64KiB envelope, 과거/미래 시각, sequence replay, target session,
+  정규화 cursor, SDP/ICE 크기와 제어 문자를 검증한다. DB user ID·인증 토큰·API 키·캡처 영상은 envelope에 넣지 않는다.
+- `navigator.mediaDevices.getDisplayMedia()`는 사용자가 **화면 공유**를 직접 누를 때만 호출하고, audio는 요청하지
+  않으며 브라우저가 예외적으로 반환한 audio track도 즉시 중지한다.
+- 다른 탭의 시청 요청은 호스트의 승인 대기 목록에만 들어간다. 호스트가 개별 승인하기 전에는
+  `RTCPeerConnection`, 영상 track 추가, offer 생성이 발생하지 않는다.
+- 승인 대기 8건, 동시 시청자 4명 상한과 승인/거절/강제 종료 UI를 두고, 중복 capture Promise·늦게 반환된
+  track·offer 전 ICE·늦은 참가자·presence 만료를 모두 cleanup한다.
+- `/studio-live` Socket.IO gateway는 namespace middleware에서 세션 인증을 끝낸 뒤 연결을 허용하고,
+  세션 expiry/sessionVersion, active work ACL, 작품 전환 generation을 재검증한다.
+- 서버는 presence, 정규화 cursor, editor lease soft-lock, 화면 공유 상태, 대상 지정 WebRTC signaling만
+  메모리에 중계하며 영상·문서·SDP/ICE를 DB에 저장하지 않는다.
+- WebSocket upgrade는 일반 CORS header에 기대지 않고 `allowRequest`에서 Origin allow-list를 강제하며,
+  Vite 개발 서버는 `/socket.io`를 `ws: true`로 Nest에 프록시한다.
+- 실제 두 클라이언트 E2E에서 즉시 인증 참가, 2명 presence, cursor relay, 경쟁 잠금 거부, 화면 상태,
+  대상 signaling, 잠금 해제, DB user ID 비노출과 악성 Origin 거부를 확인했다.
+
+아직 `StudioLiveEnvelope`와 서버의 `studio:*` event contract를 번역하는 Socket.IO frontend adapter는 연결하지
+않았다. remote cursor overlay, mutation guard, 서버 anchor comment, operation stream/CRDT, TURN, 다중 인스턴스
+Redis lease도 후속 범위다. 현재 lease는 HTTP 문서 저장을 강제하는 배타 잠금이 아니라 충돌을 줄이는 soft-lock이다.

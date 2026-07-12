@@ -1,0 +1,809 @@
+import type {
+  StudioLiveParticipant,
+  StudioLiveWebRtcIcePayload,
+} from "./studio-live-collaboration-protocol";
+import type {
+  StudioLivePeer,
+  StudioLiveRoomEvent,
+  StudioLiveSignalEnvelope,
+} from "./studio-live-collaboration-room";
+
+export interface StudioScreenShareRoom {
+  readonly participant: StudioLiveParticipant;
+  subscribe(listener: (event: StudioLiveRoomEvent) => void): () => void;
+  announceScreen(payload: { shareId: string; label: string }): boolean;
+  requestScreen(targetSessionId: string, payload: { shareId: string }): boolean;
+  respondScreen(
+    targetSessionId: string,
+    payload: { shareId: string; decision: "approved" | "rejected" | "ended" }
+  ): boolean;
+  sendWebRtcDescription(
+    targetSessionId: string,
+    payload: { shareId: string; type: "offer" | "answer"; sdp: string }
+  ): boolean;
+  sendWebRtcIce(targetSessionId: string, payload: StudioLiveWebRtcIcePayload): boolean;
+  stopScreen(payload: { shareId: string }): boolean;
+}
+
+export interface StudioRemoteScreenShare {
+  host: StudioLiveParticipant;
+  shareId: string;
+  label: string;
+}
+
+export interface StudioScreenWatchingState {
+  host: StudioLiveParticipant;
+  shareId: string;
+  status: "requesting" | "connecting" | "live";
+  stream: MediaStream | null;
+}
+
+export interface StudioScreenShareRequest {
+  viewer: StudioLiveParticipant;
+  shareId: string;
+}
+
+export interface StudioScreenShareViewer {
+  viewer: StudioLiveParticipant;
+  shareId: string;
+  status: "connecting" | "live";
+}
+
+export interface StudioScreenShareState {
+  localSharing: boolean;
+  shares: StudioRemoteScreenShare[];
+  watching: StudioScreenWatchingState | null;
+  pendingRequests: StudioScreenShareRequest[];
+  viewers: StudioScreenShareViewer[];
+}
+
+export type StudioScreenShareEvent =
+  | { type: "state"; state: StudioScreenShareState }
+  | { type: "error"; message: string };
+
+export interface StudioScreenShareDependencies {
+  getDisplayMedia?: (constraints: DisplayMediaStreamOptions) => Promise<MediaStream>;
+  createPeerConnection?: () => RTCPeerConnection;
+  createMediaStream?: (tracks: MediaStreamTrack[]) => MediaStream;
+  randomId?: () => string;
+}
+
+interface PeerState {
+  connection: RTCPeerConnection;
+  shareId: string;
+  pendingIce: RTCIceCandidateInit[];
+}
+
+interface LocalShareState {
+  shareId: string;
+  stream: MediaStream;
+  endedTrack: MediaStreamTrack;
+  onEnded: () => void;
+}
+
+export const STUDIO_SCREEN_SHARE_MAX_VIEWERS = 4;
+const STUDIO_SCREEN_SHARE_MAX_PENDING_REQUESTS = 8;
+const STUDIO_SCREEN_SHARE_MAX_PENDING_ICE = 32;
+
+function defaultGetDisplayMedia(constraints: DisplayMediaStreamOptions): Promise<MediaStream> {
+  const mediaDevices = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+  if (!mediaDevices || typeof mediaDevices.getDisplayMedia !== "function") {
+    return Promise.reject(new Error("이 브라우저는 화면 캡처를 지원하지 않습니다."));
+  }
+  return mediaDevices.getDisplayMedia(constraints);
+}
+
+function defaultCreatePeerConnection(): RTCPeerConnection {
+  if (typeof RTCPeerConnection !== "function") {
+    throw new Error("이 브라우저는 WebRTC 화면 공유를 지원하지 않습니다.");
+  }
+  // No third-party STUN/TURN is contacted in local mode. A server transport may inject an
+  // authenticated, deployment-owned ICE policy later.
+  return new RTCPeerConnection({ iceServers: [] });
+}
+
+function defaultCreateMediaStream(tracks: MediaStreamTrack[]): MediaStream {
+  return new MediaStream(tracks);
+}
+
+function defaultRandomId(): string {
+  if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
+    throw new Error("안전한 화면 공유 식별자를 만들 수 없습니다.");
+  }
+  return crypto.randomUUID();
+}
+
+function shareKey(sessionId: string, shareId: string): string {
+  return JSON.stringify([sessionId, shareId]);
+}
+
+function copyParticipant(participant: StudioLiveParticipant): StudioLiveParticipant {
+  return { ...participant };
+}
+
+function stopTracks(stream: MediaStream | null): void {
+  for (const track of stream?.getTracks() ?? []) {
+    try {
+      track.stop();
+    } catch {
+      // A track can already be ended by the browser's native sharing affordance.
+    }
+  }
+}
+
+function closePeer(peer: PeerState | null): void {
+  if (!peer) return;
+  peer.connection.onicecandidate = null;
+  peer.connection.ontrack = null;
+  peer.connection.onconnectionstatechange = null;
+  try {
+    peer.connection.close();
+  } catch {
+    // Closing an already-closed peer is harmless.
+  }
+}
+
+function sessionDescription(
+  description: RTCSessionDescription | RTCSessionDescriptionInit | null,
+  expected: "offer" | "answer"
+): { type: "offer" | "answer"; sdp: string } {
+  if (!description || description.type !== expected || !description.sdp) {
+    throw new Error("WebRTC 연결 설명을 만들지 못했습니다.");
+  }
+  return { type: expected, sdp: description.sdp };
+}
+
+function candidatePayload(shareId: string, candidate: RTCIceCandidate): StudioLiveWebRtcIcePayload | null {
+  const value = candidate.toJSON();
+  if (!value.candidate) return null;
+  return {
+    shareId,
+    candidate: value.candidate,
+    sdpMid: value.sdpMid ?? null,
+    sdpMLineIndex: value.sdpMLineIndex ?? null,
+    usernameFragment: value.usernameFragment ?? null,
+  };
+}
+
+export function isStudioScreenShareSupported(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getDisplayMedia === "function" &&
+    typeof RTCPeerConnection === "function"
+  );
+}
+
+export function studioScreenShareErrorMessage(error: unknown): string {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    switch (error.name) {
+      case "NotAllowedError":
+      case "SecurityError":
+        return "화면 공유 권한이 허용되지 않았습니다. 브라우저의 공유 대상을 다시 선택해 주세요.";
+      case "AbortError":
+        return "화면 공유 선택을 취소했습니다.";
+      case "NotFoundError":
+        return "공유할 수 있는 화면이나 창을 찾지 못했습니다.";
+      case "InvalidStateError":
+        return "화면 공유 버튼을 직접 눌러 다시 시작해 주세요.";
+      case "NotReadableError":
+        return "선택한 화면을 캡처할 수 없습니다. 운영체제의 화면 기록 권한을 확인해 주세요.";
+    }
+  }
+  return error instanceof Error && error.message
+    ? error.message
+    : "화면 공유 연결을 시작하지 못했습니다.";
+}
+
+/**
+ * Two-sided-consent screen sharing over a StudioLiveRoom. A viewer must request one announced
+ * share, and the host must approve that individual request before tracks or an offer are created.
+ * Every access decision, description and ICE message is targeted to one session.
+ */
+export class StudioScreenShareController {
+  private readonly room: StudioScreenShareRoom;
+  private readonly getDisplayMedia: (constraints: DisplayMediaStreamOptions) => Promise<MediaStream>;
+  private readonly createPeerConnection: () => RTCPeerConnection;
+  private readonly createMediaStream: (tracks: MediaStreamTrack[]) => MediaStream;
+  private readonly randomId: () => string;
+  private readonly listeners = new Set<(event: StudioScreenShareEvent) => void>();
+  private readonly shares = new Map<string, StudioRemoteScreenShare>();
+  private readonly hostPeers = new Map<string, PeerState>();
+  private readonly pendingRequests = new Map<string, StudioScreenShareRequest>();
+  private readonly viewers = new Map<string, StudioScreenShareViewer>();
+  private readonly earlyViewerIce = new Map<string, RTCIceCandidateInit[]>();
+  private knownPeerSessions = new Set<string>();
+  private unsubscribeRoom: (() => void) | null;
+  private localShare: LocalShareState | null = null;
+  private watching: StudioScreenWatchingState | null = null;
+  private viewerPeer: PeerState | null = null;
+  private startSharePromise: Promise<void> | null = null;
+  private shareGeneration = 0;
+  private closed = false;
+
+  constructor(room: StudioScreenShareRoom, dependencies: StudioScreenShareDependencies = {}) {
+    this.room = room;
+    this.getDisplayMedia = dependencies.getDisplayMedia ?? defaultGetDisplayMedia;
+    this.createPeerConnection = dependencies.createPeerConnection ?? defaultCreatePeerConnection;
+    this.createMediaStream = dependencies.createMediaStream ?? defaultCreateMediaStream;
+    this.randomId = dependencies.randomId ?? defaultRandomId;
+    this.unsubscribeRoom = room.subscribe((event) => this.onRoomEvent(event));
+  }
+
+  subscribe(listener: (event: StudioScreenShareEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  getState(): StudioScreenShareState {
+    return {
+      localSharing: this.localShare !== null,
+      shares: Array.from(this.shares.values(), (share) => ({
+        ...share,
+        host: copyParticipant(share.host),
+      })).sort((a, b) =>
+        a.host.displayName.localeCompare(b.host.displayName, "ko-KR") ||
+        a.shareId.localeCompare(b.shareId)
+      ),
+      watching: this.watching
+        ? {
+            ...this.watching,
+            host: copyParticipant(this.watching.host),
+          }
+        : null,
+      pendingRequests: Array.from(this.pendingRequests.values(), (request) => ({
+        ...request,
+        viewer: copyParticipant(request.viewer),
+      })).sort((a, b) =>
+        a.viewer.displayName.localeCompare(b.viewer.displayName, "ko-KR") ||
+        a.viewer.sessionId.localeCompare(b.viewer.sessionId)
+      ),
+      viewers: Array.from(this.viewers.values(), (viewer) => ({
+        ...viewer,
+        viewer: copyParticipant(viewer.viewer),
+      })).sort((a, b) =>
+        a.viewer.displayName.localeCompare(b.viewer.displayName, "ko-KR") ||
+        a.viewer.sessionId.localeCompare(b.viewer.sessionId)
+      ),
+    };
+  }
+
+  startShare(): Promise<void> {
+    if (this.closed) return Promise.reject(new Error("이미 닫힌 화면 공유 세션입니다."));
+    if (this.localShare) return Promise.resolve();
+    if (this.startSharePromise) return this.startSharePromise;
+
+    const generation = ++this.shareGeneration;
+    const run = this.captureAndStartShare(generation);
+    this.startSharePromise = run;
+    const clearStart = () => {
+      if (this.startSharePromise === run) this.startSharePromise = null;
+    };
+    void run.then(clearStart, clearStart);
+    return run;
+  }
+
+  private async captureAndStartShare(generation: number): Promise<void> {
+    const stream = await this.getDisplayMedia({
+      video: { frameRate: { ideal: 15, max: 30 } },
+      audio: false,
+    });
+    if (this.closed || generation !== this.shareGeneration) {
+      stopTracks(stream);
+      throw new Error(
+        this.closed ? "화면 공유 세션이 종료되었습니다." : "화면 공유 시작이 취소되었습니다."
+      );
+    }
+    const videoTrack = stream.getVideoTracks().find((track) => track.readyState === "live");
+    for (const audioTrack of stream.getTracks().filter((track) => track.kind === "audio")) {
+      audioTrack.stop();
+    }
+    if (!videoTrack) {
+      stopTracks(stream);
+      throw new Error("선택한 화면에서 사용할 수 있는 영상 트랙을 받지 못했습니다.");
+    }
+
+    let localInstalled = false;
+    try {
+      const shareId = this.randomId();
+      const onEnded = () => this.stopShare();
+      videoTrack.addEventListener("ended", onEnded, { once: true });
+      this.localShare = { shareId, stream, endedTrack: videoTrack, onEnded };
+      localInstalled = true;
+      if (!this.room.announceScreen({ shareId, label: "작업 화면" })) {
+        this.stopShare();
+        throw new Error("공동작업 채널에 화면 공유를 알리지 못했습니다.");
+      }
+      this.emitState();
+    } catch (error) {
+      if (!localInstalled) stopTracks(stream);
+      throw error;
+    }
+  }
+
+  stopShare(): void {
+    ++this.shareGeneration;
+    const local = this.localShare;
+    if (!local) return;
+    this.localShare = null;
+    this.room.stopScreen({ shareId: local.shareId });
+    local.endedTrack.removeEventListener("ended", local.onEnded);
+    stopTracks(local.stream);
+    for (const peer of this.hostPeers.values()) closePeer(peer);
+    this.hostPeers.clear();
+    this.pendingRequests.clear();
+    this.viewers.clear();
+    this.emitState();
+  }
+
+  async approveScreenRequest(viewerSessionId: string, shareId: string): Promise<void> {
+    if (this.closed) throw new Error("이미 닫힌 화면 공유 세션입니다.");
+    const local = this.localShare;
+    const request = this.pendingRequests.get(viewerSessionId);
+    if (!local || local.shareId !== shareId || request?.shareId !== shareId) {
+      throw new Error("승인할 수 있는 화면 시청 요청을 찾지 못했습니다.");
+    }
+    if (this.hostPeers.size >= STUDIO_SCREEN_SHARE_MAX_VIEWERS) {
+      this.rejectScreenRequest(viewerSessionId, shareId);
+      throw new Error(`동시 화면 시청자는 최대 ${STUDIO_SCREEN_SHARE_MAX_VIEWERS}명입니다.`);
+    }
+    if (!this.room.respondScreen(viewerSessionId, { shareId, decision: "approved" })) {
+      throw new Error("화면 시청 승인을 전달하지 못했습니다.");
+    }
+
+    this.pendingRequests.delete(viewerSessionId);
+    this.emitState();
+    try {
+      await this.openHostPeer(request.viewer, local);
+    } catch (error) {
+      this.room.respondScreen(viewerSessionId, { shareId, decision: "rejected" });
+      throw error;
+    }
+  }
+
+  rejectScreenRequest(viewerSessionId: string, shareId: string): boolean {
+    const request = this.pendingRequests.get(viewerSessionId);
+    if (!request || request.shareId !== shareId) return false;
+    if (!this.room.respondScreen(viewerSessionId, { shareId, decision: "rejected" })) return false;
+    this.pendingRequests.delete(viewerSessionId);
+    this.emitState();
+    return true;
+  }
+
+  stopViewer(viewerSessionId: string, shareId: string): boolean {
+    const peer = this.hostPeers.get(viewerSessionId);
+    if (!peer || peer.shareId !== shareId) return false;
+    closePeer(peer);
+    this.hostPeers.delete(viewerSessionId);
+    this.viewers.delete(viewerSessionId);
+    const sent = this.room.respondScreen(viewerSessionId, { shareId, decision: "ended" });
+    this.emitState();
+    return sent;
+  }
+
+  watchShare(hostSessionId: string, shareId: string): void {
+    if (this.closed) throw new Error("이미 닫힌 화면 공유 세션입니다.");
+    const share = this.shares.get(shareKey(hostSessionId, shareId));
+    if (!share) throw new Error("현재 공유 중인 화면을 찾지 못했습니다.");
+    this.stopWatching();
+    this.watching = {
+      host: copyParticipant(share.host),
+      shareId,
+      status: "requesting",
+      stream: null,
+    };
+    if (!this.room.requestScreen(hostSessionId, { shareId })) {
+      this.watching = null;
+      throw new Error("화면 시청 요청을 보내지 못했습니다.");
+    }
+    this.emitState();
+  }
+
+  stopWatching(): void {
+    this.stopWatchingInternal(true);
+  }
+
+  private stopWatchingInternal(notifyHost: boolean): void {
+    const watching = this.watching;
+    if (notifyHost && watching) {
+      this.room.respondScreen(watching.host.sessionId, {
+        shareId: watching.shareId,
+        decision: "ended",
+      });
+    }
+    const stream = this.watching?.stream ?? null;
+    this.watching = null;
+    closePeer(this.viewerPeer);
+    this.viewerPeer = null;
+    this.earlyViewerIce.clear();
+    stopTracks(stream);
+    this.emitState();
+  }
+
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.stopShare();
+    this.stopWatching();
+    this.unsubscribeRoom?.();
+    this.unsubscribeRoom = null;
+    this.shares.clear();
+    this.pendingRequests.clear();
+    this.viewers.clear();
+    this.earlyViewerIce.clear();
+    this.knownPeerSessions.clear();
+    this.listeners.clear();
+  }
+
+  private onRoomEvent(event: StudioLiveRoomEvent): void {
+    if (this.closed) return;
+    if (event.type === "presence") {
+      this.reconcilePresence(event.peers);
+      return;
+    }
+    if (event.type !== "signal") return;
+    void this.handleSignal(event.envelope).catch((error: unknown) => {
+      this.emit({ type: "error", message: studioScreenShareErrorMessage(error) });
+    });
+  }
+
+  private reconcilePresence(peers: StudioLivePeer[]): void {
+    const activeSessions = new Set(peers.map((peer) => peer.sessionId));
+    const hasNewPeer = peers.some((peer) => !this.knownPeerSessions.has(peer.sessionId));
+    let changed = false;
+    for (const [key, share] of this.shares) {
+      if (activeSessions.has(share.host.sessionId)) continue;
+      this.shares.delete(key);
+      changed = true;
+      if (this.watching?.host.sessionId === share.host.sessionId) {
+        this.stopWatchingInternal(false);
+      }
+    }
+    for (const [sessionId, request] of this.pendingRequests) {
+      if (activeSessions.has(sessionId)) continue;
+      this.pendingRequests.delete(sessionId);
+      if (request.shareId === this.localShare?.shareId) changed = true;
+    }
+    for (const [sessionId, peer] of this.hostPeers) {
+      if (activeSessions.has(sessionId)) continue;
+      closePeer(peer);
+      this.hostPeers.delete(sessionId);
+      this.viewers.delete(sessionId);
+      changed = true;
+    }
+    this.knownPeerSessions = activeSessions;
+    if (changed) this.emitState();
+    if (hasNewPeer && this.localShare) {
+      this.room.announceScreen({ shareId: this.localShare.shareId, label: "작업 화면" });
+    }
+  }
+
+  private async handleSignal(envelope: StudioLiveSignalEnvelope): Promise<void> {
+    switch (envelope.kind) {
+      case "screen:announce": {
+        const share: StudioRemoteScreenShare = {
+          host: copyParticipant(envelope.sender),
+          shareId: envelope.payload.shareId,
+          label: envelope.payload.label,
+        };
+        this.shares.set(shareKey(share.host.sessionId, share.shareId), share);
+        this.emitState();
+        return;
+      }
+      case "screen:stop": {
+        this.shares.delete(shareKey(envelope.sender.sessionId, envelope.payload.shareId));
+        if (
+          this.watching?.host.sessionId === envelope.sender.sessionId &&
+          this.watching.shareId === envelope.payload.shareId
+        ) {
+          this.stopWatchingInternal(false);
+        } else {
+          this.emitState();
+        }
+        return;
+      }
+      case "screen:request":
+        this.handleWatchRequest(envelope.sender, envelope.payload.shareId);
+        return;
+      case "screen:access":
+        this.handleScreenAccess(
+          envelope.sender,
+          envelope.payload.shareId,
+          envelope.payload.decision
+        );
+        return;
+      case "webrtc:description":
+        if (envelope.payload.type === "offer") {
+          await this.handleOffer(envelope.sender, envelope.payload.shareId, envelope.payload.sdp);
+        } else {
+          await this.handleAnswer(envelope.sender, envelope.payload.shareId, envelope.payload.sdp);
+        }
+        return;
+      case "webrtc:ice":
+        await this.handleIce(envelope.sender, envelope.payload);
+        return;
+    }
+  }
+
+  private handleWatchRequest(viewer: StudioLiveParticipant, shareId: string): void {
+    const local = this.localShare;
+    if (!local || local.shareId !== shareId) return;
+    if (this.hostPeers.has(viewer.sessionId)) return;
+    if (
+      !this.pendingRequests.has(viewer.sessionId) &&
+      this.pendingRequests.size >= STUDIO_SCREEN_SHARE_MAX_PENDING_REQUESTS
+    ) {
+      this.room.respondScreen(viewer.sessionId, { shareId, decision: "rejected" });
+      return;
+    }
+    this.pendingRequests.set(viewer.sessionId, {
+      viewer: copyParticipant(viewer),
+      shareId,
+    });
+    this.emitState();
+  }
+
+  private handleScreenAccess(
+    sender: StudioLiveParticipant,
+    shareId: string,
+    decision: "approved" | "rejected" | "ended"
+  ): void {
+    if (decision === "ended" && this.localShare?.shareId === shareId) {
+      let changed = false;
+      const request = this.pendingRequests.get(sender.sessionId);
+      if (request?.shareId === shareId) {
+        this.pendingRequests.delete(sender.sessionId);
+        changed = true;
+      }
+      const peer = this.hostPeers.get(sender.sessionId);
+      if (peer?.shareId === shareId) {
+        closePeer(peer);
+        this.hostPeers.delete(sender.sessionId);
+        changed = true;
+      }
+      const viewer = this.viewers.get(sender.sessionId);
+      if (viewer?.shareId === shareId) {
+        this.viewers.delete(sender.sessionId);
+        changed = true;
+      }
+      if (changed) {
+        this.emitState();
+        return;
+      }
+    }
+
+    const watching = this.watching;
+    if (
+      !watching ||
+      watching.host.sessionId !== sender.sessionId ||
+      watching.shareId !== shareId
+    ) {
+      return;
+    }
+    if (decision === "approved") {
+      if (watching.status === "requesting") {
+        this.watching = { ...watching, status: "connecting" };
+        this.emitState();
+      }
+      return;
+    }
+    this.stopWatchingInternal(false);
+    this.emit({
+      type: "error",
+      message:
+        decision === "rejected"
+          ? "화면 공유자가 시청 요청을 거절했습니다."
+          : "화면 공유자가 내 시청 연결을 종료했습니다.",
+    });
+  }
+
+  private async openHostPeer(
+    viewer: StudioLiveParticipant,
+    local: LocalShareState
+  ): Promise<void> {
+    const existing = this.hostPeers.get(viewer.sessionId);
+    if (existing) {
+      closePeer(existing);
+      this.hostPeers.delete(viewer.sessionId);
+      this.viewers.delete(viewer.sessionId);
+    }
+
+    const connection = this.createPeerConnection();
+    const peer: PeerState = { connection, shareId: local.shareId, pendingIce: [] };
+    this.hostPeers.set(viewer.sessionId, peer);
+    this.configureIce(peer, viewer.sessionId);
+    connection.onconnectionstatechange = () => {
+      if (connection.connectionState === "connected") {
+        const activeViewer = this.viewers.get(viewer.sessionId);
+        if (activeViewer?.shareId === local.shareId && activeViewer.status !== "live") {
+          this.viewers.set(viewer.sessionId, { ...activeViewer, status: "live" });
+          this.emitState();
+        }
+        return;
+      }
+      if (connection.connectionState !== "failed" && connection.connectionState !== "closed") return;
+      if (this.hostPeers.get(viewer.sessionId) === peer) {
+        this.hostPeers.delete(viewer.sessionId);
+        this.viewers.delete(viewer.sessionId);
+        this.emitState();
+      }
+      closePeer(peer);
+    };
+    for (const track of local.stream.getVideoTracks()) connection.addTrack(track, local.stream);
+    this.viewers.set(viewer.sessionId, {
+      viewer: copyParticipant(viewer),
+      shareId: local.shareId,
+      status: "connecting",
+    });
+    this.emitState();
+
+    try {
+      const offer = await connection.createOffer();
+      if (this.localShare !== local || this.hostPeers.get(viewer.sessionId) !== peer) {
+        throw new Error("화면 공유가 종료되어 시청 연결을 취소했습니다.");
+      }
+      await connection.setLocalDescription(offer);
+      const description = sessionDescription(connection.localDescription ?? offer, "offer");
+      if (
+        !this.room.sendWebRtcDescription(viewer.sessionId, {
+          shareId: local.shareId,
+          ...description,
+        })
+      ) {
+        throw new Error("화면 공유 연결 제안을 보내지 못했습니다.");
+      }
+    } catch (error) {
+      if (this.hostPeers.get(viewer.sessionId) === peer) this.hostPeers.delete(viewer.sessionId);
+      this.viewers.delete(viewer.sessionId);
+      closePeer(peer);
+      this.emitState();
+      throw error;
+    }
+  }
+
+  private async handleOffer(host: StudioLiveParticipant, shareId: string, sdp: string): Promise<void> {
+    const watching = this.watching;
+    if (
+      !watching ||
+      watching.host.sessionId !== host.sessionId ||
+      watching.shareId !== shareId
+    ) {
+      // No implicit playback: an offer is ignored unless the viewer explicitly requested it.
+      return;
+    }
+    closePeer(this.viewerPeer);
+    const connection = this.createPeerConnection();
+    const earlyIceKey = shareKey(host.sessionId, shareId);
+    const pendingIce = this.earlyViewerIce.get(earlyIceKey) ?? [];
+    this.earlyViewerIce.delete(earlyIceKey);
+    const peer: PeerState = { connection, shareId, pendingIce };
+    this.viewerPeer = peer;
+    this.watching = { ...watching, status: "connecting" };
+    this.configureIce(peer, host.sessionId);
+    connection.ontrack = (event) => {
+      if (this.viewerPeer !== peer || !this.watching) return;
+      if (event.track.kind !== "video") {
+        event.track.stop();
+        return;
+      }
+      const stream = event.streams[0] ?? this.createMediaStream([event.track]);
+      this.watching = { ...this.watching, status: "live", stream };
+      this.emitState();
+    };
+    connection.onconnectionstatechange = () => {
+      if (connection.connectionState !== "failed" && connection.connectionState !== "closed") return;
+      if (this.viewerPeer === peer) this.stopWatchingInternal(true);
+    };
+    this.emitState();
+
+    try {
+      await connection.setRemoteDescription({ type: "offer", sdp });
+      await this.flushIce(peer);
+      const answer = await connection.createAnswer();
+      await connection.setLocalDescription(answer);
+      const description = sessionDescription(connection.localDescription ?? answer, "answer");
+      if (!this.room.sendWebRtcDescription(host.sessionId, { shareId, ...description })) {
+        throw new Error("화면 공유 연결 응답을 보내지 못했습니다.");
+      }
+    } catch (error) {
+      if (this.viewerPeer === peer) this.stopWatchingInternal(true);
+      throw error;
+    }
+  }
+
+  private async handleAnswer(
+    viewer: StudioLiveParticipant,
+    shareId: string,
+    sdp: string
+  ): Promise<void> {
+    const peer = this.hostPeers.get(viewer.sessionId);
+    if (!peer || peer.shareId !== shareId) return;
+    await peer.connection.setRemoteDescription({ type: "answer", sdp });
+    await this.flushIce(peer);
+  }
+
+  private async handleIce(
+    sender: StudioLiveParticipant,
+    payload: StudioLiveWebRtcIcePayload
+  ): Promise<void> {
+    const init: RTCIceCandidateInit = {
+      candidate: payload.candidate,
+      sdpMid: payload.sdpMid,
+      sdpMLineIndex: payload.sdpMLineIndex,
+      usernameFragment: payload.usernameFragment,
+    };
+    const hostPeer = this.hostPeers.get(sender.sessionId);
+    if (hostPeer?.shareId === payload.shareId) {
+      try {
+        await this.addOrQueueIce(hostPeer, init);
+      } catch (error) {
+        this.stopViewer(sender.sessionId, payload.shareId);
+        throw error;
+      }
+      return;
+    }
+    if (
+      this.watching?.host.sessionId === sender.sessionId
+    ) {
+      if (this.viewerPeer?.shareId === payload.shareId) {
+        try {
+          await this.addOrQueueIce(this.viewerPeer, init);
+        } catch (error) {
+          this.stopWatchingInternal(true);
+          throw error;
+        }
+        return;
+      }
+      if (this.watching.shareId === payload.shareId) {
+        const key = shareKey(sender.sessionId, payload.shareId);
+        const queued = this.earlyViewerIce.get(key) ?? [];
+        if (queued.length >= STUDIO_SCREEN_SHARE_MAX_PENDING_ICE) {
+          this.stopWatchingInternal(true);
+          throw new Error("WebRTC 네트워크 후보가 너무 많이 대기하여 시청 연결을 종료했습니다.");
+        }
+        queued.push(init);
+        this.earlyViewerIce.set(key, queued);
+      }
+    }
+  }
+
+  private configureIce(peer: PeerState, targetSessionId: string): void {
+    peer.connection.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      const payload = candidatePayload(peer.shareId, event.candidate);
+      if (!payload) return;
+      if (!this.room.sendWebRtcIce(targetSessionId, payload)) {
+        this.emit({ type: "error", message: "WebRTC 네트워크 후보를 보내지 못했습니다." });
+      }
+    };
+  }
+
+  private async addOrQueueIce(peer: PeerState, candidate: RTCIceCandidateInit): Promise<void> {
+    if (!peer.connection.remoteDescription) {
+      if (peer.pendingIce.length >= STUDIO_SCREEN_SHARE_MAX_PENDING_ICE) {
+        throw new Error("WebRTC 네트워크 후보가 너무 많이 대기하여 연결을 종료했습니다.");
+      }
+      peer.pendingIce.push(candidate);
+      return;
+    }
+    await peer.connection.addIceCandidate(candidate);
+  }
+
+  private async flushIce(peer: PeerState): Promise<void> {
+    const queued = peer.pendingIce.splice(0);
+    for (const candidate of queued) await peer.connection.addIceCandidate(candidate);
+  }
+
+  private emitState(): void {
+    this.emit({ type: "state", state: this.getState() });
+  }
+
+  private emit(event: StudioScreenShareEvent): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch {
+        // A broken view subscriber must not keep camera/screen tracks alive.
+      }
+    }
+  }
+}
