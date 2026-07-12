@@ -1,5 +1,6 @@
 import {
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
+  assertStudioLiveCursorPayload,
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
   studioLocalLiveChannelName,
@@ -266,9 +267,11 @@ export class StudioLiveRoom {
   }
 
   updatePresence(patch: Partial<StudioLivePresencePayload>): void {
+    const tool = patch.tool === undefined ? this.presence.tool : patch.tool;
     const next: StudioLivePresencePayload = {
       visibility: patch.visibility ?? this.presence.visibility,
       pageId: patch.pageId === undefined ? this.presence.pageId : patch.pageId,
+      ...(tool === undefined ? {} : { tool }),
     };
     // Envelope creation is also the runtime validator for UI-derived page ids.
     createStudioLiveEnvelope({
@@ -286,18 +289,17 @@ export class StudioLiveRoom {
   publishCursor(cursor: StudioLiveCursorPayload): boolean {
     if (!this.ready) return false;
     const now = this.now();
-    createStudioLiveEnvelope({
-      workId: this.workId,
-      sender: this.participant,
-      sentAt: now,
-      sequence: Math.max(1, this.sequence + 1),
-      kind: "cursor:update",
-      payload: cursor,
-    });
+    assertStudioLiveCursorPayload(cursor);
     if (now - this.lastCursorSentAt < this.cursorIntervalMs) return false;
     const sent = this.post("cursor:update", cursor, null, now);
     if (sent) this.lastCursorSentAt = now;
     return sent;
+  }
+
+  /** Clears a remote pointer immediately; leave/page/visibility boundaries must not wait for TTL. */
+  clearCursor(): boolean {
+    if (!this.ready) return false;
+    return this.post("cursor:update", { x: 0, y: 0, pageId: null, tool: null });
   }
 
   claimLock(resource: string): boolean {
@@ -420,7 +422,17 @@ export class StudioLiveRoom {
   }
 
   private sendPresence(kind: "presence:hello" | "presence:heartbeat"): void {
-    this.post(kind, this.presence);
+    // v1 BroadcastChannel clients validate presence with an exact two-key payload. Keep the
+    // same-origin wire shape rolling-deploy compatible while allowing the authenticated socket
+    // adapter to publish the active tool through the server's existing presence contract.
+    const payload: StudioLivePresencePayload =
+      this.transport?.mode === "server"
+        ? this.presence
+        : {
+            visibility: this.presence.visibility,
+            pageId: this.presence.pageId,
+          };
+    this.post(kind, payload);
   }
 
   private buildEnvelope<K extends StudioLiveMessageKind>(

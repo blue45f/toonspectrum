@@ -44,6 +44,7 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     screenState: screenState(),
     screenSupported: true,
     serverAvailable: false,
+    localFallbackAllowed: true,
     usingLocalFallback: false,
     busyAction: null,
     error: null,
@@ -121,6 +122,17 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(failed).toContain("팀 서버 다시 연결");
     expect(failed).toContain("로컬 탭 모드");
     expect(failed.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+
+    const terminalFailure = renderView({
+      availability: "error",
+      mode: "server",
+      serverAvailable: true,
+      localFallbackAllowed: false,
+      error: "작품 접근 권한이 회수되었습니다.",
+    });
+    expect(terminalFailure).toContain("로컬 탭 모드");
+    expect(terminalFailure).toContain("disabled");
+    expect(terminalFailure).toContain("로컬 모드로 우회할 수 없습니다");
 
     const operationFailure = renderView({
       availability: "ready",

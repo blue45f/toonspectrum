@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createStudioLiveEnvelope, type StudioLiveParticipant } from "./studio-live-collaboration-protocol";
+import {
+  createStudioLiveEnvelope,
+  type StudioLiveEnvelope,
+  type StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 import {
   StudioLiveRoom,
   type StudioLiveRoomDependencies,
@@ -75,6 +79,7 @@ class FakeHubTransport implements StudioLiveTransport {
 
 class FakeTransportHub {
   readonly transports: FakeHubTransport[] = [];
+  readonly published: StudioLiveEnvelope[] = [];
   queued = false;
   private queue: Array<{ sender: FakeHubTransport; value: unknown }> = [];
 
@@ -87,6 +92,7 @@ class FakeTransportHub {
   }
 
   publish(sender: FakeHubTransport, value: unknown): void {
+    this.published.push(structuredClone(value) as StudioLiveEnvelope);
     if (this.queued) {
       this.queue.push({ sender, value: structuredClone(value) });
       return;
@@ -195,6 +201,29 @@ describe("StudioLiveRoom", () => {
     serverRoom.close();
   });
 
+  it("keeps local v1 presence exact-key compatible while publishing tools to server presence", async () => {
+    const local = harness("local");
+    const localRoom = local.room(alice);
+    await localRoom.start();
+    localRoom.updatePresence({ pageId: "page-2", tool: "pen" });
+    const localPresence = local.hub.published.at(-1);
+    expect(localPresence?.kind).toBe("presence:heartbeat");
+    expect(localPresence?.payload).toEqual({ visibility: "active", pageId: "page-2" });
+    expect(localPresence?.payload).not.toHaveProperty("tool");
+    localRoom.close();
+
+    const server = harness("server");
+    const serverRoom = server.room(alice);
+    await serverRoom.start();
+    serverRoom.updatePresence({ pageId: "page-2", tool: "pen" });
+    expect(server.hub.published.at(-1)?.payload).toEqual({
+      visibility: "active",
+      pageId: "page-2",
+      tool: "pen",
+    });
+    serverRoom.close();
+  });
+
   it("drops cross-work, self and replayed messages before emitting cursor state", async () => {
     const test = harness();
     const room = test.room(alice);
@@ -242,6 +271,12 @@ describe("StudioLiveRoom", () => {
     test.advance(40);
     expect(roomA.publishCursor({ x: 0.1, y: 0.9, pageId: "page-1", tool: "pen" })).toBe(true);
     expect(received).toHaveLength(2);
+    expect(roomA.clearCursor()).toBe(true);
+    expect(received.at(-1)).toEqual(
+      expect.objectContaining({
+        cursor: { x: 0, y: 0, pageId: null, tool: null },
+      })
+    );
     expect(() => roomA.publishCursor({ x: -1, y: 2, pageId: null, tool: null })).toThrow(
       "유효하지 않은 실시간 협업 메시지"
     );

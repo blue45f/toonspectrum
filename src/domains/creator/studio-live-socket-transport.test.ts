@@ -350,6 +350,69 @@ describe("StudioLiveSocketTransport", () => {
     transport.close();
   });
 
+  it("preserves active-tool metadata through presence while keeping cursor payloads rollout-compatible", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    received.length = 0;
+
+    expect(
+      transport.send(
+        envelope(
+          "presence:heartbeat",
+          { visibility: "active", pageId: "page-1", tool: "pen" },
+          2
+        )
+      )
+    ).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:presence",
+      payload: { workId: "work-1", state: "active", pageId: "page-1", tool: "pen" },
+    });
+
+    expect(
+      transport.send(
+        envelope(
+          "cursor:update",
+          { x: 0.25, y: 0.75, pageId: "page-1", tool: "pen" },
+          3
+        )
+      )
+    ).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:cursor",
+      payload: {
+        workId: "work-1",
+        pageId: "page-1",
+        x: 0.25,
+        y: 0.75,
+      },
+    });
+
+    socket.serverEmit("studio:presence:update", { ...remote, tool: "bubble" });
+    received.length = 0;
+    socket.serverEmit("studio:cursor", {
+      connectionId: remote.connectionId,
+      pageId: "page-1",
+      x: 0.5,
+      y: 0.6,
+    });
+    expect(received.at(-1)).toEqual(
+      expect.objectContaining({
+        kind: "cursor:update",
+        payload: { x: 0.5, y: 0.6, pageId: "page-1", tool: "bubble" },
+      })
+    );
+
+    transport.close();
+  });
+
   it("drops a signal without shareId instead of attributing it to an earlier screen lifecycle", async () => {
     const socket = new FakeSocket({ sessionToken: TOKEN });
     const transport = new StudioLiveSocketTransport(context(), TOKEN, {

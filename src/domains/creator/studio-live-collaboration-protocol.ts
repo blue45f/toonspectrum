@@ -33,6 +33,8 @@ export interface StudioLiveParticipant {
 export interface StudioLivePresencePayload {
   visibility: "active" | "idle";
   pageId: string | null;
+  /** Optional for v1 local-envelope compatibility; server transports may publish active tool here. */
+  tool?: string | null;
 }
 
 export interface StudioLiveCursorPayload {
@@ -266,9 +268,11 @@ function isNormalizedRatio(value: unknown): value is number {
 function isPresencePayload(value: unknown): value is StudioLivePresencePayload {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["visibility", "pageId"]) &&
+    (hasExactKeys(value, ["visibility", "pageId"]) ||
+      hasExactKeys(value, ["visibility", "pageId", "tool"])) &&
     (value.visibility === "active" || value.visibility === "idle") &&
-    nullableId(value.pageId)
+    nullableId(value.pageId) &&
+    (value.tool === undefined || value.tool === null || exactString(value.tool, MAX_TOOL_LENGTH))
   );
 }
 
@@ -285,6 +289,15 @@ function isCursorPayload(value: unknown): value is StudioLiveCursorPayload {
     nullableId(value.pageId) &&
     (value.tool === null || exactString(value.tool, MAX_TOOL_LENGTH))
   );
+}
+
+/** Cheap hot-path validation used before cursor throttling; full envelope/byte validation follows on send. */
+export function assertStudioLiveCursorPayload(
+  value: unknown
+): asserts value is StudioLiveCursorPayload {
+  if (!isCursorPayload(value)) {
+    throw new StudioLiveProtocolError("유효하지 않은 실시간 협업 메시지입니다.");
+  }
 }
 
 function isLockClaimPayload(

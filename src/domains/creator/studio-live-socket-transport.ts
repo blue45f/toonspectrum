@@ -363,7 +363,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
             workId: this.context.workId,
             state: payload.visibility,
             pageId: payload.pageId,
-            tool: null,
+            tool: payload.tool ?? null,
           });
           this.flushInitialSnapshot();
           return true;
@@ -633,7 +633,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       typeof value.y !== "number" ||
       !Number.isFinite(value.y) ||
       value.y < 0 ||
-      value.y > 1
+      value.y > 1 ||
+      (value.tool !== undefined && !nullableString(value.tool, 48))
     ) {
       return;
     }
@@ -643,7 +644,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       x: value.x,
       y: value.y,
       pageId: value.pageId,
-      tool: participant.tool,
+      tool: value.tool === undefined ? participant.tool : value.tool,
     });
   };
 

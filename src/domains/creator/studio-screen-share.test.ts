@@ -15,6 +15,7 @@ import {
 } from "./studio-screen-share";
 
 import type {
+  StudioLivePeer,
   StudioLiveRoomEvent,
   StudioLiveSignalEnvelope,
 } from "./studio-live-collaboration-room";
@@ -136,6 +137,7 @@ class FakePeerConnection {
 class FakeRoom implements StudioScreenShareRoom {
   readonly participant = local;
   readonly listeners = new Set<(event: StudioLiveRoomEvent) => void>();
+  peers: StudioLivePeer[] = [];
   readonly announcements: Array<{ shareId: string; label: string }> = [];
   readonly requests: Array<{ target: string; shareId: string }> = [];
   readonly descriptions: Array<{
@@ -152,6 +154,10 @@ class FakeRoom implements StudioScreenShareRoom {
   }> = [];
   readonly stops: string[] = [];
   sendResult = true;
+
+  getPeers(): StudioLivePeer[] {
+    return this.peers.map((peer) => ({ ...peer }));
+  }
 
   subscribe(listener: (event: StudioLiveRoomEvent) => void) {
     this.listeners.add(listener);
@@ -234,6 +240,47 @@ function emitSignal(room: FakeRoom, envelope: StudioLiveSignalEnvelope) {
 }
 
 describe("StudioScreenShareController", () => {
+  it("discovers shares that began before a viewer opened the team panel", async () => {
+    const lateViewerRoom = new FakeRoom();
+    lateViewerRoom.peers = [
+      {
+        ...remote,
+        visibility: "active",
+        pageId: "page-1",
+        lastSeenAt: 1,
+      },
+    ];
+
+    const lateViewerController = new StudioScreenShareController(lateViewerRoom);
+    expect(lateViewerRoom.requests).toEqual([
+      expect.objectContaining({
+        target: remote.sessionId,
+        shareId: expect.stringContaining("discovery"),
+      }),
+    ]);
+    const discoveryId = lateViewerRoom.requests[0].shareId;
+
+    const hostRoom = new FakeRoom();
+    const hostController = new StudioScreenShareController(hostRoom, {
+      getDisplayMedia: () => Promise.resolve(fakeStream([new FakeTrack()])),
+      randomId: () => "share-already-running",
+    });
+    await hostController.startShare();
+    emitSignal(
+      hostRoom,
+      signal("screen:request", { shareId: discoveryId }, local.sessionId)
+    );
+
+    expect(hostRoom.announcements).toEqual([
+      { shareId: "share-already-running", label: "작업 화면" },
+      { shareId: "share-already-running", label: "작업 화면" },
+    ]);
+    expect(hostController.getState().pendingRequests).toEqual([]);
+
+    lateViewerController.close();
+    hostController.close();
+  });
+
   it("starts capture only through an explicit call, excludes audio and hides native source labels", async () => {
     const room = new FakeRoom();
     const track = new FakeTrack();

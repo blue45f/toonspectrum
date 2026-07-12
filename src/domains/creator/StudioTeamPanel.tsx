@@ -55,8 +55,6 @@ import {
 import { StudioLiveCollaborationPanel } from "./StudioLiveCollaborationPanel";
 import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
 
-import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
-
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -66,8 +64,6 @@ export interface StudioTeamPanelProps {
   workId: string | null;
   loggedIn: boolean;
   authScopeKey: string | null;
-  /** Authenticated server adapter may be injected; omitted uses same-origin local tabs only. */
-  liveTransportFactory?: StudioLiveTransportFactory;
 }
 
 const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> = {
@@ -1001,9 +997,10 @@ export function StudioTeamPanelView({
 
       <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
         공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다.
-        위 같이 보기는 로그인 세션과 작품 권한을 확인한 팀 서버를 우선하며, 연결 실패 때 사용자가 직접
-        선택한 경우에만 같은 출처 로컬 탭 모드로 전환됩니다. 서버 앵커 댓글과 캔버스에서 원격
-        페이지·요소 잠금을 실제 편집에 강제하는 기능은 아직 제공 범위가 아닙니다.
+        위 같이 보기는 로그인 세션과 작품 권한을 확인한 팀 서버를 우선하며, 패널을 닫아도 캔버스
+        커서·접속 상태·페이지 따라가기는 유지됩니다. 연결 실패 때 사용자가 직접 선택한 경우에만 같은
+        출처 로컬 탭 모드로 전환됩니다. 서버 저장형 검토 댓글과 원격 페이지·요소 잠금의 실제 편집
+        강제는 다음 안전성 단계에서 연결합니다.
       </p>
     </div>
   );
@@ -1026,7 +1023,6 @@ export function StudioTeamPanel({
   workId,
   loggedIn,
   authScopeKey,
-  liveTransportFactory,
 }: StudioTeamPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -1580,9 +1576,6 @@ export function StudioTeamPanel({
           visibleSnapshot?.viewer.status === "active" &&
           visibleSnapshot.viewer.capabilities.view ? (
             <StudioLiveCollaborationPanel
-              snapshot={visibleSnapshot}
-              transportFactory={liveTransportFactory}
-              workId={workId}
             />
           ) : null}
           <StudioTeamPanelView

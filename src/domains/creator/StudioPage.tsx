@@ -97,7 +97,7 @@ import {
   History as HistoryIcon,
   Wind,
 } from "lucide-react";
-import { Fragment, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -289,6 +289,7 @@ import {
 import {
   createEmptyStudioCommentsDocument,
   normalizeStudioCommentsDocument,
+  studioCommentAnchorsEqual,
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
@@ -460,6 +461,7 @@ import {
   ungroupItems,
   type LayerGroup,
 } from "./studio-layers";
+import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import {
   computeMagicResize,
@@ -766,6 +768,11 @@ import {
   type StudioLayerNavigatorAction,
 } from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
+import {
+  StudioLivePresenceDockConnected,
+  StudioRemoteCursorOverlay,
+} from "./StudioLiveCanvasOverlay";
+import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -809,6 +816,7 @@ import type {
   StudioLayerRole,
 } from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
+import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { Outline } from "./studio-outline";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -2050,7 +2058,7 @@ function QuickStartPanel({
   ];
 
   return (
-    <div className="absolute inset-x-2 top-2 z-20 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4">
+    <div className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold">빠른 시작</p>
@@ -3906,6 +3914,12 @@ function StudioCuttoonEditor() {
         : undefined,
     [studioSessionToken]
   );
+  // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
+  // to live cursor state. The always-mounted provider owns and rotates the actual room.
+  const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
+    studioLiveRoomRef.current = room;
+  }, []);
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
@@ -3925,6 +3939,16 @@ function StudioCuttoonEditor() {
     sharedDocumentScope?.authScopeKey === studioAuthUserId &&
     sharedDocumentScope.workId === workId
       ? sharedDocumentScope.value
+      : null;
+  const studioLiveParticipant =
+    workId &&
+    studioAuthUserId &&
+    sharedDocument?.status === "active" &&
+    sharedDocument.capabilities.view
+      ? {
+          displayName: session?.user?.name ?? "내 작업",
+          role: sharedDocument.role,
+        }
       : null;
   // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
   // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
@@ -4344,6 +4368,7 @@ function StudioCuttoonEditor() {
   const [pageReviewOpen, setPageReviewOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
+  const [followingStudioSessionId, setFollowingStudioSessionId] = useState<string | null>(null);
   const [productionInsightsOpen, setProductionInsightsOpen] = useState(false);
   const [publicationOperationsOpen, setPublicationOperationsOpen] = useState(false);
   useEffect(() => {
@@ -6784,6 +6809,56 @@ function StudioCuttoonEditor() {
     setTool("select");
     setError(null);
   }
+  const studioOpenCanvasThreads = collaborationDocumentLocked || masterEditMode
+    ? []
+    : studioComments.threads.filter(
+        (thread) => !thread.resolved && thread.anchor.pageId === activePage.id
+      );
+  const studioCanvasCommentTargetIds = new Set(
+    studioOpenCanvasThreads.flatMap((thread) =>
+      thread.anchor.type === "frame"
+        ? [thread.anchor.frameId]
+        : thread.anchor.type === "element"
+          ? [thread.anchor.elementId]
+          : []
+    )
+  );
+  const studioCanvasCommentBounds = new Map<string, {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>();
+  if (studioCanvasCommentTargetIds.size > 0) {
+    for (const element of activePage.elements) {
+      if (!studioCanvasCommentTargetIds.has(element.id)) continue;
+      const bounds = elBounds(element);
+      studioCanvasCommentBounds.set(element.id, {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.w,
+        height: bounds.h,
+      });
+    }
+  }
+  const studioCanvasCommentPins = studioOpenCanvasThreads.length > 0
+    ? projectStudioCanvasCommentPins({
+        threads: studioOpenCanvasThreads,
+        pageId: activePage.id,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        boundsByElementId: studioCanvasCommentBounds,
+        labelForAnchor: (anchor) =>
+          studioCommentAnchorOptions.find((option) =>
+            studioCommentAnchorsEqual(option.anchor, anchor)
+          )?.label ??
+          (anchor.type === "page"
+            ? "페이지 댓글"
+            : anchor.type === "frame"
+              ? "컷 댓글"
+              : "요소 댓글"),
+      })
+    : [];
   const advancedFillRasterLayers: StudioFillReferenceLayer[] = elements
     .filter((element): element is ImageEl & El => element.type === "image")
     .map((element) => ({
@@ -12523,6 +12598,19 @@ function StudioCuttoonEditor() {
     cursor.getLayer()?.batchDraw();
   }
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    // Figma-style multiplayer cursor publication must run before every tool-specific early return.
+    // StudioLiveRoom performs the 40ms wire throttle; this path never writes React state.
+    if (!isExporting && canvasH > 0) {
+      const pointer = e.target.getStage()?.getRelativePointerPosition();
+      if (pointer) {
+        studioLiveRoomRef.current?.publishCursor({
+          x: Math.max(0, Math.min(1, pointer.x / CANVAS_W)),
+          y: Math.max(0, Math.min(1, pointer.y / canvasH)),
+          pageId: activePage.id,
+          tool,
+        });
+      }
+    }
     // 색상 휠 롱프레스 타이머가 아직 대기 중인데 임계값(6px) 넘게 움직였으면 드래그/클릭으로
     // 보고 취소한다. colorWheelOpen 이 이미 true 인 동안은 오버레이가 캔버스를 덮어 이 핸들러
     // 자체가 더 안 불리므로 별도 가드가 필요 없다.
@@ -15053,6 +15141,15 @@ function StudioCuttoonEditor() {
   }
 
   return (
+    <StudioLiveCollaborationProvider
+      workId={workId}
+      participant={studioLiveParticipant}
+      currentPageId={activePage.id}
+      currentTool={tool}
+      transportFactory={studioLiveTransportFactory}
+      serverRequired={Boolean(studioLiveParticipant)}
+      onRoomChange={handleStudioLiveRoomChange}
+    >
     <div
       ref={studioRootRef}
       className={cn(
@@ -17827,6 +17924,23 @@ function StudioCuttoonEditor() {
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
+          <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
+            <StudioLivePresenceDockConnected
+              followingSessionId={followingStudioSessionId}
+              onOpenTeam={() => setTeamPanelOpen(true)}
+              onToggleFollow={(sessionId) =>
+                setFollowingStudioSessionId((current) =>
+                  current === sessionId ? null : sessionId
+                )
+              }
+              onFollowPage={(pageId) => {
+                if (pageId === activePage.id || !pages.some((page) => page.id === pageId)) return;
+                setCurrentPageId(pageId);
+                setSelectedId(null);
+                setTool("select");
+              }}
+            />
+          </div>
           {sourceHydrationPending || collaborationDocumentUnavailable ? (
             <div className="sticky left-0 top-0 z-20 grid min-h-[15rem] w-full place-items-center px-6 py-10 text-center lg:min-h-[20rem]">
               <span className="max-w-sm">
@@ -17901,6 +18015,7 @@ function StudioCuttoonEditor() {
             onPointerUp={onStageUp}
             onPointerCancel={onStagePointerCancel}
             onMouseLeave={() => {
+              studioLiveRoomRef.current?.clearCursor();
               clearAdvancedFillTapGesture();
               hideBrushCursor();
               hideSmudgeCursor();
@@ -19511,6 +19626,20 @@ function StudioCuttoonEditor() {
               style={{ background: vignetteCss(pageGrade.vignette) }}
             />
           )}
+          {!masterEditMode ? (
+            <StudioRemoteCursorOverlay
+              pageId={activePage.id}
+              canvasWidth={CANVAS_W}
+              canvasHeight={canvasH}
+              hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
+              commentPins={collaborationDocumentLocked ? [] : studioCanvasCommentPins}
+              onCommentPinClick={(anchor) => {
+                selectStudioCommentAnchor(anchor);
+                setTeamPanelOpen(false);
+                setCommentsOpen(true);
+              }}
+            />
+          ) : null}
           </div>
           </div>
 
@@ -23601,7 +23730,6 @@ function StudioCuttoonEditor() {
             onClose={() => setTeamPanelOpen(false)}
             workId={workId}
             loggedIn={loggedIn}
-            liveTransportFactory={studioLiveTransportFactory}
           />
         ) : null}
       </Suspense>
@@ -24121,5 +24249,6 @@ function StudioCuttoonEditor() {
       )}
     </Container>
     </div>
+    </StudioLiveCollaborationProvider>
   );
 }

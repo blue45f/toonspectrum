@@ -9,6 +9,7 @@ import {
   STUDIO_LIVE_SDP_MAX_LENGTH,
   STUDIO_LIVE_SDP_MID_MAX_LENGTH,
   STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
+  StudioLiveProtocolError,
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
   studioLiveJsonEscapedContentByteLength,
@@ -59,6 +60,16 @@ describe("studio live collaboration protocol", () => {
     const value = message("presence:hello", { visibility: "active", pageId: "page-1" });
 
     expect(parse(value)).toEqual(value);
+    expect(
+      parse(message("presence:heartbeat", { visibility: "active", pageId: "page-1", tool: "pen" }))
+    ).not.toBeNull();
+    expect(() =>
+      message("presence:heartbeat", {
+        visibility: "active",
+        pageId: "page-1",
+        tool: "pen\nforged",
+      })
+    ).toThrow(StudioLiveProtocolError);
     expect(Object.keys(value.sender).sort()).toEqual(["displayName", "role", "sessionId"]);
     expect(value.sender).not.toHaveProperty("userId");
   });

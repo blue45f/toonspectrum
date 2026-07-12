@@ -13,13 +13,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type Ref } from "react";
 
-import { studioLiveDisplayName } from "./studio-live-collaboration-protocol";
-import { StudioLiveRoom, type StudioLivePeer } from "./studio-live-collaboration-room";
 import {
-  isStudioLocalLiveTransportSupported,
-  type StudioLiveTransportFactory,
-  type StudioLiveTransportMode,
-} from "./studio-live-collaboration-transport";
+  useStudioLiveCollaboration,
+  type StudioLiveAvailability,
+} from "./studio-live-collaboration-context";
 import {
   StudioScreenShareController,
   isStudioScreenShareSupported,
@@ -30,7 +27,9 @@ import {
   type StudioScreenShareViewer,
 } from "./studio-screen-share";
 
-import type { StudioTeamRole, StudioTeamSnapshot } from "./studio-team-client";
+import type { StudioLivePeer } from "./studio-live-collaboration-room";
+import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
+import type { StudioTeamRole } from "./studio-team-client";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -51,22 +50,14 @@ const EMPTY_SCREEN_STATE: StudioScreenShareState = {
   viewers: [],
 };
 
-type LiveAvailability = "connecting" | "ready" | "unsupported" | "error";
-
-export interface StudioLiveCollaborationPanelProps {
-  workId: string;
-  snapshot: StudioTeamSnapshot;
-  /** Optional authenticated server adapter; omitted means same-origin BroadcastChannel tabs. */
-  transportFactory?: StudioLiveTransportFactory;
-}
-
 export interface StudioLiveCollaborationPanelViewProps {
-  availability: LiveAvailability;
+  availability: StudioLiveAvailability;
   mode: StudioLiveTransportMode | null;
   peers: StudioLivePeer[];
   screenState: StudioScreenShareState;
   screenSupported: boolean;
   serverAvailable: boolean;
+  localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
   busyAction: string | null;
   error: string | null;
@@ -86,14 +77,8 @@ function tabInitial(name: string): string {
   return Array.from(name.trim())[0]?.toLocaleUpperCase("ko-KR") ?? "?";
 }
 
-function localSessionId(): string {
-  if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
-    throw new Error("안전한 로컬 협업 세션을 만들 수 없습니다.");
-  }
-  return crypto.randomUUID();
-}
-
-function statusCopy(availability: LiveAvailability, mode: StudioLiveTransportMode | null) {
+function statusCopy(availability: StudioLiveAvailability, mode: StudioLiveTransportMode | null) {
+  if (availability === "idle") return "연결 대기";
   if (availability === "connecting") return "연결 준비 중";
   if (availability === "unsupported") return "브라우저 미지원";
   if (availability === "error") return "연결 오류";
@@ -111,6 +96,7 @@ export function StudioLiveCollaborationPanelView({
   screenState,
   screenSupported,
   serverAvailable,
+  localFallbackAllowed,
   usingLocalFallback,
   busyAction,
   error,
@@ -205,7 +191,18 @@ export function StudioLiveCollaborationPanelView({
               <Radio size={15} aria-hidden="true" /> 팀 서버 다시 연결
             </Button>
             {!usingLocalFallback ? (
-              <Button className="min-h-11" type="button" variant="quiet" onClick={onUseLocalFallback}>
+              <Button
+                className="min-h-11"
+                disabled={!localFallbackAllowed}
+                title={
+                  localFallbackAllowed
+                    ? undefined
+                    : "권한 회수 또는 인증 실패 뒤에는 로컬 모드로 우회할 수 없습니다."
+                }
+                type="button"
+                variant="quiet"
+                onClick={onUseLocalFallback}
+              >
                 <UsersRound size={15} aria-hidden="true" /> 로컬 탭 모드
               </Button>
             ) : null}
@@ -482,164 +479,48 @@ export function StudioLiveCollaborationPanelView({
   );
 }
 
-export function StudioLiveCollaborationPanel({
-  workId,
-  snapshot,
-  transportFactory,
-}: StudioLiveCollaborationPanelProps) {
-  const viewer = snapshot.viewer;
-  const viewerName =
-    snapshot.members.find((member) => member.userId === viewer.userId)?.name ?? "내 작업";
-  const roomRef = useRef<StudioLiveRoom | null>(null);
+export function StudioLiveCollaborationPanel() {
+  const live = useStudioLiveCollaboration();
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [availability, setAvailability] = useState<LiveAvailability>("connecting");
-  const [mode, setMode] = useState<StudioLiveTransportMode | null>(null);
-  const [peers, setPeers] = useState<StudioLivePeer[]>([]);
   const [screenState, setScreenState] = useState<StudioScreenShareState>(EMPTY_SCREEN_STATE);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [transportPreference, setTransportPreference] = useState<"server" | "local">(
-    transportFactory ? "server" : "local"
-  );
-  const [transportRetryKey, setTransportRetryKey] = useState(0);
-  const observedTransportFactoryRef = useRef(transportFactory);
-  const selectedTransportFactory =
-    transportPreference === "server" ? transportFactory : undefined;
+  const [screenError, setScreenError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (observedTransportFactoryRef.current === transportFactory) return;
-    observedTransportFactoryRef.current = transportFactory;
-    setTransportPreference(transportFactory ? "server" : "local");
-  }, [transportFactory]);
-
-  useEffect(() => {
+    const room = live.room;
     let cancelled = false;
-    // A retry, token rotation or explicit local fallback owns a new controller generation. An
-    // unresolved picker/approval promise from the closed generation must not keep its controls busy.
     setBusyAction(null);
-    if (
-      snapshot.workId !== workId ||
-      viewer.status !== "active" ||
-      !viewer.capabilities.view ||
-      (!selectedTransportFactory && !isStudioLocalLiveTransportSupported())
-    ) {
-      setAvailability("unsupported");
-      setMode(null);
-      setPeers([]);
-      setScreenState(EMPTY_SCREEN_STATE);
-      return;
-    }
-
-    setAvailability("connecting");
-    setMode(selectedTransportFactory ? "server" : "local");
-    setPeers([]);
     setScreenState(EMPTY_SCREEN_STATE);
-    setError(null);
-    let room: StudioLiveRoom;
-    try {
-      room = new StudioLiveRoom({
-        workId,
-        participant: {
-          sessionId: localSessionId(),
-          displayName: studioLiveDisplayName(viewerName, {
-            suffix: "· 이 탭",
-            fallback: "내 작업",
-          }),
-          role: viewer.role,
-        },
-        ...(selectedTransportFactory
-          ? { dependencies: { transportFactory: selectedTransportFactory } }
-          : {}),
-      });
-    } catch (roomError) {
-      setAvailability("error");
-      setError(roomError instanceof Error ? roomError.message : "공동작업 세션을 만들지 못했습니다.");
-      return;
-    }
+    setScreenError(null);
+    if (!room) return;
+
     const screenController = new StudioScreenShareController(room);
-    roomRef.current = room;
     screenControllerRef.current = screenController;
 
     const unsubscribeRoom = room.subscribe((event) => {
-      if (cancelled) return;
-      if (event.type === "presence") setPeers(event.peers);
-      if (event.type === "transport-error") setError(event.message);
-      if (event.type === "transport-status") {
-        setMode(room.mode);
-        setError(event.status.state === "ready" ? null : event.status.message);
-        if (!event.status.recoverable) {
-          // Access revocation must terminate already-captured tracks and P2P media immediately;
-          // disconnecting only the signaling socket would otherwise leave an approved stream live.
-          screenController.close();
-          // Invalidate this controller before a pending display picker or approval promise settles.
-          // Otherwise its late error/finally branch can overwrite the terminal authorization reason
-          // and keep controls looking busy after the session has already been revoked.
-          if (screenControllerRef.current === screenController) {
-            screenControllerRef.current = null;
-          }
-          setBusyAction(null);
-          setScreenState(EMPTY_SCREEN_STATE);
-        }
-        if (event.status.state === "ready") setAvailability("ready");
-        else if (event.status.state === "connecting" || event.status.state === "disconnected") {
-          setAvailability("connecting");
-        } else if (event.status.state === "error" && room.ready) {
-          // An operation-level denial (lock conflict, peer gone, rate limit) does not make the
-          // authenticated room unavailable. Keep screen and presence controls usable.
-          setAvailability("ready");
-        } else {
-          setAvailability("error");
-        }
-      }
+      if (cancelled || event.type !== "transport-status" || event.status.recoverable) return;
+      // The room outlives this panel, but a terminal ACL revocation must still stop every capture
+      // track and P2P connection immediately.
+      screenController.close();
+      if (screenControllerRef.current === screenController) screenControllerRef.current = null;
+      setBusyAction(null);
+      setScreenState(EMPTY_SCREEN_STATE);
     });
     const unsubscribeScreen = screenController.subscribe((event) => {
       if (cancelled) return;
       if (event.type === "state") setScreenState(event.state);
-      else setError(event.message);
+      else setScreenError(event.message);
     });
-    const onVisibilityChange = () => {
-      room.updatePresence({ visibility: document.hidden ? "idle" : "active" });
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    void room
-      .start()
-      .then(() => {
-        if (cancelled || roomRef.current !== room) return;
-        setMode(room.mode);
-        setPeers(room.getPeers());
-        setAvailability("ready");
-      })
-      .catch((startError: unknown) => {
-        if (cancelled || roomRef.current !== room) return;
-        setAvailability("error");
-        setError(
-          startError instanceof Error ? startError.message : "공동작업 채널에 연결하지 못했습니다."
-        );
-      });
 
     return () => {
       cancelled = true;
-      document.removeEventListener("visibilitychange", onVisibilityChange);
       unsubscribeScreen();
       unsubscribeRoom();
       screenController.close();
-      room.close();
       if (screenControllerRef.current === screenController) screenControllerRef.current = null;
-      if (roomRef.current === room) roomRef.current = null;
     };
-  }, [
-    snapshot.workId,
-    selectedTransportFactory,
-    transportRetryKey,
-    viewer.capabilities.view,
-    viewer.role,
-    viewer.status,
-    viewer.userId,
-    viewerName,
-    workId,
-  ]);
+  }, [live.room]);
 
   const remoteStream = screenState.watching?.stream ?? null;
   useEffect(() => {
@@ -656,12 +537,12 @@ export function StudioLiveCollaborationPanel({
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
     setBusyAction("start-share");
-    setError(null);
+    setScreenError(null);
     try {
       await controller.startShare();
     } catch (shareError) {
       if (screenControllerRef.current === controller) {
-        setError(studioScreenShareErrorMessage(shareError));
+        setScreenError(studioScreenShareErrorMessage(shareError));
       }
     } finally {
       if (screenControllerRef.current === controller) setBusyAction(null);
@@ -673,11 +554,11 @@ export function StudioLiveCollaborationPanel({
     if (!controller || busyAction) return;
     const actionKey = screenItemKey("watch", share.host.sessionId, share.shareId);
     setBusyAction(actionKey);
-    setError(null);
+    setScreenError(null);
     try {
       controller.watchShare(share.host.sessionId, share.shareId);
     } catch (watchError) {
-      setError(studioScreenShareErrorMessage(watchError));
+      setScreenError(studioScreenShareErrorMessage(watchError));
     } finally {
       if (screenControllerRef.current === controller) setBusyAction(null);
     }
@@ -688,12 +569,12 @@ export function StudioLiveCollaborationPanel({
     if (!controller || busyAction) return;
     const actionKey = screenItemKey("approve", request.viewer.sessionId, request.shareId);
     setBusyAction(actionKey);
-    setError(null);
+    setScreenError(null);
     try {
       await controller.approveScreenRequest(request.viewer.sessionId, request.shareId);
     } catch (approvalError) {
       if (screenControllerRef.current === controller) {
-        setError(studioScreenShareErrorMessage(approvalError));
+        setScreenError(studioScreenShareErrorMessage(approvalError));
       }
     } finally {
       if (screenControllerRef.current === controller) setBusyAction(null);
@@ -703,47 +584,40 @@ export function StudioLiveCollaborationPanel({
   function handleRejectRequest(request: StudioScreenShareRequest) {
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
-    setError(null);
+    setScreenError(null);
     if (!controller.rejectScreenRequest(request.viewer.sessionId, request.shareId)) {
-      setError("시청 요청 거절을 전달하지 못했습니다. 연결 상태를 확인해 주세요.");
+      setScreenError("시청 요청 거절을 전달하지 못했습니다. 연결 상태를 확인해 주세요.");
     }
   }
 
   function handleStopViewer(viewerState: StudioScreenShareViewer) {
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
-    setError(null);
+    setScreenError(null);
     if (!controller.stopViewer(viewerState.viewer.sessionId, viewerState.shareId)) {
-      setError("시청 종료 신호를 전달하지 못했습니다. 연결 상태를 확인해 주세요.");
+      setScreenError("시청 종료 신호를 전달하지 못했습니다. 연결 상태를 확인해 주세요.");
     }
   }
 
   return (
     <StudioLiveCollaborationPanelView
-      availability={availability}
+      availability={live.availability}
       busyAction={busyAction}
-      error={error}
-      mode={mode}
-      peers={peers}
+      error={screenError ?? live.error}
+      mode={live.mode}
+      peers={live.peers}
       screenState={screenState}
       screenSupported={isStudioScreenShareSupported()}
-      serverAvailable={transportFactory !== undefined}
-      usingLocalFallback={transportFactory !== undefined && transportPreference === "local"}
+      serverAvailable={live.serverAvailable}
+      localFallbackAllowed={live.localFallbackAllowed}
+      usingLocalFallback={live.usingLocalFallback}
       videoRef={videoRef}
       onApproveRequest={(request) => void handleApproveRequest(request)}
       onRejectRequest={handleRejectRequest}
       onStartShare={() => void handleStartShare()}
       onStopShare={() => screenControllerRef.current?.stopShare()}
-      onRetryServer={() => {
-        setError(null);
-        setTransportPreference("server");
-        setTransportRetryKey((value) => value + 1);
-      }}
-      onUseLocalFallback={() => {
-        setError(null);
-        setTransportPreference("local");
-        setTransportRetryKey((value) => value + 1);
-      }}
+      onRetryServer={live.retryServer}
+      onUseLocalFallback={live.useLocalFallback}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
       onWatchShare={handleWatchShare}
