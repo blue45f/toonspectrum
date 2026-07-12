@@ -43,12 +43,16 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     peers: [],
     screenState: screenState(),
     screenSupported: true,
+    serverAvailable: false,
+    usingLocalFallback: false,
     busyAction: null,
     error: null,
     onApproveRequest: noop,
     onRejectRequest: noop,
     onStartShare: noop,
     onStopShare: noop,
+    onRetryServer: noop,
+    onUseLocalFallback: noop,
     onStopViewer: noop,
     onWatchShare: noop,
     onStopWatching: noop,
@@ -105,6 +109,37 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(html).toContain("팀 서버 연결");
     expect(html).toContain("로그인 세션과 작품 권한을 확인한 팀 연결");
     expect(html).not.toContain("로컬 탭 미리보기");
+  });
+
+  it("offers explicit server retry and local fallback recovery controls", () => {
+    const failed = renderView({
+      availability: "error",
+      mode: "server",
+      serverAvailable: true,
+      error: "팀 서버에 연결하지 못했습니다.",
+    });
+    expect(failed).toContain("팀 서버 다시 연결");
+    expect(failed).toContain("로컬 탭 모드");
+    expect(failed.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+
+    const operationFailure = renderView({
+      availability: "ready",
+      mode: "server",
+      serverAvailable: true,
+      error: "다른 팀원이 이 항목을 편집하고 있습니다.",
+    });
+    expect(operationFailure).toContain("다른 팀원이 이 항목을 편집하고 있습니다.");
+    expect(operationFailure).not.toContain("팀 서버 다시 연결");
+    expect(operationFailure).not.toContain("로컬 탭 모드");
+
+    const fallback = renderView({
+      mode: "local",
+      serverAvailable: true,
+      usingLocalFallback: true,
+    });
+    expect(fallback).toContain("현재 같은 출처 로컬 탭 모드");
+    expect(fallback).toContain("팀 서버 다시 연결");
+    expect(fallback).not.toContain("> 로컬 탭 모드<");
   });
 
   it("shows ephemeral tab names and roles without rendering session, page or database ids", () => {

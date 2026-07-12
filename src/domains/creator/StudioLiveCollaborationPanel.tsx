@@ -66,11 +66,15 @@ export interface StudioLiveCollaborationPanelViewProps {
   peers: StudioLivePeer[];
   screenState: StudioScreenShareState;
   screenSupported: boolean;
+  serverAvailable: boolean;
+  usingLocalFallback: boolean;
   busyAction: string | null;
   error: string | null;
   videoRef?: Ref<HTMLVideoElement>;
   onStartShare: () => void;
   onStopShare: () => void;
+  onRetryServer: () => void;
+  onUseLocalFallback: () => void;
   onApproveRequest: (request: StudioScreenShareRequest) => void;
   onRejectRequest: (request: StudioScreenShareRequest) => void;
   onStopViewer: (viewer: StudioScreenShareViewer) => void;
@@ -106,11 +110,15 @@ export function StudioLiveCollaborationPanelView({
   peers,
   screenState,
   screenSupported,
+  serverAvailable,
+  usingLocalFallback,
   busyAction,
   error,
   videoRef,
   onStartShare,
   onStopShare,
+  onRetryServer,
+  onUseLocalFallback,
   onApproveRequest,
   onRejectRequest,
   onStopViewer,
@@ -181,6 +189,27 @@ export function StudioLiveCollaborationPanelView({
         >
           <AlertCircle className="mt-0.5 shrink-0 text-bad" size={15} aria-hidden="true" />
           <span>{error}</span>
+        </div>
+      ) : null}
+
+      {serverAvailable &&
+      (usingLocalFallback || (availability === "error" && error && mode === "server")) ? (
+        <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
+          <p className="text-xs leading-relaxed text-fg-2">
+            {usingLocalFallback
+              ? "현재 같은 출처 로컬 탭 모드입니다. 서버가 복구되면 팀 세션을 다시 확인할 수 있습니다."
+              : "서버 연결을 다시 시도하거나, 이 기기의 같은 출처 탭끼리만 사용하는 로컬 모드로 전환할 수 있습니다."}
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button className="min-h-11" type="button" variant="outline" onClick={onRetryServer}>
+              <Radio size={15} aria-hidden="true" /> 팀 서버 다시 연결
+            </Button>
+            {!usingLocalFallback ? (
+              <Button className="min-h-11" type="button" variant="quiet" onClick={onUseLocalFallback}>
+                <UsersRound size={15} aria-hidden="true" /> 로컬 탭 모드
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -470,14 +499,30 @@ export function StudioLiveCollaborationPanel({
   const [screenState, setScreenState] = useState<StudioScreenShareState>(EMPTY_SCREEN_STATE);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [transportPreference, setTransportPreference] = useState<"server" | "local">(
+    transportFactory ? "server" : "local"
+  );
+  const [transportRetryKey, setTransportRetryKey] = useState(0);
+  const observedTransportFactoryRef = useRef(transportFactory);
+  const selectedTransportFactory =
+    transportPreference === "server" ? transportFactory : undefined;
+
+  useEffect(() => {
+    if (observedTransportFactoryRef.current === transportFactory) return;
+    observedTransportFactoryRef.current = transportFactory;
+    setTransportPreference(transportFactory ? "server" : "local");
+  }, [transportFactory]);
 
   useEffect(() => {
     let cancelled = false;
+    // A retry, token rotation or explicit local fallback owns a new controller generation. An
+    // unresolved picker/approval promise from the closed generation must not keep its controls busy.
+    setBusyAction(null);
     if (
       snapshot.workId !== workId ||
       viewer.status !== "active" ||
       !viewer.capabilities.view ||
-      (!transportFactory && !isStudioLocalLiveTransportSupported())
+      (!selectedTransportFactory && !isStudioLocalLiveTransportSupported())
     ) {
       setAvailability("unsupported");
       setMode(null);
@@ -487,7 +532,7 @@ export function StudioLiveCollaborationPanel({
     }
 
     setAvailability("connecting");
-    setMode(null);
+    setMode(selectedTransportFactory ? "server" : "local");
     setPeers([]);
     setScreenState(EMPTY_SCREEN_STATE);
     setError(null);
@@ -503,7 +548,9 @@ export function StudioLiveCollaborationPanel({
           }),
           role: viewer.role,
         },
-        ...(transportFactory ? { dependencies: { transportFactory } } : {}),
+        ...(selectedTransportFactory
+          ? { dependencies: { transportFactory: selectedTransportFactory } }
+          : {}),
       });
     } catch (roomError) {
       setAvailability("error");
@@ -518,6 +565,33 @@ export function StudioLiveCollaborationPanel({
       if (cancelled) return;
       if (event.type === "presence") setPeers(event.peers);
       if (event.type === "transport-error") setError(event.message);
+      if (event.type === "transport-status") {
+        setMode(room.mode);
+        setError(event.status.state === "ready" ? null : event.status.message);
+        if (!event.status.recoverable) {
+          // Access revocation must terminate already-captured tracks and P2P media immediately;
+          // disconnecting only the signaling socket would otherwise leave an approved stream live.
+          screenController.close();
+          // Invalidate this controller before a pending display picker or approval promise settles.
+          // Otherwise its late error/finally branch can overwrite the terminal authorization reason
+          // and keep controls looking busy after the session has already been revoked.
+          if (screenControllerRef.current === screenController) {
+            screenControllerRef.current = null;
+          }
+          setBusyAction(null);
+          setScreenState(EMPTY_SCREEN_STATE);
+        }
+        if (event.status.state === "ready") setAvailability("ready");
+        else if (event.status.state === "connecting" || event.status.state === "disconnected") {
+          setAvailability("connecting");
+        } else if (event.status.state === "error" && room.ready) {
+          // An operation-level denial (lock conflict, peer gone, rate limit) does not make the
+          // authenticated room unavailable. Keep screen and presence controls usable.
+          setAvailability("ready");
+        } else {
+          setAvailability("error");
+        }
+      }
     });
     const unsubscribeScreen = screenController.subscribe((event) => {
       if (cancelled) return;
@@ -557,7 +631,8 @@ export function StudioLiveCollaborationPanel({
     };
   }, [
     snapshot.workId,
-    transportFactory,
+    selectedTransportFactory,
+    transportRetryKey,
     viewer.capabilities.view,
     viewer.role,
     viewer.status,
@@ -652,11 +727,23 @@ export function StudioLiveCollaborationPanel({
       peers={peers}
       screenState={screenState}
       screenSupported={isStudioScreenShareSupported()}
+      serverAvailable={transportFactory !== undefined}
+      usingLocalFallback={transportFactory !== undefined && transportPreference === "local"}
       videoRef={videoRef}
       onApproveRequest={(request) => void handleApproveRequest(request)}
       onRejectRequest={handleRejectRequest}
       onStartShare={() => void handleStartShare()}
       onStopShare={() => screenControllerRef.current?.stopShare()}
+      onRetryServer={() => {
+        setError(null);
+        setTransportPreference("server");
+        setTransportRetryKey((value) => value + 1);
+      }}
+      onUseLocalFallback={() => {
+        setError(null);
+        setTransportPreference("local");
+        setTransportRetryKey((value) => value + 1);
+      }}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
       onWatchShare={handleWatchShare}

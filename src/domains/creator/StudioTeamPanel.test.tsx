@@ -272,6 +272,8 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).toContain("열람자 · 참여 중");
     expect(html).toContain("편집자 · 참여 중");
     expect(html).toContain('aria-label="팀 변경 기록 새로고침"');
+    expect(html).toContain("로그인 세션과 작품 권한을 확인한 팀 서버를 우선");
+    expect(html).not.toContain("위 같이 보기는 같은 출처 로컬 탭 전용");
     expect(html.match(/group-open:rotate-180/g)?.length).toBe(2);
   });
 

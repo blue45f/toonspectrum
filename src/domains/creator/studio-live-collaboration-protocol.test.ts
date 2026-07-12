@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   STUDIO_LIVE_MESSAGE_MAX_AGE_MS,
   STUDIO_LIVE_MESSAGE_MAX_BYTES,
+  STUDIO_LIVE_RESOURCE_MAX_LENGTH,
+  STUDIO_LIVE_SDP_MAX_LENGTH,
+  STUDIO_LIVE_SDP_MID_MAX_LENGTH,
+  STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
+  studioLiveJsonEscapedContentByteLength,
   studioLiveEnvelopeByteLength,
+  studioLiveUtf8ByteLength,
   studioLocalLiveChannelName,
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
@@ -155,6 +162,24 @@ describe("studio live collaboration protocol", () => {
     expect(parse({ ...release, payload: { resource: release.payload.resource } })).toBeNull();
   });
 
+  it("matches the server's exact resource identifier boundary", () => {
+    const claim = message("lock:claim", {
+      resource: "r".repeat(STUDIO_LIVE_RESOURCE_MAX_LENGTH),
+      claimId: "claim-1",
+      leaseUntil: NOW + 5_000,
+    });
+    expect(parse(claim)).not.toBeNull();
+    expect(
+      parse({
+        ...claim,
+        payload: {
+          ...claim.payload,
+          resource: "r".repeat(STUDIO_LIVE_RESOURCE_MAX_LENGTH + 1),
+        },
+      })
+    ).toBeNull();
+  });
+
   it("rejects invalid SDP types and oversized signaling before state mutation", () => {
     const offer = message(
       "webrtc:description",
@@ -167,6 +192,159 @@ describe("studio live collaboration protocol", () => {
     const tooLarge = { ...offer, padding: "x".repeat(STUDIO_LIVE_MESSAGE_MAX_BYTES) };
     expect(studioLiveEnvelopeByteLength(tooLarge)).toBeGreaterThan(STUDIO_LIVE_MESSAGE_MAX_BYTES);
     expect(parse(tooLarge)).toBeNull();
+  });
+
+  it("accepts SDP CR/LF at 48 KiB but rejects overflow and every other control", () => {
+    const boundarySdp = `v=0\r\n${"s".repeat(STUDIO_LIVE_SDP_MAX_LENGTH - 7)}`;
+    const offer = message(
+      "webrtc:description",
+      { shareId: "share-1", type: "offer", sdp: boundarySdp },
+      LOCAL_SESSION
+    );
+    expect(studioLiveJsonEscapedContentByteLength(offer.payload.sdp)).toBe(
+      STUDIO_LIVE_SDP_MAX_LENGTH
+    );
+    expect(parse(offer)).not.toBeNull();
+    expect(
+      parse({ ...offer, payload: { ...offer.payload, sdp: `${boundarySdp}x` } })
+    ).toBeNull();
+    for (const control of ["\t", "\u0000", "\u0085"]) {
+      expect(
+        parse({ ...offer, payload: { ...offer.payload, sdp: `v=0${control}tail` } })
+      ).toBeNull();
+    }
+  });
+
+  it("enforces SDP raw UTF-8 and JSON-escaped byte boundaries without banning Unicode", () => {
+    const multibyteBoundary = "가".repeat(STUDIO_LIVE_SDP_MAX_LENGTH / 3);
+    const escapedUnit = "\r\n\\\"";
+    const escapedBoundary = `vv${escapedUnit.repeat(6_143)}\r\n\\`;
+    expect(studioLiveUtf8ByteLength(multibyteBoundary)).toBe(STUDIO_LIVE_SDP_MAX_LENGTH);
+    expect(studioLiveJsonEscapedContentByteLength(multibyteBoundary)).toBe(
+      STUDIO_LIVE_SDP_MAX_LENGTH
+    );
+    expect(studioLiveUtf8ByteLength(escapedBoundary)).toBeLessThan(
+      STUDIO_LIVE_SDP_MAX_LENGTH
+    );
+    expect(studioLiveJsonEscapedContentByteLength(escapedBoundary)).toBe(
+      STUDIO_LIVE_SDP_MAX_LENGTH
+    );
+
+    const offer = message(
+      "webrtc:description",
+      { shareId: "share-1", type: "offer", sdp: multibyteBoundary },
+      LOCAL_SESSION
+    );
+    expect(parse(offer)).not.toBeNull();
+    expect(
+      parse({ ...offer, payload: { ...offer.payload, sdp: `${multibyteBoundary}가` } })
+    ).toBeNull();
+    expect(parse({ ...offer, payload: { ...offer.payload, sdp: escapedBoundary } })).not.toBeNull();
+    expect(
+      parse({ ...offer, payload: { ...offer.payload, sdp: `${escapedBoundary}"` } })
+    ).toBeNull();
+  });
+
+  it("enforces ICE, sdpMid and usernameFragment boundaries including empty optional strings", () => {
+    const ice = message(
+      "webrtc:ice",
+      {
+        shareId: "share-1",
+        candidate: "c".repeat(STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH),
+        sdpMid: "m".repeat(STUDIO_LIVE_SDP_MID_MAX_LENGTH),
+        sdpMLineIndex: 0,
+        usernameFragment: "u".repeat(STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH),
+      },
+      LOCAL_SESSION
+    );
+    expect(parse(ice)).not.toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: {
+          ...ice.payload,
+          candidate: `${ice.payload.candidate}c`,
+        },
+      })
+    ).toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: { ...ice.payload, sdpMid: `${ice.payload.sdpMid}m` },
+      })
+    ).toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: {
+          ...ice.payload,
+          usernameFragment: `${ice.payload.usernameFragment}u`,
+        },
+      })
+    ).toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: { ...ice.payload, sdpMid: "", usernameFragment: "" },
+      })
+    ).not.toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: { ...ice.payload, candidate: "candidate:\ncontrol" },
+      })
+    ).toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: { ...ice.payload, sdpMid: "mid\tcontrol" },
+      })
+    ).toBeNull();
+    expect(
+      parse({
+        ...ice,
+        payload: { ...ice.payload, usernameFragment: "user\u0085control" },
+      })
+    ).toBeNull();
+  });
+
+  it("enforces ICE raw UTF-8 and dense JSON escape byte boundaries", () => {
+    const multibyteBoundary = "🙂".repeat(STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH / 4);
+    const escapedBoundary = `cc${"\\\"".repeat(2_047)}\\`;
+    expect(studioLiveUtf8ByteLength(multibyteBoundary)).toBe(
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    );
+    expect(studioLiveJsonEscapedContentByteLength(multibyteBoundary)).toBe(
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    );
+    expect(studioLiveUtf8ByteLength(escapedBoundary)).toBeLessThan(
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    );
+    expect(studioLiveJsonEscapedContentByteLength(escapedBoundary)).toBe(
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    );
+
+    const ice = message(
+      "webrtc:ice",
+      {
+        shareId: "share-1",
+        candidate: multibyteBoundary,
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+        usernameFragment: null,
+      },
+      LOCAL_SESSION
+    );
+    expect(parse(ice)).not.toBeNull();
+    expect(
+      parse({ ...ice, payload: { ...ice.payload, candidate: `${multibyteBoundary}🙂` } })
+    ).toBeNull();
+    expect(
+      parse({ ...ice, payload: { ...ice.payload, candidate: escapedBoundary } })
+    ).not.toBeNull();
+    expect(
+      parse({ ...ice, payload: { ...ice.payload, candidate: `${escapedBoundary}"` } })
+    ).toBeNull();
   });
 
   it("rejects control characters in ids and labels while allowing SDP line endings", () => {

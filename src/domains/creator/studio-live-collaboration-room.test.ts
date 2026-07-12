@@ -11,12 +11,14 @@ import {
 import type {
   StudioLiveTransport,
   StudioLiveTransportContext,
+  StudioLiveTransportControlEvent,
   StudioLiveTransportFactory,
   StudioLiveTransportMode,
 } from "./studio-live-collaboration-transport";
 
 class FakeHubTransport implements StudioLiveTransport {
   private readonly listeners = new Set<(value: unknown) => void>();
+  private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private connected = false;
   private closed = false;
 
@@ -46,14 +48,28 @@ class FakeHubTransport implements StudioLiveTransport {
     return () => this.listeners.delete(listener);
   }
 
+  subscribeControl(listener: (event: StudioLiveTransportControlEvent) => void): () => void {
+    this.controlListeners.add(listener);
+    return () => this.controlListeners.delete(listener);
+  }
+
   receive(value: unknown): void {
     if (!this.ready) return;
     for (const listener of this.listeners) listener(structuredClone(value));
   }
 
+  receiveControl(event: StudioLiveTransportControlEvent): void {
+    if (this.closed) return;
+    if (event.type === "status" && event.status.state === "revoked") {
+      this.connected = false;
+    }
+    for (const listener of this.controlListeners) listener(structuredClone(event));
+  }
+
   close(): void {
     this.closed = true;
     this.listeners.clear();
+    this.controlListeners.clear();
   }
 }
 
@@ -349,6 +365,75 @@ describe("StudioLiveRoom", () => {
     roomA.close();
     roomB.close();
     roomC.close();
+  });
+
+  it("clears peer and lock metadata immediately when server access is revoked", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    const events: StudioLiveRoomEvent[] = [];
+    room.subscribe((event) => events.push(event));
+    await room.start();
+
+    test.hub.inject(
+      0,
+      createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: 1,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1" },
+      })
+    );
+    test.hub.transports[0]?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "element:el-1",
+        claimId: "server-lease",
+        owner: bob,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    expect(room.getPeers()).toHaveLength(1);
+    expect(room.getLocks()).toHaveLength(1);
+
+    test.hub.transports[0]?.receiveControl({
+      type: "status",
+      status: {
+        state: "revoked",
+        message: "팀 권한이 회수되었습니다.",
+        recoverable: false,
+      },
+    });
+
+    expect(room.getPeers()).toEqual([]);
+    expect(room.getLocks()).toEqual([]);
+    expect(events.slice(-3)).toEqual([
+      { type: "presence", peers: [] },
+      { type: "locks", locks: [] },
+      {
+        type: "transport-status",
+        status: {
+          state: "revoked",
+          message: "팀 권한이 회수되었습니다.",
+          recoverable: false,
+        },
+      },
+    ]);
+
+    test.hub.transports[0]?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "element:queued-after-revoke",
+        claimId: "late-server-lease",
+        owner: bob,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    expect(room.getLocks()).toEqual([]);
+    room.close();
   });
 
   it("broadcasts leave and releases owned locks before transport cleanup", async () => {

@@ -21,7 +21,7 @@
 다음 영역은 아직 부분 구현이거나 제품 실행 경로에 연결되지 않았다.
 
 - 의미 영역 분할과 색 힌트를 사용하는 AI 자동 채색
-- 인증된 Socket.IO 서버와 Studio UI의 실제 adapter 연결
+- 인증 Socket.IO 세션을 팀 패널 밖에서도 유지하는 항상 켜진 Studio live room
 - 캔버스 원격 커서, 선택 영역, 실제 편집 mutation을 막는 서버 권위 잠금
 - CRDT/OT 또는 요소 operation stream 기반 동시 편집
 - 움직이는 배경·인물의 transform tween, parallax, 본/카메라 트랙
@@ -100,20 +100,54 @@ API 키는 저장소·브라우저 번들·문서에 넣지 않는다. 대화에
 
 - `/studio-live` namespace, 작품 ACL join, presence snapshot/update/leave
 - 정규화 커서 relay, editor 전용 5~30초 lease soft-lock
-- 화면 공유 상태와 대상 지정 offer/answer/ICE/bye relay
+- 화면 공유 announce/request/access/stop과 `shareId`를 보존하는 대상 지정 offer/answer/ICE/bye relay
 - Socket.IO namespace middleware에서 연결 허용 전에 세션 인증 완료
 - 세션 principal의 만료·sessionVersion 재검증과 권한 회수 cleanup
+- presence·cursor·lock·화면 상태 변경과 대상 relay 직전에 최신 participant·principal·권한 세대를 다시
+  확인하고, 같은 이벤트 루프 틱에서 변경/전송해 권한 하향 중 `await` 경합을 차단
+- SDP·ICE 문자열은 원문 UTF-8과 JSON escape 본문 크기를 각각 제한하고, SDP의 CR/LF 외 제어 문자를
+  거부하며 잘못된 signal도 rate-limit 예산을 먼저 소비
+- 첫 ICE는 양 peer를 강제 재검증하고, 같은 작품·`shareId`·peer pair에만 고정 2초 동안 결과를 재사용한다.
+  candidate 전송으로 만료가 연장되지 않으며 재검증 시작·거절·종료·재참가·연결 해제·권한 회수 시 폐기
 - 작품 전환 중 지연 ACL 결과가 다른 작품 권한으로 사용되지 않도록 participant generation 확인
+- 팀 ACL/adapter room join·leave 도중 세션이 만료되면 speculative room leave 완료를 기다리지 않고 즉시
+  participant·principal을 정리하고 transport를 끊는 fail-closed 참가 처리
 - 허용되지 않은 WebSocket `Origin`의 upgrade를 `allowRequest`에서 거부
 - 로컬 Vite `/socket.io` WebSocket proxy
 
+### 이번 체크포인트의 인증 프런트엔드 연결
+
+- 로그인 토큰을 Socket.IO handshake 메모리에만 넣고 `/studio-live` 작품 방 ACL ACK 전에는 준비 상태로
+  전환하지 않는 same-origin WebSocket adapter
+- 서버 connection ID와 브라우저 탭 session ID를 분리해 자기 자신이 원격 참가자로 중복 표시되지 않는
+  participant identity 변환
+- presence·cursor·서버 권위 lease lock·화면 공유·WebRTC 이벤트를 strict local envelope로 변환
+- 서버가 발급한 lease ID를 받은 뒤에만 잠금을 확정하며, reconnect 이전 ACK는 generation과 connection
+  identity가 다르면 폐기
+- 연결 끊김·재접속·권한 회수 상태를 팀 패널에 표시하고, 실패 시 **팀 서버 다시 연결** 또는 명시적인
+  **로컬 탭 모드**를 선택하는 44px 모바일 복구 조작 제공
+- 공유 중 서버가 복구되면 같은 `shareId`를 재안내하되 캡처를 다시 요청하지 않고, 재안내 실패가 연결 완료
+  메시지에 덮이지 않도록 dispatch 다음 microtask에서 보고. terminal 권한 회수는 진행 중 picker/승인 세대까지
+  즉시 무효화해 기존 track·peer·busy 상태와 늦은 오류를 함께 정리
+- 작품 ACL 조회 도중 세션이 만료되는 경계와 ACL 회수 후 adapter room 이탈 지연을 fail-closed disconnect로
+  차단
+
 실제 두 Socket.IO 클라이언트 E2E에서 즉시 인증 참가, 참가자 2명 snapshot, 커서 전달, 잠금 경쟁 거부, 화면 상태, 대상 signaling, 잠금 해제, 내부 DB user ID 비노출을 검증했다. 임의 Origin의 upgrade도 거부됐다.
+
+인증 프런트엔드 연결 후에는 실제 Studio를 같은 계정·작품의 브라우저 탭 두 개로 열어 양쪽 모두
+`팀 서버 연결`, `나 포함 2개 작업 탭`, `다른 탭 1개`로 수렴하는 것을 확인했다. Nest 프로세스를 중단했다가
+복구했을 때 재접속과 작품 ACL 재참가 뒤 두 탭이 자동 복원됐다. 별도 runtime client 검사에서는
+announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareId` 없는 signal은 `invalid_payload`로
+거절됐다. 마지막 보안 보강 뒤에도 별도 두 소켓 runtime 검사에서 announce→request→approved→offer→ICE가
+모두 성공했고 누락 `shareId`는 계속 strict 거절됐으며, 임시 QA 작품은 검사 직후 삭제해 잔여 0건을 확인했다.
+375×812에서 팀 패널 하단 `700px`, 모바일 도크 상단 `700.40625px`, 겹침 `0px`이며 공유 조작은 44px 높이를
+유지했다.
 
 ### 아직 완료가 아닌 부분
 
 | 기능 | 판정 | 이유 |
 | --- | --- | --- |
-| Studio UI↔Socket.IO adapter | 기반 | 서버 이벤트와 로컬 envelope 계약이 다르며 실제 adapter가 아직 없음 |
+| Studio UI↔Socket.IO adapter | 완료(팀 패널 범위) | 인증 join·재접속·권한 회수·event 변환·명시적 로컬 fallback까지 연결. 현재 room 수명은 팀 패널 마운트에 종속 |
 | 원격 커서 overlay | 기반 | room 코어는 있으나 Konva Stage에 렌더하지 않음 |
 | 실제 mutation 잠금 | 기반 | soft-lock 상태가 HTTP 공유 문서 저장이나 요소 편집 guard를 강제하지 않음 |
 | operation stream/CRDT | 미구현 | 현재 저장은 revision 기반 전체 문서 snapshot |

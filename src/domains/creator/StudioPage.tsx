@@ -97,7 +97,7 @@ import {
   History as HistoryIcon,
   Wind,
 } from "lucide-react";
-import { Fragment, Suspense, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -460,6 +460,7 @@ import {
   ungroupItems,
   type LayerGroup,
 } from "./studio-layers";
+import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import {
   computeMagicResize,
   presetCanvasSize,
@@ -3895,6 +3896,16 @@ function StudioCuttoonEditor() {
   const linkedSeriesId = params.get("seriesId");
   const linkedChallengeId = params.get("challengeId");
   const studioAuthUserId = session?.user?.id ?? null;
+  const studioSessionToken = session?.token ?? null;
+  // Factory identity controls the lifetime of the external Socket.IO resource. Keep it stable
+  // across editor renders, but rotate it immediately when the signed session token changes.
+  const studioLiveTransportFactory = useMemo(
+    () =>
+      studioSessionToken
+        ? createStudioServerLiveTransportFactory(studioSessionToken)
+        : undefined,
+    [studioSessionToken]
+  );
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
@@ -23590,6 +23601,7 @@ function StudioCuttoonEditor() {
             onClose={() => setTeamPanelOpen(false)}
             workId={workId}
             loggedIn={loggedIn}
+            liveTransportFactory={studioLiveTransportFactory}
           />
         ) : null}
       </Suspense>

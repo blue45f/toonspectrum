@@ -20,8 +20,10 @@ import {
 import {
   createStudioLocalLiveTransport,
   type StudioLiveTransport,
+  type StudioLiveTransportControlEvent,
   type StudioLiveTransportFactory,
   type StudioLiveTransportMode,
+  type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
 
 const DEFAULT_HEARTBEAT_MS = 10_000;
@@ -63,6 +65,7 @@ export type StudioLiveRoomEvent =
     }
   | { type: "locks"; locks: StudioLiveLock[] }
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
+  | { type: "transport-status"; status: StudioLiveTransportStatus }
   | { type: "transport-error"; message: string };
 
 export interface StudioLiveRoomDependencies {
@@ -135,6 +138,7 @@ export class StudioLiveRoom {
   private readonly lastSequenceBySession = new Map<string, number>();
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
+  private unsubscribeTransportControl: (() => void) | null = null;
   private heartbeatHandle: unknown = null;
   private phase: "idle" | "starting" | "ready" | "closed" = "idle";
   private startPromise: Promise<void> | null = null;
@@ -211,9 +215,12 @@ export class StudioLiveRoom {
       const transport = this.transportFactory({
         workId: this.workId,
         roomName: studioLocalLiveChannelName(this.workId),
+        participant: copyParticipant(this.participant),
       });
       this.transport = transport;
       this.unsubscribeTransport = transport.subscribe((value) => this.onTransportMessage(value));
+      this.unsubscribeTransportControl =
+        transport.subscribeControl?.((event) => this.onTransportControl(event)) ?? null;
       try {
         await transport.connect();
         if (this.phase === "closed" || generation !== this.connectionGeneration) {
@@ -229,6 +236,8 @@ export class StudioLiveRoom {
           this.transport = null;
           this.unsubscribeTransport?.();
           this.unsubscribeTransport = null;
+          this.unsubscribeTransportControl?.();
+          this.unsubscribeTransportControl = null;
         }
         transport.close();
         throw error;
@@ -305,6 +314,11 @@ export class StudioLiveRoom {
       leaseUntil: now + this.lockLeaseMs,
     };
     const envelope = this.buildEnvelope("lock:claim", payload, null, now);
+    if (this.transport?.mode === "server") {
+      // The server owns lease ids and conflict decisions. Commit only after its authoritative ACK
+      // arrives through the transport control plane; otherwise an optimistic local lock diverges.
+      return this.sendEnvelope(envelope);
+    }
     this.applyLockClaim(envelope);
     if (this.sendEnvelope(envelope)) return true;
 
@@ -317,6 +331,14 @@ export class StudioLiveRoom {
   releaseLock(resource: string): boolean {
     const current = this.locks.get(resource);
     if (!current || current.owner.sessionId !== this.participant.sessionId) return false;
+    if (this.transport?.mode === "server") {
+      return this.post(
+        "lock:release",
+        { resource, claimId: current.claimId },
+        null,
+        this.now()
+      );
+    }
     this.locks.delete(resource);
     this.emitLocks();
     return this.post(
@@ -369,6 +391,8 @@ export class StudioLiveRoom {
     this.heartbeatHandle = null;
     this.unsubscribeTransport?.();
     this.unsubscribeTransport = null;
+    this.unsubscribeTransportControl?.();
+    this.unsubscribeTransportControl = null;
     this.transport?.close();
     this.transport = null;
     this.peers.clear();
@@ -389,7 +413,7 @@ export class StudioLiveRoom {
         leaseUntil: now + this.lockLeaseMs,
       };
       const envelope = this.buildEnvelope("lock:claim", payload, null, now);
-      this.applyLockClaim(envelope);
+      if (this.transport?.mode !== "server") this.applyLockClaim(envelope);
       this.sendEnvelope(envelope);
     }
     this.pruneExpired(now);
@@ -499,6 +523,49 @@ export class StudioLiveRoom {
         this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
         return;
     }
+  }
+
+  private onTransportControl(event: StudioLiveTransportControlEvent): void {
+    if (this.phase === "closed") return;
+    if (event.type === "status") {
+      if (event.status.state === "revoked") {
+        const hadPeers = this.peers.size > 0;
+        const hadLocks = this.locks.size > 0;
+        this.peers.clear();
+        this.locks.clear();
+        this.lastSequenceBySession.clear();
+        if (hadPeers) this.emitPresence();
+        if (hadLocks) this.emitLocks();
+      } else if (
+        event.status.state === "ready" &&
+        this.phase === "ready" &&
+        this.transport?.ready
+      ) {
+        // Reconnect joins start with a fresh server participant. Restore the current page and
+        // visibility immediately instead of waiting up to one heartbeat interval.
+        this.sendPresence("presence:heartbeat");
+      }
+      this.emit({ type: "transport-status", status: event.status });
+      return;
+    }
+    // Socket ACKs and broadcasts can already be queued when access is revoked or the connection
+    // drops. A late authoritative lease must never repopulate Room state while transport is down.
+    if (!this.ready) return;
+    if (event.lock.action === "acquired") {
+      const next: StudioLiveLock = {
+        resource: event.lock.resource,
+        claimId: event.lock.claimId,
+        owner: copyParticipant(event.lock.owner),
+        leaseUntil: event.lock.leaseUntil,
+      };
+      this.locks.set(next.resource, next);
+      this.emitLocks();
+      return;
+    }
+    const current = this.locks.get(event.lock.resource);
+    if (!current || current.claimId !== event.lock.claimId) return;
+    this.locks.delete(event.lock.resource);
+    this.emitLocks();
   }
 
   private upsertPeer(envelope: StudioLiveEnvelope, receivedAt: number): boolean {

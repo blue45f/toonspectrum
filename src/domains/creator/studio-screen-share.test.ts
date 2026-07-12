@@ -515,6 +515,99 @@ describe("StudioScreenShareController", () => {
     controller.close();
   });
 
+  it("re-announces the same active share after server reconnect without recapturing or opening a peer", async () => {
+    const room = new FakeRoom();
+    const track = new FakeTrack();
+    const stream = fakeStream([track]);
+    const getDisplayMedia = vi.fn(() => Promise.resolve(stream));
+    const createPeerConnection = vi.fn(
+      () => new FakePeerConnection() as unknown as RTCPeerConnection
+    );
+    const errors: string[] = [];
+    const controller = new StudioScreenShareController(room, {
+      getDisplayMedia,
+      createPeerConnection,
+      randomId: () => "share-reconnect",
+    });
+    controller.subscribe((event) => {
+      if (event.type === "error") errors.push(event.message);
+    });
+
+    room.emit({
+      type: "transport-status",
+      status: { state: "ready", message: "초기 팀 연결", recoverable: true },
+    });
+    expect(room.announcements).toEqual([]);
+    room.emit({
+      type: "presence",
+      peers: [{ ...remote, visibility: "active", pageId: null, lastSeenAt: 1_000_000 }],
+    });
+    await controller.startShare();
+    expect(room.announcements).toEqual([
+      { shareId: "share-reconnect", label: "작업 화면" },
+    ]);
+
+    room.emit({
+      type: "transport-status",
+      status: { state: "disconnected", message: "재연결 중", recoverable: true },
+    });
+    room.emit({
+      type: "transport-status",
+      status: { state: "ready", message: "팀 서버 재연결", recoverable: true },
+    });
+
+    await vi.waitFor(() =>
+      expect(room.announcements).toEqual([
+        { shareId: "share-reconnect", label: "작업 화면" },
+        { shareId: "share-reconnect", label: "작업 화면" },
+      ])
+    );
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1);
+    expect(createPeerConnection).not.toHaveBeenCalled();
+    expect(controller.getState().localSharing).toBe(true);
+    expect(track.stopCalls).toBe(0);
+
+    room.sendResult = false;
+    room.emit({
+      type: "transport-status",
+      status: { state: "ready", message: "팀 서버 재연결", recoverable: true },
+    });
+    await vi.waitFor(() =>
+      expect(errors).toEqual([expect.stringContaining("다시 알리지 못했습니다")])
+    );
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1);
+    expect(createPeerConnection).not.toHaveBeenCalled();
+    expect(controller.getState().localSharing).toBe(true);
+
+    controller.close();
+    expect(track.stopCalls).toBe(1);
+  });
+
+  it("drops a queued reconnect announcement when that share stops before dispatch completes", async () => {
+    const room = new FakeRoom();
+    const track = new FakeTrack();
+    const controller = new StudioScreenShareController(room, {
+      getDisplayMedia: () => Promise.resolve(fakeStream([track])),
+      createPeerConnection: () => new FakePeerConnection() as unknown as RTCPeerConnection,
+      randomId: () => "share-stopped-before-reannounce",
+    });
+
+    await controller.startShare();
+    room.emit({
+      type: "transport-status",
+      status: { state: "ready", message: "팀 서버 재연결", recoverable: true },
+    });
+    controller.stopShare();
+    await Promise.resolve();
+
+    expect(room.announcements).toEqual([
+      { shareId: "share-stopped-before-reannounce", label: "작업 화면" },
+    ]);
+    expect(controller.getState().localSharing).toBe(false);
+    expect(track.stopCalls).toBe(1);
+    controller.close();
+  });
+
   it("waits for an individual host approval before creating tracks or an offer", async () => {
     const room = new FakeRoom();
     const track = new FakeTrack();

@@ -1,11 +1,36 @@
-import type { StudioLiveEnvelope } from "./studio-live-collaboration-protocol";
+import type {
+  StudioLiveEnvelope,
+  StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 
 export type StudioLiveTransportMode = "local" | "server";
 
 export interface StudioLiveTransportContext {
   workId: string;
   roomName: string;
+  participant: StudioLiveParticipant;
 }
+
+export type StudioLiveTransportStatus =
+  | { state: "connecting"; message: string; recoverable: true }
+  | { state: "ready"; message: string; recoverable: true }
+  | { state: "disconnected"; message: string; recoverable: true }
+  | { state: "error"; message: string; recoverable: true }
+  | { state: "revoked"; message: string; recoverable: false };
+
+export type StudioLiveAuthoritativeLockEvent =
+  | {
+      action: "acquired";
+      resource: string;
+      claimId: string;
+      owner: StudioLiveParticipant;
+      leaseUntil: number;
+    }
+  | { action: "released"; resource: string; claimId: string };
+
+export type StudioLiveTransportControlEvent =
+  | { type: "status"; status: StudioLiveTransportStatus }
+  | { type: "lock"; lock: StudioLiveAuthoritativeLockEvent };
 
 /**
  * Transport-neutral ephemeral message surface. A server implementation must fail closed until its
@@ -17,6 +42,8 @@ export interface StudioLiveTransport {
   connect(): Promise<void>;
   send(envelope: StudioLiveEnvelope): boolean;
   subscribe(listener: (value: unknown) => void): () => void;
+  /** Optional server-only authoritative status/ACK seam; local transports need no control plane. */
+  subscribeControl?(listener: (event: StudioLiveTransportControlEvent) => void): () => void;
   close(): void;
 }
 

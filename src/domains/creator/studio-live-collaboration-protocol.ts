@@ -17,10 +17,12 @@ export const STUDIO_LIVE_LOCK_MAX_LEASE_MS = 30_000;
 const MAX_ID_LENGTH = 160;
 export const STUDIO_LIVE_DISPLAY_NAME_MAX_LENGTH = 80;
 const MAX_TOOL_LENGTH = 48;
-const MAX_RESOURCE_LENGTH = 240;
+export const STUDIO_LIVE_RESOURCE_MAX_LENGTH = 200;
 const MAX_SHARE_LABEL_LENGTH = 80;
-const MAX_SDP_LENGTH = 48 * 1024;
-const MAX_ICE_CANDIDATE_LENGTH = 8 * 1024;
+export const STUDIO_LIVE_SDP_MAX_LENGTH = 48 * 1024;
+export const STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH = 8 * 1024;
+export const STUDIO_LIVE_SDP_MID_MAX_LENGTH = 128;
+export const STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH = 256;
 
 export interface StudioLiveParticipant {
   sessionId: string;
@@ -124,6 +126,25 @@ export class StudioLiveProtocolError extends Error {
   }
 }
 
+const STUDIO_LIVE_TEXT_ENCODER = new TextEncoder();
+
+export function studioLiveUtf8ByteLength(value: string): number {
+  return STUDIO_LIVE_TEXT_ENCODER.encode(value).byteLength;
+}
+
+/** Byte length of JSON's escaped string body, excluding the two surrounding quote bytes. */
+export function studioLiveJsonEscapedContentByteLength(value: string): number {
+  const serialized = JSON.stringify(value);
+  return STUDIO_LIVE_TEXT_ENCODER.encode(serialized).byteLength - 2;
+}
+
+export function studioLiveStringFitsByteContract(value: string, maximumBytes: number): boolean {
+  return (
+    studioLiveUtf8ByteLength(value) <= maximumBytes &&
+    studioLiveJsonEscapedContentByteLength(value) <= maximumBytes
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -200,7 +221,8 @@ function exactString(value: unknown, maximum: number, allowEmpty = false): value
 function exactSdpString(value: unknown): value is string {
   return (
     typeof value === "string" &&
-    value.length <= MAX_SDP_LENGTH &&
+    value.length <= STUDIO_LIVE_SDP_MAX_LENGTH &&
+    studioLiveStringFitsByteContract(value, STUDIO_LIVE_SDP_MAX_LENGTH) &&
     value.length > 0 &&
     value.trim().length > 0 &&
     !containsControlCharacter(value, true)
@@ -272,7 +294,7 @@ function isLockClaimPayload(
   return (
     isRecord(value) &&
     hasExactKeys(value, ["resource", "claimId", "leaseUntil"]) &&
-    exactString(value.resource, MAX_RESOURCE_LENGTH) &&
+    exactString(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
     exactString(value.claimId, MAX_ID_LENGTH) &&
     typeof value.leaseUntil === "number" &&
     Number.isSafeInteger(value.leaseUntil) &&
@@ -285,7 +307,7 @@ function isLockReleasePayload(value: unknown): value is StudioLiveLockReleasePay
   return (
     isRecord(value) &&
     hasExactKeys(value, ["resource", "claimId"]) &&
-    exactString(value.resource, MAX_RESOURCE_LENGTH) &&
+    exactString(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
     exactString(value.claimId, MAX_ID_LENGTH)
   );
 }
@@ -339,12 +361,17 @@ function isIcePayload(value: unknown): value is StudioLiveWebRtcIcePayload {
       "usernameFragment",
     ]) &&
     exactString(value.shareId, MAX_ID_LENGTH) &&
-    exactString(value.candidate, MAX_ICE_CANDIDATE_LENGTH) &&
-    (value.sdpMid === null || exactString(value.sdpMid, MAX_ID_LENGTH, true)) &&
+    exactString(value.candidate, STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH) &&
+    studioLiveStringFitsByteContract(
+      value.candidate,
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    ) &&
+    (value.sdpMid === null ||
+      exactString(value.sdpMid, STUDIO_LIVE_SDP_MID_MAX_LENGTH, true)) &&
     (value.sdpMLineIndex === null ||
       isFiniteInteger(value.sdpMLineIndex, 0, 65_535)) &&
     (value.usernameFragment === null ||
-      exactString(value.usernameFragment, MAX_ID_LENGTH, true))
+      exactString(value.usernameFragment, STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH, true))
   );
 }
 
@@ -416,7 +443,7 @@ export function studioLiveEnvelopeByteLength(value: unknown): number | null {
   try {
     const serialized = JSON.stringify(value);
     if (serialized === undefined) return null;
-    return new TextEncoder().encode(serialized).byteLength;
+    return STUDIO_LIVE_TEXT_ENCODER.encode(serialized).byteLength;
   } catch {
     return null;
   }

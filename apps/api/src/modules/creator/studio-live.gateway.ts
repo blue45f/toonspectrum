@@ -29,16 +29,35 @@ const STUDIO_LIVE_NAMESPACE = "/studio-live";
 const STUDIO_LIVE_ROOM_PREFIX = "studio-live:";
 const STUDIO_LIVE_ACCESS_RECHECK_MS = 15_000;
 const STUDIO_LIVE_ACCESS_CACHE_MS = 5_000;
+const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_MS = 2_000;
+const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_LIMIT = 512;
 const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;
-const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 262_144;
-const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 16_384;
+const STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE = 70 * 1_024;
+const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 48 * 1_024;
+const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 8 * 1_024;
 
+const isControlCharacterCode = (codePoint: number): boolean =>
+  codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
 const noControlCharacters = (value: string): boolean => {
   for (const character of value) {
     const codePoint = character.codePointAt(0) ?? 0;
-    if (codePoint <= 0x1f || codePoint === 0x7f) return false;
+    if (isControlCharacterCode(codePoint)) return false;
   }
   return true;
+};
+const noControlCharactersExceptSdpLineEndings = (value: string): boolean => {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint === 0x0a || codePoint === 0x0d) continue;
+    if (isControlCharacterCode(codePoint)) return false;
+  }
+  return true;
+};
+const isNonBlankString = (value: string): boolean => value.trim().length > 0;
+const fitsSignalStringByteContract = (value: string, maximumBytes: number): boolean => {
+  if (Buffer.byteLength(value, "utf8") > maximumBytes) return false;
+  const serialized = JSON.stringify(value);
+  return Buffer.byteLength(serialized, "utf8") - 2 <= maximumBytes;
 };
 const boundedIdentifier = (maximum: number) =>
   z.string().trim().min(1).max(maximum).refine(noControlCharacters, "control characters are not allowed");
@@ -48,6 +67,8 @@ const ClientInstanceIdSchema = boundedIdentifier(80);
 const PageIdSchema = boundedIdentifier(160);
 const ResourceIdSchema = boundedIdentifier(200);
 const ConnectionIdSchema = boundedIdentifier(128);
+const ScreenShareIdSchema = boundedIdentifier(160);
+const ScreenShareLabelSchema = boundedIdentifier(80);
 
 export const StudioLiveJoinSchema = z
   .object({
@@ -97,19 +118,82 @@ export const StudioLiveScreenStateSchema = z
   })
   .strict();
 
+export const StudioLiveScreenAccessSchema = z
+  .object({
+    workId: WorkIdSchema,
+    targetConnectionId: ConnectionIdSchema,
+    shareId: ScreenShareIdSchema,
+    decision: z.enum(["approved", "rejected", "ended"]),
+  })
+  .strict();
+
+export const StudioLiveScreenAnnounceSchema = z
+  .object({
+    workId: WorkIdSchema,
+    shareId: ScreenShareIdSchema,
+    label: ScreenShareLabelSchema,
+  })
+  .strict();
+
+export const StudioLiveScreenRequestSchema = z
+  .object({
+    workId: WorkIdSchema,
+    targetConnectionId: ConnectionIdSchema,
+    shareId: ScreenShareIdSchema,
+  })
+  .strict();
+
+export const StudioLiveScreenStopSchema = z
+  .object({
+    workId: WorkIdSchema,
+    shareId: ScreenShareIdSchema,
+  })
+  .strict();
+
 const StudioLiveSessionDescriptionSchema = z
   .object({
     type: z.enum(["offer", "answer"]),
-    sdp: z.string().min(1).max(STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH),
+    sdp: z
+      .string()
+      .min(1)
+      .max(STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH)
+      .refine(
+        (value) => fitsSignalStringByteContract(value, STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH),
+        "SDP exceeds the byte budget"
+      )
+      .refine(isNonBlankString, "SDP must not be blank")
+      .refine(
+        noControlCharactersExceptSdpLineEndings,
+        "SDP control characters other than CR/LF are not allowed"
+      ),
   })
   .strict();
 
 const StudioLiveIceCandidateSchema = z
   .object({
-    candidate: z.string().min(1).max(STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH),
-    sdpMid: z.string().max(128).nullable().optional(),
+    candidate: z
+      .string()
+      .min(1)
+      .max(STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH)
+      .refine(
+        (value) => fitsSignalStringByteContract(value, STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH),
+        "ICE candidate exceeds the byte budget"
+      )
+      .refine(isNonBlankString, "ICE candidate must not be blank")
+      .refine(noControlCharacters, "ICE candidate control characters are not allowed"),
+    sdpMid: z
+      .string()
+      .max(128)
+      .refine(noControlCharacters, "ICE sdpMid control characters are not allowed")
+      .nullable()
+      .optional(),
     sdpMLineIndex: z.number().int().min(0).max(65_535).nullable().optional(),
-    usernameFragment: z.string().max(256).nullable().optional(),
+    usernameFragment: z
+      .string()
+      .max(256)
+      .refine(noControlCharacters, "ICE username fragment control characters are not allowed")
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -118,6 +202,7 @@ export const StudioLiveSignalSchema = z.discriminatedUnion("kind", [
     .object({
       workId: WorkIdSchema,
       targetConnectionId: ConnectionIdSchema,
+      shareId: ScreenShareIdSchema,
       kind: z.literal("description"),
       description: StudioLiveSessionDescriptionSchema,
     })
@@ -126,6 +211,7 @@ export const StudioLiveSignalSchema = z.discriminatedUnion("kind", [
     .object({
       workId: WorkIdSchema,
       targetConnectionId: ConnectionIdSchema,
+      shareId: ScreenShareIdSchema,
       kind: z.literal("candidate"),
       candidate: StudioLiveIceCandidateSchema,
     })
@@ -134,6 +220,7 @@ export const StudioLiveSignalSchema = z.discriminatedUnion("kind", [
     .object({
       workId: WorkIdSchema,
       targetConnectionId: ConnectionIdSchema,
+      shareId: ScreenShareIdSchema,
       kind: z.literal("bye"),
     })
     .strict(),
@@ -145,6 +232,10 @@ type StudioLiveCursorInput = z.infer<typeof StudioLiveCursorSchema>;
 type StudioLiveLockRequestInput = z.infer<typeof StudioLiveLockRequestSchema>;
 type StudioLiveLockReleaseInput = z.infer<typeof StudioLiveLockReleaseSchema>;
 type StudioLiveScreenStateInput = z.infer<typeof StudioLiveScreenStateSchema>;
+type StudioLiveScreenAccessInput = z.infer<typeof StudioLiveScreenAccessSchema>;
+type StudioLiveScreenAnnounceInput = z.infer<typeof StudioLiveScreenAnnounceSchema>;
+type StudioLiveScreenRequestInput = z.infer<typeof StudioLiveScreenRequestSchema>;
+type StudioLiveScreenStopInput = z.infer<typeof StudioLiveScreenStopSchema>;
 type StudioLiveSignalInput = z.infer<typeof StudioLiveSignalSchema>;
 
 export interface StudioLiveParticipant {
@@ -195,6 +286,17 @@ type StudioLiveFailureCode =
 type StudioLiveFailure = { ok: false; code: StudioLiveFailureCode; message: string };
 export type StudioLiveAck<T> = StudioLiveSuccess<T> | StudioLiveFailure;
 type StudioLiveAckCallback<T> = (response: StudioLiveAck<T>) => void;
+type StudioLivePeerRelayAuthorization =
+  | {
+      ok: true;
+      sender: StudioLiveParticipantInternal;
+      senderAuthorizationSequence: number;
+      senderPrincipal: StudioLiveAuthPrincipal;
+      target: StudioLiveParticipantInternal;
+      targetAuthorizationSequence: number;
+      targetPrincipal: StudioLiveAuthPrincipal;
+    }
+  | { ok: false; response: StudioLiveFailure };
 interface StudioLiveJoinResult {
   self: StudioLiveParticipant;
   participants: StudioLiveParticipant[];
@@ -228,6 +330,23 @@ type StudioLiveSocket = Socket<
 interface RateLimitBucket {
   count: number;
   resetsAt: number;
+}
+
+interface StudioLiveParticipantAuthorizationRecheck {
+  participant: StudioLiveParticipantInternal;
+  promise: Promise<number | null>;
+}
+
+interface StudioLiveCandidateRelayAuthorization {
+  workId: string;
+  shareId: string;
+  left: StudioLiveParticipantInternal;
+  leftAuthorizationSequence: number;
+  leftPrincipal: StudioLiveAuthPrincipal;
+  right: StudioLiveParticipantInternal;
+  rightAuthorizationSequence: number;
+  rightPrincipal: StudioLiveAuthPrincipal;
+  expiresAt: number;
 }
 
 export type StudioLiveAuthPrincipal = VerifiedSessionToken;
@@ -320,7 +439,7 @@ export function studioLiveAllowRequest(
   namespace: STUDIO_LIVE_NAMESPACE,
   path: "/socket.io",
   transports: ["websocket"],
-  maxHttpBufferSize: 300_000,
+  maxHttpBufferSize: STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE,
   perMessageDeflate: false,
   cors: {
     credentials: false,
@@ -346,6 +465,14 @@ export class StudioLiveGateway
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
   private readonly joinTransitionSequences = new Map<string, number>();
   private readonly joinTransitionTails = new Map<string, Promise<void>>();
+  private readonly participantAuthorizationRechecks = new Map<
+    string,
+    StudioLiveParticipantAuthorizationRecheck
+  >();
+  private readonly candidateRelayAuthorizations = new Map<
+    string,
+    StudioLiveCandidateRelayAuthorization
+  >();
   private accessRecheckTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -398,6 +525,8 @@ export class StudioLiveGateway
     this.rateLimits.clear();
     this.joinTransitionSequences.clear();
     this.joinTransitionTails.clear();
+    this.participantAuthorizationRechecks.clear();
+    this.candidateRelayAuthorizations.clear();
   }
 
   async handleConnection(client: StudioLiveSocket): Promise<void> {
@@ -412,6 +541,8 @@ export class StudioLiveGateway
 
   handleDisconnect(client: StudioLiveSocket): void {
     this.joinTransitionSequences.delete(client.id);
+    this.participantAuthorizationRechecks.delete(client.id);
+    this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.removeParticipant(client.id, "disconnect");
     this.rateLimits.delete(client.id);
   }
@@ -425,6 +556,11 @@ export class StudioLiveGateway
     const parsed = StudioLiveJoinSchema.safeParse(body);
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "실시간 작업실 참가 정보가 올바르지 않습니다."));
+    }
+    // Charge the valid request before session/ACL I/O so a connected client cannot bypass the
+    // admission limit while still forcing repeated database-backed session validation.
+    if (!this.consumeRateLimit(client.id, "join", 12, 60_000)) {
+      return reply(ack, failure("rate_limited", "작업실 참가 요청이 너무 많습니다."));
     }
     const transitionSequence = this.nextJoinTransitionSequence(client.id);
     return this.enqueueJoinTransition(client.id, async () => {
@@ -447,6 +583,16 @@ export class StudioLiveGateway
     if (!this.isCurrentJoinTransition(client, transitionSequence)) {
       return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
     }
+    const rejectInvalidSession = (rollbackRoom?: string): StudioLiveFailure => {
+      const response = failure("unauthenticated", "로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+      reply(ack, response);
+      client.emit("studio:error", response);
+      // Disconnect is the fail-closed boundary. Never wait for a distributed adapter leave: an
+      // adapter can stall indefinitely while the expired socket remains a speculative listener.
+      this.disconnectInvalidJoinSession(client);
+      if (rollbackRoom) this.leaveRoomBestEffort(client, rollbackRoom);
+      return response;
+    };
     // Revalidate on every room join. A socket that outlives token expiry, logout, or a session
     // version bump must not use the previously cached user id to enter another work.
     const authenticated = await this.revalidateSocketSession(client);
@@ -454,21 +600,17 @@ export class StudioLiveGateway
       return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
     }
     const userId = authenticated ? client.data.authUserId : null;
-    if (!userId) {
-      const response = failure("unauthenticated", "로그인이 필요합니다.");
-      reply(ack, response);
-      client.emit("studio:error", response);
-      client.disconnect(true);
-      return response;
+    const principal = authenticated ? client.data.authPrincipal : undefined;
+    if (!userId || !principal || !this.isSocketPrincipalCurrent(client, principal, userId)) {
+      return rejectInvalidSession();
     }
-    if (!this.consumeRateLimit(client.id, "join", 12, 60_000)) {
-      return reply(ack, failure("rate_limited", "작업실 참가 요청이 너무 많습니다."));
-    }
-
     try {
       const team = await this.creatorService.getWorkTeam(userId, input.workId);
       if (!this.isCurrentJoinTransition(client, transitionSequence)) {
         return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
+      }
+      if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+        return rejectInvalidSession();
       }
       if (
         team.workId !== input.workId ||
@@ -496,6 +638,9 @@ export class StudioLiveGateway
         if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
         return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
       }
+      if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+        return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
+      }
 
       // This is the serialized commit boundary. A newer request may enqueue while an adapter leave
       // is pending, but it cannot execute until this transition leaves exactly one authoritative
@@ -511,6 +656,9 @@ export class StudioLiveGateway
         if (!this.isSocketCurrent(client)) {
           if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
           return reply(ack, failure("not_joined", "실시간 작업실 연결이 종료되었습니다."));
+        }
+        if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+          return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
         }
         this.removeParticipant(client.id, "switch");
       }
@@ -537,9 +685,17 @@ export class StudioLiveGateway
         authorizedAt: now,
         authorizationSequence: 0,
       };
+      // No asynchronous boundary may occur between this final identity check and the authoritative
+      // participant/room-index commit below. This prevents a session that expired during adapter
+      // I/O from becoming a valid in-memory participant even briefly.
+      if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+        return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
+      }
       if (existing?.workId === input.workId && existing.capabilities.edit && !participant.capabilities.edit) {
         this.releaseSocketLocks(existing);
       }
+      this.participantAuthorizationRechecks.delete(client.id);
+      this.deleteCandidateRelayAuthorizationsForSocket(client.id);
       this.participantsBySocket.set(client.id, participant);
       const roomSockets = this.socketIdsByWork.get(input.workId) ?? new Set<string>();
       roomSockets.add(client.id);
@@ -571,16 +727,23 @@ export class StudioLiveGateway
     if (!this.consumeRateLimit(client.id, "presence", 30, 10_000)) {
       return reply(ack, failure("rate_limited", "작업 상태 갱신이 너무 빠릅니다."));
     }
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, false);
-    if (!participant) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
-
-    participant.state = parsed.data.state;
-    if (Object.hasOwn(parsed.data, "pageId")) participant.pageId = parsed.data.pageId ?? null;
-    if (Object.hasOwn(parsed.data, "tool")) participant.tool = parsed.data.tool ?? null;
-    participant.updatedAt = new Date().toISOString();
-    const safe = publicParticipant(participant);
-    this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:update", safe);
-    return reply(ack, { ok: true, data: { participant: safe } });
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        participant.state = parsed.data.state;
+        if (Object.hasOwn(parsed.data, "pageId")) participant.pageId = parsed.data.pageId ?? null;
+        if (Object.hasOwn(parsed.data, "tool")) participant.tool = parsed.data.tool ?? null;
+        participant.updatedAt = new Date().toISOString();
+        const safe = publicParticipant(participant);
+        this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:update", safe);
+        return safe;
+      }
+    );
+    if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    return reply(ack, { ok: true, data: { participant: authorized.value } });
   }
 
   @SubscribeMessage("studio:cursor")
@@ -594,15 +757,22 @@ export class StudioLiveGateway
     if (!this.consumeRateLimit(client.id, "cursor", 90, 3_000)) {
       return reply(ack, failure("rate_limited", "커서 위치 전송이 너무 빠릅니다."));
     }
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, false);
-    if (!participant) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
-    client.to(studioLiveRoom(participant.workId)).emit("studio:cursor", {
-      connectionId: participant.connectionId,
-      pageId: parsed.data.pageId,
-      x: parsed.data.x,
-      y: parsed.data.y,
-      sentAt: new Date().toISOString(),
-    });
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        client.to(studioLiveRoom(participant.workId)).emit("studio:cursor", {
+          connectionId: participant.connectionId,
+          pageId: parsed.data.pageId,
+          x: parsed.data.x,
+          y: parsed.data.y,
+          sentAt: new Date().toISOString(),
+        });
+      }
+    );
+    if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     return reply(ack, { ok: true, data: { accepted: true } });
   }
 
@@ -617,35 +787,43 @@ export class StudioLiveGateway
     if (!this.consumeRateLimit(client.id, "lock", 60, 60_000)) {
       return reply(ack, failure("rate_limited", "편집 잠금 요청이 너무 많습니다."));
     }
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, true, true);
-    if (!participant) return reply(ack, failure("forbidden", "이 원고를 편집할 권한이 없습니다."));
-
-    this.purgeExpiredLocks(parsed.data.workId);
-    const roomLocks = this.locksByWork.get(parsed.data.workId) ?? new Map<string, StudioLiveLock>();
-    const current = roomLocks.get(parsed.data.resourceId);
-    if (current && current.ownerConnectionId !== client.id) {
-      return reply(
-        ack,
-        failure("lock_conflict", `${current.ownerName}님이 이 항목을 편집하고 있습니다.`)
-      );
-    }
-    if (!current && roomLocks.size >= STUDIO_LIVE_LOCK_LIMIT_PER_WORK) {
-      return reply(ack, failure("lock_limit", "동시에 잠글 수 있는 편집 항목 수를 초과했습니다."));
-    }
-    const lock: StudioLiveLock = {
-      resourceId: parsed.data.resourceId,
-      leaseId: current?.leaseId ?? crypto.randomUUID(),
-      ownerConnectionId: client.id,
-      ownerName: participant.name,
-      expiresAt: new Date(Date.now() + parsed.data.leaseMs).toISOString(),
-    };
-    roomLocks.set(lock.resourceId, lock);
-    this.locksByWork.set(parsed.data.workId, roomLocks);
-    this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", {
-      action: "acquired",
-      lock,
-    });
-    return reply(ack, { ok: true, data: { lock } });
+    const authorized = await this.runWithAuthorizedParticipant<StudioLiveAck<{ lock: StudioLiveLock }>>(
+      client,
+      parsed.data.workId,
+      true,
+      true,
+      (participant) => {
+        this.purgeExpiredLocks(parsed.data.workId);
+        const roomLocks =
+          this.locksByWork.get(parsed.data.workId) ?? new Map<string, StudioLiveLock>();
+        const current = roomLocks.get(parsed.data.resourceId);
+        if (current && current.ownerConnectionId !== client.id) {
+          return failure(
+            "lock_conflict",
+            `${current.ownerName}님이 이 항목을 편집하고 있습니다.`
+          );
+        }
+        if (!current && roomLocks.size >= STUDIO_LIVE_LOCK_LIMIT_PER_WORK) {
+          return failure("lock_limit", "동시에 잠글 수 있는 편집 항목 수를 초과했습니다.");
+        }
+        const lock: StudioLiveLock = {
+          resourceId: parsed.data.resourceId,
+          leaseId: current?.leaseId ?? crypto.randomUUID(),
+          ownerConnectionId: client.id,
+          ownerName: participant.name,
+          expiresAt: new Date(Date.now() + parsed.data.leaseMs).toISOString(),
+        };
+        roomLocks.set(lock.resourceId, lock);
+        this.locksByWork.set(parsed.data.workId, roomLocks);
+        this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", {
+          action: "acquired",
+          lock,
+        });
+        return { ok: true, data: { lock } };
+      }
+    );
+    if (!authorized) return reply(ack, failure("forbidden", "이 원고를 편집할 권한이 없습니다."));
+    return reply(ack, authorized.value);
   }
 
   @SubscribeMessage("studio:lock:release")
@@ -656,23 +834,33 @@ export class StudioLiveGateway
   ) {
     const parsed = StudioLiveLockReleaseSchema.safeParse(body);
     if (!parsed.success) return reply(ack, failure("invalid_payload", "편집 잠금 해제 정보가 올바르지 않습니다."));
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, true);
-    if (!participant) return reply(ack, failure("forbidden", "이 원고를 편집할 권한이 없습니다."));
-    const roomLocks = this.locksByWork.get(parsed.data.workId);
-    const current = roomLocks?.get(parsed.data.resourceId);
-    const released = Boolean(
-      current && current.ownerConnectionId === client.id && current.leaseId === parsed.data.leaseId
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      true,
+      false,
+      () => {
+        const roomLocks = this.locksByWork.get(parsed.data.workId);
+        const current = roomLocks?.get(parsed.data.resourceId);
+        const released = Boolean(
+          current &&
+            current.ownerConnectionId === client.id &&
+            current.leaseId === parsed.data.leaseId
+        );
+        if (released) {
+          roomLocks?.delete(parsed.data.resourceId);
+          if (roomLocks?.size === 0) this.locksByWork.delete(parsed.data.workId);
+          this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", {
+            action: "released",
+            resourceId: parsed.data.resourceId,
+            leaseId: parsed.data.leaseId,
+          });
+        }
+        return released;
+      }
     );
-    if (released) {
-      roomLocks?.delete(parsed.data.resourceId);
-      if (roomLocks?.size === 0) this.locksByWork.delete(parsed.data.workId);
-      this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", {
-        action: "released",
-        resourceId: parsed.data.resourceId,
-        leaseId: parsed.data.leaseId,
-      });
-    }
-    return reply(ack, { ok: true, data: { released } });
+    if (!authorized) return reply(ack, failure("forbidden", "이 원고를 편집할 권한이 없습니다."));
+    return reply(ack, { ok: true, data: { released: authorized.value } });
   }
 
   @SubscribeMessage("studio:screen:set")
@@ -683,13 +871,189 @@ export class StudioLiveGateway
   ) {
     const parsed = StudioLiveScreenStateSchema.safeParse(body);
     if (!parsed.success) return reply(ack, failure("invalid_payload", "화면 공유 상태가 올바르지 않습니다."));
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, false, true);
-    if (!participant) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
-    participant.sharingScreen = parsed.data.sharing;
-    participant.updatedAt = new Date().toISOString();
-    const safe = publicParticipant(participant);
-    this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:update", safe);
-    return reply(ack, { ok: true, data: { participant: safe } });
+    if (!this.consumeRateLimit(client.id, "screen-set", 30, 60_000)) {
+      return reply(ack, failure("rate_limited", "화면 공유 상태 갱신이 너무 많습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => {
+        participant.sharingScreen = parsed.data.sharing;
+        participant.updatedAt = new Date().toISOString();
+        const safe = publicParticipant(participant);
+        this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:update", safe);
+        return safe;
+      }
+    );
+    if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    return reply(ack, { ok: true, data: { participant: authorized.value } });
+  }
+
+  @SubscribeMessage("studio:screen:announce")
+  async announceScreenShare(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveScreenAnnounceInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true }>
+  ) {
+    const parsed = StudioLiveScreenAnnounceSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "화면 공유 안내 정보가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "screen-announce", 30, 60_000)) {
+      return reply(ack, failure("rate_limited", "화면 공유 안내 전송이 너무 많습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => {
+        participant.sharingScreen = true;
+        participant.updatedAt = new Date().toISOString();
+        const room = this.server.to(studioLiveRoom(participant.workId));
+        room.emit("studio:presence:update", publicParticipant(participant));
+        room.emit("studio:screen:announce", {
+          fromConnectionId: participant.connectionId,
+          fromName: participant.name,
+          shareId: parsed.data.shareId,
+          label: parsed.data.label,
+        });
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    return reply(ack, { ok: true, data: { delivered: true } });
+  }
+
+  @SubscribeMessage("studio:screen:request")
+  async requestScreenAccess(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveScreenRequestInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true }>
+  ) {
+    const parsed = StudioLiveScreenRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "화면 공유 접근 요청이 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "screen-request", 60, 60_000)) {
+      return reply(ack, failure("rate_limited", "화면 공유 접근 요청이 너무 많습니다."));
+    }
+    let authorization = await this.authorizeRelayPeers(
+      client,
+      parsed.data.workId,
+      parsed.data.targetConnectionId,
+      "본인에게 화면 공유 접근을 요청할 수 없습니다."
+    );
+    while (authorization.ok && !this.isRelayAuthorizationCurrent(authorization)) {
+      authorization = await this.authorizeRelayPeers(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 화면 공유 접근을 요청할 수 없습니다.",
+        "rebase"
+      );
+    }
+    if (!authorization.ok) return reply(ack, authorization.response);
+
+    this.server.to(authorization.target.connectionId).emit("studio:screen:request", {
+      fromConnectionId: authorization.sender.connectionId,
+      fromName: authorization.sender.name,
+      shareId: parsed.data.shareId,
+    });
+    return reply(ack, { ok: true, data: { delivered: true } });
+  }
+
+  @SubscribeMessage("studio:screen:access")
+  async relayScreenAccess(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveScreenAccessInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true }>
+  ) {
+    const parsed = StudioLiveScreenAccessSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "화면 공유 접근 결정이 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "screen-access", 60, 60_000)) {
+      return reply(ack, failure("rate_limited", "화면 공유 접근 결정 전송이 너무 많습니다."));
+    }
+
+    let authorization = await this.authorizeRelayPeers(
+      client,
+      parsed.data.workId,
+      parsed.data.targetConnectionId,
+      "본인에게 화면 공유 접근 결정을 보낼 수 없습니다."
+    );
+    while (authorization.ok && !this.isRelayAuthorizationCurrent(authorization)) {
+      authorization = await this.authorizeRelayPeers(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 화면 공유 접근 결정을 보낼 수 없습니다.",
+        "rebase"
+      );
+    }
+    if (!authorization.ok) return reply(ack, authorization.response);
+
+    if (parsed.data.decision === "rejected" || parsed.data.decision === "ended") {
+      this.deleteCandidateRelayAuthorization(
+        parsed.data.workId,
+        parsed.data.shareId,
+        authorization.sender.connectionId,
+        authorization.target.connectionId
+      );
+    }
+
+    this.server.to(authorization.target.connectionId).emit("studio:screen:access", {
+      fromConnectionId: authorization.sender.connectionId,
+      fromName: authorization.sender.name,
+      shareId: parsed.data.shareId,
+      decision: parsed.data.decision,
+    });
+    return reply(ack, { ok: true, data: { delivered: true } });
+  }
+
+  @SubscribeMessage("studio:screen:stop")
+  async stopScreenShare(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveScreenStopInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true }>
+  ) {
+    const parsed = StudioLiveScreenStopSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "화면 공유 종료 정보가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "screen-stop", 30, 60_000)) {
+      return reply(ack, failure("rate_limited", "화면 공유 종료 전송이 너무 많습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => {
+        participant.sharingScreen = false;
+        participant.updatedAt = new Date().toISOString();
+        this.deleteCandidateRelayAuthorizationsForShare(
+          participant.workId,
+          parsed.data.shareId,
+          participant.connectionId
+        );
+        const room = this.server.to(studioLiveRoom(participant.workId));
+        room.emit("studio:presence:update", publicParticipant(participant));
+        room.emit("studio:screen:stop", {
+          fromConnectionId: participant.connectionId,
+          fromName: participant.name,
+          shareId: parsed.data.shareId,
+        });
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    return reply(ack, { ok: true, data: { delivered: true } });
   }
 
   @SubscribeMessage("studio:signal")
@@ -698,26 +1062,415 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveSignalInput,
     @Ack() ack?: StudioLiveAckCallback<{ delivered: true; signalId: string }>
   ) {
-    const parsed = StudioLiveSignalSchema.safeParse(body);
-    if (!parsed.success) return reply(ack, failure("invalid_payload", "WebRTC 연결 정보가 올바르지 않습니다."));
     if (!this.consumeRateLimit(client.id, "signal", 240, 60_000)) {
       return reply(ack, failure("rate_limited", "WebRTC 연결 요청이 너무 많습니다."));
     }
-    const participant = await this.authorizedParticipant(client, parsed.data.workId, false);
-    if (!participant) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
-    const target = this.participantsBySocket.get(parsed.data.targetConnectionId);
-    if (!target || target.workId !== participant.workId || target.connectionId === participant.connectionId) {
-      return reply(ack, failure("peer_unavailable", "연결할 팀원이 작업실에 없습니다."));
+    const parsed = StudioLiveSignalSchema.safeParse(body);
+    if (!parsed.success) return reply(ack, failure("invalid_payload", "WebRTC 연결 정보가 올바르지 않습니다."));
+    const cachedCandidateAuthorization =
+      parsed.data.kind === "candidate"
+        ? this.cachedCandidateRelayAuthorization(
+            client,
+            parsed.data.workId,
+            parsed.data.targetConnectionId,
+            parsed.data.shareId
+          )
+        : null;
+    let authorization =
+      cachedCandidateAuthorization ??
+      (await this.authorizeRelayPeers(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 WebRTC 연결 정보를 보낼 수 없습니다.",
+        parsed.data.kind === "candidate" ? "candidate-coalesced" : "force"
+      ));
+    while (authorization.ok && !this.isRelayAuthorizationCurrent(authorization)) {
+      authorization = await this.authorizeRelayPeers(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 WebRTC 연결 정보를 보낼 수 없습니다.",
+        "rebase"
+      );
     }
+    if (!authorization.ok) return reply(ack, authorization.response);
     const signalId = crypto.randomUUID();
     const { workId: _workId, targetConnectionId: _targetConnectionId, ...signal } = parsed.data;
-    this.server.to(target.connectionId).emit("studio:signal", {
+    this.server.to(authorization.target.connectionId).emit("studio:signal", {
       signalId,
-      fromConnectionId: participant.connectionId,
-      fromName: participant.name,
+      fromConnectionId: authorization.sender.connectionId,
+      fromName: authorization.sender.name,
       ...signal,
     });
+    if (parsed.data.kind === "description") {
+      this.rememberCandidateRelayAuthorization(
+        parsed.data.workId,
+        parsed.data.shareId,
+        authorization.sender,
+        authorization.target,
+        true
+      );
+    } else if (parsed.data.kind === "candidate" && !cachedCandidateAuthorization) {
+      this.rememberCandidateRelayAuthorization(
+        parsed.data.workId,
+        parsed.data.shareId,
+        authorization.sender,
+        authorization.target,
+        false
+      );
+    } else if (parsed.data.kind === "bye") {
+      this.deleteCandidateRelayAuthorization(
+        parsed.data.workId,
+        parsed.data.shareId,
+        authorization.sender.connectionId,
+        authorization.target.connectionId
+      );
+    }
     return reply(ack, { ok: true, data: { delivered: true, signalId } });
+  }
+
+  private candidateRelayAuthorizationKey(
+    workId: string,
+    shareId: string,
+    firstConnectionId: string,
+    secondConnectionId: string
+  ): string {
+    const [leftConnectionId, rightConnectionId] = [firstConnectionId, secondConnectionId].sort();
+    return JSON.stringify([workId, shareId, leftConnectionId, rightConnectionId]);
+  }
+
+  private cachedCandidateRelayAuthorization(
+    client: StudioLiveSocket,
+    workId: string,
+    targetConnectionId: string,
+    shareId: string
+  ): Extract<StudioLivePeerRelayAuthorization, { ok: true }> | null {
+    const sender = this.participantsBySocket.get(client.id);
+    const target = this.participantsBySocket.get(targetConnectionId);
+    const targetSocket = this.server.sockets.get(targetConnectionId) as
+      | StudioLiveSocket
+      | undefined;
+    if (
+      !sender ||
+      !target ||
+      !targetSocket ||
+      sender.connectionId === target.connectionId ||
+      sender.workId !== workId ||
+      target.workId !== workId
+    ) {
+      return null;
+    }
+    const key = this.candidateRelayAuthorizationKey(
+      workId,
+      shareId,
+      sender.connectionId,
+      target.connectionId
+    );
+    const cached = this.candidateRelayAuthorizations.get(key);
+    if (!cached) return null;
+    const now = Date.now();
+    const [left, right] =
+      sender.connectionId < target.connectionId ? [sender, target] : [target, sender];
+    const leftSocket = this.server.sockets.get(left.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const rightSocket = this.server.sockets.get(right.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const leftPrincipal = leftSocket?.data.authPrincipal;
+    const rightPrincipal = rightSocket?.data.authPrincipal;
+    const leftRecheck = this.participantAuthorizationRechecks.get(left.connectionId);
+    const rightRecheck = this.participantAuthorizationRechecks.get(right.connectionId);
+    const valid =
+      cached.expiresAt > now &&
+      cached.workId === workId &&
+      cached.shareId === shareId &&
+      cached.left === left &&
+      cached.right === right &&
+      cached.leftAuthorizationSequence === left.authorizationSequence &&
+      cached.rightAuthorizationSequence === right.authorizationSequence &&
+      cached.leftPrincipal === leftPrincipal &&
+      cached.rightPrincipal === rightPrincipal &&
+      Boolean(leftPrincipal && leftPrincipal.expiresAt > now) &&
+      Boolean(rightPrincipal && rightPrincipal.expiresAt > now) &&
+      leftPrincipal?.userId === left.userId &&
+      rightPrincipal?.userId === right.userId &&
+      leftSocket?.data.authUserId === left.userId &&
+      rightSocket?.data.authUserId === right.userId &&
+      this.isSocketCurrent(leftSocket as StudioLiveSocket) &&
+      this.isSocketCurrent(rightSocket as StudioLiveSocket) &&
+      leftRecheck?.participant !== left &&
+      rightRecheck?.participant !== right;
+    if (!valid) {
+      this.candidateRelayAuthorizations.delete(key);
+      return null;
+    }
+    return {
+      ok: true,
+      sender,
+      senderAuthorizationSequence: sender.authorizationSequence,
+      senderPrincipal:
+        sender.connectionId === left.connectionId ? cached.leftPrincipal : cached.rightPrincipal,
+      target,
+      targetAuthorizationSequence: target.authorizationSequence,
+      targetPrincipal:
+        target.connectionId === left.connectionId ? cached.leftPrincipal : cached.rightPrincipal,
+    };
+  }
+
+  private relayAuthorizationSnapshot(
+    sender: StudioLiveParticipantInternal,
+    target: StudioLiveParticipantInternal
+  ): Extract<StudioLivePeerRelayAuthorization, { ok: true }> | null {
+    const senderSocket = this.server.sockets.get(sender.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const targetSocket = this.server.sockets.get(target.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const senderPrincipal = senderSocket?.data.authPrincipal;
+    const targetPrincipal = targetSocket?.data.authPrincipal;
+    const now = Date.now();
+    if (
+      !senderSocket ||
+      !targetSocket ||
+      !senderPrincipal ||
+      !targetPrincipal ||
+      senderPrincipal.expiresAt <= now ||
+      targetPrincipal.expiresAt <= now ||
+      senderPrincipal.userId !== sender.userId ||
+      targetPrincipal.userId !== target.userId ||
+      senderSocket.data.authUserId !== sender.userId ||
+      targetSocket.data.authUserId !== target.userId ||
+      sender.workId !== target.workId ||
+      this.participantsBySocket.get(sender.connectionId) !== sender ||
+      this.participantsBySocket.get(target.connectionId) !== target ||
+      !this.isSocketCurrent(senderSocket) ||
+      !this.isSocketCurrent(targetSocket) ||
+      this.participantAuthorizationRechecks.get(sender.connectionId)?.participant === sender ||
+      this.participantAuthorizationRechecks.get(target.connectionId)?.participant === target
+    ) {
+      return null;
+    }
+    return {
+      ok: true,
+      sender,
+      senderAuthorizationSequence: sender.authorizationSequence,
+      senderPrincipal,
+      target,
+      targetAuthorizationSequence: target.authorizationSequence,
+      targetPrincipal,
+    };
+  }
+
+  private isRelayAuthorizationCurrent(
+    authorization: Extract<StudioLivePeerRelayAuthorization, { ok: true }>
+  ): boolean {
+    const snapshot = this.relayAuthorizationSnapshot(
+      authorization.sender,
+      authorization.target
+    );
+    return Boolean(
+      snapshot &&
+      snapshot.senderAuthorizationSequence === authorization.senderAuthorizationSequence &&
+      snapshot.targetAuthorizationSequence === authorization.targetAuthorizationSequence &&
+      snapshot.senderPrincipal === authorization.senderPrincipal &&
+      snapshot.targetPrincipal === authorization.targetPrincipal
+    );
+  }
+
+  private rememberCandidateRelayAuthorization(
+    workId: string,
+    shareId: string,
+    first: StudioLiveParticipantInternal,
+    second: StudioLiveParticipantInternal,
+    refresh: boolean
+  ): void {
+    const [left, right] =
+      first.connectionId < second.connectionId ? [first, second] : [second, first];
+    const leftSocket = this.server.sockets.get(left.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const rightSocket = this.server.sockets.get(right.connectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const leftPrincipal = leftSocket?.data.authPrincipal;
+    const rightPrincipal = rightSocket?.data.authPrincipal;
+    const now = Date.now();
+    if (
+      !leftSocket ||
+      !rightSocket ||
+      !leftPrincipal ||
+      !rightPrincipal ||
+      leftPrincipal.expiresAt <= now ||
+      rightPrincipal.expiresAt <= now ||
+      this.participantsBySocket.get(left.connectionId) !== left ||
+      this.participantsBySocket.get(right.connectionId) !== right ||
+      !this.isSocketCurrent(leftSocket) ||
+      !this.isSocketCurrent(rightSocket)
+    ) {
+      return;
+    }
+    this.purgeExpiredCandidateRelayAuthorizations(now);
+    const key = this.candidateRelayAuthorizationKey(
+      workId,
+      shareId,
+      left.connectionId,
+      right.connectionId
+    );
+    if (!refresh && this.candidateRelayAuthorizations.has(key)) return;
+    if (!this.candidateRelayAuthorizations.has(key)) {
+      while (
+        this.candidateRelayAuthorizations.size >=
+        STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_LIMIT
+      ) {
+        const oldestKey = this.candidateRelayAuthorizations.keys().next().value as
+          | string
+          | undefined;
+        if (!oldestKey) break;
+        this.candidateRelayAuthorizations.delete(oldestKey);
+      }
+    } else {
+      this.candidateRelayAuthorizations.delete(key);
+    }
+    this.candidateRelayAuthorizations.set(key, {
+      workId,
+      shareId,
+      left,
+      leftAuthorizationSequence: left.authorizationSequence,
+      leftPrincipal,
+      right,
+      rightAuthorizationSequence: right.authorizationSequence,
+      rightPrincipal,
+      expiresAt: now + STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_MS,
+    });
+  }
+
+  private purgeExpiredCandidateRelayAuthorizations(now = Date.now()): void {
+    for (const [key, authorization] of this.candidateRelayAuthorizations) {
+      if (authorization.expiresAt <= now) this.candidateRelayAuthorizations.delete(key);
+    }
+  }
+
+  private deleteCandidateRelayAuthorization(
+    workId: string,
+    shareId: string,
+    firstConnectionId: string,
+    secondConnectionId: string
+  ): void {
+    this.candidateRelayAuthorizations.delete(
+      this.candidateRelayAuthorizationKey(
+        workId,
+        shareId,
+        firstConnectionId,
+        secondConnectionId
+      )
+    );
+  }
+
+  private deleteCandidateRelayAuthorizationsForShare(
+    workId: string,
+    shareId: string,
+    connectionId: string
+  ): void {
+    for (const [key, authorization] of this.candidateRelayAuthorizations) {
+      if (
+        authorization.workId === workId &&
+        authorization.shareId === shareId &&
+        (authorization.left.connectionId === connectionId ||
+          authorization.right.connectionId === connectionId)
+      ) {
+        this.candidateRelayAuthorizations.delete(key);
+      }
+    }
+  }
+
+  private deleteCandidateRelayAuthorizationsForSocket(connectionId: string): void {
+    for (const [key, authorization] of this.candidateRelayAuthorizations) {
+      if (
+        authorization.left.connectionId === connectionId ||
+        authorization.right.connectionId === connectionId
+      ) {
+        this.candidateRelayAuthorizations.delete(key);
+      }
+    }
+  }
+
+  private async authorizeRelayPeers(
+    client: StudioLiveSocket,
+    workId: string,
+    targetConnectionId: string,
+    selfTargetMessage: string,
+    authorizationMode: "candidate-coalesced" | "force" | "rebase" = "force"
+  ): Promise<StudioLivePeerRelayAuthorization> {
+    const authorizeParticipant = (socket: StudioLiveSocket) =>
+      authorizationMode === "candidate-coalesced"
+        ? this.authorizedParticipantWithMode(
+            socket,
+            workId,
+            false,
+            "coalesced-force"
+          )
+        : this.authorizedParticipantWithMode(
+            socket,
+            workId,
+            false,
+            authorizationMode === "force" ? "force" : "cached"
+          );
+    const sender = await authorizeParticipant(client);
+    if (!sender) {
+      return {
+        ok: false,
+        response: failure("not_joined", "실시간 작업실에 다시 참여해 주세요."),
+      };
+    }
+    if (targetConnectionId === sender.connectionId) {
+      return {
+        ok: false,
+        response: failure("peer_unavailable", selfTargetMessage),
+      };
+    }
+
+    const targetSocket = this.server.sockets.get(targetConnectionId) as
+      | StudioLiveSocket
+      | undefined;
+    const target = this.participantsBySocket.get(targetConnectionId);
+    if (!targetSocket || !target || target.workId !== sender.workId) {
+      return {
+        ok: false,
+        response: failure("peer_unavailable", "연결할 팀원이 작업실에 없습니다."),
+      };
+    }
+    const authorizedTarget = await authorizeParticipant(targetSocket);
+    if (!authorizedTarget || authorizedTarget !== target) {
+      return {
+        ok: false,
+        response: failure("peer_unavailable", "연결할 팀원이 작업실에 없습니다."),
+      };
+    }
+
+    // Either peer can start a newer global authorization while the other peer is being checked.
+    // Rebase both sides until one no-await snapshot observes the same participant generations,
+    // principals, sockets, and no in-flight check for either connection.
+    while (true) {
+      const currentSender = await this.authorizedParticipant(client, workId, false);
+      if (currentSender !== sender) {
+        return {
+          ok: false,
+          response: failure("not_joined", "실시간 작업실에 다시 참여해 주세요."),
+        };
+      }
+      const currentTarget = await this.authorizedParticipant(targetSocket, workId, false);
+      if (currentTarget !== authorizedTarget) {
+        return {
+          ok: false,
+          response: failure("peer_unavailable", "연결할 팀원이 작업실에 없습니다."),
+        };
+      }
+      const snapshot = this.relayAuthorizationSnapshot(sender, authorizedTarget);
+      if (snapshot) return snapshot;
+    }
   }
 
   private nextJoinTransitionSequence(socketId: string): number {
@@ -746,6 +1499,40 @@ export class StudioLiveGateway
     return this.server.sockets.get(client.id) === client;
   }
 
+  private isSocketPrincipalCurrent(
+    client: StudioLiveSocket,
+    principal: StudioLiveAuthPrincipal,
+    userId: string
+  ): boolean {
+    return (
+      this.isSocketCurrent(client) &&
+      client.data.authPrincipal === principal &&
+      client.data.authUserId === userId &&
+      principal.userId === userId &&
+      principal.expiresAt > Date.now()
+    );
+  }
+
+  private disconnectInvalidJoinSession(client: StudioLiveSocket): void {
+    // A reconnect may reuse the Socket.IO id while speculative adapter cleanup is pending. Never
+    // tear down that replacement socket or its participant when this join belongs to the old one.
+    if (!this.isSocketCurrent(client)) {
+      client.disconnect(true);
+      return;
+    }
+    const participant = this.participantsBySocket.get(client.id);
+    if (participant) {
+      this.disconnectInvalidSession(client.id, participant);
+      return;
+    }
+    this.participantAuthorizationRechecks.delete(client.id);
+    this.deleteCandidateRelayAuthorizationsForSocket(client.id);
+    this.rateLimits.delete(client.id);
+    delete client.data.authUserId;
+    delete client.data.authPrincipal;
+    client.disconnect(true);
+  }
+
   private isCurrentJoinTransition(client: StudioLiveSocket, transitionSequence: number): boolean {
     return (
       this.isSocketCurrent(client) &&
@@ -760,6 +1547,15 @@ export class StudioLiveGateway
       // An adapter that cannot undo a speculative join cannot guarantee room isolation. Closing
       // the socket lets Socket.IO discard every adapter room instead of keeping a ghost listener.
       client.disconnect(true);
+    }
+  }
+
+  private leaveRoomBestEffort(client: StudioLiveSocket, room: string): void {
+    try {
+      const leaveResult = client.leave(room);
+      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
+    } catch {
+      // The transport is already closed by the caller, which is the authoritative isolation path.
     }
   }
 
@@ -801,7 +1597,8 @@ export class StudioLiveGateway
       return false;
     }
     try {
-      return await this.revalidateSession(principal);
+      const allowed = await this.revalidateSession(principal);
+      return allowed && this.isSocketPrincipalCurrent(client, principal, principal.userId);
     } catch {
       return false;
     }
@@ -826,36 +1623,151 @@ export class StudioLiveGateway
     return true;
   }
 
+  private isParticipantAuthorizationCurrent(
+    client: StudioLiveSocket,
+    participant: StudioLiveParticipantInternal,
+    requireEdit: boolean
+  ): boolean {
+    const principal = client.data.authPrincipal;
+    const recheck = this.participantAuthorizationRechecks.get(client.id);
+    return Boolean(
+      principal &&
+      principal.expiresAt > Date.now() &&
+      principal.userId === participant.userId &&
+      client.data.authUserId === participant.userId &&
+      this.participantsBySocket.get(client.id) === participant &&
+      this.isSocketCurrent(client) &&
+      recheck?.participant !== participant &&
+      (!requireEdit || participant.capabilities.edit)
+    );
+  }
+
+  private async runWithAuthorizedParticipant<T>(
+    client: StudioLiveSocket,
+    workId: string,
+    requireEdit: boolean,
+    forceRecheck: boolean,
+    action: (participant: StudioLiveParticipantInternal) => T
+  ): Promise<{ value: T } | null> {
+    let force = forceRecheck;
+    while (true) {
+      const participant = await this.authorizedParticipant(
+        client,
+        workId,
+        requireEdit,
+        force
+      );
+      force = false;
+      if (!participant) return null;
+      if (!this.isParticipantAuthorizationCurrent(client, participant, requireEdit)) continue;
+      return { value: action(participant) };
+    }
+  }
+
   private async authorizedParticipant(
     client: StudioLiveSocket,
     workId: string,
     requireEdit: boolean,
     forceRecheck = false
   ): Promise<StudioLiveParticipantInternal | null> {
-    const participant = this.participantsBySocket.get(client.id);
-    if (!participant || participant.workId !== workId || participant.userId !== client.data.authUserId) return null;
-    const principal = client.data.authPrincipal;
-    if (
-      !principal ||
-      principal.userId !== participant.userId ||
-      principal.expiresAt <= Date.now()
-    ) {
-      this.disconnectInvalidSession(client.id, participant);
-      return null;
+    return this.authorizedParticipantWithMode(
+      client,
+      workId,
+      requireEdit,
+      forceRecheck ? "force" : "cached"
+    );
+  }
+
+  private async authorizedParticipantWithMode(
+    client: StudioLiveSocket,
+    workId: string,
+    requireEdit: boolean,
+    initialMode: "cached" | "coalesced-force" | "force" | "sweep"
+  ): Promise<StudioLiveParticipantInternal | null> {
+    let mode = initialMode;
+    while (true) {
+      const participant = this.participantsBySocket.get(client.id);
+      if (
+        !participant ||
+        participant.workId !== workId ||
+        participant.userId !== client.data.authUserId ||
+        !this.isSocketCurrent(client)
+      ) {
+        return null;
+      }
+      const principal = client.data.authPrincipal;
+      if (
+        !principal ||
+        principal.userId !== participant.userId ||
+        principal.expiresAt <= Date.now()
+      ) {
+        this.disconnectInvalidSession(client.id, participant);
+        return null;
+      }
+
+      let recheck = this.participantAuthorizationRechecks.get(client.id);
+      if (recheck?.participant !== participant) recheck = undefined;
+      if (mode === "force") {
+        recheck = this.startParticipantAuthorizationRecheck(client.id, participant);
+      } else if (
+        !recheck &&
+        mode === "cached" &&
+        Date.now() - participant.authorizedAt < STUDIO_LIVE_ACCESS_CACHE_MS
+      ) {
+        return !requireEdit || participant.capabilities.edit ? participant : null;
+      } else if (!recheck) {
+        recheck = this.startParticipantAuthorizationRecheck(client.id, participant);
+      }
+      mode = "cached";
+
+      let validatedSequence: number | null;
+      try {
+        validatedSequence = await recheck.promise;
+      } catch {
+        return null;
+      }
+      const refreshed = this.participantsBySocket.get(client.id);
+      if (
+        refreshed !== participant ||
+        refreshed.workId !== workId ||
+        refreshed.userId !== client.data.authUserId ||
+        !this.isSocketCurrent(client)
+      ) {
+        return null;
+      }
+      if (
+        client.data.authPrincipal !== principal ||
+        principal.expiresAt <= Date.now() ||
+        principal.userId !== participant.userId
+      ) {
+        this.disconnectInvalidSession(client.id, participant);
+        return null;
+      }
+      if (
+        validatedSequence !== null &&
+        refreshed.authorizationSequence === validatedSequence
+      ) {
+        return !requireEdit || refreshed.capabilities.edit ? refreshed : null;
+      }
+      // A newer forced check superseded this one. Join that generation before consulting the
+      // refreshed cache so a pending downgrade can never authorize with the older role snapshot.
     }
-    if (!forceRecheck && Date.now() - participant.authorizedAt < STUDIO_LIVE_ACCESS_CACHE_MS) {
-      return !requireEdit || participant.capabilities.edit ? participant : null;
-    }
-    const validatedSequence = await this.revalidateParticipant(client.id, participant);
-    if (validatedSequence === null) return null;
-    const refreshed = this.participantsBySocket.get(client.id);
-    return refreshed === participant &&
-      refreshed.workId === workId &&
-      refreshed.userId === client.data.authUserId &&
-      refreshed.authorizationSequence === validatedSequence &&
-      (!requireEdit || refreshed.capabilities.edit)
-      ? refreshed
-      : null;
+  }
+
+  private startParticipantAuthorizationRecheck(
+    socketId: string,
+    participant: StudioLiveParticipantInternal
+  ): StudioLiveParticipantAuthorizationRecheck {
+    const promise = this.revalidateParticipant(socketId, participant);
+    const created: StudioLiveParticipantAuthorizationRecheck = { participant, promise };
+    this.participantAuthorizationRechecks.set(socketId, created);
+    const clear = () => {
+      if (this.participantAuthorizationRechecks.get(socketId) === created) {
+        this.participantAuthorizationRechecks.delete(socketId);
+      }
+    };
+    void promise.then(clear, clear);
+    return created;
   }
 
   private async revalidateParticipant(
@@ -895,10 +1807,16 @@ export class StudioLiveGateway
     }
     try {
       const team = await this.creatorService.getWorkTeam(participant.userId, participant.workId);
+      if (!isCurrentAuthorization() || !this.isSocketCurrent(socket)) {
+        return null;
+      }
       if (
-        !isCurrentAuthorization() ||
+        socket.data.authPrincipal !== principal ||
+        principal.expiresAt <= Date.now() ||
+        principal.userId !== participant.userId ||
         socket.data.authUserId !== participant.userId
       ) {
+        this.disconnectInvalidSession(socketId, participant);
         return null;
       }
       if (
@@ -950,9 +1868,19 @@ export class StudioLiveGateway
   private async revalidateAllParticipants(): Promise<void> {
     const participants = [...this.participantsBySocket.entries()];
     await Promise.allSettled(
-      participants.map(([socketId, participant]) =>
-        this.revalidateParticipant(socketId, participant)
-      )
+      participants.map(([socketId, participant]) => {
+        const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
+        if (!socket) {
+          this.disconnectInvalidSession(socketId, participant);
+          return Promise.resolve(null);
+        }
+        return this.authorizedParticipantWithMode(
+          socket,
+          participant.workId,
+          false,
+          "sweep"
+        );
+      })
     );
   }
 
@@ -966,7 +1894,12 @@ export class StudioLiveGateway
       message: "로그인 세션이 만료되거나 해제되어 실시간 작업실 연결을 종료했습니다.",
     });
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    void socket?.leave(studioLiveRoom(expectedParticipant.workId));
+    try {
+      const leaveResult = socket?.leave(studioLiveRoom(expectedParticipant.workId));
+      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
+    } catch {
+      // Participant removal and transport shutdown below remain the fail-closed enforcement path.
+    }
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
     if (socket) {
@@ -984,14 +1917,31 @@ export class StudioLiveGateway
       message: "팀 권한이 변경되어 실시간 작업실 연결을 종료했습니다.",
     });
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    void socket?.leave(studioLiveRoom(participant.workId));
+    // Start adapter cleanup, but never rely on an async/rejected leave to enforce revocation. The
+    // transport is closed below so a stale distributed-adapter membership cannot keep receiving
+    // room broadcasts while the membership operation is pending.
+    try {
+      const leaveResult = socket?.leave(studioLiveRoom(participant.workId));
+      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
+    } catch {
+      // Disconnecting the transport below remains the fail-closed enforcement path.
+    }
     this.removeParticipant(socketId, "revoked");
+    this.rateLimits.delete(socketId);
+    this.joinTransitionSequences.delete(socketId);
+    if (socket) {
+      delete socket.data.authUserId;
+      delete socket.data.authPrincipal;
+      socket.disconnect(true);
+    }
   }
 
   private removeParticipant(socketId: string, reason: "disconnect" | "switch" | "revoked"): void {
     const participant = this.participantsBySocket.get(socketId);
     if (!participant) return;
     this.participantsBySocket.delete(socketId);
+    this.participantAuthorizationRechecks.delete(socketId);
+    this.deleteCandidateRelayAuthorizationsForSocket(socketId);
     const roomSockets = this.socketIdsByWork.get(participant.workId);
     roomSockets?.delete(socketId);
     if (roomSockets?.size === 0) this.socketIdsByWork.delete(participant.workId);

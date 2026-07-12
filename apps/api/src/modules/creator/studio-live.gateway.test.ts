@@ -4,6 +4,12 @@ import {
   StudioLiveCursorSchema,
   StudioLiveGateway,
   StudioLiveJoinSchema,
+  StudioLiveLockReleaseSchema,
+  StudioLiveLockRequestSchema,
+  StudioLiveScreenAccessSchema,
+  StudioLiveScreenAnnounceSchema,
+  StudioLiveScreenRequestSchema,
+  StudioLiveScreenStopSchema,
   StudioLiveSignalSchema,
   isStudioLiveOriginAllowed,
   studioLiveAllowRequest,
@@ -178,6 +184,29 @@ async function connectAndJoin(
   );
 }
 
+function createTeamReadGate() {
+  let held = false;
+  const pending: Array<() => void> = [];
+  return {
+    lookup: async (userId: string, workId: string) => {
+      if (!held) return teamSnapshot(userId, workId);
+      return new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+        pending.push(() => resolve(teamSnapshot(userId, workId)));
+      });
+    },
+    hold() {
+      held = true;
+    },
+    pendingCount() {
+      return pending.length;
+    },
+    releasePending() {
+      const current = pending.splice(0);
+      for (const release of current) release();
+    },
+  };
+}
+
 describe("studio live protocol", () => {
   it("rejects unknown keys, control characters, out-of-range cursors, and oversized SDP", () => {
     expect(
@@ -189,8 +218,268 @@ describe("studio live protocol", () => {
       StudioLiveSignalSchema.safeParse({
         workId: "work-1",
         targetConnectionId: "peer",
+        shareId: "share-1",
         kind: "description",
-        description: { type: "offer", sdp: "s".repeat(262_145) },
+        description: { type: "offer", sdp: "s".repeat(48 * 1_024 + 1) },
+      }).success
+    ).toBe(false);
+  });
+
+  it("enforces the canonical 200-character resource identifier boundary", () => {
+    expect(
+      StudioLiveLockRequestSchema.safeParse({
+        workId: "work-1",
+        resourceId: "r".repeat(200),
+        leaseMs: 15_000,
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveLockRequestSchema.safeParse({
+        workId: "work-1",
+        resourceId: "r".repeat(201),
+        leaseMs: 15_000,
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveLockReleaseSchema.safeParse({
+        workId: "work-1",
+        resourceId: "r".repeat(200),
+        leaseId: "lease-1",
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveLockReleaseSchema.safeParse({
+        workId: "work-1",
+        resourceId: "r".repeat(201),
+        leaseId: "lease-1",
+      }).success
+    ).toBe(false);
+  });
+
+  it("matches the canonical SDP and ICE boundaries and control-character policy", () => {
+    const descriptionSignal = (sdp: string) => ({
+      workId: "work-1",
+      targetConnectionId: "peer",
+      shareId: "share-1",
+      kind: "description",
+      description: { type: "offer", sdp },
+    });
+    const candidateSignal = (candidate: Record<string, unknown>) => ({
+      workId: "work-1",
+      targetConnectionId: "peer",
+      shareId: "share-1",
+      kind: "candidate",
+      candidate,
+    });
+    const maximumSdp = "s".repeat(48 * 1_024);
+    const maximumMultibyteSdp = "가".repeat((48 * 1_024) / 3);
+    const maximumEscapedSdp = "\r\n\\\"".repeat((48 * 1_024) / 8);
+
+    expect(StudioLiveSignalSchema.safeParse(descriptionSignal(maximumSdp)).success).toBe(true);
+    expect(StudioLiveSignalSchema.safeParse(descriptionSignal(`${maximumSdp}s`)).success).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(descriptionSignal(maximumMultibyteSdp)).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(descriptionSignal(`${maximumMultibyteSdp}가`)).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(descriptionSignal(maximumEscapedSdp)).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(descriptionSignal(`${maximumEscapedSdp}"`)).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(descriptionSignal("v=0\r\ns=studio\r\n")).success
+    ).toBe(true);
+    expect(StudioLiveSignalSchema.safeParse(descriptionSignal("v=0\ts=studio")).success).toBe(false);
+    expect(StudioLiveSignalSchema.safeParse(descriptionSignal("v=0\u0085s=studio")).success).toBe(false);
+    expect(StudioLiveSignalSchema.safeParse(descriptionSignal(" \r\n ")).success).toBe(false);
+
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "c".repeat(8 * 1_024) })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "c".repeat(8 * 1_024 + 1) })
+      ).success
+    ).toBe(false);
+    const maximumMultibyteCandidate = `${"가".repeat(2_730)}ab`;
+    const maximumEscapedCandidate = "\\\"".repeat((8 * 1_024) / 4);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: maximumMultibyteCandidate })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: `${maximumMultibyteCandidate}c` })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: maximumEscapedCandidate })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: `${maximumEscapedCandidate}"` })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(candidateSignal({ candidate: "candidate\n1" })).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(candidateSignal({ candidate: "   " })).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(candidateSignal({ candidate: "candidate\u00801" })).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({
+          candidate: "candidate:1",
+          sdpMid: "m".repeat(128),
+          usernameFragment: "u".repeat(256),
+        })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", sdpMid: "m".repeat(129) })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", usernameFragment: "u".repeat(257) })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", sdpMid: "", usernameFragment: "" })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", sdpMid: null, usernameFragment: null })
+      ).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", sdpMid: "audio\n" })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", usernameFragment: "user\u007f" })
+      ).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse(
+        candidateSignal({ candidate: "candidate:1", extra: true })
+      ).success
+    ).toBe(false);
+  });
+
+  it("requires a strict bounded share id on every WebRTC signaling variant", () => {
+    expect(
+      StudioLiveSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        shareId: "share-1",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        shareId: "s".repeat(161),
+        kind: "candidate",
+        candidate: { candidate: "candidate:1" },
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:1" },
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        shareId: "share-1",
+        kind: "bye",
+        extra: true,
+      }).success
+    ).toBe(false);
+  });
+
+  it("strictly validates bounded screen-share metadata and the frontend decision vocabulary", () => {
+    expect(
+      StudioLiveScreenAnnounceSchema.safeParse({
+        workId: "work-1",
+        shareId: "share-1",
+        label: "작가 화면",
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveScreenAnnounceSchema.safeParse({
+        workId: "work-1",
+        shareId: "share\n1",
+        label: "작가 화면",
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveScreenAnnounceSchema.safeParse({
+        workId: "work-1",
+        shareId: "share-1",
+        label: "가".repeat(81),
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveScreenRequestSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "s".repeat(161),
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveScreenAccessSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        decision: "rejected",
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveScreenAccessSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        decision: "denied",
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveScreenStopSchema.safeParse({
+        workId: "work-1",
+        shareId: "share-1",
+        extra: true,
       }).success
     ).toBe(false);
   });
@@ -312,6 +601,136 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     expect(cursor).toMatchObject({ ok: false, code: "not_joined" });
+  });
+
+  it("disconnects without committing a participant when the session expires during the work ACL lookup", async () => {
+    let resolveTeam:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | null = null;
+    const pendingTeam = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resolveTeam = resolve;
+    });
+    const harness = createHarness(async () => pendingTeam);
+    const socket = harness.socket("editor");
+    await harness.gateway.handleConnection(socket as never);
+
+    const joining = harness.gateway.join(
+      socket as never,
+      { workId: "work-1", clientInstanceId: "client-editor" },
+      undefined
+    );
+    await vi.waitFor(() => expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(1));
+    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    resolveTeam?.(teamSnapshot("editor", "work-1"));
+
+    await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect(socket.disconnected).toBe(true);
+    expect(socket.joined.size).toBe(0);
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(internals.socketIdsByWork.has("work-1")).toBe(false);
+  });
+
+  it("rolls back a speculative adapter room when the session expires while joining it", async () => {
+    let releaseAdapterJoin: (() => void) | null = null;
+    const adapterJoin = new Promise<void>((resolve) => {
+      releaseAdapterJoin = resolve;
+    });
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await harness.gateway.handleConnection(socket as never);
+    socket.join = vi.fn(async (room: string) => {
+      await adapterJoin;
+      socket.joined.add(room);
+    });
+
+    const joining = harness.gateway.join(
+      socket as never,
+      { workId: "work-1", clientInstanceId: "client-editor" },
+      undefined
+    );
+    await vi.waitFor(() => expect(socket.join).toHaveBeenCalledWith("studio-live:work-1"));
+    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    releaseAdapterJoin?.();
+
+    await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect(socket.disconnected).toBe(true);
+    expect(socket.joined.size).toBe(0);
+    expect(socket.left).toContain("studio-live:work-1");
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(internals.socketIdsByWork.has("work-1")).toBe(false);
+  });
+
+  it("disconnects an expired speculative join without waiting for a pending adapter leave", async () => {
+    let releaseAdapterJoin: (() => void) | null = null;
+    const adapterJoin = new Promise<void>((resolve) => {
+      releaseAdapterJoin = resolve;
+    });
+    const pendingLeave = new Promise<void>(() => undefined);
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await harness.gateway.handleConnection(socket as never);
+    socket.join = vi.fn(async (room: string) => {
+      await adapterJoin;
+      socket.joined.add(room);
+    });
+    socket.leave = vi.fn(() => pendingLeave);
+
+    const joining = harness.gateway.join(
+      socket as never,
+      { workId: "work-1", clientInstanceId: "client-editor" },
+      undefined
+    );
+    await vi.waitFor(() => expect(socket.join).toHaveBeenCalledWith("studio-live:work-1"));
+    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    releaseAdapterJoin?.();
+
+    await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect(socket.disconnected).toBe(true);
+    expect(socket.leave).toHaveBeenCalledWith("studio-live:work-1");
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(internals.socketIdsByWork.has("work-1")).toBe(false);
+  });
+
+  it("rate limits a valid join before running session or work authorization I/O", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await harness.gateway.handleConnection(socket as never);
+    const internals = harness.gateway as unknown as {
+      rateLimits: Map<string, Map<string, { count: number; resetsAt: number }>>;
+    };
+    internals.rateLimits.set(
+      socket.id,
+      new Map([["join", { count: 12, resetsAt: Date.now() + 60_000 }]])
+    );
+
+    const response = await harness.gateway.join(
+      socket as never,
+      { workId: "work-1", clientInstanceId: "client-editor" },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "rate_limited" });
+    expect(harness.revalidate).not.toHaveBeenCalled();
+    expect(harness.service.getWorkTeam).not.toHaveBeenCalled();
   });
 
   it("serializes concurrent joins so only the latest work owns the socket and room index", async () => {
@@ -596,6 +1015,72 @@ describe("StudioLiveGateway", () => {
     ).resolves.toMatchObject({ ok: false, code: "forbidden" });
   });
 
+  it("does not acquire a lock when a peer relay starts a newer target downgrade at the authorization boundary", async () => {
+    const pendingReads: Array<{
+      userId: string;
+      workId: string;
+      resolve: (snapshot: ReturnType<typeof teamSnapshot>) => void;
+    }> = [];
+    let holdReads = false;
+    const harness = createHarness(async (userId, workId) => {
+      if (!holdReads) return teamSnapshot(userId, workId);
+      return new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+        pendingReads.push({ userId, workId, resolve });
+      });
+    });
+    const sender = harness.socket("sender");
+    const editor = harness.socket("editor");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, editor);
+    holdReads = true;
+
+    const offer = harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "editor",
+        shareId: "share-atomic-lock",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    const lock = harness.gateway.requestLock(
+      editor as never,
+      { workId: "work-1", resourceId: "page:atomic-lock", leaseMs: 15_000 },
+      undefined
+    );
+    await vi.waitFor(() => expect(pendingReads).toHaveLength(2));
+    expect(pendingReads.map(({ userId }) => userId)).toEqual(["sender", "editor"]);
+
+    pendingReads.shift()?.resolve(teamSnapshot("sender", "work-1"));
+    pendingReads.shift()?.resolve(
+      teamSnapshot("editor", "work-1", { role: "editor", edit: true })
+    );
+    await vi.waitFor(() => expect(pendingReads).toHaveLength(1));
+    expect(pendingReads[0]?.userId).toBe("editor");
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          emission.event === "studio:lock:update" &&
+          (emission.payload as { action?: string }).action === "acquired"
+      )
+    ).toBe(false);
+
+    pendingReads.shift()?.resolve(
+      teamSnapshot("editor", "work-1", { role: "viewer", edit: false })
+    );
+    await expect(lock).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(offer).resolves.toMatchObject({ ok: true });
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          emission.event === "studio:lock:update" &&
+          (emission.payload as { action?: string }).action === "acquired"
+      )
+    ).toBe(false);
+  });
+
   it("disconnects and cleans leases when the authenticated session is revoked", async () => {
     let sessionAllowed = true;
     const harness = createHarness(
@@ -639,6 +1124,67 @@ describe("StudioLiveGateway", () => {
     });
   });
 
+  it("disconnects and removes a participant when the work view ACL is revoked", async () => {
+    let canView = true;
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { view: canView, role: "editor", edit: true })
+    );
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    canView = false;
+
+    const revalidator = harness.gateway as unknown as {
+      revalidateAllParticipants(): Promise<void>;
+      participantsBySocket: Map<string, unknown>;
+    };
+    await revalidator.revalidateAllParticipants();
+
+    expect(socket.disconnected).toBe(true);
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(socket.left).toContain("studio-live:work-1");
+    expect(revalidator.participantsBySocket.has("editor")).toBe(false);
+    expect(harness.emissions).toContainEqual({
+      target: "editor",
+      event: "studio:access:revoked",
+      payload: {
+        workId: "work-1",
+        message: "팀 권한이 변경되어 실시간 작업실 연결을 종료했습니다.",
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:presence:leave",
+      payload: { connectionId: "editor", reason: "revoked" },
+    });
+  });
+
+  it("disconnects an ACL-revoked participant without waiting for an async adapter leave", async () => {
+    let canView = true;
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { view: canView, role: "viewer", edit: false })
+    );
+    const socket = harness.socket("viewer");
+    await connectAndJoin(harness, socket);
+    const pendingLeave = new Promise<void>(() => undefined);
+    const leave = vi.fn(() => pendingLeave);
+    socket.leave = leave;
+    canView = false;
+
+    const revalidator = harness.gateway as unknown as {
+      revalidateAllParticipants(): Promise<void>;
+      participantsBySocket: Map<string, unknown>;
+    };
+    const revocation = revalidator.revalidateAllParticipants();
+    await vi.waitFor(() => expect(socket.disconnected).toBe(true));
+    await revocation;
+
+    expect(leave).toHaveBeenCalledWith("studio-live:work-1");
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(revalidator.participantsBySocket.has("viewer")).toBe(false);
+  });
+
   it("rejects an expired principal before using the short ACL cache", async () => {
     const harness = createHarness();
     const socket = harness.socket("editor");
@@ -672,6 +1218,272 @@ describe("StudioLiveGateway", () => {
     ).toBe(false);
   });
 
+  it("fails closed when session-revocation room leave throws synchronously", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const leave = vi.fn((): Promise<void> => {
+      throw new Error("adapter leave failed");
+    });
+    socket.leave = leave;
+    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+
+    const response = await harness.gateway.updateCursor(
+      socket as never,
+      { workId: "work-1", pageId: null, x: 0.5, y: 0.5 },
+      undefined
+    );
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+    };
+
+    expect(response).toMatchObject({ ok: false, code: "not_joined" });
+    expect(leave).toHaveBeenCalledWith("studio-live:work-1");
+    expect(socket.disconnected).toBe(true);
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(internals.participantsBySocket.has("editor")).toBe(false);
+  });
+
+  it("fails closed and handles a rejected session-revocation room leave", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const leave = vi.fn(() => Promise.reject(new Error("adapter leave rejected")));
+    socket.leave = leave;
+    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+
+    const response = await harness.gateway.updateCursor(
+      socket as never,
+      { workId: "work-1", pageId: null, x: 0.5, y: 0.5 },
+      undefined
+    );
+    await Promise.resolve();
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+    };
+
+    expect(response).toMatchObject({ ok: false, code: "not_joined" });
+    expect(leave).toHaveBeenCalledWith("studio-live:work-1");
+    expect(socket.disconnected).toBe(true);
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(internals.participantsBySocket.has("editor")).toBe(false);
+  });
+
+  it("rejects a principal that expires while the forced work ACL lookup is pending", async () => {
+    let teamReads = 0;
+    let resolveRecheck:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | null = null;
+    const recheck = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resolveRecheck = resolve;
+    });
+    const harness = createHarness(async (userId, workId) => {
+      teamReads += 1;
+      if (teamReads === 1) return teamSnapshot(userId, workId);
+      return recheck;
+    });
+    const socket = harness.socket("owner");
+    await connectAndJoin(harness, socket);
+
+    const announcement = harness.gateway.announceScreenShare(
+      socket as never,
+      { workId: "work-1", shareId: "share-expiring", label: "작업 화면" },
+      undefined
+    );
+    await vi.waitFor(() => expect(teamReads).toBe(2));
+    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
+    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    resolveRecheck?.(teamSnapshot("owner", "work-1"));
+
+    await expect(announcement).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    expect(socket.disconnected).toBe(true);
+    expect(socket.data.authUserId).toBeUndefined();
+    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(harness.emissions).toContainEqual({
+      target: "owner",
+      event: "studio:access:revoked",
+      payload: {
+        workId: "work-1",
+        message: "로그인 세션이 만료되거나 해제되어 실시간 작업실 연결을 종료했습니다.",
+      },
+    });
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:screen:announce")
+    ).toBe(false);
+  });
+
+  it("announces and stops a share with bounded public metadata and synchronized presence", async () => {
+    const harness = createHarness();
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, host);
+
+    const announced = await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-1", label: "작가 화면" },
+      undefined
+    );
+    expect(announced).toEqual({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:screen:announce",
+      payload: {
+        fromConnectionId: "owner",
+        fromName: "작가",
+        shareId: "share-1",
+        label: "작가 화면",
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:presence:update",
+      payload: expect.objectContaining({ connectionId: "owner", sharingScreen: true }),
+    });
+
+    const stopped = await harness.gateway.stopScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-1" },
+      undefined
+    );
+    expect(stopped).toEqual({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:screen:stop",
+      payload: {
+        fromConnectionId: "owner",
+        fromName: "작가",
+        shareId: "share-1",
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:presence:update",
+      payload: expect.objectContaining({ connectionId: "owner", sharingScreen: false }),
+    });
+  });
+
+  it("relays screen requests and access decisions with only public peer fields", async () => {
+    const harness = createHarness();
+    const viewer = harness.socket("viewer");
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, viewer);
+    await connectAndJoin(harness, host);
+
+    const requested = await harness.gateway.requestScreenAccess(
+      viewer as never,
+      { workId: "work-1", targetConnectionId: "owner", shareId: "share-1" },
+      undefined
+    );
+    expect(requested).toEqual({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toContainEqual({
+      target: "owner",
+      event: "studio:screen:request",
+      payload: {
+        fromConnectionId: "viewer",
+        fromName: "어시스턴트",
+        shareId: "share-1",
+      },
+    });
+
+    const approved = await harness.gateway.relayScreenAccess(
+      host as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "viewer",
+        shareId: "share-1",
+        decision: "approved",
+      },
+      undefined
+    );
+    expect(approved).toEqual({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toContainEqual({
+      target: "viewer",
+      event: "studio:screen:access",
+      payload: {
+        fromConnectionId: "owner",
+        fromName: "작가",
+        shareId: "share-1",
+        decision: "approved",
+      },
+    });
+  });
+
+  it("rejects self/cross-work screen relays and rechecks the sender session", async () => {
+    let sessionAllowed = true;
+    const harness = createHarness(undefined, undefined, async () => sessionAllowed);
+    const sender = harness.socket("sender");
+    const otherWork = harness.socket("other");
+    await connectAndJoin(harness, sender, "work-1");
+    await connectAndJoin(harness, otherWork, "work-2");
+
+    await expect(
+      harness.gateway.requestScreenAccess(
+        sender as never,
+        { workId: "work-1", targetConnectionId: "sender", shareId: "share-1" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+    await expect(
+      harness.gateway.relayScreenAccess(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "other",
+          shareId: "share-1",
+          decision: "rejected",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+
+    sessionAllowed = false;
+    await expect(
+      harness.gateway.requestScreenAccess(
+        sender as never,
+        { workId: "work-1", targetConnectionId: "other", shareId: "share-1" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    expect(sender.disconnected).toBe(true);
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          emission.event === "studio:screen:request" ||
+          emission.event === "studio:screen:access"
+      )
+    ).toBe(false);
+  });
+
+  it("rate limits targeted screen requests before running peer authorization", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    const internals = harness.gateway as unknown as {
+      rateLimits: Map<string, Map<string, { count: number; resetsAt: number }>>;
+    };
+    internals.rateLimits.set(
+      "sender",
+      new Map([
+        ["screen-request", { count: 60, resetsAt: Date.now() + 60_000 }],
+      ])
+    );
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const response = await harness.gateway.requestScreenAccess(
+      sender as never,
+      { workId: "work-1", targetConnectionId: "target", shareId: "share-1" },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "rate_limited" });
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+  });
+
   it("updates screen-sharing presence without accepting a media stream on the server", async () => {
     const harness = createHarness();
     const socket = harness.socket("editor");
@@ -693,6 +1505,31 @@ describe("StudioLiveGateway", () => {
     });
   });
 
+  it("rate limits screen-state updates before their forced session and work recheck", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const internals = harness.gateway as unknown as {
+      rateLimits: Map<string, Map<string, { count: number; resetsAt: number }>>;
+    };
+    internals.rateLimits.set(
+      socket.id,
+      new Map([["screen-set", { count: 30, resetsAt: Date.now() + 60_000 }]])
+    );
+    const revalidationsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const response = await harness.gateway.setScreenSharing(
+      socket as never,
+      { workId: "work-1", sharing: true },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "rate_limited" });
+    expect(harness.revalidate).toHaveBeenCalledTimes(revalidationsBefore);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+  });
+
   it("relays WebRTC signaling only to a currently joined peer in the same work", async () => {
     const harness = createHarness();
     const sender = harness.socket("sender");
@@ -705,6 +1542,7 @@ describe("StudioLiveGateway", () => {
       {
         workId: "work-1",
         targetConnectionId: "target",
+        shareId: "share-1",
         kind: "description",
         description: { type: "offer", sdp: "v=0\r\n" },
       },
@@ -718,17 +1556,652 @@ describe("StudioLiveGateway", () => {
       payload: expect.objectContaining({
         fromConnectionId: "sender",
         fromName: "어시스턴트",
+        shareId: "share-1",
         kind: "description",
         description: { type: "offer", sdp: "v=0\r\n" },
       }),
     });
 
+    const sessionReadsAfterDescription = harness.revalidate.mock.calls.length;
+    const teamReadsAfterDescription = harness.service.getWorkTeam.mock.calls.length;
+    const candidateDelivered = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: {
+          candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 54400 typ host",
+          sdpMid: "",
+          sdpMLineIndex: null,
+          usernameFragment: "",
+        },
+      },
+      undefined
+    );
+    expect(candidateDelivered.ok).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsAfterDescription);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsAfterDescription);
+    expect(harness.emissions).toContainEqual({
+      target: "target",
+      event: "studio:signal",
+      payload: expect.objectContaining({
+        fromConnectionId: "sender",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: {
+          candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 54400 typ host",
+          sdpMid: "",
+          sdpMLineIndex: null,
+          usernameFragment: "",
+        },
+      }),
+    });
+
+    const signalEmissionsBeforeInvalid = harness.emissions.filter(
+      (emission) => emission.event === "studio:signal"
+    ).length;
+    const controlledCandidate = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:1\nforged" },
+      },
+      undefined
+    );
+    expect(controlledCandidate).toMatchObject({ ok: false, code: "invalid_payload" });
+    const byteOversizedCandidate = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: `${"\\\"".repeat((8 * 1_024) / 4)}"` },
+      },
+      undefined
+    );
+    expect(byteOversizedCandidate).toMatchObject({ ok: false, code: "invalid_payload" });
+    const byteOversizedSdp = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "description",
+        description: { type: "offer", sdp: "가".repeat((48 * 1_024) / 3 + 1) },
+      },
+      undefined
+    );
+    expect(byteOversizedSdp).toMatchObject({ ok: false, code: "invalid_payload" });
+    const missingShareId = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        kind: "bye",
+      } as never,
+      undefined
+    );
+    expect(missingShareId).toMatchObject({ ok: false, code: "invalid_payload" });
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:signal")
+    ).toHaveLength(signalEmissionsBeforeInvalid);
+
     const unavailable = await harness.gateway.relaySignal(
       sender as never,
-      { workId: "work-1", targetConnectionId: "missing", kind: "bye" },
+      {
+        workId: "work-1",
+        targetConnectionId: "missing",
+        shareId: "share-1",
+        kind: "bye",
+      },
       undefined
     );
     expect(unavailable).toMatchObject({ ok: false, code: "peer_unavailable" });
+  });
+
+  it("coalesces a fresh-cache ICE burst into one forced check per peer", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const responses = await Promise.all(
+      Array.from({ length: 24 }, (_, index) =>
+        harness.gateway.relaySignal(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: "target",
+            shareId: "share-1",
+            kind: "candidate",
+            candidate: { candidate: `candidate:${index}` },
+          },
+          undefined
+        )
+      )
+    );
+
+    expect(responses.every((response) => response.ok)).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 2);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 2);
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:signal")
+    ).toHaveLength(24);
+    const grantInternals = harness.gateway as unknown as {
+      candidateRelayAuthorizations: Map<string, { expiresAt: number }>;
+    };
+    const fixedExpiry = [...grantInternals.candidateRelayAuthorizations.values()][0]?.expiresAt;
+    if (!fixedExpiry) throw new Error("missing candidate grant expiry");
+
+    for (let index = 24; index < 30; index += 1) {
+      const response = await harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "target",
+          shareId: "share-1",
+          kind: "candidate",
+          candidate: { candidate: `candidate:${index}` },
+        },
+        undefined
+      );
+      expect(response.ok).toBe(true);
+    }
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 2);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 2);
+    expect([...grantInternals.candidateRelayAuthorizations.values()][0]?.expiresAt).toBe(
+      fixedExpiry
+    );
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:signal")
+    ).toHaveLength(30);
+  });
+
+  it("rebases a candidate onto an in-flight description authorization", async () => {
+    const gate = createTeamReadGate();
+    const harness = createHarness(gate.lookup);
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    gate.hold();
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const description = harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    const candidate = harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:coalesced" },
+      },
+      undefined
+    );
+    expect(gate.pendingCount()).toBe(1);
+    gate.releasePending();
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    gate.releasePending();
+
+    const responses = await Promise.all([description, candidate]);
+    expect(responses.every((response) => response.ok)).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 2);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 2);
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:signal")
+    ).toHaveLength(2);
+  });
+
+  it("requires a new candidate authorization for another share or peer", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const firstTarget = harness.socket("target-a");
+    const secondTarget = harness.socket("target-b");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, firstTarget);
+    await connectAndJoin(harness, secondTarget);
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+    const sendCandidate = (targetConnectionId: string, shareId: string) =>
+      harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId,
+          shareId,
+          kind: "candidate",
+          candidate: { candidate: `candidate:${targetConnectionId}:${shareId}` },
+        },
+        undefined
+      );
+
+    expect((await sendCandidate("target-a", "share-1")).ok).toBe(true);
+    expect((await sendCandidate("target-a", "share-2")).ok).toBe(true);
+    expect((await sendCandidate("target-b", "share-1")).ok).toBe(true);
+
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 6);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 6);
+  });
+
+  it("forces a new candidate authorization after the fixed grant expires", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    const sendCandidate = () =>
+      harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "target",
+          shareId: "share-1",
+          kind: "candidate",
+          candidate: { candidate: "candidate:ttl" },
+        },
+        undefined
+      );
+    expect((await sendCandidate()).ok).toBe(true);
+    const sessionReadsAfterGrant = harness.revalidate.mock.calls.length;
+    const teamReadsAfterGrant = harness.service.getWorkTeam.mock.calls.length;
+    const internals = harness.gateway as unknown as {
+      candidateRelayAuthorizations: Map<string, { expiresAt: number }>;
+    };
+    const authorization = [...internals.candidateRelayAuthorizations.values()][0];
+    if (!authorization) throw new Error("missing candidate authorization");
+    authorization.expiresAt = Date.now() - 1;
+
+    expect((await sendCandidate()).ok).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsAfterGrant + 2);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsAfterGrant + 2);
+  });
+
+  it("invalidates a candidate grant on ended access and disconnect", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    const internals = harness.gateway as unknown as {
+      candidateRelayAuthorizations: Map<string, unknown>;
+    };
+    const sendCandidate = () =>
+      harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "target",
+          shareId: "share-1",
+          kind: "candidate",
+          candidate: { candidate: "candidate:lifecycle" },
+        },
+        undefined
+      );
+
+    expect((await sendCandidate()).ok).toBe(true);
+    expect(internals.candidateRelayAuthorizations.size).toBe(1);
+    const ended = await harness.gateway.relayScreenAccess(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        decision: "ended",
+      },
+      undefined
+    );
+    expect(ended.ok).toBe(true);
+    expect(internals.candidateRelayAuthorizations.size).toBe(0);
+    const sessionReadsAfterEnded = harness.revalidate.mock.calls.length;
+    const teamReadsAfterEnded = harness.service.getWorkTeam.mock.calls.length;
+
+    expect((await sendCandidate()).ok).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsAfterEnded + 2);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsAfterEnded + 2);
+    expect(internals.candidateRelayAuthorizations.size).toBe(1);
+    harness.gateway.handleDisconnect(target as never);
+    expect(internals.candidateRelayAuthorizations.size).toBe(0);
+  });
+
+  it("converges opposite-direction forced signaling onto the latest peer generations", async () => {
+    const gate = createTeamReadGate();
+    const harness = createHarness(gate.lookup);
+    const first = harness.socket("first");
+    const second = harness.socket("second");
+    await connectAndJoin(harness, first);
+    await connectAndJoin(harness, second);
+    gate.hold();
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const firstToSecond = harness.gateway.relaySignal(
+      first as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "second",
+        shareId: "share-a",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    const secondToFirst = harness.gateway.relaySignal(
+      second as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "first",
+        shareId: "share-b",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(2));
+    gate.releasePending();
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(2));
+    gate.releasePending();
+
+    const responses = await Promise.all([firstToSecond, secondToFirst]);
+    expect(responses.every((response) => response.ok)).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 4);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 4);
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:signal")
+    ).toHaveLength(2);
+  });
+
+  it("rebases concurrent screen access and offer checks without dropping either relay", async () => {
+    const gate = createTeamReadGate();
+    const harness = createHarness(gate.lookup);
+    const host = harness.socket("owner");
+    const viewer = harness.socket("viewer");
+    await connectAndJoin(harness, host);
+    await connectAndJoin(harness, viewer);
+    gate.hold();
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const access = harness.gateway.relayScreenAccess(
+      host as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "viewer",
+        shareId: "share-1",
+        decision: "approved",
+      },
+      undefined
+    );
+    const offer = harness.gateway.relaySignal(
+      host as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "viewer",
+        shareId: "share-1",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    gate.releasePending();
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    gate.releasePending();
+
+    const responses = await Promise.all([access, offer]);
+    expect(responses.every((response) => response.ok)).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 4);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 2);
+    expect(harness.emissions.some((emission) => emission.event === "studio:screen:access")).toBe(true);
+    expect(harness.emissions.some((emission) => emission.event === "studio:signal")).toBe(true);
+  });
+
+  it("converges an offer with presence, lock, and sweep authorization collisions", async () => {
+    const gate = createTeamReadGate();
+    const harness = createHarness(gate.lookup);
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    gate.hold();
+    const sessionReadsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    const offer = harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0\r\n" },
+      },
+      undefined
+    );
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    const presence = harness.gateway.updatePresence(
+      sender as never,
+      { workId: "work-1", state: "active", pageId: "page-1", tool: "pen" },
+      undefined
+    );
+    const lock = harness.gateway.requestLock(
+      sender as never,
+      { workId: "work-1", resourceId: "page:page-1", leaseMs: 15_000 },
+      undefined
+    );
+    const revalidator = harness.gateway as unknown as {
+      revalidateAllParticipants(): Promise<void>;
+    };
+    const sweep = revalidator.revalidateAllParticipants();
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(3));
+    gate.releasePending();
+    await vi.waitFor(() => expect(gate.pendingCount()).toBe(1));
+    gate.releasePending();
+
+    const [offerResponse, presenceResponse, lockResponse] = await Promise.all([
+      offer,
+      presence,
+      lock,
+      sweep,
+    ]).then(([currentOffer, currentPresence, currentLock]) => [
+      currentOffer,
+      currentPresence,
+      currentLock,
+    ]);
+    expect(offerResponse.ok).toBe(true);
+    expect(presenceResponse.ok).toBe(true);
+    expect(lockResponse.ok).toBe(true);
+    expect(harness.revalidate).toHaveBeenCalledTimes(sessionReadsBefore + 4);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore + 4);
+    expect(harness.emissions.some((emission) => emission.event === "studio:signal")).toBe(true);
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          emission.event === "studio:lock:update" &&
+          (emission.payload as { action?: string }).action === "acquired"
+      )
+    ).toBe(true);
+  });
+
+  it("denies a fresh-cache ICE candidate when the sender session is revoked", async () => {
+    let revokedUserId: string | null = null;
+    const harness = createHarness(
+      undefined,
+      undefined,
+      async (principal) =>
+        principal.expiresAt > Date.now() && principal.userId !== revokedUserId
+    );
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    revokedUserId = "sender";
+
+    const response = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:revoked" },
+      },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "not_joined" });
+    expect(sender.disconnected).toBe(true);
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:signal")
+    ).toBe(false);
+  });
+
+  it("does not relay WebRTC signaling after the sender session is revoked", async () => {
+    let revokedUserId: string | null = null;
+    const harness = createHarness(
+      undefined,
+      undefined,
+      async (principal) =>
+        principal.expiresAt > Date.now() && principal.userId !== revokedUserId
+    );
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    revokedUserId = "sender";
+
+    const response = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "bye",
+      },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "not_joined" });
+    expect(sender.disconnected).toBe(true);
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:signal")
+    ).toBe(false);
+  });
+
+  it("does not relay WebRTC signaling to a target with an expired session", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    if (!target.data.authPrincipal) throw new Error("missing target auth principal");
+    target.data.authPrincipal.expiresAt = Date.now() - 1;
+
+    const response = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:1" },
+      },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "peer_unavailable" });
+    expect(target.disconnected).toBe(true);
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:signal")
+    ).toBe(false);
+  });
+
+  it("denies a fresh-cache ICE candidate after the target work ACL is revoked", async () => {
+    let revokedUserId: string | null = null;
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { view: userId !== revokedUserId })
+    );
+    const sender = harness.socket("sender");
+    const target = harness.socket("target");
+    await connectAndJoin(harness, sender);
+    await connectAndJoin(harness, target);
+    revokedUserId = "target";
+
+    const response = await harness.gateway.relaySignal(
+      sender as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "target",
+        shareId: "share-1",
+        kind: "candidate",
+        candidate: { candidate: "candidate:revoked-target" },
+      },
+      undefined
+    );
+
+    expect(response).toMatchObject({ ok: false, code: "peer_unavailable" });
+    expect(target.disconnected).toBe(true);
+    expect(target.data.authUserId).toBeUndefined();
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:signal")
+    ).toBe(false);
+  });
+
+  it("rejects self-targeted and cross-work WebRTC signaling", async () => {
+    const harness = createHarness();
+    const sender = harness.socket("sender");
+    const otherWork = harness.socket("other");
+    await connectAndJoin(harness, sender, "work-1");
+    await connectAndJoin(harness, otherWork, "work-2");
+
+    await expect(
+      harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "sender",
+          shareId: "share-1",
+          kind: "bye",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+    await expect(
+      harness.gateway.relaySignal(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "other",
+          shareId: "share-1",
+          kind: "bye",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:signal")
+    ).toBe(false);
   });
 
   it("releases presence and leases when a socket disconnects", async () => {

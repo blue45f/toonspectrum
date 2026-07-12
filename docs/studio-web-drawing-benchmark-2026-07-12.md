@@ -236,10 +236,10 @@ Clip Studio Teamwork의 **참여 작품을 별도 목록에서 찾아 여는 흐
 - [Magma 역할·참가자 권한](https://help.magma.com/en/articles/13713941-managing-your-canvas-permissions-roles-and-participants)
 - [Magma 레이어 제어](https://help.magma.com/en/articles/6413262-creating-a-layer-and-layer-controls)
 
-현재 `commenter`는 **검토 전용 원본 열람 역할**이며 서버 앵커 댓글을 제공한다고 표시하지 않는다. 서버
-presence·cursor relay·lease soft-lock 코어는 아래 체크포인트에서 추가됐지만, Socket.IO frontend adapter와
-캔버스 overlay/mutation guard가 연결되기 전에는 온라인 공동 편집 기능으로 표시하지 않는다. 서버 리뷰
-스레드와 operation stream도 각각의 권한 predicate·만료·복구 테스트를 연결한 뒤에만 제공 기능으로 표시한다.
+현재 `commenter`는 **검토 전용 원본 열람 역할**이며 서버 앵커 댓글을 제공한다고 표시하지 않는다. 인증
+Socket.IO frontend adapter는 아래 체크포인트에서 Studio 팀 패널까지 연결됐지만, live room을 패널 밖으로
+올리고 캔버스 overlay/mutation guard를 연결하기 전에는 완성된 온라인 공동 편집으로 표시하지 않는다. 서버
+리뷰 스레드와 operation stream도 각각의 권한 predicate·만료·복구 테스트를 연결한 뒤에만 제공 기능으로 표시한다.
 
 검증 범위:
 
@@ -275,11 +275,26 @@ Magma/Figma식 인터넷 공동 편집 전체를 한 번에 주장하지 않고,
   세션 expiry/sessionVersion, active work ACL, 작품 전환 generation을 재검증한다.
 - 서버는 presence, 정규화 cursor, editor lease soft-lock, 화면 공유 상태, 대상 지정 WebRTC signaling만
   메모리에 중계하며 영상·문서·SDP/ICE를 DB에 저장하지 않는다.
+- 권한 확인과 mutation/relay 사이의 microtask 경합을 공통 동기 실행 경계와 양 peer generation snapshot으로
+  차단한다. 첫 ICE는 sender/target ACL을 엄격히 재확인하고 같은 work·share·peer pair에만 고정 2초 grant를
+  사용해 trickle ICE의 DB 폭증을 줄이며, candidate hit로 TTL을 연장하지 않는다.
+- SDP·ICE는 code unit뿐 아니라 원문 UTF-8과 JSON escape 본문의 byte 상한을 모두 지키고, join·화면 상태·
+  signaling rate limit은 세션/ACL I/O보다 먼저 적용한다. speculative join 중 세션 만료는 adapter leave를
+  기다리지 않고 즉시 disconnect한다.
 - WebSocket upgrade는 일반 CORS header에 기대지 않고 `allowRequest`에서 Origin allow-list를 강제하며,
   Vite 개발 서버는 `/socket.io`를 `ws: true`로 Nest에 프록시한다.
 - 실제 두 클라이언트 E2E에서 즉시 인증 참가, 2명 presence, cursor relay, 경쟁 잠금 거부, 화면 상태,
   대상 signaling, 잠금 해제, DB user ID 비노출과 악성 Origin 거부를 확인했다.
 
-아직 `StudioLiveEnvelope`와 서버의 `studio:*` event contract를 번역하는 Socket.IO frontend adapter는 연결하지
-않았다. remote cursor overlay, mutation guard, 서버 anchor comment, operation stream/CRDT, TURN, 다중 인스턴스
-Redis lease도 후속 범위다. 현재 lease는 HTTP 문서 저장을 강제하는 배타 잠금이 아니라 충돌을 줄이는 soft-lock이다.
+후속 체크포인트에서 `StudioLiveEnvelope`와 서버의 `studio:*` event contract를 번역하는 인증 Socket.IO
+frontend adapter를 팀 패널에 연결했다. join ACK 전 fail-closed, reconnect 재참가, 권한 회수 terminal 상태,
+서버 connection ID 변환, authoritative lease ID, 화면 공유 승인 이벤트와 종단 간 `shareId`, 명시적인 로컬
+fallback을 제공한다. 다만 패널을 닫아도 유지되는 live room, remote cursor overlay, 실제 mutation guard, 서버
+anchor comment, operation stream/CRDT, TURN, 다중 인스턴스 Redis lease는 후속 범위다. 현재 lease는 HTTP 문서
+저장을 강제하는 배타 잠금이 아니라 충돌을 줄이는 soft-lock이다.
+
+실제 Studio 브라우저 탭 두 개에서 서버 participant가 양쪽 모두 2명으로 수렴했고, 서버 중단·복구 후 자동
+재접속과 작품 ACL 재참가도 확인했다. 375×812 팀 패널은 하단 `700px`, 모바일 도크는 `700.40625px`에서
+시작해 겹침이 `0px`이었고, 화면 공유 조작은 44px을 유지했다. 별도 두 소켓 runtime signaling 검사는
+announce→request→approved→offer→ICE의 명시적 `shareId` 보존과 누락 payload의 strict 거절을 확인했고,
+검사용 임시 작품 잔여가 0건임을 확인했다.

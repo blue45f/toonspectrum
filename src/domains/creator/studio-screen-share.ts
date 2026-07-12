@@ -84,6 +84,7 @@ interface LocalShareState {
 export const STUDIO_SCREEN_SHARE_MAX_VIEWERS = 4;
 const STUDIO_SCREEN_SHARE_MAX_PENDING_REQUESTS = 8;
 const STUDIO_SCREEN_SHARE_MAX_PENDING_ICE = 32;
+const STUDIO_SCREEN_SHARE_DEFAULT_LABEL = "작업 화면";
 
 function defaultGetDisplayMedia(constraints: DisplayMediaStreamOptions): Promise<MediaStream> {
   const mediaDevices = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
@@ -309,7 +310,7 @@ export class StudioScreenShareController {
       videoTrack.addEventListener("ended", onEnded, { once: true });
       this.localShare = { shareId, stream, endedTrack: videoTrack, onEnded };
       localInstalled = true;
-      if (!this.room.announceScreen({ shareId, label: "작업 화면" })) {
+      if (!this.room.announceScreen({ shareId, label: STUDIO_SCREEN_SHARE_DEFAULT_LABEL })) {
         this.stopShare();
         throw new Error("공동작업 채널에 화면 공유를 알리지 못했습니다.");
       }
@@ -436,6 +437,10 @@ export class StudioScreenShareController {
 
   private onRoomEvent(event: StudioLiveRoomEvent): void {
     if (this.closed) return;
+    if (event.type === "transport-status") {
+      if (event.status.state === "ready") this.scheduleLocalShareReannounce();
+      return;
+    }
     if (event.type === "presence") {
       this.reconcilePresence(event.peers);
       return;
@@ -443,6 +448,39 @@ export class StudioScreenShareController {
     if (event.type !== "signal") return;
     void this.handleSignal(event.envelope).catch((error: unknown) => {
       this.emit({ type: "error", message: studioScreenShareErrorMessage(error) });
+    });
+  }
+
+  private scheduleLocalShareReannounce(): void {
+    const local = this.localShare;
+    if (!local) return;
+    // Room subscribers are notified in registration order. Deferring until the current dispatch
+    // finishes lets the panel clear its reconnect message first, so a reannounce failure remains
+    // visible instead of being overwritten by the later `ready` status handler in the same batch.
+    queueMicrotask(() => {
+      if (this.closed || this.localShare !== local) return;
+      this.reannounceLocalShare(local);
+    });
+  }
+
+  private reannounceLocalShare(local: LocalShareState): void {
+    try {
+      if (
+        this.room.announceScreen({
+          shareId: local.shareId,
+          label: STUDIO_SCREEN_SHARE_DEFAULT_LABEL,
+        })
+      ) {
+        return;
+      }
+    } catch {
+      // Report through the controller event surface below; a Room subscriber must never throw into
+      // Socket.IO's reconnect callback or interrupt the rest of its listener cleanup.
+    }
+    this.emit({
+      type: "error",
+      message:
+        "팀 서버 재연결 후 화면 공유를 다시 알리지 못했습니다. 공유를 중지한 뒤 다시 시작해 주세요.",
     });
   }
 
@@ -473,7 +511,10 @@ export class StudioScreenShareController {
     this.knownPeerSessions = activeSessions;
     if (changed) this.emitState();
     if (hasNewPeer && this.localShare) {
-      this.room.announceScreen({ shareId: this.localShare.shareId, label: "작업 화면" });
+      this.room.announceScreen({
+        shareId: this.localShare.shareId,
+        label: STUDIO_SCREEN_SHARE_DEFAULT_LABEL,
+      });
     }
   }
 
