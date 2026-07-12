@@ -304,6 +304,29 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
     await expect(getWork(draft.id, reader)).resolves.toMatchObject({ id: draft.id, status: "published" });
   }, 90000);
 
+  it("예약 QA 계정의 창작물만 공개 피드에서 격리하고 로컬 seed 데모는 유지한다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const qaOwner = await createCreatorTestUser("QA 임시 작가", "test-user-");
+    const seedOwner = await createCreatorTestUser("로컬 시드 작가", "seed-preview-");
+    const reader = await createCreatorTestUser("일반 독자", "public-reader-");
+    const qaWork = await createWork(qaOwner, { title: "공개되면 안 되는 QA 작품", status: "published" });
+    const seedWork = await createWork(seedOwner, { title: "로컬 데모 작품", status: "published" });
+    createdWorkIds.add(qaWork.id);
+    createdWorkIds.add(seedWork.id);
+
+    await expect(getWork(qaWork.id, reader)).resolves.toBeNull();
+    await expect(getWork(qaWork.id, qaOwner)).resolves.toMatchObject({ id: qaWork.id, isOwner: true });
+    await expect(getWork(seedWork.id, reader)).resolves.toMatchObject({ id: seedWork.id });
+
+    const publicFeed = await listWorks({ viewerId: reader });
+    expect(publicFeed.some((work) => work.id === qaWork.id)).toBe(false);
+    expect(publicFeed.some((work) => work.id === seedWork.id)).toBe(true);
+
+    // 관리자 검수 경로(includeHidden)는 격리된 QA 작품도 찾을 수 있어야 한다.
+    const moderationFeed = await listWorks({ viewerId: reader, includeHidden: true });
+    expect(moderationFeed.some((work) => work.id === qaWork.id)).toBe(true);
+  }, 90000);
+
   it("시리즈에 회차를 게시하면 episodeNo 가 max+1 로 자동 부여된다", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const userId = await createCreatorTestUser();

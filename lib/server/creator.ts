@@ -32,7 +32,7 @@ import type {
   CreatorWorkRevisionSnapshot,
   CreatorWorkRevisionSnapshotSource,
 } from "./creator-work-revisions";
-import type { SQL } from "drizzle-orm";
+import type { SQL, SQLWrapper } from "drizzle-orm";
 
 const SORTS = new Set<CreatorWorkSort>(["recent", "likes", "views"]);
 const FORMATS = new Set<CreatorWorkFormat>(["cuttoon", "upload"]);
@@ -43,6 +43,10 @@ const MAX_COMMENT = 1000;
 const MAX_TAGS = 8;
 const MAX_TAG_LEN = 24;
 const MAX_PAGES = 200;
+// 브라우저/DB 통합 QA가 예약해서 쓰는 계정 접두사. 로컬 데모 시드(`seed-*`)는 의도적으로
+// 포함하지 않는다. db:seed가 원격 Neon 실행을 거부하므로 시드 데이터는 로컬 기능 시연에
+// 남아 있어야 하며, QA 임시 계정만 공개 창작 피드에서 격리한다.
+const QA_USER_ID_PREFIX = "test-user-" as const;
 
 export type CreatorWorkSort = "recent" | "likes" | "views";
 export type CreatorWorkFormat = "cuttoon" | "upload";
@@ -221,6 +225,14 @@ function parseStatus(value: unknown): CreatorWorkStatus {
 function parseTitleId(value: unknown): string | null {
   const id = clampText(value, 160);
   return id.length > 0 ? id : null;
+}
+
+function isTestUserId(value: string | null | undefined): boolean {
+  return Boolean(value?.startsWith(QA_USER_ID_PREFIX));
+}
+
+function excludeTestUserId(column: SQLWrapper): SQL {
+  return sql`coalesce(${column}, '') NOT LIKE ${`${QA_USER_ID_PREFIX}%`}`;
 }
 
 export function parseCreatorSort(value: unknown): CreatorWorkSort {
@@ -501,7 +513,10 @@ export async function listWorks(opts: {
     const ownerView = !!opts.userId && !!opts.viewerId && opts.viewerId === opts.userId;
     if (!ownerView) {
       addWhere(eq(creatorWorks.status, "published"));
-      if (!opts.includeHidden) addWhere(eq(creatorWorks.hidden, false));
+      if (!opts.includeHidden) {
+        addWhere(eq(creatorWorks.hidden, false));
+        addWhere(excludeTestUserId(users.id));
+      }
     }
     if (opts.titleId) addWhere(eq(creatorWorks.titleId, opts.titleId));
     if (opts.userId) addWhere(eq(creatorWorks.userId, opts.userId));
@@ -521,11 +536,15 @@ export async function listWorks(opts: {
     }
 
     const likeCountExpr = sql<number>`(
-      SELECT count(*) FROM ${creatorWorkLikes} WHERE ${creatorWorkLikes.workId} = ${creatorWorks.id}
+      SELECT count(*) FROM ${creatorWorkLikes}
+      WHERE ${creatorWorkLikes.workId} = ${creatorWorks.id}
+        AND ${excludeTestUserId(creatorWorkLikes.userId)}
     )`;
     const commentCountExpr = sql<number>`(
       SELECT count(*) FROM ${creatorWorkComments}
-      WHERE ${creatorWorkComments.workId} = ${creatorWorks.id} AND ${creatorWorkComments.hidden} = false
+      WHERE ${creatorWorkComments.workId} = ${creatorWorks.id}
+        AND ${creatorWorkComments.hidden} = false
+        AND ${excludeTestUserId(creatorWorkComments.userId)}
     )`;
 
     let q = db
@@ -647,17 +666,24 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       .where(eq(creatorWorks.id, id))
       .limit(1);
     if (!row) return null;
+    if (isTestUserId(row.ownerId) && row.ownerId !== viewerId) return null;
     const isOwner = !!viewerId && viewerId === row.ownerId;
     if ((row.hidden || row.status !== "published") && !isOwner) return null;
 
     const [likeCount] = await db
       .select({ count: sql<number>`count(*)`.as("count") })
       .from(creatorWorkLikes)
-      .where(eq(creatorWorkLikes.workId, id));
+      .where(and(eq(creatorWorkLikes.workId, id), excludeTestUserId(creatorWorkLikes.userId)));
     const [commentCount] = await db
       .select({ count: sql<number>`count(*)`.as("count") })
       .from(creatorWorkComments)
-      .where(and(eq(creatorWorkComments.workId, id), eq(creatorWorkComments.hidden, false)));
+      .where(
+        and(
+          eq(creatorWorkComments.workId, id),
+          eq(creatorWorkComments.hidden, false),
+          excludeTestUserId(creatorWorkComments.userId)
+        )
+      );
 
     let liked = false;
     if (viewerId) {
@@ -690,7 +716,8 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
         const visible = and(
           eq(creatorWorks.seriesId, row.seriesId),
           eq(creatorWorks.status, "published"),
-          eq(creatorWorks.hidden, false)
+          eq(creatorWorks.hidden, false),
+          excludeTestUserId(creatorWorks.userId)
         );
         const [prev] = await db
           .select({ id: creatorWorks.id, title: creatorWorks.title, episodeNo: creatorWorks.episodeNo })
@@ -732,7 +759,14 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
         const [parent] = await db
           .select({ title: creatorWorks.title })
           .from(creatorWorks)
-          .where(eq(creatorWorks.id, row.remixFromId))
+          .where(
+            and(
+              eq(creatorWorks.id, row.remixFromId),
+              eq(creatorWorks.status, "published"),
+              eq(creatorWorks.hidden, false),
+              excludeTestUserId(creatorWorks.userId)
+            )
+          )
           .limit(1);
         if (parent) {
           remixFromTitle = parent.title;
@@ -753,7 +787,8 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
           and(
             eq(creatorWorks.remixFromId, id),
             eq(creatorWorks.status, "published"),
-            eq(creatorWorks.hidden, false)
+            eq(creatorWorks.hidden, false),
+            excludeTestUserId(users.id)
           )
         )
         .orderBy(desc(creatorWorks.createdAt))
@@ -1238,7 +1273,7 @@ async function assertPublicCreatorWork(workId: string): Promise<void> {
     .from(creatorWorks)
     .where(eq(creatorWorks.id, workId))
     .limit(1);
-  if (!work || work.hidden || work.status !== "published") {
+  if (!work || work.hidden || work.status !== "published" || isTestUserId(work.ownerId)) {
     throw new Error("공개된 작품을 찾을 수 없습니다.");
   }
 }
@@ -1266,7 +1301,7 @@ export async function toggleLike(userId: string, workId: string): Promise<{ like
   const [count] = await db
     .select({ count: sql<number>`count(*)`.as("count") })
     .from(creatorWorkLikes)
-    .where(eq(creatorWorkLikes.workId, workId));
+    .where(and(eq(creatorWorkLikes.workId, workId), excludeTestUserId(creatorWorkLikes.userId)));
   return { liked, likes: Number(count?.count ?? 0) };
 }
 
@@ -1275,7 +1310,13 @@ export async function listComments(workId: string, includeHidden = false): Promi
   try {
     await assertPublicCreatorWork(workId);
     let where: SQL | undefined = eq(creatorWorkComments.workId, workId);
-    if (!includeHidden) where = and(where, eq(creatorWorkComments.hidden, false));
+    if (!includeHidden) {
+      where = and(
+        where,
+        eq(creatorWorkComments.hidden, false),
+        excludeTestUserId(creatorWorkComments.userId)
+      );
+    }
     const rows = await db
       .select({
         id: creatorWorkComments.id,
@@ -1494,6 +1535,8 @@ export async function listSharedAssets(opts: {
   const offset = Math.max(0, opts.offset ?? 0);
   const wheres: SQL[] = [eq(creatorAssets.hidden, false)];
   if (opts.mineUserId) wheres.push(eq(creatorAssets.userId, opts.mineUserId));
+  const ownerView = Boolean(opts.mineUserId && opts.viewerId === opts.mineUserId);
+  if (!ownerView) wheres.push(excludeTestUserId(creatorAssets.userId));
   const rows = await db
     .select({
       id: creatorAssets.id,
@@ -1613,7 +1656,9 @@ export interface CreatorSeriesDetail extends CreatorSeriesSummary {
 
 // 시리즈 행 + 회차 집계 select 맵(공유) — 공개(published)·비노출 제외 기준 합산.
 function seriesAggregates() {
-  const visibleEpisode = sql`${creatorWorks.seriesId} = ${creatorSeries.id} AND ${creatorWorks.status} = 'published' AND ${creatorWorks.hidden} = false`;
+  const visibleEpisode = sql`${creatorWorks.seriesId} = ${creatorSeries.id}
+    AND ${creatorWorks.status} = 'published'
+    AND ${creatorWorks.hidden} = false`;
   return {
     episodes: sql<number>`(SELECT count(*) FROM ${creatorWorks} WHERE ${visibleEpisode})`.as("episodes"),
     views: sql<number>`(SELECT coalesce(sum(${creatorWorks.views}), 0) FROM ${creatorWorks} WHERE ${visibleEpisode})`.as(
@@ -1622,7 +1667,7 @@ function seriesAggregates() {
     likes: sql<number>`(
       SELECT count(*) FROM ${creatorWorkLikes}
       INNER JOIN ${creatorWorks} ON ${creatorWorkLikes.workId} = ${creatorWorks.id}
-      WHERE ${visibleEpisode}
+      WHERE ${visibleEpisode} AND ${excludeTestUserId(creatorWorkLikes.userId)}
     )`.as("likes"),
     latestEpisodeAt: sql<Date | string | null>`(
       SELECT max(${creatorWorks.createdAt}) FROM ${creatorWorks} WHERE ${visibleEpisode}
@@ -1717,6 +1762,7 @@ export async function listSeries(opts: {
     };
     const ownerView = !!opts.userId && !!opts.viewerId && opts.viewerId === opts.userId;
     if (!ownerView) addWhere(eq(creatorSeries.hidden, false));
+    if (!ownerView) addWhere(excludeTestUserId(users.id));
     if (opts.userId) addWhere(eq(creatorSeries.userId, opts.userId));
 
     const agg = seriesAggregates();
@@ -1750,6 +1796,7 @@ export async function getSeries(id: string, viewerId?: string): Promise<CreatorS
       .where(eq(creatorSeries.id, id))
       .limit(1);
     if (!row) return null;
+    if (isTestUserId(row.ownerId) && row.ownerId !== viewerId) return null;
     const isOwner = !!viewerId && viewerId === row.ownerId;
     if (row.hidden && !isOwner) return null;
     // 소유자는 초안 회차까지(내 연재 관리), 그 외는 공개 회차만.
@@ -1953,7 +2000,7 @@ function challengeEntriesExpr() {
   return sql<number>`(
     SELECT count(*) FROM ${creatorWorks}
     WHERE ${creatorWorks.challengeId} = ${creatorChallenges.id}
-      AND ${creatorWorks.status} = 'published' AND ${creatorWorks.hidden} = false
+      AND ${creatorWorks.status} = 'published' AND ${creatorWorks.hidden} = false AND ${excludeTestUserId(creatorWorks.userId)}
   )`.as("entries");
 }
 
@@ -2085,7 +2132,7 @@ async function countFollowers(creatorId: string): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)`.as("count") })
     .from(creatorFollows)
-    .where(eq(creatorFollows.creatorId, creatorId));
+    .where(and(eq(creatorFollows.creatorId, creatorId), excludeTestUserId(creatorFollows.followerId)));
   return Number(row?.count ?? 0);
 }
 
@@ -2131,7 +2178,7 @@ export async function getFollowStats(creatorId: string, viewerId?: string): Prom
     const [followingRow] = await db
       .select({ count: sql<number>`count(*)`.as("count") })
       .from(creatorFollows)
-      .where(eq(creatorFollows.followerId, creatorId));
+      .where(and(eq(creatorFollows.followerId, creatorId), excludeTestUserId(creatorFollows.creatorId)));
     let isFollowing = false;
     if (viewerId && viewerId !== creatorId) {
       const [mine] = await db
@@ -2159,6 +2206,7 @@ export async function getCreatorPublicProfile(
       .where(eq(users.id, userId))
       .limit(1);
     if (!user) return null;
+    if (isTestUserId(user.id) && user.id !== viewerId) return null;
     const stats = await getFollowStats(userId, viewerId);
     let works = 0;
     try {

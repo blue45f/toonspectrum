@@ -45,6 +45,7 @@ yarn-error.log*
 # dev/QA artifacts (browser automation, screenshots)
 /.playwright-mcp/
 /*.png
+/tmp/
 
 # local database (libSQL/SQLite) — data/ 내용은 무시하되 크롤 스냅샷은 git 소스로 추적한다.
 /data/*
