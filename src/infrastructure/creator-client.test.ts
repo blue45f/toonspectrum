@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   WorkRevisionConflictError,
+  createWork,
   restoreWorkRevision,
   updateWork,
 } from "./creator-client";
@@ -80,5 +81,41 @@ describe("creator client revision conflicts", () => {
     await expect(updateWork("work-1", { title: "수정", baseRevision: 7 }))
       .rejects.toThrow("안전한 API 오류");
     expect(toApiError).toHaveBeenCalledOnce();
+  });
+
+  it("create/update/restore mutation에 전달된 AbortSignal을 HTTP 요청까지 보존한다", async () => {
+    const controller = new AbortController();
+    const createInput = {
+      title: "새 작품",
+      description: "설명",
+      tags: ["웹툰"],
+      format: "cuttoon" as const,
+      cover: "data:image/png;base64,cover",
+      pages: ["data:image/png;base64,page"],
+      doc: { pagesList: [] },
+      status: "draft",
+    };
+    apiPost.mockResolvedValueOnce({ id: "created" });
+    apiPatch.mockResolvedValueOnce({ id: "updated" });
+    apiPost.mockResolvedValueOnce({ id: "restored" });
+
+    await createWork(createInput, controller.signal);
+    await updateWork("work/1", { title: "수정", baseRevision: 7 }, controller.signal);
+    await restoreWorkRevision("work/1", 3, 7, controller.signal);
+
+    expect(apiPost).toHaveBeenNthCalledWith(1, "/creator/works", createInput, {
+      signal: controller.signal,
+    });
+    expect(apiPatch).toHaveBeenCalledWith(
+      "/creator/works/work%2F1",
+      { title: "수정", baseRevision: 7 },
+      { signal: controller.signal }
+    );
+    expect(apiPost).toHaveBeenNthCalledWith(
+      2,
+      "/creator/works/work%2F1/revisions/3/restore",
+      { baseRevision: 7 },
+      { signal: controller.signal }
+    );
   });
 });

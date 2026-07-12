@@ -20,6 +20,7 @@ import {
   CreatorCollaborationInvalidTargetError,
   CreatorCollaborationNotFoundError,
   CreatorCollaborationRepository,
+  CreatorCollaborationRevisionConflictError,
 } from "./creator-collaboration.repository";
 import { CreatorService } from "./creator.service";
 
@@ -75,6 +76,10 @@ vi.mock("../../../../../lib/server/creator", () => ({
 }));
 
 const collaborationRepository = {
+  listSharedWorks: vi.fn(),
+  getSharedDocument: vi.fn(),
+  getSharedDocumentMeta: vi.fn(),
+  saveSharedDocument: vi.fn(),
   getTeam: vi.fn(),
   listInvitations: vi.fn(),
   getActivity: vi.fn(),
@@ -100,6 +105,10 @@ describe("CreatorService safety gates", () => {
     bumpViews.mockReset();
     generateImageAsset.mockReset();
     collaborationRepository.getTeam.mockReset();
+    collaborationRepository.listSharedWorks.mockReset();
+    collaborationRepository.getSharedDocument.mockReset();
+    collaborationRepository.getSharedDocumentMeta.mockReset();
+    collaborationRepository.saveSharedDocument.mockReset();
     collaborationRepository.listInvitations.mockReset();
     collaborationRepository.getActivity.mockReset();
     collaborationRepository.invite.mockReset();
@@ -257,6 +266,158 @@ describe("CreatorService safety gates", () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("공유 목록·원본 문서 응답을 strict 계약으로 검증하고 저장 patch만 위임한다", async () => {
+    const sharedWork = {
+      workId: "work-1",
+      title: "공동 작업",
+      format: "cuttoon",
+      role: "editor",
+      status: "active",
+      capabilities: { view: true, comment: true, edit: true, manageMembers: false },
+      owner: { name: "작가" },
+      updatedAt: "2026-07-12T00:00:00.000Z",
+    };
+    const sharedDocument = {
+      workId: "work-1",
+      role: "editor",
+      status: "active",
+      capabilities: { view: true, edit: true },
+      revision: 7,
+      updatedAt: "2026-07-12T00:00:00.000Z",
+      document: {
+        titleId: null,
+        title: "공동 작업",
+        description: "",
+        cover: "",
+        tags: [],
+        format: "cuttoon",
+        pages: [],
+        doc: { pagesList: [] },
+        status: "draft",
+        seriesId: null,
+        episodeNo: null,
+        challengeId: null,
+        remixFromId: null,
+      },
+    };
+    const saveResponse = {
+      workId: "work-1",
+      revision: 8,
+      updatedAt: "2026-07-12T00:01:00.000Z",
+    };
+    const { document: _document, ...sharedDocumentMeta } = sharedDocument;
+    const sharedWorksPage = { items: [sharedWork], nextCursor: "next_cursor" };
+    collaborationRepository.listSharedWorks.mockResolvedValue(sharedWorksPage);
+    collaborationRepository.getSharedDocument.mockResolvedValue(sharedDocument);
+    collaborationRepository.getSharedDocumentMeta.mockResolvedValue(sharedDocumentMeta);
+    collaborationRepository.saveSharedDocument.mockResolvedValue(saveResponse);
+    const service = createService();
+
+    await expect(service.listSharedWorks("editor", 50, "current_cursor")).resolves.toEqual(
+      sharedWorksPage
+    );
+    await expect(service.getSharedWorkDocument("editor", "work-1")).resolves.toEqual(
+      sharedDocument
+    );
+    await expect(service.getSharedWorkDocumentMeta("editor", "work-1")).resolves.toEqual(
+      sharedDocumentMeta
+    );
+    await expect(
+      service.saveSharedWorkDocument("editor", "work-1", {
+        baseRevision: 7,
+        title: "수정",
+        doc: { pagesList: [{ id: "page-2" }] },
+      })
+    ).resolves.toEqual(saveResponse);
+    expect(collaborationRepository.listSharedWorks).toHaveBeenCalledWith(
+      "editor",
+      50,
+      "current_cursor"
+    );
+    expect(collaborationRepository.getSharedDocument).toHaveBeenCalledWith("editor", "work-1");
+    expect(collaborationRepository.getSharedDocumentMeta).toHaveBeenCalledWith(
+      "editor",
+      "work-1"
+    );
+    expect(collaborationRepository.saveSharedDocument).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      7,
+      { title: "수정", doc: { pagesList: [{ id: "page-2" }] } }
+    );
+  });
+
+  it("공유 저장 revision 충돌은 현재 번호만 포함한 409로 변환한다", async () => {
+    collaborationRepository.saveSharedDocument.mockRejectedValue(
+      new CreatorCollaborationRevisionConflictError(11)
+    );
+    const error = await createService()
+      .saveSharedWorkDocument("editor", "work-1", { baseRevision: 10, doc: {} })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      code: "creator_work_revision_conflict",
+      message: "다른 팀원이 먼저 저장했습니다. 최신 문서를 불러온 뒤 변경 내용을 다시 확인해 주세요.",
+      currentRevision: 11,
+    });
+    expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("document");
+  });
+
+  it("raw shared format 전환은 repository mutation 전에 strict 거부한다", async () => {
+    await expect(
+      createService().saveSharedWorkDocument(
+        "owner",
+        "work-1",
+        {
+          baseRevision: 7,
+          title: "형식 전환 시도",
+          format: "upload",
+        } as never
+      )
+    ).rejects.toThrow();
+    expect(collaborationRepository.saveSharedDocument).not.toHaveBeenCalled();
+  });
+
+  it("공유 문서 읽기·쓰기 권한 오류를 구분된 403으로 변환한다", async () => {
+    collaborationRepository.getSharedDocument.mockRejectedValue(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    collaborationRepository.getSharedDocumentMeta.mockRejectedValue(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    collaborationRepository.saveSharedDocument
+      .mockRejectedValueOnce(new CreatorCollaborationForbiddenError("document_edit_denied"))
+      .mockRejectedValueOnce(
+        new CreatorCollaborationForbiddenError("document_owner_fields_denied")
+      );
+    const service = createService();
+
+    const readError = await service
+      .getSharedWorkDocument("pending", "work-1")
+      .catch((cause: unknown) => cause);
+    const metaError = await service
+      .getSharedWorkDocumentMeta("pending", "work-1")
+      .catch((cause: unknown) => cause);
+    const writeError = await service
+      .saveSharedWorkDocument("viewer", "work-1", { baseRevision: 1, doc: {} })
+      .catch((cause: unknown) => cause);
+    const ownerFieldError = await service
+      .saveSharedWorkDocument("editor", "work-1", {
+        baseRevision: 1,
+        status: "published",
+      })
+      .catch((cause: unknown) => cause);
+    expect(readError).toBeInstanceOf(ForbiddenException);
+    expect((readError as ForbiddenException).message).toContain("볼 권한");
+    expect(metaError).toBeInstanceOf(ForbiddenException);
+    expect((metaError as ForbiddenException).message).toContain("볼 권한");
+    expect(writeError).toBeInstanceOf(ForbiddenException);
+    expect((writeError as ForbiddenException).message).toContain("저장할 권한");
+    expect(ownerFieldError).toBeInstanceOf(ForbiddenException);
+    expect((ownerFieldError as ForbiddenException).message).toContain("작품 소유자만");
+  });
+
   it("repository의 권한·충돌·대상 검증 오류를 각각 403·409·400으로 변환한다", async () => {
     collaborationRepository.getTeam.mockRejectedValue(
       new CreatorCollaborationForbiddenError("team_access_denied")
@@ -264,6 +425,9 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.invite
       .mockRejectedValueOnce(new CreatorCollaborationConflictError("invitation_already_pending"))
       .mockRejectedValueOnce(new CreatorCollaborationInvalidTargetError("target_user_unavailable"));
+    collaborationRepository.listSharedWorks.mockRejectedValue(
+      new CreatorCollaborationInvalidTargetError("invalid_cursor")
+    );
     const service = createService();
 
     await expect(service.getWorkTeam("viewer", "work")).rejects.toBeInstanceOf(ForbiddenException);
@@ -273,6 +437,11 @@ describe("CreatorService safety gates", () => {
     await expect(
       service.inviteWorkTeamMember("owner", "work", "inactive", "viewer")
     ).rejects.toBeInstanceOf(BadRequestException);
+    const cursorError = await service
+      .listSharedWorks("editor", 50, "forged")
+      .catch((cause: unknown) => cause);
+    expect(cursorError).toBeInstanceOf(BadRequestException);
+    expect((cursorError as BadRequestException).message).toContain("페이지 커서");
   });
 
   it("동일 actor·work의 초대 시도를 시간당 30회로 제한하고 429를 그대로 유지한다", async () => {

@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreateCreatorWorkSchema,
+  CreatorSharedWorksListQuerySchema,
+  CreatorSharedDocumentMetaResponseSchema,
   CreatorTeamListQuerySchema,
   CreatorTeamMemberParamsSchema,
   CreatorTeamWorkParamsSchema,
+  CreatorSharedDocumentResponseSchema,
+  CreatorSharedDocumentSaveResponseSchema,
+  CreatorSharedWorksResponseSchema,
   CreatorWorkRevisionListQuerySchema,
   CreatorWorkRevisionParamsSchema,
   InviteCreatorTeamMemberSchema,
   RespondCreatorTeamInvitationSchema,
   RestoreCreatorWorkRevisionSchema,
+  UpdateCreatorSharedDocumentSchema,
   UpdateCreatorTeamMemberSchema,
   UpdateCreatorWorkSchema,
 } from "./creator.dto";
@@ -97,5 +103,158 @@ describe("creator work zod contracts", () => {
     expect(CreatorTeamListQuerySchema.safeParse({ limit: 20, cursor: "forged" }).success).toBe(
       false
     );
+  });
+
+  it("공유 작품 목록만 opaque cursor를 허용하고 limit을 독립 검증한다", () => {
+    const cursor = Buffer.from(
+      JSON.stringify({ v: 1, sortAt: "2026-07-12T00:00:00.000Z", workId: "work-1" })
+    ).toString("base64url");
+    expect(CreatorSharedWorksListQuerySchema.parse({ cursor, limit: "50" })).toEqual({
+      limit: 50,
+      cursor,
+    });
+    expect(CreatorSharedWorksListQuerySchema.parse({})).toEqual({ limit: 20 });
+    expect(CreatorSharedWorksListQuerySchema.safeParse({ cursor: `${cursor}=` }).success).toBe(
+      false
+    );
+    expect(CreatorSharedWorksListQuerySchema.safeParse({ cursor: "a".repeat(513) }).success).toBe(
+      false
+    );
+    expect(CreatorSharedWorksListQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
+    // 초대함·활동 endpoint는 페이지 cursor를 의미 없이 받지 않는다.
+    expect(CreatorTeamListQuerySchema.safeParse({ limit: 20, cursor }).success).toBe(false);
+  });
+
+  it("공유 문서 저장은 필수 baseRevision과 strict 콘텐츠 allowlist를 적용한다", () => {
+    expect(
+      UpdateCreatorSharedDocumentSchema.parse({
+        baseRevision: 7,
+        title: "  팀 수정본  ",
+        doc: { pagesList: [] },
+      })
+    ).toEqual({ baseRevision: 7, title: "팀 수정본", doc: { pagesList: [] } });
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({ title: "revision 없음" }).success).toBe(
+      false
+    );
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7 }).success).toBe(false);
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 0, title: "수정" }).success).toBe(
+      false
+    );
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7, title: "   " }).success).toBe(
+      false
+    );
+    expect(
+      UpdateCreatorSharedDocumentSchema.safeParse({
+        baseRevision: 7,
+        doc: {},
+        seriesId: "owner-only-series",
+      }).success
+    ).toBe(false);
+    expect(
+      UpdateCreatorSharedDocumentSchema.safeParse({
+        baseRevision: 7,
+        doc: {},
+        challengeId: "owner-only-challenge",
+      }).success
+    ).toBe(false);
+    expect(
+      UpdateCreatorSharedDocumentSchema.safeParse({
+        baseRevision: 7,
+        doc: {},
+        format: "upload",
+      }).success
+    ).toBe(false);
+    expect(
+      UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7, doc: {}, hidden: false }).success
+    ).toBe(false);
+  });
+
+  it("공유 목록·문서 응답은 최소 필드와 ISO 시각을 strict 검증한다", () => {
+    const work = {
+      workId: "work-1",
+      title: "공동 작업",
+      format: "cuttoon",
+      role: "viewer",
+      status: "active",
+      capabilities: { view: true, comment: false, edit: false, manageMembers: false },
+      owner: { name: "작가" },
+      updatedAt: "2026-07-12T00:00:00.000Z",
+    };
+    const cursor = Buffer.from("cursor").toString("base64url");
+    expect(
+      CreatorSharedWorksResponseSchema.safeParse({ items: [work], nextCursor: cursor }).success
+    ).toBe(true);
+    expect(
+      CreatorSharedWorksResponseSchema.safeParse({
+        items: [{ ...work, format: "unknown" }],
+        nextCursor: null,
+      }).success
+    ).toBe(false);
+    expect(
+      CreatorSharedWorksResponseSchema.safeParse({
+        items: [{ ...work, cover: "private-large-cover" }],
+        nextCursor: null,
+      }).success
+    ).toBe(false);
+    expect(
+      CreatorSharedWorksResponseSchema.safeParse({
+        items: [{ ...work, updatedAt: "not-a-date" }],
+        nextCursor: null,
+      }).success
+    ).toBe(false);
+    expect(
+      CreatorSharedWorksResponseSchema.safeParse({ items: [work], nextCursor: `${cursor}=` }).success
+    ).toBe(false);
+    expect(CreatorSharedWorksResponseSchema.safeParse([work]).success).toBe(false);
+
+    const response = {
+      workId: "work-1",
+      role: "editor",
+      status: "active",
+      capabilities: { view: true, edit: true },
+      revision: 3,
+      updatedAt: "2026-07-12T00:00:00.000Z",
+      document: {
+        titleId: null,
+        title: "공동 작업",
+        description: "",
+        cover: "",
+        tags: [],
+        format: "cuttoon",
+        pages: [],
+        doc: {},
+        status: "draft",
+        seriesId: null,
+        episodeNo: null,
+        challengeId: null,
+        remixFromId: null,
+      },
+    };
+    expect(CreatorSharedDocumentResponseSchema.safeParse(response).success).toBe(true);
+    expect(
+      CreatorSharedDocumentResponseSchema.safeParse({ ...response, invitationId: "secret" }).success
+    ).toBe(false);
+    const { document: _document, ...meta } = response;
+    expect(CreatorSharedDocumentMetaResponseSchema.safeParse(meta).success).toBe(true);
+    for (const forbidden of [
+      { document: response.document },
+      { cover: "large-private-cover" },
+      { pages: ["private-page"] },
+      { doc: { secret: true } },
+      { owner: { name: "작가" } },
+      { userId: "private-user" },
+      { token: "private-token" },
+    ]) {
+      expect(
+        CreatorSharedDocumentMetaResponseSchema.safeParse({ ...meta, ...forbidden }).success
+      ).toBe(false);
+    }
+    expect(
+      CreatorSharedDocumentSaveResponseSchema.safeParse({
+        workId: "work-1",
+        revision: 4,
+        updatedAt: "2026-07-12T00:01:00.000Z",
+      }).success
+    ).toBe(true);
   });
 });

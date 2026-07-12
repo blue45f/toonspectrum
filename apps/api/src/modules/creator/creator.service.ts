@@ -53,10 +53,25 @@ import {
   CreatorCollaborationInvalidTargetError,
   CreatorCollaborationNotFoundError,
   CreatorCollaborationRepository,
+  CreatorCollaborationRevisionConflictError,
 } from "./creator-collaboration.repository";
+import {
+  CreatorSharedDocumentMetaResponseSchema,
+  CreatorSharedDocumentResponseSchema,
+  CreatorSharedDocumentSaveResponseSchema,
+  CreatorSharedWorksResponseSchema,
+  UpdateCreatorSharedDocumentSchema,
+} from "./creator.dto";
 
 import type { CreatorCollaborationRole } from "./creator-collaboration.policy";
-import type { CreateCreatorWorkDto, UpdateCreatorWorkDto } from "./creator.dto";
+import type {
+  CreatorSharedDocumentPatch,
+} from "./creator-collaboration.repository";
+import type {
+  CreateCreatorWorkDto,
+  UpdateCreatorSharedDocumentDto,
+  UpdateCreatorWorkDto,
+} from "./creator.dto";
 
 interface ListQuery {
   titleId?: string | null;
@@ -175,6 +190,69 @@ export class CreatorService {
   async getWorkTeamActivity(userId: string, workId: string, limit: number) {
     return this.runCreatorCollaborationOperation("get_activity", workId, () =>
       this.creatorCollaborationRepository.getActivity(userId, workId, limit)
+    );
+  }
+
+  async listSharedWorks(userId: string, limit: number, cursor?: string) {
+    return this.runCreatorCollaborationOperation("list_shared_works", "shared", async () =>
+      CreatorSharedWorksResponseSchema.parse(
+        await this.creatorCollaborationRepository.listSharedWorks(userId, limit, cursor)
+      )
+    );
+  }
+
+  async getSharedWorkDocument(userId: string, workId: string) {
+    return this.runCreatorCollaborationOperation("get_shared_document", workId, async () =>
+      CreatorSharedDocumentResponseSchema.parse(
+        await this.creatorCollaborationRepository.getSharedDocument(userId, workId)
+      )
+    );
+  }
+
+  async getSharedWorkDocumentMeta(userId: string, workId: string) {
+    return this.runCreatorCollaborationOperation("get_shared_document_meta", workId, async () =>
+      CreatorSharedDocumentMetaResponseSchema.parse(
+        await this.creatorCollaborationRepository.getSharedDocumentMeta(userId, workId)
+      )
+    );
+  }
+
+  async saveSharedWorkDocument(
+    userId: string,
+    workId: string,
+    body: UpdateCreatorSharedDocumentDto
+  ) {
+    const validated = UpdateCreatorSharedDocumentSchema.parse(body);
+    const {
+      baseRevision,
+      title,
+      description,
+      cover,
+      tags,
+      titleId,
+      pages,
+      doc,
+      status,
+    } = validated;
+    const patch: CreatorSharedDocumentPatch = {};
+    if (title !== undefined) patch.title = title;
+    if (description !== undefined) patch.description = description;
+    if (cover !== undefined) patch.cover = cover;
+    if (tags !== undefined) patch.tags = tags;
+    if (titleId !== undefined) patch.titleId = titleId;
+    if (pages !== undefined) patch.pages = pages;
+    if (doc !== undefined) patch.doc = doc;
+    if (status !== undefined) patch.status = status;
+
+    return this.runCreatorCollaborationOperation("save_shared_document", workId, async () =>
+      CreatorSharedDocumentSaveResponseSchema.parse(
+        await this.creatorCollaborationRepository.saveSharedDocument(
+          userId,
+          workId,
+          baseRevision,
+          patch
+        )
+      )
     );
   }
 
@@ -388,11 +466,21 @@ export class CreatorService {
         );
       }
       if (error instanceof CreatorCollaborationForbiddenError) {
-        throw new ForbiddenException(
-          error.code === "team_access_denied"
-            ? "이 작품의 팀 목록을 볼 권한이 없습니다."
-            : "팀원을 관리할 권한이 없습니다."
-        );
+        const messages: Record<typeof error.code, string> = {
+          team_access_denied: "이 작품의 팀 목록을 볼 권한이 없습니다.",
+          member_management_denied: "팀원을 관리할 권한이 없습니다.",
+          document_access_denied: "이 작품의 원본 문서를 볼 권한이 없습니다.",
+          document_edit_denied: "이 작품의 원본 문서를 저장할 권한이 없습니다.",
+          document_owner_fields_denied: "게시 상태와 연결 작품은 작품 소유자만 변경할 수 있습니다.",
+        };
+        throw new ForbiddenException(messages[error.code]);
+      }
+      if (error instanceof CreatorCollaborationRevisionConflictError) {
+        throw new ConflictException({
+          code: "creator_work_revision_conflict",
+          message: "다른 팀원이 먼저 저장했습니다. 최신 문서를 불러온 뒤 변경 내용을 다시 확인해 주세요.",
+          currentRevision: error.currentRevision,
+        });
       }
       if (error instanceof CreatorCollaborationConflictError) {
         const messages: Record<typeof error.code, string> = {
@@ -407,7 +495,9 @@ export class CreatorService {
       }
       if (error instanceof CreatorCollaborationInvalidTargetError) {
         throw new BadRequestException(
-          error.code === "owner_or_self_target"
+          error.code === "invalid_cursor"
+            ? "공유 작품 페이지 커서가 올바르지 않습니다."
+            : error.code === "owner_or_self_target"
             ? "작품 소유자 또는 본인은 초대할 수 없습니다."
             : error.code === "target_user_unavailable"
               ? "초대할 수 있는 활성 회원을 찾지 못했습니다."

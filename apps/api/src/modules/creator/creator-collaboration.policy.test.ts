@@ -23,10 +23,10 @@ const NO_ACCESS: CreatorCollaborationAccess = {
 
 const ACTIVE_EXPECTATIONS: Record<"owner" | CreatorCollaborationRole, CreatorCollaborationAccess> = {
   owner: { view: true, comment: true, edit: true, manageMembers: true, respondInvite: false },
-  admin: { view: false, comment: false, edit: false, manageMembers: true, respondInvite: false },
-  editor: { view: false, comment: false, edit: false, manageMembers: false, respondInvite: false },
-  commenter: { view: false, comment: false, edit: false, manageMembers: false, respondInvite: false },
-  viewer: { view: false, comment: false, edit: false, manageMembers: false, respondInvite: false },
+  admin: { view: true, comment: true, edit: true, manageMembers: true, respondInvite: false },
+  editor: { view: true, comment: true, edit: true, manageMembers: false, respondInvite: false },
+  commenter: { view: true, comment: true, edit: false, manageMembers: false, respondInvite: false },
+  viewer: { view: true, comment: false, edit: false, manageMembers: false, respondInvite: false },
 };
 
 describe("creator collaboration permission policy", () => {

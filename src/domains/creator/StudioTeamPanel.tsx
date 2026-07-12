@@ -52,6 +52,7 @@ import {
   type StudioTeamSnapshot,
   type StudioTeamStatus,
 } from "./studio-team-client";
+import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -65,11 +66,11 @@ export interface StudioTeamPanelProps {
 }
 
 const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> = {
-  owner: { label: "소유자", description: "작품과 팀 권한을 모두 관리합니다." },
-  admin: { label: "관리자", description: "팀원을 초대하고 역할을 관리합니다." },
-  editor: { label: "편집자", description: "공동 저장 연결에 사용할 편집 역할입니다." },
-  commenter: { label: "검토자", description: "서버 댓글 연결에 사용할 검토 역할입니다." },
-  viewer: { label: "열람자", description: "공유 원고 연결에 사용할 읽기 역할입니다." },
+  owner: { label: "소유자", description: "원고·게시 상태·작품 연결·팀 권한을 모두 관리합니다." },
+  admin: { label: "관리자", description: "원고를 공동 저장하고 팀원을 초대·관리합니다. 게시는 소유자 권한입니다." },
+  editor: { label: "편집자", description: "원고를 읽고 공동 저장합니다. 게시 상태와 팀원은 변경할 수 없습니다." },
+  commenter: { label: "검토자", description: "원고를 읽습니다. 서버 앵커 댓글은 다음 단계에서 연결됩니다." },
+  viewer: { label: "열람자", description: "공유 원고를 읽기 전용으로 확인합니다." },
 };
 
 const STATUS_COPY: Record<StudioTeamStatus, string> = {
@@ -994,8 +995,8 @@ export function StudioTeamPanelView({
       </details>
 
       <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
-        현재는 서버 멤버·초대·역할 관리 단계입니다. 공동 저장·서버 댓글·접속 상태는 이 권한에
-        순차적으로 연결됩니다.
+        공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다.
+        서버 앵커 댓글·접속 상태·페이지/레이어 잠금은 다음 단계에서 연결됩니다.
       </p>
     </div>
   );
@@ -1053,6 +1054,7 @@ export function StudioTeamPanel({
   const [activityScope, setActivityScope] = useState<StudioTeamRequestScope | null>(null);
   const [activityRequestScope, setActivityRequestScope] = useState<StudioTeamRequestScope | null>(null);
   const [activityReloadKey, setActivityReloadKey] = useState(0);
+  const [sharedWorksRefreshKey, setSharedWorksRefreshKey] = useState(0);
   const closeFromEffect = useEffectEvent(onClose);
   const authReady = loggedIn && authScopeKey !== null;
   const scopedSnapshot =
@@ -1081,6 +1083,7 @@ export function StudioTeamPanel({
     setActivityError(null);
     setActivityScope(null);
     setActivityRequestScope(null);
+    setSharedWorksRefreshKey(0);
   }, [authScopeKey, loggedIn]);
 
   useEffect(() => {
@@ -1404,6 +1407,9 @@ export function StudioTeamPanel({
         }
       }
     ).then((succeeded) => {
+      if (succeeded && action === "accept") {
+        setSharedWorksRefreshKey((value) => value + 1);
+      }
       window.requestAnimationFrame(() => {
         if (succeeded) {
           panelRef.current
@@ -1452,6 +1458,7 @@ export function StudioTeamPanel({
       setInvitations((current) =>
         removeAcknowledgedStudioTeamInvitation(current, currentInvitation)
       );
+      if (action === "accept") setSharedWorksRefreshKey((value) => value + 1);
       setInboxFocusTarget(nextFocusTarget);
       setNotice(action === "accept" ? "팀 초대를 수락했습니다." : "팀 초대를 거절했습니다.");
     } catch (error) {
@@ -1532,7 +1539,7 @@ export function StudioTeamPanel({
               팀 작업 공간
             </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-3" id={descriptionId}>
-              받은 초대를 확인하고 작품 멤버의 역할을 관리합니다.
+              참여 작품을 열고, 받은 초대를 확인하며 멤버 역할을 관리합니다.
             </p>
           </div>
           <button
@@ -1553,6 +1560,14 @@ export function StudioTeamPanel({
           }
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))] [scrollbar-gutter:stable]"
         >
+          <StudioSharedWorksPanel
+            authScopeKey={authScopeKey}
+            currentWorkId={workId}
+            loggedIn={loggedIn}
+            open={open}
+            refreshKey={sharedWorksRefreshKey}
+            onOpenWork={() => onClose()}
+          />
           <StudioTeamPanelView
             activity={visibleActivity}
             activityError={visibleActivityError}

@@ -259,7 +259,7 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).toContain('id="studio-team-invite-user-id"');
     expect(html).toContain("가입한 사용자의 ID로 초대합니다");
     expect(html).toContain('<strong class="font-semibold text-fg-2">편집자</strong>');
-    expect(html).toContain("공동 저장 연결에 사용할 편집 역할입니다");
+    expect(html).toContain("원고를 읽고 공동 저장합니다");
     expect(html).toContain('data-team-manage-controls="true"');
     expect(html).toContain('data-team-members-heading="true"');
     expect(html).toContain('tabindex="-1"');
@@ -350,7 +350,7 @@ describe("StudioTeamPanelView permissions", () => {
 
   it("저장된 서버 권한만 표시하며 존재하지 않는 접속 상태를 주장하지 않는다", () => {
     const html = renderView();
-    expect(html).toContain("현재는 서버 멤버·초대·역할 관리 단계입니다");
+    expect(html).toContain("revision 공동 저장까지 서버 권한에 연결되었습니다");
     expect(html).not.toContain("온라인");
     expect(html).not.toContain("접속 중");
     expect(html).not.toContain("실시간");

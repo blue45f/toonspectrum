@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, count, desc, eq, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, lt, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
   creatorWorkCollaborationEvents,
   creatorWorkCollaborators,
+  creatorWorkRevisions,
   creatorWorks,
   db,
   users,
 } from "../../../../../lib/db";
+import {
+  CREATOR_WORK_REVISION_MAX,
+  createCreatorWorkRevisionSnapshot,
+  creatorWorkRevisionRetentionCutoff,
+} from "../../../../../lib/server/creator-work-revisions";
 
 import {
   canManageCreatorCollaborationMember,
@@ -24,6 +30,7 @@ import type {
   CreatorCollaborationStatus,
   CreatorCollaborationViewerRole,
 } from "./creator-collaboration.policy";
+import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
 
 type CreatorCollaborationInvitationAction = "accept" | "decline";
 type CreatorCollaborationEventAction =
@@ -41,6 +48,14 @@ interface CreatorCollaborationEventState {
 
 export const CREATOR_COLLABORATION_MAX_MEMBERS = 100;
 export const CREATOR_COLLABORATION_REINVITE_COOLDOWN_MS = 24 * 60 * 60 * 1_000;
+const CREATOR_SHARED_WORKS_CURSOR_VERSION = 1;
+const CREATOR_SHARED_WORKS_CURSOR_MAX_LENGTH = 512;
+const CREATOR_SHARED_WORKS_CURSOR_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+export interface CreatorSharedWorksCursorKey {
+  sortAt: Date;
+  workId: string;
+}
 
 interface CreatorCollaborationWorkRecord {
   id: string;
@@ -48,6 +63,62 @@ interface CreatorCollaborationWorkRecord {
   title: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+}
+
+interface CreatorSharedWorkRecord {
+  workId: string;
+  ownerUserId: string;
+  ownerName: string | null;
+  ownerStatus: string;
+  title: string;
+  format: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  membershipRole: string | null;
+  membershipStatus: string | null;
+}
+
+interface CreatorSharedDocumentRecord extends CreatorSharedWorkRecord {
+  revision: number;
+  titleId: string | null;
+  description: string;
+  cover: string;
+  tags: unknown;
+  format: string;
+  pages: unknown;
+  doc: unknown;
+  status: string;
+  seriesId: string | null;
+  episodeNo: number | null;
+  challengeId: string | null;
+  remixFromId: string | null;
+}
+
+interface CreatorSharedDocumentMetaRecord {
+  workId: string;
+  ownerUserId: string;
+  ownerStatus: string;
+  revision: number;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  membershipRole: string | null;
+  membershipStatus: string | null;
+}
+
+type CreatorSharedDocumentMutationRecord = Omit<
+  CreatorSharedDocumentRecord,
+  "ownerName" | "ownerStatus" | "membershipRole" | "membershipStatus"
+>;
+
+export interface CreatorSharedDocumentPatch {
+  title?: string;
+  description?: string;
+  cover?: string;
+  tags?: string[];
+  titleId?: string | null;
+  pages?: string[];
+  doc?: Record<string, unknown>;
+  status?: "draft" | "published";
 }
 
 interface CreatorCollaborationUserRecord {
@@ -156,6 +227,33 @@ export interface CreatorCollaborationUnitOfWork {
     workId: string,
     limit: number
   ): Promise<CreatorCollaborationAuthorizedEventsRecord | null>;
+  listAccessibleWorks(
+    actorUserId: string,
+    limit: number,
+    cursor: CreatorSharedWorksCursorKey | null
+  ): Promise<CreatorSharedWorkRecord[]>;
+  findAccessibleDocument(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocumentRecord | null>;
+  findAccessibleDocumentMeta(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocumentMetaRecord | null>;
+  updateAccessibleDocument(
+    actorUserId: string,
+    workId: string,
+    baseRevision: number,
+    patch: CreatorSharedDocumentPatch,
+    updatedAt: Date
+  ): Promise<CreatorSharedDocumentMutationRecord | null>;
+  appendWorkRevision(
+    workId: string,
+    revision: number,
+    snapshot: CreatorWorkRevisionSnapshot,
+    createdAt: Date
+  ): Promise<void>;
+  deleteWorkRevisionsThrough(workId: string, revision: number): Promise<void>;
 }
 
 export interface CreatorCollaborationPersistence {
@@ -225,6 +323,40 @@ export interface CreatorCollaborationActivity {
   createdAt: string;
 }
 
+export interface CreatorSharedWork {
+  workId: string;
+  title: string;
+  format: "cuttoon" | "upload";
+  role: CreatorCollaborationViewerRole;
+  status: "active";
+  capabilities: Pick<CreatorCollaborationAccess, "view" | "comment" | "edit" | "manageMembers">;
+  owner: { name: string };
+  updatedAt: string;
+}
+
+export interface CreatorSharedWorksPage {
+  items: CreatorSharedWork[];
+  nextCursor: string | null;
+}
+
+export interface CreatorSharedDocument {
+  workId: string;
+  role: CreatorCollaborationViewerRole;
+  status: "active";
+  capabilities: { view: true; edit: boolean };
+  revision: number;
+  updatedAt: string;
+  document: CreatorWorkRevisionSnapshot;
+}
+
+export type CreatorSharedDocumentMeta = Omit<CreatorSharedDocument, "document">;
+
+export interface CreatorSharedDocumentSaveResponse {
+  workId: string;
+  revision: number;
+  updatedAt: string;
+}
+
 export type CreatorCollaborationNotFoundCode =
   | "work_not_found"
   | "member_not_found"
@@ -237,7 +369,12 @@ export class CreatorCollaborationNotFoundError extends Error {
   }
 }
 
-export type CreatorCollaborationForbiddenCode = "team_access_denied" | "member_management_denied";
+export type CreatorCollaborationForbiddenCode =
+  | "team_access_denied"
+  | "member_management_denied"
+  | "document_access_denied"
+  | "document_edit_denied"
+  | "document_owner_fields_denied";
 
 export class CreatorCollaborationForbiddenError extends Error {
   constructor(readonly code: CreatorCollaborationForbiddenCode) {
@@ -264,6 +401,7 @@ export class CreatorCollaborationConflictError extends Error {
 export type CreatorCollaborationInvalidTargetCode =
   | "invalid_role"
   | "invalid_action"
+  | "invalid_cursor"
   | "owner_or_self_target"
   | "target_user_unavailable";
 
@@ -271,6 +409,13 @@ export class CreatorCollaborationInvalidTargetError extends Error {
   constructor(readonly code: CreatorCollaborationInvalidTargetCode) {
     super(code);
     this.name = "CreatorCollaborationInvalidTargetError";
+  }
+}
+
+export class CreatorCollaborationRevisionConflictError extends Error {
+  constructor(readonly currentRevision: number) {
+    super("creator_work_revision_conflict");
+    this.name = "CreatorCollaborationRevisionConflictError";
   }
 }
 
@@ -283,6 +428,227 @@ const collaborationActivityViewerMemberships = alias(
   creatorWorkCollaborators,
   "creator_collaboration_activity_viewer_membership"
 );
+const sharedWorkViewerMemberships = alias(
+  creatorWorkCollaborators,
+  "creator_shared_work_viewer_membership"
+);
+const sharedDocumentEditorMemberships = alias(
+  creatorWorkCollaborators,
+  "creator_shared_document_editor_membership"
+);
+const sharedDocumentMetaViewerMemberships = alias(
+  creatorWorkCollaborators,
+  "creator_shared_document_meta_viewer_membership"
+);
+const sharedDocumentOwners = alias(users, "creator_shared_document_owner");
+const sharedDocumentMetaOwners = alias(users, "creator_shared_document_meta_owner");
+const sharedWorkOwners = alias(users, "creator_shared_work_owner");
+
+const creatorSharedWorkSelection = {
+  workId: creatorWorks.id,
+  ownerUserId: creatorWorks.userId,
+  ownerName: sharedWorkOwners.name,
+  ownerStatus: sharedWorkOwners.status,
+  title: creatorWorks.title,
+  format: creatorWorks.format,
+  createdAt: creatorWorks.createdAt,
+  updatedAt: creatorWorks.updatedAt,
+  membershipRole: sharedWorkViewerMemberships.role,
+  membershipStatus: sharedWorkViewerMemberships.status,
+};
+
+const creatorSharedDocumentSelection = {
+  workId: creatorWorks.id,
+  ownerUserId: creatorWorks.userId,
+  ownerName: sharedWorkOwners.name,
+  ownerStatus: sharedWorkOwners.status,
+  titleId: creatorWorks.titleId,
+  title: creatorWorks.title,
+  description: creatorWorks.description,
+  cover: creatorWorks.cover,
+  tags: creatorWorks.tags,
+  format: creatorWorks.format,
+  pages: creatorWorks.pages,
+  doc: creatorWorks.doc,
+  status: creatorWorks.status,
+  seriesId: creatorWorks.seriesId,
+  episodeNo: creatorWorks.episodeNo,
+  challengeId: creatorWorks.challengeId,
+  remixFromId: creatorWorks.remixFromId,
+  revision: creatorWorks.revision,
+  createdAt: creatorWorks.createdAt,
+  updatedAt: creatorWorks.updatedAt,
+  membershipRole: sharedWorkViewerMemberships.role,
+  membershipStatus: sharedWorkViewerMemberships.status,
+};
+
+const creatorSharedDocumentMetaSelection = {
+  workId: creatorWorks.id,
+  ownerUserId: creatorWorks.userId,
+  ownerStatus: sharedDocumentMetaOwners.status,
+  revision: creatorWorks.revision,
+  createdAt: creatorWorks.createdAt,
+  updatedAt: creatorWorks.updatedAt,
+  membershipRole: sharedDocumentMetaViewerMemberships.role,
+  membershipStatus: sharedDocumentMetaViewerMemberships.status,
+};
+
+const creatorSharedDocumentMutationSelection = {
+  workId: creatorWorks.id,
+  ownerUserId: creatorWorks.userId,
+  titleId: creatorWorks.titleId,
+  title: creatorWorks.title,
+  description: creatorWorks.description,
+  cover: creatorWorks.cover,
+  tags: creatorWorks.tags,
+  format: creatorWorks.format,
+  pages: creatorWorks.pages,
+  doc: creatorWorks.doc,
+  status: creatorWorks.status,
+  seriesId: creatorWorks.seriesId,
+  episodeNo: creatorWorks.episodeNo,
+  challengeId: creatorWorks.challengeId,
+  remixFromId: creatorWorks.remixFromId,
+  revision: creatorWorks.revision,
+  createdAt: creatorWorks.createdAt,
+  updatedAt: creatorWorks.updatedAt,
+};
+
+/** Query-builder export keeps the correlated ACL SQL inspectable without opening a database connection. */
+export function buildCreatorSharedDocumentUpdateQuery(
+  executor: DrizzleCreatorCollaborationExecutor,
+  actorUserId: string,
+  workId: string,
+  baseRevision: number,
+  patch: CreatorSharedDocumentPatch,
+  updatedAt: Date
+) {
+  if (Object.hasOwn(patch, "format")) {
+    throw new Error("shared document format is immutable");
+  }
+  const ownerOnlyPatch = Object.hasOwn(patch, "status") || Object.hasOwn(patch, "titleId");
+  const editorMembershipQuery = executor
+    .select({ authorized: sql`1` })
+    .from(sharedDocumentEditorMemberships)
+    .where(
+      and(
+        eq(sharedDocumentEditorMemberships.workId, creatorWorks.id),
+        eq(sharedDocumentEditorMemberships.userId, actorUserId),
+        eq(sharedDocumentEditorMemberships.status, "active"),
+        or(
+          eq(sharedDocumentEditorMemberships.role, "admin"),
+          eq(sharedDocumentEditorMemberships.role, "editor")
+        )
+      )
+    );
+  const activeOwnerQuery = executor
+    .select({ authorized: sql`1` })
+    .from(sharedDocumentOwners)
+    .where(
+      and(
+        eq(sharedDocumentOwners.id, creatorWorks.userId),
+        eq(sharedDocumentOwners.status, "active")
+      )
+    );
+  const editorMembershipExists = sql<boolean>`exists ${editorMembershipQuery}`;
+  const activeOwnerExists = sql<boolean>`exists ${activeOwnerQuery}`;
+  return executor
+    .update(creatorWorks)
+    .set({
+      ...patch,
+      revision: sql`${creatorWorks.revision} + 1`,
+      updatedAt,
+    })
+    .where(
+      and(
+        eq(creatorWorks.id, workId),
+        eq(creatorWorks.revision, baseRevision),
+        lt(creatorWorks.revision, CREATOR_WORK_REVISION_MAX),
+        ownerOnlyPatch
+          ? eq(creatorWorks.userId, actorUserId)
+          : or(
+              eq(creatorWorks.userId, actorUserId),
+              and(activeOwnerExists, editorMembershipExists)
+            )
+      )
+    )
+    .returning(creatorSharedDocumentMutationSelection);
+}
+
+/**
+ * Complete keyset query for the mixed owned/shared feed. PostgreSQL timestamps can carry
+ * microseconds while JavaScript Date cursors carry milliseconds, so ordering and filtering both
+ * truncate to the same precision to prevent a boundary row from repeating forever.
+ */
+export function buildCreatorSharedWorksListQuery(
+  executor: DrizzleCreatorCollaborationExecutor,
+  actorUserId: string,
+  limit: number,
+  cursor: CreatorSharedWorksCursorKey | null
+) {
+  const sortAt = sql<Date>`date_trunc('milliseconds', coalesce(${creatorWorks.updatedAt}, ${creatorWorks.createdAt}, to_timestamp(0)))`;
+  const access = or(
+    eq(creatorWorks.userId, actorUserId),
+    and(
+      eq(sharedWorkOwners.status, "active"),
+      eq(sharedWorkViewerMemberships.userId, actorUserId),
+      eq(sharedWorkViewerMemberships.status, "active")
+    )
+  );
+  const afterCursor = cursor
+    ? or(
+        lt(sortAt, cursor.sortAt),
+        and(eq(sortAt, cursor.sortAt), lt(creatorWorks.id, cursor.workId))
+      )
+    : undefined;
+  return executor
+    .select(creatorSharedWorkSelection)
+    .from(creatorWorks)
+    .innerJoin(sharedWorkOwners, eq(sharedWorkOwners.id, creatorWorks.userId))
+    .leftJoin(
+      sharedWorkViewerMemberships,
+      and(
+        eq(sharedWorkViewerMemberships.workId, creatorWorks.id),
+        eq(sharedWorkViewerMemberships.userId, actorUserId)
+      )
+    )
+    .where(and(access, afterCursor))
+    .orderBy(desc(sortAt), desc(creatorWorks.id))
+    .limit(limit);
+}
+
+/** Minimal ACL/revision probe: deliberately excludes title, cover, pages, doc and owner identity. */
+export function buildCreatorSharedDocumentMetaQuery(
+  executor: DrizzleCreatorCollaborationExecutor,
+  actorUserId: string,
+  workId: string
+) {
+  return executor
+    .select(creatorSharedDocumentMetaSelection)
+    .from(creatorWorks)
+    .innerJoin(sharedDocumentMetaOwners, eq(sharedDocumentMetaOwners.id, creatorWorks.userId))
+    .leftJoin(
+      sharedDocumentMetaViewerMemberships,
+      and(
+        eq(sharedDocumentMetaViewerMemberships.workId, creatorWorks.id),
+        eq(sharedDocumentMetaViewerMemberships.userId, actorUserId)
+      )
+    )
+    .where(
+      and(
+        eq(creatorWorks.id, workId),
+        or(
+          eq(creatorWorks.userId, actorUserId),
+          and(
+            eq(sharedDocumentMetaOwners.status, "active"),
+            eq(sharedDocumentMetaViewerMemberships.userId, actorUserId),
+            eq(sharedDocumentMetaViewerMemberships.status, "active")
+          )
+        )
+      )
+    )
+    .limit(1);
+}
 const validCollaborationEventPredicate = sql`(
   (
     ${creatorWorkCollaborationEvents.beforeState} is null
@@ -597,6 +963,108 @@ class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborationUnitO
     }
     return { authorized: true, events };
   }
+
+  async listAccessibleWorks(
+    actorUserId: string,
+    limit: number,
+    cursor: CreatorSharedWorksCursorKey | null
+  ): Promise<CreatorSharedWorkRecord[]> {
+    return buildCreatorSharedWorksListQuery(
+      this.executor,
+      actorUserId,
+      limit,
+      cursor
+    );
+  }
+
+  async findAccessibleDocument(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocumentRecord | null> {
+    const rows = await this.executor
+      .select(creatorSharedDocumentSelection)
+      .from(creatorWorks)
+      .innerJoin(sharedWorkOwners, eq(sharedWorkOwners.id, creatorWorks.userId))
+      .leftJoin(
+        sharedWorkViewerMemberships,
+        and(
+          eq(sharedWorkViewerMemberships.workId, creatorWorks.id),
+          eq(sharedWorkViewerMemberships.userId, actorUserId)
+        )
+      )
+      .where(
+        and(
+          eq(creatorWorks.id, workId),
+          or(
+            eq(creatorWorks.userId, actorUserId),
+            and(
+              eq(sharedWorkOwners.status, "active"),
+              eq(sharedWorkViewerMemberships.userId, actorUserId),
+              eq(sharedWorkViewerMemberships.status, "active")
+            )
+          )
+        )
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  async findAccessibleDocumentMeta(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocumentMetaRecord | null> {
+    const rows = await buildCreatorSharedDocumentMetaQuery(
+      this.executor,
+      actorUserId,
+      workId
+    );
+    return rows[0] ?? null;
+  }
+
+  async updateAccessibleDocument(
+    actorUserId: string,
+    workId: string,
+    baseRevision: number,
+    patch: CreatorSharedDocumentPatch,
+    updatedAt: Date
+  ): Promise<CreatorSharedDocumentMutationRecord | null> {
+    // 서비스가 작품 행을 먼저 잠그지만 UPDATE에도 동일 ACL을 중복 적용한다. 향후 호출자가
+    // 바뀌어도 pending/viewer 권한이 write primitive까지 도달하지 못하도록 하는 방어선이다.
+    const rows = await buildCreatorSharedDocumentUpdateQuery(
+      this.executor,
+      actorUserId,
+      workId,
+      baseRevision,
+      patch,
+      updatedAt
+    );
+    return rows[0] ?? null;
+  }
+
+  async appendWorkRevision(
+    workId: string,
+    revision: number,
+    snapshot: CreatorWorkRevisionSnapshot,
+    createdAt: Date
+  ): Promise<void> {
+    await this.executor.insert(creatorWorkRevisions).values({
+      workId,
+      revision,
+      snapshot,
+      createdAt,
+    });
+  }
+
+  async deleteWorkRevisionsThrough(workId: string, revision: number): Promise<void> {
+    await this.executor
+      .delete(creatorWorkRevisions)
+      .where(
+        and(
+          eq(creatorWorkRevisions.workId, workId),
+          lte(creatorWorkRevisions.revision, revision)
+        )
+      );
+  }
 }
 
 class DrizzleCreatorCollaborationPersistence implements CreatorCollaborationPersistence {
@@ -834,8 +1302,189 @@ function activityProjection(
   };
 }
 
+interface CreatorSharedWorksCursorPayload {
+  v: typeof CREATOR_SHARED_WORKS_CURSOR_VERSION;
+  sortAt: string;
+  workId: string;
+}
+
+function creatorSharedWorkSortDate(
+  record: Pick<CreatorSharedWorkRecord, "createdAt" | "updatedAt">
+): Date {
+  if (record.updatedAt instanceof Date && Number.isFinite(record.updatedAt.getTime())) {
+    return record.updatedAt;
+  }
+  if (record.createdAt instanceof Date && Number.isFinite(record.createdAt.getTime())) {
+    return record.createdAt;
+  }
+  return new Date(0);
+}
+
+export function encodeCreatorSharedWorksCursor(key: CreatorSharedWorksCursorKey): string {
+  const payload: CreatorSharedWorksCursorPayload = {
+    v: CREATOR_SHARED_WORKS_CURSOR_VERSION,
+    sortAt: key.sortAt.toISOString(),
+    workId: key.workId,
+  };
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+export function decodeCreatorSharedWorksCursor(
+  cursor: string
+): CreatorSharedWorksCursorKey | null {
+  if (
+    cursor.length === 0 ||
+    cursor.length > CREATOR_SHARED_WORKS_CURSOR_MAX_LENGTH ||
+    !CREATOR_SHARED_WORKS_CURSOR_PATTERN.test(cursor)
+  ) {
+    return null;
+  }
+  try {
+    const decoded = Buffer.from(cursor, "base64url");
+    // Buffer's decoder is intentionally lenient; a canonical round trip rejects aliases/truncation.
+    if (decoded.length === 0 || decoded.toString("base64url") !== cursor) return null;
+    const value: unknown = JSON.parse(decoded.toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const record = value as Record<string, unknown>;
+    if (
+      Object.keys(record).length !== 3 ||
+      record.v !== CREATOR_SHARED_WORKS_CURSOR_VERSION ||
+      typeof record.sortAt !== "string" ||
+      typeof record.workId !== "string" ||
+      record.workId.length === 0 ||
+      record.workId.length > 160 ||
+      record.workId.trim().length === 0
+    ) {
+      return null;
+    }
+    const sortAt = new Date(record.sortAt);
+    if (!Number.isFinite(sortAt.getTime()) || sortAt.toISOString() !== record.sortAt) return null;
+    const key = { sortAt, workId: record.workId };
+    return encodeCreatorSharedWorksCursor(key) === cursor ? key : null;
+  } catch {
+    return null;
+  }
+}
+
 function boundedCollaborationListLimit(value: number): number {
   return Number.isInteger(value) && value >= 1 ? Math.min(value, 50) : 20;
+}
+
+function sharedRecordAccess(
+  record: Pick<
+    CreatorSharedWorkRecord,
+    "ownerUserId" | "ownerStatus" | "membershipRole" | "membershipStatus"
+  >,
+  actorUserId: string
+): { role: CreatorCollaborationViewerRole; access: CreatorCollaborationAccess } | null {
+  if (record.ownerUserId === actorUserId) {
+    return {
+      role: "owner",
+      access: resolveCreatorCollaborationAccess({
+        actorUserId,
+        ownerUserId: record.ownerUserId,
+      }),
+    };
+  }
+  const role = normalizeCreatorCollaborationRole(record.membershipRole);
+  const status = normalizeCreatorCollaborationStatus(record.membershipStatus);
+  if (record.ownerStatus !== "active" || !role || status !== "active") return null;
+  const access = resolveCreatorCollaborationAccess({
+    actorUserId,
+    ownerUserId: record.ownerUserId,
+    membership: { userId: actorUserId, role, status },
+  });
+  return access.view ? { role, access } : null;
+}
+
+function requiredIsoString(value: Date | null): string | null {
+  return value instanceof Date && Number.isFinite(value.getTime()) ? value.toISOString() : null;
+}
+
+function creatorWorkIsoTimestamp(record: Pick<CreatorSharedWorkRecord, "createdAt" | "updatedAt">): string {
+  return creatorSharedWorkSortDate(record).toISOString();
+}
+
+function sharedWorkProjection(
+  record: CreatorSharedWorkRecord,
+  actorUserId: string
+): CreatorSharedWork | null {
+  const context = sharedRecordAccess(record, actorUserId);
+  const updatedAt = creatorWorkIsoTimestamp(record);
+  if (
+    !context ||
+    typeof record.workId !== "string" ||
+    record.workId.length === 0 ||
+    typeof record.title !== "string" ||
+    (record.format !== "cuttoon" && record.format !== "upload")
+  ) {
+    return null;
+  }
+  return {
+    workId: record.workId,
+    title: record.title,
+    format: record.format,
+    role: context.role,
+    status: "active",
+    capabilities: {
+      view: context.access.view,
+      comment: context.access.comment,
+      edit: context.access.edit,
+      manageMembers: context.access.manageMembers,
+    },
+    owner: { name: record.ownerName?.trim() || "작품 소유자" },
+    updatedAt,
+  };
+}
+
+function sharedDocumentProjection(
+  record: CreatorSharedDocumentRecord,
+  actorUserId: string
+): CreatorSharedDocument | null {
+  const context = sharedRecordAccess(record, actorUserId);
+  const updatedAt = creatorWorkIsoTimestamp(record);
+  if (
+    !context ||
+    !Number.isInteger(record.revision) ||
+    record.revision < 1 ||
+    record.revision > CREATOR_WORK_REVISION_MAX
+  ) {
+    return null;
+  }
+  return {
+    workId: record.workId,
+    role: context.role,
+    status: "active",
+    capabilities: { view: true, edit: context.access.edit },
+    revision: record.revision,
+    updatedAt,
+    document: createCreatorWorkRevisionSnapshot(record),
+  };
+}
+
+function sharedDocumentMetaProjection(
+  record: CreatorSharedDocumentMetaRecord,
+  actorUserId: string
+): CreatorSharedDocumentMeta | null {
+  const context = sharedRecordAccess(record, actorUserId);
+  if (
+    !context ||
+    typeof record.workId !== "string" ||
+    record.workId.length === 0 ||
+    !Number.isInteger(record.revision) ||
+    record.revision < 1 ||
+    record.revision > CREATOR_WORK_REVISION_MAX
+  ) {
+    return null;
+  }
+  return {
+    workId: record.workId,
+    role: context.role,
+    status: "active",
+    capabilities: { view: true, edit: context.access.edit },
+    revision: record.revision,
+    updatedAt: creatorWorkIsoTimestamp(record),
+  };
 }
 
 export class CreatorCollaborationRepository {
@@ -851,6 +1500,155 @@ export class CreatorCollaborationRepository {
     this.now = options.now ?? (() => new Date());
     this.createInvitationId = options.createInvitationId ?? randomUUID;
     this.createEventId = options.createEventId ?? randomUUID;
+  }
+
+  async listSharedWorks(
+    actorUserId: string,
+    limit: number,
+    cursor?: string
+  ): Promise<CreatorSharedWorksPage> {
+    const decodedCursor = cursor === undefined ? null : decodeCreatorSharedWorksCursor(cursor);
+    if (cursor !== undefined && decodedCursor === null) {
+      throw new CreatorCollaborationInvalidTargetError("invalid_cursor");
+    }
+    const pageLimit = boundedCollaborationListLimit(limit);
+    return this.persistence.read(async (unit) => {
+      const records = await unit.listAccessibleWorks(
+        actorUserId,
+        pageLimit + 1,
+        decodedCursor
+      );
+      const pageRecords = records.slice(0, pageLimit);
+      const items: CreatorSharedWork[] = [];
+      for (const record of pageRecords) {
+        const item = sharedWorkProjection(record, actorUserId);
+        if (!item) throw new Error("invalid creator shared work record");
+        items.push(item);
+      }
+      const lastRecord = pageRecords.at(-1);
+      const nextCursor =
+        records.length > pageLimit && lastRecord
+          ? encodeCreatorSharedWorksCursor({
+              sortAt: creatorSharedWorkSortDate(lastRecord),
+              workId: lastRecord.workId,
+            })
+          : null;
+      return { items, nextCursor };
+    });
+  }
+
+  async getSharedDocument(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocument> {
+    return this.persistence.read(async (unit) => {
+      const record = await unit.findAccessibleDocument(actorUserId, workId);
+      if (!record) {
+        const work = await unit.findWork(workId);
+        if (!work) throw new CreatorCollaborationNotFoundError("work_not_found");
+        throw new CreatorCollaborationForbiddenError("document_access_denied");
+      }
+      const document = sharedDocumentProjection(record, actorUserId);
+      if (!document) throw new Error("invalid creator shared document record");
+      return document;
+    });
+  }
+
+  async getSharedDocumentMeta(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorSharedDocumentMeta> {
+    return this.persistence.read(async (unit) => {
+      const record = await unit.findAccessibleDocumentMeta(actorUserId, workId);
+      if (!record) {
+        const work = await unit.findWork(workId);
+        if (!work) throw new CreatorCollaborationNotFoundError("work_not_found");
+        throw new CreatorCollaborationForbiddenError("document_access_denied");
+      }
+      const meta = sharedDocumentMetaProjection(record, actorUserId);
+      if (!meta) throw new Error("invalid creator shared document meta record");
+      return meta;
+    });
+  }
+
+  async saveSharedDocument(
+    actorUserId: string,
+    workId: string,
+    baseRevision: number,
+    patch: CreatorSharedDocumentPatch
+  ): Promise<CreatorSharedDocumentSaveResponse> {
+    if (
+      !Number.isInteger(baseRevision) ||
+      baseRevision < 1 ||
+      baseRevision > CREATOR_WORK_REVISION_MAX ||
+      Object.keys(patch).length === 0 ||
+      Object.hasOwn(patch, "format")
+    ) {
+      throw new Error("invalid creator shared document mutation");
+    }
+    return this.persistence.transaction(async (unit) => {
+      // 모든 멤버 변경도 작품 행을 먼저 잠그므로, 여기서 같은 행을 잠그면 ACL 확인·revision
+      // 비교·저장이 역할 회수와 직렬화된다. owner는 멤버 행 없이 항상 이 경로를 통과한다.
+      const context = await this.loadContext(unit, actorUserId, workId, true);
+      if (actorUserId !== context.work.ownerUserId) {
+        const owner = await unit.findUser(context.work.ownerUserId, true);
+        if (!owner || owner.status !== "active") {
+          throw new CreatorCollaborationForbiddenError("document_edit_denied");
+        }
+      }
+      if (!context.access.edit) {
+        throw new CreatorCollaborationForbiddenError("document_edit_denied");
+      }
+      // 편집 역할은 원고 콘텐츠를 저장할 수 있지만 작품의 공개 상태와 카탈로그 연결은
+      // 소유권 영역이다. DTO는 owner도 같은 endpoint를 쓰므로 필드를 허용하되 여기서 actor와
+      // 함께 판정해 admin/editor가 작품을 게시·비공개 전환하거나 연결 작품을 바꾸지 못하게 한다.
+      if (
+        actorUserId !== context.work.ownerUserId &&
+        (Object.hasOwn(patch, "status") || Object.hasOwn(patch, "titleId"))
+      ) {
+        throw new CreatorCollaborationForbiddenError("document_owner_fields_denied");
+      }
+      const current = await unit.findAccessibleDocument(actorUserId, workId);
+      if (!current) {
+        throw new CreatorCollaborationForbiddenError("document_edit_denied");
+      }
+      if (current.revision !== baseRevision) {
+        throw new CreatorCollaborationRevisionConflictError(current.revision);
+      }
+      if (current.revision >= CREATOR_WORK_REVISION_MAX) {
+        throw new Error("creator work revision limit reached");
+      }
+
+      const now = this.now();
+      const updated = await unit.updateAccessibleDocument(
+        actorUserId,
+        workId,
+        baseRevision,
+        patch,
+        now
+      );
+      if (!updated) {
+        const latest = await unit.findAccessibleDocument(actorUserId, workId);
+        if (latest && latest.revision !== baseRevision) {
+          throw new CreatorCollaborationRevisionConflictError(latest.revision);
+        }
+        throw new CreatorCollaborationForbiddenError("document_edit_denied");
+      }
+
+      await unit.appendWorkRevision(
+        workId,
+        updated.revision,
+        createCreatorWorkRevisionSnapshot(updated),
+        now
+      );
+      const cutoff = creatorWorkRevisionRetentionCutoff(updated.revision);
+      if (cutoff !== null) {
+        await unit.deleteWorkRevisionsThrough(workId, cutoff);
+      }
+      const updatedAt = requiredIsoString(updated.updatedAt);
+      if (!updatedAt) throw new Error("invalid creator shared document update timestamp");
+      return { workId, revision: updated.revision, updatedAt };
+    });
   }
 
   async getTeam(actorUserId: string, workId: string): Promise<CreatorCollaborationTeamSnapshot> {

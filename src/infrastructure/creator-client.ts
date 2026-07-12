@@ -202,16 +202,24 @@ export async function getWork(id: string, signal?: AbortSignal): Promise<WorkDet
   );
 }
 
-export async function createWork(input: CreateWorkInput): Promise<WorkSummary> {
+export async function createWork(input: CreateWorkInput, signal?: AbortSignal): Promise<WorkSummary> {
   return callOrThrow(
-    () => api.post<WorkSummary>(`${BASE}/works`, input),
+    () => signal
+      ? api.post<WorkSummary>(`${BASE}/works`, input, { signal })
+      : api.post<WorkSummary>(`${BASE}/works`, input),
     "창작물을 등록하지 못했습니다."
   );
 }
 
-export async function updateWork(id: string, input: UpdateWorkInput): Promise<WorkSummary> {
+export async function updateWork(
+  id: string,
+  input: UpdateWorkInput,
+  signal?: AbortSignal
+): Promise<WorkSummary> {
   return mutateWorkOrThrow(
-    () => api.patch<WorkSummary>(`${BASE}/works/${encodeURIComponent(id)}`, input),
+    () => signal
+      ? api.patch<WorkSummary>(`${BASE}/works/${encodeURIComponent(id)}`, input, { signal })
+      : api.patch<WorkSummary>(`${BASE}/works/${encodeURIComponent(id)}`, input),
     "창작물을 수정하지 못했습니다."
   );
 }
@@ -245,13 +253,20 @@ export async function getWorkRevision(
 export async function restoreWorkRevision(
   id: string,
   revision: number,
-  baseRevision: number
+  baseRevision: number,
+  signal?: AbortSignal
 ): Promise<WorkSummary> {
   return mutateWorkOrThrow(
-    () => api.post<WorkSummary>(
-      `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}/restore`,
-      { baseRevision }
-    ),
+    () => signal
+      ? api.post<WorkSummary>(
+          `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}/restore`,
+          { baseRevision },
+          { signal }
+        )
+      : api.post<WorkSummary>(
+          `${BASE}/works/${encodeURIComponent(id)}/revisions/${revision}/restore`,
+          { baseRevision }
+        ),
     "작품 버전을 복원하지 못했습니다."
   );
 }

@@ -13,8 +13,11 @@ import {
   Query,
 } from "@nestjs/common";
 
+import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+
 import {
   CreateCreatorWorkDto,
+  CreatorSharedWorksListQueryDto,
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
   CreatorTeamWorkParamsDto,
@@ -24,6 +27,7 @@ import {
   InviteCreatorTeamMemberDto,
   RespondCreatorTeamInvitationDto,
   RestoreCreatorWorkRevisionDto,
+  UpdateCreatorSharedDocumentDto,
   UpdateCreatorTeamMemberDto,
   UpdateCreatorWorkDto,
 } from "./creator.dto";
@@ -116,7 +120,7 @@ export class CreatorController {
   @Get("/creator/works/:id/team")
   @Header("Cache-Control", "no-store, max-age=0")
   async getWorkTeam(
-    @Param() params: CreatorTeamWorkParamsDto,
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
@@ -126,18 +130,61 @@ export class CreatorController {
   @Get("/creator/team/invitations")
   @Header("Cache-Control", "no-store, max-age=0")
   async listWorkTeamInvitations(
-    @Query() query: CreatorTeamListQueryDto,
+    @Query(new ZodValidationPipe(CreatorTeamListQueryDto)) query: CreatorTeamListQueryDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.listWorkTeamInvitations(uid, query.limit);
   }
 
+  @Get("/creator/team/works")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listSharedWorks(
+    @Query(new ZodValidationPipe(CreatorSharedWorksListQueryDto))
+    query: CreatorSharedWorksListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.listSharedWorks(uid, query.limit, query.cursor);
+  }
+
+  @Get("/creator/works/:id/team/document")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async getSharedWorkDocument(
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getSharedWorkDocument(uid, params.id);
+  }
+
+  @Get("/creator/works/:id/team/document/meta")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async getSharedWorkDocumentMeta(
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getSharedWorkDocumentMeta(uid, params.id);
+  }
+
+  @Patch("/creator/works/:id/team/document")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async saveSharedWorkDocument(
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Body(new ZodValidationPipe(UpdateCreatorSharedDocumentDto))
+    body: UpdateCreatorSharedDocumentDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.saveSharedWorkDocument(uid, params.id, body);
+  }
+
   @Get("/creator/works/:id/team/activity")
   @Header("Cache-Control", "no-store, max-age=0")
   async getWorkTeamActivity(
-    @Param() params: CreatorTeamWorkParamsDto,
-    @Query() query: CreatorTeamListQueryDto,
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Query(new ZodValidationPipe(CreatorTeamListQueryDto)) query: CreatorTeamListQueryDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
@@ -146,8 +193,8 @@ export class CreatorController {
 
   @Post("/creator/works/:id/team")
   async inviteWorkTeamMember(
-    @Param() params: CreatorTeamWorkParamsDto,
-    @Body() body: InviteCreatorTeamMemberDto,
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Body(new ZodValidationPipe(InviteCreatorTeamMemberDto)) body: InviteCreatorTeamMemberDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
@@ -156,8 +203,10 @@ export class CreatorController {
 
   @Patch("/creator/works/:id/team/members/:userId")
   async updateWorkTeamMemberRole(
-    @Param() params: CreatorTeamMemberParamsDto,
-    @Body() body: UpdateCreatorTeamMemberDto,
+    @Param(new ZodValidationPipe(CreatorTeamMemberParamsDto))
+    params: CreatorTeamMemberParamsDto,
+    @Body(new ZodValidationPipe(UpdateCreatorTeamMemberDto))
+    body: UpdateCreatorTeamMemberDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
@@ -171,7 +220,8 @@ export class CreatorController {
 
   @Delete("/creator/works/:id/team/members/:userId")
   async removeWorkTeamMember(
-    @Param() params: CreatorTeamMemberParamsDto,
+    @Param(new ZodValidationPipe(CreatorTeamMemberParamsDto))
+    params: CreatorTeamMemberParamsDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
@@ -180,8 +230,9 @@ export class CreatorController {
 
   @Post("/creator/works/:id/team/invitations/respond")
   async respondToWorkTeamInvitation(
-    @Param() params: CreatorTeamWorkParamsDto,
-    @Body() body: RespondCreatorTeamInvitationDto,
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto)) params: CreatorTeamWorkParamsDto,
+    @Body(new ZodValidationPipe(RespondCreatorTeamInvitationDto))
+    body: RespondCreatorTeamInvitationDto,
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);

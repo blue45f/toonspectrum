@@ -1,24 +1,47 @@
 import { describe, expect, it } from "vitest";
 
+import { db } from "../../../../../lib/db";
+
 import {
   CreatorCollaborationConflictError,
   CreatorCollaborationForbiddenError,
   CreatorCollaborationInvalidTargetError,
   CreatorCollaborationNotFoundError,
   CreatorCollaborationRepository,
+  CreatorCollaborationRevisionConflictError,
+  buildCreatorSharedDocumentMetaQuery,
+  buildCreatorSharedDocumentUpdateQuery,
+  buildCreatorSharedWorksListQuery,
+  decodeCreatorSharedWorksCursor,
+  encodeCreatorSharedWorksCursor,
 } from "./creator-collaboration.repository";
 
 import type {
   CreatorCollaborationPersistence,
   CreatorCollaborationUnitOfWork,
+  CreatorSharedDocumentPatch,
+  CreatorSharedWorksCursorKey,
 } from "./creator-collaboration.repository";
 
 interface MemoryWork {
   id: string;
   ownerUserId: string;
   title: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  titleId?: string | null;
+  description?: string;
+  cover?: string;
+  tags?: string[];
+  format?: "cuttoon" | "upload";
+  pages?: string[];
+  doc?: Record<string, unknown>;
+  status?: "draft" | "published";
+  seriesId?: string | null;
+  episodeNo?: number | null;
+  challengeId?: string | null;
+  remixFromId?: string | null;
+  revision?: number;
 }
 
 interface MemoryUser {
@@ -130,8 +153,12 @@ class MemoryCollaborationStore
   readonly users = new Map<string, MemoryUser>();
   memberships = new Map<string, MemoryMembership>();
   events: MemoryEvent[] = [];
+  workRevisions: Array<{ workId: string; revision: number; snapshot: unknown; createdAt: Date }> = [];
   nextEventSequence = 1;
   failNextEvent = false;
+  failNextWorkRevision = false;
+  documentUpdateCount = 0;
+  workRevisionAppendCount = 0;
   transactionCount = 0;
   lockedWorkIds: string[] = [];
   lockedUserIds: string[] = [];
@@ -149,11 +176,18 @@ class MemoryCollaborationStore
     this.transactionCount += 1;
     const before = cloneMemberships(this.memberships);
     const beforeEvents = cloneEvents(this.events);
+    const beforeWorks = new Map(
+      [...this.works].map(([key, work]) => [key, { ...work }])
+    );
+    const beforeWorkRevisions = this.workRevisions.map((revision) => ({ ...revision }));
     try {
       return await run(this);
     } catch (error) {
       this.memberships = before;
       this.events = beforeEvents;
+      this.works.clear();
+      for (const [key, work] of beforeWorks) this.works.set(key, work);
+      this.workRevisions = beforeWorkRevisions;
       throw error;
     }
   }
@@ -306,6 +340,151 @@ class MemoryCollaborationStore
     this.authorizedEventRowsMaterialized += events.length;
     return { authorized: true as const, events };
   }
+
+  private sharedDocumentRecord(actorUserId: string, workId: string) {
+    const work = this.works.get(workId);
+    if (!work) return null;
+    const owner = this.users.get(work.ownerUserId);
+    if (!owner) return null;
+    const membership = this.memberships.get(membershipKey(workId, actorUserId));
+    if (
+      actorUserId !== work.ownerUserId &&
+      !(owner.status === "active" && membership?.status === "active")
+    ) {
+      return null;
+    }
+    return {
+      workId: work.id,
+      ownerUserId: work.ownerUserId,
+      ownerName: owner.name,
+      ownerStatus: owner.status,
+      titleId: work.titleId ?? null,
+      title: work.title,
+      description: work.description ?? "",
+      cover: work.cover ?? "",
+      tags: work.tags ?? [],
+      format: work.format ?? "cuttoon",
+      pages: work.pages ?? [],
+      doc: work.doc ?? {},
+      status: work.status ?? "draft",
+      seriesId: work.seriesId ?? null,
+      episodeNo: work.episodeNo ?? null,
+      challengeId: work.challengeId ?? null,
+      remixFromId: work.remixFromId ?? null,
+      revision: work.revision ?? 1,
+      createdAt: work.createdAt,
+      updatedAt: work.updatedAt,
+      membershipRole: membership?.role ?? null,
+      membershipStatus: membership?.status ?? null,
+    };
+  }
+
+  async listAccessibleWorks(
+    actorUserId: string,
+    limit: number,
+    cursor: CreatorSharedWorksCursorKey | null
+  ) {
+    return [...this.works.values()]
+      .map((work) => this.sharedDocumentRecord(actorUserId, work.id))
+      .filter((work): work is NonNullable<typeof work> => work !== null)
+      .sort(
+        (left, right) =>
+          (right.updatedAt ?? right.createdAt ?? new Date(0)).getTime() -
+            (left.updatedAt ?? left.createdAt ?? new Date(0)).getTime() ||
+          right.workId.localeCompare(left.workId)
+      )
+      .filter((work) => {
+        if (!cursor) return true;
+        const sortAt = work.updatedAt ?? work.createdAt ?? new Date(0);
+        return (
+          sortAt.getTime() < cursor.sortAt.getTime() ||
+          (sortAt.getTime() === cursor.sortAt.getTime() && work.workId < cursor.workId)
+        );
+      })
+      .slice(0, limit)
+      .map((work) => ({
+        workId: work.workId,
+        ownerUserId: work.ownerUserId,
+        ownerName: work.ownerName,
+        ownerStatus: work.ownerStatus,
+        title: work.title,
+        format: work.format,
+        createdAt: work.createdAt,
+        updatedAt: work.updatedAt,
+        membershipRole: work.membershipRole,
+        membershipStatus: work.membershipStatus,
+      }));
+  }
+
+  async findAccessibleDocument(actorUserId: string, workId: string) {
+    return this.sharedDocumentRecord(actorUserId, workId);
+  }
+
+  async findAccessibleDocumentMeta(actorUserId: string, workId: string) {
+    const record = this.sharedDocumentRecord(actorUserId, workId);
+    if (!record) return null;
+    return {
+      workId: record.workId,
+      ownerUserId: record.ownerUserId,
+      ownerStatus: record.ownerStatus,
+      revision: record.revision,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      membershipRole: record.membershipRole,
+      membershipStatus: record.membershipStatus,
+    };
+  }
+
+  async updateAccessibleDocument(
+    actorUserId: string,
+    workId: string,
+    baseRevision: number,
+    patch: Parameters<CreatorCollaborationUnitOfWork["updateAccessibleDocument"]>[3],
+    updatedAt: Date
+  ) {
+    const work = this.works.get(workId);
+    if (!work || (work.revision ?? 1) !== baseRevision) return null;
+    const owner = this.users.get(work.ownerUserId);
+    const membership = this.memberships.get(membershipKey(workId, actorUserId));
+    const canEdit =
+      actorUserId === work.ownerUserId ||
+      (owner?.status === "active" &&
+        membership?.status === "active" &&
+        (membership.role === "admin" || membership.role === "editor"));
+    if (!canEdit) return null;
+    this.documentUpdateCount += 1;
+    Object.assign(work, patch, { revision: baseRevision + 1, updatedAt });
+    const record = this.sharedDocumentRecord(actorUserId, workId);
+    if (!record) return null;
+    const {
+      ownerName: _ownerName,
+      ownerStatus: _ownerStatus,
+      membershipRole: _membershipRole,
+      membershipStatus: _membershipStatus,
+      ...mutation
+    } = record;
+    return mutation;
+  }
+
+  async appendWorkRevision(
+    workId: string,
+    revision: number,
+    snapshot: Parameters<CreatorCollaborationUnitOfWork["appendWorkRevision"]>[2],
+    createdAt: Date
+  ): Promise<void> {
+    this.workRevisionAppendCount += 1;
+    if (this.failNextWorkRevision) {
+      this.failNextWorkRevision = false;
+      throw new Error("work revision insert failed");
+    }
+    this.workRevisions.push({ workId, revision, snapshot, createdAt });
+  }
+
+  async deleteWorkRevisionsThrough(workId: string, revision: number): Promise<void> {
+    this.workRevisions = this.workRevisions.filter(
+      (entry) => entry.workId !== workId || entry.revision > revision
+    );
+  }
 }
 
 const BASE_DATE = new Date("2026-07-12T00:00:00.000Z");
@@ -417,6 +596,93 @@ function createFixture(now = DEFAULT_NOW) {
 }
 
 describe("CreatorCollaborationRepository", () => {
+  it("공동 문서 primitive는 raw format 전환을 SQL 생성 전에 거부한다", () => {
+    const rawPatch = { format: "upload" } as unknown as CreatorSharedDocumentPatch;
+    expect(() =>
+      buildCreatorSharedDocumentUpdateQuery(
+        db,
+        "owner",
+        "work-1",
+        1,
+        rawPatch,
+        DEFAULT_NOW
+      )
+    ).toThrow("shared document format is immutable");
+  });
+
+  it("공동 저장 UPDATE는 실제 원본 테이블 alias를 가진 correlated ACL SQL을 생성한다", () => {
+    const query = buildCreatorSharedDocumentUpdateQuery(
+      db,
+      "editor",
+      "work-1",
+      7,
+      { title: "수정" },
+      DEFAULT_NOW
+    ).toSQL();
+
+    expect(query.sql).toContain('from "user" "creator_shared_document_owner"');
+    expect(query.sql).toContain(
+      'from "creator_work_collaborator" "creator_shared_document_editor_membership"'
+    );
+    expect(query.sql).toContain('"creator_work"."revision" + 1');
+    expect(query.sql).not.toContain('from "creator_shared_document_owner" where');
+    expect(query.sql).not.toContain(
+      'from "creator_shared_document_editor_membership" where'
+    );
+  });
+
+  it("게시 상태·연결 작품 UPDATE SQL은 owner predicate만 허용하고 editor ACL을 제거한다", () => {
+    for (const patch of [{ status: "published" as const }, { titleId: "catalog-work" }]) {
+      const query = buildCreatorSharedDocumentUpdateQuery(
+        db,
+        "editor",
+        "work-1",
+        7,
+        patch,
+        DEFAULT_NOW
+      ).toSQL();
+
+      expect(query.sql).toContain('"creator_work"."userId" =');
+      expect(query.sql).not.toContain("creator_shared_document_editor_membership");
+      expect(query.sql).not.toContain("creator_shared_document_owner");
+      expect(query.params).toContain("editor");
+    }
+  });
+
+  it("공유 작품 keyset SQL은 정렬·경계 비교를 동일한 millisecond 정밀도로 고정한다", () => {
+    const query = buildCreatorSharedWorksListQuery(db, "editor", 21, {
+      sortAt: new Date("2026-07-12T00:00:00.123Z"),
+      workId: "work-20",
+    }).toSQL();
+
+    expect(query.sql.match(/date_trunc\('milliseconds'/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(query.sql).toContain('"creator_work"."id" <');
+    expect(query.sql).toContain('order by date_trunc(\'milliseconds\'');
+    expect(query.params).toContain("editor");
+    expect(query.params).toContain("work-20");
+    expect(query.sql).toContain('"creator_work"."format"');
+    expect(query.sql).not.toContain('"creator_work"."revision"');
+    expect(query.sql).not.toContain('"creator_work"."cover"');
+    expect(query.sql).not.toContain('"creator_work"."pages"');
+    expect(query.sql).not.toContain('"creator_work"."doc"');
+  });
+
+  it("document meta SQL은 ACL·revision 시각만 조회하고 원고 대용량 열을 선택하지 않는다", () => {
+    const query = buildCreatorSharedDocumentMetaQuery(db, "viewer", "work-1").toSQL();
+
+    expect(query.sql).toContain('"creator_work"."revision"');
+    expect(query.sql).toContain('"creator_work"."updatedAt"');
+    expect(query.sql).toContain('"creator_shared_document_meta_viewer_membership"."role"');
+    expect(query.sql).not.toContain('"creator_work"."cover"');
+    expect(query.sql).not.toContain('"creator_work"."pages"');
+    expect(query.sql).not.toContain('"creator_work"."doc"');
+    expect(query.sql).not.toContain('"creator_work"."title"');
+    expect(query.sql).not.toContain('"creator_shared_document_meta_owner"."name"');
+    expect(query.sql).not.toContain("invitationId");
+    expect(query.params).toContain("viewer");
+    expect(query.params).toContain("work-1");
+  });
+
   it("소유자에게 owner-first 활성·대기 팀 snapshot과 전체 관리 권한을 반환한다", async () => {
     const { repository, store } = createFixture();
 
@@ -469,7 +735,7 @@ describe("CreatorCollaborationRepository", () => {
     expect(editorSnapshot.viewer).toMatchObject({
       role: "editor",
       status: "active",
-      capabilities: { view: false, edit: false, manageMembers: false },
+      capabilities: { view: true, edit: true, manageMembers: false },
     });
     expect(editorSnapshot.members.map(({ userId }) => userId)).toEqual(["owner", "editor"]);
   });
@@ -1049,6 +1315,392 @@ describe("CreatorCollaborationRepository", () => {
     await expect(repository.listInvitations("pending", 20)).resolves.toEqual([]);
   });
 
+  it("공유 작품 목록은 소유 작품과 active 멤버 작품만 최신순으로 최소 투영한다", async () => {
+    const { repository, store } = createFixture();
+    store.works.set("work-owned", {
+      id: "work-owned",
+      ownerUserId: "editor",
+      title: "내 공동 작업",
+      createdAt: new Date("2026-07-13T00:00:00.000Z"),
+      updatedAt: null,
+      revision: 4,
+    });
+    store.works.set("work-legacy", {
+      id: "work-legacy",
+      ownerUserId: "editor",
+      title: "시각 정보 없는 레거시 작품",
+      createdAt: null,
+      updatedAt: null,
+      revision: 1,
+    });
+    store.users.set("viewer", {
+      userId: "viewer",
+      name: "열람자",
+      image: null,
+      status: "active",
+    });
+    store.memberships.set(membershipKey("work-1", "viewer"), {
+      workId: "work-1",
+      userId: "viewer",
+      role: "viewer",
+      status: "active",
+      invitationId: "00000000-0000-4000-8000-000000000305",
+      invitedBy: "owner",
+      createdAt: BASE_DATE,
+      updatedAt: BASE_DATE,
+      respondedAt: BASE_DATE,
+    });
+
+    const editorPage = await repository.listSharedWorks("editor", 20);
+    const editorWorks = editorPage.items;
+    expect(editorWorks.map(({ workId }) => workId)).toEqual([
+      "work-owned",
+      "work-1",
+      "work-legacy",
+    ]);
+    expect(editorPage.nextCursor).toBeNull();
+    expect(editorWorks[0]).toEqual({
+      workId: "work-owned",
+      title: "내 공동 작업",
+      format: "cuttoon",
+      role: "owner",
+      status: "active",
+      capabilities: { view: true, comment: true, edit: true, manageMembers: true },
+      owner: { name: "편집자" },
+      updatedAt: "2026-07-13T00:00:00.000Z",
+    });
+    expect(editorWorks[1]).toMatchObject({
+      role: "editor",
+      capabilities: { view: true, comment: true, edit: true, manageMembers: false },
+    });
+    expect(editorWorks[1]).not.toHaveProperty("revision");
+    expect(editorWorks[1]).not.toHaveProperty("cover");
+    expect(editorWorks[2]?.updatedAt).toBe("1970-01-01T00:00:00.000Z");
+
+    await expect(repository.listSharedWorks("pending", 20)).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    const viewerWorks = (await repository.listSharedWorks("viewer", 20)).items;
+    expect(viewerWorks[0]).toMatchObject({
+      workId: "work-1",
+      role: "viewer",
+      capabilities: { view: true, comment: false, edit: false, manageMembers: false },
+    });
+  });
+
+  it("공유 작품 cursor는 전체 정렬키로 50개 초과 작품을 중복·누락 없이 순회한다", async () => {
+    const { repository, store } = createFixture();
+    const tiedTimestamp = new Date("2026-07-15T00:00:00.000Z");
+    for (let index = 0; index < 55; index += 1) {
+      const id = `owned-${String(index).padStart(3, "0")}`;
+      store.works.set(id, {
+        id,
+        ownerUserId: "editor",
+        title: `소유 작품 ${index}`,
+        createdAt: BASE_DATE,
+        updatedAt: tiedTimestamp,
+        revision: 1,
+      });
+    }
+
+    const first = await repository.listSharedWorks("editor", 20);
+    expect(first.items).toHaveLength(20);
+    expect(first.items[0]?.workId).toBe("owned-054");
+    expect(first.items.at(-1)?.workId).toBe("owned-035");
+    expect(first.nextCursor).not.toBeNull();
+    expect(decodeCreatorSharedWorksCursor(first.nextCursor!)).toEqual({
+      sortAt: tiedTimestamp,
+      workId: "owned-035",
+    });
+
+    const allItems = [...first.items];
+    let cursor = first.nextCursor;
+    while (cursor) {
+      const page = await repository.listSharedWorks("editor", 20, cursor);
+      allItems.push(...page.items);
+      cursor = page.nextCursor;
+    }
+
+    expect(allItems).toHaveLength(56);
+    expect(new Set(allItems.map(({ workId }) => workId)).size).toBe(56);
+    expect(allItems.at(-1)?.workId).toBe("work-1");
+
+    const validAlternatePosition = encodeCreatorSharedWorksCursor({
+      sortAt: tiedTimestamp,
+      workId: "owned-045",
+    });
+    const afterAlternatePosition = await repository.listSharedWorks(
+      "editor",
+      5,
+      validAlternatePosition
+    );
+    expect(afterAlternatePosition.items.map(({ workId }) => workId)).toEqual([
+      "owned-044",
+      "owned-043",
+      "owned-042",
+      "owned-041",
+      "owned-040",
+    ]);
+
+    await expect(repository.listSharedWorks("editor", 20, "forged")).rejects.toEqual(
+      new CreatorCollaborationInvalidTargetError("invalid_cursor")
+    );
+    await expect(
+      repository.listSharedWorks("editor", 20, `${first.nextCursor}=`)
+    ).rejects.toEqual(new CreatorCollaborationInvalidTargetError("invalid_cursor"));
+    const reorderedCursor = Buffer.from(
+      JSON.stringify({ workId: "owned-035", sortAt: tiedTimestamp.toISOString(), v: 1 })
+    ).toString("base64url");
+    const whitespaceCursor = Buffer.from(
+      JSON.stringify(
+        { v: 1, sortAt: tiedTimestamp.toISOString(), workId: "owned-035" },
+        null,
+        2
+      )
+    ).toString("base64url");
+    await expect(
+      repository.listSharedWorks("editor", 20, reorderedCursor)
+    ).rejects.toEqual(new CreatorCollaborationInvalidTargetError("invalid_cursor"));
+    await expect(
+      repository.listSharedWorks("editor", 20, whitespaceCursor)
+    ).rejects.toEqual(new CreatorCollaborationInvalidTargetError("invalid_cursor"));
+  });
+
+  it("active 모든 역할은 원본을 읽고 owner/admin/editor만 revision 저장한다", async () => {
+    const { repository, store } = createFixture();
+    store.works.get("work-1")!.revision = 1;
+    store.works.get("work-1")!.doc = { pagesList: [{ id: "page-1" }] };
+    for (const [userId, role] of [
+      ["commenter", "commenter"],
+      ["viewer", "viewer"],
+    ] as const) {
+      store.users.set(userId, {
+        userId,
+        name: userId,
+        image: null,
+        status: "active",
+      });
+      store.memberships.set(membershipKey("work-1", userId), {
+        workId: "work-1",
+        userId,
+        role,
+        status: "active",
+        invitationId: `00000000-0000-4000-8000-00000000030${role === "commenter" ? "6" : "7"}`,
+        invitedBy: "owner",
+        createdAt: BASE_DATE,
+        updatedAt: BASE_DATE,
+        respondedAt: BASE_DATE,
+      });
+    }
+
+    await expect(repository.getSharedDocument("owner", "work-1")).resolves.toMatchObject({
+      role: "owner",
+      revision: 1,
+      capabilities: { view: true, edit: true },
+      document: { doc: { pagesList: [{ id: "page-1" }] } },
+    });
+    await expect(repository.getSharedDocument("admin", "work-1")).resolves.toMatchObject({
+      role: "admin",
+      capabilities: { view: true, edit: true },
+    });
+    await expect(repository.getSharedDocument("commenter", "work-1")).resolves.toMatchObject({
+      role: "commenter",
+      capabilities: { view: true, edit: false },
+    });
+    await expect(repository.getSharedDocument("viewer", "work-1")).resolves.toMatchObject({
+      role: "viewer",
+      capabilities: { view: true, edit: false },
+    });
+
+    for (const [userId, role, edit] of [
+      ["owner", "owner", true],
+      ["admin", "admin", true],
+      ["editor", "editor", true],
+      ["commenter", "commenter", false],
+      ["viewer", "viewer", false],
+    ] as const) {
+      await expect(repository.getSharedDocumentMeta(userId, "work-1")).resolves.toEqual({
+        workId: "work-1",
+        role,
+        status: "active",
+        capabilities: { view: true, edit },
+        revision: 1,
+        updatedAt: BASE_DATE.toISOString(),
+      });
+    }
+    await expect(repository.getSharedDocument("pending", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    await expect(repository.getSharedDocument("declined", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    await expect(repository.getSharedDocumentMeta("pending", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    await expect(repository.getSharedDocumentMeta("declined", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+
+    const saved = await repository.saveSharedDocument("editor", "work-1", 1, {
+      title: "팀 수정본",
+      doc: { pagesList: [{ id: "page-2" }] },
+    });
+    expect(saved).toEqual({
+      workId: "work-1",
+      revision: 2,
+      updatedAt: DEFAULT_NOW.toISOString(),
+    });
+    expect(store.works.get("work-1")).toMatchObject({
+      title: "팀 수정본",
+      revision: 2,
+      doc: { pagesList: [{ id: "page-2" }] },
+    });
+    expect(store.workRevisions).toHaveLength(1);
+    expect(store.workRevisions[0]).toMatchObject({
+      workId: "work-1",
+      revision: 2,
+      snapshot: { title: "팀 수정본", doc: { pagesList: [{ id: "page-2" }] } },
+    });
+    await expect(repository.getSharedDocumentMeta("editor", "work-1")).resolves.toMatchObject({
+      revision: 2,
+      updatedAt: DEFAULT_NOW.toISOString(),
+      capabilities: { view: true, edit: true },
+    });
+    expect(store.lockedWorkIds).toContain("work-1");
+    expect(store.lockedUserIds).toContain("owner");
+
+    await expect(
+      repository.saveSharedDocument("editor", "work-1", 2, { status: "published" })
+    ).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_owner_fields_denied")
+    );
+    await expect(
+      repository.saveSharedDocument("admin", "work-1", 2, { titleId: "catalog-title" })
+    ).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_owner_fields_denied")
+    );
+    await expect(
+      repository.saveSharedDocument("commenter", "work-1", 2, { description: "불가" })
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
+    await expect(
+      repository.saveSharedDocument("viewer", "work-1", 2, { description: "불가" })
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
+    await expect(
+      repository.saveSharedDocument(
+        "owner",
+        "work-1",
+        2,
+        { format: "upload" } as unknown as CreatorSharedDocumentPatch
+      )
+    ).rejects.toThrow("invalid creator shared document mutation");
+    expect(store.documentUpdateCount).toBe(1);
+    expect(store.workRevisionAppendCount).toBe(1);
+  });
+
+  it("게시 상태와 연결 작품은 소유자만 공동 문서 endpoint에서 변경한다", async () => {
+    const { repository, store } = createFixture();
+
+    await expect(
+      repository.saveSharedDocument("owner", "work-1", 1, {
+        status: "published",
+        titleId: "catalog-title",
+      })
+    ).resolves.toMatchObject({ workId: "work-1", revision: 2 });
+
+    expect(store.works.get("work-1")).toMatchObject({
+      status: "published",
+      titleId: "catalog-title",
+      revision: 2,
+    });
+    expect(store.documentUpdateCount).toBe(1);
+    expect(store.workRevisionAppendCount).toBe(1);
+  });
+
+  it("stale revision은 현재 번호만 반환하고 같은 transaction의 snapshot 이력을 보존한다", async () => {
+    const { repository, store } = createFixture();
+    store.works.get("work-1")!.revision = 20;
+    for (let revision = 1; revision <= 20; revision += 1) {
+      store.workRevisions.push({
+        workId: "work-1",
+        revision,
+        snapshot: { title: `r${revision}` },
+        createdAt: BASE_DATE,
+      });
+    }
+
+    await expect(
+      repository.saveSharedDocument("admin", "work-1", 19, { title: "stale" })
+    ).rejects.toEqual(new CreatorCollaborationRevisionConflictError(20));
+    expect(store.works.get("work-1")?.title).toBe("비밀 프로젝트 1화");
+    expect(store.workRevisions).toHaveLength(20);
+    expect(store.documentUpdateCount).toBe(0);
+    expect(store.workRevisionAppendCount).toBe(0);
+
+    await repository.saveSharedDocument("admin", "work-1", 20, { title: "r21" });
+    expect(store.workRevisions).toHaveLength(20);
+    expect(store.workRevisions.map(({ revision }) => revision)).toEqual(
+      Array.from({ length: 20 }, (_, index) => index + 2)
+    );
+    expect(store.workRevisions.at(-1)).toMatchObject({ revision: 21, snapshot: { title: "r21" } });
+  });
+
+  it("revision snapshot 저장 실패는 문서 본문·revision·updatedAt까지 원자적으로 롤백한다", async () => {
+    const { repository, store } = createFixture();
+    const before = { ...store.works.get("work-1")! };
+    store.failNextWorkRevision = true;
+
+    await expect(
+      repository.saveSharedDocument("editor", "work-1", 1, {
+        title: "롤백되어야 하는 제목",
+        doc: { pagesList: [{ id: "rollback" }] },
+      })
+    ).rejects.toThrow("work revision insert failed");
+
+    expect(store.works.get("work-1")).toEqual(before);
+    expect(store.workRevisions).toEqual([]);
+    expect(store.documentUpdateCount).toBe(1);
+    expect(store.workRevisionAppendCount).toBe(1);
+  });
+
+  it("비활성 소유자의 공유 접근·저장을 차단하되 소유자 본인의 접근은 유지한다", async () => {
+    const { repository, store } = createFixture();
+    store.users.get("owner")!.status = "suspended";
+
+    await expect(repository.listSharedWorks("editor", 20)).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    await expect(repository.getSharedDocument("editor", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    await expect(repository.getSharedDocumentMeta("editor", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("document_access_denied")
+    );
+    await expect(
+      repository.saveSharedDocument("editor", "work-1", 1, { title: "차단" })
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
+    expect(store.lockedUserIds).toContain("owner");
+    expect(store.workRevisions).toEqual([]);
+    expect(store.documentUpdateCount).toBe(0);
+    expect(store.workRevisionAppendCount).toBe(0);
+
+    await expect(repository.listSharedWorks("owner", 20)).resolves.toMatchObject({
+      items: [{ workId: "work-1" }],
+      nextCursor: null,
+    });
+    await expect(repository.getSharedDocument("owner", "work-1")).resolves.toMatchObject({
+      role: "owner",
+    });
+    await expect(repository.getSharedDocumentMeta("owner", "work-1")).resolves.toMatchObject({
+      role: "owner",
+      capabilities: { view: true, edit: true },
+    });
+    await expect(
+      repository.saveSharedDocument("owner", "work-1", 1, { title: "소유자 수정" })
+    ).resolves.toMatchObject({ revision: 2 });
+  });
+
   it("없는 작품·멤버·초대는 권한 상승 없이 typed not-found로 끝난다", async () => {
     const { repository } = createFixture();
 
@@ -1056,6 +1708,9 @@ describe("CreatorCollaborationRepository", () => {
       new CreatorCollaborationNotFoundError("work_not_found")
     );
     await expect(repository.getActivity("owner", "missing", 20)).rejects.toEqual(
+      new CreatorCollaborationNotFoundError("work_not_found")
+    );
+    await expect(repository.getSharedDocumentMeta("owner", "missing")).rejects.toEqual(
       new CreatorCollaborationNotFoundError("work_not_found")
     );
     await expect(repository.removeMember("owner", "work-1", "missing")).rejects.toEqual(
