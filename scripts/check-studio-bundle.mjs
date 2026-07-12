@@ -8,9 +8,9 @@ const studioEntry = "src/domains/creator/StudioPage.tsx";
 const appEntry = "index.html";
 
 const budgets = {
-  // Measured 2026-07-13 after the 3D runtime split: 2,224,408 raw / 710,282 gzip.
+  // Measured 2026-07-13 after async 3D capture integration: 2,224,416 raw / 710,284 gzip.
   studio: { raw: 2_350_000, gzip: 750_000 },
-  // Measured after the same build: 443,257 raw / 143,949 gzip.
+  // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
 

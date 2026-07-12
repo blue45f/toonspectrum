@@ -22,13 +22,13 @@
 95,305B(9.6%) 감소다. SVG/PSD 엔진은 이 정적 폐쇄에 남지 않는다.
 
 이어 3D 런타임 경계를 분리한 동일 방식의 production manifest 측정에서 Studio 정적 폐쇄는
-2,948,329B raw / 893,614B gzip에서 **2,224,408B / 710,282B**로 줄었다. 직전 기준 대비
-723,921B raw(24.6%)와 183,332B gzip(20.5%) 감소이며, 첫 측정 3,264,770B / 988,919B와 비교하면
-총 1,040,362B raw(31.9%)와 278,637B gzip(28.2%)를 줄였다. `StudioBackground3D`, R3F,
+2,948,329B raw / 893,614B gzip에서 **2,224,416B / 710,284B**로 줄었다. 직전 기준 대비
+723,913B raw(24.6%)와 183,330B gzip(20.5%) 감소이며, 첫 측정 3,264,770B / 988,919B와 비교하면
+총 1,040,354B raw(31.9%)와 278,635B gzip(28.2%)를 줄였다. `StudioBackground3D`, R3F,
 `three.module`, primitive 생성기는 이제 Studio 정적 import 폐쇄에 남지 않는다.
 
 선택형 WebGL 인트로의 Three.js도 앱 공통 엔트리에서 분리했다. 앱 엔트리는 최초 1,171,388B raw /
-329,246B gzip에서 현재 **443,257B / 143,949B**가 됐다. 동적 인트로 청크 로드가 실패하면 이미
+329,246B gzip에서 현재 **443,257B / 143,956B**가 됐다. 동적 인트로 청크 로드가 실패하면 이미
 엔트리에 있는 정적 스플래시로 복구한다. Studio 3D 편집기 역시 intent preload 실패를 활성화 실패로
 고정하지 않고, 실제 활성화 시 다시 시도할 수 있는 별도 dynamic import 경계를 사용한다.
 
@@ -85,7 +85,7 @@ W3C [Pointer Events Level 3](https://www.w3.org/TR/pointerevents3/)의 coalesced
   Studio 정적 폐쇄에 포함되지 않음
 - `IntroSplash`와 `three.module`이 앱 공통 엔트리에 포함되지 않음
 
-Studio 예산은 현재 측정값보다 raw 125,592B(5.6%), gzip 39,718B(5.6%) 여유를 두되, SVG/PSD,
+Studio 예산은 현재 측정값보다 raw 125,584B(5.6%), gzip 39,716B(5.6%) 여유를 두되, SVG/PSD,
 3D 편집 런타임 또는 WebGL 인트로가 다시 정적 import되면 이름 검사에서도 즉시 실패하도록 잡았다.
 로컬 `ci`와 GitHub Actions 모두 production build 직후 이 검사를 실행한다.
 

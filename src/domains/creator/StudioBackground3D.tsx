@@ -38,7 +38,15 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 
@@ -89,6 +97,11 @@ import {
 } from "./studio-background-3d-scene-templates";
 import { BG_SKY_PRESETS, DEFAULT_SKY_PRESET_ID, getSkyPreset } from "./studio-background-3d-sky";
 import {
+  captureStudioBg3dRaster,
+  getStudioBg3dCaptureSourceSize,
+  type StudioBg3dCaptureAdapter,
+} from "./studio-bg3d-capture-adapter";
+import {
   deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
   type StudioBg3dDeviceSignals,
@@ -125,7 +138,6 @@ import {
   type StudioBg3dLtRasterLayer,
   type StudioBg3dLtRasterLayerRole,
 } from "./studio-bg3d-lt-render";
-import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   parseStudioBg3dSceneDocument,
@@ -141,6 +153,10 @@ import {
   adaptStudioBg3dRuntimeToDocument,
   hydrateStudioBg3dDocumentToRuntime,
 } from "./studio-bg3d-scene-runtime";
+import {
+  createStudioBg3dThreeWebglCaptureAdapter,
+  registerStudioBg3dCaptureExcludedObject,
+} from "./studio-bg3d-three-webgl-capture";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 
 export interface StudioBackground3DLtLayer {
@@ -178,7 +194,7 @@ type LtUserPresetNotice = {
   readonly tone: LtUserPresetNoticeTone;
   readonly message: string;
 };
-type CaptureState = { gl: THREE.WebGLRenderer | null; scene: THREE.Scene | null; camera: THREE.Camera | null };
+type CaptureState = { adapter: StudioBg3dCaptureAdapter | null };
 type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose"> & {
   readonly record: Bg3dVerifiedStoredRecord;
   readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
@@ -271,23 +287,6 @@ function ltUserPresetFailureMessage(
 
 function waitForStudioBg3dPaintFrame(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
-}
-
-function readStudioBg3dCaptureRgba(
-  sourceCanvas: HTMLCanvasElement,
-  width: number,
-  height: number
-): Uint8ClampedArray {
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("2D capture context unavailable.");
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.clearRect(0, 0, width, height);
-  context.drawImage(sourceCanvas, 0, 0, width, height);
-  return new Uint8ClampedArray(context.getImageData(0, 0, width, height).data);
 }
 
 function encodeStudioBg3dLtLayers(
@@ -772,15 +771,21 @@ function round(value: number, precision: number): number {
 
 /* ── R3F Canvas 내부에서 렌더러/씬/카메라를 꺼내 캡처용 ref에 흘려보내는 다리.
    VRM 포저의 CaptureBridge와 동일한 패턴 — ref-not-state라 마운트마다 리렌더를 유발하지 않는다. */
-function CaptureBridge({ onCaptureUpdate }: { onCaptureUpdate: (state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => void }) {
+function CaptureBridge({
+  onCaptureUpdate,
+}: {
+  onCaptureUpdate: (state: CaptureState, cleanupAdapter?: StudioBg3dCaptureAdapter | null) => void;
+}) {
   const { camera, gl, scene } = useThree();
+  const updateCapture = useEffectEvent(onCaptureUpdate);
 
   useEffect(() => {
-    onCaptureUpdate({ camera, gl, scene });
+    const adapter = createStudioBg3dThreeWebglCaptureAdapter({ camera, renderer: gl, scene });
+    updateCapture({ adapter });
     return () => {
-      onCaptureUpdate({ camera: null, gl: null, scene: null }, gl);
+      updateCapture({ adapter: null }, adapter);
     };
-  }, [camera, gl, scene, onCaptureUpdate]);
+  }, [camera, gl, scene]);
 
   return null;
 }
@@ -880,7 +885,7 @@ function BgViewportController({ onReady }: { onReady: (api: BgViewportApi | null
    내보내기(라인아트 캡처) 시에는 항상 숨긴다 — 참조용 뷰포트 보조물일 뿐 결과물이 아니다. */
 function BgGroundHelper({ visible }: { visible: boolean }) {
   return (
-    <group visible={visible}>
+    <group ref={registerStudioBg3dCaptureExcludedObject} visible={visible}>
       <gridHelper args={[40, 40, "#c7ccd6", "#e7e9ee"]} position={[0, -0.001, 0]} />
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]}>
         <circleGeometry args={[9, 40]} />
@@ -944,7 +949,7 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: Bg
         )}
       </mesh>
       {showEdges ? (
-        <lineSegments geometry={edges}>
+        <lineSegments ref={registerStudioBg3dCaptureExcludedObject} geometry={edges}>
           <lineBasicMaterial color="#000000" />
         </lineSegments>
       ) : null}
@@ -1112,7 +1117,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   );
   const [deviceSignals, setDeviceSignals] = useState<StudioBg3dDeviceSignals>(() => collectDeviceSignals());
 
-  const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
+  const captureRef = useRef<CaptureState>({ adapter: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
   const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
   const viewportHostRef = useRef<HTMLDivElement>(null);
@@ -1943,10 +1948,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const onCaptureUpdate = (state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => {
-    if (cleanupGl) {
-      if (captureRef.current.gl === cleanupGl) {
-        captureRef.current = { camera: null, gl: null, scene: null };
+  const onCaptureUpdate = (
+    state: CaptureState,
+    cleanupAdapter?: StudioBg3dCaptureAdapter | null
+  ) => {
+    if (cleanupAdapter) {
+      if (captureRef.current.adapter === cleanupAdapter) {
+        captureRef.current = { adapter: null };
       }
     } else {
       captureRef.current = state;
@@ -1960,11 +1968,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       return;
     }
     const currentCapture = captureRef.current;
-    if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera) {
+    if (!currentCapture.adapter) {
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
       return;
     }
-    const { gl, scene, camera } = currentCapture;
+    const captureAdapter = currentCapture.adapter;
     const sky = getSkyPreset(skyPresetId);
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
     const currentBaseDocument: StudioBg3dSceneDocument = {
@@ -2002,48 +2010,37 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     // LT 검출은 깨끗한 셰이딩 캡처를 입력으로 삼는다. 캡처 중에는 그리드·변환 핸들·프리미티브의
     // 뷰포트용 edge overlay를 숨기고, 순수 래스터 단계가 주선·재질선·톤을 독립적으로 계산한다.
     const previousLineArtPreview = lineArtPreview;
-    const previousClearColor = new THREE.Color();
-    gl.getClearColor(previousClearColor);
-    const previousClearAlpha = gl.getClearAlpha();
     setLineArtPreview(false);
     setIsCapturing(true);
     try {
       // React/R3F가 캡처 전용 visibility와 셰이딩 상태를 반영할 시간을 보장한다.
       await waitForStudioBg3dPaintFrame();
       await waitForStudioBg3dPaintFrame();
-      if (!componentActiveRef.current || captureRef.current.gl !== gl) return;
+      if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
 
-      gl.setClearColor(sky.clearColor, transparentInsert ? 0 : 1);
-      gl.render(scene, camera);
+      const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter);
       const captureSize = resolveStudioBg3dLtCaptureSize({
-        sourceWidth: gl.domElement.width,
-        sourceHeight: gl.domElement.height,
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height,
         requestedHeight: adapted.document.output.exportHeight,
         maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
       });
       if (!captureSize) {
         throw new Error("LT capture size admission failed.");
       }
-      const rgba = readStudioBg3dCaptureRgba(
-        gl.domElement,
-        captureSize.width,
-        captureSize.height
-      );
-      const depth = adapted.document.output.line.depthEnabled
-        ? captureStudioBg3dThreeDepth({
-            renderer: gl,
-            scene,
-            camera,
-            width: captureSize.width,
-            height: captureSize.height,
-          })
-        : undefined;
+      const captured = await captureStudioBg3dRaster(captureAdapter, {
+        width: captureSize.width,
+        height: captureSize.height,
+        background: { color: sky.clearColor, alpha: transparentInsert ? 0 : 1 },
+        includeDepth: adapted.document.output.line.depthEnabled,
+      });
+      if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
       const rendered = renderStudioBg3dLtLayers(
         {
-          width: captureSize.width,
-          height: captureSize.height,
-          rgba,
-          ...(depth ? { depth } : {}),
+          width: captured.width,
+          height: captured.height,
+          rgba: captured.rgba,
+          ...(captured.depth ? { depth: captured.depth } : {}),
         },
         { line: adapted.document.output.line, tone: adapted.document.output.tone }
       );
@@ -2061,12 +2058,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         compositePngDataUrl: encoded.compositePngDataUrl,
         bg3dScene: adapted.document,
       });
-      if (accepted !== false) onClose();
+      if (accepted === false) {
+        setError(
+          "편집 문서가 변경되었거나 현재 페이지에 삽입할 수 없습니다. 3D 창을 닫고 페이지 잠금·선택 상태를 확인한 뒤 다시 열어 주세요."
+        );
+        return;
+      }
+      onClose();
     } catch {
       setError("3D 장면을 LT 레이어로 변환하지 못했습니다. 출력 해상도와 브라우저 그래픽 상태를 확인해 주세요.");
     } finally {
       if (componentActiveRef.current) {
-        gl.setClearColor(previousClearColor, previousClearAlpha);
         setLineArtPreview(previousLineArtPreview);
         setIsCapturing(false);
       }
@@ -2226,22 +2228,24 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     />
                   ))}
                   {!isCapturing && selectedId && primitiveObjectsRef.current.get(selectedId) ? (
-                    <TransformControls
-                      object={primitiveObjectsRef.current.get(selectedId)}
-                      mode={transformMode}
-                      space={transformMode === "rotate" ? "local" : "world"}
-                      onMouseDown={() => setIsTransforming(true)}
-                      onMouseUp={() => setIsTransforming(false)}
-                      onObjectChange={() => {
-                        const obj = primitiveObjectsRef.current.get(selectedId);
-                        if (!obj) return;
-                        const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
-                        const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
-                        const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
-                        if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale });
-                        else if (selectedCustomModel) updateCustomModelTransform(selectedId, { position, rotation, scale });
-                      }}
-                    />
+                    <group ref={registerStudioBg3dCaptureExcludedObject}>
+                      <TransformControls
+                        object={primitiveObjectsRef.current.get(selectedId)}
+                        mode={transformMode}
+                        space={transformMode === "rotate" ? "local" : "world"}
+                        onMouseDown={() => setIsTransforming(true)}
+                        onMouseUp={() => setIsTransforming(false)}
+                        onObjectChange={() => {
+                          const obj = primitiveObjectsRef.current.get(selectedId);
+                          if (!obj) return;
+                          const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
+                          const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
+                          const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
+                          if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale });
+                          else if (selectedCustomModel) updateCustomModelTransform(selectedId, { position, rotation, scale });
+                        }}
+                      />
+                    </group>
                   ) : null}
                   <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} minDistance={2} maxDistance={60} />
                 </Canvas>

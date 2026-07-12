@@ -30,9 +30,9 @@ function assertCaptureDimensions(width: number, height: number): void {
  * depth. Renderer target, clear state, XR state, scene override material, and allocations are
  * restored/disposed even when rendering or readback fails.
  */
-export function captureStudioBg3dThreeDepth(
+export async function captureStudioBg3dThreeDepth(
   input: CaptureStudioBg3dThreeDepthInput
-): Float32Array {
+): Promise<Float32Array> {
   const { renderer, scene, camera, width, height } = input;
   assertCaptureDimensions(width, height);
   if (!renderer || !scene?.isScene || !camera?.isCamera) {
@@ -63,21 +63,29 @@ export function captureStudioBg3dThreeDepth(
   const packed = new Uint8Array(width * height * 4);
 
   try {
-    renderer.xr.enabled = false;
-    renderer.autoClear = true;
-    scene.overrideMaterial = depthMaterial;
-    renderer.setRenderTarget(target);
-    renderer.setClearColor(0xffffff, 1);
-    renderer.clear(true, true, true);
-    renderer.render(scene, camera);
-    renderer.readRenderTargetPixels(target, 0, 0, width, height, packed);
+    let readback: Promise<THREE.TypedArray>;
+    try {
+      renderer.xr.enabled = false;
+      renderer.autoClear = true;
+      scene.overrideMaterial = depthMaterial;
+      renderer.setRenderTarget(target);
+      renderer.setClearColor(0xffffff, 1);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+      // Three submits readPixels/fence work synchronously before returning this Promise. Restore
+      // the live R3F renderer immediately so subsequent frames cannot render into the depth target
+      // or through MeshDepthMaterial while the GPU fence is pending.
+      readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, packed);
+    } finally {
+      scene.overrideMaterial = previousOverrideMaterial;
+      renderer.setRenderTarget(previousTarget);
+      renderer.setClearColor(previousClearColor, previousClearAlpha);
+      renderer.autoClear = previousAutoClear;
+      renderer.xr.enabled = previousXrEnabled;
+    }
+    await readback;
     return decodeStudioBg3dThreeRgbaDepth({ width, height, rgba: packed, flipY: true });
   } finally {
-    scene.overrideMaterial = previousOverrideMaterial;
-    renderer.setRenderTarget(previousTarget);
-    renderer.setClearColor(previousClearColor, previousClearAlpha);
-    renderer.autoClear = previousAutoClear;
-    renderer.xr.enabled = previousXrEnabled;
     depthMaterial.dispose();
     target.dispose();
   }

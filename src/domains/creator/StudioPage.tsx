@@ -24020,8 +24020,8 @@ function StudioCuttoonEditor() {
             }}
             onInsert={(result) => {
               const mutationTicket = bg3dMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return;
-              applyBg3dRenderedImage(result, bg3dInitialElementId);
+              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
+              return applyBg3dRenderedImage(result, bg3dInitialElementId);
             }}
           />
         ) : null}
