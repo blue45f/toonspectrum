@@ -8,6 +8,7 @@ import {
 import { type ReactNode, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
+import { shouldRenderAppSplash } from "./app-shell-splash";
 import { AppRouter } from "./routes/AppRouter";
 
 import { AuthSessionProvider } from "@/components/auth/session-provider";
@@ -291,13 +292,14 @@ export function AppShell({
   showSkipLink = true,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
+  const { pathname, search } = useLocation();
   useVisitPing();
   useVocalBgmPlaylist();
   // 전역 포인터 피드백 훅이 기본 클릭음과 상황별 SFX를 한 번만 라우팅한다.
   useClickVisualFeedback();
   return (
     <AuthSessionProvider>
-      {splash ?? <RandomIntro />}
+      {shouldRenderAppSplash(pathname, search) ? (splash ?? <RandomIntro />) : null}
       <Suspense fallback={null}>
         <StoreSync />
       </Suspense>

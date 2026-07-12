@@ -47,4 +47,5 @@ jobs:
       - run: pnpm exec drizzle-kit push --force
       - run: pnpm run test
       - run: pnpm run build
+      - run: pnpm run check:studio-bundle
       - run: pnpm run build:all

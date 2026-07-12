@@ -44,6 +44,7 @@ const requiredScripts = [
   "lint",
   "typecheck",
   "test",
+  "check:studio-bundle",
   "validate:architecture",
 ];
 for (const script of requiredScripts) {

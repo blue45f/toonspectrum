@@ -80,6 +80,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // CI reads this graph to enforce the mobile Studio's initial-JS budgets and lazy-only engines.
+    manifest: true,
     modulePreload: {
       resolveDependencies(_filename, deps, context) {
         if (context.hostType !== "html") return deps;

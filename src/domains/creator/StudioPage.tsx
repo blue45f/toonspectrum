@@ -351,6 +351,11 @@ import {
   type DialogueLocaleMap,
 } from "./studio-dialogue-translate";
 import {
+  loadStudioPsdExportModule,
+  loadStudioPsdImportModule,
+  loadStudioSvgExportModule,
+} from "./studio-document-export-loaders";
+import {
   advanceStudioDraftIdentityScope,
   createStudioDraftIdentityScope,
   invalidateStudioOwnerDetailAfterSharedSave,
@@ -582,6 +587,16 @@ import {
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
+import {
+  beginStudioStrokePointerSession,
+  collectStudioStrokePointerBatch,
+  isStudioStrokePointerEvent,
+  shouldCancelStudioFingerStrokeForAdditionalContact,
+  tryCaptureStudioStrokePointer,
+  tryReleaseStudioStrokePointer,
+  type StudioPointerCaptureTarget,
+  type StudioStrokePointerSession,
+} from "./studio-pointer-input";
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
 import {
@@ -590,8 +605,6 @@ import {
   serializeStudioProjectFile,
   type StudioProjectFile,
 } from "./studio-project-file";
-import { exportPagePsd, type PsdExportEl, type PsdExportResult } from "./studio-psd-export";
-import { importPsdFile, psdImportResultMessage } from "./studio-psd-import";
 import {
   createEmptyStudioPublicationAnalyticsDocument,
   normalizeStudioPublicationAnalyticsDocument,
@@ -718,7 +731,6 @@ import {
   type ShapeParams,
   type StrokeStyle,
 } from "./studio-stroke-shapes";
-import { exportPageToSvg, type SvgExportEl, type SvgExportResult } from "./studio-svg-export";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   DEFAULT_WATERMARK,
@@ -831,6 +843,7 @@ import type { Outline } from "./studio-outline";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PhotoFilter } from "./studio-photo-filter";
+import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
 import type {
   StudioPublishAiProvenance,
   StudioPublishAiUsage,
@@ -844,6 +857,7 @@ import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { Sketch } from "./studio-sketch";
 import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-image-client";
 import type { Stylize } from "./studio-stylize";
+import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { Vibrance } from "./studio-vibrance";
 import type {
   StudioAssetMenuPanelProps,
@@ -6149,6 +6163,10 @@ function StudioCuttoonEditor() {
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
   const drawingRef = useRef<DrawEl | null>(null);
+  // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
+  // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
+  const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
+  const drawingPointerCaptureTargetRef = useRef<StudioPointerCaptureTarget | null>(null);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -6219,6 +6237,12 @@ function StudioCuttoonEditor() {
     () => () => {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
+      const pointerSession = drawingPointerSessionRef.current;
+      if (pointerSession) {
+        tryReleaseStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
+      }
+      drawingPointerSessionRef.current = null;
+      drawingPointerCaptureTargetRef.current = null;
     },
     []
   );
@@ -12166,6 +12190,22 @@ function StudioCuttoonEditor() {
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
   }
+  function releaseDrawingPointerSession() {
+    const session = drawingPointerSessionRef.current;
+    if (session) {
+      tryReleaseStudioStrokePointer(drawingPointerCaptureTargetRef.current, session.pointerId);
+    }
+    drawingPointerSessionRef.current = null;
+    drawingPointerCaptureTargetRef.current = null;
+  }
+  function discardDrawingPointerSession() {
+    drawingRef.current = null;
+    perspectiveRayRef.current = null;
+    isometricAxisRayRef.current = null;
+    stopQuickShapeTracking();
+    clearDraftPreview();
+    releaseDrawingPointerSession();
+  }
   function noteQuickShapePointerMoved(pos: { x: number; y: number }) {
     const anchor = quickShapeStillAnchorRef.current;
     if (!anchor) return; // 무장 안 됨 — 저비용 no-op
@@ -12578,11 +12618,25 @@ function StudioCuttoonEditor() {
       return;
     }
     if (tool === "draw") {
+      const pointerSample = e.evt as PointerEvent;
+      const activePointerSession = drawingPointerSessionRef.current;
+      if (activePointerSession || drawingRef.current) {
+        if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
+          // Two fingers mean navigation, not two simultaneous brush tips. Cancel the unfinished
+          // finger stroke before the existing wrap-level pinch/undo gesture consumes both touches.
+          // A pen plus a touch is deliberately different: the touch is treated as palm input.
+          discardDrawingPointerSession();
+        }
+        return;
+      }
+      const pointerSession = beginStudioStrokePointerSession(pointerSample);
+      // A second contact cannot replace a live pen stroke. Right-click/barrel-button presses also
+      // remain available to the context menu instead of leaving a one-point draft behind.
+      if (!pointerSession) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
       setSelectedId(null);
 
-      const pointerSample = e.evt as PointerEvent;
       const pressure = resolveBrushPressureSample({
         pointerType: pointerSample.pointerType,
         rawPressure: pointerSample.pressure,
@@ -12631,6 +12685,9 @@ function StudioCuttoonEditor() {
               tiltYs: drawMode === "pen" && brush === "calligraphy" ? [stylus.tiltY] : undefined,
               twists: drawMode === "pen" && brush === "calligraphy" ? [stylus.twist] : undefined,
             };
+      drawingPointerSessionRef.current = pointerSession;
+      drawingPointerCaptureTargetRef.current = pointerSample.target as StudioPointerCaptureTarget | null;
+      tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
@@ -12967,6 +13024,8 @@ function StudioCuttoonEditor() {
       }
     }
     if (tool !== "draw" || !drawingRef.current) return;
+    const pointerEvent = e.evt as PointerEvent;
+    if (!isStudioStrokePointerEvent(drawingPointerSessionRef.current, pointerEvent)) return;
     const kind = drawingRef.current.kind ?? "freehand";
     if (drawMode === "pen") {
       // QuickShape 정지-감지용 포인터 위치 — freehand 누적 경로와 도형-드래그 경로 둘 다에서
@@ -12978,24 +13037,7 @@ function StudioCuttoonEditor() {
     if (kind === "freehand") {
       const stage = e.target.getStage();
       if (!stage) return;
-      // getCoalescedEvents 로 브라우저가 병합해 버렸던 실제 하드웨어 포인터 이벤트들을 복원한다.
-      // 빠르게 움직일수록 pointermove 는 한 프레임에 하나만 오지만, 그사이 실제로는 펜/마우스가
-      // 여러 지점을 지나쳤다 — 그 중간점들을 다시 스트로크에 반영하면 빠른 스트로크가 각지지
-      // 않고 매끈해진다(네이티브 저지연 엔진과의 격차를 좁히는 유의미한 최적화). 미지원 브라우저
-      // (Safari 등)는 getCoalescedEvents 자체가 없으므로 현재 이벤트 하나만 처리해 기존과 동일.
-      const nativeEvt = e.evt as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
-      const coalesced = typeof nativeEvt.getCoalescedEvents === "function" ? nativeEvt.getCoalescedEvents() : [];
-      const events = coalesced.length > 0 ? coalesced : [nativeEvt];
-      for (const ev of events) {
-        // Konva 는 Stage 컨테이너 rect 기준 clientX/clientY 로 좌표를 계산한다 — coalesced 이벤트도
-        // 같은 브라우저 좌표계이므로 이 공개 API로 임시 포인터 위치를 갱신해 재사용할 수 있다.
-        stage.setPointersPositions(ev);
-        const p = stage.getRelativePointerPosition();
-        if (p) appendFreehandStrokePoint(p, ev);
-      }
-      // 마지막으로 실제(최신) 이벤트 기준 포인터 위치로 stage 를 복원 — 브러시 커서 등 다른 로직이
-      // 이 틱 이후 stage.getPointerPosition() 을 참조해도 어긋나지 않는다.
-      stage.setPointersPositions(nativeEvt);
+      consumeFreehandPointerBatch(stage, pointerEvent, true);
       return;
     }
     const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -13110,9 +13152,91 @@ function StudioCuttoonEditor() {
     drawingRef.current = next;
     scheduleDraft(next);
   }
+  function consumeFreehandPointerBatch(
+    stage: Konva.Stage,
+    pointerEvent: PointerEvent,
+    includePredicted: boolean
+  ): boolean {
+    const session = drawingPointerSessionRef.current;
+    if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
+
+    const batch = collectStudioStrokePointerBatch(session, pointerEvent, { includePredicted });
+    drawingPointerSessionRef.current = batch.session;
+    try {
+      // Konva derives canvas coordinates from client coordinates. Temporarily feeding each restored
+      // hardware event through the public pointer API avoids duplicating its transform math.
+      for (const sample of batch.authoritative) {
+        stage.setPointersPositions(sample);
+        const point = stage.getRelativePointerPosition();
+        if (point) appendFreehandStrokePoint(point, sample);
+      }
+
+      const authoritativeDrawing = drawingRef.current;
+      if (authoritativeDrawing && batch.predicted.length > 0) {
+        // Predictions make the tip feel closer to the pen, but never advance drawingRef/history.
+        // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
+        const authoritativePerspectiveRay = perspectiveRayRef.current;
+        const authoritativeIsometricRay = isometricAxisRayRef.current;
+        try {
+          for (const sample of batch.predicted) {
+            stage.setPointersPositions(sample);
+            const point = stage.getRelativePointerPosition();
+            if (point) appendFreehandStrokePoint(point, sample);
+          }
+          const predictedPreview = drawingRef.current;
+          drawingRef.current = authoritativeDrawing;
+          if (predictedPreview !== authoritativeDrawing) scheduleDraft(predictedPreview);
+        } finally {
+          drawingRef.current = authoritativeDrawing;
+          perspectiveRayRef.current = authoritativePerspectiveRay;
+          isometricAxisRayRef.current = authoritativeIsometricRay;
+        }
+      }
+    } finally {
+      // Other Stage consumers (cursor, hit testing, collaboration) must observe the real latest
+      // pointer rather than a coalesced or future estimate after this handler returns.
+      stage.setPointersPositions(pointerEvent);
+    }
+    return true;
+  }
+  function finishDrawingPointer(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
+    try {
+      if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand" && stage) {
+        // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
+        // authoritatively so a fast flick keeps its final tail; predictions remain preview-only.
+        consumeFreehandPointerBatch(stage, pointerEvent, false);
+      }
+      if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
+        let finished = drawingRef.current;
+        // 손떨림 보정 2단계: 프리핸드 스트로크 확정 시 이동평균 스무딩(점 개수·필압 정렬 보존).
+        if ((finished.kind ?? "freehand") === "freehand" && stabilizer > 0) {
+          finished = { ...finished, points: smoothStrokePoints(finished.points, stabilizer) };
+        }
+        // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
+        commit([...elements, finished]);
+      }
+    } finally {
+      // No error or stale tool ref may strand DOM capture or a predicted RAF after the stroke ends.
+      releaseDrawingPointerSession();
+      drawingRef.current = null;
+      perspectiveRayRef.current = null;
+      isometricAxisRayRef.current = null;
+      clearDraftPreview();
+    }
+  }
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+    // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
+    // pointer (typically a palm) cannot cancel the pen that opened the stroke.
+    const drawingPointerSession = drawingPointerSessionRef.current;
+    if (drawingRef.current || drawingPointerSession) {
+      if (drawingPointerSession && !isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
+        return;
+      }
+      discardDrawingPointerSession();
+      return;
+    }
     const current = advancedFillTapGestureRef.current;
     if (current) {
       const outcome = endStudioAdvancedFillTap(current, pointerId, true);
@@ -13123,34 +13247,32 @@ function StudioCuttoonEditor() {
       if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
       return;
     }
-
-    // 브라우저 스크롤 전환·펜 연결 해제 등으로 pointercancel이 오면 미완성 획을 문서에
-    // 커밋하지 않고 모든 임시 상태를 정리한다. 다음 획이 이전 좌표·원근 락을 이어받지 않는다.
-    if (drawingRef.current) {
-      drawingRef.current = null;
-      perspectiveRayRef.current = null;
-      isometricAxisRayRef.current = null;
-      stopQuickShapeTracking();
-      clearDraftPreview();
-    }
-
-    const captureTarget = pointerEvent.target as {
-      hasPointerCapture?: (id: number) => boolean;
-      releasePointerCapture?: (id: number) => void;
-    } | null;
-    if (
-      captureTarget?.releasePointerCapture
-      && (!captureTarget.hasPointerCapture || captureTarget.hasPointerCapture(pointerId))
-    ) {
-      try {
-        captureTarget.releasePointerCapture(pointerId);
-      } catch {
-        // 이미 브라우저가 캡처를 해제한 경쟁 상태는 무해하다.
-      }
-    }
   }
 
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    const pointerEvent = e.evt as PointerEvent;
+    const drawingPointerSession = drawingPointerSessionRef.current;
+    if (drawingRef.current || drawingPointerSession) {
+      if (!drawingPointerSession) {
+        // Defensive HMR/legacy state: ownership is unknown, so discard rather than committing an
+        // arbitrary pointer's draft. Normal sessions always have both refs.
+        discardDrawingPointerSession();
+        return;
+      }
+      if (!isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
+        // A secondary touch ending must not stop QuickShape, commit, or discard the active pen.
+        return;
+      }
+      stopQuickShapeTracking();
+      if (colorWheelTimerRef.current) {
+        clearTimeout(colorWheelTimerRef.current);
+        colorWheelTimerRef.current = null;
+      }
+      // Handle drawing before every other tool's early-return branch. Even a stale marquee/crop ref
+      // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally.
+      finishDrawingPointer(e.target.getStage(), pointerEvent);
+      return;
+    }
     stopQuickShapeTracking(); // 무조건 실행 — 어느 분기로 빠지든 인터벌이 새지 않게 한다.
     // 색상 휠 롱프레스 타이머가 아직 안 터졌는데 포인터를 뗐다 — 평범한 클릭/드래그였다는 뜻이니
     // 타이머만 정리한다(이미 열려 있었다면 오버레이가 이벤트를 가로채서 애초에 여기까지 안 온다).
@@ -13324,18 +13446,6 @@ function StudioCuttoonEditor() {
       }
       return;
     }
-    if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
-      let finished = drawingRef.current;
-      // 손떨림 보정 2단계: 프리핸드 스트로크 확정 시 이동평균 스무딩(점 개수·필압 정렬 보존).
-      if ((finished.kind ?? "freehand") === "freehand" && stabilizer > 0) {
-        finished = { ...finished, points: smoothStrokePoints(finished.points, stabilizer) };
-      }
-      commit([...elements, finished]);
-    }
-    drawingRef.current = null;
-    perspectiveRayRef.current = null;
-    isometricAxisRayRef.current = null;
-    clearDraftPreview();
   }
   // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
   function hideBrushCursor() {
@@ -14464,10 +14574,11 @@ function StudioCuttoonEditor() {
   }
 
   // 현재 페이지 → 벡터 SVG 직렬화(요소 데이터 필요라 여기서 조립). 다운로드·고지는 내보내기 패널이 담당.
-  function exportCurrentPageToSvg(): SvgExportResult {
+  async function exportCurrentPageToSvg(): Promise<SvgExportResult> {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 SVG로 내보낼 수 있어요.");
     }
+    const { exportPageToSvg } = await loadStudioSvgExportModule();
     return exportPageToSvg({
       width: CANVAS_W,
       height: canvasH,
@@ -14483,10 +14594,11 @@ function StudioCuttoonEditor() {
   // 현재 페이지 → 요소별 레이어를 가진 PSD. exportPagePsd 는 숨김 요소를 스스로 거르지 않으므로
   // (숨긴 요소는 렌더 시점에 Konva 노드 자체가 없어 캡처가 불가능 — 모듈 JSDoc 계약) 여기서
   // isEffectivelyHidden 기준으로 미리 걸러 넘긴다.
-  function exportCurrentPageToPsd(): Promise<PsdExportResult> {
+  async function exportCurrentPageToPsd(): Promise<PsdExportResult> {
     if (!ensureSharedDocumentAvailableForExport()) {
-      return Promise.reject(new Error("공동 문서를 불러온 뒤 PSD로 내보낼 수 있어요."));
+      throw new Error("공동 문서를 불러온 뒤 PSD로 내보낼 수 있어요.");
     }
+    const { exportPagePsd } = await loadStudioPsdExportModule();
     const visible = elements.filter((el) => !isEffectivelyHidden(el, groups));
     return exportPagePsd(stageRef.current as unknown as Konva.Stage, visible as unknown as PsdExportEl[], CANVAS_W, canvasH, effScale, {
       scale: exportScale,
@@ -15219,6 +15331,7 @@ function StudioCuttoonEditor() {
     setPsdImportBusy(true);
     setPsdImportStatus(null);
     try {
+      const { importPsdFile, psdImportResultMessage } = await loadStudioPsdImportModule();
       const result = await importPsdFile(file, CANVAS_W);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (result.elements.length === 0) {
@@ -18261,6 +18374,10 @@ function StudioCuttoonEditor() {
             ref={stageRef}
             width={CANVAS_W * effScale}
             height={canvasH * effScale}
+            // Drawing owns the contact stream; browser panning would otherwise cancel a fast
+            // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
+            // touch events, and a second touch cancels an unfinished finger stroke above.
+            style={{ touchAction: tool === "draw" ? "none" : "auto" }}
             scaleX={effScale}
             scaleY={effScale}
             onPointerDown={onStageDown}
