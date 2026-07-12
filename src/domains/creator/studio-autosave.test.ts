@@ -11,6 +11,7 @@ import {
   serializeStudioAutosave,
   studioAutosaveHasContent,
   studioAutosaveKey,
+  studioSharedAutosaveCompatibility,
 } from "./studio-autosave";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
@@ -62,6 +63,51 @@ describe("studio autosave", () => {
       })
     );
     expect(parsed?.publishPack).toEqual({ profile: "tapas", aiUsage: "none", disclosure: "" });
+  });
+
+  it("공동 작품 source work/revision을 직렬화·파싱 왕복에서 보존한다", () => {
+    const parsed = parseStudioAutosave(
+      serializeStudioAutosave({
+        version: 2,
+        savedAt: "2026-07-12T00:00:00.000Z",
+        pagesList: [{ id: "p1", elements: [{ id: "e1" }] }],
+        sourceWorkId: "shared/work 01",
+        sourceRevision: 7,
+      })
+    );
+
+    expect(parsed).toMatchObject({ sourceWorkId: "shared/work 01", sourceRevision: 7 });
+  });
+
+  it("공동 작품 자동저장은 work/revision exact match일 때만 복구 가능하다", () => {
+    const payload = {
+      version: 2 as const,
+      savedAt: "2026-07-12T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [{ id: "e1" }] }],
+      sourceWorkId: "shared-work",
+      sourceRevision: 7,
+    };
+
+    expect(
+      studioSharedAutosaveCompatibility(payload, { workId: "shared-work", revision: 7 })
+    ).toEqual({ compatible: true, reason: "match" });
+    expect(
+      studioSharedAutosaveCompatibility(payload, { workId: "other-work", revision: 7 })
+    ).toEqual({ compatible: false, reason: "work-mismatch" });
+    expect(
+      studioSharedAutosaveCompatibility(payload, { workId: "shared-work", revision: 8 })
+    ).toEqual({ compatible: false, reason: "revision-mismatch" });
+  });
+
+  it("source metadata가 없는 legacy 공동 자동저장은 자동 재베이스하지 않는다", () => {
+    const legacy = parseStudioAutosave(
+      JSON.stringify({ pagesList: [{ id: "p1", elements: [{ id: "e1" }] }] })
+    );
+
+    expect(legacy).not.toBeNull();
+    expect(
+      studioSharedAutosaveCompatibility(legacy!, { workId: "shared-work", revision: 1 })
+    ).toEqual({ compatible: false, reason: "legacy-unversioned" });
   });
 
   it("캘리그래피 획의 필압·틸트·회전·펜촉 설정을 자동저장 왕복에서 보존한다", () => {

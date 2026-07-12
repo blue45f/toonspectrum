@@ -32,7 +32,33 @@ export type StudioAutosavePayload = {
   panelGutter?: unknown;
   currentPageId?: string;
   publishPack?: unknown;
+  /** Shared-work optimistic-concurrency source. Both fields are required for safe shared restore. */
+  sourceWorkId?: string;
+  sourceRevision?: number;
 };
+
+export type StudioSharedAutosaveCompatibility =
+  | { compatible: true; reason: "match" }
+  | {
+      compatible: false;
+      reason: "legacy-unversioned" | "work-mismatch" | "revision-mismatch";
+    };
+
+export function studioSharedAutosaveCompatibility(
+  payload: StudioAutosavePayload,
+  current: { workId: string; revision: number }
+): StudioSharedAutosaveCompatibility {
+  if (payload.sourceWorkId === undefined || payload.sourceRevision === undefined) {
+    return { compatible: false, reason: "legacy-unversioned" };
+  }
+  if (payload.sourceWorkId !== current.workId) {
+    return { compatible: false, reason: "work-mismatch" };
+  }
+  if (payload.sourceRevision !== current.revision) {
+    return { compatible: false, reason: "revision-mismatch" };
+  }
+  return { compatible: true, reason: "match" };
+}
 
 export function studioAutosaveKey(input: {
   userId?: string | null;
@@ -75,6 +101,16 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
       panelGutter: record.panelGutter,
       currentPageId: typeof record.currentPageId === "string" ? record.currentPageId : undefined,
       publishPack: record.publishPack,
+      sourceWorkId:
+        typeof record.sourceWorkId === "string" && record.sourceWorkId.trim().length > 0
+          ? record.sourceWorkId
+          : undefined,
+      sourceRevision:
+        typeof record.sourceRevision === "number" &&
+        Number.isSafeInteger(record.sourceRevision) &&
+        record.sourceRevision >= 1
+          ? record.sourceRevision
+          : undefined,
     };
   } catch {
     return null;

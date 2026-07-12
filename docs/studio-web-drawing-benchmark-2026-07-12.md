@@ -170,3 +170,87 @@ Magma의 협업은 캔버스 안의 커서뿐 아니라 초대 수락, 역할 �
 - 1280×900 우측 패널, 375×812 하단 시트 캡처 확인
 - 모바일 패널 하단 `700px`, 도구막대 상단 `700.40625px`, 겹침 `0px`, 간격 `0.40625px`
 - 앱 루트 `inert`, body/document 스크롤 잠금, Escape 닫기와 팀 버튼 포커스 복원 확인
+
+## 2026-07-12 공유 작품·원본 문서 ACL 체크포인트
+
+Clip Studio Teamwork의 **참여 작품을 별도 목록에서 찾아 여는 흐름**과 Magma Artspace의
+**프로젝트 단위 역할 접근**을 ToonSpectrum의 서버 revision 모델에 연결했다. 경쟁 제품의 배타 페이지
+편집이나 공유 캔버스를 곧바로 CRDT 실시간 편집으로 과장하지 않고, 먼저 모든 원본 읽기·저장 경로가
+같은 ACL과 충돌 규칙을 강제하도록 만들었다.
+
+- `GET /creator/team/works`에서 내가 소유한 작품과 수락한 팀 작품을 최근 수정순으로 함께 조회
+- 목록에는 작품 ID·제목·작품 형식(`cuttoon / upload`)·소유자 표시명·역할·capability·수정 시각만 포함하고 cover/pages/doc/revision,
+  사용자 ID, 초대 토큰은 제외해 모바일 응답과 개인정보 노출을 최소화
+- `updatedAt`이 없는 레거시 작품은 `createdAt`, 최종적으로 결정적 epoch로 폴백하고, PostgreSQL의
+  microsecond와 JavaScript millisecond 정밀도 차이를 `date_trunc('milliseconds', ...)`로 통일
+- 수정 시각 내림차순 뒤 작품 ID 내림차순을 tie-breaker로 쓰는 opaque cursor keyset 페이지네이션으로
+  50개를 넘는 팀 원고도 중복·누락·무한 경계 반복 없이 계속 조회
+- owner/admin/editor는 원본 읽기·저장, commenter/viewer는 원본 읽기만 허용하며 pending/declined는 차단
+- non-owner는 작품 소유자 계정도 `active`일 때만 목록·원본 읽기·저장이 가능
+- `GET /creator/works/:id/team/document`는 공개용으로 축약된 doc가 아니라 재편집 원본과 현재 revision을
+  private/no-store 응답으로 제공
+- `GET /creator/works/:id/team/document/meta`는 포커스 복귀·권한 변경 확인 때 제목·표지·페이지·doc·소유자
+  정보를 다시 내려받지 않고 역할·capability·revision·수정 시각만 확인
+- `PATCH /creator/works/:id/team/document`는 `baseRevision`과 최소 1개 변경 필드를 요구하고,
+  시리즈·챌린지·리믹스 관계, hidden, revision 등 소유 관계/관리 필드는 strict 거부
+- 생성 후 작품 형식은 데이터 구조 계약으로 보고 공동 PATCH에서 `format`을 DTO·클라이언트 allow-list와
+  repository/SQL primitive 양쪽에서 거부해 editor가 업로드↔컷툰을 우회 전환하지 못하게 함
+- 같은 endpoint를 쓰더라도 `status`와 `titleId`는 owner에게만 허용해 admin/editor가 작품을
+  게시·비공개 전환하거나 카탈로그 연결을 바꾸지 못하며, 팀 편집자는 원고 콘텐츠만 저장
+- 작품 행 → non-owner의 경우 소유자 행 순으로 잠근 같은 transaction에서 ACL 재검증, revision 비교,
+  조건부 UPDATE, 새 전체 snapshot 삽입, 최근 20개 retention을 처리
+- UPDATE SQL에도 active owner와 active admin/editor membership을 correlated `EXISTS`로 다시 넣어 내부 호출
+  실수와 역할 회수 경쟁에서도 fail-closed
+- Drizzle alias를 raw SQL에 잘못 보간해 원본 테이블 없는 `FROM alias`가 생기지 않도록 query-builder
+  subquery를 사용하고 생성 SQL의 실제 테이블+alias를 자동 검사
+- stale 저장은 문서 내용 없이 `409 creator_work_revision_conflict`와 현재 revision만 반환
+- snapshot 삽입 실패는 문서 본문·revision·updatedAt까지 롤백하고, 충돌·권한 거부는 UPDATE/INSERT 0회
+- 팀 패널의 **팀 작품** 목록에서 역할, 저장 가능 여부, 최근 수정 시각을 확인하고 컷툰은
+  `/studio?id=...`, 업로드형은 `/studio?mode=upload&id=...`로 형식 보존 전환
+- 목록 높이는 `min(18rem, 42dvh)` 안에서 독립 스크롤하고 50개 단위 **작품 더 불러오기**를 제공해
+  팀 메뉴 전체가 하단 도크·푸터 뒤로 길어지지 않게 유지
+- 로그인 계정 scope를 목록·문서·저장 응답에 함께 묶고 A→B 계정/작품 전환 뒤 도착한 응답은 UI·이동·
+  자동저장 정리에 적용하지 않음
+- 기존 작품 편집은 owner도 같은 공유 문서 GET/PATCH를 사용하며, owner-only 연출/버전 상세는 revision이
+  정확히 일치할 때만 보조 기능에 연결
+- viewer/commenter는 캔버스 포인터·Transformer·undo/redo·페이지/마스터/레이어/가져오기·로컬 댓글·
+  게시 메타·서버 저장을 잠그고, 스크롤·미니맵·내보내기와 팀 패널은 유지
+- 권한 로딩 중에는 빈 초기 캔버스 저장과 autosave를 차단하고, 실패하면 무한 로딩으로 위장하지 않고
+  잠금 이유와 44px 재시도 경로를 표시
+- 계정·작품·권한·문서 generation ticket을 비동기 AI/파일 가져오기/클립보드/복원/저장에 적용해,
+  계정 전환이나 권한 회수 뒤 늦게 끝난 작업이 새 계정 원고에 반영되지 않도록 차단
+- 공동 원고 로컬 자동저장에는 출처 작품 ID와 서버 revision을 함께 기록하고 둘이 현재 원본과 정확히
+  일치할 때만 자동 복구하며, 불일치·레거시는 원본에 적용하지 않고 JSON 백업으로 수동 병합 가능
+- 업로드형 원고도 같은 shared document ACL을 사용해 owner/admin/editor는 revision 기반 공동 저장,
+  commenter/viewer는 이미지·메타·저장 모두 읽기 전용으로 제공하고 owner만 공개 상태를 변경
+- 업로드 저장 직전 UTF-8 JSON 실제 직렬화 크기를 측정해 서버 16MB 한계보다 낮은 15MB에서 선제 차단하고,
+  원본 파일 1장/선택 묶음 크기와 PNG·JPEG·WebP 헤더의 실제 해상도를 디코딩 전에 검사해 모바일 OOM 완화
+- 최대 40장 업로드 목록은 `52dvh / 36rem` 독립 스크롤과 content visibility를 사용하고, 320px에서는
+  이동·삭제 44px 조작을 별도 행으로 재배치하며 저장 액션은 정상 흐름에서 입력 뒤에 배치한 뒤 도달
+  시에만 상단 safe-area에 고정해 작품 정보·하단 푸터를 덮지 않게 유지
+
+공식 근거:
+
+- [Clip Studio Teamwork](https://tips.clip-studio.com/en-us/articles/4777)
+- [Magma Artspaces](https://help.magma.com/en/articles/13346727-introduction-to-artspaces)
+- [Magma 역할·참가자 권한](https://help.magma.com/en/articles/13713941-managing-your-canvas-permissions-roles-and-participants)
+- [Magma 레이어 제어](https://help.magma.com/en/articles/6413262-creating-a-layer-and-layer-controls)
+
+현재 `commenter`는 **검토 전용 원본 열람 역할**이며 서버 앵커 댓글을 제공한다고 표시하지 않는다. 실제
+서버 리뷰 스레드, presence, 페이지/레이어 soft lock, 원격 커서, operation stream은 다음 체크포인트에서
+각각의 권한 predicate·만료·복구 테스트를 연결한 뒤에만 제공 기능으로 표시한다.
+
+검증 범위:
+
+- 신규/회귀 API·클라이언트·팀 UI·업로드·저장 용량 경계 대상 16개 파일, 287개 테스트 통과
+- owner/admin/editor/commenter/viewer·pending/declined, 비활성 소유자, stale revision, snapshot rollback 검증
+- 생성된 PostgreSQL UPDATE의 correlated 원본 테이블 alias와 revision 조건을 `toSQL()`로 검사
+- 개발 PostgreSQL에 기존 forward-only 협업 멤버십·감사 migration을 적용하고, 실제 HTTP에서 소유자 초대 →
+  편집자 수락 → 형식별 keyset 목록 → 원본/meta 조회 → revision 저장 → stale 409 → owner 필드 403 →
+  viewer 읽기 200/쓰기 403 → 삭제 cascade까지 확인
+- `tsx` 개발 서버에서도 explicit Zod pipe로 `limit=1` cursor 페이지가 1건씩 중복 없이 이어지고,
+  범위 밖/unknown query와 shared `format` 변경 body가 500이 아닌 strict 400으로 종료됨을 확인
+- 1280×900 팀 우측 패널과 375×812 팀 하단 시트·업로드 화면을 실캡처하고, 모바일 팀 패널 하단
+  `700px`, 도구막대 상단 `700.40625px`, 겹침 `0px` 확인
+- 모바일 업로드 저장 도크를 작품 정보와 겹치지 않는 상단 sticky 방식으로 재배치하고 입력/도크 겹침
+  `0px`, 브라우저 콘솔 오류 `0건` 확인
