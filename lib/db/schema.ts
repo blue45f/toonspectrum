@@ -432,6 +432,47 @@ export const creatorWorkRevisions = pgTable(
   ]
 );
 
+// 작품 소유자는 creator_work.userId로 판정하며 이 테이블에는 넣지 않는다. 멤버 행은 초대부터
+// 수락/거절까지의 상태를 보존해 팀 관리 API와 이후 실시간 presence 권한의 단일 근거로 사용한다.
+export const creatorWorkCollaborators = pgTable(
+  "creator_work_collaborator",
+  {
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("viewer"),
+    status: text("status").notNull().default("pending"),
+    // 초대 조건(역할)이 바뀌거나 재초대될 때 회전하는 동의 토큰이다.
+    invitationId: text("invitationId").notNull(),
+    // 초대한 관리자가 탈퇴해도 이미 수락한 팀 멤버십은 유지한다.
+    invitedBy: text("invitedBy").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    respondedAt: timestamp("respondedAt", { mode: "date", withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ name: "creator_work_collaborator_pkey", columns: [t.workId, t.userId] }),
+    index("idx_creator_work_collaborator_user_status_updated").on(t.userId, t.status, t.updatedAt),
+    index("idx_creator_work_collaborator_work_status_role").on(t.workId, t.status, t.role),
+    index("idx_creator_work_collaborator_invited_by").on(t.invitedBy),
+    check(
+      "creator_work_collaborator_role_check",
+      sql`${t.role} in ('admin', 'editor', 'commenter', 'viewer')`
+    ),
+    check(
+      "creator_work_collaborator_status_check",
+      sql`${t.status} in ('pending', 'active', 'declined')`
+    ),
+    check(
+      "creator_work_collaborator_response_state_check",
+      sql`(${t.status} = 'pending' and ${t.respondedAt} is null) or (${t.status} in ('active', 'declined') and ${t.respondedAt} is not null)`
+    ),
+  ]
+);
+
 // ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
 // author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
 export const creatorSeries = pgTable("creator_series", {

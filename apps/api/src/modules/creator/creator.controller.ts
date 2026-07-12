@@ -15,10 +15,15 @@ import {
 
 import {
   CreateCreatorWorkDto,
+  CreatorTeamMemberParamsDto,
+  CreatorTeamWorkParamsDto,
   CreatorWorkRevisionListParamsDto,
   CreatorWorkRevisionListQueryDto,
   CreatorWorkRevisionParamsDto,
+  InviteCreatorTeamMemberDto,
+  RespondCreatorTeamInvitationDto,
   RestoreCreatorWorkRevisionDto,
+  UpdateCreatorTeamMemberDto,
   UpdateCreatorWorkDto,
 } from "./creator.dto";
 import { CreatorService } from "./creator.service";
@@ -104,6 +109,65 @@ export class CreatorController {
       params.id,
       params.revision,
       body.baseRevision
+    );
+  }
+
+  @Get("/creator/works/:id/team")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getWorkTeam(
+    @Param() params: CreatorTeamWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.getWorkTeam(uid, params.id);
+  }
+
+  @Post("/creator/works/:id/team")
+  async inviteWorkTeamMember(
+    @Param() params: CreatorTeamWorkParamsDto,
+    @Body() body: InviteCreatorTeamMemberDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.inviteWorkTeamMember(uid, params.id, body.userId, body.role);
+  }
+
+  @Patch("/creator/works/:id/team/members/:userId")
+  async updateWorkTeamMemberRole(
+    @Param() params: CreatorTeamMemberParamsDto,
+    @Body() body: UpdateCreatorTeamMemberDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.updateWorkTeamMemberRole(
+      uid,
+      params.id,
+      params.userId,
+      body.role
+    );
+  }
+
+  @Delete("/creator/works/:id/team/members/:userId")
+  async removeWorkTeamMember(
+    @Param() params: CreatorTeamMemberParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.removeWorkTeamMember(uid, params.id, params.userId);
+  }
+
+  @Post("/creator/works/:id/team/invitations/respond")
+  async respondToWorkTeamInvitation(
+    @Param() params: CreatorTeamWorkParamsDto,
+    @Body() body: RespondCreatorTeamInvitationDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.respondToWorkTeamInvitation(
+      uid,
+      params.id,
+      body.action,
+      body.invitationId
     );
   }
 

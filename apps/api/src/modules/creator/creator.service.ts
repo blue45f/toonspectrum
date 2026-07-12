@@ -1,9 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -44,6 +47,15 @@ import {
   CreatorWorkRevisionNotFoundError,
 } from "../../../../../lib/server/creator-work-revisions";
 
+import {
+  CreatorCollaborationConflictError,
+  CreatorCollaborationForbiddenError,
+  CreatorCollaborationInvalidTargetError,
+  CreatorCollaborationNotFoundError,
+  CreatorCollaborationRepository,
+} from "./creator-collaboration.repository";
+
+import type { CreatorCollaborationRole } from "./creator-collaboration.policy";
 import type { CreateCreatorWorkDto, UpdateCreatorWorkDto } from "./creator.dto";
 
 interface ListQuery {
@@ -57,6 +69,13 @@ interface ListQuery {
 
 @Injectable()
 export class CreatorService {
+  private readonly logger = new Logger(CreatorService.name);
+
+  constructor(
+    @Inject(CreatorCollaborationRepository)
+    private readonly creatorCollaborationRepository: CreatorCollaborationRepository
+  ) {}
+
   async listWorks(q: ListQuery, viewerId?: string) {
     return listWorks({
       titleId: q.titleId ?? undefined,
@@ -139,6 +158,60 @@ export class CreatorService {
       }
       throw new BadRequestException("작품 revision을 복원할 수 없습니다.");
     }
+  }
+
+  async getWorkTeam(userId: string, workId: string) {
+    return this.runCreatorCollaborationOperation("get_team", workId, () =>
+      this.creatorCollaborationRepository.getTeam(userId, workId)
+    );
+  }
+
+  async inviteWorkTeamMember(
+    userId: string,
+    workId: string,
+    targetUserId: string,
+    role: CreatorCollaborationRole
+  ) {
+    if (!rateLimit(`creator-team-invite:${userId}:${workId}`, 30, 60 * 60_000)) {
+      throw new HttpException(
+        {
+          code: "creator_team_invite_rate_limited",
+          message: "팀 초대 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+        },
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
+    return this.runCreatorCollaborationOperation("invite_member", workId, () =>
+      this.creatorCollaborationRepository.invite(userId, workId, targetUserId, role)
+    );
+  }
+
+  async updateWorkTeamMemberRole(
+    userId: string,
+    workId: string,
+    targetUserId: string,
+    role: CreatorCollaborationRole
+  ) {
+    return this.runCreatorCollaborationOperation("update_member_role", workId, () =>
+      this.creatorCollaborationRepository.updateMemberRole(userId, workId, targetUserId, role)
+    );
+  }
+
+  async removeWorkTeamMember(userId: string, workId: string, targetUserId: string) {
+    return this.runCreatorCollaborationOperation("remove_member", workId, () =>
+      this.creatorCollaborationRepository.removeMember(userId, workId, targetUserId)
+    );
+  }
+
+  async respondToWorkTeamInvitation(
+    userId: string,
+    workId: string,
+    action: "accept" | "decline",
+    invitationId: string
+  ) {
+    return this.runCreatorCollaborationOperation("respond_invitation", workId, () =>
+      this.creatorCollaborationRepository.respondToInvitation(userId, workId, action, invitationId)
+    );
   }
 
   async deleteWork(userId: string, id: string, isAdmin: boolean) {
@@ -283,5 +356,67 @@ export class CreatorService {
   // 팔로잉 피드 — 팔로우한 창작자의 최신 작품.
   async listFollowingFeed(viewerId: string) {
     return listWorks({ followedBy: viewerId, viewerId, sort: "recent" });
+  }
+
+  private async runCreatorCollaborationOperation<T>(
+    operationName: string,
+    workId: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof CreatorCollaborationNotFoundError) {
+        throw new NotFoundException(
+          error.code === "work_not_found"
+            ? "작품을 찾을 수 없습니다."
+            : error.code === "member_not_found"
+              ? "팀원을 찾을 수 없습니다."
+              : "대기 중인 초대를 찾을 수 없습니다."
+        );
+      }
+      if (error instanceof CreatorCollaborationForbiddenError) {
+        throw new ForbiddenException(
+          error.code === "team_access_denied"
+            ? "이 작품의 팀 목록을 볼 권한이 없습니다."
+            : "팀원을 관리할 권한이 없습니다."
+        );
+      }
+      if (error instanceof CreatorCollaborationConflictError) {
+        const messages: Record<typeof error.code, string> = {
+          member_already_active: "이미 참여 중인 팀원입니다.",
+          invitation_already_pending: "이미 응답을 기다리는 초대가 있습니다.",
+          invitation_not_pending: "이미 처리되었거나 더 이상 응답할 수 없는 초대입니다.",
+          invitation_changed: "초대 내용이 변경되었습니다. 최신 팀 정보를 불러온 뒤 다시 선택해 주세요.",
+          member_limit_reached: "팀 정원이 가득 찼습니다. 기존 팀원을 정리한 뒤 다시 시도해 주세요.",
+          reinvite_cooldown: "최근 처리된 초대입니다. 잠시 후 다시 시도해 주세요.",
+        };
+        throw new ConflictException({ code: error.code, message: messages[error.code] });
+      }
+      if (error instanceof CreatorCollaborationInvalidTargetError) {
+        throw new BadRequestException(
+          error.code === "owner_or_self_target"
+            ? "작품 소유자 또는 본인은 초대할 수 없습니다."
+            : error.code === "target_user_unavailable"
+              ? "초대할 수 있는 활성 회원을 찾지 못했습니다."
+              : "팀 요청 내용이 올바르지 않습니다."
+        );
+      }
+      const errorType =
+        error instanceof Error ? error.name.replace(/[^A-Za-z0-9_$.-]/g, "?").slice(0, 80) : typeof error;
+      const sanitizedTrace =
+        error instanceof Error
+          ? error.stack
+              ?.split("\n")
+              .filter((line) => /^\s+at\s/.test(line))
+              .slice(0, 12)
+              .join("\n")
+          : undefined;
+      this.logger.error(
+        `Creator collaboration ${operationName} failed for work=${JSON.stringify(workId.slice(0, 160))}; cause=${errorType}`,
+        sanitizedTrace
+      );
+      throw new ServiceUnavailableException("팀 작업 공간을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+    }
   }
 }

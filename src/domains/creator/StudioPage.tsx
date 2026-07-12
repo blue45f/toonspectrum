@@ -62,6 +62,7 @@ import {
   Lock,
   LockOpen,
   MessageCircle,
+  UsersRound,
   Minus,
   MousePointer2,
   PaintBucket,
@@ -1111,6 +1112,13 @@ const StudioCommentsPanel = lazyRetry(
       default: mod.StudioCommentsPanel,
     })),
   "StudioCommentsPanel"
+);
+const StudioTeamPanel = lazyRetry(
+  () =>
+    import("./StudioTeamPanel").then((mod) => ({
+      default: mod.StudioTeamPanel,
+    })),
+  "StudioTeamPanel"
 );
 function loadStudioReferencePanel() {
   return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
@@ -4032,6 +4040,7 @@ function StudioCuttoonEditor() {
     : null;
   const [pageReviewOpen, setPageReviewOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [productionInsightsOpen, setProductionInsightsOpen] = useState(false);
   const [publicationOperationsOpen, setPublicationOperationsOpen] = useState(false);
   const [checkpoints, setCheckpoints] = useState<StudioCheckpoint[]>([]);
@@ -15798,7 +15807,10 @@ function StudioCuttoonEditor() {
         </button>
         <button
           type="button"
-          onClick={() => setCommentsOpen(true)}
+          onClick={() => {
+            setTeamPanelOpen(false);
+            setCommentsOpen(true);
+          }}
           aria-pressed={commentsOpen}
           aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
           className={cn(toolBtn(commentsOpen), "relative")}
@@ -15812,6 +15824,19 @@ function StudioCuttoonEditor() {
               {Math.min(openStudioCommentCount, 99)}
             </span>
           ) : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCommentsOpen(false);
+            setTeamPanelOpen(true);
+          }}
+          aria-pressed={teamPanelOpen}
+          aria-label="팀 작업 공간"
+          className={toolBtn(teamPanelOpen)}
+          title="작품 팀원 초대·역할·서버 권한 관리"
+        >
+          <UsersRound size={14} />
         </button>
         <button
           type="button"
@@ -22203,6 +22228,17 @@ function StudioCuttoonEditor() {
             currentActor={studioCommentActor}
             anchorOptions={studioCommentAnchorOptions}
             onSelectAnchor={selectStudioCommentAnchor}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {teamPanelOpen ? (
+          <StudioTeamPanel
+            open
+            onClose={() => setTeamPanelOpen(false)}
+            workId={workId}
+            loggedIn={loggedIn}
           />
         ) : null}
       </Suspense>
