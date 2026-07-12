@@ -66,7 +66,7 @@ export interface PropDef {
   hint: string;
 }
 
-/* ── 소품 카탈로그(18종) ─────────────────────────────────────────────── */
+/* ── 소품 카탈로그(현대·판타지·의료 직업 소품) ──────────────────────── */
 
 export const VRM_PROPS: readonly PropDef[] = [
   // 손 소품
@@ -78,6 +78,9 @@ export const VRM_PROPS: readonly PropDef[] = [
   { id: "book", label: "책", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.01, 0.04], defaultRotationDeg: [60, 0, 0], defaultScale: 1, defaultColor: "#7a3b3b", hint: "학원물·독서 컷. 두 손에 각각 얹어도 좋아요." },
   { id: "fan", label: "부채", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.01], defaultRotationDeg: [0, 0, 20], defaultScale: 1, defaultColor: "#d8475e", hint: "사극·여름 컷. 펼친 각도를 회전으로." },
   { id: "bouquet", label: "꽃다발", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.03, 0.02], defaultRotationDeg: [-15, 0, 0], defaultScale: 1, defaultColor: "#e86a9b", hint: "고백·축하 컷. 색상으로 꽃 색을 바꾸세요." },
+  { id: "clipboard", label: "의료 차트", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.02, 0.04], defaultRotationDeg: [70, 0, 5], defaultScale: 1, defaultColor: "#d6b37a", hint: "회진·진료 컷. 왼손 안쪽으로 붙여 차트를 받쳐 주세요." },
+  { id: "syringe", label: "주사기", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, -80], defaultScale: 0.9, defaultColor: "#dbeafe", hint: "처치·실험 컷. 손가락 사이에 오도록 위치와 크기를 조정하세요." },
+  { id: "medicalBag", label: "응급 의료 가방", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, -0.06, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#dc2626", hint: "응급실·구급대 컷. 손 아래에 매달리도록 배치됩니다." },
   // 머리 소품
   { id: "cap", label: "캡모자", category: "head", defaultBone: "head", defaultPosition: [0, 0.08, 0.01], defaultRotationDeg: [-8, 0, 0], defaultScale: 1, defaultColor: "#2b3a55", hint: "캐주얼 컷. 앞뒤로 당겨 깊이를 맞추세요." },
   { id: "beret", label: "베레모", category: "head", defaultBone: "head", defaultPosition: [-0.03, 0.09, 0], defaultRotationDeg: [0, 0, 12], defaultScale: 1, defaultColor: "#7a3b52", hint: "아트·감성 컷. 한쪽으로 비스듬히." },
@@ -85,11 +88,15 @@ export const VRM_PROPS: readonly PropDef[] = [
   { id: "sunglasses", label: "선글라스", category: "head", defaultBone: "head", defaultPosition: [0, 0.02, 0.07], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#101014", hint: "쿨한 컷. 살짝 내려 콧등에 걸쳐도." },
   { id: "crown", label: "왕관", category: "head", defaultBone: "head", defaultPosition: [0, 0.11, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e7c14b", hint: "공주·왕자 컷. 색으로 금/은을 선택." },
   { id: "ribbon", label: "머리 리본", category: "head", defaultBone: "head", defaultPosition: [0.05, 0.08, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e8536e", hint: "소녀 캐릭터. 좌우로 옮겨 사이드 포인트." },
+  { id: "surgicalCap", label: "수술 모자", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#0f766e", hint: "수술실 컷. 머리 크기에 맞춰 스케일과 높이를 조정하세요." },
+  { id: "faceMask", label: "의료 마스크", category: "head", defaultBone: "head", defaultPosition: [0, -0.025, 0.085], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#bfdbfe", hint: "수술·감염병 컷. 얼굴 앞쪽으로 당겨 코와 입을 덮습니다." },
   // 몸 소품
   { id: "backpack", label: "백팩", category: "body", defaultBone: "chest", defaultPosition: [0, -0.05, -0.1], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#3b4a3b", hint: "학생·여행 컷. 등 쪽으로 밀어 자연스럽게." },
   { id: "shoulderbag", label: "숄더백", category: "body", defaultBone: "chest", defaultPosition: [0.08, -0.08, 0.04], defaultRotationDeg: [0, 0, 10], defaultScale: 1, defaultColor: "#5a4632", hint: "데일리 컷. 한쪽 어깨로 사선 배치." },
   { id: "cape", label: "망토", category: "body", defaultBone: "chest", defaultPosition: [0, 0, -0.06], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#3a2b55", hint: "히어로·판타지 컷. 색으로 진영을 표현." },
   { id: "wings", label: "날개", category: "body", defaultBone: "chest", defaultPosition: [0, 0.02, -0.08], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f2f2f5", hint: "천사·요정 컷. 스케일을 키워 존재감을." },
+  { id: "stethoscope", label: "청진기", category: "body", defaultBone: "neck", defaultPosition: [0, -0.055, 0.055], defaultRotationDeg: [90, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "의사·간호사 컷. 목 아래에 걸리도록 위치를 미세 조정하세요." },
+  { id: "idBadge", label: "의료진 명찰", category: "body", defaultBone: "chest", defaultPosition: [0.08, 0.02, 0.09], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "병원·연구실 컷. 가슴 한쪽에 붙는 ID 카드입니다." },
   // 추가 12종 (손/머리/몸 다양)
   { id: "umbrella", label: "우산", category: "hand", defaultBone: "rightHand", defaultPosition: [0.03, 0.05, 0.02], defaultRotationDeg: [0, 0, 10], defaultScale: 1.1, defaultColor: "#1e293b", hint: "비·그늘 컷. 색으로 천 변경." },
   { id: "flute", label: "플루트", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0, 0.01], defaultRotationDeg: [80, 10, 0], defaultScale: 0.9, defaultColor: "#854d0e", hint: "음악·판타지." },
@@ -322,6 +329,42 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       }
       break;
     }
+    case "clipboard": {
+      group.add(mesh(new three.BoxGeometry(0.145, 0.205, 0.012), mat(0.72, 0.05)));
+      const paper = mesh(new three.BoxGeometry(0.125, 0.175, 0.002), mat(0.92, 0, "#f8fafc"));
+      paper.position.set(0, -0.004, 0.008);
+      group.add(paper);
+      const clip = mesh(new three.BoxGeometry(0.045, 0.025, 0.01), mat(0.28, 0.72, "#94a3b8"));
+      clip.position.set(0, 0.095, 0.012);
+      group.add(clip);
+      break;
+    }
+    case "syringe": {
+      group.add(mesh(new three.CylinderGeometry(0.014, 0.014, 0.16, 16), mat(0.18, 0.05, "#dbeafe")));
+      const plunger = mesh(new three.CylinderGeometry(0.007, 0.007, 0.09, 12), mat(0.35, 0.25, "#64748b"));
+      plunger.position.set(0, -0.115, 0);
+      group.add(plunger);
+      const flange = mesh(new three.BoxGeometry(0.065, 0.012, 0.018), mat(0.4, 0.12, hex));
+      flange.position.set(0, -0.08, 0);
+      group.add(flange);
+      const needle = mesh(new three.CylinderGeometry(0.0015, 0.0015, 0.1, 8), mat(0.2, 0.9, "#cbd5e1"));
+      needle.position.set(0, 0.13, 0);
+      group.add(needle);
+      break;
+    }
+    case "medicalBag": {
+      group.add(mesh(new three.BoxGeometry(0.24, 0.16, 0.1), mat(0.72, 0.08)));
+      const handle = mesh(new three.TorusGeometry(0.065, 0.012, 8, 20, Math.PI), mat(0.58, 0.1, "#7f1d1d"));
+      handle.position.set(0, 0.09, 0);
+      group.add(handle);
+      const crossVertical = mesh(new three.BoxGeometry(0.025, 0.09, 0.008), mat(0.5, 0.05, "#f8fafc"));
+      crossVertical.position.set(0, 0, 0.055);
+      group.add(crossVertical);
+      const crossHorizontal = mesh(new three.BoxGeometry(0.09, 0.025, 0.008), mat(0.5, 0.05, "#f8fafc"));
+      crossHorizontal.position.set(0, 0, 0.055);
+      group.add(crossHorizontal);
+      break;
+    }
     case "cap": {
       group.add(mesh(new three.SphereGeometry(0.1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0.6)));
       const brim = mesh(new three.BoxGeometry(0.16, 0.01, 0.1), mat(0.6));
@@ -381,6 +424,24 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       group.add(knot);
       break;
     }
+    case "surgicalCap": {
+      group.add(mesh(new three.SphereGeometry(0.105, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0.82, 0.02)));
+      const band = mesh(new three.TorusGeometry(0.09, 0.008, 8, 24), mat(0.72, 0.02, hex));
+      band.rotation.set(Math.PI / 2, 0, 0);
+      group.add(band);
+      break;
+    }
+    case "faceMask": {
+      const mask = mesh(new three.BoxGeometry(0.12, 0.075, 0.012), mat(0.86, 0.01));
+      group.add(mask);
+      for (const side of [-1, 1] as const) {
+        const strap = mesh(new three.TorusGeometry(0.035, 0.003, 6, 16, Math.PI), mat(0.65, 0, "#f8fafc"));
+        strap.position.set(side * 0.072, 0, -0.005);
+        strap.rotation.set(Math.PI / 2, side > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+        group.add(strap);
+      }
+      break;
+    }
     case "backpack": {
       group.add(mesh(new three.BoxGeometry(0.18, 0.24, 0.1), mat(0.7)));
       const pocket = mesh(new three.BoxGeometry(0.14, 0.1, 0.04), mat(0.7));
@@ -409,6 +470,35 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
         wing.scale.setScalar(1);
         group.add(wing);
       }
+      break;
+    }
+    case "stethoscope": {
+      const tube = mesh(new three.TorusGeometry(0.09, 0.006, 8, 28, Math.PI * 1.55), mat(0.64, 0.05));
+      tube.rotation.set(0, 0, Math.PI * 0.72);
+      group.add(tube);
+      for (const side of [-1, 1] as const) {
+        const earpiece = mesh(new three.CylinderGeometry(0.004, 0.004, 0.09, 8), mat(0.55, 0.18, "#94a3b8"));
+        earpiece.position.set(side * 0.055, 0.08, 0);
+        earpiece.rotation.set(0, 0, side * 0.38);
+        group.add(earpiece);
+      }
+      const chestPiece = mesh(new three.CylinderGeometry(0.022, 0.022, 0.008, 20), mat(0.25, 0.8, "#cbd5e1"));
+      chestPiece.position.set(0, -0.105, 0);
+      chestPiece.rotation.set(Math.PI / 2, 0, 0);
+      group.add(chestPiece);
+      break;
+    }
+    case "idBadge": {
+      group.add(mesh(new three.BoxGeometry(0.065, 0.09, 0.008), mat(0.74, 0.04)));
+      const portrait = mesh(new three.BoxGeometry(0.022, 0.028, 0.003), mat(0.55, 0.04, "#93c5fd"));
+      portrait.position.set(-0.015, 0.015, 0.006);
+      group.add(portrait);
+      const stripe = mesh(new three.BoxGeometry(0.055, 0.008, 0.003), mat(0.5, 0.05, "#2563eb"));
+      stripe.position.set(0, -0.025, 0.006);
+      group.add(stripe);
+      const clip = mesh(new three.BoxGeometry(0.018, 0.018, 0.01), mat(0.3, 0.65, "#94a3b8"));
+      clip.position.set(0, 0.052, 0);
+      group.add(clip);
       break;
     }
     case "umbrella": {

@@ -144,6 +144,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       applyCostume: (c: any) => { calls.push("costume:" + (c ? "yes" : "no")); },
       applyProps: (p: any) => { calls.push("props:" + (p?.items ? "yes" : "no")); },
       applyPhysics: (p: any) => { calls.push("physics:" + (p ? "yes" : "no")); },
+      applyCustomColors: (colors: Record<string, string>) => { calls.push("colors:" + colors.face); },
     };
 
     const fullState = {
@@ -152,6 +153,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       costume: { hidden: ["foo"] },
       props: { items: [{ uid: "1" }] },
       physics: { stiffnessScale: 1 },
+      customColors: { face: "#123456" },
     } as any;
 
     applyFullState(vrm, fullState, mockApplyers);
@@ -159,6 +161,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(calls).toContain("costume:yes");
     expect(calls).toContain("props:yes");
     expect(calls).toContain("physics:yes");
+    expect(calls).toContain("colors:#123456");
   });
 
   it("planFullStateRestore returns complete plan with stripped bones for maximal AC2 input", () => {
@@ -177,6 +180,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       costume: { hidden: ["x"] },
       props: { items: [{ uid: "p1" }] },
       physics: { stiffnessScale: 1.1 },
+      customColors: { face: "#123456", body: "#123456" },
     } as any;
 
     const plan = planFullStateRestore(input);
@@ -191,6 +195,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect((plan.costume as any)?.hidden).toContain("x");
     expect((plan.propsItems as any)?.[0]?.uid).toBe("p1");
     expect((plan.physics as any)?.stiffnessScale).toBe(1.1);
+    expect(plan.customColors?.face).toBe("#123456");
   });
 });
 

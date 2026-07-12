@@ -12,6 +12,7 @@ import {
   applyWardrobeSet,
   buildGarmentParts,
   createWardrobeEquip,
+  mergeWardrobeCostumeVisibility,
   parseWardrobe,
   sanitizeWardrobeMetrics,
   serializeWardrobe,
@@ -28,10 +29,20 @@ describe("워드로브 카탈로그", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("슬롯별 6종씩 24종이 등록되어 있다", () => {
-    expect(WARDROBE_ITEMS.length).toBe(24);
+  it("슬롯별 7종씩 28종이 등록되어 있다", () => {
+    expect(WARDROBE_ITEMS.length).toBe(28);
     for (const slot of WARDROBE_SLOTS) {
-      expect(wardrobeItemsBySlot(slot).length).toBe(6);
+      expect(wardrobeItemsBySlot(slot).length).toBe(7);
+    }
+  });
+
+  it("의료 가운·스크럽·팬츠·클로그를 실제 파츠로 제공한다", () => {
+    expect(wardrobeItemById("labcoat")?.slot).toBe("outer");
+    expect(wardrobeItemById("scrubs")?.slot).toBe("top");
+    expect(wardrobeItemById("scrubpants")?.slot).toBe("bottom");
+    expect(wardrobeItemById("clogs")?.slot).toBe("shoes");
+    for (const id of ["labcoat", "scrubs", "scrubpants", "clogs"]) {
+      expect(buildGarmentParts(id, FALLBACK_WARDROBE_METRICS).length, id).toBeGreaterThan(1);
     }
   });
 
@@ -46,6 +57,62 @@ describe("워드로브 카탈로그", () => {
   it("wardrobeItemById는 미지의 id에 undefined를 준다", () => {
     expect(wardrobeItemById("no-such-item")).toBeUndefined();
     expect(wardrobeItemById("blazer")?.slot).toBe("outer");
+  });
+});
+
+describe("베이크드 의상 자동 숨김", () => {
+  const meshes = [
+    { key: "shirt-mesh", slot: "tops" as const },
+    { key: "coat-mesh", slot: "outer" as const },
+    { key: "pants-mesh", slot: "bottoms" as const },
+    { key: "dress-mesh", slot: "onepiece" as const },
+    { key: "shoes-mesh", slot: "shoes" as const },
+    { key: "accessory-mesh", slot: "accessory" as const },
+  ];
+
+  it("복원된 워드로브와 겹치는 원본 의상만 숨긴다", () => {
+    const wardrobe = applyWardrobeSet(WARDROBE_SETS.find((set) => set.id === "doctor")!);
+    const result = mergeWardrobeCostumeVisibility(
+      { hidden: ["manual-hidden"], recolor: { "shirt-mesh": "#123456" } },
+      wardrobe,
+      meshes,
+      true,
+    );
+
+    expect(result.hidden).toEqual(expect.arrayContaining([
+      "manual-hidden",
+      "shirt-mesh",
+      "coat-mesh",
+      "pants-mesh",
+      "dress-mesh",
+      "shoes-mesh",
+    ]));
+    expect(result.hidden).not.toContain("accessory-mesh");
+    expect(result.recolor).toEqual({ "shirt-mesh": "#123456" });
+  });
+
+  it("자동 숨김을 끄면 사용자 상태만 복제해 반환한다", () => {
+    const original = { hidden: ["manual-hidden"], recolor: { "shirt-mesh": "#123456" } };
+    const result = mergeWardrobeCostumeVisibility(
+      original,
+      applyWardrobeSet(WARDROBE_SETS.find((set) => set.id === "doctor")!),
+      meshes,
+      false,
+    );
+
+    expect(result).toEqual(original);
+    expect(result).not.toBe(original);
+    expect(result.hidden).not.toBe(original.hidden);
+    expect(result.recolor).not.toBe(original.recolor);
+  });
+
+  it("빈 워드로브는 원본 의상 가시성을 바꾸지 않고 중복 숨김 키를 제거한다", () => {
+    expect(mergeWardrobeCostumeVisibility(
+      { hidden: ["shirt-mesh", "shirt-mesh"], recolor: {} },
+      {},
+      meshes,
+      true,
+    )).toEqual({ hidden: ["shirt-mesh"], recolor: {} });
   });
 });
 

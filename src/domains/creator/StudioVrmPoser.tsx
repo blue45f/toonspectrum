@@ -1,16 +1,29 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
+  STUDIO_VRM_AGE_LABELS,
+  STUDIO_VRM_CHARACTER_RECIPES,
+  STUDIO_VRM_OCCUPATION_LABELS,
+  STUDIO_VRM_PRESENTATION_LABELS,
+  filterStudioVrmCharacterRecipes,
+  type StudioVrmAgeBand,
+  type StudioVrmCharacterRecipe,
+  type StudioVrmOccupation,
+  type StudioVrmPresentation,
+} from "./studio-vrm-character-recipes";
+import {
   classifyMeshName,
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
+  parseCostumeState,
   tintColor,
   serializeCostume,
   type CostumeState,
@@ -90,6 +103,7 @@ import {
   applyWardrobeSet,
   createWardrobeEquip,
   buildGarmentParts,
+  mergeWardrobeCostumeVisibility,
   parseWardrobe,
   serializeWardrobe,
   sanitizeWardrobeMetrics,
@@ -310,6 +324,36 @@ const COSTUME_PRESETS: CostumePreset[] = [
     emoji: "👨‍🚀",
     colors: { tops: "#f97316", bottoms: "#e2e8f0", hair: "#475569", body: "#f1f5f9", face: "#f1f5f9" },
   },
+  {
+    id: "office",
+    name: "오피스 정장",
+    emoji: "💼",
+    colors: { tops: "#f8fafc", bottoms: "#111827", hair: "#2b211f", body: "#c98b68", face: "#c98b68" },
+  },
+  {
+    id: "doctor",
+    name: "의사 가운",
+    emoji: "🥼",
+    colors: { tops: "#f8fafc", bottoms: "#155e75", hair: "#3b2b27", body: "#dca982", face: "#dca982" },
+  },
+  {
+    id: "surgeon",
+    name: "외과 수술복",
+    emoji: "🩺",
+    colors: { tops: "#0f766e", bottoms: "#115e59", hair: "#242124", body: "#9f684e", face: "#9f684e" },
+  },
+  {
+    id: "nurse",
+    name: "간호 스크럽",
+    emoji: "🏥",
+    colors: { tops: "#60a5fa", bottoms: "#2563eb", hair: "#49352f", body: "#efd1bb", face: "#efd1bb" },
+  },
+  {
+    id: "paramedic",
+    name: "응급구조사",
+    emoji: "🚑",
+    colors: { tops: "#f97316", bottoms: "#1e293b", hair: "#252027", body: "#b87855", face: "#b87855" },
+  },
   // 추가 10종 (장르 다양성: 웹툰·판타지·현대·전통·코스프레)
   {
     id: "idol",
@@ -375,6 +419,13 @@ const COSTUME_PRESETS: CostumePreset[] = [
 
 const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
+const DEFAULT_VRM_CUSTOM_COLORS: Record<string, string> = {
+  tops: "#ffffff",
+  bottoms: "#ffffff",
+  hair: "#ffffff",
+  body: "#ffffff",
+  face: "#ffffff",
+};
 // 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손 + 척추/가슴).
 // 머리·목은 이미 얼굴 채널에서 EMA 스무딩되므로 제외.
 const LIMB_BONE_RE = /Arm|Leg|Foot|Hand|[Ss]pine|[Cc]hest/;
@@ -404,14 +455,76 @@ const FACE_LOST_HINT_FRAMES = 150;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
+const LIBRARY_BATCH_SIZE = 12;
 const HTML_FALLBACK_VRM_ERROR = "VRM 파일 대신 웹 페이지가 응답했습니다. 배포에 해당 .vrm 파일이 포함되어 있는지 확인해 주세요.";
 
 const CONTROL_BUTTON =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
-  "inline-grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "inline-grid size-11 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const VIEWPORT_BTN =
-  "grid size-9 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+function VrmColorControl({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (hex: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => setDraft(value), [value]);
+
+  function handleDraftChange(next: string) {
+    setDraft(next);
+    if (HEX_COLOR_PATTERN.test(next)) onChange(next.toLowerCase());
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <input
+        type="color"
+        value={HEX_COLOR_PATTERN.test(value) ? value : "#ffffff"}
+        disabled={disabled}
+        aria-label={`${label} 색상 선택`}
+        onChange={(event) => onChange(event.target.value)}
+        className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-0 disabled:cursor-not-allowed"
+      />
+      <input
+        type="text"
+        value={draft}
+        disabled={disabled}
+        aria-label={`${label} HEX 색상`}
+        aria-invalid={!HEX_COLOR_PATTERN.test(draft)}
+        autoCapitalize="none"
+        autoCorrect="off"
+        inputMode="text"
+        maxLength={7}
+        pattern="#[0-9a-fA-F]{6}"
+        spellCheck={false}
+        onChange={(event) => handleDraftChange(event.target.value)}
+        onBlur={() => {
+          if (!HEX_COLOR_PATTERN.test(draft)) setDraft(value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            setDraft(value);
+            event.currentTarget.blur();
+          }
+        }}
+        className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+      />
+    </div>
+  );
+}
 
 // 우측 컨트롤 패널 탭 — 16개 섹션을 작업 흐름별로 묶어 탐색 부담을 줄인다.
 type PanelTab = "character" | "pose" | "face" | "scene" | "props";
@@ -421,6 +534,42 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; h
   { id: "face", label: "표정", icon: Smile, hint: "표정 · 블렌드 · 웹캠" },
   { id: "scene", label: "연출", icon: Clapperboard, hint: "카메라 · 조명 · 물리" },
   { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
+];
+
+type CharacterPanelSection = "recipes" | "library" | "appearance" | "wardrobe";
+const CHARACTER_PANEL_SECTIONS: Array<{
+  id: CharacterPanelSection;
+  label: string;
+  icon: typeof UserRound;
+}> = [
+  { id: "recipes", label: "시작 캐릭터", icon: UserRound },
+  { id: "library", label: "모델", icon: Upload },
+  { id: "appearance", label: "체형·색", icon: Sliders },
+  { id: "wardrobe", label: "의상", icon: Shirt },
+];
+
+const RECIPE_AGE_FILTERS: ReadonlyArray<StudioVrmAgeBand | "all"> = [
+  "all",
+  "child",
+  "teen",
+  "young-adult",
+  "adult",
+  "senior",
+];
+const RECIPE_PRESENTATION_FILTERS: ReadonlyArray<StudioVrmPresentation | "all"> = [
+  "all",
+  "feminine",
+  "masculine",
+  "androgynous",
+];
+const RECIPE_OCCUPATION_FILTERS: ReadonlyArray<StudioVrmOccupation | "all"> = [
+  "all",
+  "student",
+  "creator",
+  "office",
+  "doctor",
+  "nurse",
+  "paramedic",
 ];
 
 const ENV_VARIANTS: Array<{ id: EnvVariant; label: string }> = [
@@ -2456,6 +2605,10 @@ function parseCameraError(error: unknown): string {
 }
 
 export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: StudioVrmPoserProps) {
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [status, setStatus] = useState<LoadStatus>("empty");
   const [error, setError] = useState("");
   const [modelName, setModelName] = useState("");
@@ -2469,6 +2622,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activeExpressionCategory, setActiveExpressionCategory] = useState<string>("emotion");
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
+  const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("recipes");
+  const [recipeQuery, setRecipeQuery] = useState("");
+  const [recipeAgeFilter, setRecipeAgeFilter] = useState<StudioVrmAgeBand | "all">("all");
+  const [recipePresentationFilter, setRecipePresentationFilter] = useState<StudioVrmPresentation | "all">("all");
+  const [recipeOccupationFilter, setRecipeOccupationFilter] = useState<StudioVrmOccupation | "all">("all");
+  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
+  const [recipeError, setRecipeError] = useState("");
   const [poseQuery, setPoseQuery] = useState("");
   const [bodyRotation, setBodyRotation] = useState(0);
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
@@ -2490,6 +2650,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 빠르게 좁힐 수 있게 한다(클라이언트 사이드 부분일치, 대소문자 무시) — "캐릭터 만들기" 진입점을
   // 통합하며 그쪽 UX를 이 라이브러리 자체로 흡수했다.
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_BATCH_SIZE);
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
@@ -2501,13 +2662,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [envVariant, setEnvVariant] = useState<EnvVariant>("none");
   const [fullStateName, setFullStateName] = useState("");
   const [savedFullStates, setSavedFullStates] = useState<Record<string, FullVrmState>>({});
-  const [customColors, setCustomColors] = useState<Record<string, string>>({
-    tops: "#ffffff",
-    bottoms: "#ffffff",
-    hair: "#ffffff",
-    body: "#ffffff",
-    face: "#ffffff",
-  });
+  const [customColors, setCustomColors] = useState<Record<string, string>>({ ...DEFAULT_VRM_CUSTOM_COLORS });
   const [materialFx, setMaterialFx] = useState<VrmMaterialFx>(DEFAULT_VRM_MATERIAL_FX);
   const [isSharingPose, setIsSharingPose] = useState(false);
   const [sharedPoses, setSharedPoses] = useState<SharedAsset[]>([]);
@@ -2586,6 +2741,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   }, []);
 
+  const handleCharacterSectionChange = (section: CharacterPanelSection) => {
+    setActiveCharacterSection(section);
+    if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
+  };
+
   // 탭 키보드 내비게이션(WAI-ARIA Tabs 패턴): 좌우 방향키 + Home/End. 포커스는 탭 버튼에 둔다.
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     const idx = PANEL_TABS.findIndex((t) => t.id === activePanelTab);
@@ -2599,6 +2759,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     const nextTab = PANEL_TABS[next];
     handlePanelTabChange(nextTab.id);
     document.getElementById(`vrm-tab-${nextTab.id}`)?.focus();
+  };
+
+  const handleCharacterTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const idx = CHARACTER_PANEL_SECTIONS.findIndex((section) => section.id === activeCharacterSection);
+    let next: number;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % CHARACTER_PANEL_SECTIONS.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + CHARACTER_PANEL_SECTIONS.length) % CHARACTER_PANEL_SECTIONS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = CHARACTER_PANEL_SECTIONS.length - 1;
+    else return;
+    e.preventDefault();
+    const nextSection = CHARACTER_PANEL_SECTIONS[next];
+    handleCharacterSectionChange(nextSection.id);
+    document.getElementById(`vrm-character-subtab-${nextSection.id}`)?.focus();
   };
 
   const handleViewportReady = useCallback((api: ViewportApi | null) => {
@@ -2639,8 +2813,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         lighting,
         env: envVariant,
         fingerOverrides: fingerEdits,
+        customColors,
+        materialFx,
       }),
-    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits]
+    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx]
   );
 
   const restoreHistoryAt = (index: number) => {
@@ -2694,14 +2870,72 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     redoRef.current = doRedo;
   });
 
-  // 키보드 단축키: Esc 닫기, ⌘/Ctrl+Z 되돌리기, ⌘/Ctrl+Shift+Z(또는 +Y) 다시 실행.
+  // 모달이 열린 동안 배경 스크롤을 잠그고, 첫 포커스를 명시하며 닫힐 때 진입점으로 돌려준다.
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `calc(${previousPaddingRight || "0px"} + ${scrollbarWidth}px)`;
+    }
+    const focusFrame = requestAnimationFrame(() => {
+      (closeButtonRef.current ?? dialogRef.current)?.focus({ preventScroll: true });
+    });
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [open]);
+
+  // 키보드 단축키: Esc 닫기, Tab 포커스 트랩, ⌘/Ctrl+Z 되돌리기,
+  // ⌘/Ctrl+Shift+Z(또는 +Y) 다시 실행. 모달 뒤 전역 ⌘K 팔레트는 열지 않는다.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const dialog = dialogRef.current;
+      const topElement = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+      const dialogIsTopmost = !!dialog && (!topElement || topElement === dialog || dialog.contains(topElement));
       if (e.key === "Escape") {
+        if (e.defaultPrevented || !dialogIsTopmost) return;
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
+
+      if (e.key === "Tab" && dialog && dialogIsTopmost) {
+        const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+        )).filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0 && element.getAttribute("aria-hidden") !== "true");
+        if (focusable.length === 0) {
+          e.preventDefault();
+          dialog.focus();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !dialog.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing || !(e.metaKey || e.ctrlKey)) return;
@@ -2715,8 +2949,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         redoRef.current();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
   // Note: VrmActor (inside Canvas) receives fingerEdits/bodyScale and applies via unified pipeline on prop changes.
@@ -2744,9 +2978,24 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 비활성 탭 섹션은 hidden 속성으로 숨겨 마운트는 유지(웹캠 video 등 ref 보존).
   // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
+  const hideOnCharacterSection = (section: CharacterPanelSection) =>
+    activePanelTab !== "character" || activeCharacterSection !== section;
+  const filteredCharacterRecipes = filterStudioVrmCharacterRecipes(STUDIO_VRM_CHARACTER_RECIPES, {
+    query: recipeQuery,
+    ageBand: recipeAgeFilter,
+    presentation: recipePresentationFilter,
+    occupation: recipeOccupationFilter,
+  });
+  const normalizedLibraryQuery = libraryQuery.trim().toLocaleLowerCase("ko-KR");
+  const filteredLibraryEntries = libraryEntries.filter((entry) =>
+    entry.name.toLocaleLowerCase("ko-KR").includes(normalizedLibraryQuery)
+  );
+  const visibleLibraryEntries = filteredLibraryEntries.slice(0, libraryVisibleCount);
+  const hiddenLibraryEntryCount = Math.max(0, filteredLibraryEntries.length - visibleLibraryEntries.length);
+  const libraryEntryById = new Map(libraryEntries.map((entry) => [entry.id, entry] as const));
   const availableExpressionActions = getAvailableExpressionActions(vrm);
   const hasMToonMaterial = vrm ? hasVrmMToonMaterial(vrm) : false;
-  const activeLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
+  const activeLibraryEntry = libraryEntryById.get(activeModelId) ?? null;
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
   interface PendingPoseData {
@@ -3333,7 +3582,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 풀 스테이트 copy/paste + local save/load (새 기능)
   function handleCopyFullState() {
     try {
-      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits });
+      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: {items: vrmPropItems}, physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx });
       const json = JSON.stringify(full);
       navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
@@ -3349,7 +3598,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function handleSaveFullLocal() {
     const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
-    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits});
+    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:{items:vrmPropItems}, physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx});
     const next = { ...savedFullStates, [name]: full };
     setSavedFullStates(next);
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
@@ -3357,6 +3606,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function commitFullStateRestore(s: FullVrmState, vrm: VRM | null) {
     const plan = planFullStateRestore(s);
+    const restoredColors = plan.customColors ?? DEFAULT_VRM_CUSTOM_COLORS;
+    const restoredCostume = parseCostumeState(plan.costume);
+    const restoredWardrobe = parseWardrobe(plan.wardrobe);
     setCustomBones(plan.strippedBones);
     setCustomYOffset(plan.yOffset);
     setExpressionWeights(plan.expressionWeights);
@@ -3364,8 +3616,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (plan.lighting) setLighting(plan.lighting);
     if (plan.env) setEnvVariant(plan.env);
     if (plan.fingerOverrides) setFingerEdits(plan.fingerOverrides);
-    if (plan.costume && typeof plan.costume === "object") setCostumeState(plan.costume as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    setWardrobeState(parseWardrobe(plan.wardrobe)); // 워드로브는 무조건 반영 — undo/redo에서 장착 변화도 되돌린다.
+    // 의상·워드로브는 무조건 반영 — undo/redo에서 장착/숨김 변화도 되돌리고 이전 값이
+    // 눌어붙지 않게 한다. 새 VRM 메시를 알아야 하는 자동 숨김은 아래 vrm 분기에서 합성한다.
+    setWardrobeState(restoredWardrobe);
     if (plan.propsItems) setVrmPropItems(plan.propsItems as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     // materialFx 는 별도 저장/공유 payload에 담기지만(poseMetadata.materialFx), FullVrmState 경로
@@ -3373,17 +3626,31 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     // 사라진다 — plan에 실려 왔으면 항상 state로 복원한다(없으면 기본값으로 되돌려 이전 값이
     // 눌어붙지 않게 한다).
     setMaterialFx(plan.materialFx ?? DEFAULT_VRM_MATERIAL_FX);
+    setCustomColors({ ...restoredColors });
 
     if (vrm) {
       const meshes = collectCostumeMeshes(vrm);
+      // recipe/구버전처럼 가시성 데이터가 없는 상태만 자동 숨김을 보강한다.
+      // 명시적인 costume은 사용자가 원본 의상을 다시 표시한 선택까지 담은 authoritative state다.
+      const effectiveCostume = plan.costume == null
+        ? mergeWardrobeCostumeVisibility(restoredCostume, restoredWardrobe, meshes, wardrobeAutoHide)
+        : restoredCostume;
+      setCostumeMeshes(meshes);
+      setCostumeState(effectiveCostume);
+      setSelectedCostumeKey(null);
+      applyCostumeState(meshes, effectiveCostume);
       applyFullState(vrm, s, {
         applyPose: (b, y) => applyPoseToVrm(vrm, b, y),
         applyExpr: (w) => applyExpressionWeightsToVrm(vrm, w),
-        applyCostume: (c) => { setCostumeMeshes(meshes); applyCostumeState(meshes, c as any); }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyProps: (p: any) => { if (p?.items) { setVrmPropItems(p.items); } }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyPhysics: (p: any) => { if (p) { setVrmPhysics(p as any); if (countSpringBoneJoints(vrm)) { applyVrmSpringBonePhysics(vrm, p as any); settleVrmPhysics(vrm); } } }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyMaterialFx: (fx) => applyVrmMaterialFx(vrm, fx),
+        applyCustomColors: (colors) => applyVrmCustomColors(vrm, colors),
       });
+      if (!plan.customColors) applyVrmCustomColors(vrm, DEFAULT_VRM_CUSTOM_COLORS);
+    } else {
+      setCostumeState(restoredCostume);
+      setSelectedCostumeKey(null);
     }
   }
 
@@ -3605,6 +3872,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setVrmPhysics(DEFAULT_VRM_PHYSICS);
     setPhysicsPreview(false);
     setSpringJointCount(0);
+    setActiveRecipeId(null);
+    setRecipeError("");
   }, [open]);
 
   const loadModelRef = useRef(loadModelFromLibraryEntry);
@@ -3730,6 +3999,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         props: pending.vrmProps,
         physics: pending.physics,
         materialFx: pending.materialFx,
+        customColors: pending.customColors,
       };
       commitFullStateRestore(pendingFull, nextVrm);
     } else {
@@ -3742,23 +4012,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setActiveExpressionId("neutral");
       setExpressionWeights({});
       setBodyRotation(0);
-      setCustomColors({
-        tops: "#ffffff",
-        bottoms: "#ffffff",
-        hair: "#ffffff",
-        body: "#ffffff",
-        face: "#ffffff",
-      });
+      setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
       setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
       applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits, bodyScale });
       applyExpressionWeightsToVrm(nextVrm, {});
-      applyVrmCustomColors(nextVrm, {
-        tops: "#ffffff",
-        bottoms: "#ffffff",
-        hair: "#ffffff",
-        body: "#ffffff",
-        face: "#ffffff",
-      });
+      applyVrmCustomColors(nextVrm, DEFAULT_VRM_CUSTOM_COLORS);
       applyVrmMaterialFx(nextVrm, DEFAULT_VRM_MATERIAL_FX);
       // 본 부착 소품·워드로브 초기화.
       setVrmPropItems([]);
@@ -3871,6 +4129,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
       const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
       if (firstUploadedEntry) {
+        setActiveRecipeId(null);
         loadModelFromLibraryEntry(firstUploadedEntry);
       }
     } catch (caughtError: unknown) {
@@ -3882,7 +4141,44 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function handleSampleLoad() {
+    setActiveRecipeId(null);
     loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
+  }
+
+  function handleCharacterRecipeSelect(recipe: StudioVrmCharacterRecipe) {
+    const entry = libraryEntries.find((candidate) => candidate.id === recipe.modelId);
+    const wardrobeSet = wardrobeSetById(recipe.wardrobeSetId);
+    if (!entry || !wardrobeSet) {
+      setRecipeError("이 시작 캐릭터에 필요한 모델 또는 의상 세트를 찾지 못했습니다.");
+      return;
+    }
+
+    const pose = findPose(recipe.poseId);
+    const recipeProps = recipe.propIds.flatMap((propId, index) => {
+      const item = createPropInstance(propId, `recipe-${recipe.id}-${index + 1}`);
+      return item ? [item] : [];
+    });
+
+    pendingPoseDataRef.current = {
+      modelId: recipe.modelId,
+      bones: pose.bones,
+      yOffset: pose.yOffset ?? 0,
+      expressionWeights: {},
+      customColors: { ...recipe.colors },
+      wardrobe: serializeWardrobe(applyWardrobeSet(wardrobeSet)),
+      vrmProps: serializeVrmProps(recipeProps),
+      bodyScale: recipe.bodyScale,
+      lighting: { intensity: 1.2, colorTemp: 0.5, directionDeg: 45 },
+      env: "none",
+      materialFx: DEFAULT_VRM_MATERIAL_FX,
+    };
+    setActiveRecipeId(recipe.id);
+    setActivePoseId(recipe.poseId);
+    setActiveExpressionId("neutral");
+    setBodyRotation(0);
+    setActiveCameraId("front");
+    setRecipeError("");
+    loadModelFromLibraryEntry(entry);
   }
 
   async function handleDeleteEntry(event: MouseEvent<HTMLButtonElement>, entry: VrmLibraryEntry) {
@@ -4340,37 +4636,42 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
   if (!open) return null;
 
-  return (
+  return createDomPortal(
     <div
+      ref={dialogRef}
       aria-modal="true"
-      className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
+      aria-labelledby={dialogTitleId}
+      aria-describedby={dialogDescriptionId}
+      className="fixed inset-0 z-[80] isolate overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_button]:min-w-11 pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-6 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11 sm:p-4"
+      data-studio-vrm-dialog="true"
       role="dialog"
+      tabIndex={-1}
       style={{
         // 노치/홈인디케이터 안전영역을 모달 바깥 패딩에 반영해 하단(웹캠/푸터)이 잘리지 않게 한다.
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
       }}
     >
-      <div className="mx-auto flex h-full max-h-full max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
+      <div className="mx-auto flex h-full min-h-0 max-h-full max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <UserRound size={14} aria-hidden />
-              VRM 포저
+              VRM 캐릭터 빌더
             </p>
-            <h2 className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 캐릭터 포즈 만들기</h2>
-            <p className="mt-1 line-clamp-1 text-xs text-fg-3">
+            <h2 id={dialogTitleId} className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 캐릭터 만들기</h2>
+            <p id={dialogDescriptionId} className="mt-1 line-clamp-1 text-xs text-fg-3">
               {displayModelName ? `${displayModelName} · 투명 PNG로 패널에 추가` : "내 VRM을 불러와 투명 PNG로 패널에 추가"}
             </p>
           </div>
-          <button type="button" aria-label="닫기" title="닫기 (Esc)" className={ICON_BUTTON} onClick={onClose}>
+          <button ref={closeButtonRef} type="button" aria-label="닫기" title="닫기 (Esc)" className={ICON_BUTTON} onClick={onClose}>
             <X size={17} aria-hidden />
           </button>
         </header>
 
         {/* 모바일: 뷰포트(상단)+컨트롤(하단) 두 행을 명시적으로 나눠 컨트롤 패널이 자체 스크롤되게 한다
             (행을 안 잡으면 패널이 모달 밖으로 흘러 하단의 웹캠/푸터가 잘림). 데스크톱(lg): 2단 컬럼. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,44dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
           <section className="relative min-h-0 overflow-hidden bg-card lg:min-h-0">
             <div
               aria-hidden
@@ -4514,48 +4815,32 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Sparkles size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">장르별 VRM 캐릭터를 올려 시작하세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">시작 캐릭터를 골라 바로 만드세요.</p>
                       <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                        VRoid Studio에서 무료 애니메이션풍 캐릭터를 직접 만들고, 로맨스·판타지·액션 등 다양한 장르 캐릭터를 .vrm으로 업로드할 수 있습니다.
+                        연령대·여성/남성/중성 표현·의료진 같은 역할을 고르면 모델, 체형, 의상, 소품과 포즈가 한 번에 준비됩니다.
                       </p>
                       <div className="mt-4 flex justify-center gap-2">
-                        <button type="button" className={cx(CONTROL_BUTTON, "border-accent/50 bg-accent text-on-accent")} onClick={() => fileInputRef.current?.click()}>
-                          <Upload size={14} aria-hidden />
-                          VRM 업로드
+                        <button
+                          type="button"
+                          className={cx(CONTROL_BUTTON, "border-accent/50 bg-accent text-on-accent")}
+                          onClick={() => {
+                            handlePanelTabChange("character");
+                            handleCharacterSectionChange("recipes");
+                          }}
+                        >
+                          <WandSparkles size={14} aria-hidden />
+                          시작 캐릭터
                         </button>
                         <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")} onClick={handleSampleLoad}>
                           루미 불러오기
                         </button>
-                      </div>
-                      <div className="mt-5 space-y-1.5 rounded-xl border border-line bg-panel p-3 text-left text-xs shadow-sm">
-                        <p className="font-semibold text-fg">VRM 캐릭터 만들기</p>
-                        <ul className="list-disc list-inside text-fg-2 space-y-1 font-medium">
-                          <li>
-                            <a href="https://vroid.com/studio" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                              VRoid Studio (무료)
-                            </a>
-                            <span className="text-fg-3 font-normal"> - 3D 아바타 직접 디자인</span>
-                          </li>
-                          <li>
-                            <a href="https://hub.vroid.com/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                              VRoid Hub
-                            </a>
-                            <span className="text-fg-3 font-normal"> - 무료 공유 모델 다운로드</span>
-                          </li>
-                          <li>
-                            <a href="https://booth.pm/ko/search/VRM" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                              Booth (부스)
-                            </a>
-                            <span className="text-fg-3 font-normal"> - 하이퀄리티 만화/웹툰 에셋</span>
-                          </li>
-                        </ul>
                       </div>
                     </div>
                   </div>
                 ) : null}
 
                 {status === "loading" ? (
-                  <div className="absolute inset-0 grid place-items-center bg-card/45 p-6 text-center backdrop-blur-sm">
+                  <div className="absolute inset-0 grid place-items-center bg-card/45 p-6 text-center backdrop-blur-sm" role="status" aria-live="polite">
                     <div>
                       <Loader2 className="mx-auto animate-spin text-accent" size={30} aria-hidden />
                       <p className="mt-3 text-sm font-semibold text-fg">VRM을 불러오는 중입니다.</p>
@@ -4564,7 +4849,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 ) : null}
 
                 {status === "error" ? (
-                  <div className="absolute inset-x-3 bottom-3 rounded-xl border border-line bg-panel/95 p-3 text-sm shadow-xl backdrop-blur">
+                  <div className="absolute inset-x-3 bottom-3 rounded-xl border border-line bg-panel/95 p-3 text-sm shadow-xl backdrop-blur" role="alert">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 shrink-0 text-accent" size={16} aria-hidden />
                       <div>
@@ -4595,7 +4880,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     title={tab.hint}
                     onKeyDown={handleTabKeyDown}
                     className={cx(
-                      "group flex flex-col items-center gap-1 rounded-xl border px-1 py-1.5 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      "group flex min-h-11 flex-col items-center gap-1 rounded-xl border px-1 py-1.5 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                       isActive
                         ? "border-accent/55 bg-accent-soft text-accent shadow-[inset_0_-2px_0_0_var(--color-accent,oklch(0.72_0.16_45))]"
                         : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
@@ -4608,14 +4893,195 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 );
               })}
             </div>
-            <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
-              <section hidden={hideOnTab("character")}>
+            <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
+              {activePanelTab === "character" ? (
+                <div className="sticky -top-4 z-20 -mx-4 -mt-4 border-b border-line bg-panel/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
+                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-4 gap-1">
+                    {CHARACTER_PANEL_SECTIONS.map((section) => {
+                      const SectionIcon = section.icon;
+                      const selected = activeCharacterSection === section.id;
+                      return (
+                        <button
+                          key={section.id}
+                          id={`vrm-character-subtab-${section.id}`}
+                          type="button"
+                          role="tab"
+                          aria-selected={selected}
+                          aria-controls={`vrm-character-section-${section.id}`}
+                          tabIndex={selected ? 0 : -1}
+                          onKeyDown={handleCharacterTabKeyDown}
+                          className={cx(
+                            "flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                            selected
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
+                          )}
+                          onClick={() => handleCharacterSectionChange(section.id)}
+                        >
+                          <SectionIcon size={14} aria-hidden />
+                          <span className="truncate">{section.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <section
+                id="vrm-character-section-recipes"
+                role="tabpanel"
+                aria-labelledby="vrm-character-subtab-recipes"
+                hidden={hideOnCharacterSection("recipes")}
+              >
+                <div className="mb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                        <WandSparkles size={15} className="text-accent" aria-hidden />
+                        VRM 시작 캐릭터
+                      </h3>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        모델·체형·피부색·실제 3D 의상·직업 소품·포즈를 한 번에 조합한 뒤 각 단계에서 다시 다듬으세요.
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-bold text-fg-3">
+                      {STUDIO_VRM_CHARACTER_RECIPES.length}종
+                    </span>
+                  </div>
+
+                  <div className="relative mt-3">
+                    <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
+                    <input
+                      type="search"
+                      value={recipeQuery}
+                      onChange={(event) => setRecipeQuery(event.target.value)}
+                      placeholder="의사·학생·노년·중성 표현 검색"
+                      aria-label="시작 캐릭터 검색"
+                      className="min-h-11 w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+                    />
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
+                      연령대
+                      <select
+                        value={recipeAgeFilter}
+                        onChange={(event) => setRecipeAgeFilter(event.target.value as StudioVrmAgeBand | "all")}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
+                      >
+                        {RECIPE_AGE_FILTERS.map((value) => (
+                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_AGE_LABELS[value]}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
+                      표현
+                      <select
+                        value={recipePresentationFilter}
+                        onChange={(event) => setRecipePresentationFilter(event.target.value as StudioVrmPresentation | "all")}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
+                      >
+                        {RECIPE_PRESENTATION_FILTERS.map((value) => (
+                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_PRESENTATION_LABELS[value]}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
+                      역할
+                      <select
+                        value={recipeOccupationFilter}
+                        onChange={(event) => setRecipeOccupationFilter(event.target.value as StudioVrmOccupation | "all")}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
+                      >
+                        {RECIPE_OCCUPATION_FILTERS.map((value) => (
+                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_OCCUPATION_LABELS[value]}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <p className="mb-2 text-[0.66rem] font-semibold text-fg-3" role="status" aria-live="polite">
+                  조건에 맞는 시작 캐릭터 {filteredCharacterRecipes.length}종
+                </p>
+                {recipeError ? (
+                  <p className="mb-2 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad" role="alert">{recipeError}</p>
+                ) : null}
+                {filteredCharacterRecipes.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-line bg-card/45 px-3 py-6 text-center text-xs text-fg-3">
+                    조건에 맞는 시작 캐릭터가 없습니다. 필터를 줄이거나 다른 검색어를 입력하세요.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredCharacterRecipes.map((recipe) => {
+                      const entry = libraryEntryById.get(recipe.modelId);
+                      const selected = activeRecipeId === recipe.id;
+                      const loading = selected && status === "loading";
+                      return (
+                        <button
+                          key={recipe.id}
+                          type="button"
+                          disabled={!entry || status === "loading"}
+                          aria-pressed={selected}
+                          className={cx(
+                            "min-h-[9.5rem] overflow-hidden rounded-xl border p-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
+                            selected
+                              ? "border-accent/60 bg-accent-soft"
+                              : "border-line bg-card hover:border-accent/35 hover:bg-raised"
+                          )}
+                          onClick={() => handleCharacterRecipeSelect(recipe)}
+                        >
+                          <span className="flex items-start gap-2">
+                            <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-panel text-xl">
+                              {entry?.thumbnail ? (
+                                <img src={entry.thumbnail} alt="" className="h-full w-full object-contain" />
+                              ) : loading ? (
+                                <Loader2 size={18} className="animate-spin text-accent" aria-hidden />
+                              ) : (
+                                <span aria-hidden>{recipe.emoji}</span>
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[0.7rem] font-bold leading-snug text-fg">{recipe.label}</span>
+                              <span className="mt-1 block text-[0.62rem] leading-snug text-fg-3">
+                                {STUDIO_VRM_AGE_LABELS[recipe.ageBand]} · {STUDIO_VRM_OCCUPATION_LABELS[recipe.occupation]}
+                              </span>
+                            </span>
+                          </span>
+                          <span className="mt-2 line-clamp-3 block text-[0.64rem] leading-relaxed text-fg-3">
+                            {recipe.description}
+                          </span>
+                          <span className="mt-2 flex flex-wrap gap-1">
+                            <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2">
+                              {STUDIO_VRM_PRESENTATION_LABELS[recipe.presentation]}
+                            </span>
+                            {recipe.propIds.length > 0 ? (
+                              <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2">
+                                소품 {recipe.propIds.length}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section
+                id="vrm-character-section-library"
+                role="tabpanel"
+                aria-labelledby="vrm-character-subtab-library"
+                hidden={hideOnCharacterSection("library")}
+              >
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <Upload size={15} className="text-accent" aria-hidden />
                     캐릭터 라이브러리
                   </h3>
-                  <span className="text-[0.68rem] text-fg-3">{libraryEntries.length}명</span>
+                  <span className="text-[0.68rem] text-fg-3" aria-live="polite">
+                    표시 {visibleLibraryEntries.length}/{filteredLibraryEntries.length}명
+                  </span>
                 </div>
                 <input ref={fileInputRef} accept=".vrm" className="sr-only" multiple type="file" onChange={handleFileChange} />
                 <button
@@ -4631,11 +5097,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
                 </p>
 
-                <div className="mt-3 rounded-xl border border-line bg-accent-soft/30 p-3">
-                  <h4 className="flex items-center gap-1 text-xs font-bold text-accent">
+                <details className="group mt-3 rounded-xl border border-line bg-accent-soft/30 p-3">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-xs font-bold text-accent [&::-webkit-details-marker]:hidden">
                     <Sparkles size={13} aria-hidden />
-                    무료 VRM 캐릭터 / 의상 / 악세사리 추천 사이트
-                  </h4>
+                    무료 VRM·의상 찾기
+                    <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" aria-hidden />
+                  </summary>
                   <p className="mt-1 text-[0.68rem] leading-normal text-fg-2">
                     아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonSpectrum에 자유롭게 추가할 수 있습니다.
                   </p>
@@ -4671,13 +5138,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       </div>
                     </a>
                   </div>
-                </div>
+                </details>
 
-                <div className="mt-3 rounded-xl border border-line bg-card/60 p-3">
-                  <h4 className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                <details className="group mt-3 rounded-xl border border-line bg-card/60 p-3">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
                     <Paintbrush size={13} className="text-accent" aria-hidden />
-                    나만의 캐릭터 만들기 (VRoid Studio)
-                  </h4>
+                    VRoid Studio에서 원본 모델 만들기
+                    <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                  </summary>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
                     VRoid Studio는 코딩이나 모델링 지식 없이도 얼굴, 헤어, 의상 등을 마우스 클릭과 드래그로 자유롭게 디자인할 수 있는 무료 3D 아바타 제작 도구입니다.
                   </p>
@@ -4700,7 +5168,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   >
                     VRoid Studio 공식 다운로드 <ExternalLink size={10} className="opacity-70" />
                   </a>
-                </div>
+                </details>
 
                 {libraryStatus === "error" && libraryError ? (
                   <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
@@ -4720,11 +5188,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <input
                     type="text"
                     value={libraryQuery}
-                    onChange={(e) => setLibraryQuery(e.target.value)}
+                    onChange={(e) => {
+                      setLibraryQuery(e.target.value);
+                      setLibraryVisibleCount(LIBRARY_BATCH_SIZE);
+                    }}
                     placeholder="캐릭터 이름 검색..."
                     aria-label="캐릭터 라이브러리 검색"
                     spellCheck={false}
-                    className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+                    className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
                   />
                 </div>
 
@@ -4733,11 +5204,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 캐릭터를 불러오는 중입니다.</div>
                   ) : null}
 
-                  {libraryEntries.length > 0 && libraryEntries.filter((entry) => entry.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).length === 0 ? (
+                  {libraryEntries.length > 0 && filteredLibraryEntries.length === 0 ? (
                     <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">"{libraryQuery}"와 일치하는 캐릭터가 없어요.</div>
                   ) : null}
 
-                  {libraryEntries.filter((entry) => entry.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((entry) => {
+                  {visibleLibraryEntries.map((entry) => {
                     const isActive = entry.id === activeModelId;
                     const isDeleting = deletingModelId === entry.id;
 
@@ -4753,7 +5224,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           type="button"
                           className="grid min-h-[6.25rem] w-full grid-rows-[4.5rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                           disabled={status === "loading" && isActive}
-                          onClick={() => loadModelFromLibraryEntry(entry)}
+                          onClick={() => {
+                            setActiveRecipeId(null);
+                            loadModelFromLibraryEntry(entry);
+                          }}
                         >
                           <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
                             {entry.thumbnail ? (
@@ -4776,7 +5250,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           <button
                             type="button"
                             aria-label={`${entry.name} 삭제`}
-                            className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
+                            className="absolute right-1.5 top-1.5 grid size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors pointer-coarse:size-11 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
                             disabled={isDeleting}
                             onClick={(event) => handleDeleteEntry(event, entry)}
                           >
@@ -4787,6 +5261,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     );
                   })}
                 </div>
+                {hiddenLibraryEntryCount > 0 ? (
+                  <button
+                    type="button"
+                    className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                    onClick={() => setLibraryVisibleCount((count) => count + LIBRARY_BATCH_SIZE)}
+                  >
+                    캐릭터 {Math.min(LIBRARY_BATCH_SIZE, hiddenLibraryEntryCount)}명 더 보기
+                    <span className="text-fg-3">· {hiddenLibraryEntryCount}명 남음</span>
+                  </button>
+                ) : filteredLibraryEntries.length > LIBRARY_BATCH_SIZE ? (
+                  <button
+                    type="button"
+                    className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                    onClick={() => {
+                      setLibraryVisibleCount(LIBRARY_BATCH_SIZE);
+                      panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
+                    처음 {LIBRARY_BATCH_SIZE}명만 보기
+                  </button>
+                ) : null}
               </section>
 
               <section hidden={hideOnTab("face")}>
@@ -5131,7 +5626,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         >
                           <button
                             type="button"
-                            className="w-full text-left focus:outline-none"
+                            className="w-full rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                             disabled={!vrm}
                             onClick={() => handleCustomPoseSelect(pose)}
                           >
@@ -5184,7 +5679,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     서버에 등록된 공유 포즈가 없습니다. 첫 포즈를 공유해 보세요!
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-2 lg:max-h-[220px] lg:overflow-y-auto lg:pr-1">
                     {sharedPoses.map((asset) => {
                       const isActive = activePoseId === `shared-${asset.id}`;
                       return (
@@ -5199,7 +5694,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         >
                           <button
                             type="button"
-                            className="w-full text-left focus:outline-none flex flex-col h-full justify-between"
+                            className="flex h-full w-full flex-col justify-between rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                             disabled={!vrm}
                             onClick={() => handleSelectSharedPose(asset)}
                           >
@@ -5233,7 +5728,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 )}
               </details>
 
-              <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
+              <section
+                id="vrm-character-section-wardrobe"
+                role="tabpanel"
+                aria-labelledby="vrm-character-subtab-wardrobe"
+                hidden={hideOnCharacterSection("wardrobe")}
+                className="rounded-xl border border-line bg-card/45 p-3"
+              >
                 <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Shirt size={14} className="text-accent" aria-hidden />
                   3D 의상 실장착
@@ -5307,13 +5808,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                         </div>
                         {equip ? (
                           <div className="mt-1.5 flex items-center gap-2.5">
-                            <label className="flex items-center gap-1 text-[0.68rem] font-semibold text-fg-2">
+                            <label className="flex min-h-11 items-center gap-1 text-[0.68rem] font-semibold text-fg-2">
                               색
                               <input
                                 type="color"
                                 value={equip.color}
                                 onChange={(e) => updateWardrobeEquip(slot, { color: e.target.value })}
-                                className="size-5 cursor-pointer rounded border border-line bg-transparent p-0"
+                                className="size-8 cursor-pointer rounded border border-line bg-transparent p-0 pointer-coarse:size-11"
                                 aria-label={`${WARDROBE_SLOT_LABELS[slot]} 색상`}
                               />
                             </label>
@@ -5359,7 +5860,65 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </div>
               </section>
 
-              <section hidden={hideOnTab("character")} className="rounded-xl border border-line bg-card/45 p-3">
+              <section
+                id="vrm-character-section-appearance"
+                role="tabpanel"
+                aria-labelledby="vrm-character-subtab-appearance"
+                hidden={hideOnCharacterSection("appearance")}
+                className="rounded-xl border border-line bg-card/45 p-3"
+              >
+                <div className="mb-4 border-b border-line/45 pb-4">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                      <UserRound size={14} className="text-accent" aria-hidden />
+                      체형 비율
+                    </h3>
+                    <button
+                      type="button"
+                      disabled={!vrm}
+                      className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
+                      onClick={() => setBodyScale({ height: 1, width: 1 })}
+                    >
+                      기본 비율
+                    </button>
+                  </div>
+                  <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
+                    어린이·청소년·성인·노년 실루엣의 시작 비율을 유지하거나, 키와 체격을 직접 조정하세요.
+                  </p>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-10 shrink-0 font-medium">키</span>
+                      <input
+                        type="range"
+                        min="0.7"
+                        max="1.4"
+                        step="0.01"
+                        value={bodyScale.height}
+                        disabled={!vrm}
+                        onChange={(event) => setBodyScale((current) => ({ ...current, height: Number(event.target.value) }))}
+                        className="h-2 flex-1 accent-accent"
+                        aria-label="캐릭터 키 비율"
+                      />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.height.toFixed(2)}×</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg-2">
+                      <span className="w-10 shrink-0 font-medium">체격</span>
+                      <input
+                        type="range"
+                        min="0.7"
+                        max="1.3"
+                        step="0.01"
+                        value={bodyScale.width}
+                        disabled={!vrm}
+                        onChange={(event) => setBodyScale((current) => ({ ...current, width: Number(event.target.value) }))}
+                        className="h-2 flex-1 accent-accent"
+                        aria-label="캐릭터 체격 비율"
+                      />
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.width.toFixed(2)}×</span>
+                    </label>
+                  </div>
+                </div>
+
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   의상 및 신체 색상 변경
@@ -5403,38 +5962,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     { key: "body", label: "피부(몸)" },
                     { key: "face", label: "얼굴" },
                   ].map((part) => (
-                    <div key={part.key} className="flex flex-col gap-1">
+                    <div key={part.key} className="flex min-w-0 flex-col gap-1">
                       <span className="text-[0.65rem] font-semibold text-fg-2">{part.label}</span>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="color"
-                          value={customColors[part.key] || "#ffffff"}
-                          disabled={!vrm}
-                          onChange={(e) => {
-                            const hex = e.target.value;
-                            setCustomColors((prev) => ({
-                              ...prev,
-                              [part.key]: hex,
-                            }));
-                          }}
-                          className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
-                        />
-                        <input
-                          type="text"
-                          value={customColors[part.key] || "#ffffff"}
-                          disabled={!vrm}
-                          onChange={(e) => {
-                            const hex = e.target.value;
-                            if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
-                              setCustomColors((prev) => ({
-                                ...prev,
-                                [part.key]: hex,
-                              }));
-                            }
-                          }}
-                          className="w-16 rounded border border-line bg-card px-1 py-0.5 text-[0.65rem] text-fg focus-visible:outline focus-visible:outline-accent"
-                        />
-                      </div>
+                      <VrmColorControl
+                        label={part.label}
+                        value={customColors[part.key] || "#ffffff"}
+                        disabled={!vrm}
+                        onChange={(hex) => setCustomColors((prev) => ({ ...prev, [part.key]: hex }))}
+                      />
                     </div>
                   ))}
                 </div>
@@ -5443,13 +5978,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
                   disabled={!vrm}
                   onClick={() => {
-                    setCustomColors({
-                      tops: "#ffffff",
-                      bottoms: "#ffffff",
-                      hair: "#ffffff",
-                      body: "#ffffff",
-                      face: "#ffffff",
-                    });
+                    setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
                   }}
                 >
                   색상 초기화
@@ -5701,23 +6230,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
                 <div className="space-y-3.5">
-                  {/* 몸 비율 */}
-                  <div className="space-y-1.5">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">몸 비율</p>
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">키</span>
-                      <input type="range" min="0.7" max="1.4" step="0.01" value={bodyScale.height} onChange={e => setBodyScale(s => ({...s, height: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.height.toFixed(2)}×</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">너비</span>
-                      <input type="range" min="0.7" max="1.3" step="0.01" value={bodyScale.width} onChange={e => setBodyScale(s => ({...s, width: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.width.toFixed(2)}×</span>
-                    </label>
-                  </div>
-
                   {/* 조명 미세 조정 */}
-                  <div className="space-y-1.5 border-t border-line/45 pt-3">
+                  <div className="space-y-1.5">
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">조명 미세 조정</p>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
                       <span className="w-12 shrink-0 font-medium">밝기</span>
@@ -5991,7 +6505,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               {/* ── 의상 분리 토글 / 리컬러 ─────────────────────────────── */}
-              <details hidden={hideOnTab("character")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <details hidden={hideOnCharacterSection("appearance")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={15} className="text-accent" aria-hidden />
                   의상 분리 · 부분 채색
@@ -6091,7 +6605,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </details>
 
               {/* ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────── */}
-              <details hidden={hideOnTab("character")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
+              <details hidden={hideOnCharacterSection("appearance")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Paintbrush size={15} className="text-accent" aria-hidden />
                   재질 효과 (그림자 · 외곽선 · 림라이트)
@@ -6859,7 +7373,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
             </div>
 
-            <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-3 sm:px-5">
+            <footer className="sticky bottom-0 z-20 flex shrink-0 items-center justify-between gap-2 border-t border-line bg-panel/95 px-4 py-3 backdrop-blur sm:px-5">
               <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")} onClick={onClose}>
                 닫기
               </button>
@@ -6876,6 +7390,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
           </aside>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

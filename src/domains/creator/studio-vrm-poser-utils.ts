@@ -1057,6 +1057,8 @@ export type FullVrmState = {
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
   materialFx?: VrmMaterialFx;
+  /** 원본 VRM의 머리·피부·의상 재질에 적용한 비파괴 색상 오버라이드. */
+  customColors?: Record<string, string>;
 };
 
 export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
@@ -1076,6 +1078,7 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
     env: state.env,
     fingerOverrides: state.fingerOverrides,
     materialFx: state.materialFx,
+    customColors: state.customColors,
   };
 }
 
@@ -1087,6 +1090,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   applyProps?: (p: unknown) => void;
   applyPhysics?: (p: unknown) => void;
   applyMaterialFx?: (fx: VrmMaterialFx) => void;
+  applyCustomColors?: (colors: Record<string, string>) => void;
 }) {
   if (state.bones) applyers.applyPose(stripFingerBones(state.bones), state.yOffset ?? 0);
   if (state.expressionWeights) applyers.applyExpr(state.expressionWeights);
@@ -1097,6 +1101,7 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   if (state.props && applyers.applyProps) applyers.applyProps(state.props);
   if (state.physics && applyers.applyPhysics) applyers.applyPhysics(state.physics);
   if (state.materialFx && applyers.applyMaterialFx) applyers.applyMaterialFx(state.materialFx);
+  if (state.customColors && applyers.applyCustomColors) applyers.applyCustomColors(state.customColors);
   // lighting/env applied in scene setup (UI side)
 }
 
@@ -1141,6 +1146,7 @@ export function planFullStateRestore(state: FullVrmState): {
   propsItems?: unknown;
   physics?: unknown;
   materialFx?: VrmMaterialFx;
+  customColors?: Record<string, string>;
 } {
   return {
     strippedBones: stripFingerBones(state.bones || {}),
@@ -1155,6 +1161,7 @@ export function planFullStateRestore(state: FullVrmState): {
     propsItems: (state.props as any)?.items, // eslint-disable-line @typescript-eslint/no-explicit-any
     physics: state.physics,
     materialFx: state.materialFx,
+    customColors: state.customColors,
   };
 }
 
@@ -1181,6 +1188,7 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       costume: poseData.costume,
       props: poseData.props ?? (poseData.vrmProps ? { items: parseVrmProps(poseData.vrmProps).items } : undefined),
       physics: poseData.physics,
+      customColors: poseData.customColors,
     };
   } catch {
     return null;
@@ -1231,4 +1239,3 @@ export function createFullStateLoadHandlers(deps: {
     },
   };
 }
-

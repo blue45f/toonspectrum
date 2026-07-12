@@ -21,7 +21,31 @@ describe("VRM 소품 카탈로그", () => {
   });
 
   it("16종 이상이 등록되어 있다", () => {
-    expect(VRM_PROPS.length).toBeGreaterThanOrEqual(28);
+    expect(VRM_PROPS.length).toBeGreaterThanOrEqual(37);
+  });
+
+  it("의료진 역할을 구분할 수 있는 의료 소품 7종을 제공한다", () => {
+    const medicalIds = [
+      "clipboard",
+      "syringe",
+      "medicalBag",
+      "surgicalCap",
+      "faceMask",
+      "stethoscope",
+      "idBadge",
+    ];
+    for (const id of medicalIds) {
+      expect(propDefById(id), id).toBeDefined();
+    }
+    expect(propsByCategory("hand").map((prop) => prop.id)).toEqual(
+      expect.arrayContaining(["clipboard", "syringe", "medicalBag"])
+    );
+    expect(propsByCategory("head").map((prop) => prop.id)).toEqual(
+      expect.arrayContaining(["surgicalCap", "faceMask"])
+    );
+    expect(propsByCategory("body").map((prop) => prop.id)).toEqual(
+      expect.arrayContaining(["stethoscope", "idBadge"])
+    );
   });
 
   it("모든 기본 부착 본이 부착 가능 본 집합에 속한다", () => {

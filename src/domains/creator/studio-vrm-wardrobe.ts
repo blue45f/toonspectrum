@@ -8,7 +8,7 @@
 //  - 사이징은 모델별 골격 실측 치수(WardrobeMetrics)로 계산 → 어떤 VRM에도 자동 핏.
 //  - 부착 본은 VRM 필수 humanoid 본만 사용(spine/hips/팔다리/발) — chest·neck 등 옵셔널 본 미의존.
 
-import type { CostumeSlot } from "./studio-vrm-costume";
+import type { CostumeSlot, CostumeState } from "./studio-vrm-costume";
 
 export const VRM_WARDROBE_VERSION = 1 as const;
 
@@ -32,6 +32,41 @@ export const WARDROBE_HIDE_COSTUME_SLOTS: Record<WardrobeSlot, CostumeSlot[]> = 
   bottom: ["bottoms", "onepiece"],
   shoes: ["shoes"],
 };
+
+/**
+ * 실장착 워드로브와 같은 부위의 베이크드 의상을 숨긴 최종 의상 상태를 만든다.
+ *
+ * 프리셋/undo/공유 상태 복원은 개별 장착 핸들러를 거치지 않으므로, 이 계산을 복원 경로에서도
+ * 한 번 더 수행해야 원본 의상과 절차형 의상이 겹쳐 보이지 않는다. 사용자가 직접 숨긴 메시와
+ * 리컬러 정보는 그대로 보존한다.
+ */
+export function mergeWardrobeCostumeVisibility(
+  costume: CostumeState,
+  wardrobe: WardrobeState,
+  meshes: readonly { key: string; slot: CostumeSlot }[],
+  autoHide: boolean,
+): CostumeState {
+  if (!autoHide) {
+    return { hidden: [...costume.hidden], recolor: { ...costume.recolor } };
+  }
+
+  const hiddenSlots = new Set<CostumeSlot>();
+  for (const slot of WARDROBE_SLOTS) {
+    if (!wardrobe[slot]) continue;
+    for (const costumeSlot of WARDROBE_HIDE_COSTUME_SLOTS[slot]) {
+      hiddenSlots.add(costumeSlot);
+    }
+  }
+
+  const wardrobeMeshKeys = meshes
+    .filter((mesh) => hiddenSlots.has(mesh.slot))
+    .map((mesh) => mesh.key);
+
+  return {
+    hidden: Array.from(new Set([...costume.hidden, ...wardrobeMeshKeys])),
+    recolor: { ...costume.recolor },
+  };
+}
 
 /* ── 골격 실측 치수 ──────────────────────────────────────────────────── */
 
@@ -160,6 +195,7 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
   { id: "cardigan", label: "가디건", slot: "outer", emoji: "🧶", defaultColor: "#d6b98c", hint: "포근한 일상 컷에." },
   { id: "armor", label: "플레이트 아머", slot: "outer", emoji: "🛡️", defaultColor: "#9aa3b2", hint: "기사·판타지 컷. 어깨 견갑이 포인트." },
   { id: "robe", label: "마법사 로브", slot: "outer", emoji: "🪄", defaultColor: "#3a2b55", hint: "마법사·사제 컷. 소매가 넓어요." },
+  { id: "labcoat", label: "의료 가운", slot: "outer", emoji: "🥼", defaultColor: "#f8fafc", hint: "의사·연구원 컷. 긴 흰 가운과 포켓이 포함됩니다." },
   // 상의
   { id: "tshirt", label: "티셔츠", slot: "top", emoji: "👕", defaultColor: "#e5e7eb", hint: "만능 기본템. 반팔이에요." },
   { id: "shirt", label: "셔츠", slot: "top", emoji: "👔", defaultColor: "#f8fafc", hint: "긴팔+카라. 단추 라인이 살아있어요." },
@@ -167,6 +203,7 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
   { id: "sailor", label: "세일러 톱", slot: "top", emoji: "⚓", defaultColor: "#f8fafc", hint: "교복·마린 컷. 뒷카라와 리본 포함." },
   { id: "tank", label: "탱크톱", slot: "top", emoji: "🎽", defaultColor: "#94a3b8", hint: "여름·트레이닝 컷." },
   { id: "dress", label: "원피스", slot: "top", emoji: "👗", defaultColor: "#e8a6bd", hint: "상의+스커트 일체형. 하의 없이 단독 착용 추천." },
+  { id: "scrubs", label: "의료 스크럽 상의", slot: "top", emoji: "🩺", defaultColor: "#0f766e", hint: "의사·간호사·응급구조사 컷. 반소매 V넥 작업복입니다." },
   // 하의
   { id: "pleated", label: "플리츠 스커트", slot: "bottom", emoji: "🩳", defaultColor: "#1e293b", hint: "교복 컷 단골. 물리 스커트와 달리 절대 뚫리지 않아요." },
   { id: "longskirt", label: "롱스커트", slot: "bottom", emoji: "👗", defaultColor: "#6e2434", hint: "우아한 컷. 발목까지 내려와요." },
@@ -174,6 +211,7 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
   { id: "pants", label: "슬림 팬츠", slot: "bottom", emoji: "👖", defaultColor: "#1c1c22", hint: "정장·데일리 컷." },
   { id: "wide", label: "와이드 팬츠", slot: "bottom", emoji: "👖", defaultColor: "#4b5563", hint: "밑단이 넓게 퍼지는 실루엣." },
   { id: "jeans", label: "청바지", slot: "bottom", emoji: "👖", defaultColor: "#3b5b85", hint: "캐주얼 만능. 밑단 롤업 디테일." },
+  { id: "scrubpants", label: "의료 스크럽 팬츠", slot: "bottom", emoji: "🩺", defaultColor: "#115e59", hint: "병원 근무복의 여유 있는 일자 팬츠입니다." },
   // 신발
   { id: "sneakers", label: "스니커즈", slot: "shoes", emoji: "👟", defaultColor: "#f1f5f9", hint: "캐주얼 기본. 색으로 포인트를." },
   { id: "boots", label: "앵클부츠", slot: "shoes", emoji: "🥾", defaultColor: "#5a4632", hint: "가을·여행 컷." },
@@ -181,6 +219,7 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
   { id: "heels", label: "하이힐", slot: "shoes", emoji: "👠", defaultColor: "#991b1b", hint: "드레스·파티 컷." },
   { id: "loafers", label: "로퍼", slot: "shoes", emoji: "🥿", defaultColor: "#451a03", hint: "교복·오피스 컷." },
   { id: "sandals", label: "샌들", slot: "shoes", emoji: "🩴", defaultColor: "#d6b98c", hint: "여름·바캉스 컷." },
+  { id: "clogs", label: "의료 클로그", slot: "shoes", emoji: "🩴", defaultColor: "#f1f5f9", hint: "병원·실험실 근무용으로 발등을 감싸는 가벼운 신발입니다." },
 ] as const;
 
 export function wardrobeItemById(id: string): WardrobeItemDef | undefined {
@@ -281,6 +320,11 @@ export const WARDROBE_SETS: readonly WardrobeSet[] = [
   { id: "druid", label: "숲의 로브 세트", emoji: "🍃", equips: { outer: { itemId: "robe", color: "#2f5141" }, bottom: { itemId: "pants", color: "#78350f" }, shoes: { itemId: "sandals", color: "#8a6a3c" } } },
   { id: "casual", label: "캐주얼 세트", emoji: "🛹", equips: { top: { itemId: "tshirt", color: "#e5e7eb" }, bottom: { itemId: "jeans", color: "#3b5b85" }, shoes: { itemId: "sneakers", color: "#f1f5f9" } } },
   { id: "winter", label: "겨울 니트 세트", emoji: "❄️", equips: { top: { itemId: "sweater", color: "#7a3b3b" }, bottom: { itemId: "longskirt", color: "#6e2434" }, shoes: { itemId: "boots", color: "#5a4632" } } },
+  { id: "office", label: "오피스 정장 세트", emoji: "💼", equips: { outer: { itemId: "blazer", color: "#1f2937" }, top: { itemId: "shirt", color: "#f8fafc" }, bottom: { itemId: "pants", color: "#111827" }, shoes: { itemId: "loafers", color: "#3f2d20" } } },
+  { id: "doctor", label: "의사 가운 세트", emoji: "🥼", equips: { outer: { itemId: "labcoat", color: "#f8fafc" }, top: { itemId: "scrubs", color: "#0e7490" }, bottom: { itemId: "scrubpants", color: "#155e75" }, shoes: { itemId: "clogs", color: "#f1f5f9" } } },
+  { id: "surgeon", label: "외과 수술복 세트", emoji: "🩺", equips: { top: { itemId: "scrubs", color: "#0f766e" }, bottom: { itemId: "scrubpants", color: "#115e59" }, shoes: { itemId: "clogs", color: "#dbeafe" } } },
+  { id: "nurse", label: "간호 스크럽 세트", emoji: "🏥", equips: { top: { itemId: "scrubs", color: "#60a5fa" }, bottom: { itemId: "scrubpants", color: "#2563eb" }, shoes: { itemId: "clogs", color: "#f8fafc" } } },
+  { id: "paramedic", label: "응급구조사 세트", emoji: "🚑", equips: { outer: { itemId: "hoodie", color: "#f97316" }, top: { itemId: "tshirt", color: "#f8fafc" }, bottom: { itemId: "pants", color: "#1e293b" }, shoes: { itemId: "sneakers", color: "#111827" } } },
 ] as const;
 
 export function wardrobeSetById(id: string): WardrobeSet | undefined {
@@ -568,6 +612,40 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       parts.push({ bone: "spine", shape: { kind: "torus", r: m.shoulderW * 0.31, tube: m.shoulderW * 0.06 }, offset: scaleVec(m.up, m.spineToNeck * 0.9), align: m.up, squash: [1, 1, 0.74], roughness: 0.78 });
       break;
     }
+    case "labcoat": {
+      const skirtLen = m.upperLeg.left.len * 0.72;
+      const fwd = m.footForward.left;
+      parts.push(torsoShell(m, { rMul: 1.13 * f, bottomExt: 3.2, roughness: 0.72 }));
+      parts.push(skirtCone(m, { len: skirtLen, rTopMul: 1.12 * f, flare: 1.2 }));
+      for (const s of SIDES) {
+        parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 1.02, r: armR(s, 1.3), roughness: 0.72 }));
+        parts.push(limbSleeve(s === "left" ? "leftLowerArm" : "rightLowerArm", m.lowerArm[s], { coverage: 0.95, r: armR(s, 1.18), roughness: 0.72 }));
+      }
+      // V자 라펠과 양쪽 포켓 — 가운 실루엣을 일반 코트와 구분한다.
+      for (const side of [-1, 1] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.17, h: m.spineToNeck * 0.34, d: 0.012 },
+          offset: addVec(
+            addVec(scaleVec(m.up, m.spineToNeck * 0.62), scaleVec(fwd, m.shoulderW * 0.52 * f)),
+            [side * m.shoulderW * 0.12, 0, 0]
+          ),
+          color: "#e2e8f0",
+          roughness: 0.72,
+        });
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.22, h: m.hipsToSpine * 0.42, d: 0.016 },
+          offset: addVec(
+            addVec(scaleVec(m.up, -m.hipsToSpine * 0.72), scaleVec(fwd, m.shoulderW * 0.54 * f)),
+            [side * m.shoulderW * 0.19, 0, 0]
+          ),
+          color: "#f1f5f9",
+          roughness: 0.72,
+        });
+      }
+      break;
+    }
     case "cardigan": {
       parts.push(torsoShell(m, { rMul: 1.1 * f, bottomExt: 3.1, roughness: 0.92 }));
       for (const s of SIDES) {
@@ -617,6 +695,24 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       for (const s of SIDES) {
         parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 0.42, r: armR(s, 1.26), roughness: 0.82 }));
       }
+      break;
+    }
+    case "scrubs": {
+      const fwd = m.footForward.left;
+      parts.push(torsoShell(m, { rMul: 1.08 * f, topExt: 0.88, bottomExt: 2.75, roughness: 0.84 }));
+      for (const s of SIDES) {
+        parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 0.38, r: armR(s, 1.3), roughness: 0.84 }));
+      }
+      // 가슴 포켓과 V넥 중심선.
+      parts.push({
+        bone: "spine",
+        shape: { kind: "box", w: m.shoulderW * 0.18, h: m.spineToNeck * 0.18, d: 0.012 },
+        offset: addVec(
+          addVec(scaleVec(m.up, m.spineToNeck * 0.38), scaleVec(fwd, m.shoulderW * 0.54 * f)),
+          [m.shoulderW * 0.15, 0, 0]
+        ),
+        roughness: 0.84,
+      });
       break;
     }
     case "shirt": {
@@ -706,6 +802,7 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       break;
     }
     case "pants":
+    case "scrubpants":
     case "jeans":
     case "wide": {
       const flare = def.id === "wide" ? 1.55 : 1.02;
@@ -744,6 +841,10 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
     case "loafers":
     case "sandals": {
       for (const s of SIDES) parts.push(...shoeParts(m, s, def.id, f));
+      break;
+    }
+    case "clogs": {
+      for (const s of SIDES) parts.push(...shoeParts(m, s, "loafers", f));
       break;
     }
     default:
