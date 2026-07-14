@@ -58,7 +58,7 @@ describe("studio chrome UI", () => {
       </StudioAppMenubar>
     );
     expect(html).toContain('data-studio-app-menubar="true"');
-    expect(html).toContain("min-h-9");
+    expect(html).toContain("h-10");
     expect(html).toContain("스튜디오");
   });
 

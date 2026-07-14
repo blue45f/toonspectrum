@@ -162,7 +162,7 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
-        "flex min-h-9 shrink-0 flex-nowrap items-center gap-1.5 border-b border-line/80 bg-panel px-2 py-1",
+        "flex h-10 min-h-10 shrink-0 flex-nowrap items-center gap-2 border-b border-line px-2.5",
         "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
@@ -349,7 +349,7 @@ export function StudioEdgeRailButton({
       aria-label={`${label} 펼치기`}
       data-studio-edge-rail={side}
       className={cn(
-        "group hidden w-8 shrink-0 flex-col items-center gap-2 border-line bg-panel/90 py-3 text-fg-3",
+        "group hidden w-8 shrink-0 flex-col items-center gap-2.5 border-line bg-panel py-4 text-fg-3",
         "transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
         side === "left" && "border-r",
@@ -359,9 +359,11 @@ export function StudioEdgeRailButton({
       )}
     >
       {Icon ? (
-        <Icon size={STUDIO_ICON_SIZE.rail} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="opacity-80 group-hover:opacity-100" />
+        <Icon size={15} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="opacity-70 transition-opacity group-hover:opacity-100" />
       ) : null}
-      <span className="text-[0.62rem] font-bold tracking-wide [writing-mode:vertical-rl]">{label}</span>
+      <span className="text-[0.6rem] font-semibold tracking-[0.14em] text-fg-3 [writing-mode:vertical-rl] group-hover:text-fg-2">
+        {label}
+      </span>
     </button>
   );
 }
@@ -511,8 +513,8 @@ export function StudioVerticalToolRail({
       aria-label={ariaLabel}
       data-studio-tool-rail="true"
       className={cn(
-        "hidden w-11 shrink-0 flex-col items-center gap-0.5 overflow-y-auto overscroll-contain",
-        "border-r border-line bg-panel/95 py-1.5",
+        "hidden w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain",
+        "border-r border-line py-2",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "lg:flex",
         className
@@ -553,20 +555,20 @@ export function StudioRailToolButton({
       title={label}
       aria-pressed={active}
       className={cn(
-        "relative grid size-9 place-items-center rounded-md border",
+        "relative grid size-9 place-items-center rounded-lg border border-transparent",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active
-          ? "border-accent/60 bg-accent-soft/70 text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.14)]"
+          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.22)]"
           : accented
-            ? "border-accent/25 bg-accent-soft/20 text-accent hover:bg-accent-soft/35"
-            : "border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg",
+            ? "text-accent hover:bg-accent-soft/40"
+            : "text-fg-2 hover:bg-raised hover:text-fg",
         disabled && "cursor-not-allowed opacity-35",
         className
       )}
       {...rest}
     >
-      <Icon size={STUDIO_ICON_SIZE.tool} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+      <Icon size={17} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={active ? "text-accent" : undefined} />
       {grouped ? (
         <span
           aria-hidden
@@ -583,7 +585,7 @@ export function StudioRailDivider({ className }: { className?: string }): ReactE
     <span
       role="separator"
       aria-hidden
-      className={cn("my-0.5 h-px w-7 shrink-0 bg-line-strong/50", className)}
+      className={cn("my-1 h-px w-6 shrink-0 bg-line/80", className)}
     />
   );
 }
@@ -606,10 +608,7 @@ export function StudioQuickActionsBar({
       role="group"
       aria-label={ariaLabel}
       data-studio-quick-actions="true"
-      className={cn(
-        "flex shrink-0 items-center gap-0.5 rounded-lg border border-line/55 bg-card/40 p-px",
-        className
-      )}
+      className={cn("studio-opt-cluster shrink-0", className)}
     >
       {children}
     </div>
@@ -635,8 +634,8 @@ export function StudioStatusBar({
       aria-label={ariaLabel}
       data-studio-status-bar="true"
       className={cn(
-        "pointer-events-auto absolute bottom-2 left-2 z-20 flex max-w-[min(100%,28rem)] flex-wrap items-center gap-1",
-        "rounded-lg border border-line/80 bg-panel/92 px-1.5 py-1 text-[0.62rem] font-semibold text-fg-2 shadow-md backdrop-blur-sm",
+        "pointer-events-auto absolute bottom-3 left-3 z-20 flex max-w-[min(100%,36rem)] flex-wrap items-center gap-1.5",
+        "rounded-xl px-2.5 py-1.5 text-[0.65rem] font-semibold tracking-tight text-fg-2",
         className
       )}
     >

@@ -121,13 +121,13 @@ export function StudioDrawOptionsBar({
       aria-label="그리기 옵션"
       data-studio-draw-options="true"
       className={cn(
-        "flex min-h-10 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line bg-panel/95 px-2 py-1",
+        "flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >
       {onSetDrawMode ? (
-        <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-line/70 bg-card/50 p-0.5" role="group" aria-label="그리기 모드">
+        <div className="studio-opt-cluster shrink-0" role="group" aria-label="그리기 모드">
           {(
             [
               { id: "pen" as const, label: "펜", Icon: Pencil },
@@ -141,15 +141,15 @@ export function StudioDrawOptionsBar({
               title={label}
               onClick={() => onSetDrawMode(id)}
               className={cn(
-                "inline-flex h-7 items-center gap-1 rounded px-2 text-[0.65rem] font-semibold",
+                "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.68rem] font-semibold",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 drawMode === id
-                  ? "bg-accent text-on-accent"
-                  : "text-fg-2 hover:bg-raised"
+                  ? "bg-accent text-on-accent shadow-sm"
+                  : "text-fg-2 hover:bg-raised hover:text-fg"
               )}
             >
-              <Icon size={13} aria-hidden />
+              <Icon size={14} strokeWidth={1.75} aria-hidden />
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
@@ -214,13 +214,13 @@ export function StudioDrawOptionsBar({
           max={48}
           value={strokeWidth}
           onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
-          className="w-20 accent-accent sm:w-28"
+          className="studio-range w-20 sm:w-28"
           aria-valuetext={`${strokeWidth}픽셀`}
         />
-        <span className="w-7 tabular-nums text-fg-2">{strokeWidth}</span>
+        <span className="w-7 tabular-nums text-[0.68rem] text-fg">{strokeWidth}</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.65rem] font-semibold text-fg-3">
+      <label className="flex shrink-0 items-center gap-1.5 text-[0.68rem] font-medium text-fg-3">
         <span className="select-none">불투명</span>
         <input
           type="range"
@@ -229,12 +229,12 @@ export function StudioDrawOptionsBar({
           step={1}
           value={Math.round(brushOpacity * 100)}
           onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
-          className="w-16 accent-accent sm:w-24"
+          className="studio-range w-16 sm:w-24"
         />
-        <span className="w-8 tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+        <span className="w-8 tabular-nums text-[0.68rem] text-fg">{Math.round(brushOpacity * 100)}%</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.65rem] font-semibold text-fg-3" title="라이브 손떨림 보정 강도">
+      <label className="flex shrink-0 items-center gap-1.5 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도">
         <span className="select-none">보정</span>
         <input
           type="range"
@@ -243,9 +243,9 @@ export function StudioDrawOptionsBar({
           step={1}
           value={stabilizer}
           onChange={(e) => onStabilizerChange(Number(e.target.value))}
-          className="w-14 accent-accent sm:w-20"
+          className="studio-range w-14 sm:w-20"
         />
-        <span className="w-4 tabular-nums text-fg-2">{stabilizer}</span>
+        <span className="w-4 tabular-nums text-[0.68rem] text-fg">{stabilizer}</span>
       </label>
 
       {onStabilizerModeChange ? (

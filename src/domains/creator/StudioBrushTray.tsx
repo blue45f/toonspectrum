@@ -70,16 +70,16 @@ export function StudioBrushTray({
               title={`${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               className={cn(
-                "flex h-9 min-w-[2.75rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-md border px-1.5",
+                "flex h-9 min-w-[2.85rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
-                  ? "border-accent/60 bg-accent text-on-accent shadow-sm"
-                  : "border-line/70 bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
+                  ? "border-accent/50 bg-accent text-on-accent shadow-[0_1px_0_oklch(0.72_0.185_42/0.25)]"
+                  : "border-transparent bg-transparent text-fg-2 hover:border-line/80 hover:bg-raised hover:text-fg"
               )}
             >
               <BrushPreviewStroke weight={item.previewWeight} active={active} />
-              <span className="text-[0.58rem] font-bold leading-none">{item.shortName}</span>
+              <span className="text-[0.58rem] font-semibold leading-none tracking-tight">{item.shortName}</span>
             </button>
           );
         })}

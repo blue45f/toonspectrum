@@ -76,12 +76,12 @@ export function StudioSelectOptionsBar({
       aria-label="선택 옵션"
       data-studio-select-options="true"
       className={cn(
-        "flex min-h-9 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line bg-panel/90 px-2 py-1",
+        "flex h-10 min-h-10 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2.5",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >
-      <span className="mr-1 max-w-[12rem] truncate text-[0.68rem] font-bold text-fg-2">
+      <span className="mr-1.5 max-w-[12rem] truncate rounded-md border border-line/70 bg-card/60 px-2 py-1 text-[0.68rem] font-semibold text-fg">
         {selectionCount > 1 ? `${selectionCount}개 선택` : selectionLabel ?? "선택됨"}
       </span>
       <Action icon={Copy} label="복제" onClick={onDuplicate} />

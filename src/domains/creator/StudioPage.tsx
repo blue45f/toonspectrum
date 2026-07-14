@@ -16936,12 +16936,12 @@ function StudioCuttoonEditor() {
           )}
         >
           <h1
-            className="min-w-0 max-w-[12rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg lg:max-w-[16rem]"
+            className="min-w-0 max-w-[12rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg lg:max-w-[18rem]"
             title={title.trim() || "무제"}
           >
             {title.trim() || "무제"}
           </h1>
-          <span className="hidden shrink-0 text-[0.62rem] tabular-nums text-fg-3 sm:inline">
+          <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
             {pageDisplayName(activePage, activePageIndex)}
           </span>
           {displayLinkedTitleId ? (
@@ -20195,7 +20195,11 @@ function StudioCuttoonEditor() {
             onDrop={onWrapDrop}
             className={cn(
               // Magma-like: canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
-              "relative min-h-0 flex-1 overflow-auto rounded-none border-0 border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-none lg:rounded-none",
+              "relative min-h-0 flex-1 overflow-auto rounded-none border-0 outline-none",
+              "bg-[oklch(0.145_0.008_70)]",
+              "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
+              "[background-size:24px_24px]",
+              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-none",
               canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
@@ -20277,7 +20281,7 @@ function StudioCuttoonEditor() {
           {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
           <div
             className={cn(
-              "relative",
+              "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               (collaborationDocumentLocked || saving) && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
