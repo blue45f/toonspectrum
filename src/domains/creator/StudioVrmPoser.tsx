@@ -15,17 +15,6 @@ import {
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
-  STUDIO_VRM_AGE_LABELS,
-  STUDIO_VRM_CHARACTER_RECIPES,
-  STUDIO_VRM_OCCUPATION_LABELS,
-  STUDIO_VRM_PRESENTATION_LABELS,
-  filterStudioVrmCharacterRecipes,
-  type StudioVrmAgeBand,
-  type StudioVrmCharacterRecipe,
-  type StudioVrmOccupation,
-  type StudioVrmPresentation,
-} from "./studio-vrm-character-recipes";
-import {
   classifyMeshName,
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
@@ -560,41 +549,16 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; h
   { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
 ];
 
-type CharacterPanelSection = "recipes" | "library" | "forge" | "appearance" | "wardrobe";
+type CharacterPanelSection = "library" | "forge" | "appearance" | "wardrobe";
 const CHARACTER_PANEL_SECTIONS: Array<{
   id: CharacterPanelSection;
   label: string;
   icon: typeof UserRound;
 }> = [
-  { id: "recipes", label: "시작", icon: UserRound },
   { id: "library", label: "모델", icon: Upload },
   { id: "forge", label: "조형", icon: Sparkles },
   { id: "appearance", label: "체형·색", icon: Sliders },
   { id: "wardrobe", label: "의상", icon: Shirt },
-];
-
-const RECIPE_AGE_FILTERS: ReadonlyArray<StudioVrmAgeBand | "all"> = [
-  "all",
-  "child",
-  "teen",
-  "young-adult",
-  "adult",
-  "senior",
-];
-const RECIPE_PRESENTATION_FILTERS: ReadonlyArray<StudioVrmPresentation | "all"> = [
-  "all",
-  "feminine",
-  "masculine",
-  "androgynous",
-];
-const RECIPE_OCCUPATION_FILTERS: ReadonlyArray<StudioVrmOccupation | "all"> = [
-  "all",
-  "student",
-  "creator",
-  "office",
-  "doctor",
-  "nurse",
-  "paramedic",
 ];
 
 const ENV_VARIANTS: Array<{ id: EnvVariant; label: string }> = [
@@ -2813,13 +2777,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activeExpressionCategory, setActiveExpressionCategory] = useState<string>("emotion");
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
-  const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("recipes");
-  const [recipeQuery, setRecipeQuery] = useState("");
-  const [recipeAgeFilter, setRecipeAgeFilter] = useState<StudioVrmAgeBand | "all">("all");
-  const [recipePresentationFilter, setRecipePresentationFilter] = useState<StudioVrmPresentation | "all">("all");
-  const [recipeOccupationFilter, setRecipeOccupationFilter] = useState<StudioVrmOccupation | "all">("all");
-  const [activeRecipeId, setActiveRecipeId] = useState<string | null>(null);
-  const [recipeError, setRecipeError] = useState("");
+  const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("library");
   const [poseQuery, setPoseQuery] = useState("");
   const [bodyRotation, setBodyRotation] = useState(0);
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
@@ -3181,12 +3139,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
   const hideOnCharacterSection = (section: CharacterPanelSection) =>
     activePanelTab !== "character" || activeCharacterSection !== section;
-  const filteredCharacterRecipes = filterStudioVrmCharacterRecipes(STUDIO_VRM_CHARACTER_RECIPES, {
-    query: recipeQuery,
-    ageBand: recipeAgeFilter,
-    presentation: recipePresentationFilter,
-    occupation: recipeOccupationFilter,
-  });
   const normalizedLibraryQuery = libraryQuery.trim().toLocaleLowerCase("ko-KR");
   const filteredLibraryEntries = libraryEntries.filter((entry) =>
     entry.name.toLocaleLowerCase("ko-KR").includes(normalizedLibraryQuery)
@@ -4088,8 +4040,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setVrmPhysics(DEFAULT_VRM_PHYSICS);
     setPhysicsPreview(false);
     setSpringJointCount(0);
-    setActiveRecipeId(null);
-    setRecipeError("");
   }, [open]);
 
   const loadModelRef = useRef(loadModelFromLibraryEntry);
@@ -4349,7 +4299,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
       const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
       if (firstUploadedEntry) {
-        setActiveRecipeId(null);
         loadModelFromLibraryEntry(firstUploadedEntry);
       }
     } catch (caughtError: unknown) {
@@ -4361,44 +4310,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function handleSampleLoad() {
-    setActiveRecipeId(null);
     loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
-  }
-
-  function handleCharacterRecipeSelect(recipe: StudioVrmCharacterRecipe) {
-    const entry = libraryEntries.find((candidate) => candidate.id === recipe.modelId);
-    const wardrobeSet = wardrobeSetById(recipe.wardrobeSetId);
-    if (!entry || !wardrobeSet) {
-      setRecipeError("이 시작 캐릭터에 필요한 모델 또는 의상 세트를 찾지 못했습니다.");
-      return;
-    }
-
-    const pose = findPose(recipe.poseId);
-    const recipeProps = recipe.propIds.flatMap((propId, index) => {
-      const item = createPropInstance(propId, `recipe-${recipe.id}-${index + 1}`);
-      return item ? [item] : [];
-    });
-
-    pendingPoseDataRef.current = {
-      modelId: recipe.modelId,
-      bones: pose.bones,
-      yOffset: pose.yOffset ?? 0,
-      expressionWeights: {},
-      customColors: { ...recipe.colors },
-      wardrobe: serializeWardrobe(applyWardrobeSet(wardrobeSet)),
-      vrmProps: serializeVrmProps(recipeProps),
-      bodyScale: recipe.bodyScale,
-      lighting: { intensity: 1.2, colorTemp: 0.5, directionDeg: 45 },
-      env: "none",
-      materialFx: DEFAULT_VRM_MATERIAL_FX,
-    };
-    setActiveRecipeId(recipe.id);
-    setActivePoseId(recipe.poseId);
-    setActiveExpressionId("neutral");
-    setBodyRotation(0);
-    setActiveCameraId("front");
-    setRecipeError("");
-    loadModelFromLibraryEntry(entry);
   }
 
   async function handleDeleteEntry(event: MouseEvent<HTMLButtonElement>, entry: VrmLibraryEntry) {
@@ -5048,11 +4960,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <div className="absolute inset-0 grid place-items-center bg-card/50 p-6 text-center backdrop-blur-[1px]">
                     <div className="max-w-[22rem]">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
-                        <Sparkles size={22} aria-hidden />
+                        <Upload size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">시작 캐릭터를 골라 바로 만드세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">VRM 모델을 불러와 장면을 시작하세요.</p>
                       <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                        연령대·여성/남성/중성 표현·의료진 같은 역할을 고르면 모델, 체형, 의상, 소품과 포즈가 한 번에 준비됩니다.
+                        내 .vrm 파일을 업로드하거나 모델 라이브러리에서 준비된 모델을 선택하세요. 불러온 뒤 조형, 포즈, 의상과 소품을 자유롭게 편집할 수 있습니다.
                       </p>
                       <div className="mt-4 flex justify-center gap-2">
                         <button
@@ -5060,11 +4972,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           className={cx(CONTROL_BUTTON, "border-accent/50 bg-accent text-on-accent")}
                           onClick={() => {
                             handlePanelTabChange("character");
-                            handleCharacterSectionChange("recipes");
+                            handleCharacterSectionChange("library");
                           }}
                         >
-                          <WandSparkles size={14} aria-hidden />
-                          시작 캐릭터
+                          <Upload size={14} aria-hidden />
+                          모델 라이브러리
                         </button>
                         <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")} onClick={handleSampleLoad}>
                           루미 불러오기
@@ -5131,7 +5043,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
             <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
               {activePanelTab === "character" ? (
                 <div className="sticky -top-4 z-20 -mx-4 -mt-4 border-b border-line bg-panel/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-5 gap-1">
+                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-4 gap-1">
                     {CHARACTER_PANEL_SECTIONS.map((section) => {
                       const SectionIcon = section.icon;
                       const selected = activeCharacterSection === section.id;
@@ -5161,147 +5073,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   </div>
                 </div>
               ) : null}
-
-              <section
-                id="vrm-character-section-recipes"
-                role="tabpanel"
-                aria-labelledby="vrm-character-subtab-recipes"
-                hidden={hideOnCharacterSection("recipes")}
-              >
-                <div className="mb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                        <WandSparkles size={15} className="text-accent" aria-hidden />
-                        VRM 시작 캐릭터
-                      </h3>
-                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        모델·체형·피부색·실제 3D 의상·직업 소품·포즈를 한 번에 조합한 뒤 각 단계에서 다시 다듬으세요.
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-bold text-fg-3">
-                      {STUDIO_VRM_CHARACTER_RECIPES.length}종
-                    </span>
-                  </div>
-
-                  <div className="relative mt-3">
-                    <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
-                    <input
-                      type="search"
-                      value={recipeQuery}
-                      onChange={(event) => setRecipeQuery(event.target.value)}
-                      placeholder="의사·학생·노년·중성 표현 검색"
-                      aria-label="시작 캐릭터 검색"
-                      className="min-h-11 w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
-                    />
-                  </div>
-
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                      연령대
-                      <select
-                        value={recipeAgeFilter}
-                        onChange={(event) => setRecipeAgeFilter(event.target.value as StudioVrmAgeBand | "all")}
-                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
-                      >
-                        {RECIPE_AGE_FILTERS.map((value) => (
-                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_AGE_LABELS[value]}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                      표현
-                      <select
-                        value={recipePresentationFilter}
-                        onChange={(event) => setRecipePresentationFilter(event.target.value as StudioVrmPresentation | "all")}
-                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
-                      >
-                        {RECIPE_PRESENTATION_FILTERS.map((value) => (
-                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_PRESENTATION_LABELS[value]}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                      역할
-                      <select
-                        value={recipeOccupationFilter}
-                        onChange={(event) => setRecipeOccupationFilter(event.target.value as StudioVrmOccupation | "all")}
-                        className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-1.5 text-[0.68rem] text-fg outline-none focus:border-accent"
-                      >
-                        {RECIPE_OCCUPATION_FILTERS.map((value) => (
-                          <option key={value} value={value}>{value === "all" ? "전체" : STUDIO_VRM_OCCUPATION_LABELS[value]}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                </div>
-
-                <p className="mb-2 text-[0.66rem] font-semibold text-fg-3" role="status" aria-live="polite">
-                  조건에 맞는 시작 캐릭터 {filteredCharacterRecipes.length}종
-                </p>
-                {recipeError ? (
-                  <p className="mb-2 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad" role="alert">{recipeError}</p>
-                ) : null}
-                {filteredCharacterRecipes.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-line bg-card/45 px-3 py-6 text-center text-xs text-fg-3">
-                    조건에 맞는 시작 캐릭터가 없습니다. 필터를 줄이거나 다른 검색어를 입력하세요.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {filteredCharacterRecipes.map((recipe) => {
-                      const entry = libraryEntryById.get(recipe.modelId);
-                      const selected = activeRecipeId === recipe.id;
-                      const loading = selected && status === "loading";
-                      return (
-                        <button
-                          key={recipe.id}
-                          type="button"
-                          disabled={!entry || status === "loading"}
-                          aria-pressed={selected}
-                          className={cx(
-                            "min-h-[9.5rem] overflow-hidden rounded-xl border p-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
-                            selected
-                              ? "border-accent/60 bg-accent-soft"
-                              : "border-line bg-card hover:border-accent/35 hover:bg-raised"
-                          )}
-                          onClick={() => handleCharacterRecipeSelect(recipe)}
-                        >
-                          <span className="flex items-start gap-2">
-                            <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-panel text-xl">
-                              {entry?.thumbnail ? (
-                                <img src={entry.thumbnail} alt="" className="h-full w-full object-contain" />
-                              ) : loading ? (
-                                <Loader2 size={18} className="animate-spin text-accent" aria-hidden />
-                              ) : (
-                                <span aria-hidden>{recipe.emoji}</span>
-                              )}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[0.7rem] font-bold leading-snug text-fg">{recipe.label}</span>
-                              <span className="mt-1 block text-[0.62rem] leading-snug text-fg-3">
-                                {STUDIO_VRM_AGE_LABELS[recipe.ageBand]} · {STUDIO_VRM_OCCUPATION_LABELS[recipe.occupation]}
-                              </span>
-                            </span>
-                          </span>
-                          <span className="mt-2 line-clamp-3 block text-[0.64rem] leading-relaxed text-fg-3">
-                            {recipe.description}
-                          </span>
-                          <span className="mt-2 flex flex-wrap gap-1">
-                            <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2">
-                              {STUDIO_VRM_PRESENTATION_LABELS[recipe.presentation]}
-                            </span>
-                            {recipe.propIds.length > 0 ? (
-                              <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2">
-                                소품 {recipe.propIds.length}
-                              </span>
-                            ) : null}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
 
               <section
                 id="vrm-character-section-library"
@@ -5460,7 +5231,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                           className="grid min-h-[6.25rem] w-full grid-rows-[4.5rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                           disabled={status === "loading" && isActive}
                           onClick={() => {
-                            setActiveRecipeId(null);
                             loadModelFromLibraryEntry(entry);
                           }}
                         >

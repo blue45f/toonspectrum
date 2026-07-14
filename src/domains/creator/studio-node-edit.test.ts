@@ -210,11 +210,12 @@ describe("isNodeEditableKind", () => {
 });
 
 describe("isPressureWidthBrush", () => {
-  it("pen/gpen/marker(pen 모드)는 true", () => {
+  it("pen/gpen/marker/watercolor(pen 모드)는 true", () => {
     expect(isPressureWidthBrush("pen", "pen")).toBe(true);
     expect(isPressureWidthBrush(undefined, "pen")).toBe(true);
     expect(isPressureWidthBrush("gpen", "pen")).toBe(true);
     expect(isPressureWidthBrush("marker", "pen")).toBe(true);
+    expect(isPressureWidthBrush("watercolor", "pen")).toBe(true);
   });
 
   it("brush/pencil/highlighter/screentone(pen 모드)는 false", () => {

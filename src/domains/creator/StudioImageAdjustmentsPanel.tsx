@@ -354,6 +354,35 @@ const StudioGrainSection = lazy(async () => {
   return { default: StudioGrainSection };
 });
 
+const StudioInkWashSection = lazy(async () => {
+  const [panelMod, inkWash] = await Promise.all([
+    import("./StudioInkWashPanel"),
+    import("./studio-ink-wash"),
+  ]);
+  const Panel = panelMod.StudioInkWashPanel;
+  function StudioInkWashSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = inkWash.normalizeInkWash(selected.inkWash);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) => {
+          const next = inkWash.normalizeInkWash({ ...value, ...patch });
+          onPatch({
+            // strength 0은 저장할 이유가 없는 항등값이다. 이렇게 지워야 초기 청크의 가벼운
+            // 활성 판정도 false가 되어 Konva 캐시·필터 모듈을 불필요하게 켜지 않는다.
+            inkWash: inkWash.isIdentityInkWash(next) ? undefined : next,
+          } as Partial<El>);
+        }}
+        onApplyPreset={(v) =>
+          onPatch({ inkWash: inkWash.isIdentityInkWash(v) ? undefined : v } as Partial<El>)
+        }
+        onReset={() => onPatch({ inkWash: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioInkWashSection };
+});
+
 const StudioBlurSection = lazy(async () => {
   const [panelMod, blur] = await Promise.all([
     import("./StudioBlurPanel"),
@@ -717,6 +746,10 @@ export function StudioImageAdjustmentsPanel({
 
       <AdjustmentSection title="그레인" forceOpen={hasAdjustmentValue(selected.grain)}>
         <StudioGrainSection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+
+      <AdjustmentSection title="수묵/번짐 재질" forceOpen={hasAdjustmentValue(selected.inkWash)}>
+        <StudioInkWashSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
       <AdjustmentSection title="블러 FX" forceOpen={hasAdjustmentValue(selected.blurFx)}>

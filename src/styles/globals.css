@@ -3,9 +3,19 @@
 /* Studio 모바일 앱 셸은 페이지가 아니라 캔버스 스크롤 영역만 움직인다. React가 사이트
    헤더·푸터를 언마운트하고 이 속성은 배경 문서의 바운스/스크롤 체이닝까지 막는다. */
 html[data-studio-mobile-immersive="true"],
-html[data-studio-mobile-immersive="true"] body {
+html[data-studio-mobile-immersive="true"] body,
+html[data-studio-canvas-only="true"],
+html[data-studio-canvas-only="true"] body {
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* 창작 편집기는 작은 버튼의 눌림 축소가 시선을 캔버스에서 떼고 펜/터치 조작의
+   정밀 피드백과도 충돌한다. Studio 범위에서만 transform 기반 클릭 효과를 끄고,
+   일반 사이트의 버튼·카드 피드백은 그대로 유지한다. 필요한 특수 조작은 명시적으로
+   data-studio-allow-press-feedback="true"를 달아 다시 허용할 수 있다. */
+[data-studio-editor="true"] button:active:not([data-studio-allow-press-feedback="true"]) {
+  transform: none !important;
 }
 
 /* ============================================================

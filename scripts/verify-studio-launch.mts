@@ -23,6 +23,17 @@ import { chromium, type Browser, type Page } from "playwright";
 
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+// 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 두 요청은
+// UI 부트에 필수가 아닌 best-effort 작업(카탈로그 병합·AI 제공자 상태)이고, API 부재가 Studio
+// 렌더/상호작용 회귀처럼 strict gate를 막아서는 안 된다. 다른 console error는 계속 실패 처리한다.
+const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/kmas/merge-on-access",
+  "/api/studio-ai/status",
+] as const;
+
+function isExpectedStaticPreviewApiError(message: string): boolean {
+  return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
+}
 
 interface RunResult {
   ok: boolean;
@@ -74,11 +85,20 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   const ctx = await browser.newContext();
   const page: Page = await ctx.newPage();
   const consoleErrors: string[] = [];
+  const failedResponses: string[] = [];
 
   page.on("console", (m) => {
-    if (m.type() === "error") consoleErrors.push(m.text());
+    if (m.type() === "error") {
+      const location = m.location().url;
+      const message = location ? `${m.text()} @ ${location}` : m.text();
+      if (!isExpectedStaticPreviewApiError(message)) consoleErrors.push(message);
+    }
   });
   page.on("pageerror", (e) => consoleErrors.push(String(e)));
+  page.on("response", (response) => {
+    const message = `${response.status()} ${response.url()}`;
+    if (response.status() >= 500 && !isExpectedStaticPreviewApiError(message)) failedResponses.push(message);
+  });
 
   // Dismiss quick-start before any navigation / storage init
   await page.addInitScript(({ key }) => {
@@ -155,6 +175,16 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   const ok = pageDelta >= 2 && dimOk && consoleErrors.length === 0;
   if (!ok) {
     log(`run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, errs=${consoleErrors.length})`);
+    if (consoleErrors.length > 0) {
+      // 실패 시 원인을 출력해야 실제 Studio 회귀와 무해한 네트워크 경고를 구별할 수 있다.
+      // 메시지는 길어질 수 있어 최대 8건만 로그에 남기되, strict gate 자체는 그대로 유지한다.
+      for (const [index, message] of consoleErrors.slice(0, 8).entries()) {
+        log(`run${run} consoleError[${index}]: ${message}`);
+      }
+    }
+    for (const [index, response] of failedResponses.slice(0, 8).entries()) {
+      log(`run${run} failedResponse[${index}]: ${response}`);
+    }
   }
   return { ok, stageInfo: { logicalW, hasKonvaSurface, pageDelta }, errCount: consoleErrors.length, shot };
 }

@@ -736,6 +736,7 @@ import {
   type StrokeStyle,
 } from "./studio-stroke-shapes";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
+import { planWatercolorBrushDabs, watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
 import {
   DEFAULT_WATERMARK,
   normalizeWatermark,
@@ -835,6 +836,7 @@ import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
+import type { InkWash } from "./studio-ink-wash";
 import type {
   StudioLayerColor,
   StudioLayerNavigatorItem,
@@ -1446,6 +1448,8 @@ export interface ImageEl {
   glow?: Glow;
   halftone?: Halftone;
   grain?: Grain;
+  /** 수묵/수채 번짐·종이결·안료 과립을 조합하는 비파괴 재질 효과. */
+  inkWash?: InkWash;
   blurFx?: BlurFx;
   distort?: Distort;
   stylize?: Stylize;
@@ -2476,6 +2480,56 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                 }}
                 fill={stroke}
                 opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brush === "watercolor" && el.mode !== "eraser") {
+            // 수채는 매 렌더에서 스트로크 id/필압/점열로 dab 계획을 다시 계산한다. 계획 자체가
+            // 순수·결정적이라 히스토리 복원, 협업 동기화, 내보내기에서도 번짐 위치가 흔들리지 않는다.
+            const dabs = planWatercolorBrushDabs({
+              points: processFreehandPoints(points),
+              pressures: el.pressures,
+              baseWidth: strokeWidth,
+              seed: watercolorBrushSeedFromKey(el.id),
+              // 길고 촘촘한 스트로크도 editor 재렌더마다 작업량이 폭증하지 않게 한 획당 cap을 둔다.
+              // cap에 걸려도 플래너가 첫/끝 core와 경로 연속성을 우선 보존한다.
+              maxDabs: 512,
+            });
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  if (dabs.length === 0) return;
+                  context.save();
+                  for (const dab of dabs) {
+                    context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
+                    context.beginPath();
+                    context.arc(dab.x, dab.y, dab.radius, 0, Math.PI * 2);
+                    if (dab.role === "diffuse") {
+                      // 외곽이 0 alpha로 사라지는 방사 그라디언트라, 별도 blur 필터 없이도 젖은
+                      // 종이 가장자리처럼 퍼진다. 중심 dab과 함께 그려져 단일 탭도 자연스러운 점이 된다.
+                      const gradient = context.createRadialGradient(
+                        dab.x,
+                        dab.y,
+                        0,
+                        dab.x,
+                        dab.y,
+                        dab.radius
+                      );
+                      gradient.addColorStop(0, stroke);
+                      gradient.addColorStop(0.45, stroke);
+                      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+                      context.fillStyle = gradient;
+                    } else {
+                      context.fillStyle = stroke;
+                    }
+                    context.fill();
+                  }
+                  context.restore();
+                }}
                 globalCompositeOperation={composite}
                 listening={false}
               />
@@ -4654,32 +4708,59 @@ function StudioCuttoonEditor() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
   const [maximized, setMaximized] = useState(false);
+  // 캔버스만 보기 — 브라우저 전체화면 권한 없이도 작업 제목·상단 툴바·양쪽 도크를 모두
+  // 접어 펜 태블릿/큰 모니터에서 실제 드로잉 앱처럼 작업면을 쓴다. 원래 패널 배치는
+  // 건드리지 않는 일시적 프레젠테이션 상태라 종료하면 사용자의 작업공간이 그대로 돌아온다.
+  const [canvasOnlyMode, setCanvasOnlyMode] = useState(false);
   // 데스크톱 브라우저 맞춤 상태로 창 폭을 모바일 경계 아래로 줄이면 해당 복원 버튼이
   // 모바일 툴바에서 사라진다. 경계 진입 commit 전에 상태를 내려 터치 화면을 고정 셸에 가두지 않는다.
   useLayoutEffect(() => {
     if (isMobile && maximized) setMaximized(false);
-  }, [isMobile, maximized]);
-  // 모바일 컷툰 편집기는 사이트 크롬 대신 자체 앱 셸을 소유한다. App이 헤더·푸터·전역
-  // 플로팅 컨트롤을 실제로 언마운트하므로 시각적으로 가려진 링크가 Tab 순서에 남지 않는다.
+    // 모바일은 전용 앱 셸이 이미 캔버스 우선 구조이므로 데스크톱 전용 캔버스만 보기의
+    // 중복 상태를 남기지 않는다.
+    if (isMobile && canvasOnlyMode) setCanvasOnlyMode(false);
+  }, [canvasOnlyMode, isMobile, maximized]);
+  // 모바일 앱 셸과 데스크톱 캔버스만 보기는 사이트 크롬 대신 Studio가 화면을 소유한다.
+  // App이 헤더·푸터·전역 플로팅 컨트롤을 실제로 언마운트하므로, 단순 overlay와 달리
+  // 보이지 않는 사이트 링크가 Tab 순서에 남거나 푸터가 캔버스 아래에서 스크롤되지 않는다.
+  const studioImmersiveSurface = mobileImmersive || canvasOnlyMode;
   useLayoutEffect(() => {
-    if (!mobileImmersive || typeof document === "undefined") return;
+    if (!studioImmersiveSurface || typeof document === "undefined") return;
     const root = document.documentElement;
-    const previousMode = root.getAttribute("data-studio-mobile-immersive");
-    root.setAttribute("data-studio-mobile-immersive", "true");
+    const previousMobileMode = root.getAttribute("data-studio-mobile-immersive");
+    const previousCanvasOnlyMode = root.getAttribute("data-studio-canvas-only");
+    if (mobileImmersive) {
+      root.setAttribute("data-studio-mobile-immersive", "true");
+    }
+    if (canvasOnlyMode && !isMobile) {
+      root.setAttribute("data-studio-canvas-only", "true");
+    }
     acquireImmersiveSurface("studio");
     return () => {
       releaseImmersiveSurface("studio");
-      if (previousMode === null) {
+      if (previousMobileMode === null) {
         root.removeAttribute("data-studio-mobile-immersive");
       } else {
-        root.setAttribute("data-studio-mobile-immersive", previousMode);
+        root.setAttribute("data-studio-mobile-immersive", previousMobileMode);
+      }
+      if (previousCanvasOnlyMode === null) {
+        root.removeAttribute("data-studio-canvas-only");
+      } else {
+        root.setAttribute("data-studio-canvas-only", previousCanvasOnlyMode);
       }
     };
-  }, [acquireImmersiveSurface, mobileImmersive, releaseImmersiveSurface]);
+  }, [
+    acquireImmersiveSurface,
+    canvasOnlyMode,
+    isMobile,
+    mobileImmersive,
+    releaseImmersiveSurface,
+    studioImmersiveSurface,
+  ]);
   // 전체화면/브라우저 맞춤은 저장된 작업공간을 바꾸지 않는 일시적인 프레젠테이션 상태다.
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
-  const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive;
+  const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive || canvasOnlyMode;
   const visibleLeftPanelOpen = leftPanelOpen && !presentationPanelsHidden;
   const visibleRightPanelOpen = rightPanelOpen && !presentationPanelsHidden;
   const liveWorkspaceLayout = normalizeStudioWorkspaceLayout(
@@ -5000,6 +5081,9 @@ function StudioCuttoonEditor() {
   }, []);
   function toggleFullscreen() {
     if (typeof document === "undefined") return;
+    // 캔버스만 보기와 브라우저 Fullscreen API는 서로 다른 복원 경로(Esc)를 갖는다. 함께 켜면
+    // Escape 한 번에 둘 다 빠질 수 있으므로, 새 프레젠테이션 모드를 고를 때 이전 모드를 정리한다.
+    setCanvasOnlyMode(false);
     if (document.fullscreenElement) {
       void document.exitFullscreen?.();
     } else {
@@ -5008,7 +5092,21 @@ function StudioCuttoonEditor() {
   }
   // 브라우저 창 최대화 토글 — 저장된 패널 상태는 보존하고 화면에서만 잠시 숨긴다.
   function toggleMaximize() {
+    setCanvasOnlyMode(false);
     setMaximized((current) => !current);
+  }
+  function enterCanvasOnlyMode() {
+    // Fullscreen API와 합쳐 두 개의 Esc 복원 상태가 남지 않게 한다. 브라우저 탭을 유지하는
+    // 캔버스만 보기가 별도의 짧은 진입/이탈 루프를 제공하므로 펜 작업에는 이쪽이 더 예측 가능하다.
+    if (typeof document !== "undefined" && document.fullscreenElement) {
+      void document.exitFullscreen?.();
+      setIsFullscreen(false);
+    }
+    setMaximized(false);
+    setMenu(null);
+    setMobileSheet(null);
+    setQuickActionsOpen(false);
+    setCanvasOnlyMode(true);
   }
   function changeMobileImmersiveMode(enabled: boolean) {
     saveStudioMobileImmersivePreference(studioMobileImmersiveSessionStorage(), enabled);
@@ -5029,6 +5127,18 @@ function StudioCuttoonEditor() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [maximized]);
+  // 캔버스만 보기도 Esc 한 번으로만 종료한다. 모달 등이 이미 Escape를 소비한 경우에는
+  // 그 최상위 레이어를 먼저 닫아 예상치 못한 모드 이탈을 막는다.
+  useEffect(() => {
+    if (!canvasOnlyMode || typeof window === "undefined") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.key !== "Escape") return;
+      event.preventDefault();
+      setCanvasOnlyMode(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canvasOnlyMode]);
   const rememberColor = (c: string) => {
     void import("./studio-color-utils")
       .then(({ pushRecentColor, storeRecentColors }) => {
@@ -5624,7 +5734,7 @@ function StudioCuttoonEditor() {
     const el = wrapRef.current;
     // 컨테이너 폭에 맞춰 캔버스를 채운다. 전체화면이면 초광폭 모니터도 채우게 상한을 4배로 올린다.
     // ResizeObserver로 패널 접기·전체화면 등 레이아웃 변화까지 감지(예전엔 window resize만 들어 접어도 안 넓어졌다).
-    const cap = isFullscreen || maximized || mobileImmersive ? 4 : 2.5;
+    const cap = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
     const measure = () => {
       const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
       setScale(Math.min(cap, Math.max(0.1, w / CANVAS_W)));
@@ -5640,7 +5750,7 @@ function StudioCuttoonEditor() {
       ro?.disconnect();
       globalThis.removeEventListener("resize", measure);
     };
-  }, [isFullscreen, maximized, mobileImmersive]);
+  }, [canvasOnlyMode, isFullscreen, maximized, mobileImmersive]);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
@@ -5800,6 +5910,7 @@ function StudioCuttoonEditor() {
     effScale,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
+    canvasOnlyMode,
     isFullscreen,
     maximized,
     mobileImmersive,
@@ -7104,7 +7215,7 @@ function StudioCuttoonEditor() {
   }
   const selectedBg3dEditSource = resolveBg3dEditSource(selected);
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
-  const showQuickStart = !menu && (
+  const showQuickStart = !canvasOnlyMode && !menu && (
     quickStartOpen ||
     (workHydrated && !hasAutosave && elements.length === 0 && !quickStartDismissed)
   );
@@ -15385,10 +15496,13 @@ function StudioCuttoonEditor() {
     <div
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
+      data-studio-editor="true"
       className={cn(
         isFullscreen && "min-h-screen overflow-y-auto bg-canvas",
         maximized && !isMobile && !mobileImmersive &&
           "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
+        canvasOnlyMode && !isMobile &&
+          "fixed inset-0 z-[70] h-[100dvh] overflow-hidden overscroll-none bg-canvas",
         mobileImmersive &&
           "fixed inset-0 z-[75] h-[100dvh] overflow-hidden overscroll-none bg-canvas"
       )}
@@ -15407,16 +15521,18 @@ function StudioCuttoonEditor() {
       style={mobileImmersive ? { padding: "0.25rem" } : undefined}
       className={cn(
         "py-3 lg:py-6",
-        !(isFullscreen || maximized || mobileImmersive) &&
+        !(isFullscreen || maximized || mobileImmersive || canvasOnlyMode) &&
           "xl:max-w-[1700px] 2xl:max-w-[2200px]",
-        (isFullscreen || maximized || mobileImmersive) && "max-w-none",
+        (isFullscreen || maximized || mobileImmersive || canvasOnlyMode) && "max-w-none",
         maximized && !mobileImmersive && "px-3 py-3",
+        canvasOnlyMode && "flex h-full min-h-0 flex-col px-1 py-1",
         mobileImmersive && "flex h-full min-h-0 flex-col px-1 py-1"
       )}
     >
       <div
         className={cn(
           "mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4",
+          canvasOnlyMode && "hidden",
           mobileImmersive && "mb-1.5 block shrink-0"
         )}
       >
@@ -15995,7 +16111,7 @@ function StudioCuttoonEditor() {
             ) : null}
           </div>
         ) : null}
-        {!loggedIn && !mobileImmersive && (
+        {!loggedIn && !mobileImmersive && !canvasOnlyMode && (
           <div className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
             만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
           </div>
@@ -16012,6 +16128,7 @@ function StudioCuttoonEditor() {
       <div
         className={cn(
           "sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur",
+          canvasOnlyMode && "hidden",
           mobileImmersive && "top-1 mb-1.5 shrink-0 rounded-xl p-1"
         )}
       >
@@ -17645,6 +17762,18 @@ function StudioCuttoonEditor() {
           >
             {isFullscreen ? "창 모드" : "전체화면"}
           </button>
+          <button
+            type="button"
+            onClick={enterCanvasOnlyMode}
+            aria-pressed={canvasOnlyMode}
+            className={cn(
+              toolBtn(canvasOnlyMode),
+              "hidden h-8 gap-1 px-2 text-[10px] font-semibold lg:inline-flex"
+            )}
+            title="캔버스만 보기 — 제목·툴바·양쪽 패널을 잠시 숨기고 Esc로 복원"
+          >
+            <Minimize2 size={12} /> 캔버스만
+          </button>
           <span className="mx-0.5 h-5 w-px bg-line" />
           <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
         </div>
@@ -17675,6 +17804,7 @@ function StudioCuttoonEditor() {
       <div
         className={cn(
           "flex flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0",
+          canvasOnlyMode && "min-h-0 flex-1 gap-0 overflow-hidden",
           mobileImmersive && "min-h-0 flex-1 gap-0 overflow-hidden"
         )}
       >
@@ -18044,6 +18174,7 @@ function StudioCuttoonEditor() {
         <div
           className={cn(
             "relative min-w-0 flex-1 lg:min-w-[22rem]",
+            canvasOnlyMode && "flex min-h-0 flex-col overflow-hidden",
             mobileImmersive && "flex min-h-0 flex-col overflow-hidden"
           )}
           data-studio-logical-w={CANVAS_W}
@@ -18290,6 +18421,7 @@ function StudioCuttoonEditor() {
             onDrop={onWrapDrop}
             className={cn(
               "relative overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
+              canvasOnlyMode && "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain lg:max-h-none",
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
                 : "max-h-[calc(100dvh-26rem)] min-h-[15rem]",
@@ -20037,7 +20169,10 @@ function StudioCuttoonEditor() {
           <button
             type="button"
             onClick={() => setQuickStartOpen(true)}
-            className="absolute bottom-3 right-3 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid"
+            className={cn(
+              "absolute bottom-3 right-3 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              canvasOnlyMode && "!hidden"
+            )}
             aria-label="빠른 시작 도움말 열기"
             aria-expanded={showQuickStart}
             title="빠른 시작"
@@ -20048,7 +20183,10 @@ function StudioCuttoonEditor() {
           <button
             type="button"
             onClick={() => setShortcutsOpen(true)}
-            className="absolute bottom-3 right-16 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid"
+            className={cn(
+              "absolute bottom-3 right-16 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              canvasOnlyMode && "!hidden"
+            )}
             aria-label="키보드 단축키 보기"
             title="키보드 단축키 (?)"
           >
@@ -24646,6 +24784,20 @@ function StudioCuttoonEditor() {
         </div>
       )}
     </Container>
+    {canvasOnlyMode ? (
+      <div className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[45] flex justify-center px-3">
+        <button
+          type="button"
+          onClick={() => setCanvasOnlyMode(false)}
+          className="pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-xs font-semibold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          title="일반 편집 화면으로 복원 (Esc)"
+        >
+          <Maximize2 size={14} aria-hidden />
+          도구막대 복원
+          <kbd className="rounded border border-line bg-card px-1.5 py-0.5 text-[0.65rem] font-medium text-fg-3">Esc</kbd>
+        </button>
+      </div>
+    ) : null}
     </div>
     </StudioLiveCollaborationProvider>
   );

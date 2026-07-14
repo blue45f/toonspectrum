@@ -1,6 +1,7 @@
 /** Three/WebGL implementation of the renderer-neutral Studio 3D capture contract. */
 
 import * as THREE from "three";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
@@ -38,25 +39,106 @@ function hideCaptureExcludedObjects(scene: THREE.Scene): () => void {
   };
 }
 
-function readCanvasRgba(
-  sourceCanvas: HTMLCanvasElement,
-  width: number,
-  height: number
-): Uint8ClampedArray {
-  const canvas = sourceCanvas.ownerDocument.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("2D capture context unavailable.");
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.clearRect(0, 0, width, height);
-  context.drawImage(sourceCanvas, 0, 0, width, height);
-  return normalizeStudioBg3dRgbaReadback({
-    width,
-    height,
-    rgba: context.getImageData(0, 0, width, height).data,
+/**
+ * Captures the same display-color result as the canvas without requiring
+ * `preserveDrawingBuffer`. The first target holds Three's linear scene pass; OutputPass then
+ * applies the renderer's active tone mapping and output color-space conversion into an RGBA8
+ * target suitable for readback. Keeping these passes separate is important: WebGLRenderer skips
+ * material tone mapping when a normal render target is active.
+ *
+ * Submission happens before the first await. The live R3F state is consequently restored while
+ * the GPU fence is pending, just like the depth adapter, and the temporary targets stay alive
+ * until the asynchronous readback settles.
+ */
+async function captureStudioBg3dThreeWebglColor(input: {
+  readonly renderer: THREE.WebGLRenderer;
+  readonly scene: THREE.Scene;
+  readonly camera: THREE.Camera;
+  readonly request: StudioBg3dCaptureRequest;
+}): Promise<Uint8ClampedArray> {
+  const { renderer, scene, camera, request } = input;
+  const previousTarget = renderer.getRenderTarget();
+  const previousActiveCubeFace = renderer.getActiveCubeFace();
+  const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
+  const previousClearColor = renderer.getClearColor(new THREE.Color());
+  const previousClearAlpha = renderer.getClearAlpha();
+  const previousAutoClear = renderer.autoClear;
+  const previousXrEnabled = renderer.xr.enabled;
+  const previousViewport = renderer.getViewport(new THREE.Vector4());
+  const previousScissor = renderer.getScissor(new THREE.Vector4());
+  const previousScissorTest = renderer.getScissorTest();
+  const sceneTarget = new THREE.WebGLRenderTarget(request.width, request.height, {
+    depthBuffer: true,
+    stencilBuffer: false,
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    generateMipmaps: false,
   });
+  // This is an intermediate working-color buffer. OutputPass owns the one explicit sRGB transfer.
+  sceneTarget.texture.colorSpace = THREE.NoColorSpace;
+  const outputTarget = new THREE.WebGLRenderTarget(request.width, request.height, {
+    depthBuffer: false,
+    stencilBuffer: false,
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    generateMipmaps: false,
+  });
+  outputTarget.texture.colorSpace = THREE.NoColorSpace;
+  const outputPass = new OutputPass();
+  const packed = new Uint8Array(request.width * request.height * 4);
+
+  try {
+    let readback: Promise<THREE.TypedArray>;
+    try {
+      renderer.xr.enabled = false;
+      renderer.autoClear = true;
+      renderer.setClearColor(request.background.color, request.background.alpha);
+      renderer.setRenderTarget(sceneTarget);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+
+      // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
+      // transform. OutputPass recreates that transform (tone mapping + output color space) before
+      // the RGBA8 readback so exported LT input remains visually aligned with the viewport.
+      outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
+      readback = renderer.readRenderTargetPixelsAsync(
+        outputTarget,
+        0,
+        0,
+        request.width,
+        request.height,
+        packed,
+      );
+    } finally {
+      // `readRenderTargetPixelsAsync` has already submitted its copy/fence work. Never leave a
+      // live R3F frame pointed at a temporary capture target while the Promise waits for the GPU.
+      renderer.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel);
+      renderer.setClearColor(previousClearColor, previousClearAlpha);
+      renderer.autoClear = previousAutoClear;
+      renderer.xr.enabled = previousXrEnabled;
+      renderer.setViewport(previousViewport);
+      renderer.setScissor(previousScissor);
+      renderer.setScissorTest(previousScissorTest);
+    }
+    await readback;
+    return normalizeStudioBg3dRgbaReadback({
+      width: request.width,
+      height: request.height,
+      rgba: packed,
+      // WebGL framebuffer readback starts at its bottom row; the capture contract is top-down.
+      flipY: true,
+    });
+  } finally {
+    // OutputPass owns a module-shared fullscreen geometry, so dispose only its per-capture
+    // material. Its public dispose() would also dispose that shared geometry.
+    outputPass.material.dispose();
+    sceneTarget.dispose();
+    outputTarget.dispose();
+  }
 }
 
 export function createStudioBg3dThreeWebglCaptureAdapter(
@@ -71,15 +153,11 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
   }
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
-    const previousClearColor = renderer.getClearColor(new THREE.Color());
-    const previousClearAlpha = renderer.getClearAlpha();
     const restoreCaptureExcludedObjects = hideCaptureExcludedObjects(scene);
-    let rgba: Uint8ClampedArray;
+    let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
     try {
-      renderer.setClearColor(request.background.color, request.background.alpha);
-      renderer.render(scene, camera);
-      rgba = readCanvasRgba(renderer.domElement, request.width, request.height);
+      colorReadback = captureStudioBg3dThreeWebglColor({ camera, renderer, request, scene });
       if (request.includeDepth) {
         depthReadback = captureStudioBg3dThreeDepth({
           renderer,
@@ -90,13 +168,15 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
         });
       }
     } finally {
-      // The depth readback may wait on a GPU fence. Restore the visible R3F clear state before
-      // awaiting it so live frames cannot briefly render with export-only state. Engine-level
-      // helper exclusion also closes the gap before React commits isCapturing=true.
-      renderer.setClearColor(previousClearColor, previousClearAlpha);
+      // Both GPU passes submit their readback work before their first await and restore renderer
+      // state themselves. Keep viewport-only objects hidden through both submissions, then restore
+      // their exact original visibility while the GPU fence(s) are pending.
       restoreCaptureExcludedObjects();
     }
-    const depth = depthReadback ? await depthReadback : undefined;
+    const [rgba, depth] = await Promise.all([
+      colorReadback!,
+      depthReadback ?? Promise.resolve(undefined),
+    ]);
     return {
       width: request.width,
       height: request.height,

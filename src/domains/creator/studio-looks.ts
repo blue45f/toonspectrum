@@ -102,6 +102,15 @@ export const STUDIO_LOOKS: StudioLook[] = [
       lineart: true,
     },
   },
+  {
+    id: "sumi-e-webtoon",
+    label: "수묵 웹툰",
+    tip: "사진·3D 배경을 먹의 농담, 젖은 가장자리 번짐, 한지 섬유와 안료 과립으로 바꿔 동양화풍 장면 컷을 만듭니다.",
+    category: "만화",
+    patch: {
+      inkWash: { strength: 86, spread: 3, edgeBleed: 56, granulation: 46, paper: 62, inkColor: "#20282c", seed: 41 },
+    },
+  },
 
   // ===== 시네마틱 =====
   {
@@ -363,6 +372,7 @@ export const LOOK_FILTER_KEYS: (keyof ImageFilterFields)[] = [
   "glow",
   "halftone",
   "grain",
+  "inkWash",
   "blurFx",
   "distort",
   "stylize",

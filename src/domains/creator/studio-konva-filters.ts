@@ -30,6 +30,7 @@ import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
 import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
 import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "./studio-grain";
 import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "./studio-halftone";
+import { inkWashKonvaFilter, normalizeInkWash, isIdentityInkWash } from "./studio-ink-wash";
 import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "./studio-levels";
 import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
@@ -50,6 +51,10 @@ function hasActiveHalftone(el: ImageFilterFields): boolean {
 // 그레인이 항등(세기0)이 아니면 활성.
 function hasActiveGrain(el: ImageFilterFields): boolean {
   return !!el.grain && !isIdentityGrain(normalizeGrain(el.grain));
+}
+// 수묵/수채 번짐 재질이 항등(세기 0)이 아니면 활성.
+function hasActiveInkWash(el: ImageFilterFields): boolean {
+  return !!el.inkWash && !isIdentityInkWash(normalizeInkWash(el.inkWash));
 }
 // 흐림 갤러리가 항등(세기0)이 아니면 활성.
 function hasActiveBlurFx(el: ImageFilterFields): boolean {
@@ -384,6 +389,8 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Halftone = halftoneKonvaFilter;
   // 그레인/텍스처 — this.attrs.grainType/grainAmount/grainSize/grainSeed 적용(studio-grain).
   F.Grain = grainKonvaFilter;
+  // 수묵/수채 번짐 — this.attrs.inkWash*로 안료 확산·한지 종이결·과립을 비파괴 적용.
+  F.InkWash = inkWashKonvaFilter;
   // 흐림 갤러리 — this.attrs.bfType/bfStrength/bfRadius/bfAngle 적용(studio-blur).
   F.BlurFx = blurFxKonvaFilter;
   // 기하 왜곡 — this.attrs.dsType/dsAmount/dsScale 적용(studio-distort).
@@ -420,6 +427,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveGlow(el) ||
     hasActiveHalftone(el) ||
     hasActiveGrain(el) ||
+    hasActiveInkWash(el) ||
     hasActiveBlurFx(el) ||
     hasActiveDistort(el) ||
     hasActiveStylize(el) ||
@@ -602,6 +610,20 @@ export function buildImageFilters(
     attrs.ctaColor = cta.keyColor;
     attrs.ctaStrength = cta.strength;
   }
+  // 수묵/수채 재질 — 색/톤 보정과 색상 투명화 뒤, 하프톤·스타일라이즈·스케치보다 앞.
+  // 따라서 사용자가 고른 키 색상/톤을 보존한 다음 안료와 종이로 변환하고, 이후 잉크/망점
+  // 효과는 이미 변환된 결과를 기준으로 자연스럽게 겹친다.
+  if (hasActiveInkWash(el)) {
+    filters.push(F.InkWash!);
+    const iw = normalizeInkWash(el.inkWash);
+    attrs.inkWashStrength = iw.strength;
+    attrs.inkWashSpread = iw.spread;
+    attrs.inkWashEdgeBleed = iw.edgeBleed;
+    attrs.inkWashGranulation = iw.granulation;
+    attrs.inkWashPaper = iw.paper;
+    attrs.inkWashColor = iw.inkColor;
+    attrs.inkWashSeed = iw.seed;
+  }
   if (isActiveNumber(el.inkThreshold)) {
     filters.push(F.InkThreshold!);
     attrs.inkThreshold = el.inkThreshold!;
@@ -741,6 +763,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.glow ?? null,
     el.halftone ?? null,
     el.grain ?? null,
+    el.inkWash ?? null,
     el.blurFx ?? null,
     el.distort ?? null,
     el.stylize ?? null,

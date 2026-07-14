@@ -21,6 +21,7 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
   { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
   { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
+  { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];

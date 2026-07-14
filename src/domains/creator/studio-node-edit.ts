@@ -285,13 +285,13 @@ export function isNodeEditableKind(kind: string | undefined): boolean {
 
 /**
  * 이 브러시/모드 조합이 실제로 필압→굵기 렌더링에 반영되는지 — StudioDrawNode 의 브랜치
- * 분기와 1:1 대응(pen/gpen/marker + 모든 eraser 스트로크는 pressures 를 읽는다; brush/
- * screentone/pencil/highlighter 는 고정 굵기라 "굵기" 모드가 시각적으로 무의미하다).
+ * 분기와 1:1 대응(pen/gpen/marker/watercolor + 모든 eraser 스트로크는 pressures 를 읽는다;
+ * brush/screentone/pencil/highlighter 는 고정 굵기라 "굵기" 모드가 시각적으로 무의미하다).
  */
 export function isPressureWidthBrush(brush: string | undefined, mode: "pen" | "eraser" | undefined): boolean {
   // StudioDrawNode 는 brush 별 조기 분기를 모두 `el.mode !== "eraser"` 로 가드한다 — 즉
   // eraser 모드면 브러시와 무관하게 항상 필압을 읽는 기본(default) 분기로 떨어진다.
   if (mode === "eraser") return true;
   const b = brush ?? "pen";
-  return b === "pen" || b === "gpen" || b === "marker";
+  return b === "pen" || b === "gpen" || b === "marker" || b === "watercolor";
 }

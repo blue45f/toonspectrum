@@ -160,7 +160,12 @@ function useClickVisualFeedback() {
       if (
         !target ||
         target.matches(":disabled, [aria-disabled='true'], [data-no-fx]") ||
-        target.closest("[data-no-fx]")
+        target.closest("[data-no-fx]") ||
+        // Studio는 펜/터치 작업 중 작은 클릭 애니메이션·파티클이 커서와 캔버스 판단을 가린다.
+        // 전용 에디터 안에서는 명시적으로 opt-in한 조작만 전역 FX를 쓸 수 있게 한다.
+        (target.closest("[data-studio-editor='true']") &&
+          !target.matches("[data-studio-allow-click-fx='true']") &&
+          !target.closest("[data-studio-allow-click-fx='true']"))
       ) {
         return;
       }

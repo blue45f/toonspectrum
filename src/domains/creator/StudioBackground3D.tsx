@@ -2158,7 +2158,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   className="h-full w-full"
                   dpr={deviceQuality.effectiveDpr}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
-                  gl={{ antialias: sceneBaseDocument.render.antialias, preserveDrawingBuffer: true, alpha: true }}
+                  gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1)}
                   onPointerMissed={() => setSelectedId(null)}
                 >

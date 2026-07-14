@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { hasActiveImageFilters as hasLightweightActiveImageFilters } from "./studio-konva-filter-fields";
 import {
   buildImageFilters,
   hasActiveImageFilters,
@@ -49,10 +50,11 @@ const CUSTOM = [
   "Sharpen",
   "InkThreshold",
   "Duotone",
+  "InkWash",
 ] as const;
 
 describe("registerStudioKonvaFilters", () => {
-  it("커스텀 필터 9종을 함수로 등록한다", () => {
+  it("커스텀 필터 10종을 함수로 등록한다", () => {
     const konva = fakeKonva();
     registerStudioKonvaFilters(konva);
     for (const name of CUSTOM) {
@@ -221,6 +223,42 @@ describe("buildImageFilters", () => {
     expect(filters).toEqual([]);
     expect(attrs).toEqual({});
   });
+
+  it("수묵 재질은 활성값만 필터와 전용 attrs로 직렬화한다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const { filters, attrs } = buildImageFilters(
+      {
+        inkWash: {
+          strength: 82,
+          spread: 4,
+          edgeBleed: 55,
+          granulation: 36,
+          paper: 64,
+          inkColor: "#264c70",
+          seed: 112,
+        },
+      },
+      konva,
+    );
+    expect(filters).toContain(konva.Filters.InkWash);
+    expect(attrs).toMatchObject({
+      inkWashStrength: 82,
+      inkWashSpread: 4,
+      inkWashEdgeBleed: 55,
+      inkWashGranulation: 36,
+      inkWashPaper: 64,
+      inkWashColor: "#264c70",
+      inkWashSeed: 112,
+    });
+  });
+
+  it("수묵 재질의 세기 0은 캐시를 켜지 않는 항등값이다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    expect(hasActiveImageFilters({ inkWash: { strength: 0 } as ImageFilterFields["inkWash"] })).toBe(false);
+    expect(buildImageFilters({ inkWash: { strength: 0 } as ImageFilterFields["inkWash"] }, konva).filters).toEqual([]);
+  });
 });
 
 describe("hasActiveImageFilters", () => {
@@ -237,6 +275,13 @@ describe("hasActiveImageFilters", () => {
     expect(hasActiveImageFilters({ grayscale: false, sepia: false, invert: false })).toBe(false);
     // 듀오톤은 한쪽만 있으면 비활성.
     expect(hasActiveImageFilters({ duotoneShadow: "#000" })).toBe(false);
+  });
+
+  it("가벼운 초기 청크 판정도 strength 0 수묵 객체로 필터 모듈을 불러오지 않는다", () => {
+    const none = { strength: 0, spread: 3, edgeBleed: 48, granulation: 38, paper: 46, inkColor: "#20282c", seed: 41 };
+    expect(hasLightweightActiveImageFilters({ inkWash: none })).toBe(false);
+    expect(hasLightweightActiveImageFilters({ inkWash: { ...none, strength: 1 } })).toBe(true);
+    expect(hasLightweightActiveImageFilters({ inkWash: {} as ImageFilterFields["inkWash"] })).toBe(false);
   });
 });
 

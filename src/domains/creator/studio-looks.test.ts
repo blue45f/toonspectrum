@@ -7,6 +7,7 @@ import { normalizeGlow } from "./studio-glow";
 import { normalizeGradientMap } from "./studio-gradient-map";
 import { normalizeGrain } from "./studio-grain";
 import { normalizeHalftone } from "./studio-halftone";
+import { normalizeInkWash } from "./studio-ink-wash";
 import { normalizeLight } from "./studio-light";
 import {
   LOOK_FILTER_KEYS,
@@ -36,6 +37,7 @@ const OBJECT_NORMALIZERS: Partial<Record<keyof ImageFilterFields, (v: unknown) =
   gradientMap: (v) => normalizeGradientMap(v as never),
   halftone: (v) => normalizeHalftone(v as never),
   grain: (v) => normalizeGrain(v as never),
+  inkWash: (v) => normalizeInkWash(v as never),
   glow: (v) => normalizeGlow(v as never),
   stylize: (v) => normalizeStylize(v as never),
   light: (v) => normalizeLight(v as never),
@@ -186,6 +188,7 @@ describe("LOOK_FILTER_KEYS", () => {
       "glow",
       "halftone",
       "grain",
+      "inkWash",
       "blurFx",
       "distort",
       "stylize",

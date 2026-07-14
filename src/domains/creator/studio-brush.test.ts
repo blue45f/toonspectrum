@@ -20,16 +20,21 @@ import {
 } from "./studio-brush";
 
 describe("BRUSH_PRESETS", () => {
-  it("includes G-pen, tilt calligraphy and screentone while keeping legacy ids", () => {
+  it("includes G-pen, tilt calligraphy, watercolor and screentone while keeping legacy ids", () => {
     const ids = BRUSH_PRESETS.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const required of ["pen", "gpen", "calligraphy", "marker", "highlighter", "brush", "pencil", "screentone"]) {
+    for (const required of ["pen", "gpen", "calligraphy", "marker", "highlighter", "brush", "watercolor", "pencil", "screentone"]) {
       expect(ids).toContain(required);
     }
     expect(BRUSH_PRESETS.find((preset) => preset.id === "calligraphy")).toMatchObject({
       name: "캘리그래피(펜 기울기)",
       defaultWidth: 12,
       defaultOpacity: 1,
+    });
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "watercolor")).toMatchObject({
+      name: "수채 번짐",
+      defaultWidth: 28,
+      defaultOpacity: 0.55,
     });
   });
 

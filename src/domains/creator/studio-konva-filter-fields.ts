@@ -11,6 +11,7 @@ import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
+import type { InkWash } from "./studio-ink-wash";
 import type { LevelsRgbChannels } from "./studio-levels";
 import type { Light } from "./studio-light";
 import type { Outline } from "./studio-outline";
@@ -63,6 +64,8 @@ export type ImageFilterFields = {
   glow?: Glow;
   halftone?: Halftone;
   grain?: Grain;
+  /** 수묵/수채 번짐, 한지 섬유, 안료 과립을 함께 합성하는 비파괴 재질 효과. */
+  inkWash?: InkWash;
   blurFx?: BlurFx;
   distort?: Distort;
   stylize?: Stylize;
@@ -89,6 +92,15 @@ function hasObjectFilter(value: unknown): boolean {
   return value != null;
 }
 
+// 수묵 재질은 strength만 0이어도 기본 파라미터 객체가 남을 수 있다. 이 파일은 /studio 첫
+// 청크에서 읽히므로 무거운 픽셀 엔진을 import하지 않고, 효과를 켜는 최소 조건만 가볍게 판별한다.
+// 누락/잘못된 strength는 normalizeInkWash에서 기본 0으로 돌아가므로 캐시를 켤 이유가 없다.
+function hasActiveInkWashCandidate(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const strength = (value as { strength?: unknown }).strength;
+  return typeof strength === "number" && Number.isFinite(strength) && strength > 0;
+}
+
 /** 가벼운 활성 판정. true면 고급 필터 엔진을 동적 로드하고, 엔진이 최종 identity 여부를 다시 판정한다. */
 export function hasActiveImageFilters(el: ImageFilterFields): boolean {
   return !!(
@@ -113,6 +125,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasObjectFilter(el.glow) ||
     hasObjectFilter(el.halftone) ||
     hasObjectFilter(el.grain) ||
+    hasActiveInkWashCandidate(el.inkWash) ||
     hasObjectFilter(el.blurFx) ||
     hasObjectFilter(el.distort) ||
     hasObjectFilter(el.stylize) ||
@@ -179,6 +192,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.glow ?? null,
     el.halftone ?? null,
     el.grain ?? null,
+    el.inkWash ?? null,
     el.blurFx ?? null,
     el.distort ?? null,
     el.stylize ?? null,
