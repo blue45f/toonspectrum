@@ -6,12 +6,14 @@ import {
   StudioAppMenubar,
   StudioDockButton,
   StudioEdgeRailButton,
+  StudioHudPill,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
   StudioQuickActionsBar,
   StudioRailToolButton,
   StudioStatusBar,
   StudioToolBelt,
+  StudioToolIdentity,
   StudioToolbarDivider,
   StudioToolbarCluster,
   StudioVerticalToolRail,
@@ -124,6 +126,23 @@ describe("studio chrome UI", () => {
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('data-studio-quick-actions="true"');
     expect(html).toContain('data-studio-status-bar="true"');
+    expect(html).toContain("100%");
+  });
+
+  it("renders Krita/Pixlr tool identity and Concepts/Ibis HUD pills", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <StudioToolIdentity icon={Pencil} title="펜(매끈)" detail="6px · 100%" shortcut="B" />
+        <StudioHudPill accent title="배율">
+          100%
+        </StudioHudPill>
+      </>
+    );
+    expect(html).toContain('data-studio-tool-identity="true"');
+    expect(html).toContain("펜(매끈)");
+    expect(html).toContain("6px · 100%");
+    expect(html).toContain("B");
+    expect(html).toContain('data-studio-hud-pill="true"');
     expect(html).toContain("100%");
   });
 });

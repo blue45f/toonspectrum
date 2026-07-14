@@ -494,7 +494,7 @@ export function StudioContextActionButton({
 }
 
 /**
- * Magma-style left vertical Toolbar — icon-first tools left of the canvas.
+ * Magma/Krita/Ibis left vertical Toolbar — icon-first tools left of the canvas.
  * Grouped tools can show a flyout chevron (Magma Super Simple triangle affordance).
  */
 export function StudioVerticalToolRail({
@@ -513,8 +513,9 @@ export function StudioVerticalToolRail({
       aria-label={ariaLabel}
       data-studio-tool-rail="true"
       className={cn(
+        // xl: slightly wider like Krita docker / Ibis tool column
         "hidden w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain",
-        "border-r border-line py-2",
+        "border-r border-line py-2 xl:w-12 xl:gap-1.5 xl:py-2.5",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "lg:flex",
         className
@@ -522,6 +523,75 @@ export function StudioVerticalToolRail({
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * Krita/Pixlr tool-options identity — “what am I using right now?”
+ * Lives at the start of the draw options strip (not marketing copy).
+ */
+export function StudioToolIdentity({
+  icon: Icon,
+  title,
+  detail,
+  shortcut,
+  className,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  detail?: string;
+  shortcut?: string;
+  className?: string;
+}): ReactElement {
+  return (
+    <div
+      data-studio-tool-identity="true"
+      className={cn("shrink-0", className)}
+      title={detail ? `${title} — ${detail}` : title}
+    >
+      {Icon ? (
+        <span className="grid size-6 place-items-center rounded-md bg-canvas/50 text-accent">
+          <Icon size={14} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+        </span>
+      ) : null}
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[0.68rem] font-bold tracking-tight text-fg">{title}</span>
+        {detail ? (
+          <span className="block truncate text-[0.55rem] font-medium text-fg-3">{detail}</span>
+        ) : null}
+      </span>
+      {shortcut ? (
+        <kbd className="ml-0.5 hidden rounded border border-line/80 bg-canvas/40 px-1 py-px text-[0.52rem] font-semibold tabular-nums text-fg-3 sm:inline">
+          {shortcut}
+        </kbd>
+      ) : null}
+    </div>
+  );
+}
+
+/** Concepts/Ibis compact metric pill for the status bar. */
+export function StudioHudPill({
+  children,
+  className,
+  title,
+  accent,
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: string;
+  accent?: boolean;
+}): ReactElement {
+  return (
+    <span
+      data-studio-hud-pill="true"
+      title={title}
+      className={cn(
+        accent && "border-accent/40 bg-accent-soft/50 text-accent",
+        className
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -535,7 +605,7 @@ export interface StudioRailToolButtonProps
   accented?: boolean;
 }
 
-/** Icon-only tool on the left Magma-style rail. */
+/** Icon-only tool on the left Magma/Ibis-style rail. */
 export function StudioRailToolButton({
   active = false,
   icon: Icon,
@@ -555,20 +625,25 @@ export function StudioRailToolButton({
       title={label}
       aria-pressed={active}
       className={cn(
-        "relative grid size-9 place-items-center rounded-lg border border-transparent",
+        "relative grid size-9 place-items-center rounded-xl border border-transparent xl:size-10",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active
-          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.22)]"
+          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.28)]"
           : accented
-            ? "text-accent hover:bg-accent-soft/40"
+            ? "text-accent hover:bg-accent-soft/45"
             : "text-fg-2 hover:bg-raised hover:text-fg",
         disabled && "cursor-not-allowed opacity-35",
         className
       )}
       {...rest}
     >
-      <Icon size={17} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={active ? "text-accent" : undefined} />
+      <Icon
+        size={17}
+        strokeWidth={STUDIO_ICON_STROKE}
+        aria-hidden
+        className={cn(active && "text-accent", "xl:scale-105")}
+      />
       {grouped ? (
         <span
           aria-hidden
@@ -616,7 +691,7 @@ export function StudioQuickActionsBar({
 }
 
 /**
- * Magma Status Bar — bottom-left magnification + layout mode, over the canvas.
+ * Sketchbook/Krita/Concepts status bar — zoom + tool metrics over the canvas.
  * Does not steal layout height when position=absolute.
  */
 export function StudioStatusBar({
@@ -634,8 +709,8 @@ export function StudioStatusBar({
       aria-label={ariaLabel}
       data-studio-status-bar="true"
       className={cn(
-        "pointer-events-auto absolute bottom-3 left-3 z-20 flex max-w-[min(100%,36rem)] flex-wrap items-center gap-1.5",
-        "rounded-xl px-2.5 py-1.5 text-[0.65rem] font-semibold tracking-tight text-fg-2",
+        "pointer-events-auto absolute bottom-3 left-3 z-20 flex max-w-[min(100%,42rem)] flex-wrap items-center gap-1.5",
+        "rounded-2xl px-2.5 py-1.5 text-[0.65rem] font-semibold tracking-tight text-fg-2",
         className
       )}
     >

@@ -33,6 +33,8 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("브러시 크기 프리셋");
     expect(html).toContain("XS");
     expect(html).toContain("XL");
+    expect(html).toContain('data-studio-tool-identity="true"');
+    expect(html).toContain("펜(매끈)");
     expect(html).toContain('aria-pressed="true"');
   });
 

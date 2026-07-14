@@ -1,11 +1,16 @@
 /**
- * StudioDrawOptionsBar — tool options strip under the menu (CSP/Fresco/Magma Properties lite).
- * Brush kit · size · opacity · stabilizer · color · smart shape.
+ * StudioDrawOptionsBar — Krita/Pixlr tool-options + Canva size chips + MediBang clarity.
+ * Tool identity · brush kit · size · opacity · stabilizer · color · smart shape.
  * Pure presentation.
  */
 import { ArrowLeftRight, Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles, Wand2 } from "lucide-react";
 
-import { STUDIO_BRUSH_SIZE_CHIPS, nearestStudioBrushSizeChip } from "./studio-brush";
+import {
+  BRUSH_PRESETS,
+  STUDIO_BRUSH_SIZE_CHIPS,
+  nearestStudioBrushSizeChip,
+} from "./studio-brush";
+import { StudioToolIdentity } from "./studio-chrome-ui";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -116,6 +121,17 @@ export function StudioDrawOptionsBar({
   shapeSlot,
   className,
 }: StudioDrawOptionsBarProps): ReactElement {
+  const brushMeta = BRUSH_PRESETS.find((preset) => preset.id === brushId);
+  const identityTitle =
+    drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : (brushMeta?.name ?? "펜");
+  const identityDetail =
+    drawMode === "eraser"
+      ? `${strokeWidth}px`
+      : drawMode === "shape"
+        ? "드래그로 그리기"
+        : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`;
+  const IdentityIcon = drawMode === "eraser" ? Eraser : Pencil;
+
   return (
     <div
       role="toolbar"
@@ -123,11 +139,21 @@ export function StudioDrawOptionsBar({
       data-studio-draw-options="true"
       className={cn(
         // Primary icons stay in view; secondary chips can scroll. End cluster is sticky.
-        "relative flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2",
+        // h-12: Ibis/MediBang-style slightly taller tool options for touch + clarity.
+        "relative flex h-12 min-h-12 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2",
         "[scrollbar-width:thin] [scrollbar-color:oklch(0.45_0.02_70/0.45)_transparent]",
         className
       )}
     >
+      {/* Krita/Pixlr: always know the active tool */}
+      <StudioToolIdentity
+        icon={IdentityIcon}
+        title={identityTitle}
+        detail={identityDetail}
+        shortcut={drawMode === "eraser" ? "E" : drawMode === "pen" ? "B" : undefined}
+        className="hidden sm:inline-flex"
+      />
+
       {onSetDrawMode ? (
         <div className="studio-opt-cluster shrink-0" role="group" aria-label="그리기 모드">
           {(

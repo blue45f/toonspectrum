@@ -336,6 +336,7 @@ import {
   StudioQuickActionsBar,
   StudioRailDivider,
   StudioRailToolButton,
+  StudioHudPill,
   StudioStatusBar,
   StudioToolBelt,
   StudioToolbarCluster,
@@ -20209,45 +20210,63 @@ function StudioCuttoonEditor() {
 
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
-          {/* Magma Status Bar — zoom + layout mode over the canvas (does not steal flex height) */}
+          {/* Sketchbook/Krita/Concepts status — zoom HUD + tool metrics over canvas */}
           {!canvasOnlyMode ? (
             <StudioStatusBar className={cn(mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]")}>
-              <span className="tabular-nums text-fg" title="배율">
-                {Math.round(zoom * scale * 100)}%
-              </span>
-              <span aria-hidden className="h-3 w-px bg-line" />
-              <span className="text-fg-3" title={pageDisplayName(activePage, activePageIndex)}>
+              <StudioHudPill title="배율">
+                <button
+                  type="button"
+                  className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
+                  aria-label="축소"
+                  onClick={() => setZoom((z) => Math.max(0.25, Math.round((z - 0.1) * 10) / 10))}
+                >
+                  −
+                </button>
+                <span className="min-w-[2.4rem] text-center tabular-nums text-fg">
+                  {Math.round(zoom * scale * 100)}%
+                </span>
+                <button
+                  type="button"
+                  className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
+                  aria-label="확대"
+                  onClick={() => setZoom((z) => Math.min(4, Math.round((z + 0.1) * 10) / 10))}
+                >
+                  +
+                </button>
+              </StudioHudPill>
+              <StudioHudPill title={pageDisplayName(activePage, activePageIndex)} className="max-w-[7rem] truncate">
                 {pageDisplayName(activePage, activePageIndex)}
-              </span>
-              <span aria-hidden className="h-3 w-px bg-line" />
-              <span className="tabular-nums text-fg-3" title="현재 도구">
+              </StudioHudPill>
+              <StudioHudPill title="현재 도구" accent={tool === "draw"}>
                 {tool === "draw"
                   ? drawMode === "eraser"
                     ? `지우개 ${strokeWidth}px`
                     : drawMode === "shape"
                       ? `도형 · ${drawShape}`
-                      : `${brush} · ${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`
+                      : `${BRUSH_PRESETS.find((p) => p.id === brush)?.name ?? brush} · ${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`
                   : tool === "select"
                     ? selected
                       ? `선택 · ${elementLabel(selected)}`
                       : "선택"
                     : tool}
-              </span>
+              </StudioHudPill>
               {tool === "draw" && symmetryType !== "none" ? (
-                <>
-                  <span aria-hidden className="h-3 w-px bg-line" />
-                  <span className="font-bold text-accent" title="대칭 그리기">
-                    대칭:{symmetryType === "vertical" ? "세로" : symmetryType === "horizontal" ? "가로" : symmetryType === "radial" ? "방사" : "만화경"}
-                  </span>
-                </>
+                <StudioHudPill accent title="대칭 그리기">
+                  대칭:
+                  {symmetryType === "vertical"
+                    ? "세로"
+                    : symmetryType === "horizontal"
+                      ? "가로"
+                      : symmetryType === "radial"
+                        ? "방사"
+                        : "만화경"}
+                </StudioHudPill>
               ) : null}
               {tool === "draw" && quickShapeActive ? (
-                <>
-                  <span aria-hidden className="h-3 w-px bg-line" />
-                  <span className="font-bold text-accent">스마트도형</span>
-                </>
+                <StudioHudPill accent title="스마트 도형">
+                  스마트도형
+                </StudioHudPill>
               ) : null}
-              <span aria-hidden className="h-3 w-px bg-line" />
               <div className="flex items-center gap-px" role="group" aria-label="레이아웃 모드">
                 {(["focus", "simple", "full"] as const).map((mode) => (
                   <button
@@ -20258,7 +20277,7 @@ function StudioCuttoonEditor() {
                     aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
                     onClick={() => setStudioUiDensity(mode)}
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[0.58rem] font-bold transition-colors",
+                      "rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold transition-colors",
                       uiDensityMode === mode
                         ? "bg-accent text-on-accent"
                         : "text-fg-3 hover:bg-raised hover:text-fg-2"
@@ -20278,7 +20297,7 @@ function StudioCuttoonEditor() {
                     setZoom(1);
                   }
                 }}
-                className="rounded px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
                 title="너비에 맞춤"
               >
                 맞춤
@@ -20289,7 +20308,7 @@ function StudioCuttoonEditor() {
                   if (canvasOnlyMode) setCanvasOnlyMode(false);
                   else enterCanvasOnlyMode();
                 }}
-                className="rounded px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
                 title="Tab — 캔버스만 / 도구 토글"
               >
                 {canvasOnlyMode ? "도구" : "Tab"}
