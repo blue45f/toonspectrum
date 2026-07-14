@@ -15473,14 +15473,25 @@ function StudioCuttoonEditor() {
         {
           id: "export",
           label: "내보내기 / 다운로드",
+          icon: Download,
           onSelect: () => {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
           },
         },
         {
+          id: "copy-image",
+          label: "이미지를 클립보드로",
+          icon: Copy,
+          onSelect: () => {
+            void handleCopyToClipboard();
+          },
+          separatorAfter: true,
+        },
+        {
           id: "save-draft",
           label: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장",
+          icon: Bookmark,
           shortcut: "⌘S",
           disabled: saving || collaborationDocumentLocked,
           onSelect: () => {
@@ -15490,15 +15501,50 @@ function StudioCuttoonEditor() {
         {
           id: "publish",
           label: workId ? "수정 게시" : "게시",
-          disabled: saving || collaborationDocumentLocked || Boolean(sharedDocument && sharedDocument.role !== "owner"),
+          icon: Upload,
+          disabled:
+            saving ||
+            collaborationDocumentLocked ||
+            Boolean(sharedDocument && sharedDocument.role !== "owner"),
           separatorAfter: true,
           onSelect: () => {
             void handleSave("published");
           },
         },
         {
+          id: "export-json",
+          label: "백업 (.json)",
+          icon: Download,
+          onSelect: () => handleExportProject(),
+        },
+        {
+          id: "export-archive",
+          label: "아카이브 백업",
+          icon: Package,
+          disabled: projectArchiveBusy,
+          onSelect: () => {
+            void handleExportProjectArchive();
+          },
+        },
+        {
+          id: "import-json",
+          label: "프로젝트 가져오기…",
+          icon: FileUp,
+          disabled: collaborationDocumentLocked,
+          onSelect: () => projectImportInputRef.current?.click(),
+        },
+        {
+          id: "import-psd",
+          label: "PSD 가져오기…",
+          icon: FileUp,
+          disabled: psdImportBusy || collaborationDocumentLocked,
+          separatorAfter: true,
+          onSelect: () => psdImportInputRef.current?.click(),
+        },
+        {
           id: "project",
           label: "프로젝트 도구…",
+          icon: Folder,
           onSelect: () => {
             setExportMenuOpen(false);
             setProjectActionsOpen(true);
@@ -15513,6 +15559,7 @@ function StudioCuttoonEditor() {
         {
           id: "undo",
           label: "실행취소",
+          icon: Undo2,
           shortcut: "⌘Z",
           disabled: hi === 0 || collaborationDocumentLocked,
           onSelect: () => undo(),
@@ -15520,23 +15567,70 @@ function StudioCuttoonEditor() {
         {
           id: "redo",
           label: "다시실행",
+          icon: Redo2,
           shortcut: "⌘⇧Z",
           disabled: hi >= history.length - 1 || collaborationDocumentLocked,
           onSelect: () => redo(),
           separatorAfter: true,
         },
         {
+          id: "copy",
+          label: "복사",
+          icon: Copy,
+          shortcut: "⌘C",
+          disabled: !selected && marqueeIds.length === 0,
+          onSelect: () => {
+            copySelectedElements();
+          },
+        },
+        {
+          id: "duplicate",
+          label: "복제",
+          icon: Files,
+          shortcut: "⌘D",
+          disabled:
+            collaborationDocumentLocked ||
+            activePageMutationLocked ||
+            (!selected && marqueeIds.length === 0),
+          onSelect: () => duplicateSelected(),
+        },
+        {
+          id: "delete",
+          label: "삭제",
+          icon: Trash2,
+          shortcut: "⌫",
+          danger: true,
+          disabled:
+            collaborationDocumentLocked ||
+            activePageMutationLocked ||
+            (!selected && marqueeIds.length === 0),
+          onSelect: () => removeSelected(),
+          separatorAfter: true,
+        },
+        {
           id: "history",
           label: "작업 내역",
+          icon: HistoryIcon,
           onSelect: () => setHistoryPanelOpen((v) => !v),
         },
         {
           id: "select",
           label: "선택 도구",
+          icon: MousePointer2,
           shortcut: "V",
           onSelect: () => {
             setTool("select");
             setEyedropperActive(false);
+          },
+        },
+        {
+          id: "eyedropper",
+          label: "스포이드",
+          icon: Pipette,
+          shortcut: "I",
+          onSelect: () => {
+            setTool("select");
+            setEyedropperActive(true);
           },
         },
       ],
@@ -15548,6 +15642,7 @@ function StudioCuttoonEditor() {
         {
           id: "template",
           label: "템플릿 · 에셋",
+          icon: LayoutTemplate,
           onSelect: () => {
             preloadStudioAssetMenuPanel();
             setMenu("template");
@@ -15556,34 +15651,53 @@ function StudioCuttoonEditor() {
         {
           id: "bubble",
           label: "말풍선",
+          icon: MessageCircle,
           onSelect: () => addBubble("speech"),
         },
         {
           id: "text",
           label: "텍스트",
+          icon: TypeIcon,
           onSelect: () => addText(),
         },
         {
           id: "image",
           label: "이미지…",
+          icon: ImagePlus,
           separatorAfter: true,
           onSelect: () => {
-            // Prefer the first visible image file input in insert cluster
-            document.querySelector<HTMLInputElement>('label input[type="file"][accept="image/*"]')?.click();
+            document
+              .querySelector<HTMLInputElement>('label input[type="file"][accept="image/*"]')
+              ?.click();
           },
         },
         {
           id: "char",
           label: "3D 캐릭터",
+          icon: Sparkles,
           onSelect: () => setPoserVrmOpen(true),
+        },
+        {
+          id: "bg3d",
+          label: "3D 배경",
+          icon: Boxes,
+          onSelect: () => setBg3dOpen(true),
         },
         {
           id: "ref",
           label: "참고 이미지",
+          icon: PictureInPicture2,
           onSelect: () => {
             preloadStudioReferencePanel();
             setReferencePanelOpen(true);
           },
+        },
+        {
+          id: "page",
+          label: "새 페이지",
+          icon: Plus,
+          disabled: collaborationDocumentLocked,
+          onSelect: () => addPage(),
         },
       ],
     },
@@ -15594,6 +15708,7 @@ function StudioCuttoonEditor() {
         {
           id: "density-focus",
           label: "슈퍼심플 레이아웃",
+          icon: Minimize2,
           onSelect: () => {
             setStudioUiDensity("focus");
             setLeftPanelOpen(false);
@@ -15603,11 +15718,13 @@ function StudioCuttoonEditor() {
         {
           id: "density-full",
           label: "전체 레이아웃",
+          icon: LayoutGrid,
           onSelect: () => setStudioUiDensity("full"),
         },
         {
           id: "wide",
           label: "패널 접어 넓게",
+          icon: Maximize2,
           onSelect: () => {
             setLeftPanelOpen(false);
             setRightPanelOpen(false);
@@ -15616,6 +15733,7 @@ function StudioCuttoonEditor() {
         {
           id: "fit",
           label: "너비에 맞춤",
+          icon: ScanLine,
           onSelect: () => {
             const wrap = wrapRef.current;
             if (wrap) {
@@ -15629,12 +15747,35 @@ function StudioCuttoonEditor() {
         {
           id: "fullscreen",
           label: isFullscreen ? "창 모드" : "전체화면",
+          icon: isFullscreen ? Minimize2 : Maximize2,
           onSelect: () => toggleFullscreen(),
         },
         {
           id: "canvas-only",
           label: "캔버스만",
+          icon: Square,
+          shortcut: "Tab",
           onSelect: () => enterCanvasOnlyMode(),
+          separatorAfter: true,
+        },
+        {
+          id: "left-panel",
+          label: leftPanelOpen ? "왼쪽 패널 숨기기" : "왼쪽 패널 보이기",
+          icon: Layers,
+          onSelect: () => setLeftPanelOpen((v) => !v),
+        },
+        {
+          id: "right-panel",
+          label: rightPanelOpen ? "속성 패널 숨기기" : "속성 패널 보이기",
+          icon: SlidersHorizontal,
+          onSelect: () => setRightPanelOpen((v) => !v),
+        },
+        {
+          id: "shortcuts",
+          label: "단축키 도움말",
+          icon: Command,
+          shortcut: "?",
+          onSelect: () => setShortcutsOpen(true),
         },
       ],
     },
@@ -15645,6 +15786,7 @@ function StudioCuttoonEditor() {
         {
           id: "pen",
           label: "펜",
+          icon: Pencil,
           shortcut: "B",
           onSelect: () => {
             setTool("draw");
@@ -15654,6 +15796,7 @@ function StudioCuttoonEditor() {
         {
           id: "eraser",
           label: "지우개",
+          icon: Eraser,
           shortcut: "E",
           onSelect: () => {
             setTool("draw");
@@ -15663,12 +15806,14 @@ function StudioCuttoonEditor() {
         {
           id: "fill",
           label: "채우기",
+          icon: PaintBucket,
           shortcut: "G",
           onSelect: () => toggleAdvancedFill(),
         },
         {
           id: "smart-shape",
           label: "스마트 도형",
+          icon: Shapes,
           onSelect: () => {
             setQuickShapeActive(true);
             setTool("draw");
@@ -15679,11 +15824,13 @@ function StudioCuttoonEditor() {
         {
           id: "bg",
           label: "배경 · 톤",
+          icon: Mountain,
           onSelect: () => setMenu("bgScene"),
         },
         {
           id: "style",
           label: "팔레트 · 브랜드",
+          icon: Palette,
           onSelect: () => setMenu("palette"),
         },
       ],
@@ -15695,6 +15842,7 @@ function StudioCuttoonEditor() {
         {
           id: "ai-assist",
           label: "AI 어시스트",
+          icon: WandSparkles,
           onSelect: () => {
             setMenu("aiAssist");
           },
@@ -15702,11 +15850,13 @@ function StudioCuttoonEditor() {
         {
           id: "stock",
           label: "스톡 이미지",
+          icon: Images,
           onSelect: () => setMenu("stockImage"),
         },
         {
           id: "integrations",
           label: "연동 설정",
+          icon: Settings2,
           onSelect: () => setMenu("integrations"),
         },
       ],

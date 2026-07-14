@@ -10,8 +10,13 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     label: "파일",
     items: [
       { id: "export", label: "내보내기 / 다운로드", onSelect: vi.fn() },
+      { id: "copy-image", label: "이미지를 클립보드로", onSelect: vi.fn(), separatorAfter: true },
       { id: "save-draft", label: "임시저장", shortcut: "⌘S", onSelect: vi.fn() },
       { id: "publish", label: "게시", onSelect: vi.fn(), separatorAfter: true },
+      { id: "export-json", label: "백업 (.json)", onSelect: vi.fn() },
+      { id: "export-archive", label: "아카이브 백업", onSelect: vi.fn() },
+      { id: "import-json", label: "프로젝트 가져오기…", onSelect: vi.fn() },
+      { id: "import-psd", label: "PSD 가져오기…", onSelect: vi.fn(), separatorAfter: true },
       { id: "project", label: "프로젝트 도구…", onSelect: vi.fn() },
     ],
   },
@@ -21,8 +26,12 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     items: [
       { id: "undo", label: "실행취소", shortcut: "⌘Z", onSelect: vi.fn() },
       { id: "redo", label: "다시실행", shortcut: "⌘⇧Z", onSelect: vi.fn(), separatorAfter: true },
+      { id: "copy", label: "복사", shortcut: "⌘C", onSelect: vi.fn() },
+      { id: "duplicate", label: "복제", shortcut: "⌘D", onSelect: vi.fn() },
+      { id: "delete", label: "삭제", shortcut: "⌫", onSelect: vi.fn(), danger: true, separatorAfter: true },
       { id: "history", label: "작업 내역", onSelect: vi.fn() },
       { id: "select", label: "선택 도구", shortcut: "V", onSelect: vi.fn() },
+      { id: "eyedropper", label: "스포이드", shortcut: "I", onSelect: vi.fn() },
     ],
   },
   {
@@ -34,7 +43,9 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
       { id: "text", label: "텍스트", onSelect: vi.fn() },
       { id: "image", label: "이미지…", onSelect: vi.fn(), separatorAfter: true },
       { id: "char", label: "3D 캐릭터", onSelect: vi.fn() },
+      { id: "bg3d", label: "3D 배경", onSelect: vi.fn() },
       { id: "ref", label: "참고 이미지", onSelect: vi.fn() },
+      { id: "page", label: "새 페이지", onSelect: vi.fn() },
     ],
   },
   {
@@ -46,7 +57,10 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
       { id: "wide", label: "패널 접어 넓게", onSelect: vi.fn() },
       { id: "fit", label: "너비에 맞춤", onSelect: vi.fn(), separatorAfter: true },
       { id: "fullscreen", label: "전체화면", onSelect: vi.fn() },
-      { id: "canvas-only", label: "캔버스만", onSelect: vi.fn() },
+      { id: "canvas-only", label: "캔버스만", shortcut: "Tab", onSelect: vi.fn(), separatorAfter: true },
+      { id: "left-panel", label: "왼쪽 패널 보이기", onSelect: vi.fn() },
+      { id: "right-panel", label: "속성 패널 보이기", onSelect: vi.fn() },
+      { id: "shortcuts", label: "단축키 도움말", shortcut: "?", onSelect: vi.fn() },
     ],
   },
   {
@@ -97,6 +111,7 @@ describe("StudioMainMenu", () => {
     expect(html).toContain("파일");
     expect(html).toContain("편집");
     expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain("data-studio-main-menu-trigger");
   });
 
   it("exposes the full commercial File/Edit/Insert/View/Draw/AI catalog labels", () => {
@@ -104,7 +119,6 @@ describe("StudioMainMenu", () => {
     expect(html).toContain('aria-label="메인 메뉴"');
     for (const group of PRODUCTION_MENU_CATALOG) {
       expect(html).toContain(group.label);
-      // Closed dropdowns only render triggers — items appear after open; catalog still declares them.
       expect(group.items.length).toBeGreaterThan(0);
     }
     expect(PRODUCTION_MENU_CATALOG.map((g) => g.id)).toEqual([
@@ -118,9 +132,18 @@ describe("StudioMainMenu", () => {
     const itemLabels = PRODUCTION_MENU_CATALOG.flatMap((g) => g.items.map((i) => i.label));
     for (const required of [
       "내보내기 / 다운로드",
+      "프로젝트 가져오기…",
+      "PSD 가져오기…",
       "프로젝트 도구…",
+      "복사",
+      "복제",
+      "삭제",
+      "스포이드",
       "템플릿 · 에셋",
+      "3D 배경",
+      "새 페이지",
       "슈퍼심플 레이아웃",
+      "단축키 도움말",
       "스마트 도형",
       "AI 어시스트",
     ]) {

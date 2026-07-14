@@ -1,8 +1,9 @@
 /**
  * StudioMainMenu — Magma/CSP/Photopea-style top application menu.
- * File · Edit · Insert · View · AI as compact dropdowns.
+ * File · Edit · Insert · View · Draw · AI as compact dropdowns.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
+ * When one menu is open, hovering another group switches (desktop app menubar UX).
  */
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import {
@@ -48,11 +49,14 @@ function MenuDropdown({
   open,
   onOpen,
   onClose,
+  /** Magma-style: when any sibling menu is open, pointer-enter opens this one. */
+  barActive,
 }: {
   group: StudioMainMenuGroup;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
+  barActive: boolean;
 }): ReactElement {
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -65,15 +69,14 @@ function MenuDropdown({
     const btn = buttonRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    const minWidth = Math.max(232, rect.width + 48);
+    const minWidth = Math.max(248, rect.width + 48);
     let left = rect.left;
-    // Keep panel inside viewport horizontally.
     if (typeof window !== "undefined") {
       left = Math.min(left, window.innerWidth - minWidth - 8);
       left = Math.max(8, left);
     }
     setCoords({
-      top: rect.bottom + 8,
+      top: rect.bottom + 6,
       left,
       minWidth,
     });
@@ -92,6 +95,11 @@ function MenuDropdown({
     function onDoc(e: MouseEvent) {
       const t = e.target as Node;
       if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      // Clicking another menu trigger is handled by that trigger's onOpen — don't steal it.
+      const otherTrigger = (e.target as HTMLElement | null)?.closest?.(
+        "[data-studio-main-menu-trigger]"
+      );
+      if (otherTrigger) return;
       onClose();
     }
     function onKey(e: KeyboardEvent) {
@@ -122,7 +130,9 @@ function MenuDropdown({
             aria-label={group.label}
             data-studio-main-menu-panel="true"
             className={cn(
-              "fixed overflow-hidden rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
+              // Portaled to body — use menubarMenu layer (above options/toolbelt, below full modals).
+              "fixed max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
+              "[scrollbar-width:thin]",
               STUDIO_Z_CLASS.menubarMenu
             )}
             style={{
@@ -145,7 +155,7 @@ function MenuDropdown({
                       onClose();
                     }}
                     className={cn(
-                      "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-[0.78rem] font-medium",
+                      "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
                       STUDIO_EASE,
                       STUDIO_FOCUS_RING,
                       item.danger && "text-bad",
@@ -178,10 +188,13 @@ function MenuDropdown({
       : null;
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0" onMouseEnter={() => {
+      if (barActive && !open) onOpen();
+    }}>
       <button
         ref={buttonRef}
         type="button"
+        data-studio-main-menu-trigger={group.id}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
@@ -213,6 +226,7 @@ function MenuDropdown({
 /** Application menu bar — Magma Top Bar menu section. */
 export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
+  const barActive = openId !== null;
 
   return (
     <nav
@@ -225,8 +239,9 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
           key={group.id}
           group={group}
           open={openId === group.id}
+          barActive={barActive}
           onOpen={() => setOpenId(group.id)}
-          onClose={() => setOpenId(null)}
+          onClose={() => setOpenId((id) => (id === group.id ? null : id))}
         />
       ))}
     </nav>
