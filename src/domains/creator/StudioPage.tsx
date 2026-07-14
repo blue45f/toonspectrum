@@ -17774,8 +17774,9 @@ function StudioCuttoonEditor() {
           </StudioQuickActionsBar>
         ) : null}
         <StudioToolbarDivider />
-        {studioUiDensityAllows(uiDensityMode, "toolbar-assets") ? (
-        <StudioToolbarCluster label="에셋 라이브러리">
+        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted. */}
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
+        <StudioToolbarCluster label="에셋 라이브러리" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "lg:sr-only")}>
         <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -18478,10 +18479,10 @@ function StudioCuttoonEditor() {
         </>
         ) : null}
 
-        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? (
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
         <>
-        <StudioToolbarDivider label="장면" />
-        <StudioToolbarCluster label="배경·톤">
+        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
+        <StudioToolbarCluster label="배경·톤" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "lg:sr-only")}>
         <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -18641,8 +18642,8 @@ function StudioCuttoonEditor() {
         </>
         ) : null}
 
-        {studioUiDensityAllows(uiDensityMode, "toolbar-style") ? (
-        <StudioToolbarCluster label="스타일">
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
+        <StudioToolbarCluster label="스타일" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "lg:sr-only")}>
         <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -18688,10 +18689,10 @@ function StudioCuttoonEditor() {
         </StudioToolbarCluster>
         ) : null}
 
-        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? (
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
         <>
-        <StudioToolbarDivider label="AI" />
-        <StudioToolbarCluster label="AI 연동">
+        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
+        <StudioToolbarCluster label="AI 연동" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "lg:sr-only")}>
         <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
