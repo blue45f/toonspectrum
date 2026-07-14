@@ -320,6 +320,7 @@ import {
   StudioDockNavButton,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
+  StudioToolBelt,
   StudioToolbarCluster,
   StudioToolbarDivider,
 } from "./studio-chrome-ui";
@@ -989,7 +990,6 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { lazyRetry } from "@/lib/lazy-retry";
-import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
@@ -4256,8 +4256,6 @@ function StudioCuttoonEditor() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
-  const acquireImmersiveSurface = useUi((state) => state.acquireImmersiveSurface);
-  const releaseImmersiveSurface = useUi((state) => state.releaseImmersiveSurface);
   const workId = params.get("id");
   const remixId = params.get("remix");
   const creationLinks = studioCreationLinkParams({
@@ -5152,42 +5150,28 @@ function StudioCuttoonEditor() {
     if (isMobile && canvasOnlyMode) setCanvasOnlyMode(false);
   }, [canvasOnlyMode, isMobile, maximized]);
   // 모바일 앱 셸과 데스크톱 캔버스만 보기는 사이트 크롬 대신 Studio가 화면을 소유한다.
-  // App이 헤더·푸터·전역 플로팅 컨트롤을 실제로 언마운트하므로, 단순 overlay와 달리
-  // 보이지 않는 사이트 링크가 Tab 순서에 남거나 푸터가 캔버스 아래에서 스크롤되지 않는다.
-  const studioImmersiveSurface = mobileImmersive || canvasOnlyMode;
+  // Immersive site-chrome hide is owned by App's StudioRouteImmersiveBridge (path-based).
+  // Studio only stamps presentation data attributes for CSS/hooks (mobile / canvas-only).
   useLayoutEffect(() => {
-    if (!studioImmersiveSurface || typeof document === "undefined") return;
+    if (typeof document === "undefined") return;
     const root = document.documentElement;
-    const previousMobileMode = root.getAttribute("data-studio-mobile-immersive");
-    const previousCanvasOnlyMode = root.getAttribute("data-studio-canvas-only");
+    root.setAttribute("data-studio-app", "true");
     if (mobileImmersive) {
       root.setAttribute("data-studio-mobile-immersive", "true");
+    } else {
+      root.removeAttribute("data-studio-mobile-immersive");
     }
     if (canvasOnlyMode && !isMobile) {
       root.setAttribute("data-studio-canvas-only", "true");
+    } else {
+      root.removeAttribute("data-studio-canvas-only");
     }
-    acquireImmersiveSurface("studio");
     return () => {
-      releaseImmersiveSurface("studio");
-      if (previousMobileMode === null) {
-        root.removeAttribute("data-studio-mobile-immersive");
-      } else {
-        root.setAttribute("data-studio-mobile-immersive", previousMobileMode);
-      }
-      if (previousCanvasOnlyMode === null) {
-        root.removeAttribute("data-studio-canvas-only");
-      } else {
-        root.setAttribute("data-studio-canvas-only", previousCanvasOnlyMode);
-      }
+      root.removeAttribute("data-studio-app");
+      root.removeAttribute("data-studio-mobile-immersive");
+      root.removeAttribute("data-studio-canvas-only");
     };
-  }, [
-    acquireImmersiveSurface,
-    canvasOnlyMode,
-    isMobile,
-    mobileImmersive,
-    releaseImmersiveSurface,
-    studioImmersiveSurface,
-  ]);
+  }, [canvasOnlyMode, isMobile, mobileImmersive]);
   // 전체화면/브라우저 맞춤은 저장된 작업공간을 바꾸지 않는 일시적인 프레젠테이션 상태다.
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
@@ -16390,7 +16374,12 @@ function StudioCuttoonEditor() {
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       data-studio-editor="true"
+      data-studio-app-shell="true"
       className={cn(
+        // Default draw-app shell: fill the viewport without site chrome padding.
+        "flex min-h-0 flex-col bg-canvas text-fg",
+        !isFullscreen && !maximized && !canvasOnlyMode && !mobileImmersive &&
+          "h-[100dvh] max-h-[100dvh] overflow-hidden",
         isFullscreen && "min-h-screen overflow-y-auto bg-canvas",
         maximized && !isMobile && !mobileImmersive &&
           "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
@@ -17061,22 +17050,16 @@ function StudioCuttoonEditor() {
         <StudioPublishContextBanner context={publishContext} />
       </div>
 
-      {/* 툴바 */}
-      {/* 데스크톱: wrap 유지(아래로 열리는 팝오버가 가로 스크롤 컨테이너에 잘리지 않도록).
-          모바일: 한 줄 가로 스크롤로 압축해 캔버스 세로 공간을 확보한다(여러 줄 wrap이 화면을 잡아먹지 않게).
-          이때 각 메뉴 팝오버는 모바일에서 fixed 로 뜨므로 overflow 스크롤에 잘리지 않는다(아래 메뉴들 참조). */}
-      {/* 모바일은 backdrop-blur 를 빼고 불투명 bg-panel 을 쓴다 — backdrop-filter 는 fixed 자식의 containing block 을 만들어
-          메뉴 팝오버(fixed)가 이 가로 스크롤 도구막대 안에 갇혀(overflow 클리핑) 안 보이게 되기 때문. 데스크톱은 기존 blur 유지. */}
-      <div
+      {/* Draw-app tool belt — full-width sticky chrome (no site GNB). Mobile: horizontal scroll. */}
+      <StudioToolBelt
         className={cn(
-          "sticky top-2 z-30 mb-3 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto rounded-2xl border border-line bg-panel p-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:z-20 lg:flex-wrap lg:overflow-visible lg:bg-panel/80 lg:backdrop-blur",
           canvasOnlyMode && "hidden",
-          mobileImmersive && "top-1 mb-1.5 shrink-0 rounded-xl p-1"
+          mobileImmersive && "shrink-0 py-1"
         )}
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
-        <span aria-hidden className="pointer-events-none sticky left-0 -ml-2 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel/80 to-transparent lg:hidden" />
-        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-line bg-card/70 p-0.5" role="group" aria-label="화면 밀도">
+        <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
+        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-line/70 bg-card/80 p-0.5" role="group" aria-label="화면 밀도">
           {(["simple", "full", "focus"] as const).map((mode) => (
             <button
               key={mode}
@@ -17086,9 +17069,9 @@ function StudioCuttoonEditor() {
               aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
               onClick={() => setStudioUiDensity(mode)}
               className={cn(
-                "min-h-9 rounded-lg px-2 text-[0.65rem] font-semibold transition-colors pointer-coarse:min-h-11",
+                "min-h-9 rounded-lg px-2.5 text-[0.68rem] font-semibold transition-colors pointer-coarse:min-h-11",
                 uiDensityMode === mode
-                  ? "bg-accent text-on-accent"
+                  ? "bg-accent text-on-accent shadow-sm"
                   : "text-fg-3 hover:bg-raised hover:text-fg-2"
               )}
             >
@@ -18753,7 +18736,7 @@ function StudioCuttoonEditor() {
           <span className="mx-0.5 h-5 w-px bg-line" />
           <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
         </div>
-      </div>
+      </StudioToolBelt>
 
       {pageEditLocked && !masterEditMode ? (
         <div

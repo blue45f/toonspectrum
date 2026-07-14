@@ -116,6 +116,27 @@ function WebFloatingControls() {
   );
 }
 
+/**
+ * Route-level immersive owner: site GNB/footer never flash on /studio (including the
+ * lazy StudioPage load gap). Release only when leaving the studio path.
+ */
+function StudioRouteImmersiveBridge() {
+  const { pathname } = useLocation();
+  const acquireImmersiveSurface = useUi((state) => state.acquireImmersiveSurface);
+  const releaseImmersiveSurface = useUi((state) => state.releaseImmersiveSurface);
+  const onStudioPath = isImmersiveMobileRoute(pathname);
+
+  useEffect(() => {
+    if (!onStudioPath) return;
+    acquireImmersiveSurface("studio");
+    return () => {
+      releaseImmersiveSurface("studio");
+    };
+  }, [acquireImmersiveSurface, onStudioPath, releaseImmersiveSurface]);
+
+  return null;
+}
+
 // 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
 export default function App() {
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
@@ -141,10 +162,18 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <StudioRouteImmersiveBridge />
       <AppShell
         header={studioImmersive ? null : <SiteHeader />}
         footer={studioImmersive ? null : <DeferredFooter />}
         floatingControls={studioImmersive ? null : <WebFloatingControls />}
+        // Studio owns its shell — hide site skip-to-content chrome too.
+        showSkipLink={!studioImmersive}
+        mainClassName={
+          studioImmersive
+            ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"
+            : "min-h-screen pb-20 outline-none md:pb-0"
+        }
         chromeOverlay={
           <>
             {!studioImmersive ? (

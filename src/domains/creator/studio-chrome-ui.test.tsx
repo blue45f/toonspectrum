@@ -6,6 +6,7 @@ import {
   StudioDockButton,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
+  StudioToolBelt,
   StudioToolbarDivider,
   StudioToolbarCluster,
 } from "./studio-chrome-ui";
@@ -19,7 +20,7 @@ describe("studio chrome UI", () => {
     expect(html).toContain("uppercase");
   });
 
-  it("groups toolbar clusters with accessible labels", () => {
+  it("groups toolbar clusters with accessible labels and draw-app shell frame", () => {
     const html = renderToStaticMarkup(
       <StudioToolbarCluster label="그리기 도구">
         <button type="button">펜</button>
@@ -27,6 +28,20 @@ describe("studio chrome UI", () => {
     );
     expect(html).toContain('role="group"');
     expect(html).toContain('aria-label="그리기 도구"');
+    expect(html).toContain("rounded-xl");
+    expect(html).toContain("border-line");
+  });
+
+  it("renders a full tool-belt rail for the immersive draw-app shell", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolBelt>
+        <button type="button">펜</button>
+      </StudioToolBelt>
+    );
+    expect(html).toContain('role="toolbar"');
+    expect(html).toContain('data-studio-tool-belt="true"');
+    expect(html).toContain("스튜디오 도구");
+    expect(html).toContain("sticky");
   });
 
   it("renders menu popover header and subtabs with icons", () => {

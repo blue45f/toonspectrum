@@ -44,15 +44,15 @@ export function StudioToolbarDivider({
         role="separator"
         aria-label={label}
         className={cn(
-          "mx-0.5 hidden h-7 shrink-0 items-center gap-1.5 self-center lg:inline-flex",
+          "mx-0.5 hidden h-8 shrink-0 items-center gap-1.5 self-center lg:inline-flex",
           className
         )}
       >
-        <span aria-hidden className="h-5 w-px bg-line" />
-        <span className="select-none text-[0.58rem] font-bold uppercase tracking-[0.08em] text-fg-3">
+        <span aria-hidden className="h-6 w-px bg-line-strong/70" />
+        <span className="select-none text-[0.6rem] font-bold uppercase tracking-[0.1em] text-fg-3">
           {label}
         </span>
-        <span aria-hidden className="h-5 w-px bg-line" />
+        <span aria-hidden className="h-6 w-px bg-line-strong/70" />
       </span>
     );
   }
@@ -60,7 +60,7 @@ export function StudioToolbarDivider({
     <span
       role="separator"
       aria-hidden
-      className={cn("mx-0.5 h-5 w-px shrink-0 self-center bg-line", className)}
+      className={cn("mx-0.5 h-6 w-px shrink-0 self-center bg-line-strong/60", className)}
     />
   );
 }
@@ -70,16 +70,57 @@ export function StudioToolbarCluster({
   label,
   children,
   className,
+  showCaption = false,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  /** Optional desktop caption under the cluster (draw-app IA). */
+  showCaption?: boolean;
 }): ReactElement {
   return (
     <div
       role="group"
       aria-label={label}
-      className={cn("flex max-w-full shrink-0 items-center gap-1", className)}
+      className={cn(
+        "flex max-w-full shrink-0 flex-col items-stretch gap-0.5",
+        className
+      )}
+    >
+      <div className="flex max-w-full items-center gap-1 rounded-xl border border-line/60 bg-card/40 p-0.5 shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.04)]">
+        {children}
+      </div>
+      {showCaption ? (
+        <span className="hidden select-none px-1 text-center text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-fg-3 lg:block">
+          {label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Outer tool-belt rail — full-width sticky chrome for the draw-app shell. */
+export function StudioToolBelt({
+  children,
+  className,
+  "aria-label": ariaLabel = "스튜디오 도구",
+}: {
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}): ReactElement {
+  return (
+    <div
+      role="toolbar"
+      aria-label={ariaLabel}
+      data-studio-tool-belt="true"
+      className={cn(
+        "sticky top-0 z-30 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto",
+        "rounded-none border-b border-line bg-panel/95 px-2 py-1.5 shadow-[0_1px_0_oklch(0.2_0.01_70/0.06)]",
+        "[-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "lg:flex-wrap lg:overflow-visible lg:rounded-none lg:px-3 lg:py-2",
+        className
+      )}
     >
       {children}
     </div>
