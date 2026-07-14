@@ -5,6 +5,7 @@
  */
 import { ArrowLeftRight, Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles, Wand2 } from "lucide-react";
 
+import { STUDIO_BRUSH_SIZE_CHIPS, nearestStudioBrushSizeChip } from "./studio-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -207,6 +208,33 @@ export function StudioDrawOptionsBar({
       <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line sm:block" />
 
       <SizePreview size={strokeWidth} color={drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color} />
+
+      {/* Canva/Express-style size chips — one-tap brush scale */}
+      <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="브러시 크기 프리셋">
+        {STUDIO_BRUSH_SIZE_CHIPS.map((chip) => {
+          const active = nearestStudioBrushSizeChip(strokeWidth) === chip.id;
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              title={`${chip.label} · ${chip.width}px`}
+              aria-label={`브러시 크기 ${chip.label} ${chip.width}픽셀`}
+              aria-pressed={active}
+              onClick={() => onStrokeWidthChange(chip.width)}
+              className={cn(
+                "grid h-7 min-w-7 place-items-center rounded-md px-1 text-[0.58rem] font-bold tabular-nums",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                active
+                  ? "bg-accent text-on-accent shadow-sm"
+                  : "bg-card text-fg-3 ring-1 ring-line/80 hover:bg-raised hover:text-fg"
+              )}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
 
       <label className="flex shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3">
         <span className="select-none">크기</span>

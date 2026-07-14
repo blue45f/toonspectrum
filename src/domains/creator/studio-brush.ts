@@ -14,20 +14,113 @@ export interface BrushPreset {
   defaultColor?: string;
 }
 
+/**
+ * Render family — many commercial aliases share one deterministic stroke pipeline.
+ * Inspired by Canva/Express (named beginner tools) + Picsart depth without clone branding.
+ */
+export type StudioBrushRenderFamily =
+  | "pen"
+  | "gpen"
+  | "calligraphy"
+  | "marker"
+  | "highlighter"
+  | "neon"
+  | "brush"
+  | "watercolor"
+  | "ink-particle"
+  | "airbrush"
+  | "dry-media"
+  | "pencil"
+  | "screentone";
+
+/** Map preset id → render family (unknown ids fall back to pen). */
+export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRenderFamily>> = {
+  pen: "pen",
+  fineliner: "pen",
+  ballpoint: "pen",
+  gpen: "gpen",
+  liner: "gpen",
+  calligraphy: "calligraphy",
+  marker: "marker",
+  "felt-tip": "marker",
+  "marker-bold": "marker",
+  highlighter: "highlighter",
+  neon: "neon",
+  brush: "brush",
+  watercolor: "watercolor",
+  "ink-particle": "ink-particle",
+  airbrush: "airbrush",
+  spray: "airbrush",
+  "dry-media": "dry-media",
+  crayon: "dry-media",
+  chalk: "dry-media",
+  pencil: "pencil",
+  "soft-pencil": "pencil",
+  screentone: "screentone",
+};
+
+export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRenderFamily {
+  if (typeof brushId !== "string" || !brushId) return "pen";
+  return STUDIO_BRUSH_RENDER_FAMILY[brushId] ?? "pen";
+}
+
+/**
+ * Commercial brush kit — Canva/Express beginner names + Picsart expressive media + webtoon line tools.
+ * Keep legacy ids first so saved documents remain stable.
+ */
 export const BRUSH_PRESETS: BrushPreset[] = [
+  // —— Line tools (AutoDraw-adjacent clean ink, Magma/CSP line art) ——
   { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
+  { id: "fineliner", name: "파인라이너", defaultWidth: 2.2, defaultOpacity: 1.0 },
+  { id: "ballpoint", name: "볼펜", defaultWidth: 3.5, defaultOpacity: 0.95 },
   { id: "gpen", name: "G펜(필압)", defaultWidth: 7, defaultOpacity: 1.0 },
+  { id: "liner", name: "잉크 라이너", defaultWidth: 5, defaultOpacity: 1.0 },
   { id: "calligraphy", name: "캘리그래피(펜 기울기)", defaultWidth: 12, defaultOpacity: 1.0 },
+  // —— Markers (Canva Draw / Express / Picsart) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
+  { id: "felt-tip", name: "펠트펜", defaultWidth: 10, defaultOpacity: 0.85 },
+  { id: "marker-bold", name: "볼드 마커", defaultWidth: 28, defaultOpacity: 0.55 },
   { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
+  { id: "neon", name: "네온 마커", defaultWidth: 18, defaultOpacity: 0.75, defaultColor: "#39ff14" },
+  // —— Paint (Picsart / Express digital paint) ——
   { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
   { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
-  { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
-  { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
+  { id: "spray", name: "스프레이", defaultWidth: 40, defaultOpacity: 0.55 },
+  // —— Texture / dry media ——
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
+  { id: "soft-pencil", name: "소프트 연필", defaultWidth: 5, defaultOpacity: 0.7 },
+  { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
+  { id: "crayon", name: "크레용", defaultWidth: 14, defaultOpacity: 0.88 },
+  { id: "chalk", name: "초크", defaultWidth: 16, defaultOpacity: 0.8 },
+  { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];
+
+/** Canva-style quick size chips (screen px brush width). */
+export const STUDIO_BRUSH_SIZE_CHIPS = [
+  { id: "xs", label: "XS", width: 2 },
+  { id: "s", label: "S", width: 6 },
+  { id: "m", label: "M", width: 12 },
+  { id: "l", label: "L", width: 24 },
+  { id: "xl", label: "XL", width: 40 },
+] as const;
+
+export type StudioBrushSizeChipId = (typeof STUDIO_BRUSH_SIZE_CHIPS)[number]["id"];
+
+export function nearestStudioBrushSizeChip(width: unknown): StudioBrushSizeChipId {
+  const w = typeof width === "number" && Number.isFinite(width) ? width : 6;
+  let best: (typeof STUDIO_BRUSH_SIZE_CHIPS)[number] = STUDIO_BRUSH_SIZE_CHIPS[1];
+  let dist = Math.abs(w - best.width);
+  for (const chip of STUDIO_BRUSH_SIZE_CHIPS) {
+    const d = Math.abs(w - chip.width);
+    if (d < dist) {
+      best = chip;
+      dist = d;
+    }
+  }
+  return best.id;
+}
 
 export const BRUSH_PRESSURE_CURVE_PRESETS = [
   { id: "soft", label: "민감하게", exponent: 0.65, description: "약한 압력에도 굵기가 빠르게 올라옵니다." },

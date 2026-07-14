@@ -4,8 +4,10 @@ import {
   BRUSH_PRESETS,
   BRUSH_PRESSURE_CURVE_PRESETS,
   STABILIZER_MAX,
+  STUDIO_BRUSH_SIZE_CHIPS,
   buildCalligraphySegments,
   gpenSegmentWidths,
+  nearestStudioBrushSizeChip,
   normalizeCalligraphyStylusInput,
   polylineLength,
   processFreehandPoints,
@@ -14,6 +16,7 @@ import {
   pressureCurveValueForPreset,
   resampleStrokePressures,
   resolveBrushPressureSample,
+  resolveStudioBrushRenderFamily,
   sanitizeCalligraphyTipSettings,
   screentoneDotRadius,
   screentoneDotsForStroke,
@@ -25,21 +28,31 @@ import {
 } from "./studio-brush";
 
 describe("BRUSH_PRESETS", () => {
-  it("includes G-pen, tilt calligraphy, watercolor and screentone while keeping legacy ids", () => {
+  it("includes G-pen, tilt calligraphy, watercolor and commercial Canva/Express/Picsart aliases", () => {
     const ids = BRUSH_PRESETS.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const required of [
       "pen",
+      "fineliner",
+      "ballpoint",
       "gpen",
+      "liner",
       "calligraphy",
       "marker",
+      "felt-tip",
+      "marker-bold",
       "highlighter",
+      "neon",
       "brush",
       "watercolor",
       "ink-particle",
       "airbrush",
+      "spray",
       "dry-media",
+      "crayon",
+      "chalk",
       "pencil",
+      "soft-pencil",
       "screentone",
     ]) {
       expect(ids).toContain(required);
@@ -59,6 +72,9 @@ describe("BRUSH_PRESETS", () => {
       defaultWidth: 32,
       defaultOpacity: 0.7,
     });
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "neon")).toMatchObject({
+      defaultColor: "#39ff14",
+    });
   });
 
   it("defines sane defaults for every preset", () => {
@@ -68,6 +84,20 @@ describe("BRUSH_PRESETS", () => {
       expect(preset.defaultOpacity).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("maps commercial aliases onto stable render families", () => {
+    expect(resolveStudioBrushRenderFamily("fineliner")).toBe("pen");
+    expect(resolveStudioBrushRenderFamily("spray")).toBe("airbrush");
+    expect(resolveStudioBrushRenderFamily("crayon")).toBe("dry-media");
+    expect(resolveStudioBrushRenderFamily("neon")).toBe("neon");
+    expect(resolveStudioBrushRenderFamily("unknown-tool")).toBe("pen");
+  });
+
+  it("exposes Canva-style size chips and nearest selection", () => {
+    expect(STUDIO_BRUSH_SIZE_CHIPS.map((c) => c.id)).toEqual(["xs", "s", "m", "l", "xl"]);
+    expect(nearestStudioBrushSizeChip(7)).toBe("s");
+    expect(nearestStudioBrushSizeChip(40)).toBe("xl");
   });
 });
 

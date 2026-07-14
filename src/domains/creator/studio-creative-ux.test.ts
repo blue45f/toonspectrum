@@ -21,11 +21,19 @@ describe("studio creative ux", () => {
     expect(new Set(all.map((item) => item.id)).size).toBe(BRUSH_PRESETS.length);
   });
 
+  it("filters Picsart-style media groups", () => {
+    const markers = listStudioBrushTrayItems("marker");
+    expect(markers.length).toBeGreaterThan(0);
+    expect(markers.every((item) => item.mediaGroup === "marker")).toBe(true);
+    expect(markers.some((item) => item.id === "neon")).toBe(true);
+  });
+
   it("builds short labels and preview weights for tray chips", () => {
     const pen = studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "pen")!);
     expect(pen.shortName).toBe("펜");
     expect(pen.previewWeight).toBeGreaterThan(0);
     expect(pen.hint.length).toBeGreaterThan(4);
+    expect(pen.previewStyle).toBe("solid");
   });
 
   it("exposes drawing-first starter cards without publish marketing", () => {

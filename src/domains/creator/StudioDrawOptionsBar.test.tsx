@@ -30,6 +30,9 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("스마트 도형");
     expect(html).toContain('aria-label="스마트 도형"');
     expect(html).toContain('data-studio-draw-options-end="true"');
+    expect(html).toContain("브러시 크기 프리셋");
+    expect(html).toContain("XS");
+    expect(html).toContain("XL");
     expect(html).toContain('aria-pressed="true"');
   });
 

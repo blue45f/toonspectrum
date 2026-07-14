@@ -153,6 +153,20 @@ export function isStudioBrushDynamicsPresetId(value: unknown): value is StudioBr
   return value === "ink-particle" || value === "airbrush" || value === "dry-media";
 }
 
+/**
+ * Map commercial brush aliases (spray/crayon/chalk/…) onto a dynamics engine preset.
+ * Keeps saved stroke `brush` ids stable while reusing airbrush/dry-media/ink pipelines.
+ */
+export function resolveStudioBrushDynamicsPresetId(
+  brushId: unknown
+): StudioBrushDynamicsPresetId | null {
+  if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
+  if (typeof brushId !== "string") return null;
+  if (brushId === "spray") return "airbrush";
+  if (brushId === "crayon" || brushId === "chalk") return "dry-media";
+  return null;
+}
+
 export interface StudioBrushDynamicsPreset {
   id: StudioBrushDynamicsPresetId;
   name: string;

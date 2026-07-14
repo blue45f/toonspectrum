@@ -293,5 +293,15 @@ export function isPressureWidthBrush(brush: string | undefined, mode: "pen" | "e
   // eraser 모드면 브러시와 무관하게 항상 필압을 읽는 기본(default) 분기로 떨어진다.
   if (mode === "eraser") return true;
   const b = brush ?? "pen";
-  return b === "pen" || b === "gpen" || b === "marker" || b === "watercolor";
+  return (
+    b === "pen" ||
+    b === "fineliner" ||
+    b === "ballpoint" ||
+    b === "gpen" ||
+    b === "liner" ||
+    b === "marker" ||
+    b === "felt-tip" ||
+    b === "marker-bold" ||
+    b === "watercolor"
+  );
 }

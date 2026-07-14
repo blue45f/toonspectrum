@@ -239,6 +239,7 @@ import {
   processPencilPoints,
   resampleStrokePressures,
   resolveBrushPressureSample,
+  resolveStudioBrushRenderFamily,
   screentoneDotRadius,
   screentoneDotsForStroke,
   shouldAppendStrokePoint,
@@ -249,9 +250,9 @@ import {
   type CalligraphyStylusInput,
 } from "./studio-brush";
 import {
-  isStudioBrushDynamicsPresetId,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
+  resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
@@ -2443,10 +2444,8 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
   const shapeDash = strokeDashArray(strokeStyle.dash, strokeWidth);
 
   const symmetricVariations = getSymmetricPoints(el.points, el.symmetry);
-  const dynamicBrushId = kind === "freehand"
-    && el.mode !== "eraser"
-    && isStudioBrushDynamicsPresetId(el.brush)
-    ? el.brush
+  const dynamicBrushId = kind === "freehand" && el.mode !== "eraser"
+    ? resolveStudioBrushDynamicsPresetId(el.brush)
     : null;
   const dynamicBrushPlan = dynamicBrushId
     ? (() => {
@@ -2613,16 +2612,22 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
 
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
+          const brushFamily = resolveStudioBrushRenderFamily(brush);
           const dynamicBrush = dynamicBrushId !== null;
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
-          if (points.length === 2 && brush !== "watercolor" && brush !== "screentone" && !dynamicBrush) {
+          if (
+            points.length === 2 &&
+            brushFamily !== "watercolor" &&
+            brushFamily !== "screentone" &&
+            !dynamicBrush
+          ) {
             const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
             const pressureAware = el.mode === "eraser"
-              || brush === "pen"
-              || brush === "gpen"
-              || brush === "calligraphy"
-              || brush === "marker";
+              || brushFamily === "pen"
+              || brushFamily === "gpen"
+              || brushFamily === "calligraphy"
+              || brushFamily === "marker";
             const width = pressureAware
               ? strokeWidth * (0.3 + pressure * 1.4)
               : strokeWidth;
@@ -2687,7 +2692,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "calligraphy" && el.mode !== "eraser") {
+          if (brushFamily === "calligraphy" && el.mode !== "eraser") {
             const smoothed = processFreehandPoints(points, renderSampleDistance);
             const sourcePointCount = Math.floor(points.length / 2);
             const sampleCount = Math.min(
@@ -2739,7 +2744,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "brush" && el.mode !== "eraser") {
+          if (brushFamily === "brush" && el.mode !== "eraser") {
             const smoothed = processFreehandPoints(points, renderSampleDistance);
             return (
               <Shape
@@ -2780,7 +2785,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "watercolor" && el.mode !== "eraser") {
+          if (brushFamily === "watercolor" && el.mode !== "eraser") {
             // 수채는 매 렌더에서 스트로크 id/필압/점열로 dab 계획을 다시 계산한다. 계획 자체가
             // 순수·결정적이라 히스토리 복원, 협업 동기화, 내보내기에서도 번짐 위치가 흔들리지 않는다.
             const dabs = planWatercolorBrushDabs({
@@ -2830,7 +2835,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "gpen" && el.mode !== "eraser") {
+          if (brushFamily === "gpen" && el.mode !== "eraser") {
             // G펜: 필압(또는 속도 기반 의사 필압)에 따라 굵기가 변하고 양 끝이 가늘어지는 만화 잉크 선.
             const smoothed = processFreehandPoints(points, renderSampleDistance);
             const segmentCount = Math.floor(smoothed.length / 2);
@@ -2864,7 +2869,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "screentone" && el.mode !== "eraser") {
+          if (brushFamily === "screentone" && el.mode !== "eraser") {
             // 스크린톤: 전역 격자에 정렬된 망점 도트를 스트로크 경로에 찍는다(겹쳐도 패턴 유지).
             const pitch = Math.max(3, strokeWidth * 0.42);
             const radius = Math.max(2, strokeWidth / 2);
@@ -2889,7 +2894,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "pencil" && el.mode !== "eraser") {
+          if (brushFamily === "pencil" && el.mode !== "eraser") {
             const jittered = processPencilPoints(points);
             return (
               <Line
@@ -2907,7 +2912,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
-          if (brush === "highlighter" && el.mode !== "eraser") {
+          if (brushFamily === "highlighter" && el.mode !== "eraser") {
             const smoothed = processFreehandPoints(points, renderSampleDistance);
             return (
               <Line
@@ -2920,6 +2925,25 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                 lineJoin="miter"
                 tension={0.4}
                 globalCompositeOperation="multiply"
+                listening={false}
+              />
+            );
+          }
+
+          if (brushFamily === "neon" && el.mode !== "eraser") {
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            return (
+              <Line
+                key={index}
+                points={smoothed}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                opacity={opacity}
+                lineCap="round"
+                lineJoin="round"
+                tension={0.35}
+                // Screen-style glow on dark panels — Express/Picsart neon marker affordance.
+                globalCompositeOperation="lighter"
                 listening={false}
               />
             );
@@ -5839,8 +5863,9 @@ function StudioCuttoonEditor() {
     setStrokeWidth(preset.defaultWidth);
     setBrushOpacity(preset.defaultOpacity);
     if (preset.defaultColor) setColor(preset.defaultColor);
-    if (isStudioBrushDynamicsPresetId(preset.id)) {
-      setBrushDynamics(studioBrushDynamicsPresetSettings(preset.id));
+    const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
+    if (dynamicsId) {
+      setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
     }
     setBrushSlotsState((prev) => {
       const next = rememberStudioBrushSlot(prev, {
@@ -5860,8 +5885,9 @@ function StudioCuttoonEditor() {
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
     if (preset) {
       setBrush(preset.id);
-      if (isStudioBrushDynamicsPresetId(preset.id)) {
-        setBrushDynamics(studioBrushDynamicsPresetSettings(preset.id));
+      const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
+      if (dynamicsId) {
+        setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
       }
     } else {
       setBrush(slot.brushId);
@@ -13805,7 +13831,7 @@ function StudioCuttoonEditor() {
         fallbackPressure: 0.8,
       });
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
-      const capturePointerDynamics = drawMode === "pen" && isStudioBrushDynamicsPresetId(brush);
+      const capturePointerDynamics = drawMode === "pen" && resolveStudioBrushDynamicsPresetId(brush) !== null;
       const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
       const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
         ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
@@ -14364,7 +14390,7 @@ function StudioCuttoonEditor() {
       targetY,
       current.sampleSpacing ?? strokeSampleDistanceForScale(effScale)
     )) return;
-    const capturePointerDynamics = current.mode === "pen" && isStudioBrushDynamicsPresetId(current.brush);
+    const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
     const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
     const previousPointCount = Math.floor(current.points.length / 2);
     const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerSample) : null;
@@ -14477,7 +14503,7 @@ function StudioCuttoonEditor() {
                   fallbackPressure: lastPressure,
                 })
               : lastPressure;
-            const capturePointerDynamics = current.mode === "pen" && isStudioBrushDynamicsPresetId(current.brush);
+            const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
             const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
             const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerEvent) : null;
             const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
@@ -16924,7 +16950,7 @@ function StudioCuttoonEditor() {
   const pendingBrushDelete = pendingBrushDeletes.length > 0
     ? pendingBrushDeletes[pendingBrushDeletes.length - 1]
     : null;
-  const isolatedDynamicDraft = draft?.mode === "pen" && isStudioBrushDynamicsPresetId(draft.brush)
+  const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
 

@@ -31,6 +31,7 @@ import {
   processFreehandPoints,
   processPencilPoints,
   resampleStrokePressures,
+  resolveStudioBrushRenderFamily,
   screentoneDotRadius,
   screentoneDotsForStroke,
   strokeRenderDistance,
@@ -38,9 +39,9 @@ import {
   type CalligraphyTipSettings,
 } from "./studio-brush";
 import {
-  isStudioBrushDynamicsPresetId,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
+  resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
@@ -700,9 +701,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const strokeAttrs = `${att("stroke", stroke)}${att("stroke-width", strokeWidth)}`;
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
-  const dynamicBrushId = kind === "freehand" && isStudioBrushDynamicsPresetId(el.brush)
-    ? el.brush
-    : null;
+  const dynamicBrushId = kind === "freehand" ? resolveStudioBrushDynamicsPresetId(el.brush) : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
   const dynamicPlan = dynamicBrushId
@@ -825,22 +824,29 @@ function serializeFreehand(
   dynamics?: NormalizedStudioBrushDynamicsSettings
 ): string {
   const brush = el.brush ?? "pen";
-  const dynamicBrush = isStudioBrushDynamicsPresetId(brush);
+  const brushFamily = resolveStudioBrushRenderFamily(brush);
+  const dynamicsPresetId = resolveStudioBrushDynamicsPresetId(brush);
+  const dynamicBrush = dynamicsPresetId !== null;
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
-  if (points.length === 2 && brush !== "watercolor" && brush !== "screentone" && !dynamicBrush) {
+  if (
+    points.length === 2 &&
+    brushFamily !== "watercolor" &&
+    brushFamily !== "screentone" &&
+    !dynamicBrush
+  ) {
     const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
-    const pressureAware = brush === "pen"
-      || brush === "gpen"
-      || brush === "calligraphy"
-      || brush === "marker";
+    const pressureAware = brushFamily === "pen"
+      || brushFamily === "gpen"
+      || brushFamily === "calligraphy"
+      || brushFamily === "marker";
     const width = pressureAware ? strokeWidth * (0.3 + pressure * 1.4) : strokeWidth;
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, width / 2))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
-  if (dynamicBrush) {
+  if (dynamicBrush && dynamicsPresetId) {
     const tip = dynamics?.tip ?? normalizeStudioBrushDynamicsSettings(
-      el.brushDynamics ?? studioBrushDynamicsPresetSettings(brush)
+      el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicsPresetId)
     ).tip;
     const useEllipse = studioBrushTipUsesSolidEllipse(tip);
     if (useEllipse) {
@@ -869,7 +875,7 @@ function serializeFreehand(
     return `<g>${stamps}</g>`;
   }
 
-  if (brush === "watercolor") {
+  if (brushFamily === "watercolor") {
     const dabs = planWatercolorBrushDabs({
       points: processFreehandPoints(points, renderSampleDistance),
       pressures: el.pressures,
@@ -888,7 +894,7 @@ function serializeFreehand(
     return `<g${opacityAttr}>${circles}</g>`;
   }
 
-  if (brush === "calligraphy") {
+  if (brushFamily === "calligraphy") {
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     if (smoothed.length < 2) return "";
     const sourcePointCount = Math.floor(points.length / 2);
@@ -920,7 +926,7 @@ function serializeFreehand(
     )).join("")}</g>`;
   }
 
-  if (brush === "brush") {
+  if (brushFamily === "brush") {
     // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     if (smoothed.length < 2) return "";
@@ -944,7 +950,7 @@ function serializeFreehand(
     return `<path d="${sub.join(" ")}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
-  if (brush === "gpen") {
+  if (brushFamily === "gpen") {
     // G펜 — 세그먼트별 굵기(필압 테이퍼)를 세그먼트 path 로 그대로 재현.
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     const segmentCount = Math.floor(smoothed.length / 2);
@@ -961,7 +967,7 @@ function serializeFreehand(
     return `<g${opacityAttr}>${segs.join("")}</g>`;
   }
 
-  if (brush === "screentone") {
+  if (brushFamily === "screentone") {
     // 스크린톤 — 전역 격자 정렬 망점(결정적)을 원으로 그대로 재현.
     const pitch = Math.max(3, strokeWidth * 0.42);
     const radius = Math.max(2, strokeWidth / 2);
@@ -974,16 +980,21 @@ function serializeFreehand(
     return `<g fill="${escapeXml(stroke)}"${opacityAttr}>${circles.join("")}</g>`;
   }
 
-  if (brush === "pencil") {
+  if (brushFamily === "pencil") {
     // 연필 — 결정적 지터 + tension 0.2 곡선.
     const jittered = processPencilPoints(points);
     return `<path d="${tensionPathD(jittered, 0.2)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
   }
 
-  if (brush === "highlighter") {
+  if (brushFamily === "highlighter") {
     // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+  }
+
+  if (brushFamily === "neon") {
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    return `<path d="${tensionPathD(smoothed, 0.35)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round" style="mix-blend-mode:screen"${opacityAttr}/>`;
   }
 
   // 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기(캔버스 산식 0.3+p×1.4)로 재현.
