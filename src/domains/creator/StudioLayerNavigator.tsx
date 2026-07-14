@@ -1447,7 +1447,7 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="표시 중인 레이어를 평탄화 그룹으로 묶습니다"
+                title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
               >
                 <Grid2X2 size={13} /> 표시 평탄화
               </button>
@@ -1603,7 +1603,7 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="표시 레이어 평탄화"
+                title="표시 레이어 병합"
               >
                 <Grid2X2 size={13} /> 평탄화
               </button>
