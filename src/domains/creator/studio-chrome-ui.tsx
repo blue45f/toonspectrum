@@ -1,10 +1,14 @@
 /**
  * Studio chrome UI — toolbar, dock, and menu-shell primitives shared by StudioPage.
  *
- * Competitor mapping (names not cloned):
- * - CSP / Fresco: labeled tool groups + strong separators
- * - Procreate / Figma: icon-first primary tools, edge-dock shell, single-row belt
- * - Magma: sticky menu header + subtab chips
+ * Competitor mapping (names not cloned; IA only from public Magma help):
+ * - Magma Editor: Top Bar + left vertical Toolbar + center Canvas + right Properties/Layers
+ *   + bottom Status Bar + Quick Actions (undo/redo/zoom/fit)
+ *   Layout modes Super Simple / Simple / Full
+ *   https://help.magma.com/en/articles/6871160-magma-s-editor-user-interface
+ *   https://help.magma.com/en/articles/10586978-magma-layout-modes
+ * - CSP / Fresco: labeled tool groups
+ * - Figma: edge-dock shell
  *
  * Canvas-max policy: chrome is dense, flush, and sticky — never steals vertical
  * space with marketing headers or multi-row wrap on desktop.
@@ -484,5 +488,159 @@ export function StudioContextActionButton({
       <Icon size={16} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
       {label}
     </button>
+  );
+}
+
+/**
+ * Magma-style left vertical Toolbar — icon-first tools left of the canvas.
+ * Grouped tools can show a flyout chevron (Magma Super Simple triangle affordance).
+ */
+export function StudioVerticalToolRail({
+  children,
+  className,
+  "aria-label": ariaLabel = "그리기 도구",
+}: {
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}): ReactElement {
+  return (
+    <div
+      role="toolbar"
+      aria-orientation="vertical"
+      aria-label={ariaLabel}
+      data-studio-tool-rail="true"
+      className={cn(
+        "hidden w-11 shrink-0 flex-col items-center gap-0.5 overflow-y-auto overscroll-contain",
+        "border-r border-line bg-panel/95 py-1.5",
+        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "lg:flex",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export interface StudioRailToolButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+  active?: boolean;
+  icon: LucideIcon;
+  label: string;
+  /** Magma-style group indicator (long-press / alternate tools exist). */
+  grouped?: boolean;
+  accented?: boolean;
+}
+
+/** Icon-only tool on the left Magma-style rail. */
+export function StudioRailToolButton({
+  active = false,
+  icon: Icon,
+  label,
+  grouped = false,
+  accented = false,
+  className,
+  disabled,
+  type = "button",
+  ...rest
+}: StudioRailToolButtonProps): ReactElement {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      className={cn(
+        "relative grid size-9 place-items-center rounded-md border",
+        STUDIO_EASE,
+        STUDIO_FOCUS_RING,
+        active
+          ? "border-accent/60 bg-accent-soft/70 text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.14)]"
+          : accented
+            ? "border-accent/25 bg-accent-soft/20 text-accent hover:bg-accent-soft/35"
+            : "border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg",
+        disabled && "cursor-not-allowed opacity-35",
+        className
+      )}
+      {...rest}
+    >
+      <Icon size={STUDIO_ICON_SIZE.tool} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+      {grouped ? (
+        <span
+          aria-hidden
+          className="absolute bottom-0.5 right-0.5 size-0 border-b-[4px] border-r-[4px] border-b-current border-r-transparent opacity-55"
+        />
+      ) : null}
+    </button>
+  );
+}
+
+/** Thin hairline inside the vertical tool rail. */
+export function StudioRailDivider({ className }: { className?: string }): ReactElement {
+  return (
+    <span
+      role="separator"
+      aria-hidden
+      className={cn("my-0.5 h-px w-7 shrink-0 bg-line-strong/50", className)}
+    />
+  );
+}
+
+/**
+ * Magma Top Bar Quick Actions — undo / redo / zoom / fit, icon-first.
+ * Lives in the horizontal tool belt center (Magma Quick Actions strip).
+ */
+export function StudioQuickActionsBar({
+  children,
+  className,
+  "aria-label": ariaLabel = "빠른 작업",
+}: {
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}): ReactElement {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      data-studio-quick-actions="true"
+      className={cn(
+        "flex shrink-0 items-center gap-0.5 rounded-lg border border-line/55 bg-card/40 p-px",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Magma Status Bar — bottom-left magnification + layout mode, over the canvas.
+ * Does not steal layout height when position=absolute.
+ */
+export function StudioStatusBar({
+  children,
+  className,
+  "aria-label": ariaLabel = "캔버스 상태",
+}: {
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}): ReactElement {
+  return (
+    <div
+      role="status"
+      aria-label={ariaLabel}
+      data-studio-status-bar="true"
+      className={cn(
+        "pointer-events-auto absolute bottom-2 left-2 z-20 flex max-w-[min(100%,28rem)] flex-wrap items-center gap-1",
+        "rounded-lg border border-line/80 bg-panel/92 px-1.5 py-1 text-[0.62rem] font-semibold text-fg-2 shadow-md backdrop-blur-sm",
+        className
+      )}
+    >
+      {children}
+    </div>
   );
 }

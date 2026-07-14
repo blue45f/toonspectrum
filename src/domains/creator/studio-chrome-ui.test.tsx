@@ -8,9 +8,13 @@ import {
   StudioEdgeRailButton,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
+  StudioQuickActionsBar,
+  StudioRailToolButton,
+  StudioStatusBar,
   StudioToolBelt,
   StudioToolbarDivider,
   StudioToolbarCluster,
+  StudioVerticalToolRail,
 } from "./studio-chrome-ui";
 
 describe("studio chrome UI", () => {
@@ -98,5 +102,28 @@ describe("studio chrome UI", () => {
     expect(html).toContain("bg-accent");
     expect(html).toContain("text-on-accent");
     expect(html).toContain("펜");
+  });
+
+  it("renders Magma-style vertical tool rail, quick actions, and status bar", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <StudioVerticalToolRail>
+          <StudioRailToolButton icon={Pencil} label="펜 (B)" active grouped />
+        </StudioVerticalToolRail>
+        <StudioQuickActionsBar>
+          <button type="button">undo</button>
+        </StudioQuickActionsBar>
+        <StudioStatusBar>
+          <span>100%</span>
+        </StudioStatusBar>
+      </>
+    );
+    expect(html).toContain('data-studio-tool-rail="true"');
+    expect(html).toContain('aria-orientation="vertical"');
+    expect(html).toContain('aria-label="펜 (B)"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('data-studio-quick-actions="true"');
+    expect(html).toContain('data-studio-status-bar="true"');
+    expect(html).toContain("100%");
   });
 });

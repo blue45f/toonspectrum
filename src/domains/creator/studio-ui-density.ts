@@ -1,5 +1,13 @@
 /**
- * Studio UI density modes — Magma Simple / Full / Focus style, mapped onto ToonSpectrum chrome.
+ * Studio UI density modes — mapped from Magma Super Simple / Simple / Full layout modes.
+ * Official Magma docs (IA only, no clone of branding):
+ * https://help.magma.com/en/articles/10586978-magma-layout-modes
+ *
+ * Our keys stay simple | full | focus for storage stability:
+ * - focus  ≈ Super Simple (minimal chrome, draw tools stay)
+ * - simple ≈ Simple (core tools, hide advanced AI/3D)
+ * - full   ≈ Full (everything)
+ *
  * Pure prefs model; StudioPage applies visibility matrix to toolbar clusters and panels.
  */
 
@@ -21,7 +29,9 @@ export type StudioUiChromeRegion =
   | "left-panel"
   | "right-panel"
   | "page-strip"
-  | "status-rail";
+  | "status-rail"
+  | "tool-rail"
+  | "quick-actions";
 
 export interface StudioUiDensityState {
   mode: StudioUiDensityMode;
@@ -84,28 +94,38 @@ export function studioUiDensityAllows(
 ): boolean {
   const normalized = normalizeStudioUiDensityMode(mode);
   if (normalized === "full") return true;
+
+  // Super Simple (focus): left tool rail + quick actions + status; panels off.
   if (normalized === "focus") {
     return (
       region === "toolbar-draw"
       || region === "toolbar-insert"
+      || region === "tool-rail"
+      || region === "quick-actions"
       || region === "status-rail"
     );
   }
-  // simple: hide advanced AI/3D-heavy chrome, keep core webtoon tools
+
+  // Simple: core webtoon tools; hide AI/3D-heavy chrome (Magma Simple hides advanced brush props).
   if (region === "toolbar-ai" || region === "toolbar-reference") return false;
   return true;
 }
 
+/** Short UI chip label (Magma Super Simple / Simple / Full). */
 export function studioUiDensityLabel(mode: StudioUiDensityMode): string {
   if (mode === "simple") return "심플";
-  if (mode === "focus") return "집중";
+  if (mode === "focus") return "슈퍼심플";
   return "전체";
 }
 
 export function studioUiDensityDescription(mode: StudioUiDensityMode): string {
-  if (mode === "simple") return "핵심 컷·펜 도구만 보여 입문 작가에게 맞춥니다.";
-  if (mode === "focus") return "캔버스와 그리기 도구 위주 — 모바일 집중 모드와 같은 밀도입니다.";
-  return "모든 메뉴·패널을 표시합니다.";
+  if (mode === "simple") {
+    return "Magma Simple에 가깝게 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
+  }
+  if (mode === "focus") {
+    return "Magma Super Simple에 가깝게 — 좌측 도구 레일과 캔버스 위주, 패널·고급 메뉴를 접습니다.";
+  }
+  return "Magma Full에 가깝게 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.";
 }
 
 /** Map existing mobile immersive flag into density for unified consumers. */

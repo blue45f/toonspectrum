@@ -10,18 +10,23 @@ import {
 } from "./studio-ui-density";
 
 describe("studio ui density modes", () => {
-  it("normalizes unknown modes to full", () => {
+  it("normalizes unknown modes to full and maps Magma layout labels", () => {
     expect(normalizeStudioUiDensityMode("nope")).toBe("full");
     expect(normalizeStudioUiDensityMode("simple")).toBe("simple");
     expect(studioUiDensityFromImmersive(true)).toBe("focus");
-    expect(studioUiDensityLabel("focus")).toBe("집중");
+    // Magma Super Simple / Simple / Full (IA only)
+    expect(studioUiDensityLabel("focus")).toBe("슈퍼심플");
+    expect(studioUiDensityLabel("simple")).toBe("심플");
+    expect(studioUiDensityLabel("full")).toBe("전체");
   });
 
-  it("hides AI/reference in simple and most chrome in focus", () => {
+  it("hides AI/reference in simple and most chrome in focus (Super Simple)", () => {
     expect(studioUiDensityAllows("simple", "toolbar-draw")).toBe(true);
     expect(studioUiDensityAllows("simple", "toolbar-ai")).toBe(false);
     expect(studioUiDensityAllows("simple", "toolbar-reference")).toBe(false);
     expect(studioUiDensityAllows("focus", "toolbar-draw")).toBe(true);
+    expect(studioUiDensityAllows("focus", "tool-rail")).toBe(true);
+    expect(studioUiDensityAllows("focus", "quick-actions")).toBe(true);
     expect(studioUiDensityAllows("focus", "toolbar-assets")).toBe(false);
     expect(studioUiDensityAllows("focus", "right-panel")).toBe(false);
     expect(studioUiDensityAllows("full", "toolbar-ai")).toBe(true);

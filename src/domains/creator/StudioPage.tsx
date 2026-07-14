@@ -322,9 +322,14 @@ import {
   StudioMenuSubtabs,
   StudioAppMenubar,
   StudioEdgeRailButton,
+  StudioQuickActionsBar,
+  StudioRailDivider,
+  StudioRailToolButton,
+  StudioStatusBar,
   StudioToolBelt,
   StudioToolbarCluster,
   StudioToolbarDivider,
+  StudioVerticalToolRail,
 } from "./studio-chrome-ui";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import {
@@ -17058,26 +17063,41 @@ function StudioCuttoonEditor() {
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
-        <div className="flex shrink-0 items-center gap-px rounded-md border border-line/70 bg-card/70 p-px" role="group" aria-label="화면 밀도">
-          {(["simple", "full", "focus"] as const).map((mode) => (
+        {/* Magma Quick Actions — undo/redo/history always near the left of the top bar */}
+        {studioUiDensityAllows(uiDensityMode, "quick-actions") ? (
+          <StudioQuickActionsBar>
             <button
-              key={mode}
               type="button"
-              aria-pressed={uiDensityMode === mode}
-              title={studioUiDensityDescription(mode)}
-              aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
-              onClick={() => setStudioUiDensity(mode)}
-              className={cn(
-                "min-h-8 rounded px-2 text-[0.65rem] font-semibold transition-colors pointer-coarse:min-h-11",
-                uiDensityMode === mode
-                  ? "bg-accent text-on-accent shadow-sm"
-                  : "text-fg-3 hover:bg-raised hover:text-fg-2"
-              )}
+              onClick={undo}
+              disabled={hi === 0 || collaborationDocumentLocked}
+              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+              title="실행취소 (⌘Z)"
+              aria-label="실행취소"
             >
-              {studioUiDensityLabel(mode)}
+              <Undo2 size={15} strokeWidth={1.75} />
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={hi >= history.length - 1 || collaborationDocumentLocked}
+              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+              title="다시실행 (⌘⇧Z)"
+              aria-label="다시실행"
+            >
+              <Redo2 size={15} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryPanelOpen((v) => !v)}
+              aria-pressed={historyPanelOpen}
+              className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5")}
+              title="작업 내역"
+              aria-label="작업 내역"
+            >
+              <HistoryIcon size={15} strokeWidth={1.75} />
+            </button>
+          </StudioQuickActionsBar>
+        ) : null}
         <StudioToolbarDivider />
         {studioUiDensityAllows(uiDensityMode, "toolbar-assets") ? (
         <StudioToolbarCluster label="에셋 라이브러리">
@@ -17683,10 +17703,11 @@ function StudioCuttoonEditor() {
         </>
         ) : null}
 
+        {/* 모바일 가로 벨트: 데스크톱은 Magma식 좌측 세로 레일로 이동 (lg:hidden). */}
         {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
         <>
-        <StudioToolbarDivider label="도구" />
-        <StudioToolbarCluster label="그리기 도구">
+        <StudioToolbarDivider label="도구" className="lg:hidden" />
+        <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
         <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"} title="선택 (V)">
           <MousePointer2 size={15} aria-hidden /> 선택
         </button>
@@ -18510,22 +18531,6 @@ function StudioCuttoonEditor() {
           </div>
         )}
         <span className="mx-0.5 h-5 w-px bg-line" />
-        <button type="button" onClick={undo} disabled={hi === 0 || collaborationDocumentLocked} className={cn(toolBtn(false), "disabled:opacity-40")} title="실행취소">
-          <Undo2 size={14} />
-        </button>
-        <button type="button" onClick={redo} disabled={hi >= history.length - 1 || collaborationDocumentLocked} className={cn(toolBtn(false), "disabled:opacity-40")} title="다시실행">
-          <Redo2 size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setHistoryPanelOpen((v) => !v)}
-          aria-pressed={historyPanelOpen}
-          aria-label="작업 내역 (히스토리)"
-          className={toolBtn(historyPanelOpen)}
-          title="작업 내역 (히스토리)"
-        >
-          <HistoryIcon size={14} />
-        </button>
         <button
           type="button"
           onClick={() => setTimelapseOpen(true)}
@@ -19121,6 +19126,123 @@ function StudioCuttoonEditor() {
           <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
         )}
 
+        {/* Magma-style left vertical Toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
+        {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
+          <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
+            <StudioRailToolButton
+              icon={MousePointer2}
+              label="선택 (V)"
+              active={tool === "select" && !advancedFillActive && !eyedropperActive}
+              onClick={() => {
+                setTool("select");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={Pencil}
+              label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+              active={tool === "draw" && drawMode === "pen"}
+              disabled={activeSurfaceReviewLocked}
+              grouped
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={Eraser}
+              label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+              active={tool === "draw" && drawMode === "eraser"}
+              disabled={activeSurfaceReviewLocked}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("eraser");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={PaintBucket}
+              label={advancedFillUnsupportedReason ?? "채우기 (G)"}
+              active={advancedFillActive}
+              disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+              onClick={toggleAdvancedFill}
+            />
+            <StudioRailToolButton
+              icon={Pipette}
+              label="스포이드 (I / Alt+클릭)"
+              active={eyedropperActive}
+              onClick={() => {
+                setEyedropperActive((v) => !v);
+                setMenu(null);
+              }}
+            />
+            <StudioRailDivider />
+            <StudioRailToolButton
+              icon={TypeIcon}
+              label="텍스트 추가"
+              onClick={() => {
+                addText();
+              }}
+            />
+            <StudioRailToolButton
+              icon={MessageCircle}
+              label="말풍선 추가"
+              onClick={() => {
+                addBubble("speech");
+              }}
+            />
+            <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg" title="이미지 추가">
+              <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">이미지 추가</span>
+              <input type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0" onChange={onPickImage} />
+            </label>
+            <StudioRailDivider />
+            <StudioRailToolButton
+              icon={Film}
+              label={
+                selected?.type !== "image"
+                  ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요"
+                  : "프레임 애니메이션"
+              }
+              active={frameAnimOpen && frameAnimTargetId === selected?.id}
+              disabled={selected?.type !== "image"}
+              onClick={() => {
+                if (!selected || selected.type !== "image") return;
+                if (!selected.frames || selected.frames.length === 0) {
+                  const firstId = uid();
+                  patchEl(selected.id, {
+                    frames: [{ id: firstId, src: selected.src }],
+                    frameFps: DEFAULT_FRAME_FPS,
+                    frameLoop: true,
+                    activeFrameId: firstId,
+                  });
+                }
+                capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
+                setFrameAnimTargetId(selected.id);
+                setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
+              }}
+            />
+            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+              <StudioRailToolButton
+                icon={PictureInPicture2}
+                label="참고 이미지"
+                active={referencePanelOpen}
+                accented
+                onClick={() => {
+                  preloadStudioReferencePanel();
+                  setReferencePanelOpen((v) => !v);
+                }}
+                onMouseEnter={preloadStudioReferencePanel}
+                onFocus={preloadStudioReferencePanel}
+              />
+            ) : null}
+          </StudioVerticalToolRail>
+        ) : null}
+
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <div
           className={cn(
@@ -19355,6 +19477,54 @@ function StudioCuttoonEditor() {
 
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
+          {/* Magma Status Bar — zoom + layout mode over the canvas (does not steal flex height) */}
+          {!canvasOnlyMode ? (
+            <StudioStatusBar className={cn(mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]")}>
+              <span className="tabular-nums text-fg" title="배율">
+                {Math.round(zoom * scale * 100)}%
+              </span>
+              <span aria-hidden className="h-3 w-px bg-line" />
+              <span className="text-fg-3" title={pageDisplayName(activePage, activePageIndex)}>
+                {pageDisplayName(activePage, activePageIndex)}
+              </span>
+              <span aria-hidden className="h-3 w-px bg-line" />
+              <div className="flex items-center gap-px" role="group" aria-label="레이아웃 모드">
+                {(["focus", "simple", "full"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={uiDensityMode === mode}
+                    title={studioUiDensityDescription(mode)}
+                    aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
+                    onClick={() => setStudioUiDensity(mode)}
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[0.58rem] font-bold transition-colors",
+                      uiDensityMode === mode
+                        ? "bg-accent text-on-accent"
+                        : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                    )}
+                  >
+                    {studioUiDensityLabel(mode)}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const wrap = wrapRef.current;
+                  if (wrap) {
+                    const w = wrap.clientWidth;
+                    setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+                    setZoom(1);
+                  }
+                }}
+                className="rounded px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                title="너비에 맞춤"
+              >
+                맞춤
+              </button>
+            </StudioStatusBar>
+          ) : null}
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
           <div
@@ -19372,11 +19542,12 @@ function StudioCuttoonEditor() {
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
-              "relative overflow-auto rounded-2xl border border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem]",
-              canvasOnlyMode && "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain lg:max-h-none",
+              // Magma-like: canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
+              "relative min-h-0 flex-1 overflow-auto rounded-none border-0 border-line bg-[repeating-conic-gradient(#0000000a_0deg_90deg,transparent_90deg_180deg)] [background-size:24px_24px] outline-none transition-all focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-none lg:rounded-none",
+              canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
-                : "max-h-[calc(100dvh-26rem)] min-h-[15rem]",
+                : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
               advancedFillArmed && "cursor-crosshair",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
