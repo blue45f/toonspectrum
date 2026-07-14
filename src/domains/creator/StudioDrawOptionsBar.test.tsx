@@ -28,6 +28,8 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("불투명");
     expect(html).toContain("보정");
     expect(html).toContain("스마트 도형");
+    expect(html).toContain('aria-label="스마트 도형"');
+    expect(html).toContain('data-studio-draw-options-end="true"');
     expect(html).toContain('aria-pressed="true"');
   });
 

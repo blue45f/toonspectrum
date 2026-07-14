@@ -121,8 +121,9 @@ export function StudioDrawOptionsBar({
       aria-label="그리기 옵션"
       data-studio-draw-options="true"
       className={cn(
-        "flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
-        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        // Primary icons stay in view; secondary chips can scroll. End cluster is sticky.
+        "relative flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2",
+        "[scrollbar-width:thin] [scrollbar-color:oklch(0.45_0.02_70/0.45)_transparent]",
         className
       )}
     >
@@ -141,7 +142,7 @@ export function StudioDrawOptionsBar({
               title={label}
               onClick={() => onSetDrawMode(id)}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.68rem] font-semibold",
+                "inline-flex h-8 items-center gap-1 rounded-md px-2 text-[0.68rem] font-semibold",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 drawMode === id
@@ -150,7 +151,7 @@ export function StudioDrawOptionsBar({
               )}
             >
               <Icon size={14} strokeWidth={1.75} aria-hidden />
-              <span className="hidden sm:inline">{label}</span>
+              <span className="hidden md:inline">{label}</span>
             </button>
           ))}
         </div>
@@ -198,7 +199,8 @@ export function StudioDrawOptionsBar({
           activeBrushId={brushId}
           compact={compactBrushes}
           onSelect={onSelectBrush}
-          className="min-w-0 max-w-[min(28rem,42vw)]"
+          // Cap width so size/color/end icons stay on-screen at laptop widths.
+          className="min-w-0 max-w-[min(14rem,28vw)] xl:max-w-[min(20rem,34vw)]"
         />
       ) : null}
 
@@ -206,7 +208,7 @@ export function StudioDrawOptionsBar({
 
       <SizePreview size={strokeWidth} color={drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color} />
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.65rem] font-semibold text-fg-3">
+      <label className="flex shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3">
         <span className="select-none">크기</span>
         <input
           type="range"
@@ -214,13 +216,13 @@ export function StudioDrawOptionsBar({
           max={48}
           value={strokeWidth}
           onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
-          className="studio-range w-20 sm:w-28"
+          className="studio-range w-16 sm:w-20"
           aria-valuetext={`${strokeWidth}픽셀`}
         />
-        <span className="w-7 tabular-nums text-[0.68rem] text-fg">{strokeWidth}</span>
+        <span className="w-6 tabular-nums text-[0.68rem] text-fg">{strokeWidth}</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.68rem] font-medium text-fg-3">
+      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3">
         <span className="select-none">불투명</span>
         <input
           type="range"
@@ -229,12 +231,12 @@ export function StudioDrawOptionsBar({
           step={1}
           value={Math.round(brushOpacity * 100)}
           onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
-          className="studio-range w-16 sm:w-24"
+          className="studio-range w-14 sm:w-16"
         />
-        <span className="w-8 tabular-nums text-[0.68rem] text-fg">{Math.round(brushOpacity * 100)}%</span>
+        <span className="w-7 tabular-nums text-[0.68rem] text-fg">{Math.round(brushOpacity * 100)}%</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도">
+      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도">
         <span className="select-none">보정</span>
         <input
           type="range"
@@ -243,13 +245,14 @@ export function StudioDrawOptionsBar({
           step={1}
           value={stabilizer}
           onChange={(e) => onStabilizerChange(Number(e.target.value))}
-          className="studio-range w-14 sm:w-20"
+          className="studio-range w-12 sm:w-14"
         />
         <span className="w-4 tabular-nums text-[0.68rem] text-fg">{stabilizer}</span>
       </label>
 
+      {/* Secondary drawing science — hide under xl so icons/color stay exposed on laptop widths */}
       {onStabilizerModeChange ? (
-        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="보정 방식">
+        <div className="hidden shrink-0 items-center gap-0.5 xl:flex" role="group" aria-label="보정 방식">
           {(
             [
               { id: "standard" as const, label: "표준" },
@@ -279,7 +282,10 @@ export function StudioDrawOptionsBar({
       ) : null}
 
       {onPostCorrectionChange ? (
-        <label className="flex shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3" title="획 끝난 뒤 곡선 다듬기">
+        <label
+          className="hidden shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3 xl:flex"
+          title="획 끝난 뒤 곡선 다듬기"
+        >
           <span className="select-none">후처리</span>
           <input
             type="range"
@@ -288,14 +294,14 @@ export function StudioDrawOptionsBar({
             step={1}
             value={postCorrection}
             onChange={(e) => onPostCorrectionChange(Number(e.target.value))}
-            className="w-12 accent-accent sm:w-16"
+            className="w-12 accent-accent"
           />
           <span className="w-4 tabular-nums text-fg-2">{postCorrection}</span>
         </label>
       ) : null}
 
       {onPressureCurveChange ? (
-        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="필압 반응">
+        <div className="hidden shrink-0 items-center gap-0.5 xl:flex" role="group" aria-label="필압 반응">
           {(
             [
               { id: "soft" as const, label: "민감" },
@@ -396,97 +402,111 @@ export function StudioDrawOptionsBar({
         </>
       ) : null}
 
-      {onToggleCanvasFlipH ? (
-        <button
-          type="button"
-          aria-pressed={canvasFlipH}
-          onClick={onToggleCanvasFlipH}
-          title="캔버스 좌우 반전 (그리기 확인용)"
-          className={cn(
-            "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[0.6rem] font-bold",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
-            canvasFlipH
-              ? "border-accent bg-accent-soft text-accent"
-              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
-          )}
-        >
-          <FlipHorizontal2 size={13} aria-hidden />
-          반전
-        </button>
-      ) : null}
+      {/* Sticky end cluster — always pin primary action icons even when the middle scrolls */}
+      <div
+        data-studio-draw-options-end="true"
+        className={cn(
+          "sticky right-0 ml-auto flex shrink-0 items-center gap-1 border-l border-line/70 bg-panel/95 pl-1.5 backdrop-blur-sm",
+          "shadow-[-10px_0_12px_-8px_oklch(0.12_0.02_70/0.55)]"
+        )}
+      >
+        {onToggleCanvasFlipH ? (
+          <button
+            type="button"
+            aria-pressed={canvasFlipH}
+            onClick={onToggleCanvasFlipH}
+            title="캔버스 좌우 반전 (그리기 확인용)"
+            aria-label="캔버스 좌우 반전"
+            className={cn(
+              "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[0.6rem] font-bold",
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING,
+              canvasFlipH
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+            )}
+          >
+            <FlipHorizontal2 size={13} strokeWidth={1.75} aria-hidden />
+            <span className="hidden sm:inline">반전</span>
+          </button>
+        ) : null}
 
-      {onOpenBrushStudio ? (
-        <button
-          type="button"
-          onClick={onOpenBrushStudio}
-          title="브러시 스튜디오 — 필압·도장·촉 고급 설정"
-          className={cn(
-            "inline-flex h-7 items-center gap-1 rounded-md border border-line bg-card px-1.5 text-[0.6rem] font-bold text-fg-2 hover:bg-raised",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING
-          )}
-        >
-          <Wand2 size={13} aria-hidden />
-          고급
-        </button>
-      ) : null}
+        {onOpenBrushStudio ? (
+          <button
+            type="button"
+            onClick={onOpenBrushStudio}
+            title="브러시 스튜디오 — 필압·도장·촉 고급 설정"
+            aria-label="브러시 고급 설정"
+            className={cn(
+              "inline-flex h-7 items-center gap-1 rounded-md border border-line bg-card px-1.5 text-[0.6rem] font-bold text-fg-2 hover:bg-raised",
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING
+            )}
+          >
+            <Wand2 size={13} strokeWidth={1.75} aria-hidden />
+            <span className="hidden sm:inline">고급</span>
+          </button>
+        ) : null}
 
-      {onSymmetryTypeChange ? (
-        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="대칭 그리기">
-          <FlipHorizontal2 size={13} className="mr-0.5 text-fg-3" aria-hidden />
-          {(
-            [
-              { id: "none" as const, label: "없음" },
-              { id: "vertical" as const, label: "세로" },
-              { id: "horizontal" as const, label: "가로" },
-              { id: "radial" as const, label: "방사" },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={symmetryType === item.id}
-              title={`대칭: ${item.label}`}
-              onClick={() => onSymmetryTypeChange(item.id)}
-              className={cn(
-                "h-7 rounded px-1.5 text-[0.6rem] font-bold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-                symmetryType === item.id
-                  ? "bg-accent text-on-accent"
-                  : "text-fg-3 hover:bg-raised hover:text-fg-2"
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+        {onSymmetryTypeChange ? (
+          <div className="hidden shrink-0 items-center gap-0.5 lg:flex" role="group" aria-label="대칭 그리기">
+            <FlipHorizontal2 size={13} className="mr-0.5 text-fg-3" aria-hidden />
+            {(
+              [
+                { id: "none" as const, label: "없음" },
+                { id: "vertical" as const, label: "세로" },
+                { id: "horizontal" as const, label: "가로" },
+                { id: "radial" as const, label: "방사" },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={symmetryType === item.id}
+                title={`대칭: ${item.label}`}
+                onClick={() => onSymmetryTypeChange(item.id)}
+                className={cn(
+                  "h-7 rounded px-1.5 text-[0.6rem] font-bold",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                  symmetryType === item.id
+                    ? "bg-accent text-on-accent"
+                    : "text-fg-3 hover:bg-raised hover:text-fg-2"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-      {drawMode === "pen" ? (
-        <button
-          type="button"
-          aria-pressed={quickShapeActive}
-          onClick={onToggleQuickShape}
-          title="스마트 도형 — 낙서를 선·원·사각형으로 다듬기"
-          className={cn(
-            "ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[0.65rem] font-bold",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
-            quickShapeActive
-              ? "border-accent bg-accent-soft text-accent"
-              : "border-line bg-card text-fg-2 hover:bg-raised"
-          )}
-        >
-          {quickShapeActive ? <Sparkles size={13} aria-hidden /> : <Shapes size={13} aria-hidden />}
-          스마트 도형
-        </button>
-      ) : (
-        <span className="ml-auto" />
-      )}
+        {drawMode === "pen" ? (
+          <button
+            type="button"
+            aria-pressed={quickShapeActive}
+            onClick={onToggleQuickShape}
+            title="스마트 도형 — 낙서를 선·원·사각형으로 다듬기"
+            aria-label="스마트 도형"
+            className={cn(
+              "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[0.65rem] font-bold",
+              STUDIO_EASE,
+              STUDIO_FOCUS_RING,
+              quickShapeActive
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised"
+            )}
+          >
+            {quickShapeActive ? (
+              <Sparkles size={13} strokeWidth={1.75} aria-hidden />
+            ) : (
+              <Shapes size={13} strokeWidth={1.75} aria-hidden />
+            )}
+            <span className="hidden sm:inline">스마트 도형</span>
+          </button>
+        ) : null}
 
-      {shapeSlot}
+        {shapeSlot}
+      </div>
     </div>
   );
 }
