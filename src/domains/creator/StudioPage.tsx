@@ -3963,6 +3963,8 @@ function FocusLinesNode({
   onSelect,
   onChange,
   dragBoundFunc,
+  onInteractionBegin,
+  onInteractionEnd,
 }: {
   el: FocusLinesEl;
   draggable: boolean;
@@ -3970,6 +3972,8 @@ function FocusLinesNode({
   onSelect: () => void;
   onChange: (patch: Partial<FocusLinesEl>) => void;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
   const count = el.lineCount ?? 80;
   const innerR = el.innerRadius ?? 120;
@@ -4017,7 +4021,14 @@ function FocusLinesNode({
       strokeWidth={el.strokeWidth ?? 2.5}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
-      {...resizableNodeProps<Partial<FocusLinesEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
+      {...resizableNodeProps<Partial<FocusLinesEl>>({
+        draggable,
+        dragBoundFunc,
+        onSelect,
+        onChange,
+        onInteractionBegin,
+        onInteractionEnd,
+      })}
     />
   );
 }
@@ -4029,6 +4040,8 @@ function SpeedLinesNode({
   onSelect,
   onChange,
   dragBoundFunc,
+  onInteractionBegin,
+  onInteractionEnd,
 }: {
   el: SpeedLinesEl;
   draggable: boolean;
@@ -4036,6 +4049,8 @@ function SpeedLinesNode({
   onSelect: () => void;
   onChange: (patch: Partial<SpeedLinesEl>) => void;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
   const count = el.lineCount ?? 60;
   const dir = el.direction ?? "horizontal";
@@ -4083,7 +4098,14 @@ function SpeedLinesNode({
       strokeWidth={el.strokeWidth ?? 2.5}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
-      {...resizableNodeProps<Partial<SpeedLinesEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
+      {...resizableNodeProps<Partial<SpeedLinesEl>>({
+        draggable,
+        dragBoundFunc,
+        onSelect,
+        onChange,
+        onInteractionBegin,
+        onInteractionEnd,
+      })}
     />
   );
 }
@@ -19773,6 +19795,8 @@ function StudioCuttoonEditor() {
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch)}
                       dragBoundFunc={snapBoundFunc}
+                      onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                      onInteractionEnd={endLiveResourceEdit}
                     />
                   );
                 if (el.type === "speedLines")
@@ -19785,6 +19809,8 @@ function StudioCuttoonEditor() {
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch)}
                       dragBoundFunc={snapBoundFunc}
+                      onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                      onInteractionEnd={endLiveResourceEdit}
                     />
                   );
                 if (el.type === "draw") {
