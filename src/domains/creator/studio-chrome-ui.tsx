@@ -146,11 +146,11 @@ export function StudioToolBelt({
   );
 }
 
-/** Compact app menubar above the tool belt — title + file actions, one thin strip. */
+/** Compact app menubar above the tool belt — document + file actions, one thin strip. */
 export function StudioAppMenubar({
   children,
   className,
-  "aria-label": ariaLabel = "스튜디오 메뉴",
+  "aria-label": ariaLabel = "문서 메뉴",
 }: {
   children: ReactNode;
   className?: string;

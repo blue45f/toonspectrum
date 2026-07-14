@@ -28,12 +28,13 @@ describe("studio creative ux", () => {
     expect(pen.hint.length).toBeGreaterThan(4);
   });
 
-  it("exposes multi-product starter cards including smart-shape and brush-kit", () => {
+  it("exposes drawing-first starter cards without publish marketing", () => {
     const ids = STUDIO_CREATIVE_STARTER_CARDS.map((card) => card.id);
     expect(ids).toContain("smart-shape");
     expect(ids).toContain("brush-kit");
     expect(ids).toContain("collab-focus");
     expect(ids).toContain("draw");
+    expect(ids).not.toContain("publish");
     expect(STUDIO_CREATIVE_STARTER_CARDS.every((card) => card.label && card.hint)).toBe(true);
   });
 });

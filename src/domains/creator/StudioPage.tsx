@@ -71,7 +71,6 @@ import {
   PenTool,
   Plus,
   Redo2,
-  Send,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
@@ -2177,7 +2176,6 @@ function QuickStartPanel({
   onOpenTemplate,
   onOpenCharacter,
   onOpenBubble,
-  onOpenPublish,
   onSmartShape,
   onStartDraw,
   onBrushKit,
@@ -2188,111 +2186,113 @@ function QuickStartPanel({
   onOpenTemplate: () => void;
   onOpenCharacter: () => void;
   onOpenBubble: () => void;
-  onOpenPublish: () => void;
   onSmartShape: () => void;
   onStartDraw: () => void;
   onBrushKit: () => void;
   onCollabFocus: () => void;
 }) {
-  // Multi-tool inspired starters (AutoDraw / Canva / Picsart / Express / Magma IA — not clones).
+  // Drawing-first tools only — no publish/marketing copy in the canvas overlay.
   const steps = [
     {
-      id: "template",
-      label: "템플릿 고르기",
-      hint: "컷 레이아웃부터 — 빈 화면 부담을 줄여요.",
-      icon: LayoutTemplate,
-      onClick: onOpenTemplate,
-    },
-    {
-      id: "smart-shape",
-      label: "스마트 도형",
-      hint: "낙서를 선·원·사각형으로 자동 다듬어요.",
-      icon: Shapes,
-      onClick: onSmartShape,
-    },
-    {
       id: "draw",
-      label: "바로 그리기",
-      hint: "펜을 켜고 스케치부터 — 초보자 친화.",
+      label: "펜으로 그리기",
+      hint: "바로 스케치 시작",
       icon: Pencil,
       onClick: onStartDraw,
     },
     {
+      id: "smart-shape",
+      label: "스마트 도형",
+      hint: "낙서 → 선·원·사각형",
+      icon: Shapes,
+      onClick: onSmartShape,
+    },
+    {
       id: "brush-kit",
-      label: "브러시 키트",
-      hint: "연필·마커·형광·붓을 한눈에 고르세요.",
+      label: "브러시",
+      hint: "연필·마커·붓·형광펜",
       icon: Palette,
       onClick: onBrushKit,
     },
     {
+      id: "template",
+      label: "컷 템플릿",
+      hint: "패널 레이아웃 배치",
+      icon: LayoutTemplate,
+      onClick: onOpenTemplate,
+    },
+    {
       id: "collab-focus",
-      label: "집중 레이아웃",
-      hint: "패널을 접고 캔버스·도구만 남겨요.",
+      label: "캔버스 넓히기",
+      hint: "패널 접고 집중 모드",
       icon: Maximize2,
       onClick: onCollabFocus,
     },
     {
       id: "character",
-      label: "캐릭터 넣기",
-      hint: "2D 캐릭터·VRM을 바로 올려요.",
+      label: "캐릭터",
+      hint: "2D / 3D 포즈",
       icon: Smile,
       onClick: onOpenCharacter,
     },
     {
       id: "bubble",
-      label: "말풍선·대사",
-      hint: "더블클릭으로 대사를 바꿔요.",
+      label: "말풍선",
+      hint: "대사 넣기",
       icon: MessageCircle,
       onClick: onOpenBubble,
-    },
-    {
-      id: "publish",
-      label: "게시하기",
-      hint: "제목을 적고 작품으로 올려요.",
-      icon: Send,
-      onClick: onOpenPublish,
     },
   ];
 
   return (
     <div
       data-studio-creative-starter="true"
-      className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4"
+      className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-4 sm:p-3.5"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold">창작 시작 허브</p>
-          <p className="mt-1 max-w-[48ch] text-xs leading-relaxed text-fg-3">
-            예시·템플릿·스마트 도형·브러시 키트로 바로 시작하세요. 협업 집중 레이아웃도 한 탭.
+          <p className="text-sm font-bold">도구 빠른 실행</p>
+          <p className="mt-0.5 max-w-[40ch] text-[0.7rem] leading-snug text-fg-3">
+            그릴 준비 완료. 아래에서 바로 도구를 고르세요.
           </p>
         </div>
         <button
           type="button"
           onClick={onDismiss}
           className="grid size-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          aria-label="빠른 시작 닫기"
+          aria-label="닫기"
           title="닫기"
         >
           <X size={15} aria-hidden />
         </button>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onExample}
           className={cn(
             buttonClass({ size: "sm", variant: "solid" }),
-            "min-h-10 justify-center gap-1.5 px-3 text-sm sm:min-w-36"
+            "min-h-9 justify-center gap-1.5 px-3 text-sm"
           )}
         >
           <Sparkles size={15} aria-hidden />
-          예시로 시작
+          예시 캔버스
         </button>
-        <p className="text-xs leading-relaxed text-fg-3">2컷 템플릿, 캐릭터, 말풍선을 한 번에 넣어요.</p>
+        <button
+          type="button"
+          onClick={onStartDraw}
+          className={cn(
+            buttonClass({ size: "sm", variant: "quiet" }),
+            "min-h-9 justify-center gap-1.5 px-3 text-sm"
+          )}
+        >
+          <Pencil size={15} aria-hidden />
+          빈 캔버스에서 그리기
+        </button>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
         {steps.map((step) => {
           const Icon = step.icon;
           return (
@@ -2300,14 +2300,14 @@ function QuickStartPanel({
               key={step.id}
               type="button"
               onClick={step.onClick}
-              className="group flex min-h-[4.25rem] items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-left transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="group flex min-h-[3.75rem] flex-col items-start gap-1 rounded-xl border border-line bg-card px-2.5 py-2 text-left transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                <Icon size={18} aria-hidden />
+              <span className="grid size-7 place-items-center rounded-md bg-accent-soft text-accent">
+                <Icon size={15} aria-hidden />
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-fg">{step.label}</span>
-                <span className="mt-0.5 block text-xs leading-snug text-fg-3">{step.hint}</span>
+                <span className="block text-xs font-bold text-fg">{step.label}</span>
+                <span className="mt-0.5 block text-[0.65rem] leading-snug text-fg-3">{step.hint}</span>
               </span>
             </button>
           );
@@ -6050,6 +6050,14 @@ function StudioCuttoonEditor() {
     if (!markStudioDocumentChanged()) return;
     setTitleState(next);
   };
+  // Browser tab: document name only (no marketing "창작 스튜디오" product copy).
+  useEffect(() => {
+    const label = title.trim() || "무제";
+    document.title = `${label} · Studio`;
+    return () => {
+      // AppRouter restores route titles when leaving; no-op cleanup.
+    };
+  }, [title]);
   const [description, setDescriptionState] = useState("");
   const setDescription = (next: Parameters<typeof setDescriptionState>[0]) => {
     if (!markStudioDocumentChanged()) return;
@@ -16502,23 +16510,31 @@ function StudioCuttoonEditor() {
       )}
     >
       <StudioAppMenubar
+        aria-label="문서 메뉴"
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive && "min-h-8 gap-1 px-1.5 py-0.5"
         )}
       >
+        {/* Magma/Figma-style: document name + workspace only — no marketing product title. */}
         <div
           className={cn(
             "flex min-w-0 shrink-0 items-center gap-1.5",
             mobileImmersive && "hidden"
           )}
         >
-          <h1 className="shrink-0 text-[0.8125rem] font-bold tracking-tight text-fg lg:text-sm">
-            스튜디오
+          <h1
+            className="min-w-0 max-w-[12rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg lg:max-w-[16rem]"
+            title={title.trim() || "무제"}
+          >
+            {title.trim() || "무제"}
           </h1>
+          <span className="hidden shrink-0 text-[0.62rem] tabular-nums text-fg-3 sm:inline">
+            {pageDisplayName(activePage, activePageIndex)}
+          </span>
           {displayLinkedTitleId ? (
             <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
-              팬 창작
+              링크됨
             </span>
           ) : null}
           {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
@@ -16532,7 +16548,7 @@ function StudioCuttoonEditor() {
             />
           ) : (
             <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
-              작업공간 전환 중…
+              전환 중…
             </span>
           )}
           {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
@@ -16546,7 +16562,7 @@ function StudioCuttoonEditor() {
           ) : null}
         </div>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line sm:block" />
-        {/* 파일·내보내기 액션 — 한 줄 가로 스크롤, 세로 공간 0. */}
+        {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
           className={cn(
             "flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -16560,8 +16576,8 @@ function StudioCuttoonEditor() {
               aria-pressed={mobileImmersive}
               aria-label={
                 mobileImmersive
-                  ? "모바일 집중 드로잉 모드 종료"
-                  : "모바일 집중 드로잉 모드 시작"
+                  ? "전체 화면 드로잉 종료"
+                  : "전체 화면 드로잉"
               }
               data-studio-mobile-app-mode
               className={cn(
@@ -16574,8 +16590,8 @@ function StudioCuttoonEditor() {
               )}
               title={
                 mobileImmersive
-                  ? "사이트 화면으로 복원 — 원고·선택·실행취소 상태는 유지됩니다"
-                  : "사이트 헤더와 푸터를 숨기고 전체 화면을 캔버스로 사용"
+                  ? "일반 화면으로 복원"
+                  : "전체 화면으로 그리기"
               }
             >
               {mobileImmersive ? (
@@ -16583,17 +16599,17 @@ function StudioCuttoonEditor() {
               ) : (
                 <Maximize2 size={15} aria-hidden />
               )}
-              {mobileImmersive ? "앱 모드 종료" : "집중 드로잉"}
+              {mobileImmersive ? "종료" : "전체화면"}
             </button>
           ) : null}
           {mobileImmersive ? (
             <>
-              <h1 className="sr-only">창작 스튜디오 모바일 집중 드로잉 모드</h1>
+              <h1 className="sr-only">드로잉 전체화면</h1>
               <span
                 className="min-w-24 max-w-40 shrink-0 truncate px-1 text-xs font-semibold text-fg-2"
-                title={`${title.trim() || "새 작품"} · ${pageDisplayName(activePage, activePageIndex)}`}
+                title={`${title.trim() || "무제"} · ${pageDisplayName(activePage, activePageIndex)}`}
               >
-                {title.trim() || "새 작품"} · {pageDisplayName(activePage, activePageIndex)}
+                {title.trim() || "무제"} · {pageDisplayName(activePage, activePageIndex)}
               </span>
             </>
           ) : null}
@@ -16704,13 +16720,10 @@ function StudioCuttoonEditor() {
               >
                 <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
                   <span>
-                    <span className="block text-xs font-bold text-fg">프로젝트 작업</span>
-                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">파일·기획·검토·게시 도구를 한곳에서 엽니다.</span>
+                    <span className="block text-xs font-bold text-fg">파일 · 프로젝트</span>
+                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">백업 · 복구 · 검토 · 내보내기</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1">
-                    <span className="hidden rounded-full border border-line bg-card px-2 py-1 text-[0.6rem] font-semibold text-fg-3 min-[420px]:inline-flex">
-                      기능 유지 · 화면 절약
-                    </span>
                     <button
                       type="button"
                       onClick={() => setProjectActionsOpen(false)}
@@ -17094,12 +17107,13 @@ function StudioCuttoonEditor() {
             ) : null}
           </div>
         ) : null}
-        {!loggedIn && !mobileImmersive && !canvasOnlyMode && (
-          <div className="my-1 rounded-lg border border-line bg-card/60 px-2.5 py-1.5 text-xs text-fg-2">
-            만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
-          </div>
-        )}
-        <StudioPublishContextBanner context={publishContext} />
+        {/* 게시·로그인 안내는 드로잉 크롬에 띄우지 않음 — 저장/게시 액션 시점에만 노출. */}
+        {(publishContext.series || publishContext.challenge) && !mobileImmersive && !canvasOnlyMode ? (
+          <StudioPublishContextBanner
+            context={publishContext}
+            className="my-1 mb-1 px-2.5 py-1.5 text-xs"
+          />
+        ) : null}
       </div>
 
       {/* Draw-app tool belt — full-width sticky chrome (no site GNB). Single-row scroll. */}
@@ -18757,7 +18771,7 @@ function StudioCuttoonEditor() {
             onClick={toggleFullscreen}
             aria-pressed={isFullscreen}
             className={cn(toolBtn(isFullscreen), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            title="전체화면 — 창작 스튜디오를 모니터 전체로 (ESC로 종료)"
+            title="전체화면 (ESC로 종료)"
           >
             {isFullscreen ? "창" : "전체"}
           </button>
@@ -21416,7 +21430,6 @@ function StudioCuttoonEditor() {
                 setPoserVrmOpen(true);
               }}
               onOpenBubble={() => openQuickStartMenu("bubble")}
-              onOpenPublish={openPublishStep}
               onSmartShape={() => {
                 dismissQuickStart();
                 setQuickShapeActive(true);
@@ -21471,12 +21484,12 @@ function StudioCuttoonEditor() {
             type="button"
             onClick={() => setQuickStartOpen(true)}
             className={cn(
-              "absolute bottom-3 right-3 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-sm font-bold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              "absolute bottom-3 right-3 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
-            aria-label="빠른 시작 도움말 열기"
+            aria-label="도구 빠른 실행"
             aria-expanded={showQuickStart}
-            title="빠른 시작"
+            title="도구 빠른 실행"
           >
             ?
           </button>
@@ -21485,11 +21498,11 @@ function StudioCuttoonEditor() {
             type="button"
             onClick={() => setShortcutsOpen(true)}
             className={cn(
-              "absolute bottom-3 right-16 z-30 hidden size-10 place-items-center rounded-full border border-line bg-panel/95 text-base text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              "absolute bottom-3 right-14 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-sm text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
-            aria-label="키보드 단축키 보기"
-            title="키보드 단축키 (?)"
+            aria-label="단축키"
+            title="단축키"
           >
             ⌨
           </button>

@@ -40,7 +40,7 @@ const STATIC_TITLES: Record<string, string> = {
   "/contact": "광고·제휴 문의",
   "/support": "문의",
   "/create": "창작 게시판",
-  "/studio": "창작 스튜디오",
+  "/studio": "Studio",
   "/me": "내 정보",
   "/fortune": "캐릭터 운세",
   "/play": "놀이터",
