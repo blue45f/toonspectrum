@@ -10,6 +10,8 @@ export interface StudioPointerEventLike {
   pointerType?: unknown;
   isPrimary?: unknown;
   button?: unknown;
+  /** Bitmask: 1 = left. Present on PointerEvent/MouseEvent during drag. */
+  buttons?: unknown;
   clientX?: unknown;
   clientY?: unknown;
   pressure?: unknown;
@@ -102,12 +104,34 @@ function safeRelatedEvents<T extends StudioPointerEventLike>(
   }
 }
 
+/**
+ * True when the left primary contact is down.
+ * Mouse: button 0 on pointerdown; buttons bitmask 1 during drag.
+ * Pen/touch: button 0 on down; some drivers omit buttons mid-stroke.
+ */
+export function isStudioLeftContactDown(event: StudioPointerEventLike): boolean {
+  const button = finiteNumber(event.button, 0);
+  // Reject middle (1) and right (2) explicitly. -1 is used on some move events.
+  if (button === 1 || button === 2) return false;
+  if (typeof event.buttons === "number" && Number.isFinite(event.buttons)) {
+    // buttons === 0 means released (mouse left the drag without up in some edge cases).
+    if (event.buttons === 0) return false;
+    return (event.buttons & 1) === 1;
+  }
+  // pointerdown without buttons field: require primary button index 0.
+  return button === 0 || button === -1;
+}
+
 /** Starts one primary, left-contact drawing session. Secondary touch and barrel/right clicks lose. */
 export function beginStudioStrokePointerSession(
   event: StudioPointerEventLike
 ): StudioStrokePointerSession | null {
   if (event.isPrimary === false) return null;
+  // Mouse/pen/touch must start on left contact only (context menu / barrel stay free).
   if (finiteNumber(event.button, 0) !== 0) return null;
+  if (typeof event.buttons === "number" && event.buttons !== 0 && (event.buttons & 1) === 0) {
+    return null;
+  }
   const pointerId = pointerIdOf(event);
   if (!Number.isFinite(pointerId)) return null;
   return {
@@ -123,6 +147,21 @@ export function isStudioStrokePointerEvent(
   event: StudioPointerEventLike
 ): boolean {
   return Boolean(session && pointerIdOf(event, session.pointerId) === session.pointerId);
+}
+
+/**
+ * Mouse can release outside the canvas without a reliable pointerup if capture fails.
+ * When buttons reports 0 mid-stroke for mouse/unknown, the stroke must end.
+ * Pen/touch often omit a reliable buttons mask — never force-end those on buttons alone.
+ */
+export function shouldEndStudioStrokeForReleasedContact(
+  session: StudioStrokePointerSession | null | undefined,
+  event: StudioPointerEventLike
+): boolean {
+  if (!session || !isStudioStrokePointerEvent(session, event)) return false;
+  if (session.pointerType !== "mouse" && session.pointerType !== "unknown") return false;
+  if (typeof event.buttons !== "number" || !Number.isFinite(event.buttons)) return false;
+  return event.buttons === 0;
 }
 
 /** A second finger transitions a finger stroke into navigation; pen + touch remains palm-safe. */

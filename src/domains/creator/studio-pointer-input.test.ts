@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   beginStudioStrokePointerSession,
   collectStudioStrokePointerBatch,
+  isStudioLeftContactDown,
   isStudioStrokePointerEvent,
   shouldCancelStudioFingerStrokeForAdditionalContact,
+  shouldEndStudioStrokeForReleasedContact,
   tryCaptureStudioStrokePointer,
   tryReleaseStudioStrokePointer,
   type StudioPointerEventLike,
@@ -39,11 +41,52 @@ describe("studio pointer input", () => {
   it("opens only a primary left-contact stroke and keeps a legacy Safari pointer fallback", () => {
     expect(beginStudioStrokePointerSession(sample(1, { isPrimary: false }))).toBeNull();
     expect(beginStudioStrokePointerSession(sample(1, { button: 2 }))).toBeNull();
+    expect(beginStudioStrokePointerSession(sample(1, { button: 0, buttons: 2 }))).toBeNull();
+    expect(beginStudioStrokePointerSession(sample(1, { pointerType: "mouse", buttons: 1 }))).toMatchObject({
+      pointerId: 7,
+      pointerType: "mouse",
+    });
 
     expect(beginStudioStrokePointerSession(sample(1))).toMatchObject({ pointerId: 7, pointerType: "pen" });
     expect(beginStudioStrokePointerSession(sample(1, { pointerId: undefined }))?.pointerId).toBe(1);
     expect(beginStudioStrokePointerSession(sample(1, { pointerId: Number.NaN }))).toBeNull();
     expect(beginStudioStrokePointerSession(sample(1, { pointerId: -1 }))).toBeNull();
+  });
+
+  it("treats mouse left contact via buttons mask and rejects middle/right", () => {
+    expect(isStudioLeftContactDown(sample(1, { pointerType: "mouse", button: 0, buttons: 1 }))).toBe(true);
+    expect(isStudioLeftContactDown(sample(1, { pointerType: "mouse", button: -1, buttons: 1 }))).toBe(true);
+    expect(isStudioLeftContactDown(sample(1, { pointerType: "mouse", button: -1, buttons: 0 }))).toBe(false);
+    expect(isStudioLeftContactDown(sample(1, { pointerType: "mouse", button: 2, buttons: 2 }))).toBe(false);
+    expect(isStudioLeftContactDown(sample(1, { pointerType: "mouse", button: 1, buttons: 4 }))).toBe(false);
+    // pointerdown without buttons still starts on primary button index 0
+    expect(isStudioLeftContactDown(sample(1, { button: 0, buttons: undefined }))).toBe(true);
+  });
+
+  it("ends mouse/unknown strokes when buttons reports release mid-drag, not pen/touch", () => {
+    const mouse = beginStudioStrokePointerSession(sample(1, { pointerType: "mouse", buttons: 1 }))!;
+    const pen = beginStudioStrokePointerSession(sample(1, { pointerType: "pen" }))!;
+    const touch = beginStudioStrokePointerSession(sample(1, { pointerType: "touch" }))!;
+    const unknown = beginStudioStrokePointerSession(sample(1, { pointerType: "unknown", buttons: 1 }))!;
+
+    expect(shouldEndStudioStrokeForReleasedContact(mouse, sample(2, { pointerType: "mouse", buttons: 0 }))).toBe(
+      true
+    );
+    expect(shouldEndStudioStrokeForReleasedContact(mouse, sample(2, { pointerType: "mouse", buttons: 1 }))).toBe(
+      false
+    );
+    expect(shouldEndStudioStrokeForReleasedContact(mouse, sample(2, { pointerId: 99, buttons: 0 }))).toBe(false);
+    expect(shouldEndStudioStrokeForReleasedContact(pen, sample(2, { pointerType: "pen", buttons: 0 }))).toBe(false);
+    expect(shouldEndStudioStrokeForReleasedContact(touch, sample(2, { pointerType: "touch", buttons: 0 }))).toBe(
+      false
+    );
+    expect(
+      shouldEndStudioStrokeForReleasedContact(unknown, sample(2, { pointerType: "unknown", buttons: 0 }))
+    ).toBe(true);
+    expect(shouldEndStudioStrokeForReleasedContact(null, sample(2, { buttons: 0 }))).toBe(false);
+    expect(
+      shouldEndStudioStrokeForReleasedContact(mouse, sample(2, { pointerType: "mouse", buttons: undefined }))
+    ).toBe(false);
   });
 
   it("binds every move/up/cancel decision to the pointer that opened the stroke", () => {
