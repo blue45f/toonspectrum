@@ -33,9 +33,22 @@ import {
   resampleStrokePressures,
   screentoneDotRadius,
   screentoneDotsForStroke,
+  strokeRenderDistance,
   type CalligraphyStylusInput,
   type CalligraphyTipSettings,
 } from "./studio-brush";
+import {
+  isStudioBrushDynamicsPresetId,
+  normalizeStudioBrushDynamicsSettings,
+  planStudioDynamicBrushDabs,
+  studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSeedFromKey,
+  type StudioDynamicBrushDab,
+  type StudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
+import {
+  studioDynamicBrushDabVariations,
+} from "./studio-brush-symmetry";
 import {
   bubblePathData,
   bubblePathDataMulti,
@@ -217,9 +230,13 @@ export interface SvgDrawElLike extends SvgElMeta {
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
+  sampleSpacing?: number;
   tiltXs?: number[];
   tiltYs?: number[];
   twists?: number[];
+  speeds?: number[];
+  tangentialPressures?: number[];
+  brushDynamics?: StudioBrushDynamicsSettings;
   brushTip?: CalligraphyTipSettings;
   strokeStyle?: StrokeStyle;
   shapeParams?: ShapeParams;
@@ -345,6 +362,18 @@ function fmt(n: number): string {
   if (!Number.isFinite(n)) return "0";
   const rounded = Math.round(n * 100) / 100 + 0;
   return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+/**
+ * 누적형 dab 투명도 포맷 — 좌표보다 높은 6자리 정밀도로 아주 옅은 에어브러시도 보존한다.
+ * SVG opacity 유효 범위로 제한하고, 0보다 큰 값이 반올림만으로 완전 투명해지지 않게 한다.
+ */
+function fmtDabOpacity(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const bounded = Math.min(1, Math.max(0, n));
+  const rounded = Math.round(bounded * 1_000_000) / 1_000_000;
+  const visible = bounded > 0 && rounded === 0 ? 0.000001 : rounded;
+  return visible.toFixed(6).replace(/\.?0+$/, "");
 }
 
 /** XML 텍스트/속성 이스케이프 — & < > " ' 전부 치환(속성·본문 공용). */
@@ -665,8 +694,35 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const strokeAttrs = `${att("stroke", stroke)}${att("stroke-width", strokeWidth)}`;
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
+  const dynamicBrushId = kind === "freehand" && isStudioBrushDynamicsPresetId(el.brush)
+    ? el.brush
+    : null;
+  // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
+  // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
+  const dynamicDabVariations = dynamicBrushId
+    ? (() => {
+        const dynamics = normalizeStudioBrushDynamicsSettings(
+          el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
+        );
+        const baseDabs = planStudioDynamicBrushDabs({
+          points: el.points,
+          pressures: el.pressures,
+          tangentialPressures: el.tangentialPressures,
+          speeds: el.speeds,
+          tiltXs: el.tiltXs,
+          tiltYs: el.tiltYs,
+          twists: el.twists,
+          baseWidth: strokeWidth,
+          baseOpacity: dynamics.opacity.base,
+          settings: dynamics,
+          seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
+          maxDabs: 1024,
+        });
+        return studioDynamicBrushDabVariations(baseDabs, el.symmetry);
+      })()
+    : null;
   const parts: string[] = [];
-  for (const points of variations) {
+  for (const [variationIndex, points] of variations.entries()) {
     if (kind === "rect") {
       const box = drawBounds(points);
       const w = Math.max(0.1, box.width);
@@ -730,7 +786,16 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         `<g${opacityAttr}><path d="${pointsToPathD(points)}" fill="none"${strokeAttrs}${dashAttr} stroke-linecap="${strokeStyle.lineCap}"/>${head}</g>`
       );
     } else {
-      parts.push(serializeFreehand(ctx, el, points, stroke, strokeWidth, opacityAttr));
+      parts.push(serializeFreehand(
+        ctx,
+        el,
+        points,
+        stroke,
+        strokeWidth,
+        opacityAttr,
+        opacity,
+        dynamicDabVariations?.[variationIndex]
+      ));
     }
   }
   return parts.join("");
@@ -743,11 +808,15 @@ function serializeFreehand(
   points: number[],
   stroke: string,
   strokeWidth: number,
-  opacityAttr: string
+  opacityAttr: string,
+  strokeOpacity: number,
+  dynamicDabs?: readonly StudioDynamicBrushDab[]
 ): string {
   const brush = el.brush ?? "pen";
+  const dynamicBrush = isStudioBrushDynamicsPresetId(brush);
+  const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
-  if (points.length === 2 && brush !== "watercolor" && brush !== "screentone") {
+  if (points.length === 2 && brush !== "watercolor" && brush !== "screentone" && !dynamicBrush) {
     const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
     const pressureAware = brush === "pen"
       || brush === "gpen"
@@ -757,9 +826,23 @@ function serializeFreehand(
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, width / 2))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
+  if (dynamicBrush) {
+    const ellipses = (dynamicDabs ?? []).map((dab) => {
+      // Canvas renderer applies the toolbar/stroke opacity to every dab. Keep SVG overlap and
+      // accumulation identical instead of applying opacity once to the completed group.
+      const opacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
+      // Canvas first clamps the circular radius and then applies Y scale(roundness). Applying the
+      // minimum independently to ry would turn a thin tilted tip back into a round 0.5px dot.
+      const radius = Math.max(0.25, dab.size / 2);
+      const ry = radius * dab.roundness;
+      return `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(radius)}" ry="${fmt(ry)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}" transform="rotate(${fmt(dab.angle)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`;
+    }).join("");
+    return `<g>${ellipses}</g>`;
+  }
+
   if (brush === "watercolor") {
     const dabs = planWatercolorBrushDabs({
-      points: processFreehandPoints(points),
+      points: processFreehandPoints(points, renderSampleDistance),
       pressures: el.pressures,
       baseWidth: strokeWidth,
       seed: watercolorBrushSeedFromKey(el.id),
@@ -777,7 +860,7 @@ function serializeFreehand(
   }
 
   if (brush === "calligraphy") {
-    const smoothed = processFreehandPoints(points);
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
     if (smoothed.length < 2) return "";
     const sourcePointCount = Math.floor(points.length / 2);
     const sampleCount = Math.min(
@@ -810,7 +893,7 @@ function serializeFreehand(
 
   if (brush === "brush") {
     // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
-    const smoothed = processFreehandPoints(points);
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
     if (smoothed.length < 2) return "";
     const angle = -Math.PI / 6;
     const dx = (strokeWidth / 2) * Math.cos(angle);
@@ -834,7 +917,7 @@ function serializeFreehand(
 
   if (brush === "gpen") {
     // G펜 — 세그먼트별 굵기(필압 테이퍼)를 세그먼트 path 로 그대로 재현.
-    const smoothed = processFreehandPoints(points);
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
     const segmentCount = Math.floor(smoothed.length / 2);
     const rawPressures = el.pressures ?? [];
     const sampled = resampleStrokePressures(rawPressures, segmentCount, 0.6);
@@ -870,12 +953,12 @@ function serializeFreehand(
 
   if (brush === "highlighter") {
     // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
-    const smoothed = processFreehandPoints(points);
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
     return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
   }
 
   // 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기(캔버스 산식 0.3+p×1.4)로 재현.
-  const smoothed = processFreehandPoints(points);
+  const smoothed = processFreehandPoints(points, renderSampleDistance);
   const pressures = el.pressures;
   if (pressures && pressures.length > 0 && smoothed.length >= 4) {
     const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));

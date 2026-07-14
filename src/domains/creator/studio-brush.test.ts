@@ -20,13 +20,28 @@ import {
   shouldAppendStrokePoint,
   smoothStrokePoints,
   stabilizePoint,
+  strokeRenderDistance,
+  strokeSampleDistanceForScale,
 } from "./studio-brush";
 
 describe("BRUSH_PRESETS", () => {
   it("includes G-pen, tilt calligraphy, watercolor and screentone while keeping legacy ids", () => {
     const ids = BRUSH_PRESETS.map((preset) => preset.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const required of ["pen", "gpen", "calligraphy", "marker", "highlighter", "brush", "watercolor", "pencil", "screentone"]) {
+    for (const required of [
+      "pen",
+      "gpen",
+      "calligraphy",
+      "marker",
+      "highlighter",
+      "brush",
+      "watercolor",
+      "ink-particle",
+      "airbrush",
+      "dry-media",
+      "pencil",
+      "screentone",
+    ]) {
       expect(ids).toContain(required);
     }
     expect(BRUSH_PRESETS.find((preset) => preset.id === "calligraphy")).toMatchObject({
@@ -38,6 +53,11 @@ describe("BRUSH_PRESETS", () => {
       name: "수채 번짐",
       defaultWidth: 28,
       defaultOpacity: 0.55,
+    });
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "airbrush")).toMatchObject({
+      name: "소프트 에어브러시",
+      defaultWidth: 32,
+      defaultOpacity: 0.7,
     });
   });
 
@@ -142,6 +162,17 @@ describe("resolveBrushPressureSample", () => {
         pressureCurve: 1,
       })
     ).toBeCloseTo(0.25, 10);
+  });
+
+  it("uses the configured initial fallback instead of treating zero travel as maximum pressure", () => {
+    expect(resolveBrushPressureSample({
+      pointerType: "mouse",
+      rawPressure: 0.5,
+      distance: 0,
+      velocityFallbackEnabled: false,
+      fallbackPressure: 0.8,
+      pressureCurve: 1,
+    })).toBe(0.8);
   });
 
   it("falls back safely for NaN/out-of-range pressure and clamps the result", () => {
@@ -519,6 +550,20 @@ describe("screentoneDotsForStroke (스크린톤 도트 브러시)", () => {
 });
 
 describe("legacy point processors stay intact", () => {
+  it("keeps live sampling at the same CSS-pixel distance across zoom levels", () => {
+    for (const scale of [0.5, 1, 2, 4]) {
+      expect(strokeSampleDistanceForScale(scale) * scale).toBeCloseTo(1.5, 10);
+    }
+    expect(strokeSampleDistanceForScale(Number.NaN)).toBe(1.5);
+  });
+
+  it("derives render thinning from a new stroke's captured sampling distance", () => {
+    expect(strokeRenderDistance(1.5)).toBe(3);
+    expect(strokeRenderDistance(0.75)).toBe(1.5);
+    expect(strokeRenderDistance(undefined)).toBe(3);
+    expect(strokeRenderDistance(Number.NaN)).toBe(3);
+  });
+
   it("processFreehandPoints thins dense points and keeps endpoints", () => {
     const pts: number[] = [];
     for (let i = 0; i <= 50; i++) pts.push(i, 0); // 1px 간격 → 3px 미만은 솎아짐
@@ -526,6 +571,17 @@ describe("legacy point processors stay intact", () => {
     expect(out.length).toBeLessThan(pts.length);
     expect(out[0]).toBe(0);
     expect(out[out.length - 2]).toBe(50);
+  });
+
+  it("accepts a per-stroke thinning distance without changing the legacy default", () => {
+    const points = [0, 0, 1, 0, 2, 0, 3, 0, 4, 0];
+    const legacy = processFreehandPoints(points);
+    const detailed = processFreehandPoints(points, 1);
+    expect(legacy).toHaveLength(6);
+    expect(detailed).toHaveLength(points.length);
+    expect(legacy.slice(0, 2)).toEqual([0, 0]);
+    expect(legacy.slice(-2)).toEqual([4, 0]);
+    expect(detailed.slice(-2)).toEqual([4, 0]);
   });
 
   it("processPencilPoints applies bounded deterministic jitter", () => {

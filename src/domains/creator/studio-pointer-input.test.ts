@@ -22,9 +22,14 @@ function sample(
     clientX: x,
     clientY: x + 1,
     pressure: 0.5,
+    tangentialPressure: 0,
     tiltX: 10,
     tiltY: -5,
+    altitudeAngle: 1,
+    azimuthAngle: 0.2,
     twist: 20,
+    width: 1,
+    height: 1,
     timeStamp: x,
     ...overrides,
   };
@@ -112,24 +117,65 @@ describe("studio pointer input", () => {
     ]);
   });
 
-  it("does not collapse distinct coordinates, pressure, tilt or twist that share a timestamp", () => {
+  it("does not collapse distinct coordinates or professional stylus channels that share a timestamp", () => {
     const session = beginStudioStrokePointerSession(sample(0, { timeStamp: 0 }))!;
     const a = sample(1, { timeStamp: 0 });
     const b = sample(2, { timeStamp: 0 });
     const pressureChange = sample(2, { timeStamp: 0, pressure: 0.8 });
-    const tiltChange = sample(2, { timeStamp: 0, pressure: 0.8, tiltX: 30 });
-    const twistChange = sample(2, { timeStamp: 0, pressure: 0.8, tiltX: 30, twist: 90 });
+    const barrelChange = sample(2, { timeStamp: 0, pressure: 0.8, tangentialPressure: 0.4 });
+    const tiltChange = sample(2, { timeStamp: 0, pressure: 0.8, tangentialPressure: 0.4, tiltX: 30 });
+    const angleChange = sample(2, {
+      timeStamp: 0,
+      pressure: 0.8,
+      tangentialPressure: 0.4,
+      tiltX: 30,
+      altitudeAngle: 0.6,
+      azimuthAngle: 1.1,
+    });
+    const twistChange = sample(2, {
+      timeStamp: 0,
+      pressure: 0.8,
+      tangentialPressure: 0.4,
+      tiltX: 30,
+      altitudeAngle: 0.6,
+      azimuthAngle: 1.1,
+      twist: 90,
+    });
+    const contactChange = sample(2, {
+      timeStamp: 0,
+      pressure: 0.8,
+      tangentialPressure: 0.4,
+      tiltX: 30,
+      altitudeAngle: 0.6,
+      azimuthAngle: 1.1,
+      twist: 90,
+      width: 3,
+      height: 2,
+    });
     const current = sample(3, {
       timeStamp: 0,
-      getCoalescedEvents: () => [a, b, b, pressureChange, tiltChange, twistChange],
+      getCoalescedEvents: () => [
+        a,
+        b,
+        b,
+        pressureChange,
+        barrelChange,
+        tiltChange,
+        angleChange,
+        twistChange,
+        contactChange,
+      ],
     });
 
     expect(collectStudioStrokePointerBatch(session, current).authoritative).toEqual([
       a,
       b,
       pressureChange,
+      barrelChange,
       tiltChange,
+      angleChange,
       twistChange,
+      contactChange,
       current,
     ]);
   });

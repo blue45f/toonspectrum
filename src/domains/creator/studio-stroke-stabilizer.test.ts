@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createStudioPointerVelocityState,
   createStudioStrokeStabilizerState,
+  flushStudioStrokeStabilizerEndpoint,
   normalizeStudioStabilizerMode,
   sampleStudioPointerVelocity,
   stabilizeStudioStrokeSample,
@@ -161,6 +162,38 @@ describe("studio stroke stabilizer", () => {
       const result = stabilizeStudioStrokeSample(state, { x: 30, y: 40, timeStamp: 20 }, { strength: 0, mode });
       expect(result.point).toEqual([30, 40]);
     }
+  });
+
+  it("flushes a lagging live filter to the finite raw endpoint on pointer release", () => {
+    const initial = createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 0 });
+    const lagging = stabilizeStudioStrokeSample(
+      initial,
+      { x: 100, y: 35, timeStamp: 16 },
+      { strength: 9, mode: "standard" }
+    );
+    expect(lagging.point[0]).toBeLessThan(100);
+
+    const flushed = flushStudioStrokeStabilizerEndpoint(lagging.state);
+    expect(flushed.point).toEqual([100, 35]);
+    expect(flushed.state).toEqual({
+      rawX: 100,
+      rawY: 35,
+      outputX: 100,
+      outputY: 35,
+      timeStamp: 16,
+    });
+  });
+
+  it("sanitizes malformed endpoint state without producing non-finite coordinates", () => {
+    const flushed = flushStudioStrokeStabilizerEndpoint({
+      rawX: Number.NaN,
+      rawY: Infinity,
+      outputX: 7,
+      outputY: 9,
+      timeStamp: -1,
+    });
+    expect(flushed.point).toEqual([7, 9]);
+    expect(Object.values(flushed.state).every(Number.isFinite)).toBe(true);
   });
 
   it("sanitizes malformed samples and remains deterministic", () => {

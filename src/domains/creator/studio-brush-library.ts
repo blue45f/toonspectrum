@@ -10,6 +10,12 @@
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
 import { BRUSH_PRESETS, STABILIZER_MAX } from "./studio-brush";
+import {
+  DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsEqual,
+  type NormalizedStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
 import { normalizeHexColor } from "./studio-color-utils";
 import {
   isStudioStabilizerMode,
@@ -51,6 +57,8 @@ export interface StudioBrushSnapshot {
   tipAngle: number;
   /** 캘리그래피 펜촉의 단축/장축 비율(0.08=납작한 촉, 1=원형 촉). */
   tipRoundness: number;
+  /** 필압·속도·틸트·트위스트에 따른 입자 크기/농도/간격/산포를 재현하는 정규화된 동역학 설정. */
+  brushDynamics: NormalizedStudioBrushDynamicsSettings;
 }
 
 export interface StudioSavedBrush extends StudioBrushSnapshot {
@@ -153,6 +161,7 @@ const DEFAULT_SNAPSHOT: StudioBrushSnapshot = {
   tiltEnabled: true,
   tipAngle: -30,
   tipRoundness: 0.24,
+  brushDynamics: DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
 };
 
 function isKnownBrushId(id: unknown): id is string {
@@ -175,6 +184,30 @@ function clampedNumberField(
   }
   adjusted.push(key);
   return fallback;
+}
+
+/** JSON 데이터의 키 순서와 무관한 구조 비교. 순환 참조 입력도 보정 대상으로 안전하게 처리한다. */
+function jsonStructureEqual(
+  left: unknown,
+  right: unknown,
+  seen = new WeakMap<object, object>()
+): boolean {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => jsonStructureEqual(value, right[index], seen));
+  }
+
+  const knownRight = seen.get(left);
+  if (knownRight) return knownRight === right;
+  seen.set(left, right);
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  const rightKeys = Object.keys(rightRecord);
+  if (leftKeys.length !== rightKeys.length || leftKeys.some((key) => !(key in rightRecord))) return false;
+  return leftKeys.every((key) => jsonStructureEqual(leftRecord[key], rightRecord[key], seen));
 }
 
 /**
@@ -255,6 +288,8 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     DEFAULT_SNAPSHOT.tipRoundness,
     adjustedFields
   );
+  const brushDynamics = normalizeStudioBrushDynamicsSettings(o.brushDynamics);
+  if (!jsonStructureEqual(o.brushDynamics, brushDynamics)) adjustedFields.push("brushDynamics");
 
   let useVelocityPressure: boolean;
   if (typeof o.useVelocityPressure === "boolean") {
@@ -305,6 +340,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       tiltEnabled,
       tipAngle,
       tipRoundness,
+      brushDynamics,
     },
     adjustedFields,
   };
@@ -679,13 +715,14 @@ export function brushMatchesSnapshot(
     && brush.velocitySensitivity === snapshot.velocitySensitivity
     && brush.tiltEnabled === snapshot.tiltEnabled
     && brush.tipAngle === snapshot.tipAngle
-    && brush.tipRoundness === snapshot.tipRoundness;
+    && brush.tipRoundness === snapshot.tipRoundness
+    && studioBrushDynamicsSettingsEqual(brush.brushDynamics, snapshot.brushDynamics);
 }
 
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
 export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
-export const BRUSH_EXPORT_VERSION = 3;
+export const BRUSH_EXPORT_VERSION = 4;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
@@ -707,6 +744,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     tiltEnabled: brush.tiltEnabled,
     tipAngle: brush.tipAngle,
     tipRoundness: brush.tipRoundness,
+    brushDynamics: normalizeStudioBrushDynamicsSettings(brush.brushDynamics),
   };
   return JSON.stringify(payload, null, 2);
 }

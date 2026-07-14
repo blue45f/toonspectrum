@@ -50,7 +50,12 @@ interface MobileRunResult {
   ok: boolean;
   immersive: boolean;
   controlsReady: boolean;
+  dynamicBrushReady: boolean;
   noPanelDockOverlap: boolean;
+  noHorizontalOverflow: boolean;
+  categoryTargetsReady: boolean;
+  rootInert: boolean;
+  launcherFocusRestored: boolean;
   dotRecorded: boolean;
   dotRendered: boolean;
   errCount: number;
@@ -239,14 +244,53 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   await sheet.waitFor({ state: "visible", timeout: 3000 });
 
   const lineCorrection = sheet.getByRole("region", { name: "선 보정" });
-  const pressureInput = sheet.getByRole("region", { name: "필압 입력" });
   await lineCorrection.scrollIntoViewIfNeeded();
-  await pressureInput.scrollIntoViewIfNeeded();
+  const airbrushPreset = sheet.getByRole("button", { name: "소프트 에어브러시", exact: true });
+  await airbrushPreset.click();
+  const dynamicBrushReady = await airbrushPreset.getAttribute("aria-pressed") === "true";
+  const brushStudioLaunchers = sheet
+    .locator('button[aria-haspopup="dialog"]')
+    .filter({ hasText: /^\s*브러시 스튜디오/ });
+  const exactBrushStudioLauncher = (await brushStudioLaunchers.count()) === 1;
+  const brushStudioLauncher = brushStudioLaunchers.first();
+  await brushStudioLauncher.scrollIntoViewIfNeeded();
+  await brushStudioLauncher.click();
+
+  const brushStudio = page.getByRole("dialog", { name: "브러시 스튜디오", exact: true });
+  await brushStudio.waitFor({ state: "visible", timeout: 3000 });
+  // `visible` becomes true at the first frame of the global dialog materialize animation. Measuring
+  // touch targets while its scale is still below 1 would report a transient ~41.6px box for a
+  // steady-state 44px control, so wait for the dialog's own entrance animation to settle first.
+  await brushStudio.evaluate(async (dialog) => {
+    await Promise.all(dialog.getAnimations().map(async (animation) => {
+      try { await animation.finished; } catch {}
+    }));
+  });
+  const brushStudioPanel = brushStudio.locator(":scope > div").first();
+  const categoryTabs = brushStudio.getByRole("tab");
+  const categoryTabHeights = await categoryTabs.evaluateAll((tabs) =>
+    tabs.map((tab) => tab.getBoundingClientRect().height)
+  );
+  const categoryTargetsReady =
+    categoryTabHeights.length === 5 &&
+    categoryTabHeights.every((height) => height >= 44);
+  const rootInert = await page.locator("#root").evaluate((root) => root.hasAttribute("inert"));
+
+  await brushStudio.getByRole("tab", { name: "입력", exact: true }).click();
+  const globalPressureHeading = brushStudio.getByRole("heading", {
+    name: "전역 입력 보정",
+    exact: true,
+  });
+  const pressureInput = brushStudio.getByRole("region", { name: "필압 입력" });
+  await globalPressureHeading.waitFor({ state: "visible", timeout: 3000 });
+  await pressureInput.waitFor({ state: "visible", timeout: 3000 });
   const controlsReady =
+    dynamicBrushReady &&
+    exactBrushStudioLauncher &&
     (await lineCorrection.count()) === 1 &&
     (await pressureInput.count()) === 1 &&
     await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled() &&
-    await sheet.getByRole("combobox", { name: "필압 반응" }).isEnabled();
+    await brushStudio.getByRole("combobox", { name: "필압 반응" }).isEnabled();
 
   const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
   const mobileImmersivePreference = await page.evaluate(() =>
@@ -263,13 +307,37 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     immersiveRootReady &&
     !siteBrandVisible &&
     !siteFooterVisible;
-  const sheetBox = await sheet.boundingBox();
+  const panelBox = await brushStudioPanel.boundingBox();
   const dockBox = await dock.boundingBox();
   const noPanelDockOverlap = Boolean(
-    sheetBox && dockBox && sheetBox.y + sheetBox.height <= dockBox.y + 1
+    panelBox && dockBox && panelBox.y + panelBox.height <= dockBox.y + 1
   );
+  const horizontalOverflow = await page.evaluate(() => ({
+    document: Math.max(
+      0,
+      document.documentElement.scrollWidth - window.innerWidth,
+      document.body.scrollWidth - window.innerWidth
+    ),
+  }));
+  const panelHorizontalOverflow = await brushStudioPanel.evaluate((panel) =>
+    Math.max(0, panel.scrollWidth - panel.clientWidth)
+  );
+  const noHorizontalOverflow =
+    horizontalOverflow.document === 0 && panelHorizontalOverflow === 0;
 
   await page.screenshot({ path: shot, fullPage: false });
+
+  await brushStudio.getByRole("button", { name: "브러시 스튜디오 닫기", exact: true }).click();
+  await brushStudio.waitFor({ state: "detached", timeout: 3000 });
+  await page.waitForFunction(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLButtonElement &&
+      active.getAttribute("aria-haspopup") === "dialog" &&
+      active.textContent?.includes("브러시 스튜디오");
+  });
+  const launcherFocusRestored = await brushStudioLauncher.evaluate(
+    (launcher) => document.activeElement === launcher
+  );
 
   await sheet.getByRole("button", { name: "브러시 설정 닫기" }).click();
   const stage = page.locator(".konvajs-content").first();
@@ -293,6 +361,10 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     immersive &&
     controlsReady &&
     noPanelDockOverlap &&
+    noHorizontalOverflow &&
+    categoryTargetsReady &&
+    rootInert &&
+    launcherFocusRestored &&
     dotRecorded &&
     dotRendered &&
     consoleErrors.length === 0;
@@ -300,7 +372,11 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     `mobile: immersive=${immersive} root=${immersiveRootReady} ` +
     `rootValue=${mobileImmersiveValue} preference=${mobileImmersivePreference} ` +
     `siteBrand=${siteBrandVisible} siteFooter=${siteFooterVisible} controlsReady=${controlsReady} ` +
-    `noPanelDockOverlap=${noPanelDockOverlap} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
+    `dynamicBrushReady=${dynamicBrushReady} ` +
+    `noPanelDockOverlap=${noPanelDockOverlap} noHorizontalOverflow=${noHorizontalOverflow} ` +
+    `categoryTargetsReady=${categoryTargetsReady} categoryTabHeights=${categoryTabHeights.join(",")} ` +
+    `rootInert=${rootInert} ` +
+    `launcherFocusRestored=${launcherFocusRestored} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
     `consoleErrors=${consoleErrors.length}`
   );
   if (!ok) {
@@ -314,7 +390,12 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     ok,
     immersive,
     controlsReady,
+    dynamicBrushReady,
     noPanelDockOverlap,
+    noHorizontalOverflow,
+    categoryTargetsReady,
+    rootInert,
+    launcherFocusRestored,
     dotRecorded,
     dotRendered,
     errCount: consoleErrors.length,

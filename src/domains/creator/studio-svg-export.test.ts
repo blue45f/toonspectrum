@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { screentoneDotsForStroke } from "./studio-brush";
+import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
 import {
   SVG_EXPORT_MIME,
@@ -34,6 +35,41 @@ function rectEl(over: Partial<Extract<SvgExportEl, { type: "draw" }>> = {}): Ext
     fill: "#ff0000",
     ...over,
   };
+}
+
+interface DynamicEllipseAttributes {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  angle: number;
+}
+
+/** 동적 브러시 variation마다 생성되는 `<g>`에서 타원 지오메트리만 수치로 읽는다. */
+function dynamicEllipseGroups(svg: string): DynamicEllipseAttributes[][] {
+  return Array.from(svg.matchAll(/<g>(.*?)<\/g>/g), (groupMatch) =>
+    Array.from(
+      groupMatch[1]!.matchAll(
+        /<ellipse cx="([^"]+)" cy="([^"]+)" rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) [^)]+\)"\/>/g
+      ),
+      (ellipseMatch) => ({
+        cx: Number(ellipseMatch[1]),
+        cy: Number(ellipseMatch[2]),
+        rx: Number(ellipseMatch[3]),
+        ry: Number(ellipseMatch[4]),
+        angle: Number(ellipseMatch[5]),
+      })
+    )
+  ).filter((group) => group.length > 0);
+}
+
+function expectNear(actual: number, expected: number, tolerance = 0.02) {
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+}
+
+function axisVector(angle: number): { x: number; y: number } {
+  const radians = angle * Math.PI / 180;
+  return { x: Math.cos(radians), y: Math.sin(radians) };
 }
 
 function textEl(over: Partial<Extract<SvgExportEl, { type: "text" }>> = {}): Extract<SvgExportEl, { type: "text" }> {
@@ -234,6 +270,213 @@ describe("도형 직렬화", () => {
     expect(first.svg).toContain('stop-color="#336699"');
     expect((first.svg.match(/<circle /g) ?? []).length).toBeGreaterThan(2);
     expect(first.skipped).toEqual([]);
+  });
+
+  it("입자 브러시 — Canvas와 같은 결정적 타원형 dab·회전·유량을 SVG로 보존한다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-svg-1",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [8, 12, 28, 8, 52, 30, 80, 18],
+      pressures: [0.15, 0.45, 0.9, 0.35],
+      speeds: [0.1, 0.5, 1.1, 0.3],
+      tiltXs: [0, 12, 38, 8],
+      tiltYs: [0, 6, 24, 4],
+      twists: [0, 45, 180, 355],
+      tangentialPressures: [0, 0.2, -0.25, 0],
+      brushDynamics: studioBrushDynamicsPresetSettings("dry-media"),
+      stroke: "#3a2218",
+      strokeWidth: 9,
+    });
+    const first = exportPageToSvg(page([dynamic]));
+    const second = exportPageToSvg(page([dynamic]));
+    expect(first.svg).toBe(second.svg);
+    expect((first.svg.match(/<ellipse /g) ?? []).length).toBeGreaterThan(3);
+    expect(first.svg).toContain('fill="#3a2218"');
+    expect(first.svg).toContain("transform=\"rotate(");
+    expect(first.svg).toMatch(/opacity="0\.[0-9]+"/);
+    expect(first.skipped).toEqual([]);
+  });
+
+  it("입자 브러시 — 획 투명도를 완성 그룹이 아니라 Canvas와 같은 각 dab에 적용한다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-opacity",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [8, 12, 32, 18, 58, 10],
+      pressures: [0.3, 0.8, 0.5],
+      brushDynamics: studioBrushDynamicsPresetSettings("dry-media"),
+      stroke: "#4455aa",
+      strokeWidth: 22,
+    });
+    const full = exportPageToSvg(page([{ ...dynamic, opacity: 1 }])).svg;
+    const half = exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg;
+    const dabOpacities = (svg: string) => Array.from(
+      svg.matchAll(/<ellipse [^>]*opacity="([0-9.]+)"/g),
+      (match) => Number(match[1])
+    );
+    const fullOpacities = dabOpacities(full);
+    const halfOpacities = dabOpacities(half);
+    expect(half).not.toContain('<g opacity="0.5">');
+    expect(halfOpacities).toHaveLength(fullOpacities.length);
+    expect(halfOpacities.length).toBeGreaterThan(2);
+    halfOpacities.forEach((value, index) => {
+      // 전용 opacity formatter는 6자리이므로 독립 반올림 오차만 허용한다.
+      expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
+    });
+  });
+
+  it("기본 에어브러시 — 필압 0·툴바 투명도 70%의 저농도 dab을 0으로 반올림하지 않는다", () => {
+    const { svg } = exportPageToSvg(page([rectEl({
+      id: "airbrush-low-alpha",
+      kind: "freehand",
+      brush: "airbrush",
+      points: [10, 10],
+      pressures: [0],
+      stroke: "#336699",
+      strokeWidth: 32,
+      opacity: 0.7,
+      // brushDynamics 미설정은 실제 구형 획/기본 도구처럼 airbrush 기본 preset을 사용한다.
+    })]));
+
+    // default opacity .3×.25, flow .18×.35, toolbar .7 = .0033075. 부동소수점의 마지막
+    // 반올림 방향과 무관하게 두 자리 좌표 포맷의 0이 아니라 실제 저농도를 유지해야 한다.
+    const serializedOpacity = Number(/<ellipse [^>]*opacity="([0-9.]+)"/.exec(svg)?.[1]);
+    expect(serializedOpacity).toBeGreaterThan(0);
+    expect(serializedOpacity).toBeCloseTo(0.3 * 0.25 * 0.18 * 0.35 * 0.7, 5);
+    expect(svg).not.toContain('opacity="0"');
+  });
+
+  it("얇고 기울어진 드라이 미디어 — Canvas처럼 반지름 최소값 적용 뒤 roundness로 ry를 축소한다", () => {
+    const { svg } = exportPageToSvg(page([rectEl({
+      id: "thin-dry-media",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [5, 7],
+      pressures: [0],
+      tiltXs: [90],
+      tiltYs: [0],
+      stroke: "#21160f",
+      strokeWidth: 0.1,
+    })]));
+
+    // serializeDraw의 안전 최소 strokeWidth=1에서 dab radius는 .25, tilt roundness는 .112다.
+    // Canvas geometry: ry=.25×.112=.028(SVG 좌표 포맷 .03), 독립 clamp라면 잘못된 .25가 된다.
+    expect(svg).toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.03"[^>]*transform="rotate\((?!0 )/);
+    expect(svg).not.toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.25"/);
+  });
+
+  it("입자 브러시 세로 대칭 — 원본 dab의 산포와 타원 축을 다시 추첨하지 않고 정확히 반사한다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-vertical-affine",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [20, 30],
+      pressures: [0.4],
+      speeds: [0.9],
+      tiltXs: [35],
+      tiltYs: [20],
+      stroke: "#352116",
+      strokeWidth: 8,
+      symmetry: { type: "vertical", centerX: 50, centerY: 50 },
+    });
+    const first = exportPageToSvg(page([dynamic])).svg;
+    const second = exportPageToSvg(page([dynamic])).svg;
+    const groups = dynamicEllipseGroups(first);
+    expect(first).toBe(second);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toHaveLength(1);
+    expect(groups[1]).toHaveLength(1);
+
+    const original = groups[0]![0]!;
+    const mirrored = groups[1]![0]!;
+    const source = { x: 20, y: 30 };
+    const mirroredSource = { x: 80, y: 30 };
+    const scatter = { x: original.cx - source.x, y: original.cy - source.y };
+    const mirroredScatter = {
+      x: mirrored.cx - mirroredSource.x,
+      y: mirrored.cy - mirroredSource.y,
+    };
+    expect(Math.hypot(scatter.x, scatter.y)).toBeGreaterThan(0.01);
+    expectNear(mirrored.cx, 100 - original.cx);
+    expectNear(mirrored.cy, original.cy);
+    expectNear(mirroredScatter.x, -scatter.x);
+    expectNear(mirroredScatter.y, scatter.y);
+    expect(mirrored.rx).toBe(original.rx);
+    expect(mirrored.ry).toBe(original.ry);
+    const originalAxis = axisVector(original.angle);
+    const mirroredAxis = axisVector(mirrored.angle);
+    expectNear(mirroredAxis.x, -originalAxis.x, 0.001);
+    expectNear(mirroredAxis.y, originalAxis.y, 0.001);
+  });
+
+  it("입자 브러시 방사 대칭 — 산포 중심과 타원 축을 원본에서 90도 회전한 affine 복제본으로 만든다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-radial-affine",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [20, 30],
+      pressures: [0.4],
+      speeds: [0.9],
+      tiltXs: [35],
+      tiltYs: [20],
+      stroke: "#352116",
+      strokeWidth: 8,
+      symmetry: { type: "radial", centerX: 50, centerY: 50, radialCount: 4 },
+    });
+    const first = exportPageToSvg(page([dynamic])).svg;
+    const groups = dynamicEllipseGroups(first);
+    expect(first).toBe(exportPageToSvg(page([dynamic])).svg);
+    expect(groups).toHaveLength(4);
+    const original = groups[0]![0]!;
+    const quarterTurn = groups[1]![0]!;
+    const scatter = { x: original.cx - 20, y: original.cy - 30 };
+    const rotatedScatter = { x: quarterTurn.cx - 70, y: quarterTurn.cy - 20 };
+    expectNear(quarterTurn.cx, 100 - original.cy);
+    expectNear(quarterTurn.cy, original.cx);
+    expectNear(rotatedScatter.x, -scatter.y);
+    expectNear(rotatedScatter.y, scatter.x);
+    expect(quarterTurn.rx).toBe(original.rx);
+    expect(quarterTurn.ry).toBe(original.ry);
+    const originalAxis = axisVector(original.angle);
+    const rotatedAxis = axisVector(quarterTurn.angle);
+    expectNear(rotatedAxis.x, -originalAxis.y, 0.001);
+    expectNear(rotatedAxis.y, originalAxis.x, 0.001);
+  });
+
+  it("입자 브러시 만화경 대칭 — 회전군 뒤 반사군도 같은 산포·축의 결정적 affine 복제본이다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-kaleidoscope-affine",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [20, 30],
+      pressures: [0.4],
+      speeds: [0.9],
+      tiltXs: [35],
+      tiltYs: [20],
+      stroke: "#352116",
+      strokeWidth: 8,
+      symmetry: { type: "kaleidoscope", centerX: 50, centerY: 50, radialCount: 3 },
+    });
+    const first = exportPageToSvg(page([dynamic])).svg;
+    const groups = dynamicEllipseGroups(first);
+    expect(first).toBe(exportPageToSvg(page([dynamic])).svg);
+    expect(groups).toHaveLength(6);
+    const original = groups[0]![0]!;
+    // N개 회전 뒤 첫 반사는 중심을 지나는 수평축(axisAngle=0) 기준이다.
+    const reflected = groups[3]![0]!;
+    const scatter = { x: original.cx - 20, y: original.cy - 30 };
+    const reflectedScatter = { x: reflected.cx - 20, y: reflected.cy - 70 };
+    expectNear(reflected.cx, original.cx);
+    expectNear(reflected.cy, 100 - original.cy);
+    expectNear(reflectedScatter.x, scatter.x);
+    expectNear(reflectedScatter.y, -scatter.y);
+    expect(reflected.rx).toBe(original.rx);
+    expect(reflected.ry).toBe(original.ry);
+    const originalAxis = axisVector(original.angle);
+    const reflectedAxis = axisVector(reflected.angle);
+    expectNear(reflectedAxis.x, originalAxis.x, 0.001);
+    expectNear(reflectedAxis.y, -originalAxis.y, 0.001);
   });
 
   it("형광펜 — multiply 혼합과 사각 끝을 유지한다", () => {

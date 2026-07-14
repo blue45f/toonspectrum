@@ -234,8 +234,20 @@ import {
   screentoneDotsForStroke,
   shouldAppendStrokePoint,
   smoothStrokePoints,
+  strokeRenderDistance,
+  strokeSampleDistanceForScale,
+  type BrushPreset,
   type CalligraphyStylusInput,
 } from "./studio-brush";
+import {
+  isStudioBrushDynamicsPresetId,
+  normalizeStudioBrushDynamicsSettings,
+  planStudioDynamicBrushDabs,
+  studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSeedFromKey,
+  type NormalizedStudioBrushDynamicsSettings,
+  type StudioBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
 import {
   browserBrushLibraryStorage,
   brushMatchesSnapshot,
@@ -247,6 +259,7 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import {
   bubbleShapeCanvasPointToLocal,
@@ -753,6 +766,7 @@ import {
 import {
   createStudioPointerVelocityState,
   createStudioStrokeStabilizerState,
+  flushStudioStrokeStabilizerEndpoint,
   sampleStudioPointerVelocity,
   stabilizeStudioStrokeSample,
   type StudioPointerVelocityState,
@@ -797,7 +811,7 @@ import {
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
-import { StudioBrushInputControls } from "./StudioBrushInputControls";
+import { StudioBrushStudio } from "./StudioBrushStudio";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
@@ -1662,10 +1676,17 @@ interface DrawEl {
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
-  /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피 브러시에서만 저장한다. */
+  /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
+  sampleSpacing?: number;
+  /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피·입자 브러시에서 저장한다. */
   tiltXs?: number[];
   tiltYs?: number[];
   twists?: number[];
+  /** 입자 브러시가 속도·배럴 압력을 문서와 함께 재생하기 위한 포인트별 입력. */
+  speeds?: number[];
+  tangentialPressures?: number[];
+  /** 입자 브러시의 입력→출력 매핑 스냅샷. 저장·협업·SVG 내보내기에서 같은 dab을 재현한다. */
+  brushDynamics?: NormalizedStudioBrushDynamicsSettings;
   /** 이 획을 다시 열거나 내보낼 때도 같은 펜촉 결과를 재현하기 위한 스냅샷. */
   brushTip?: {
     tiltEnabled: boolean;
@@ -2279,6 +2300,33 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
   const shapeDash = strokeDashArray(strokeStyle.dash, strokeWidth);
 
   const symmetricVariations = getSymmetricPoints(el.points, el.symmetry);
+  const dynamicBrushId = kind === "freehand"
+    && el.mode !== "eraser"
+    && isStudioBrushDynamicsPresetId(el.brush)
+    ? el.brush
+    : null;
+  const dynamicDabVariations = dynamicBrushId
+    ? (() => {
+        const dynamics = normalizeStudioBrushDynamicsSettings(
+          el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
+        );
+        const baseDabs = planStudioDynamicBrushDabs({
+          points: el.points,
+          pressures: el.pressures,
+          tangentialPressures: el.tangentialPressures,
+          speeds: el.speeds,
+          tiltXs: el.tiltXs,
+          tiltYs: el.tiltYs,
+          twists: el.twists,
+          baseWidth: strokeWidth,
+          baseOpacity: dynamics.opacity.base,
+          settings: dynamics,
+          seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
+          maxDabs: 1024,
+        });
+        return studioDynamicBrushDabVariations(baseDabs, el.symmetry);
+      })()
+    : null;
 
   return (
     <>
@@ -2418,8 +2466,10 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
 
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
+          const dynamicBrush = dynamicBrushId !== null;
+          const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
-          if (points.length === 2 && brush !== "watercolor" && brush !== "screentone") {
+          if (points.length === 2 && brush !== "watercolor" && brush !== "screentone" && !dynamicBrush) {
             const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
             const pressureAware = el.mode === "eraser"
               || brush === "pen"
@@ -2443,8 +2493,37 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             );
           }
 
+          if (dynamicBrush && el.mode !== "eraser") {
+            const dabs = dynamicDabVariations?.[index] ?? dynamicDabVariations?.[0] ?? [];
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  context.save();
+                  const inheritedAlpha = context.globalAlpha;
+                  for (const dab of dabs) {
+                    context.save();
+                    context.globalAlpha = inheritedAlpha
+                      * Math.min(1, Math.max(0, dab.opacity * dab.flow * opacity));
+                    context.translate(dab.x, dab.y);
+                    context.rotate(dab.angle * Math.PI / 180);
+                    context.scale(1, dab.roundness);
+                    context.beginPath();
+                    context.arc(0, 0, Math.max(0.25, dab.size / 2), 0, Math.PI * 2);
+                    context.fillStyle = stroke;
+                    context.fill();
+                    context.restore();
+                  }
+                  context.restore();
+                }}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
           if (brush === "calligraphy" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points);
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
             const sourcePointCount = Math.floor(points.length / 2);
             const sampleCount = Math.min(
               sourcePointCount,
@@ -2496,7 +2575,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           }
 
           if (brush === "brush" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points);
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
             return (
               <Shape
                 key={index}
@@ -2540,7 +2619,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             // 수채는 매 렌더에서 스트로크 id/필압/점열로 dab 계획을 다시 계산한다. 계획 자체가
             // 순수·결정적이라 히스토리 복원, 협업 동기화, 내보내기에서도 번짐 위치가 흔들리지 않는다.
             const dabs = planWatercolorBrushDabs({
-              points: processFreehandPoints(points),
+              points: processFreehandPoints(points, renderSampleDistance),
               pressures: el.pressures,
               baseWidth: strokeWidth,
               seed: watercolorBrushSeedFromKey(el.id),
@@ -2588,7 +2667,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
 
           if (brush === "gpen" && el.mode !== "eraser") {
             // G펜: 필압(또는 속도 기반 의사 필압)에 따라 굵기가 변하고 양 끝이 가늘어지는 만화 잉크 선.
-            const smoothed = processFreehandPoints(points);
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
             const segmentCount = Math.floor(smoothed.length / 2);
             const rawPressures = el.pressures ?? [];
             const sampled = resampleStrokePressures(rawPressures, segmentCount, 0.6);
@@ -2664,7 +2743,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           }
 
           if (brush === "highlighter" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points);
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
             return (
               <Line
                 key={index}
@@ -2682,7 +2761,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           }
 
           // Default "pen" or "marker" or "eraser"
-          const smoothed = processFreehandPoints(points);
+          const smoothed = processFreehandPoints(points, renderSampleDistance);
           const pressures = el.pressures;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
             const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
@@ -5263,6 +5342,9 @@ function StudioCuttoonEditor() {
   const [tiltEnabled, setTiltEnabled] = useState<boolean>(true);
   const [tipAngle, setTipAngle] = useState<number>(-30);
   const [tipRoundness, setTipRoundness] = useState<number>(0.24);
+  const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
+    studioBrushDynamicsPresetSettings("ink-particle")
+  );
   // 데스크톱 관리 패널과 모바일 퀵 선반이 같은 배열을 소비한다. 같은 탭의 localStorage 변경은
   // storage 이벤트를 발생시키지 않으므로 StudioPage가 단일 source of truth를 소유한다.
   const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
@@ -5339,6 +5421,7 @@ function StudioCuttoonEditor() {
     tiltEnabled,
     tipAngle,
     tipRoundness,
+    brushDynamics,
   };
   const appliedSavedBrush = appliedSavedBrushId
     ? savedBrushes.find((savedBrush) => savedBrush.id === appliedSavedBrushId) ?? null
@@ -5368,6 +5451,7 @@ function StudioCuttoonEditor() {
     setTiltEnabled(saved.tiltEnabled);
     setTipAngle(saved.tipAngle);
     setTipRoundness(saved.tipRoundness);
+    setBrushDynamics(normalizeStudioBrushDynamicsSettings(saved.brushDynamics));
     setAppliedSavedBrushId(saved.id);
     const used = markBrushUsedWithResult(browserBrushLibraryStorage(), saved.id);
     if (used.status === "updated") {
@@ -5381,6 +5465,25 @@ function StudioCuttoonEditor() {
     } else if (used.status === "storage-error") {
       announceDrawingShortcut("브러시는 적용했지만 브라우저 저장소 오류로 최근 사용 기록은 남기지 못했어요.");
     }
+  }
+
+  function applyBuiltInBrushPreset(preset: BrushPreset) {
+    setBrush(preset.id);
+    setStrokeWidth(preset.defaultWidth);
+    setBrushOpacity(preset.defaultOpacity);
+    if (preset.defaultColor) setColor(preset.defaultColor);
+    if (isStudioBrushDynamicsPresetId(preset.id)) {
+      setBrushDynamics(studioBrushDynamicsPresetSettings(preset.id));
+    }
+  }
+
+  function applyDynamicsPreset(
+    id: StudioBrushDynamicsPresetId,
+    settings: NormalizedStudioBrushDynamicsSettings
+  ) {
+    const preset = BRUSH_PRESETS.find((candidate) => candidate.id === id);
+    if (preset) applyBuiltInBrushPreset(preset);
+    setBrushDynamics(normalizeStudioBrushDynamicsSettings(settings));
   }
   const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
   drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
@@ -13042,12 +13145,19 @@ function StudioCuttoonEditor() {
         pointerType: pointerSample.pointerType,
         rawPressure: pointerSample.pressure,
         distance: 0,
-        velocityFallbackEnabled: useVelocityPressure,
+        // 첫 샘플에는 속도가 아직 없으므로 mouse/touch를 '정지=최대 필압'으로 해석하지 않는다.
+        // 실제 pen pressure는 이 플래그와 무관하게 항상 우선한다.
+        velocityFallbackEnabled: false,
         velocitySensitivity,
         pressureCurve,
         fallbackPressure: 0.8,
       });
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
+      const capturePointerDynamics = drawMode === "pen" && isStudioBrushDynamicsPresetId(brush);
+      const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
+      const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
+        ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
+        : 0;
 
       const common = {
         id: uid(),
@@ -13058,6 +13168,9 @@ function StudioCuttoonEditor() {
         brush: drawMode === "pen" ? brush : undefined,
         brushTip: drawMode === "pen" && brush === "calligraphy"
           ? { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness }
+          : undefined,
+        brushDynamics: capturePointerDynamics
+          ? normalizeStudioBrushDynamicsSettings(brushDynamics)
           : undefined,
         symmetry: symmetryType !== "none" ? {
           type: symmetryType,
@@ -13082,9 +13195,12 @@ function StudioCuttoonEditor() {
               mode: drawMode,
               points: [pos.x, pos.y],
               pressures: [pressure],
-              tiltXs: drawMode === "pen" && brush === "calligraphy" ? [stylus.tiltX] : undefined,
-              tiltYs: drawMode === "pen" && brush === "calligraphy" ? [stylus.tiltY] : undefined,
-              twists: drawMode === "pen" && brush === "calligraphy" ? [stylus.twist] : undefined,
+              sampleSpacing: strokeSampleDistanceForScale(effScale),
+              tiltXs: captureStylus ? [stylus.tiltX] : undefined,
+              tiltYs: captureStylus ? [stylus.tiltY] : undefined,
+              twists: captureStylus ? [stylus.twist] : undefined,
+              speeds: capturePointerDynamics ? [0] : undefined,
+              tangentialPressures: capturePointerDynamics ? [tangentialPressure] : undefined,
             };
       drawingPointerSessionRef.current = pointerSession;
       drawingPointerCaptureTargetRef.current = pointerSample.target as StudioPointerCaptureTarget | null;
@@ -13548,10 +13664,20 @@ function StudioCuttoonEditor() {
 
     const lastX = current.points[current.points.length - 2] ?? targetX;
     const lastY = current.points[current.points.length - 1] ?? targetY;
-    if (!shouldAppendStrokePoint(lastX, lastY, targetX, targetY)) return;
-    const captureStylus = current.mode === "pen" && current.brush === "calligraphy";
+    if (!shouldAppendStrokePoint(
+      lastX,
+      lastY,
+      targetX,
+      targetY,
+      current.sampleSpacing ?? strokeSampleDistanceForScale(effScale)
+    )) return;
+    const capturePointerDynamics = current.mode === "pen" && isStudioBrushDynamicsPresetId(current.brush);
+    const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
     const previousPointCount = Math.floor(current.points.length / 2);
     const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerSample) : null;
+    const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
+      ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
+      : 0;
     const appendStylusValue = (values: number[] | undefined, value: number): number[] => {
       const aligned = Array.from(
         { length: previousPointCount },
@@ -13566,6 +13692,12 @@ function StudioCuttoonEditor() {
       tiltXs: stylus ? appendStylusValue(current.tiltXs, stylus.tiltX) : current.tiltXs,
       tiltYs: stylus ? appendStylusValue(current.tiltYs, stylus.tiltY) : current.tiltYs,
       twists: stylus ? appendStylusValue(current.twists, stylus.twist) : current.twists,
+      speeds: capturePointerDynamics
+        ? appendStylusValue(current.speeds, velocitySample.speed)
+        : current.speeds,
+      tangentialPressures: capturePointerDynamics
+        ? appendStylusValue(current.tangentialPressures, tangentialPressure)
+        : current.tangentialPressures,
     };
     drawingRef.current = next;
     scheduleDraft(next);
@@ -13627,6 +13759,55 @@ function StudioCuttoonEditor() {
         // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
         // authoritatively so a fast flick keeps its final tail; predictions remain preview-only.
         consumeFreehandPointerBatch(stage, pointerEvent, false);
+      }
+      if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
+        const liveState = drawingStabilizerRef.current;
+        if (liveState) {
+          const flushed = flushStudioStrokeStabilizerEndpoint(liveState);
+          drawingStabilizerRef.current = flushed.state;
+          const current = drawingRef.current;
+          const x = flushed.point[0];
+          const y = flushed.point[1];
+          const lastX = current.points[current.points.length - 2] ?? x;
+          const lastY = current.points[current.points.length - 1] ?? y;
+          if (Math.hypot(x - lastX, y - lastY) > 1e-6) {
+            const pointCount = Math.floor(current.points.length / 2);
+            const lastPressure = current.pressures?.at(-1) ?? 0.5;
+            const pressure = pointerEvent.pointerType === "pen"
+              ? resolveBrushPressureSample({
+                  pointerType: "pen",
+                  rawPressure: pointerEvent.pressure,
+                  velocityFallbackEnabled: false,
+                  pressureCurve,
+                  fallbackPressure: lastPressure,
+                })
+              : lastPressure;
+            const capturePointerDynamics = current.mode === "pen" && isStudioBrushDynamicsPresetId(current.brush);
+            const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
+            const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerEvent) : null;
+            const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
+              ? Math.min(1, Math.max(-1, pointerEvent.tangentialPressure))
+              : (current.tangentialPressures?.at(-1) ?? 0);
+            const appendAligned = (values: number[] | undefined, value: number): number[] => [
+              ...Array.from({ length: pointCount }, (_, index) => values?.[index] ?? 0),
+              value,
+            ];
+            drawingRef.current = {
+              ...current,
+              points: [...current.points, x, y],
+              pressures: appendAligned(current.pressures, pressure),
+              tiltXs: stylus ? appendAligned(current.tiltXs, stylus.tiltX) : current.tiltXs,
+              tiltYs: stylus ? appendAligned(current.tiltYs, stylus.tiltY) : current.tiltYs,
+              twists: stylus ? appendAligned(current.twists, stylus.twist) : current.twists,
+              speeds: capturePointerDynamics
+                ? appendAligned(current.speeds, current.speeds?.at(-1) ?? 0)
+                : current.speeds,
+              tangentialPressures: capturePointerDynamics
+                ? appendAligned(current.tangentialPressures, tangentialPressure)
+                : current.tangentialPressures,
+            };
+          }
+        }
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         let finished = drawingRef.current;
@@ -15797,6 +15978,9 @@ function StudioCuttoonEditor() {
   const pendingBrushDelete = pendingBrushDeletes.length > 0
     ? pendingBrushDeletes[pendingBrushDeletes.length - 1]
     : null;
+  const isolatedDynamicDraft = draft?.mode === "pen" && isStudioBrushDynamicsPresetId(draft.brush)
+    ? draft
+    : null;
 
   return (
     <StudioLiveCollaborationProvider
@@ -17735,14 +17919,7 @@ function StudioCuttoonEditor() {
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => {
-                          setBrush(p.id);
-                          setStrokeWidth(p.defaultWidth);
-                          setBrushOpacity(p.defaultOpacity);
-                          if (p.defaultColor) {
-                            setColor(p.defaultColor);
-                          }
-                        }}
+                        onClick={() => applyBuiltInBrushPreset(p)}
                         className={cn(
                           "h-7 px-2 text-xs font-semibold rounded-md transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                           active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised hover:text-fg"
@@ -19903,7 +20080,7 @@ function StudioCuttoonEditor() {
                   </>
                 );
               })()}
-              {draft && <StudioDrawNode el={draft} />}
+              {draft && !isolatedDynamicDraft ? <StudioDrawNode el={draft} /> : null}
               <Transformer
                 ref={trRef}
                 rotateEnabled
@@ -19935,6 +20112,13 @@ function StudioCuttoonEditor() {
                 );
               })()}
             </Layer>
+            {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다. committed 입자 획이 포인터 RAF마다
+                수천 개의 dab을 재실행하지 않아 모바일 입력 지연과 배터리 사용을 줄인다. */}
+            {isolatedDynamicDraft && (
+              <Layer listening={false}>
+                <StudioDrawNode el={isolatedDynamicDraft} />
+              </Layer>
+            )}
             {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
             {!isExporting && tool === "draw" && (
               <Layer listening={false}>
@@ -23208,14 +23392,7 @@ function StudioCuttoonEditor() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => {
-                            setBrush(p.id);
-                            setStrokeWidth(p.defaultWidth);
-                            setBrushOpacity(p.defaultOpacity);
-                            if (p.defaultColor) {
-                              setColor(p.defaultColor);
-                            }
-                          }}
+                          onClick={() => applyBuiltInBrushPreset(p)}
                           className={cn(
                             "rounded border py-1 text-xs transition-colors",
                             active
@@ -23398,63 +23575,27 @@ function StudioCuttoonEditor() {
                   </Suspense>
                 )}
 
-                <StudioBrushInputControls
-                  useVelocityPressure={useVelocityPressure}
-                  onUseVelocityPressureChange={setUseVelocityPressure}
-                  velocitySensitivity={velocitySensitivity}
-                  onVelocitySensitivityChange={setVelocitySensitivity}
-                  pressureCurve={pressureCurve}
-                  onPressureCurveChange={setPressureCurve}
-                />
-
-                {drawMode === "pen" && brush === "calligraphy" ? (
-                  <div className="space-y-2 border-t border-line/35 pt-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold text-fg-2">캘리그래피 펜촉</p>
-                        <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-                          Apple Pencil·Wacom의 기울기와 회전을 포인트마다 기록해 촉 방향과 굵기를 재현합니다.
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={tiltEnabled}
-                        onChange={(event) => setTiltEnabled(event.target.checked)}
-                        aria-label="스타일러스 기울기 반영"
-                        className="size-4 shrink-0 cursor-pointer rounded accent-accent"
-                      />
-                    </div>
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
-                      <span>기본 촉 각도</span>
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={-180}
-                          max={180}
-                          step={5}
-                          value={tipAngle}
-                          onChange={(event) => setTipAngle(Number(event.target.value))}
-                          className="w-20 cursor-pointer accent-accent"
-                        />
-                        <span className="w-9 text-right tabular-nums">{tipAngle}°</span>
-                      </span>
-                    </label>
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
-                      <span>촉 원형도</span>
-                      <span className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0.08}
-                          max={1}
-                          step={0.02}
-                          value={tipRoundness}
-                          onChange={(event) => setTipRoundness(Number(event.target.value))}
-                          className="w-20 cursor-pointer accent-accent"
-                        />
-                        <span className="w-9 text-right tabular-nums">{Math.round(tipRoundness * 100)}%</span>
-                      </span>
-                    </label>
-                  </div>
+                {drawMode !== "shape" ? (
+                  <StudioBrushStudio
+                    brushId={brush}
+                    strokeWidth={strokeWidth}
+                    color={color}
+                    settings={brushDynamics}
+                    onSettingsChange={setBrushDynamics}
+                    onSelectDynamicsPreset={applyDynamicsPreset}
+                    useVelocityPressure={useVelocityPressure}
+                    onUseVelocityPressureChange={setUseVelocityPressure}
+                    velocitySensitivity={velocitySensitivity}
+                    onVelocitySensitivityChange={setVelocitySensitivity}
+                    pressureCurve={pressureCurve}
+                    onPressureCurveChange={setPressureCurve}
+                    tiltEnabled={tiltEnabled}
+                    onTiltEnabledChange={setTiltEnabled}
+                    tipAngle={tipAngle}
+                    onTipAngleChange={setTipAngle}
+                    tipRoundness={tipRoundness}
+                    onTipRoundnessChange={setTipRoundness}
+                  />
                 ) : null}
 
                 {/* 대칭 그리기 자 (Symmetry Ruler) */}
@@ -23995,12 +24136,7 @@ function StudioCuttoonEditor() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => {
-                            setBrush(p.id);
-                            setStrokeWidth(p.defaultWidth);
-                            setBrushOpacity(p.defaultOpacity);
-                            if (p.defaultColor) setColor(p.defaultColor);
-                          }}
+                          onClick={() => applyBuiltInBrushPreset(p)}
                           aria-pressed={active}
                           className={cn(
                             "min-h-[2.75rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
@@ -24152,70 +24288,28 @@ function StudioCuttoonEditor() {
                   preserveCorners={preserveCorners}
                   onPreserveCornersChange={setPreserveCorners}
                 />
-                <StudioBrushInputControls
+                <StudioBrushStudio
                   density="touch"
+                  brushId={brush}
+                  strokeWidth={strokeWidth}
+                  color={color}
+                  settings={brushDynamics}
+                  onSettingsChange={setBrushDynamics}
+                  onSelectDynamicsPreset={applyDynamicsPreset}
                   useVelocityPressure={useVelocityPressure}
                   onUseVelocityPressureChange={setUseVelocityPressure}
                   velocitySensitivity={velocitySensitivity}
                   onVelocitySensitivityChange={setVelocitySensitivity}
                   pressureCurve={pressureCurve}
                   onPressureCurveChange={setPressureCurve}
+                  tiltEnabled={tiltEnabled}
+                  onTiltEnabledChange={setTiltEnabled}
+                  tipAngle={tipAngle}
+                  onTipAngleChange={setTipAngle}
+                  tipRoundness={tipRoundness}
+                  onTipRoundnessChange={setTipRoundness}
                 />
               </>
-            ) : null}
-
-            {drawMode === "pen" && brush === "calligraphy" ? (
-              <div className="mt-2.5 space-y-2.5 border-t border-line/60 pt-2.5">
-                <label
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-card/55 px-3"
-                >
-                  <span>
-                    <span className="block text-xs font-semibold text-fg-2">스타일러스 기울기</span>
-                    <span className="block text-[0.62rem] leading-relaxed text-fg-3">
-                      Apple Pencil·Wacom의 tilt와 twist를 획에 저장
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={tiltEnabled}
-                    onChange={(event) => setTiltEnabled(event.target.checked)}
-                    aria-label="스타일러스 기울기 반영"
-                    className="size-5 shrink-0 rounded accent-accent"
-                  />
-                </label>
-                <div>
-                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>기본 촉 각도</span>
-                    <span className="tabular-nums text-fg-2">{tipAngle}°</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    step={5}
-                    value={tipAngle}
-                    onChange={(event) => setTipAngle(Number(event.target.value))}
-                    aria-label="기본 촉 각도"
-                    className="h-11 w-full accent-accent"
-                  />
-                </div>
-                <div>
-                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>촉 원형도</span>
-                    <span className="tabular-nums text-fg-2">{Math.round(tipRoundness * 100)}%</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={0.08}
-                    max={1}
-                    step={0.02}
-                    value={tipRoundness}
-                    onChange={(event) => setTipRoundness(Number(event.target.value))}
-                    aria-label="촉 원형도"
-                    className="h-11 w-full accent-accent"
-                  />
-                </div>
-              </div>
             ) : null}
 
             {/* 도형 모양 + 채우기 — 도형 모드에서만 */}

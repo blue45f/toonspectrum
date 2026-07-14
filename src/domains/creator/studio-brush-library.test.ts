@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsPresetSettings,
+} from "./studio-brush-dynamics";
+import {
   BRUSH_EXPORT_KIND,
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
@@ -57,6 +62,10 @@ const validSnapshot: StudioBrushSnapshot = {
   tiltEnabled: true,
   tipAngle: -35,
   tipRoundness: 0.3,
+  brushDynamics: normalizeStudioBrushDynamicsSettings({
+    ...studioBrushDynamicsPresetSettings("dry-media"),
+    seed: 492,
+  }),
 };
 
 const brush = (id: string, createdAt = 1): StudioSavedBrush => ({
@@ -89,6 +98,7 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toContain("tiltEnabled");
     expect(adjustedFields).toContain("tipAngle");
     expect(adjustedFields).toContain("tipRoundness");
+    expect(adjustedFields).toContain("brushDynamics");
   });
 
   it("알 수 없는 brushId는 pen으로 대체한다", () => {
@@ -169,6 +179,58 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toEqual(["tipAngle", "tipRoundness", "tiltEnabled"]);
   });
 
+  it("브러시 동역학을 렌더러 안전 범위와 완전한 JSON 구조로 정규화한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushDynamics: {
+        seed: -3,
+        maxSpeed: Number.POSITIVE_INFINITY,
+        spacingRatio: 999,
+        width: {
+          base: -100,
+          mappings: [{ source: "pressure", amount: 9 }],
+        },
+      },
+    });
+
+    expect(snapshot.brushDynamics).toEqual(normalizeStudioBrushDynamicsSettings({
+      seed: -3,
+      maxSpeed: Number.POSITIVE_INFINITY,
+      spacingRatio: 999,
+      width: {
+        base: -100,
+        mappings: [{ source: "pressure", amount: 9 }],
+      },
+    }));
+    expect(snapshot.brushDynamics.seed).toBe(0);
+    expect(snapshot.brushDynamics.spacingRatio).toBe(16);
+    expect(snapshot.brushDynamics.width.base).toBe(0.05);
+    expect(snapshot.brushDynamics.width.mappings[0]?.amount).toBe(1);
+    expect(adjustedFields).toEqual(["brushDynamics"]);
+    expect(() => JSON.stringify(snapshot.brushDynamics)).not.toThrow();
+  });
+
+  it("키 순서가 달라도 이미 정규화된 동역학은 보정된 것으로 표시하지 않는다", () => {
+    const reordered = {
+      roundness: validSnapshot.brushDynamics.roundness,
+      angle: validSnapshot.brushDynamics.angle,
+      scatter: validSnapshot.brushDynamics.scatter,
+      spacing: validSnapshot.brushDynamics.spacing,
+      flow: validSnapshot.brushDynamics.flow,
+      opacity: validSnapshot.brushDynamics.opacity,
+      width: validSnapshot.brushDynamics.width,
+      scatterRatio: validSnapshot.brushDynamics.scatterRatio,
+      spacingRatio: validSnapshot.brushDynamics.spacingRatio,
+      maxSpeed: validSnapshot.brushDynamics.maxSpeed,
+      fallbackPressure: validSnapshot.brushDynamics.fallbackPressure,
+      seed: validSnapshot.brushDynamics.seed,
+      version: validSnapshot.brushDynamics.version,
+    };
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, brushDynamics: reordered });
+    expect(snapshot.brushDynamics).toEqual(validSnapshot.brushDynamics);
+    expect(adjustedFields).toEqual([]);
+  });
+
   it("무관한 필드에 순환 참조가 있어도 던지거나 멈추지 않는다(필드별 단순 읽기만 하므로 재귀 순회 없음)", () => {
     const circular: Record<string, unknown> = { ...validSnapshot };
     circular.selfRef = circular;
@@ -234,6 +296,13 @@ describe("listBrushes", () => {
       tipAngle: -30,
       tipRoundness: 0.24,
     });
+  });
+
+  it("이전 저장 브러시에 동역학 필드가 없어도 기본 동역학으로 마이그레이션한다", () => {
+    const legacy = brush("legacy-dynamics") as Partial<StudioSavedBrush>;
+    delete legacy.brushDynamics;
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
+    expect(listBrushes(s)[0]?.brushDynamics).toEqual(DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS);
   });
 
   it("v2 저장 브러시에 새 선 보정 필드가 없어도 안전 기본값으로 마이그레이션한다", () => {
@@ -547,6 +616,18 @@ describe("빠른 선반·복제·삭제 취소", () => {
     const saved = brush("match");
     expect(brushMatchesSnapshot(saved, validSnapshot)).toBe(true);
     expect(brushMatchesSnapshot(saved, { ...validSnapshot, strokeWidth: 13 })).toBe(false);
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      brushDynamics: { width: validSnapshot.brushDynamics.width } as StudioBrushSnapshot["brushDynamics"],
+    })).toBe(false);
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({ ...validSnapshot.brushDynamics, version: 999 }),
+    })).toBe(true);
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({ ...validSnapshot.brushDynamics, seed: 493 }),
+    })).toBe(false);
   });
 });
 
@@ -563,6 +644,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.tiltEnabled).toBe(true);
     expect(parsed.tipAngle).toBe(-35);
     expect(parsed.tipRoundness).toBe(0.3);
+    expect(parsed.brushDynamics).toEqual(validSnapshot.brushDynamics);
     expect(parsed).not.toHaveProperty("pinned");
     expect(parsed).not.toHaveProperty("lastUsedAt");
   });
@@ -575,9 +657,19 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(imported.brushId).toBe(original.brushId);
     expect(imported.strokeWidth).toBe(original.strokeWidth);
     expect(imported.color).toBe(original.color);
+    expect(imported.brushDynamics).toEqual(original.brushDynamics);
     expect(imported).toMatchObject({ pinned: false, lastUsedAt: null });
     expect(adjustedFields).toEqual([]);
     expect(imported.id).not.toBe(original.id); // 가져오기는 새 id를 발급한다(같은 id 충돌 방지)
+  });
+
+  it("v1~v3 내보내기처럼 brushDynamics가 없어도 기본값으로 가져온다", () => {
+    const legacy = JSON.parse(writeBrushJson(brush("legacy-export")));
+    legacy.version = 3;
+    delete legacy.brushDynamics;
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(legacy));
+    expect(imported.brushDynamics).toEqual(DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS);
+    expect(adjustedFields).toContain("brushDynamics");
   });
 
   it("kind가 없거나 다르면 던진다", () => {

@@ -22,6 +22,9 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
   { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
   { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
+  { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
+  { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
+  { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];
@@ -54,6 +57,27 @@ export function pressureCurveValueForPreset(id: unknown): number {
 
 // 손떨림 보정 강도 범위(0=끔 ~ 10=최대).
 export const STABILIZER_MAX = 10;
+
+/**
+ * 라이브 포인터가 화면에서 이 거리(CSS px) 이상 이동했을 때 다음 문서 점을 채택한다.
+ * 캔버스 논리 좌표에 상수를 직접 쓰면 줌 배율만큼 체감 간격이 달라지므로 모든 호출부는
+ * `strokeSampleDistanceForScale`을 통해 논리 거리로 변환한다.
+ */
+export const STROKE_SAMPLE_SCREEN_DISTANCE = 1.5;
+export const LEGACY_STROKE_RENDER_DISTANCE = 3;
+
+export function strokeSampleDistanceForScale(scale: unknown): number {
+  const safeScale = clamp(finiteNumber(scale, 1), 0.01, 64);
+  return STROKE_SAMPLE_SCREEN_DISTANCE / safeScale;
+}
+
+/** 새 획은 라이브 채택 간격의 두 배로 가볍게 정리하고, 기존 문서는 과거 3px 결과를 유지한다. */
+export function strokeRenderDistance(sampleDistance: unknown): number {
+  if (typeof sampleDistance !== "number" || !Number.isFinite(sampleDistance) || sampleDistance <= 0) {
+    return LEGACY_STROKE_RENDER_DISTANCE;
+  }
+  return clamp(sampleDistance * 2, 0.05, 128);
+}
 
 export interface SmoothStrokeOptions {
   /** true면 넓은 이웃에서 검출한 의도적인 각점을 이동평균으로 둥글리지 않는다. */
@@ -622,8 +646,17 @@ function hash(n: number): number {
  * 1. Thinning: discards points that are too close to the previous point.
  * 2. Smoothing: applies a weighted moving average to remove high-frequency jitter.
  */
-export function processFreehandPoints(points: number[]): number[] {
+export function processFreehandPoints(
+  points: number[],
+  minDistance = LEGACY_STROKE_RENDER_DISTANCE
+): number[] {
   if (points.length < 4) return points;
+
+  const safeMinDistance = clamp(
+    finiteNumber(minDistance, LEGACY_STROKE_RENDER_DISTANCE),
+    0,
+    128
+  );
 
   // 1. Light point-thinning (distance thresholding)
   const thinned: number[] = [points[0], points[1]];
@@ -637,7 +670,7 @@ export function processFreehandPoints(points: number[]): number[] {
 
     const dist = Math.hypot(x - lastX, y - lastY);
     // Keep point if it is at least 3 pixels away or it is the very last point in the path
-    if (dist >= 3 || i === points.length - 2) {
+    if (dist >= safeMinDistance || i === points.length - 2) {
       thinned.push(x, y);
       lastX = x;
       lastY = y;

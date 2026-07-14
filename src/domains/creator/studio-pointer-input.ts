@@ -13,9 +13,14 @@ export interface StudioPointerEventLike {
   clientX?: unknown;
   clientY?: unknown;
   pressure?: unknown;
+  tangentialPressure?: unknown;
   tiltX?: unknown;
   tiltY?: unknown;
+  altitudeAngle?: unknown;
+  azimuthAngle?: unknown;
   twist?: unknown;
+  width?: unknown;
+  height?: unknown;
   timeStamp?: unknown;
   getCoalescedEvents?: unknown;
   getPredictedEvents?: unknown;
@@ -70,9 +75,14 @@ function pointerSampleSignature(event: StudioPointerEventLike, pointerId: number
     finiteNumber(event.clientX, 0),
     finiteNumber(event.clientY, 0),
     finiteNumber(event.pressure, 0),
+    finiteNumber(event.tangentialPressure, 0),
     finiteNumber(event.tiltX, 0),
     finiteNumber(event.tiltY, 0),
+    finiteNumber(event.altitudeAngle, 0),
+    finiteNumber(event.azimuthAngle, 0),
     finiteNumber(event.twist, 0),
+    finiteNumber(event.width, 0),
+    finiteNumber(event.height, 0),
   ]);
 }
 

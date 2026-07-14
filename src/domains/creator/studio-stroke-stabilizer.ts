@@ -73,6 +73,26 @@ export interface StudioStrokeStabilizerResult {
   speed: number;
 }
 
+/**
+ * 포인터를 놓는 순간 라이브 필터의 지연을 확정 raw endpoint까지 따라잡는다. 이 단계가 없으면
+ * 강한 EMA/정밀 가이드에서 문서에 저장된 획이 실제 펜을 놓은 위치보다 짧게 끝난다.
+ */
+export function flushStudioStrokeStabilizerEndpoint(
+  state: StudioStrokeStabilizerState
+): StudioStrokeStabilizerResult {
+  const fallbackX = finiteNumber(state.outputX, 0);
+  const fallbackY = finiteNumber(state.outputY, 0);
+  const rawX = finiteNumber(state.rawX, fallbackX);
+  const rawY = finiteNumber(state.rawY, fallbackY);
+  const timeStamp = safeTimeStamp(state.timeStamp, 0);
+  return {
+    point: [rawX, rawY],
+    state: { rawX, rawY, outputX: rawX, outputY: rawY, timeStamp },
+    effectiveStrength: 0,
+    speed: 0,
+  };
+}
+
 const DEFAULT_FRAME_MS = 1000 / 60;
 const MIN_SAMPLE_MS = 1;
 const MAX_SAMPLE_MS = 64;

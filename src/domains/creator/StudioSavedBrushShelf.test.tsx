@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
 import type { StudioSavedBrush } from "./studio-brush-library";
@@ -27,6 +28,7 @@ function savedBrush(index: number): StudioSavedBrush {
     tiltEnabled: true,
     tipAngle: -30,
     tipRoundness: 0.24,
+    brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
   };
 }
 
