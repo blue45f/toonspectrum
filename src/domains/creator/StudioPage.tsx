@@ -889,6 +889,7 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
+import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
 import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
@@ -908,6 +909,7 @@ import {
 import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioMainMenu, type StudioMainMenuGroup } from "./StudioMainMenu";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
@@ -15120,10 +15122,258 @@ function StudioCuttoonEditor() {
   // 멤버 기준으로 통일해 서브탭 전환 시 팝오버 크기가 튀지 않게 한다.
   const groupPopoverClass = (width: "w-72" | "w-80") =>
     cn(
-      // Anchored under the denser tool belt (menubar ~36px + belt ~40px).
-      "fixed inset-x-2 top-[5.5rem] z-[60] max-h-[calc(100dvh-8rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-[min(70dvh,32rem)] lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg",
+      // Always fixed under chrome so main-menu opens work even when the legacy toolbelt is off-screen.
+      "fixed inset-x-2 top-[6.5rem] z-[80] max-h-[min(70dvh,32rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );
+
+  const studioMainMenuGroups: StudioMainMenuGroup[] = [
+    {
+      id: "file",
+      label: "파일",
+      items: [
+        {
+          id: "export",
+          label: "내보내기 / 다운로드",
+          onSelect: () => {
+            setProjectActionsOpen(false);
+            setExportMenuOpen(true);
+          },
+        },
+        {
+          id: "save-draft",
+          label: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장",
+          shortcut: "⌘S",
+          disabled: saving || collaborationDocumentLocked,
+          onSelect: () => {
+            void handleSave("draft");
+          },
+        },
+        {
+          id: "publish",
+          label: workId ? "수정 게시" : "게시",
+          disabled: saving || collaborationDocumentLocked || Boolean(sharedDocument && sharedDocument.role !== "owner"),
+          separatorAfter: true,
+          onSelect: () => {
+            void handleSave("published");
+          },
+        },
+        {
+          id: "project",
+          label: "프로젝트 도구…",
+          onSelect: () => {
+            setExportMenuOpen(false);
+            setProjectActionsOpen(true);
+          },
+        },
+      ],
+    },
+    {
+      id: "edit",
+      label: "편집",
+      items: [
+        {
+          id: "undo",
+          label: "실행취소",
+          shortcut: "⌘Z",
+          disabled: hi === 0 || collaborationDocumentLocked,
+          onSelect: () => undo(),
+        },
+        {
+          id: "redo",
+          label: "다시실행",
+          shortcut: "⌘⇧Z",
+          disabled: hi >= history.length - 1 || collaborationDocumentLocked,
+          onSelect: () => redo(),
+          separatorAfter: true,
+        },
+        {
+          id: "history",
+          label: "작업 내역",
+          onSelect: () => setHistoryPanelOpen((v) => !v),
+        },
+        {
+          id: "select",
+          label: "선택 도구",
+          shortcut: "V",
+          onSelect: () => {
+            setTool("select");
+            setEyedropperActive(false);
+          },
+        },
+      ],
+    },
+    {
+      id: "insert",
+      label: "삽입",
+      items: [
+        {
+          id: "template",
+          label: "템플릿 · 에셋",
+          onSelect: () => {
+            preloadStudioAssetMenuPanel();
+            setMenu("template");
+          },
+        },
+        {
+          id: "bubble",
+          label: "말풍선",
+          onSelect: () => addBubble("speech"),
+        },
+        {
+          id: "text",
+          label: "텍스트",
+          onSelect: () => addText(),
+        },
+        {
+          id: "image",
+          label: "이미지…",
+          separatorAfter: true,
+          onSelect: () => {
+            // Prefer the first visible image file input in insert cluster
+            document.querySelector<HTMLInputElement>('label input[type="file"][accept="image/*"]')?.click();
+          },
+        },
+        {
+          id: "char",
+          label: "3D 캐릭터",
+          onSelect: () => setPoserVrmOpen(true),
+        },
+        {
+          id: "ref",
+          label: "참고 이미지",
+          onSelect: () => {
+            preloadStudioReferencePanel();
+            setReferencePanelOpen(true);
+          },
+        },
+      ],
+    },
+    {
+      id: "view",
+      label: "보기",
+      items: [
+        {
+          id: "density-focus",
+          label: "슈퍼심플 레이아웃",
+          onSelect: () => {
+            setStudioUiDensity("focus");
+            setLeftPanelOpen(false);
+            setRightPanelOpen(false);
+          },
+        },
+        {
+          id: "density-full",
+          label: "전체 레이아웃",
+          onSelect: () => setStudioUiDensity("full"),
+        },
+        {
+          id: "wide",
+          label: "패널 접어 넓게",
+          onSelect: () => {
+            setLeftPanelOpen(false);
+            setRightPanelOpen(false);
+          },
+        },
+        {
+          id: "fit",
+          label: "너비에 맞춤",
+          onSelect: () => {
+            const wrap = wrapRef.current;
+            if (wrap) {
+              const w = wrap.clientWidth;
+              setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+              setZoom(1);
+            }
+          },
+          separatorAfter: true,
+        },
+        {
+          id: "fullscreen",
+          label: isFullscreen ? "창 모드" : "전체화면",
+          onSelect: () => toggleFullscreen(),
+        },
+        {
+          id: "canvas-only",
+          label: "캔버스만",
+          onSelect: () => enterCanvasOnlyMode(),
+        },
+      ],
+    },
+    {
+      id: "draw",
+      label: "그리기",
+      items: [
+        {
+          id: "pen",
+          label: "펜",
+          shortcut: "B",
+          onSelect: () => {
+            setTool("draw");
+            setDrawMode("pen");
+          },
+        },
+        {
+          id: "eraser",
+          label: "지우개",
+          shortcut: "E",
+          onSelect: () => {
+            setTool("draw");
+            setDrawMode("eraser");
+          },
+        },
+        {
+          id: "fill",
+          label: "채우기",
+          shortcut: "G",
+          onSelect: () => toggleAdvancedFill(),
+        },
+        {
+          id: "smart-shape",
+          label: "스마트 도형",
+          onSelect: () => {
+            setQuickShapeActive(true);
+            setTool("draw");
+            setDrawMode("pen");
+          },
+          separatorAfter: true,
+        },
+        {
+          id: "bg",
+          label: "배경 · 톤",
+          onSelect: () => setMenu("bgScene"),
+        },
+        {
+          id: "style",
+          label: "팔레트 · 브랜드",
+          onSelect: () => setMenu("palette"),
+        },
+      ],
+    },
+    {
+      id: "ai",
+      label: "AI",
+      items: [
+        {
+          id: "ai-assist",
+          label: "AI 어시스트",
+          onSelect: () => {
+            setMenu("aiAssist");
+          },
+        },
+        {
+          id: "stock",
+          label: "스톡 이미지",
+          onSelect: () => setMenu("stockImage"),
+        },
+        {
+          id: "integrations",
+          label: "연동 설정",
+          onSelect: () => setMenu("integrations"),
+        },
+      ],
+    },
+  ];
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
   const mobileBarBtn = (active: boolean) =>
@@ -16562,6 +16812,12 @@ function StudioCuttoonEditor() {
           ) : null}
         </div>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line sm:block" />
+        {/* Magma/CSP application menu — desktop; replaces the cluttered horizontal toolbelt IA */}
+        <StudioMainMenu
+          groups={studioMainMenuGroups}
+          className={cn("hidden min-w-0 lg:flex", mobileImmersive && "!hidden")}
+        />
+        <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line lg:block" />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
           className={cn(
@@ -17116,11 +17372,49 @@ function StudioCuttoonEditor() {
         ) : null}
       </div>
 
-      {/* Draw-app tool belt — full-width sticky chrome (no site GNB). Single-row scroll. */}
+      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP/Magma properties strip). */}
+      {tool === "draw" && !canvasOnlyMode ? (
+        <StudioDrawOptionsBar
+          className={cn(mobileImmersive && "order-first")}
+          drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
+          brushId={brush}
+          strokeWidth={strokeWidth}
+          brushOpacity={brushOpacity}
+          stabilizer={stabilizer}
+          stabilizerModeLabel={stabilizerMode}
+          color={color}
+          recentSwatches={DRAW_COLOR_SWATCHES}
+          quickShapeActive={quickShapeActive}
+          compactBrushes={uiDensityMode !== "full"}
+          onSelectBrush={(item) => {
+            const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
+            if (preset) applyBuiltInBrushPreset(preset);
+          }}
+          onStrokeWidthChange={setStrokeWidth}
+          onOpacityChange={setBrushOpacity}
+          onStabilizerChange={setStabilizer}
+          onColorChange={setColor}
+          onToggleQuickShape={() => {
+            const next = !quickShapeActive;
+            if (next) disarmAllPixelTools();
+            setQuickShapeActive(next);
+          }}
+          onSetDrawMode={(mode) => {
+            if (mode === "shape") return;
+            setTool("draw");
+            setDrawMode(mode);
+            setEyedropperActive(false);
+          }}
+        />
+      ) : null}
+
+      {/* Legacy tool belt: primary on mobile; off-screen host on desktop so popovers still mount. */}
       <StudioToolBelt
         className={cn(
           canvasOnlyMode && "hidden",
-          mobileImmersive && "shrink-0"
+          mobileImmersive && "shrink-0",
+          // Desktop: park belt chrome off-screen (not display:none) so fixed popovers still mount & click.
+          "lg:fixed lg:left-[-100vw] lg:top-0 lg:h-0 lg:w-0 lg:overflow-visible lg:border-0 lg:p-0"
         )}
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
@@ -19242,6 +19536,30 @@ function StudioCuttoonEditor() {
                 setQuickShapeActive((v) => !v);
                 setTool("draw");
                 setDrawMode("pen");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={Square}
+              label="사각형 도형"
+              active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("shape");
+                setDrawShape("rect");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={Circle}
+              label="타원 도형"
+              active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("shape");
+                setDrawShape("ellipse");
                 setEyedropperActive(false);
                 setMenu(null);
               }}
