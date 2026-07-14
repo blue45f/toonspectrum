@@ -266,6 +266,14 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import {
+  assignStudioBrushSlot,
+  loadStudioBrushSlotsState,
+  rememberStudioBrushSlot,
+  saveStudioBrushSlotsState,
+  studioBrushSlotAt,
+  type StudioBrushSlotsState,
+} from "./studio-brush-slots";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
   buildStudioBrushTipAlphaMap,
@@ -1197,6 +1205,10 @@ const StudioMainMenu = lazyRetry(
 const StudioDrawOptionsBar = lazyRetry(
   () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
+);
+const StudioSelectOptionsBar = lazyRetry(
+  () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
+  "StudioSelectOptionsBar"
 );
 const StudioBrushTray = lazyRetry(
   () => import("./StudioBrushTray").then((mod) => ({ default: mod.StudioBrushTray })),
@@ -5672,6 +5684,11 @@ function StudioCuttoonEditor() {
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brush, setBrush] = useState<string>("pen");
+  const [brushSlotsState, setBrushSlotsState] = useState<StudioBrushSlotsState>(() =>
+    loadStudioBrushSlotsState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
+    )
+  );
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
   const [stabilizer, setStabilizer] = useState<number>(6);
@@ -5817,6 +5834,34 @@ function StudioCuttoonEditor() {
     if (isStudioBrushDynamicsPresetId(preset.id)) {
       setBrushDynamics(studioBrushDynamicsPresetSettings(preset.id));
     }
+    setBrushSlotsState((prev) => {
+      const next = rememberStudioBrushSlot(prev, {
+        brushId: preset.id,
+        strokeWidth: preset.defaultWidth,
+        brushOpacity: preset.defaultOpacity,
+      });
+      saveStudioBrushSlotsState(
+        typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+        next
+      );
+      return next;
+    });
+  }
+
+  function applyBrushSlot(slot: { brushId: string; strokeWidth: number; brushOpacity: number }) {
+    const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
+    if (preset) {
+      setBrush(preset.id);
+      if (isStudioBrushDynamicsPresetId(preset.id)) {
+        setBrushDynamics(studioBrushDynamicsPresetSettings(preset.id));
+      }
+    } else {
+      setBrush(slot.brushId);
+    }
+    setStrokeWidth(slot.strokeWidth);
+    setBrushOpacity(slot.brushOpacity);
+    setTool("draw");
+    setDrawMode("pen");
   }
 
   function applyDynamicsPreset(
@@ -10709,8 +10754,19 @@ function StudioCuttoonEditor() {
         e.preventDefault();
         setZoom(1);
       } else if (drawingShortcut) {
+        const targetEl = e.target instanceof HTMLElement ? e.target : null;
+        const inField = Boolean(
+          targetEl?.closest("input, textarea, select, [contenteditable='true']")
+        );
+        // Tab / number slots must not steal focus from form fields.
+        if (inField && (drawingShortcut.type === "toggle-chrome" || drawingShortcut.type === "recall-brush-slot")) {
+          return;
+        }
         e.preventDefault();
-        if (activeSurfaceReviewLockedRef.current) {
+        if (
+          activeSurfaceReviewLockedRef.current &&
+          drawingShortcut.type !== "toggle-chrome"
+        ) {
           if (!e.repeat) {
             announceDrawingShortcut(
               collaborationDocumentLocked
@@ -10741,14 +10797,54 @@ function StudioCuttoonEditor() {
           currentDrawing.strokeWidth = nextWidth;
           setStrokeWidth(nextWidth);
           if (!e.repeat) announceDrawingShortcut(`브러시 크기 ${nextWidth}px`);
-        } else {
+        } else if (drawingShortcut.type === "adjust-opacity") {
           const currentDrawing = drawingShortcutStateRef.current;
           const nextOpacity = adjustStudioBrushOpacity(currentDrawing.brushOpacity, drawingShortcut.delta);
           if (nextOpacity === currentDrawing.brushOpacity) return;
           currentDrawing.brushOpacity = nextOpacity;
           setBrushOpacity(nextOpacity);
           if (!e.repeat) announceDrawingShortcut(`브러시 불투명도 ${Math.round(nextOpacity * 100)}%`);
+        } else if (drawingShortcut.type === "recall-brush-slot") {
+          const slot = studioBrushSlotAt(brushSlotsState, drawingShortcut.index);
+          if (!slot) {
+            if (!e.repeat) announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1} 비어 있음 · Shift+${drawingShortcut.index + 1}로 저장`);
+            return;
+          }
+          applyBrushSlot(slot);
+          announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1}`);
+        } else if (drawingShortcut.type === "toggle-chrome") {
+          // Magma Tab: hide chrome for canvas-first drawing.
+          if (canvasOnlyMode) {
+            setCanvasOnlyMode(false);
+            announceDrawingShortcut("도구 표시");
+          } else {
+            enterCanvasOnlyMode();
+            announceDrawingShortcut("캔버스만");
+          }
         }
+      } else if (
+        !mod &&
+        e.shiftKey &&
+        !e.altKey &&
+        !e.repeat &&
+        /^[1-6]$/.test(e.key) &&
+        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
+      ) {
+        e.preventDefault();
+        const index = Number(e.key) - 1;
+        setBrushSlotsState((prev) => {
+          const next = assignStudioBrushSlot(prev, index, {
+            brushId: brush,
+            strokeWidth,
+            brushOpacity,
+          });
+          saveStudioBrushSlotsState(
+            typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+            next
+          );
+          return next;
+        });
+        announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
       } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
         e.preventDefault();
         toggleAdvancedFill();
@@ -17397,6 +17493,8 @@ function StudioCuttoonEditor() {
             stabilizerModeLabel={stabilizerMode}
             color={color}
             recentSwatches={DRAW_COLOR_SWATCHES}
+            brushSlots={brushSlotsState.slots}
+            symmetryType={symmetryType}
             quickShapeActive={quickShapeActive}
             compactBrushes={uiDensityMode !== "full"}
             onSelectBrush={(item) => {
@@ -17418,6 +17516,44 @@ function StudioCuttoonEditor() {
               setDrawMode(mode);
               setEyedropperActive(false);
             }}
+            onRecallBrushSlot={(index) => {
+              const slot = studioBrushSlotAt(brushSlotsState, index);
+              if (slot) applyBrushSlot(slot);
+            }}
+            onAssignBrushSlot={(index) => {
+              setBrushSlotsState((prev) => {
+                const next = assignStudioBrushSlot(prev, index, {
+                  brushId: brush,
+                  strokeWidth,
+                  brushOpacity,
+                });
+                saveStudioBrushSlotsState(
+                  typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+                  next
+                );
+                return next;
+              });
+              announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+            }}
+            onSymmetryTypeChange={setSymmetryType}
+          />
+        </Suspense>
+      ) : null}
+      {tool === "select" && !canvasOnlyMode && (selectedId || marqueeIds.length > 0) ? (
+        <Suspense fallback={null}>
+          <StudioSelectOptionsBar
+            selectionCount={marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0}
+            selectionLabel={selected ? elementLabel(selected) : null}
+            locked={Boolean(selected?.locked)}
+            onDuplicate={duplicateSelected}
+            onDelete={removeSelected}
+            onBringFront={() => reorder("front")}
+            onSendBack={() => reorder("back")}
+            onToggleLock={
+              selected
+                ? () => patchEl(selected.id, { locked: !selected.locked })
+                : undefined
+            }
           />
         </Suspense>
       ) : null}
@@ -26306,6 +26442,41 @@ function StudioCuttoonEditor() {
               <button
                 type="button"
                 onClick={() => {
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-fg hover:bg-raised"
+              >
+                <Pencil size={12} />
+                펜으로 그리기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  addBubble("speech");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <MessageCircle size={12} />
+                말풍선 추가
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  addText();
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
+              >
+                <TypeIcon size={12} />
+                텍스트 추가
+              </button>
+              <div className="my-1 h-px bg-line" />
+              <button
+                type="button"
+                onClick={() => {
                   addPage();
                   setContextMenu((prev) => ({ ...prev, visible: false }));
                 }}
@@ -26313,6 +26484,19 @@ function StudioCuttoonEditor() {
               >
                 <Plus size={12} />
                 새 페이지 추가
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickShapeActive(true);
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setContextMenu((prev) => ({ ...prev, visible: false }));
+                }}
+                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-accent hover:bg-raised"
+              >
+                <Shapes size={12} />
+                스마트 도형 켜기
               </button>
             </>
           )}

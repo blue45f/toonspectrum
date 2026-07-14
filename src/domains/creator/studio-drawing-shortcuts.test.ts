@@ -68,6 +68,23 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "KeyB", isComposing: true })).toBeNull();
     expect(resolveStudioDrawingShortcut({ code: "KeyE", keyCode: 229 })).toBeNull();
   });
+
+  it("Digit1–6은 최근 브러시 슬롯 호출로 해석한다", () => {
+    expect(resolveStudioDrawingShortcut({ code: "Digit1" })).toEqual({
+      type: "recall-brush-slot",
+      index: 0,
+    });
+    expect(resolveStudioDrawingShortcut({ code: "Digit6" })).toEqual({
+      type: "recall-brush-slot",
+      index: 5,
+    });
+    expect(resolveStudioDrawingShortcut({ code: "Digit1", shiftKey: true })).toBeNull();
+  });
+
+  it("Tab은 크롬 토글로 해석한다", () => {
+    expect(resolveStudioDrawingShortcut({ code: "Tab" })).toEqual({ type: "toggle-chrome" });
+    expect(resolveStudioDrawingShortcut({ code: "Tab", metaKey: true })).toBeNull();
+  });
 });
 
 describe("드로잉 단축키 수치 조절", () => {

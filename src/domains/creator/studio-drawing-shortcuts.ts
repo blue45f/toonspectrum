@@ -7,7 +7,11 @@ export type StudioDrawingShortcut =
   | { type: "select-pen" }
   | { type: "toggle-eraser" }
   | { type: "adjust-width"; delta: number }
-  | { type: "adjust-opacity"; delta: number };
+  | { type: "adjust-opacity"; delta: number }
+  /** Magma-style recent brush slot recall (0–5). */
+  | { type: "recall-brush-slot"; index: number }
+  /** Toggle canvas-first chrome (Tab, Magma-style). */
+  | { type: "toggle-chrome" };
 
 export interface StudioDrawingShortcutEvent {
   code?: string;
@@ -49,6 +53,19 @@ export function resolveStudioDrawingShortcut(
 
   if (code === "KeyB" && !event.altKey && !event.repeat) return { type: "select-pen" };
   if (code === "KeyE" && !event.altKey && !event.repeat) return { type: "toggle-eraser" };
+
+  // Digit1–6 → recent brush slots (no modifiers). Shift+Digit assigns is handled by caller.
+  if (!event.altKey && !event.shiftKey && !event.repeat) {
+    const digitMatch = /^Digit([1-6])$/.exec(code);
+    if (digitMatch) {
+      return { type: "recall-brush-slot", index: Number(digitMatch[1]) - 1 };
+    }
+  }
+
+  // Tab toggles chrome (ignore when focus is in inputs — caller checks).
+  if (code === "Tab" && !event.altKey && !event.repeat) {
+    return { type: "toggle-chrome" };
+  }
 
   if (code === "BracketLeft" || code === "BracketRight") {
     const direction = code === "BracketLeft" ? -1 : 1;

@@ -24,6 +24,8 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "[ · ]", label: "브러시 크기 ±1px" },
       { keys: "⇧ [ · ⇧ ]", label: "브러시 크기 ±5px" },
       { keys: "⌥ [ · ⌥ ]", label: "불투명도 ±5%" },
+      { keys: "1–6", label: "최근 브러시 슬롯 호출" },
+      { keys: "⇧ 1–6", label: "현재 브러시를 슬롯에 저장" },
     ],
   },
   {
@@ -55,6 +57,8 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘ 0", label: "100%로 맞춤" },
       { keys: "⌘ + 휠", label: "포인터 기준 확대/축소" },
       { keys: "Space + 드래그", label: "화면 이동(팬)" },
+      { keys: "Tab", label: "캔버스만 / 도구 토글" },
+      { keys: "?", label: "단축키 도움말" },
     ],
   },
 ];

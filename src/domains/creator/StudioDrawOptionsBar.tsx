@@ -3,19 +3,19 @@
  * Brush kit · size · opacity · stabilizer · color · smart shape.
  * Pure presentation.
  */
-import { Eraser, Pencil, Shapes, Sparkles } from "lucide-react";
+import { Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles } from "lucide-react";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
+import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { ReactElement, ReactNode } from "react";
-
-
 
 import { cn } from "@/lib/utils";
 
 export type StudioDrawModeUi = "pen" | "eraser" | "shape";
+export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
 
 export interface StudioDrawOptionsBarProps {
   drawMode: StudioDrawModeUi;
@@ -26,6 +26,8 @@ export interface StudioDrawOptionsBarProps {
   stabilizerModeLabel?: string;
   color: string;
   recentSwatches?: readonly string[];
+  brushSlots?: readonly (StudioBrushSlot | null)[];
+  symmetryType?: StudioSymmetryUi;
   quickShapeActive: boolean;
   compactBrushes?: boolean;
   onSelectBrush: (item: StudioBrushTrayItem) => void;
@@ -35,6 +37,9 @@ export interface StudioDrawOptionsBarProps {
   onColorChange: (hex: string) => void;
   onToggleQuickShape: () => void;
   onSetDrawMode?: (mode: StudioDrawModeUi) => void;
+  onRecallBrushSlot?: (index: number) => void;
+  onAssignBrushSlot?: (index: number) => void;
+  onSymmetryTypeChange?: (type: StudioSymmetryUi) => void;
   shapeSlot?: ReactNode;
   className?: string;
 }
@@ -69,6 +74,8 @@ export function StudioDrawOptionsBar({
   stabilizerModeLabel,
   color,
   recentSwatches = [],
+  brushSlots = [],
+  symmetryType = "none",
   quickShapeActive,
   compactBrushes = true,
   onSelectBrush,
@@ -78,6 +85,9 @@ export function StudioDrawOptionsBar({
   onColorChange,
   onToggleQuickShape,
   onSetDrawMode,
+  onRecallBrushSlot,
+  onAssignBrushSlot,
+  onSymmetryTypeChange,
   shapeSlot,
   className,
 }: StudioDrawOptionsBarProps): ReactElement {
@@ -122,6 +132,43 @@ export function StudioDrawOptionsBar({
         </div>
       ) : null}
 
+      {onRecallBrushSlot ? (
+        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="최근 브러시 슬롯 1–6">
+          {Array.from({ length: 6 }, (_, index) => {
+            const slot = brushSlots[index] ?? null;
+            return (
+              <button
+                key={index}
+                type="button"
+                disabled={!slot && !onAssignBrushSlot}
+                title={
+                  slot
+                    ? `${index + 1}: ${slot.brushId} · ${slot.strokeWidth}px · ${Math.round(slot.brushOpacity * 100)}% (클릭=호출, Shift+클릭=저장)`
+                    : `${index + 1}: 빈 슬롯 — Shift+클릭으로 현재 브러시 저장`
+                }
+                aria-label={`브러시 슬롯 ${index + 1}`}
+                onClick={(e) => {
+                  if (e.shiftKey && onAssignBrushSlot) onAssignBrushSlot(index);
+                  else if (slot) onRecallBrushSlot(index);
+                  else if (onAssignBrushSlot) onAssignBrushSlot(index);
+                }}
+                className={cn(
+                  "grid size-7 place-items-center rounded border text-[0.6rem] font-bold tabular-nums",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                  slot
+                    ? "border-line bg-card text-fg-2 hover:border-accent/50 hover:bg-raised"
+                    : "border-dashed border-line/70 text-fg-3 hover:bg-raised/60",
+                  !slot && !onAssignBrushSlot && "opacity-40"
+                )}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {drawMode === "pen" ? (
         <StudioBrushTray
           activeBrushId={brushId}
@@ -140,7 +187,7 @@ export function StudioDrawOptionsBar({
         <input
           type="range"
           min={1}
-          max={64}
+          max={48}
           value={strokeWidth}
           onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
           className="w-20 accent-accent sm:w-28"
@@ -214,6 +261,38 @@ export function StudioDrawOptionsBar({
             </label>
           </div>
         </>
+      ) : null}
+
+      {onSymmetryTypeChange ? (
+        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="대칭 그리기">
+          <FlipHorizontal2 size={13} className="mr-0.5 text-fg-3" aria-hidden />
+          {(
+            [
+              { id: "none" as const, label: "없음" },
+              { id: "vertical" as const, label: "세로" },
+              { id: "horizontal" as const, label: "가로" },
+              { id: "radial" as const, label: "방사" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={symmetryType === item.id}
+              title={`대칭: ${item.label}`}
+              onClick={() => onSymmetryTypeChange(item.id)}
+              className={cn(
+                "h-7 rounded px-1.5 text-[0.6rem] font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                symmetryType === item.id
+                  ? "bg-accent text-on-accent"
+                  : "text-fg-3 hover:bg-raised hover:text-fg-2"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       ) : null}
 
       {drawMode === "pen" ? (
