@@ -1167,6 +1167,26 @@ export function StudioLayerNavigator({
           </button>
           <button
             type="button"
+            disabled={readOnly || batchSelectedIds.length < 2}
+            onClick={() => onAction({ type: "merge-selected", ids: batchSelectedIds })}
+            className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
+            aria-label="선택 레이어 병합"
+            title="선택한 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
+          >
+            <Layers3 size={13} />
+          </button>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => onAction({ type: "flatten-visible" })}
+            className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
+            aria-label="표시 레이어 병합"
+            title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
+          >
+            <Grid2X2 size={13} />
+          </button>
+          <button
+            type="button"
             onClick={(event) => openActionMenu(event, { kind: "batch", id: "selection" })}
             aria-haspopup="dialog"
             aria-expanded={actionTarget?.kind === "batch"}
@@ -1435,7 +1455,8 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="선택한 레이어를 하나로 묶습니다"
+                title="선택한 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
+                aria-label="선택 레이어 병합"
               >
                 <Layers3 size={13} /> 선택 병합
               </button>
@@ -1448,8 +1469,9 @@ export function StudioLayerNavigator({
                 }}
                 className={compactControl}
                 title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
+                aria-label="표시 레이어 병합"
               >
-                <Grid2X2 size={13} /> 표시 평탄화
+                <Grid2X2 size={13} /> 표시 병합
               </button>
               <button
                 type="button"
@@ -1591,7 +1613,8 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="아래 레이어와 병합"
+                title="아래 레이어와 병합합니다 (가능하면 래스터 베이크)"
+                aria-label="아래로 병합"
               >
                 <Layers3 size={13} /> 아래로 병합
               </button>
@@ -1603,9 +1626,10 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="표시 레이어 병합"
+                title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
+                aria-label="표시 레이어 병합"
               >
-                <Grid2X2 size={13} /> 평탄화
+                <Grid2X2 size={13} /> 표시 병합
               </button>
               <button
                 type="button"

@@ -142,6 +142,24 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('aria-label="선택 레이어 일괄 작업 더보기"');
   });
 
+  it("exposes commercial merge/flatten actions on the always-visible batch toolbar", () => {
+    // Merge is a primary commercial action — keep it one click away when 2+ layers are selected.
+    const html = renderNavigator(
+      [
+        layer("bottom", "image", 0, { label: "배경" }),
+        layer("mid", "draw", 1, { label: "선화" }),
+        layer("top", "image", 2, { label: "톤" }),
+      ],
+      [],
+      { selectedIds: ["mid", "top"] }
+    );
+    expect(html).toContain('aria-label="선택 레이어 일괄 작업"');
+    expect(html).toContain('aria-label="선택 레이어 병합"');
+    expect(html).toContain('aria-label="표시 레이어 병합"');
+    expect(html).toContain("선택한 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)");
+    expect(html).toContain("표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)");
+  });
+
   it("disables document mutations while retaining search and selection in read-only mode", () => {
     const html = renderNavigator(
       [layer("locked", "image", 0, { label: "검토 잠금 원화" })],
