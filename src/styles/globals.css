@@ -639,8 +639,13 @@ body[data-studio-app="true"] .route-stage::before,
   position: relative;
   z-index: 1;
 }
-[data-studio-main-menu="true"] [role="menu"] {
-  z-index: var(--studio-z-menubar-menu, 60);
+/* Portaled main-menu panels attach to body — must beat chrome without fighting site isolation */
+[data-studio-main-menu-panel="true"] {
+  z-index: var(--studio-z-menubar-menu, 60) !important;
+}
+/* Fixed tool popovers (assets / bg / AI) */
+[data-studio-tool-popover="true"] {
+  z-index: var(--studio-z-tool-popover, 70) !important;
 }
 
 /* Soften default editor text rendering */

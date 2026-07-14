@@ -15460,6 +15460,7 @@ function StudioCuttoonEditor() {
   // Always `fixed` so they still paint when the legacy toolbelt is parked off-screen on desktop.
   const groupPopoverClass = (width: "w-72" | "w-80") =>
     cn(
+      // data-studio-tool-popover is set via class list attribute pattern in markup where needed.
       "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(70dvh,32rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );

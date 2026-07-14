@@ -877,7 +877,8 @@ export function StudioWorkspaceMenu({
         />
       </button>
 
-      <StudioWorkspaceOverlayLayer portal={isMobile}>
+      {/* Always portal: desktop menubar scroll/stacking must not clip the dialog. */}
+      <StudioWorkspaceOverlayLayer portal>
         <button
           type="button"
           aria-label="작업공간 메뉴 닫기"
@@ -901,9 +902,10 @@ export function StudioWorkspaceMenu({
           onKeyDownCapture={handleDialogKeyDownCapture}
           onKeyUpCapture={(event) => event.stopPropagation()}
           className={cn(
-            "fixed inset-x-2 z-[100] flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden rounded-lg border border-line-strong bg-panel shadow-xl",
-            "top-[max(0.5rem,env(safe-area-inset-top))] bottom-[max(0.5rem,env(safe-area-inset-bottom))]",
-            "lg:absolute lg:inset-x-auto lg:bottom-auto lg:right-0 lg:top-[calc(100%+0.5rem)] lg:h-auto lg:max-h-[min(42rem,calc(100dvh-5rem))] lg:w-96"
+            // Always fixed so desktop menubar overflow never clips this dialog (portal on mobile already).
+            "fixed z-[100] flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden rounded-lg border border-line-strong bg-panel shadow-xl",
+            "inset-x-2 top-[max(0.5rem,env(safe-area-inset-top))] bottom-[max(0.5rem,env(safe-area-inset-bottom))]",
+            "lg:inset-x-auto lg:bottom-auto lg:right-3 lg:top-14 lg:h-auto lg:max-h-[min(42rem,calc(100dvh-5rem))] lg:w-96"
           )}
           data-testid="studio-workspace-dialog"
           data-studio-shortcut-boundary="true"

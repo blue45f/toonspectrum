@@ -146,7 +146,11 @@ export function StudioToolBelt({
   );
 }
 
-/** Compact app menubar above the tool belt — document + file actions, one thin strip. */
+/**
+ * Compact app menubar — document + file actions.
+ * Outer shell is overflow-visible + z-50 so dropdowns are never clipped by the
+ * horizontal scroll row (CSS: overflow-x:auto forces y clipping of absolute menus).
+ */
 export function StudioAppMenubar({
   children,
   className,
@@ -162,12 +166,21 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
-        "relative z-[50] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2.5 border-b border-line px-3",
-        "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "relative z-[50] h-11 min-h-11 shrink-0 border-b border-line",
+        // Critical: do NOT put overflow-x-auto here — it clips File/Edit dropdowns.
+        "overflow-visible",
         className
       )}
     >
-      {children}
+      <div
+        data-studio-app-menubar-scroll="true"
+        className={cn(
+          "flex h-full min-h-11 w-full flex-nowrap items-center gap-2.5 px-3",
+          "overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

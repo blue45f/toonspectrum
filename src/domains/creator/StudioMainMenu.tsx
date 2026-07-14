@@ -1,12 +1,23 @@
 /**
  * StudioMainMenu — Magma/CSP/Photopea-style top application menu.
- * File · Edit · Insert · View · AI  as compact dropdowns (not a 40-button toolbelt).
- * Pure presentation; parent supplies actions.
+ * File · Edit · Insert · View · AI as compact dropdowns.
+ * Menus portal to document.body with fixed coords so they never lose to options-strip
+ * stacking or menubar overflow clipping.
  */
 import { ChevronDown, type LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import { STUDIO_Z_CLASS } from "./studio-z-index";
 
 import { cn } from "@/lib/utils";
 
@@ -44,27 +55,132 @@ function MenuDropdown({
   onClose: () => void;
 }): ReactElement {
   const panelId = useId();
-  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; minWidth: number } | null>(
+    null
+  );
+
+  const updateCoords = () => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const minWidth = Math.max(232, rect.width + 48);
+    let left = rect.left;
+    // Keep panel inside viewport horizontally.
+    if (typeof window !== "undefined") {
+      left = Math.min(left, window.innerWidth - minWidth - 8);
+      left = Math.max(8, left);
+    }
+    setCoords({
+      top: rect.bottom + 8,
+      left,
+      minWidth,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+    updateCoords();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) onClose();
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      onClose();
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
+    function onReposition() {
+      updateCoords();
+    }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
     };
   }, [open, onClose]);
 
+  const menu =
+    open && coords && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={menuRef}
+            id={panelId}
+            role="menu"
+            aria-label={group.label}
+            data-studio-main-menu-panel="true"
+            className={cn(
+              "fixed overflow-hidden rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
+              STUDIO_Z_CLASS.menubarMenu
+            )}
+            style={{
+              top: coords.top,
+              left: coords.left,
+              minWidth: coords.minWidth,
+            }}
+          >
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.id}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={item.disabled}
+                    onClick={() => {
+                      if (item.disabled) return;
+                      item.onSelect();
+                      onClose();
+                    }}
+                    className={cn(
+                      "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-[0.78rem] font-medium",
+                      STUDIO_EASE,
+                      STUDIO_FOCUS_RING,
+                      item.danger && "text-bad",
+                      item.disabled
+                        ? "cursor-not-allowed opacity-40"
+                        : "text-fg-2 hover:bg-raised hover:text-fg"
+                    )}
+                  >
+                    {Icon ? (
+                      <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
+                    ) : (
+                      <span aria-hidden className="size-[15px] shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
+                    {item.shortcut ? (
+                      <span className="shrink-0 rounded-md border border-line/70 bg-canvas/55 px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums tracking-wide text-fg-3">
+                        {item.shortcut}
+                      </span>
+                    ) : null}
+                  </button>
+                  {item.separatorAfter ? (
+                    <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -89,56 +205,7 @@ function MenuDropdown({
           )}
         />
       </button>
-      {open ? (
-        <div
-          id={panelId}
-          role="menu"
-          aria-label={group.label}
-          className="absolute left-0 top-full z-[60] mt-2 min-w-[14.5rem] overflow-hidden rounded-2xl border border-line bg-panel py-1.5"
-        >
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.id}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={item.disabled}
-                  onClick={() => {
-                    if (item.disabled) return;
-                    item.onSelect();
-                    onClose();
-                  }}
-                  className={cn(
-                    "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-[0.78rem] font-medium",
-                    STUDIO_EASE,
-                    STUDIO_FOCUS_RING,
-                    item.danger && "text-bad",
-                    item.disabled
-                      ? "cursor-not-allowed opacity-40"
-                      : "text-fg-2 hover:bg-raised hover:text-fg"
-                  )}
-                >
-                  {Icon ? (
-                    <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
-                  ) : (
-                    <span aria-hidden className="size-[15px] shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
-                  {item.shortcut ? (
-                    <span className="shrink-0 rounded-md border border-line/70 bg-canvas/55 px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums tracking-wide text-fg-3">
-                      {item.shortcut}
-                    </span>
-                  ) : null}
-                </button>
-                {item.separatorAfter ? (
-                  <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+      {menu}
     </div>
   );
 }
