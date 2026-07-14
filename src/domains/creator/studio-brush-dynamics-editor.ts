@@ -8,7 +8,12 @@ import {
   type StudioBrushDynamicsMappingSettings,
   type StudioBrushDynamicsPresetId,
   type StudioBrushDynamicsSource,
+  type StudioBrushTaperSettings,
 } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushTipSettings,
+  type StudioBrushTipSettings,
+} from "./studio-brush-tip-stamp";
 
 export type StudioBrushDynamicsPropertyKey =
   | "width"
@@ -128,5 +133,27 @@ export function updateStudioBrushDynamicsJitter(
       ...normalized[property],
       jitter: amount > 0 ? { mode, amount } : null,
     },
+  });
+}
+
+export function updateStudioBrushDynamicsTaper(
+  settings: unknown,
+  patch: Partial<StudioBrushTaperSettings>
+): NormalizedStudioBrushDynamicsSettings {
+  const normalized = normalizeStudioBrushDynamicsSettings(settings);
+  return normalizeStudioBrushDynamicsSettings({
+    ...normalized,
+    taper: { ...normalized.taper, ...patch },
+  });
+}
+
+export function updateStudioBrushDynamicsTip(
+  settings: unknown,
+  patch: Partial<StudioBrushTipSettings>
+): NormalizedStudioBrushDynamicsSettings {
+  const normalized = normalizeStudioBrushDynamicsSettings(settings);
+  return normalizeStudioBrushDynamicsSettings({
+    ...normalized,
+    tip: normalizeStudioBrushTipSettings({ ...normalized.tip, ...patch }),
   });
 }

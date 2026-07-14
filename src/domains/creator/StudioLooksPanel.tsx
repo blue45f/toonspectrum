@@ -1,23 +1,30 @@
 /**
  * Studio Looks Panel
- * 라이트룸/인스타그램 프리셋 같은 원클릭 "룩" 인스펙터 — 큐레이티드 룩을 카테고리별로 묶어
- * 칩으로 보여주고, 누르면 onApplyLook(look)으로 해당 룩을 통째로 적용한다(부모가 reset+patch).
- * 상단 유틸 줄에서 현재 요소의 필터를 복사/붙여넣기하거나 전체 초기화한다.
- * 룩 카탈로그(STUDIO_LOOKS)와 카테고리만 읽고 콜백으로만 쓰는 순수 프레젠테이션 컴포넌트(상태 없음).
+ * 원클릭 룩 인스펙터 — 검색·즐겨찾기·최근 적용 + 카테고리 칩.
+ * 상태(즐겨찾기)는 부모가 localStorage 와 동기화해 넘긴다.
  */
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Search, Star } from "lucide-react";
+import { useState } from "react";
 
+import {
+  createStudioEffectId,
+  isStudioEffectFavorite,
+  type StudioEffectFavoriteState,
+  type StudioEffectId,
+} from "./studio-effect-favorites";
 import { STUDIO_LOOKS, type StudioLook, type StudioLookCategory } from "./studio-looks";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
 
-
-// StudioGrainPanel과 동일한 칩 스타일 — 룩 칩에 재사용한다.
 const CHIP_CLASS =
   "rounded-md border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg";
 
-// 카테고리 표시 순서 — StudioLookCategory 유니언 순서 그대로(만화→시네마틱→빈티지→감성→흑백→실험).
 const CATEGORY_ORDER: StudioLookCategory[] = ["만화", "시네마틱", "빈티지", "감성", "흑백", "실험"];
+
+function lookEffectId(lookId: string): StudioEffectId {
+  return createStudioEffectId("look", lookId);
+}
 
 export function StudioLooksPanel({
   onApplyLook,
@@ -25,19 +32,46 @@ export function StudioLooksPanel({
   onPaste,
   onResetAll,
   canPaste,
+  favoriteState,
+  onToggleFavorite,
 }: {
   onApplyLook: (look: StudioLook) => void;
   onCopy: () => void;
   onPaste: () => void;
   onResetAll: () => void;
   canPaste: boolean;
+  favoriteState: StudioEffectFavoriteState;
+  onToggleFavorite: (effectId: StudioEffectId) => void;
 }): React.ReactElement {
+  const [query, setQuery] = useState("");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+
+  const q = query.trim().toLocaleLowerCase("ko-KR");
+  const filtered = STUDIO_LOOKS.filter((look) => {
+    const effectId = lookEffectId(look.id);
+    if (favoritesOnly && !isStudioEffectFavorite(favoriteState, effectId)) return false;
+    if (!q) return true;
+    return (
+      look.label.toLocaleLowerCase("ko-KR").includes(q) ||
+      look.tip.toLocaleLowerCase("ko-KR").includes(q) ||
+      look.category.toLocaleLowerCase("ko-KR").includes(q) ||
+      look.id.toLocaleLowerCase("ko-KR").includes(q)
+    );
+  });
+
+  const recentLooks = favoriteState.recent
+    .map((id) => {
+      if (!id.startsWith("look:")) return null;
+      const raw = id.slice("look:".length);
+      return STUDIO_LOOKS.find((look) => look.id === raw) ?? null;
+    })
+    .filter((look): look is StudioLook => Boolean(look))
+    .slice(0, 8);
+
   return (
     <div className="space-y-2">
-      {/* 헤더 */}
       <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">원클릭 룩 (Looks)</p>
 
-      {/* 유틸 줄 — 현재 요소 필터 복사 / 붙여넣기(클립보드 비면 비활성) / 전체 초기화 */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -67,29 +101,98 @@ export function StudioLooksPanel({
         </button>
       </div>
 
-      {/* 카테고리별 룩 칩 — 카테고리 순서대로 묶고, 비어 있는 카테고리는 건너뛴다. */}
-      {CATEGORY_ORDER.map((category) => {
-        const looks = STUDIO_LOOKS.filter((look) => look.category === category);
-        if (looks.length === 0) return null;
-        return (
-          <div key={category} className="space-y-1">
-            <p className="text-[0.6rem] font-medium text-fg-3 uppercase tracking-wide">{category}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {looks.map((look) => (
-                <button
-                  key={look.id}
-                  type="button"
-                  onClick={() => onApplyLook(look)}
-                  title={look.tip}
-                  className={CHIP_CLASS}
-                >
-                  {look.label}
-                </button>
-              ))}
-            </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <label className="relative min-w-0 flex-1">
+          <span className="sr-only">룩 검색</span>
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="룩 검색…"
+            className="min-h-9 w-full rounded-lg border border-line bg-card py-1.5 pl-7 pr-2 text-[0.7rem] text-fg placeholder:text-fg-3"
+          />
+        </label>
+        <button
+          type="button"
+          aria-pressed={favoritesOnly}
+          onClick={() => setFavoritesOnly((value) => !value)}
+          className={cn(
+            "inline-flex min-h-9 items-center gap-1 rounded-lg border px-2 text-[0.65rem] font-semibold",
+            favoritesOnly
+              ? "border-accent/50 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          )}
+        >
+          <Star className="size-3.5" aria-hidden fill={favoritesOnly ? "currentColor" : "none"} />
+          즐겨찾기
+        </button>
+      </div>
+
+      {recentLooks.length > 0 && !favoritesOnly && !q ? (
+        <div className="space-y-1">
+          <p className="text-[0.6rem] font-medium text-fg-3 uppercase tracking-wide">최근</p>
+          <div className="flex flex-wrap gap-1.5">
+            {recentLooks.map((look) => (
+              <button
+                key={`recent-${look.id}`}
+                type="button"
+                onClick={() => onApplyLook(look)}
+                title={look.tip}
+                className={CHIP_CLASS}
+              >
+                {look.label}
+              </button>
+            ))}
           </div>
-        );
-      })}
+        </div>
+      ) : null}
+
+      {filtered.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line bg-card/40 px-3 py-4 text-center text-[0.7rem] text-fg-3">
+          {favoritesOnly ? "즐겨찾기한 룩이 없어요. 별 아이콘으로 추가해 보세요." : "검색 결과가 없어요."}
+        </p>
+      ) : (
+        CATEGORY_ORDER.map((category) => {
+          const looks = filtered.filter((look) => look.category === category);
+          if (looks.length === 0) return null;
+          return (
+            <div key={category} className="space-y-1">
+              <p className="text-[0.6rem] font-medium text-fg-3 uppercase tracking-wide">{category}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {looks.map((look) => {
+                  const effectId = lookEffectId(look.id);
+                  const favorited = isStudioEffectFavorite(favoriteState, effectId);
+                  return (
+                    <div key={look.id} className="inline-flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onApplyLook(look)}
+                        title={look.tip}
+                        className={CHIP_CLASS}
+                      >
+                        {look.label}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={favorited ? `${look.label} 즐겨찾기 해제` : `${look.label} 즐겨찾기`}
+                        aria-pressed={favorited}
+                        onClick={() => onToggleFavorite(effectId)}
+                        className={cn(
+                          "grid size-7 place-items-center rounded-md border border-transparent text-fg-3 transition-colors hover:border-line hover:bg-raised hover:text-fg",
+                          favorited && "text-accent"
+                        )}
+                      >
+                        <Star className="size-3" fill={favorited ? "currentColor" : "none"} aria-hidden />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

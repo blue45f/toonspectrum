@@ -97,6 +97,8 @@ import {
   GanttChartSquare,
   History as HistoryIcon,
   Wind,
+  SquareSplitHorizontal,
+  Mountain,
 } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -106,6 +108,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioCreationLinkParams } from "./creator-studio-links";
+import {
+  studioAdjustmentStackToFilterFields,
+  type StudioAdjustmentStack,
+} from "./studio-adjustment-stack";
 import {
   runStudioAdvancedFillInBrowser,
   studioAdvancedFillResultMessage,
@@ -171,6 +177,7 @@ import {
   removeKeyframe,
   removeTrack,
   resolveTimelineComposite,
+  resolveTimelineTransforms,
   setKeyframe,
   type AnimationTimelineDoc,
 } from "./studio-anim-tracks";
@@ -260,6 +267,11 @@ import {
   type StudioSavedBrush,
 } from "./studio-brush-library";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
+import {
+  buildStudioBrushTipAlphaMap,
+  planStudioBrushTipStamp,
+  studioBrushTipUsesSolidEllipse,
+} from "./studio-brush-tip-stamp";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import {
   bubbleShapeCanvasPointToLocal,
@@ -302,6 +314,15 @@ import {
   studioCheckpointKey,
   type StudioCheckpoint,
 } from "./studio-checkpoints";
+import {
+  StudioContextActionButton,
+  StudioDockButton,
+  StudioDockNavButton,
+  StudioMenuPopoverHeader,
+  StudioMenuSubtabs,
+  StudioToolbarCluster,
+  StudioToolbarDivider,
+} from "./studio-chrome-ui";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import {
   assembleComipoPage,
@@ -398,6 +419,14 @@ import {
   studioEditorInstanceKey,
 } from "./studio-editor-scope";
 import {
+  loadStudioEffectFavoriteState,
+  rememberStudioEffectRecent,
+  saveStudioEffectFavoriteState,
+  toggleStudioEffectFavorite,
+  type StudioEffectFavoriteState,
+  type StudioEffectId,
+} from "./studio-effect-favorites";
+import {
   type ExportFormat,
 } from "./studio-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
@@ -483,6 +512,18 @@ import {
   type LayerMaskPaintMode,
 } from "./studio-layer-mask";
 import {
+  applyStudioLayerMergePlan,
+  planStudioLayerFlattenVisible,
+  planStudioLayerMergeDown,
+  planStudioLayerMergeSelected,
+  type StudioLayerMergePlan,
+} from "./studio-layer-merge";
+import {
+  bakeStudioMergeComposite,
+  planStudioMergeBakeMode,
+  type StudioMergeBakeImageSource,
+} from "./studio-layer-merge-bake";
+import {
   normalizeStudioLayerColor,
   normalizeStudioLayerRole,
 } from "./studio-layer-navigator";
@@ -503,7 +544,19 @@ import {
   type LayerGroup,
 } from "./studio-layers";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
+import {
+  canBeginStudioLiveMutation,
+  studioLiveMutationResources,
+} from "./studio-live-mutation-guard";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
+import {
+  createStudioMacroSession,
+  recordStudioMacroCommand,
+  startStudioMacroRecording,
+  stopStudioMacroRecording,
+  studioMacroSessionToAutoActionSet,
+  type StudioMacroSession,
+} from "./studio-macro-recorder";
 import {
   computeMagicResize,
   presetCanvasSize,
@@ -603,6 +656,7 @@ import {
   type PanelSplitLine,
   type PanelSplitPreview,
 } from "./studio-panel-split";
+import { studioToolButtonClass } from "./studio-panel-ui";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -774,6 +828,14 @@ import {
   type StudioStrokeStabilizerState,
 } from "./studio-stroke-stabilizer";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
+import {
+  loadStudioUiDensityState,
+  saveStudioUiDensityState,
+  studioUiDensityAllows,
+  studioUiDensityDescription,
+  studioUiDensityLabel,
+  type StudioUiDensityMode,
+} from "./studio-ui-density";
 import { planWatercolorBrushDabs, watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
 import {
   DEFAULT_WATERMARK,
@@ -1507,6 +1569,8 @@ export interface ImageEl {
   // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
   skewX?: number;
   skewY?: number;
+  /** Photopea-style reorderable smart filter stack (non-destructive). */
+  smartFilters?: StudioAdjustmentStack;
   // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.
   // src는 항상 frames 중 현재 표시 프레임의 src와 동일하게 유지한다.
   frames?: StudioAnimFrame[];
@@ -2305,7 +2369,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
     && isStudioBrushDynamicsPresetId(el.brush)
     ? el.brush
     : null;
-  const dynamicDabVariations = dynamicBrushId
+  const dynamicBrushPlan = dynamicBrushId
     ? (() => {
         const dynamics = normalizeStudioBrushDynamicsSettings(
           el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
@@ -2324,9 +2388,13 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
           seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
           maxDabs: 1024,
         });
-        return studioDynamicBrushDabVariations(baseDabs, el.symmetry);
+        return {
+          dynamics,
+          dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
+        };
       })()
     : null;
+  const dynamicDabVariations = dynamicBrushPlan?.dabVariations ?? null;
 
   return (
     <>
@@ -2495,6 +2563,9 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
 
           if (dynamicBrush && el.mode !== "eraser") {
             const dabs = dynamicDabVariations?.[index] ?? dynamicDabVariations?.[0] ?? [];
+            const tip = dynamicBrushPlan?.dynamics.tip;
+            const useEllipse = studioBrushTipUsesSolidEllipse(tip);
+            const tipAlphaMap = useEllipse ? null : buildStudioBrushTipAlphaMap(tip);
             return (
               <Shape
                 key={index}
@@ -2502,17 +2573,32 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                   context.save();
                   const inheritedAlpha = context.globalAlpha;
                   for (const dab of dabs) {
-                    context.save();
-                    context.globalAlpha = inheritedAlpha
+                    const baseAlpha = inheritedAlpha
                       * Math.min(1, Math.max(0, dab.opacity * dab.flow * opacity));
-                    context.translate(dab.x, dab.y);
-                    context.rotate(dab.angle * Math.PI / 180);
-                    context.scale(1, dab.roundness);
-                    context.beginPath();
-                    context.arc(0, 0, Math.max(0.25, dab.size / 2), 0, Math.PI * 2);
-                    context.fillStyle = stroke;
-                    context.fill();
-                    context.restore();
+                    if (useEllipse || !tipAlphaMap) {
+                      context.save();
+                      context.globalAlpha = baseAlpha;
+                      context.translate(dab.x, dab.y);
+                      context.rotate(dab.angle * Math.PI / 180);
+                      context.scale(1, dab.roundness);
+                      context.beginPath();
+                      context.arc(0, 0, Math.max(0.25, dab.size / 2), 0, Math.PI * 2);
+                      context.fillStyle = stroke;
+                      context.fill();
+                      context.restore();
+                      continue;
+                    }
+                    // PNG-alpha / procedural tip stamp path: spacing·scatter already live in dab x/y.
+                    const stamp = planStudioBrushTipStamp(dab, tip, { alphaMap: tipAlphaMap, grid: 7 });
+                    for (const sample of stamp.samples) {
+                      context.save();
+                      context.globalAlpha = baseAlpha * sample.alpha;
+                      context.beginPath();
+                      context.arc(dab.x + sample.dx, dab.y + sample.dy, sample.radius, 0, Math.PI * 2);
+                      context.fillStyle = stroke;
+                      context.fill();
+                      context.restore();
+                    }
                   }
                   context.restore();
                 }}
@@ -3481,6 +3567,8 @@ function UrlImage({
   onChange,
   dragBoundFunc,
   autoFitFrames,
+  onInteractionBegin,
+  onInteractionEnd,
 }: {
   el: ImageEl;
   draggable: boolean;
@@ -3489,6 +3577,8 @@ function UrlImage({
   onChange: (patch: Partial<ImageEl>) => void;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
   autoFitFrames: FrameEl[] | null;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
@@ -3639,22 +3729,33 @@ function UrlImage({
       shadowOpacity={el.shadowOpacity ?? 1}
       cornerRadius={el.cornerRadius ?? 0}
       {...toKonvaSkewAttrs(el)}
-      {...resizableNodeProps<Partial<ImageEl>>({ draggable, dragBoundFunc, onSelect, onChange })}
+      {...resizableNodeProps<Partial<ImageEl>>({
+        draggable,
+        dragBoundFunc,
+        onSelect,
+        onChange,
+        onInteractionBegin,
+        onInteractionEnd,
+      })}
       onDragEnd={(e) => {
         // 패널 자동맞춤(studio-panel-autofit) — resizableNodeProps 의 기본 onDragEnd({x,y}만
         // 패치)를 이 이미지 한정으로 덮어쓴다. autoFitFrames 는 호출부(renderEl)가 이미 "그룹
         // 드래그 중이 아니고 자격도 있음"까지 걸러서 넘긴다 — null 이거나 빈 배열이면 시도조차
         // 하지 않고 기존과 완전히 동일하게 동작한다.
-        const draggedX = e.target.x();
-        const draggedY = e.target.y();
-        const fit =
-          autoFitFrames && autoFitFrames.length > 0
-            ? computePanelAutoFitPatch(
-                { x: draggedX, y: draggedY, width: el.width, height: el.height },
-                autoFitFrames
-              )
-            : null;
-        onChange(fit ?? { x: draggedX, y: draggedY });
+        try {
+          const draggedX = e.target.x();
+          const draggedY = e.target.y();
+          const fit =
+            autoFitFrames && autoFitFrames.length > 0
+              ? computePanelAutoFitPatch(
+                  { x: draggedX, y: draggedY, width: el.width, height: el.height },
+                  autoFitFrames
+                )
+              : null;
+          onChange(fit ?? { x: draggedX, y: draggedY });
+        } finally {
+          onInteractionEnd?.();
+        }
       }}
     />
   );
@@ -3668,6 +3769,8 @@ function FramePanel({
   onSelect,
   onChange,
   dragBoundFunc,
+  onInteractionBegin,
+  onInteractionEnd,
 }: {
   el: FrameEl;
   theme: "classic" | "soft" | "vivid";
@@ -3676,6 +3779,8 @@ function FramePanel({
   onSelect: () => void;
   onChange: (patch: Partial<FrameEl>) => void;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
 
@@ -3748,19 +3853,38 @@ function FramePanel({
       dragBoundFunc={dragBoundFunc}
       onMouseDown={onSelect}
       onTap={onSelect}
-      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
+      onDragStart={(e) => {
+        if (onInteractionBegin && !onInteractionBegin()) e.target.stopDrag();
+      }}
+      onTransformStart={(e) => {
+        if (onInteractionBegin && !onInteractionBegin()) {
+          const node = e.target as Konva.Node & { stopDrag?: () => void };
+          node.stopDrag?.();
+        }
+      }}
+      onDragEnd={(e) => {
+        try {
+          onChange({ x: e.target.x(), y: e.target.y() });
+        } finally {
+          onInteractionEnd?.();
+        }
+      }}
       onTransformEnd={(e) => {
-        const node = e.target as Konva.Group;
-        const sx = node.scaleX();
-        const sy = node.scaleY();
-        const w = Math.max(40, el.width * sx);
-        const h = Math.max(40, el.height * sy);
-        node.scaleX(1);
-        node.scaleY(1);
-        // 폴리곤도 같은 비율로 스케일해 형태 유지.
-        const patch: Partial<FrameEl> = { x: node.x(), y: node.y(), width: w, height: h };
-        if (poly) patch.points = poly.map((v, i) => v * (i % 2 === 0 ? sx : sy));
-        onChange(patch);
+        try {
+          const node = e.target as Konva.Group;
+          const sx = node.scaleX();
+          const sy = node.scaleY();
+          const w = Math.max(40, el.width * sx);
+          const h = Math.max(40, el.height * sy);
+          node.scaleX(1);
+          node.scaleY(1);
+          // 폴리곤도 같은 비율로 스케일해 형태 유지.
+          const patch: Partial<FrameEl> = { x: node.x(), y: node.y(), width: w, height: h };
+          if (poly) patch.points = poly.map((v, i) => v * (i % 2 === 0 ? sx : sy));
+          onChange(patch);
+        } finally {
+          onInteractionEnd?.();
+        }
       }}
     >
       {poly ? (
@@ -3969,6 +4093,11 @@ function SpeedLinesNode({
 }
 
 // 캔버스 줌 한계와 클램프(0.05 단위 반올림으로 깔끔한 퍼센트 유지).
+/** Module-level wall clock for timeline rAF — keeps performance.now out of the component body. */
+function studioTimelineClockMs(): number {
+  return globalThis.performance.now();
+}
+
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
 function clampZoom(z: number) {
@@ -4136,6 +4265,131 @@ function StudioCuttoonEditor() {
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const studioLiveHeldResourcesRef = useRef<string[]>([]);
+  const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
+    loadStudioUiDensityState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
+    ).mode
+  );
+  const [effectFavoriteState, setEffectFavoriteState] = useState<StudioEffectFavoriteState>(() =>
+    loadStudioEffectFavoriteState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
+    )
+  );
+  const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
+  const [layerMergeBusy, setLayerMergeBusy] = useState(false);
+  function setStudioUiDensity(mode: StudioUiDensityMode) {
+    setUiDensityMode(mode);
+    saveStudioUiDensityState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+      { mode }
+    );
+  }
+  function persistEffectFavoriteState(next: StudioEffectFavoriteState) {
+    setEffectFavoriteState(next);
+    saveStudioEffectFavoriteState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+      next
+    );
+  }
+  function toggleEffectFavorite(effectId: StudioEffectId) {
+    persistEffectFavoriteState(toggleStudioEffectFavorite(effectFavoriteState, effectId));
+  }
+  function rememberEffectRecent(effectId: StudioEffectId) {
+    persistEffectFavoriteState(rememberStudioEffectRecent(effectFavoriteState, effectId));
+  }
+  function beginLiveResourceEdit(elementIds?: readonly string[] | null): boolean {
+    const room = studioLiveRoomRef.current;
+    if (!room) return true;
+    const decision = canBeginStudioLiveMutation({
+      locks: room.getLocks(),
+      pageId: activePage.id,
+      elementIds,
+      selfSessionId: room.participant.sessionId,
+    });
+    if (!decision.ok) {
+      setError(decision.reason);
+      return false;
+    }
+    const resources = studioLiveMutationResources({
+      pageId: activePage.id,
+      elementIds,
+    });
+    for (const resource of resources) {
+      room.claimLock(resource);
+    }
+    studioLiveHeldResourcesRef.current = resources;
+    return true;
+  }
+  function endLiveResourceEdit() {
+    const room = studioLiveRoomRef.current;
+    const held = studioLiveHeldResourcesRef.current;
+    studioLiveHeldResourcesRef.current = [];
+    if (!room || held.length === 0) return;
+    for (const resource of held) room.releaseLock(resource);
+  }
+  function nodeInteractionBegin(elementId: string): boolean {
+    return beginLiveResourceEdit([elementId]);
+  }
+  function startMacroRecord() {
+    // Timestamp is taken inside startStudioMacroRecording (default now) to keep this handler render-pure.
+    setMacroSession(startStudioMacroRecording(createStudioMacroSession("녹음 매크로")));
+    setAutoActionStatus("매크로 녹음을 시작했어요. 레이어·레터링 조작이 기록됩니다.");
+    setAutoActionError(null);
+  }
+  function stopMacroRecord() {
+    const stopped = stopStudioMacroRecording(macroSession);
+    const actionSet = studioMacroSessionToAutoActionSet(stopped);
+    setMacroSession(createStudioMacroSession(stopped.name));
+    setAutoActionSet(actionSet);
+    setAutoActionPlan(null);
+    setAutoActionStatus(
+      stopped.commands.length > 0
+        ? `매크로 ${stopped.commands.length}단계를 Action Set으로 저장했어요.`
+        : "녹음된 단계가 없어 빈 Action Set을 만들었어요."
+    );
+  }
+  function maybeRecordMacroFromPatch(patch: Partial<El>) {
+    if (!macroSession.recording) return;
+    const fields = patch as Partial<El> & {
+      fontSize?: number;
+      color?: string;
+      blendMode?: string;
+      opacity?: number;
+      hidden?: boolean;
+      locked?: boolean;
+    };
+    if (typeof fields.opacity === "number") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "set-opacity", opacity: fields.opacity })
+      );
+    }
+    if (typeof fields.hidden === "boolean") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "set-hidden", hidden: fields.hidden })
+      );
+    }
+    if (typeof fields.locked === "boolean") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "set-locked", locked: fields.locked })
+      );
+    }
+    if (typeof fields.blendMode === "string") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "set-blend-mode", blendMode: fields.blendMode })
+      );
+    }
+    if (typeof fields.fontSize === "number") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "lettering-font-size", fontSize: fields.fontSize })
+      );
+    }
+    if (typeof fields.color === "string") {
+      setMacroSession((session) =>
+        recordStudioMacroCommand(session, { type: "lettering-color", color: fields.color })
+      );
+    }
+  }
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
     studioLiveRoomRef.current = room;
   }, []);
@@ -4911,8 +5165,18 @@ function StudioCuttoonEditor() {
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
   const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive || canvasOnlyMode;
-  const visibleLeftPanelOpen = leftPanelOpen && !presentationPanelsHidden;
-  const visibleRightPanelOpen = rightPanelOpen && !presentationPanelsHidden;
+  const densityHidesLeftPanel = !studioUiDensityAllows(uiDensityMode, "left-panel");
+  const densityHidesRightPanel = !studioUiDensityAllows(uiDensityMode, "right-panel");
+  const densityHidesPageStrip = !studioUiDensityAllows(uiDensityMode, "page-strip");
+  const densityShowsStatusRail = studioUiDensityAllows(uiDensityMode, "status-rail");
+  // Focus density treats the left dock as the page strip (page-strip region).
+  const visibleLeftPanelOpen =
+    leftPanelOpen &&
+    !presentationPanelsHidden &&
+    !densityHidesLeftPanel &&
+    !densityHidesPageStrip;
+  const visibleRightPanelOpen =
+    rightPanelOpen && !presentationPanelsHidden && !densityHidesRightPanel;
   const liveWorkspaceLayout = normalizeStudioWorkspaceLayout(
     {
       inspector: inspectorLayout,
@@ -5696,11 +5960,11 @@ function StudioCuttoonEditor() {
   // 것을 막는다(idx가 안 바뀌면 timelineComposite/renderEl 결과도 안 바뀌므로 리렌더가 무의미하다).
   useEffect(() => {
     if (!timelinePlaying) return;
-    const start = performance.now();
+    const start = studioTimelineClockMs();
     let raf = 0;
     let lastIdx = -1;
     const tick = () => {
-      const elapsed = performance.now() - start;
+      const elapsed = studioTimelineClockMs() - start;
       const idx = globalFrameIndexAtElapsed(animTimeline, elapsed, true);
       if (idx !== lastIdx) {
         lastIdx = idx;
@@ -8888,6 +9152,7 @@ function StudioCuttoonEditor() {
   function patchEl(id: string, patch: Partial<El>) {
     const target = elementById.get(id);
     if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
+    maybeRecordMacroFromPatch(patch);
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
   }
   // 매직 리사이즈 — 프리셋을 누르면 폭(CANVAS_W)은 그대로 두고 높이만 목표 비율로 바꾼 뒤,
@@ -9167,6 +9432,82 @@ function StudioCuttoonEditor() {
     if (changed) commit(next);
   }
 
+  async function commitLayerMergePlan(
+    result: ReturnType<typeof planStudioLayerMergeDown>
+  ) {
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    if (masterEditMode) {
+      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없어요.");
+      return;
+    }
+    if (pageEditLocked && !masterEditMode) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      return;
+    }
+    if (layerMergeBusy) return;
+    if (!beginLiveResourceEdit(result.plan.removeIds)) return;
+    setLayerMergeBusy(true);
+    try {
+      const plan: StudioLayerMergePlan = result.plan;
+      const sources: StudioMergeBakeImageSource[] = plan.removeIds
+        .map((id) => elements.find((element) => element.id === id))
+        .filter((element): element is El => Boolean(element))
+        .map((element) => {
+          const bounds = elBounds(element);
+          return {
+            id: element.id,
+            type: element.type,
+            src: element.type === "image" ? element.src : undefined,
+            x: bounds.x,
+            y: bounds.y,
+            width: Math.max(1, bounds.w),
+            height: Math.max(1, bounds.h),
+            opacity: element.opacity,
+            rotation: "rotation" in element ? Number(element.rotation ?? 0) : 0,
+            flipped: element.type === "image" ? element.flipped : undefined,
+            flippedY: element.type === "image" ? element.flippedY : undefined,
+          };
+        });
+      const mode = planStudioMergeBakeMode(sources);
+      if (mode.mode === "raster") {
+        const baked = await bakeStudioMergeComposite({
+          plan,
+          sources,
+          newId: uid(),
+        });
+        if (baked.ok && baked.mode === "raster") {
+          const composite: ImageEl = {
+            ...baked.composite,
+            rotation: 0,
+          };
+          const next = applyStudioLayerMergePlan(elements, plan, composite) as El[];
+          commit(next);
+          setSelectedId(composite.id);
+          setMarqueeIds([]);
+          setError(null);
+          return;
+        }
+        if (!baked.ok) {
+          setError(baked.reason);
+          return;
+        }
+      }
+      // Mixed vector/raster or bake unavailable — non-destructive group merge (single undo).
+      const group = createLayerGroup(uid(), plan.resultName);
+      updateActivePage({
+        groups: [...groups, group],
+        elements: groupItems(elements, [...plan.removeIds], group.id) as El[],
+      });
+      setError(null);
+    } finally {
+      setLayerMergeBusy(false);
+      endLiveResourceEdit();
+    }
+  }
+
   function handleLayerNavigatorAction(action: StudioLayerNavigatorAction) {
     if (pageEditLocked && !masterEditMode) {
       setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
@@ -9215,6 +9556,32 @@ function StudioCuttoonEditor() {
       case "set-items-locked":
         patchLayerItems(action.ids, () => ({ locked: action.locked }));
         return;
+      case "merge-down": {
+        void commitLayerMergePlan(
+          planStudioLayerMergeDown({
+            items: elements,
+            groups,
+            selectedId: action.id,
+          })
+        );
+        return;
+      }
+      case "flatten-visible": {
+        void commitLayerMergePlan(
+          planStudioLayerFlattenVisible({ items: elements, groups })
+        );
+        return;
+      }
+      case "merge-selected": {
+        void commitLayerMergePlan(
+          planStudioLayerMergeSelected({
+            items: elements,
+            groups,
+            selectedIds: action.ids,
+          })
+        );
+        return;
+      }
       case "set-item-flag":
         patchLayerItems([action.id], () => ({ [action.flag]: action.value } as Partial<El>));
         return;
@@ -12709,6 +13076,7 @@ function StudioCuttoonEditor() {
     stopQuickShapeTracking();
     clearDraftPreview();
     releaseDrawingPointerSession();
+    endLiveResourceEdit();
   }
   function noteQuickShapePointerMoved(pos: { x: number; y: number }) {
     const anchor = quickShapeStillAnchorRef.current;
@@ -13133,10 +13501,14 @@ function StudioCuttoonEditor() {
         }
         return;
       }
+      if (!beginLiveResourceEdit()) return;
       const pointerSession = beginStudioStrokePointerSession(pointerSample);
       // A second contact cannot replace a live pen stroke. Right-click/barrel-button presses also
       // remain available to the context menu instead of leaving a one-point draft behind.
-      if (!pointerSession) return;
+      if (!pointerSession) {
+        endLiveResourceEdit();
+        return;
+      }
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
       setSelectedId(null);
@@ -13829,6 +14201,7 @@ function StudioCuttoonEditor() {
       perspectiveRayRef.current = null;
       isometricAxisRayRef.current = null;
       clearDraftPreview();
+      endLiveResourceEdit();
     }
   }
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
@@ -14271,34 +14644,36 @@ function StudioCuttoonEditor() {
   function startEditText(id: string) {
     const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
+    if (!beginLiveResourceEdit([id])) return;
     setEditing({ id, value: el.text });
   }
 
-
-
-
   function commitEditText() {
-    if (editing) {
-      const el = elementById.get(editing.id);
-      // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존) — 단,
-      // autoShrinkText(크기 고정 모드)가 켜져 있으면 높이는 건드리지 않는다(렌더 시점에
-      // fitBubbleFontSize가 폰트 크기를 알아서 줄인다).
-      let height: number | undefined;
-      if (el && el.type === "bubble" && !el.autoShrinkText) {
-        const measure = new KonvaRuntime.Text({
-          text: editing.value || " ",
-          width: el.width - 36,
-          fontSize: el.fontSize ?? 24,
-          fontFamily: el.font ?? "Pretendard, sans-serif",
-          align: "center",
-          lineHeight: el.lineHeight ?? 1.1,
-        });
-        height = Math.max(el.height, Math.ceil(measure.height()) + 28);
-        measure.destroy();
+    try {
+      if (editing) {
+        const el = elementById.get(editing.id);
+        // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존) — 단,
+        // autoShrinkText(크기 고정 모드)가 켜져 있으면 높이는 건드리지 않는다(렌더 시점에
+        // fitBubbleFontSize가 폰트 크기를 알아서 줄인다).
+        let height: number | undefined;
+        if (el && el.type === "bubble" && !el.autoShrinkText) {
+          const measure = new KonvaRuntime.Text({
+            text: editing.value || " ",
+            width: el.width - 36,
+            fontSize: el.fontSize ?? 24,
+            fontFamily: el.font ?? "Pretendard, sans-serif",
+            align: "center",
+            lineHeight: el.lineHeight ?? 1.1,
+          });
+          height = Math.max(el.height, Math.ceil(measure.height()) + 28);
+          measure.destroy();
+        }
+        patchEl(editing.id, { text: editing.value, ...(height !== undefined ? { height } : {}) } as Partial<El>);
       }
-      patchEl(editing.id, { text: editing.value, ...(height !== undefined ? { height } : {}) } as Partial<El>);
+      setEditing(null);
+    } finally {
+      endLiveResourceEdit();
     }
-    setEditing(null);
   }
 
   async function captureReadyStageForPage(page: PageState): Promise<Konva.Stage> {
@@ -14652,11 +15027,8 @@ function StudioCuttoonEditor() {
 
   // 터치 기기(작은 폰)에서는 도구 버튼을 키워 thumb 로 누르기 쉽게 한다(pointer-coarse: h-10).
   // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
-  const toolBtn = (active: boolean) =>
-    cn(
-      "inline-flex h-9 shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]",
-      active ? "border-accent/60 bg-accent-soft/50 text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-    );
+  // 시각 토큰은 studio-panel-ui / studio-chrome-ui 와 공유한다(경쟁사 수준의 일관 어포던스).
+  const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
 
   // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
@@ -14669,25 +15041,12 @@ function StudioCuttoonEditor() {
       "fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );
-  // 그룹 팝오버 안의 서브탭 칩 — 기존 장르/카테고리 필터 칩(rounded-full)과 동일한 시각 언어를 재사용.
-  const groupTabBtn = (active: boolean) =>
-    cn(
-      "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.7rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3",
-      active ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-2 hover:bg-raised"
-    );
-
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
+  // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
   const mobileBarBtn = (active: boolean) =>
     cn(
       "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
-    );
-
-  // 모바일 하단 '드로잉 도구' 버튼 — 한 손 조작용 큰 터치 타깃(>=44px). 활성 도구는 감귤색으로 또렷하게.
-  const mobileDrawToolBtn = (active: boolean) =>
-    cn(
-      "flex min-h-[2.875rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised active:bg-raised"
     );
   const quickActionsDisabledActions = new Set<StudioQuickActionId>();
   if (hi === 0 || masterEditMode || collaborationDocumentLocked) quickActionsDisabledActions.add("undo");
@@ -16597,10 +16956,20 @@ function StudioCuttoonEditor() {
             : "contents"
         )}
       >
-        {error && (
-          <div className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
-        )}
-        {expectsSharedDocument && (!mobileImmersive || collaborationDocumentLocked) ? (
+        {densityShowsStatusRail && error ? (
+          <div role="status" className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
+        ) : null}
+        {densityShowsStatusRail && layerMergeBusy ? (
+          <div role="status" className="mb-3 rounded-xl border border-accent/35 bg-accent-soft/30 px-3 py-2 text-sm text-fg-2">
+            레이어를 병합하는 중…
+          </div>
+        ) : null}
+        {densityShowsStatusRail && macroSession.recording ? (
+          <div role="status" className="mb-3 rounded-xl border border-bad/30 bg-bad/10 px-3 py-2 text-sm font-semibold text-bad">
+            매크로 녹음 중 · {macroSession.commands.length}단계
+          </div>
+        ) : null}
+        {densityShowsStatusRail && expectsSharedDocument && (!mobileImmersive || collaborationDocumentLocked) ? (
           <div
             role="status"
             aria-live="polite"
@@ -16672,6 +17041,29 @@ function StudioCuttoonEditor() {
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-2 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel/80 to-transparent lg:hidden" />
+        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-line bg-card/70 p-0.5" role="group" aria-label="화면 밀도">
+          {(["simple", "full", "focus"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={uiDensityMode === mode}
+              title={studioUiDensityDescription(mode)}
+              aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
+              onClick={() => setStudioUiDensity(mode)}
+              className={cn(
+                "min-h-9 rounded-lg px-2 text-[0.65rem] font-semibold transition-colors pointer-coarse:min-h-11",
+                uiDensityMode === mode
+                  ? "bg-accent text-on-accent"
+                  : "text-fg-3 hover:bg-raised hover:text-fg-2"
+              )}
+            >
+              {studioUiDensityLabel(mode)}
+            </button>
+          ))}
+        </div>
+        <StudioToolbarDivider />
+        {studioUiDensityAllows(uiDensityMode, "toolbar-assets") ? (
+        <StudioToolbarCluster label="에셋 라이브러리">
         <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -16685,41 +17077,32 @@ function StudioCuttoonEditor() {
             aria-expanded={activeToolbarGroup === "assetGroup"}
             className={toolBtn(activeToolbarGroup === "assetGroup")}
           >
-            <Folder size={14} /> 에셋
-            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "assetGroup" && "rotate-180")} />
+            <Folder size={15} aria-hidden /> 에셋
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
           </button>
           {activeToolbarGroup === "assetGroup" && (
             <div className={groupPopoverClass("w-80")}>
-              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
-                <button type="button" onClick={() => setMenu("template")} aria-pressed={menu === "template"} className={groupTabBtn(menu === "template")}>
-                  <LayoutTemplate size={12} /> 템플릿
-                </button>
-                <button type="button" onClick={() => setMenu("emeres")} aria-pressed={menu === "emeres"} className={groupTabBtn(menu === "emeres")}>
-                  <PenTool size={12} /> 이메레스
-                </button>
-                <button type="button" onClick={() => setMenu("scene")} aria-pressed={menu === "scene"} className={groupTabBtn(menu === "scene")}>
-                  <Clapperboard size={12} /> 장면
-                </button>
-                <button type="button" onClick={() => setMenu("clip")} aria-pressed={menu === "clip"} className={groupTabBtn(menu === "clip")}>
-                  <Bookmark size={12} /> 클립
-                </button>
-                <button type="button" onClick={() => setMenu("sticker")} aria-pressed={menu === "sticker"} className={groupTabBtn(menu === "sticker")}>
-                  <StickerIcon size={12} /> 효과
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    preloadStudioAssetMenuPanel();
-                    setMenu("asset");
-                  }}
-                  onMouseEnter={preloadStudioAssetMenuPanel}
-                  onFocus={preloadStudioAssetMenuPanel}
-                  aria-pressed={menu === "asset"}
-                  className={groupTabBtn(menu === "asset")}
-                >
-                  <Library size={12} /> 내 에셋
-                </button>
-              </div>
+              <StudioMenuPopoverHeader
+                icon={Folder}
+                title="에셋"
+                description="템플릿·밑그림·장면·클립·효과를 한 메뉴에서 고릅니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="에셋 메뉴 구역"
+                activeId={menu}
+                onSelect={(id) => {
+                  if (id === "asset") preloadStudioAssetMenuPanel();
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "template", label: "템플릿", icon: LayoutTemplate },
+                  { id: "emeres", label: "이메레스", icon: PenTool },
+                  { id: "scene", label: "장면", icon: Clapperboard },
+                  { id: "clip", label: "클립", icon: Bookmark },
+                  { id: "sticker", label: "효과", icon: StickerIcon },
+                  { id: "asset", label: "내 에셋", icon: Library },
+                ]}
+              />
               {menu === "template" && (
                 <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
                   <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
@@ -17255,11 +17638,18 @@ function StudioCuttoonEditor() {
             </div>
           )}
         </div>
-        <button type="button" onClick={addFrame} className={toolBtn(false)}>
-          <Plus size={14} /> + 패널 추가
+        </StudioToolbarCluster>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-cut") ? (
+        <>
+        <StudioToolbarDivider label="컷" />
+        <StudioToolbarCluster label="컷 배치">
+        <button type="button" onClick={addFrame} className={toolBtn(false)} title="새 패널 프레임 추가">
+          <Plus size={15} aria-hidden /> 패널
         </button>
         <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)} title="기울어진 분할선의 두 패널을 한 번에 추가">
-          <span className="text-[13px] leading-none">◩</span> 사선 컷
+          <SquareSplitHorizontal size={15} aria-hidden /> 사선 컷
         </button>
         {selected?.type === "frame" && (
           <button
@@ -17268,12 +17658,20 @@ function StudioCuttoonEditor() {
             className={toolBtn(Boolean(selected.points))}
             title="선택한 패널을 사선(평행사변형)↔사각형으로"
           >
-            <span className="text-[13px] leading-none">◪</span> {selected.points ? "직선화" : "사선화"}
+            <SquareSplitHorizontal size={15} aria-hidden className="opacity-90" />
+            {selected.points ? "직선화" : "사선화"}
           </button>
         )}
-        <span className="mx-0.5 h-5 w-px bg-line" />
-        <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
-          <MousePointer2 size={14} /> 선택
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
+        <>
+        <StudioToolbarDivider label="도구" />
+        <StudioToolbarCluster label="그리기 도구">
+        <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"} title="선택 (V)">
+          <MousePointer2 size={15} aria-hidden /> 선택
         </button>
         <button
           type="button"
@@ -17287,7 +17685,7 @@ function StudioCuttoonEditor() {
           className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
           aria-pressed={tool === "draw" && drawMode === "pen"}
         >
-          <Pencil size={14} /> 펜
+          <Pencil size={15} aria-hidden /> 펜
         </button>
         <button
           type="button"
@@ -17301,7 +17699,7 @@ function StudioCuttoonEditor() {
           className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
           aria-pressed={tool === "draw" && drawMode === "eraser"}
         >
-          <Eraser size={14} /> 지우개
+          <Eraser size={15} aria-hidden /> 지우개
         </button>
         <button
           type="button"
@@ -17311,7 +17709,7 @@ function StudioCuttoonEditor() {
           aria-pressed={advancedFillActive}
           title={advancedFillUnsupportedReason ?? "선택 래스터의 닫힌 영역을 참조 경계로 채우기 (G)"}
         >
-          <PaintBucket size={14} /> 고급 채우기
+          <PaintBucket size={15} aria-hidden /> 채우기
         </button>
         <button
           type="button"
@@ -17334,28 +17732,43 @@ function StudioCuttoonEditor() {
           className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
           title={selected?.type !== "image" ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요" : "선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"}
         >
-          <Film size={14} /> 프레임 애니메이션
+          <Film size={15} aria-hidden /> 프레임
         </button>
-        <span className="mx-0.5 h-5 w-px bg-line" />
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+        <>
+        <StudioToolbarDivider label="참조" />
+        <StudioToolbarCluster label="참조·3D">
         <button
           type="button"
           onClick={() => setPoserVrmOpen(true)}
-          className={cn(toolBtn(poserVrmOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           title="무료 베이스 캐릭터를 골라 포즈·표정·의상·색상까지 만들고 투명 배경으로 추가하기"
         >
-          <Sparkles size={14} /> 3D 캐릭터
+          <UsersRound size={15} aria-hidden /> 3D 캐릭터
         </button>
         <button
           type="button"
           onClick={() => setReferencePanelOpen((v) => !v)}
           onMouseEnter={preloadStudioReferencePanel}
           onFocus={preloadStudioReferencePanel}
-          className={cn(toolBtn(referencePanelOpen), "text-accent border border-accent/20 bg-accent-soft/30 hover:bg-accent-soft/50")}
+          className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           aria-pressed={referencePanelOpen}
           title="참고 이미지 패널 — 그리는 동안 옆에 이미지를 띄워두기"
         >
-          <PictureInPicture2 size={14} /> 참고 이미지
+          <PictureInPicture2 size={15} aria-hidden /> 참고
         </button>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? (
+        <>
+        <StudioToolbarDivider label="장면" />
+        <StudioToolbarCluster label="배경·톤">
         <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -17364,36 +17777,36 @@ function StudioCuttoonEditor() {
             aria-expanded={activeToolbarGroup === "bgGroup"}
             className={toolBtn(activeToolbarGroup === "bgGroup")}
           >
-            <ImageIcon size={14} /> 배경
-            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "bgGroup" && "rotate-180")} />
+            <Mountain size={15} aria-hidden /> 배경
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
           </button>
           {activeToolbarGroup === "bgGroup" && (
             <div className={groupPopoverClass("w-80")}>
-              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
-                <button type="button" onClick={() => setMenu("bgScene")} aria-pressed={menu === "bgScene"} className={groupTabBtn(menu === "bgScene")}>
-                  <ImageIcon size={12} /> 배경 씬
-                </button>
-                <button type="button" onClick={() => setMenu("tone")} aria-pressed={menu === "tone"} className={groupTabBtn(menu === "tone")}>
-                  <Grid2x2 size={12} /> 톤
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
+              <StudioMenuPopoverHeader
+                icon={Mountain}
+                title="배경·톤"
+                description="2D 씬, 스크린톤, 3D 블록아웃을 한 곳에서 배치합니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="배경 메뉴 구역"
+                activeId={menu === "bgScene" || menu === "tone" ? menu : "bgScene"}
+                onSelect={(id) => {
+                  if (id === "bg3d") {
                     setBg3dInitialScene(undefined);
                     setBg3dInitialDataUrl(undefined);
                     setBg3dInitialElementId(undefined);
                     setBg3dOpen(true);
                     setMenu(null);
-                  }}
-                  onPointerEnter={preloadStudioBackground3D}
-                  onPointerDown={preloadStudioBackground3D}
-                  onFocus={preloadStudioBackground3D}
-                  title="3D 배경 블록아웃 만들기"
-                  className={groupTabBtn(false)}
-                >
-                  <Boxes size={12} /> 3D 배경
-                </button>
-              </div>
+                    return;
+                  }
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "bgScene", label: "배경 씬", icon: ImageIcon },
+                  { id: "tone", label: "톤", icon: Grid2x2 },
+                  { id: "bg3d", label: "3D 배경", icon: Boxes, title: "3D 배경 블록아웃 만들기" },
+                ]}
+              />
               {menu === "bgScene" && (
                 <>
                   <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
@@ -17429,7 +17842,7 @@ function StudioCuttoonEditor() {
                           aria-pressed={bgSceneGenreFilter === genre}
                           className={cn(
                             "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                            bgSceneGenreFilter === genre ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                            bgSceneGenreFilter === genre ? "border-accent bg-accent text-on-accent" : "border-line bg-card text-fg-3 hover:bg-raised"
                           )}
                         >
                           {genre === "all" ? "전체" : genre}
@@ -17511,6 +17924,12 @@ function StudioCuttoonEditor() {
             </div>
           )}
         </div>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-style") ? (
+        <StudioToolbarCluster label="스타일">
         <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -17520,31 +17939,25 @@ function StudioCuttoonEditor() {
             className={toolBtn(activeToolbarGroup === "styleGroup")}
             title="색상 팔레트 · 브랜드 킷(글꼴·로고)"
           >
-            <Palette size={14} /> 스타일
-            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "styleGroup" && "rotate-180")} />
+            <Palette size={15} aria-hidden /> 스타일
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
           </button>
           {activeToolbarGroup === "styleGroup" && (
             <div className={groupPopoverClass("w-72")}>
-              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
-                <button
-                  type="button"
-                  onClick={() => setMenu("palette")}
-                  aria-pressed={menu === "palette"}
-                  title="색상 팔레트 저장·가져오기(.gpl)·내보내기"
-                  className={groupTabBtn(menu === "palette")}
-                >
-                  <Palette size={12} /> 팔레트
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMenu("brandKit")}
-                  aria-pressed={menu === "brandKit"}
-                  title="팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용"
-                  className={groupTabBtn(menu === "brandKit")}
-                >
-                  <Package size={12} /> 브랜드 킷
-                </button>
-              </div>
+              <StudioMenuPopoverHeader
+                icon={Palette}
+                title="스타일"
+                description="팔레트와 브랜드 킷으로 작품 톤을 고정합니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="스타일 메뉴 구역"
+                activeId={menu === "palette" || menu === "brandKit" ? menu : "palette"}
+                onSelect={(id) => setMenu(id as StudioMenu)}
+                items={[
+                  { id: "palette", label: "팔레트", icon: Palette, title: "색상 팔레트 저장·가져오기(.gpl)·내보내기" },
+                  { id: "brandKit", label: "브랜드 킷", icon: Package, title: "팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용" },
+                ]}
+              />
               {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
               {menu === "brandKit" && (
                 <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
@@ -17559,6 +17972,13 @@ function StudioCuttoonEditor() {
             </div>
           )}
         </div>
+        </StudioToolbarCluster>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? (
+        <>
+        <StudioToolbarDivider label="AI" />
+        <StudioToolbarCluster label="AI 연동">
         <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -17568,66 +17988,41 @@ function StudioCuttoonEditor() {
             className={toolBtn(activeToolbarGroup === "aiGroup")}
             title="AI 어시스트 · 시나리오 설계 · 스톡 사진 · 연동 설정 — Z.ai/DeepSeek 서버 텍스트 또는 내 API 연동"
           >
-            <Sparkles size={14} /> AI 연동
-            <ChevronDown size={12} className={cn("transition-transform", activeToolbarGroup === "aiGroup" && "rotate-180")} />
+            <WandSparkles size={15} aria-hidden /> AI
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
           </button>
           {activeToolbarGroup === "aiGroup" && (
             <div className={groupPopoverClass("w-80")}>
-              <div className="sticky top-0 z-10 mb-2 flex flex-wrap gap-1 bg-panel pb-2">
-                <button
-                  type="button"
-                  onClick={() => setMenu("aiAssist")}
-                  aria-pressed={menu === "aiAssist"}
-                  title="내 API 키로 배경 생성·캐릭터 일관성 생성·구도 제안(BYOK, 서버 비용 없음)"
-                  className={groupTabBtn(menu === "aiAssist")}
-                >
-                  <Sparkles size={12} /> AI 어시스트
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
+              <StudioMenuPopoverHeader
+                icon={WandSparkles}
+                title="AI 연동"
+                description="초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="AI 메뉴 구역"
+                activeId={
+                  menu === "aiAssist" || menu === "stockImage" || menu === "integrations"
+                    ? menu
+                    : "aiAssist"
+                }
+                onSelect={(id) => {
+                  if (id === "scenario") {
+                    if (masterEditMode) return;
                     setScenarioOpen(true);
                     setMenu(null);
-                  }}
-                  disabled={masterEditMode}
-                  title={
-                    masterEditMode
-                      ? "마스터 편집 중에는 사용할 수 없어요"
-                      : "시나리오 설계 — 텍스트 장면을 먼저 검토하고 필요한 이미지만 선택 생성"
+                    return;
                   }
-                  className={cn(groupTabBtn(false), "disabled:opacity-40")}
-                >
-                  <Clapperboard size={12} /> 시나리오 설계
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    preloadStudioStockImagePanel();
-                    setMenu("stockImage");
-                  }}
-                  onMouseEnter={preloadStudioStockImagePanel}
-                  onFocus={preloadStudioStockImagePanel}
-                  aria-pressed={menu === "stockImage"}
-                  title="Unsplash 무료 사진 검색해 삽입(내 Access Key로, 서버 비용 없음)"
-                  className={groupTabBtn(menu === "stockImage")}
-                >
-                  <Images size={12} /> 스톡 사진
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    preloadStudioIntegrationsSettingsPanel();
-                    setMenu("integrations");
-                  }}
-                  onMouseEnter={preloadStudioIntegrationsSettingsPanel}
-                  onFocus={preloadStudioIntegrationsSettingsPanel}
-                  aria-pressed={menu === "integrations"}
-                  title="AI 어시스트·스톡 사진 등 API 키가 필요한 기능을 한 곳에서 설정"
-                  className={groupTabBtn(menu === "integrations")}
-                >
-                  <Settings2 size={12} /> 연동 설정
-                </button>
-              </div>
+                  if (id === "stockImage") preloadStudioStockImagePanel();
+                  if (id === "integrations") preloadStudioIntegrationsSettingsPanel();
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "aiAssist", label: "어시스트", icon: Sparkles, title: "BYOK 배경·캐릭터·구도 제안" },
+                  { id: "scenario", label: "시나리오", icon: Clapperboard, disabled: masterEditMode, title: masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 설계" },
+                  { id: "stockImage", label: "스톡", icon: Images, title: "Unsplash 무료 사진" },
+                  { id: "integrations", label: "설정", icon: Settings2, title: "API 키·연동 설정" },
+                ]}
+              />
               {menu === "aiAssist" && (
                 <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
                   {/* AI 어시스트 서브탭 전용 내부 스크롤 — 그룹 팝오버 자체는(desktop lg:) overflow-visible로
@@ -17881,13 +18276,21 @@ function StudioCuttoonEditor() {
             </div>
           )}
         </div>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
+        <>
+        <StudioToolbarDivider />
+        <StudioToolbarCluster label="삽입·색">
         <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
-          <ImagePlus size={14} /> 이미지
+          <ImagePlus size={15} aria-hidden /> 이미지
           <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
         </label>
-        <span className="mx-0.5 h-5 w-px bg-line" />
-        <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
-          색
+        <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">
+          <Palette size={14} aria-hidden className="text-fg-3" />
+          <span className="sr-only sm:not-sr-only sm:inline">색</span>
           <LazyStudioColorPopover
             value={color}
             onChange={setColor}
@@ -17897,6 +18300,9 @@ function StudioCuttoonEditor() {
             title="브러시·도형 색상"
           />
         </span>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
         {tool === "draw" && (
           // 모바일: 이 인라인 브러시 바는 하단 드로잉 도구막대 + "브러시" 시트가 대체하므로 숨긴다(가로 스크롤 폭 절약·캔버스 우선).
           <div className="hidden max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md lg:flex">
@@ -19159,6 +19565,16 @@ function StudioCuttoonEditor() {
                 const timelineComposite = timelinePlaying
                   ? resolveTimelineComposite(animTimeline, elements.map((e) => e.id), timelinePreviewFrame)
                   : null;
+                // Preview-only transform tween (display offsets; does not commit to history).
+                const timelineTransformFrame = timelinePlaying ? timelinePreviewFrame : timelinePlayhead;
+                const timelineTransforms =
+                  timelineOpen || timelinePlaying
+                    ? resolveTimelineTransforms(
+                        animTimeline,
+                        elements.map((e) => e.id),
+                        timelineTransformFrame
+                      )
+                    : null;
                 // 이미지 드래그-드롭 패널 자동맞춤(studio-panel-autofit) 후보 프레임 — renderEl 안에서
                 // 이미지 요소마다 매번 다시 필터링하지 않도록 렌더당 한 번만 계산한다. hidden 프레임은
                 // containingPanel()과 동일하게 제외한다(자동맞춤 결과도 결국 그 클립 메커니즘에
@@ -19254,7 +19670,22 @@ function StudioCuttoonEditor() {
                   // 사용자가 아직 적용하지 않은 채우기 미리보기가 가장 높은 우선순위다. 타임라인 재생
                   // 중엔 도구 진입이 막히지만, 이미 만든 미리보기를 잃지 않고 적용/취소할 수는 있어야 한다.
                   const effectiveSrc = advancedFillPreviewSrc ?? timelineOverride?.src;
-                  const effectiveEl = effectiveSrc ? ({ ...el, src: effectiveSrc } as ImageEl) : el;
+                  const smartFilterFields = studioAdjustmentStackToFilterFields(el.smartFilters);
+                  const pose = timelineTransforms?.get(el.id);
+                  const effectiveEl = {
+                    ...el,
+                    ...smartFilterFields,
+                    ...(effectiveSrc ? { src: effectiveSrc } : null),
+                    ...(pose
+                      ? {
+                          x: el.x + pose.x,
+                          y: el.y + pose.y,
+                          rotation: (el.rotation ?? 0) + pose.rotation,
+                          width: Math.max(1, el.width * pose.scaleX),
+                          height: Math.max(1, el.height * pose.scaleY),
+                        }
+                      : null),
+                  } as ImageEl;
                   // 패널 자동맞춤(studio-panel-autofit) — 이 이미지가 드래그 종료 시 자동맞춤을
                   // 시도해도 되는지 여기서 전부 판정해 autoFitFrames 하나로 UrlImage 에 넘긴다.
                   // null 이면 UrlImage 는 시도조차 하지 않고 기존과 완전히 동일하게 {x,y}만 패치한다.
@@ -19297,6 +19728,8 @@ function StudioCuttoonEditor() {
                         onChange={(patch) => patchEl(el.id, patch)}
                         dragBoundFunc={snapBoundFunc}
                         autoFitFrames={autoFitFrames}
+                        onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                        onInteractionEnd={endLiveResourceEdit}
                       />
                     </Fragment>
                   );
@@ -19312,6 +19745,8 @@ function StudioCuttoonEditor() {
                       onSelect={onSelect}
                       onChange={(patch) => patchEl(el.id, patch as Partial<El>)}
                       dragBoundFunc={snapBoundFunc}
+                      onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                      onInteractionEnd={endLiveResourceEdit}
                     />
                   );
                 }
@@ -19383,13 +19818,26 @@ function StudioCuttoonEditor() {
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
                       {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
+                      {...textNodeProps<Partial<El>>({
+                        id: el.id,
+                        draggable,
+                        dragBoundFunc: snapBoundFunc,
+                        onSelect,
+                        onEdit: startEditText,
+                        onPatch: patchEl,
+                        onInteractionBegin: () => nodeInteractionBegin(el.id),
+                        onInteractionEnd: endLiveResourceEdit,
+                      })}
                       onTransformEnd={(e) => {
-                        const node = e.target;
-                        const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
-                        node.scaleX(1);
-                        node.scaleY(1);
-                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                        try {
+                          const node = e.target;
+                          const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
+                          node.scaleX(1);
+                          node.scaleY(1);
+                          patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                        } finally {
+                          endLiveResourceEdit();
+                        }
                       }}
                     />
                   );
@@ -19434,14 +19882,27 @@ function StudioCuttoonEditor() {
                       shadowOpacity={el.shadowOpacity}
                       shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
                       {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
+                      {...textNodeProps<Partial<El>>({
+                        id: el.id,
+                        draggable,
+                        dragBoundFunc: snapBoundFunc,
+                        onSelect,
+                        onEdit: startEditText,
+                        onPatch: patchEl,
+                        onInteractionBegin: () => nodeInteractionBegin(el.id),
+                        onInteractionEnd: endLiveResourceEdit,
+                      })}
                       onTransformEnd={(e) => {
-                        const node = e.target as Konva.Text;
-                        const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
-                        const w = Math.max(40, node.width() * node.scaleX());
-                        node.scaleX(1);
-                        node.scaleY(1);
-                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, width: w, rotation: node.rotation() });
+                        try {
+                          const node = e.target as Konva.Text;
+                          const fs = Math.max(10, Math.round(el.fontSize * node.scaleX()));
+                          const w = Math.max(40, node.width() * node.scaleX());
+                          node.scaleX(1);
+                          node.scaleY(1);
+                          patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, width: w, rotation: node.rotation() });
+                        } finally {
+                          endLiveResourceEdit();
+                        }
                       }}
                     />
                   );
@@ -19458,13 +19919,26 @@ function StudioCuttoonEditor() {
                       rotation={el.rotation}
                       opacity={el.opacity ?? 1}
                       {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({ id: el.id, draggable, dragBoundFunc: snapBoundFunc, onSelect, onEdit: startEditText, onPatch: patchEl })}
+                      {...textNodeProps<Partial<El>>({
+                        id: el.id,
+                        draggable,
+                        dragBoundFunc: snapBoundFunc,
+                        onSelect,
+                        onEdit: startEditText,
+                        onPatch: patchEl,
+                        onInteractionBegin: () => nodeInteractionBegin(el.id),
+                        onInteractionEnd: endLiveResourceEdit,
+                      })}
                       onTransformEnd={(e) => {
-                        const node = e.target as Konva.Text;
-                        const fs = Math.max(16, Math.round(el.fontSize * node.scaleX()));
-                        node.scaleX(1);
-                        node.scaleY(1);
-                        patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                        try {
+                          const node = e.target as Konva.Text;
+                          const fs = Math.max(16, Math.round(el.fontSize * node.scaleX()));
+                          node.scaleX(1);
+                          node.scaleY(1);
+                          patchEl(el.id, { x: node.x(), y: node.y(), fontSize: fs, rotation: node.rotation() });
+                        } finally {
+                          endLiveResourceEdit();
+                        }
                       }}
                     />
                   );
@@ -20992,6 +21466,7 @@ function StudioCuttoonEditor() {
                     if (e.key === "Escape") {
                       e.preventDefault();
                       setEditing(null);
+                      endLiveResourceEdit();
                     } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                       e.preventDefault();
                       commitEditText();
@@ -21001,7 +21476,14 @@ function StudioCuttoonEditor() {
                   className="w-full resize-none rounded-lg border border-line bg-card p-2 text-sm text-fg outline-none focus:border-accent"
                 />
                 <div className="mt-2 flex justify-end gap-2">
-                  <button type="button" onClick={() => setEditing(null)} className={buttonClass({ size: "sm", variant: "quiet" })}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(null);
+                      endLiveResourceEdit();
+                    }}
+                    className={buttonClass({ size: "sm", variant: "quiet" })}
+                  >
                     취소
                   </button>
                   <button type="button" onClick={commitEditText} className={buttonClass({ size: "sm", variant: "solid" })}>
@@ -23045,6 +23527,9 @@ function StudioCuttoonEditor() {
                       filterClipboard={filterClipboard}
                       onSetFilterClipboard={setFilterClipboard}
                       onPatch={(patch) => patchEl(selected.id, patch)}
+                      effectFavoriteState={effectFavoriteState}
+                      onToggleEffectFavorite={toggleEffectFavorite}
+                      onRememberEffectRecent={rememberEffectRecent}
                     />
                   </div>
                   <div
@@ -23721,11 +24206,18 @@ function StudioCuttoonEditor() {
               aria-label="선택 요소 속성"
               className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
             >
-              <MousePointer2 size={22} className="mx-auto text-fg-3" aria-hidden />
-              <p className="mt-2 text-xs font-semibold text-fg-2">편집할 요소를 선택하세요</p>
-              <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                선택한 요소에 맞는 기본·전문 설정만 이곳에 표시됩니다.
+              <div className="mx-auto mb-2 grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-3">
+                <MousePointer2 size={20} aria-hidden />
+              </div>
+              <p className="text-xs font-semibold text-fg-2 text-pretty">편집할 요소를 선택하세요</p>
+              <p className="mx-auto mt-1.5 max-w-[30ch] text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
+                캔버스에서 프레임·말풍선·획을 고르면 여기에 기본·전문 설정이 나타납니다. 펜 도구(B)로 바로 그릴 수도 있어요.
               </p>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[0.62rem] text-fg-3">
+                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">레이어 탭 · 순서</span>
+                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">검색 · 채우기/마스크</span>
+                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">게시 · 내보내기</span>
+              </div>
             </div>
           ) : null}
 
@@ -23900,7 +24392,7 @@ function StudioCuttoonEditor() {
               bottom: `calc(6.45rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
             }}
           >
-            <div className="w-20 shrink-0 px-2">
+            <div className="w-[4.75rem] shrink-0 px-2">
               <p className="truncate text-[0.68rem] font-bold text-fg">
                 {marqueeIds.length > 0
                   ? `${marqueeIds.length}개 선택`
@@ -23908,75 +24400,42 @@ function StudioCuttoonEditor() {
                     ? elementLabel(selected)
                     : "선택"}
               </p>
-              <p className="text-[0.58rem] text-fg-3">빠른 작업</p>
+              <p className="text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">빠른 작업</p>
             </div>
             <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
-            <button
-              type="button"
+            <StudioContextActionButton
+              icon={SlidersHorizontal}
+              label="속성"
               onClick={() => {
                 openInspectorRoute({ primary: "properties" });
                 setMobileSheet("props");
               }}
-              className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised"
-            >
-              <SlidersHorizontal size={16} aria-hidden /> 속성
-            </button>
+            />
             {selected?.type === "image" && marqueeIds.length === 0 ? (
-              <button
-                type="button"
-                onClick={toggleAdvancedFill}
+              <StudioContextActionButton
+                icon={PaintBucket}
+                label="채우기"
+                active={advancedFillActive}
                 disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-                aria-pressed={advancedFillActive}
-                className={cn(
-                  "flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                  advancedFillActive ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised",
-                )}
-              >
-                <PaintBucket size={16} aria-hidden /> 채우기
-              </button>
+                onClick={toggleAdvancedFill}
+              />
             ) : null}
-            <button
-              type="button"
-              onClick={duplicateSelected}
-              className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised"
-            >
-              <Copy size={16} aria-hidden /> 복제
-            </button>
+            <StudioContextActionButton icon={Copy} label="복제" onClick={duplicateSelected} />
             {selected && marqueeIds.length === 0 ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => reorder("front")}
-                  className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised"
-                >
-                  <ArrowUpToLine size={16} aria-hidden /> 앞으로
-                </button>
-                <button
-                  type="button"
-                  onClick={() => reorder("back")}
-                  className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised"
-                >
-                  <ArrowDownToLine size={16} aria-hidden /> 뒤로
-                </button>
+                <StudioContextActionButton icon={ArrowUpToLine} label="앞으로" onClick={() => reorder("front")} />
+                <StudioContextActionButton icon={ArrowDownToLine} label="뒤로" onClick={() => reorder("back")} />
               </>
             ) : null}
-            <button
-              type="button"
-              onClick={removeSelected}
-              className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-bad hover:bg-bad/10"
-            >
-              <Trash2 size={16} aria-hidden /> 삭제
-            </button>
-            <button
-              type="button"
+            <StudioContextActionButton icon={Trash2} label="삭제" danger onClick={removeSelected} />
+            <StudioContextActionButton
+              icon={X}
+              label="해제"
               onClick={() => {
                 setSelectedId(null);
                 setMarqueeIds([]);
               }}
-              className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised"
-            >
-              <X size={16} aria-hidden /> 해제
-            </button>
+            />
           </div>
         ) : null}
 
@@ -24382,27 +24841,27 @@ function StudioCuttoonEditor() {
             className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
             style={{ bottom: mobileKeyboardInset }}
           >
-            {/* 1행: 핵심 드로잉 도구 (>=44px 터치 타깃, 활성 도구 감귤색) */}
-            <div className="flex items-stretch gap-1">
-              <button
-                type="button"
+            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
+            <div className="flex items-stretch gap-1" role="toolbar" aria-label="드로잉 도구">
+              <StudioDockButton
+                icon={MousePointer2}
+                label="선택"
+                active={tool === "select"}
                 onClick={() => {
                   setTool("select");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "select"}
-                className={mobileDrawToolBtn(tool === "select")}
-              >
-                <MousePointer2 size={19} aria-hidden />
-                <span>선택</span>
-              </button>
-              <button
-                type="button"
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Pencil}
+                label="펜"
+                active={tool === "draw" && drawMode === "pen"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
                 onClick={() => {
-                  // 펜이 이미 활성이면 같은 버튼으로 브러시 설정 시트를 연다(굵기·색·프리셋).
                   if (tool === "draw" && drawMode === "pen") {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
@@ -24413,13 +24872,11 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "pen"}
-                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "pen"), "disabled:opacity-40")}
-              >
-                <Pencil size={19} aria-hidden />
-                <span>펜</span>
-              </button>
-              <button
-                type="button"
+              />
+              <StudioDockButton
+                icon={Eraser}
+                label="지우개"
+                active={tool === "draw" && drawMode === "eraser"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
                 onClick={() => {
@@ -24429,17 +24886,14 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "eraser"}
-                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "eraser"), "disabled:opacity-40")}
-              >
-                <Eraser size={19} aria-hidden />
-                <span>지우개</span>
-              </button>
-              <button
-                type="button"
+              />
+              <StudioDockButton
+                icon={Square}
+                label="도형"
+                active={tool === "draw" && drawMode === "shape"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
                 onClick={() => {
-                  // 도형이 이미 활성이면 같은 버튼으로 도형/색 설정 시트를 연다.
                   if (tool === "draw" && drawMode === "shape") {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
@@ -24450,38 +24904,30 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "shape"}
-                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "shape"), "disabled:opacity-40")}
-              >
-                <Square size={18} aria-hidden />
-                <span>도형</span>
-              </button>
+              />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <button
-                ref={mobileBrushDockButtonRef}
-                type="button"
-                onClick={undo}
+              <StudioDockButton
+                icon={Undo2}
+                label="되돌리기"
                 disabled={hi === 0 || collaborationDocumentLocked}
-                className={cn(mobileDrawToolBtn(false), "disabled:opacity-35")}
+                onClick={undo}
                 aria-label="실행취소"
-              >
-                <Undo2 size={19} aria-hidden />
-                <span>되돌리기</span>
-              </button>
-              <button
-                type="button"
-                onClick={redo}
+              />
+              <StudioDockButton
+                icon={Redo2}
+                label="다시"
                 disabled={hi >= history.length - 1 || collaborationDocumentLocked}
-                className={cn(mobileDrawToolBtn(false), "disabled:opacity-35")}
+                onClick={redo}
                 aria-label="다시실행"
-              >
-                <Redo2 size={19} aria-hidden />
-                <span>다시</span>
-              </button>
+              />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <button
-                type="button"
+              <StudioDockButton
+                ref={mobileBrushDockButtonRef}
+                label="브러시"
+                active={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-label="브러시 설정 (굵기·색·프리셋)"
                 onClick={() => {
-                  // 브러시 설정 시트(굵기·색·프리셋·도형). 드로잉 도구가 아니면 펜으로 전환해 바로 그릴 수 있게.
                   if (tool !== "draw") {
                     setTool("draw");
                     setDrawMode("pen");
@@ -24489,46 +24935,41 @@ function StudioCuttoonEditor() {
                   }
                   setMobileSheet((s) => (s === "draw" ? null : "draw"));
                 }}
-                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
-                aria-label="브러시 설정 (굵기·색·프리셋)"
-                className={mobileDrawToolBtn(mobileSheet === "draw" || mobileSheet === "brushes")}
-              >
-                <span
-                  aria-hidden
-                  className="size-[19px] rounded-full border-2 border-current"
-                  style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "rgba(255,255,255,0.45)" }}
-                />
-                <span>브러시</span>
-              </button>
+                swatch={(
+                  <span
+                    aria-hidden
+                    className="size-[19px] rounded-full border-2 border-current"
+                    style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "oklch(0.95 0.01 85 / 0.45)" }}
+                  />
+                )}
+              />
             </div>
 
             {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
-            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1">
+            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1" role="toolbar" aria-label="작업 공간">
               {workspaceState.mobileControlSide === "left"
                 ? mobileQuickActionsButton
                 : null}
-              <button
-                type="button"
-                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+              <StudioDockNavButton
+                icon={Files}
+                label="페이지"
+                active={mobileSheet === "pages"}
                 aria-pressed={mobileSheet === "pages"}
-                className={mobileBarBtn(mobileSheet === "pages")}
-              >
-                <Files size={17} aria-hidden />
-                <span>페이지</span>
-              </button>
-              <button
-                type="button"
+                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+              />
+              <StudioDockNavButton
+                icon={Plus}
+                label="추가"
                 onClick={() => {
                   setMobileSheet(null);
                   setQuickStartOpen(true);
                 }}
-                className={mobileBarBtn(false)}
-              >
-                <Plus size={17} aria-hidden />
-                <span>추가</span>
-              </button>
-              <button
-                type="button"
+              />
+              <StudioDockNavButton
+                icon={Layers}
+                label="작업"
+                active={mobileSheet === "props"}
+                aria-pressed={mobileSheet === "props"}
                 onClick={() => {
                   if (mobileSheet === "props") {
                     setMobileSheet(null);
@@ -24537,12 +24978,7 @@ function StudioCuttoonEditor() {
                   openInspectorRoute({ primary: selected ? "properties" : "layers" });
                   setMobileSheet("props");
                 }}
-                aria-pressed={mobileSheet === "props"}
-                className={mobileBarBtn(mobileSheet === "props")}
-              >
-                <Layers size={17} aria-hidden />
-                <span>작업 패널</span>
-              </button>
+              />
               <div className="flex w-[8.25rem] flex-none items-center justify-center">
                 <button
                   type="button"
@@ -24993,6 +25429,10 @@ function StudioCuttoonEditor() {
             status={autoActionStatus}
             busy={autoActionBusy}
             error={autoActionError}
+            macroRecording={macroSession.recording}
+            macroCommandCount={macroSession.commands.length}
+            onStartMacroRecord={startMacroRecord}
+            onStopMacroRecord={stopMacroRecord}
             onClose={() => {
               if (!autoActionBusy) setAutoActionsOpen(false);
             }}

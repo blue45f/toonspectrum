@@ -43,12 +43,18 @@ import {
   planStudioDynamicBrushDabs,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSeedFromKey,
+  type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import {
   studioDynamicBrushDabVariations,
 } from "./studio-brush-symmetry";
+import {
+  buildStudioBrushTipAlphaMap,
+  planStudioBrushTipStampWorldSamples,
+  studioBrushTipUsesSolidEllipse,
+} from "./studio-brush-tip-stamp";
 import {
   bubblePathData,
   bubblePathDataMulti,
@@ -699,7 +705,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
     : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
-  const dynamicDabVariations = dynamicBrushId
+  const dynamicPlan = dynamicBrushId
     ? (() => {
         const dynamics = normalizeStudioBrushDynamicsSettings(
           el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
@@ -718,9 +724,13 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
           maxDabs: 1024,
         });
-        return studioDynamicBrushDabVariations(baseDabs, el.symmetry);
+        return {
+          dynamics,
+          dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
+        };
       })()
     : null;
+  const dynamicDabVariations = dynamicPlan?.dabVariations ?? null;
   const parts: string[] = [];
   for (const [variationIndex, points] of variations.entries()) {
     if (kind === "rect") {
@@ -794,7 +804,8 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         strokeWidth,
         opacityAttr,
         opacity,
-        dynamicDabVariations?.[variationIndex]
+        dynamicDabVariations?.[variationIndex],
+        dynamicPlan?.dynamics
       ));
     }
   }
@@ -810,7 +821,8 @@ function serializeFreehand(
   strokeWidth: number,
   opacityAttr: string,
   strokeOpacity: number,
-  dynamicDabs?: readonly StudioDynamicBrushDab[]
+  dynamicDabs?: readonly StudioDynamicBrushDab[],
+  dynamics?: NormalizedStudioBrushDynamicsSettings
 ): string {
   const brush = el.brush ?? "pen";
   const dynamicBrush = isStudioBrushDynamicsPresetId(brush);
@@ -827,17 +839,34 @@ function serializeFreehand(
   }
 
   if (dynamicBrush) {
-    const ellipses = (dynamicDabs ?? []).map((dab) => {
-      // Canvas renderer applies the toolbar/stroke opacity to every dab. Keep SVG overlap and
-      // accumulation identical instead of applying opacity once to the completed group.
-      const opacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
-      // Canvas first clamps the circular radius and then applies Y scale(roundness). Applying the
-      // minimum independently to ry would turn a thin tilted tip back into a round 0.5px dot.
-      const radius = Math.max(0.25, dab.size / 2);
-      const ry = radius * dab.roundness;
-      return `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(radius)}" ry="${fmt(ry)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}" transform="rotate(${fmt(dab.angle)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`;
+    const tip = dynamics?.tip ?? normalizeStudioBrushDynamicsSettings(
+      el.brushDynamics ?? studioBrushDynamicsPresetSettings(brush)
+    ).tip;
+    const useEllipse = studioBrushTipUsesSolidEllipse(tip);
+    if (useEllipse) {
+      const ellipses = (dynamicDabs ?? []).map((dab) => {
+        // Canvas renderer applies the toolbar/stroke opacity to every dab. Keep SVG overlap and
+        // accumulation identical instead of applying opacity once to the completed group.
+        const opacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
+        // Canvas first clamps the circular radius and then applies Y scale(roundness). Applying the
+        // minimum independently to ry would turn a thin tilted tip back into a round 0.5px dot.
+        const radius = Math.max(0.25, dab.size / 2);
+        const ry = radius * dab.roundness;
+        return `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(radius)}" ry="${fmt(ry)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}" transform="rotate(${fmt(dab.angle)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`;
+      }).join("");
+      return `<g>${ellipses}</g>`;
+    }
+
+    // PNG-alpha / procedural tip stamp path — same footprint planner as Canvas.
+    const alphaMap = buildStudioBrushTipAlphaMap(tip);
+    const stamps = (dynamicDabs ?? []).flatMap((dab) => {
+      const baseOpacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
+      return planStudioBrushTipStampWorldSamples(dab, tip, { alphaMap, grid: 7 }).map((sample) => {
+        const opacity = Math.min(1, Math.max(0, baseOpacity * sample.alpha));
+        return `<circle cx="${fmt(sample.x)}" cy="${fmt(sample.y)}" r="${fmt(sample.radius)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}"/>`;
+      });
     }).join("");
-    return `<g>${ellipses}</g>`;
+    return `<g>${stamps}</g>`;
   }
 
   if (brush === "watercolor") {

@@ -186,6 +186,8 @@ describe("sanitizeBrushSnapshot", () => {
         seed: -3,
         maxSpeed: Number.POSITIVE_INFINITY,
         spacingRatio: 999,
+        taper: { enabled: true, startLength: 2, minSizeRatio: -4 },
+        tip: { shape: "grain", softness: 4, alphaMapSize: 1 },
         width: {
           base: -100,
           mappings: [{ source: "pressure", amount: 9 }],
@@ -197,6 +199,8 @@ describe("sanitizeBrushSnapshot", () => {
       seed: -3,
       maxSpeed: Number.POSITIVE_INFINITY,
       spacingRatio: 999,
+      taper: { enabled: true, startLength: 2, minSizeRatio: -4 },
+      tip: { shape: "grain", softness: 4, alphaMapSize: 1 },
       width: {
         base: -100,
         mappings: [{ source: "pressure", amount: 9 }],
@@ -206,12 +210,40 @@ describe("sanitizeBrushSnapshot", () => {
     expect(snapshot.brushDynamics.spacingRatio).toBe(16);
     expect(snapshot.brushDynamics.width.base).toBe(0.05);
     expect(snapshot.brushDynamics.width.mappings[0]?.amount).toBe(1);
+    expect(snapshot.brushDynamics.taper.startLength).toBe(0.5);
+    expect(snapshot.brushDynamics.taper.minSizeRatio).toBe(0);
+    expect(snapshot.brushDynamics.tip).toMatchObject({ shape: "grain", softness: 1, alphaMapSize: 8 });
     expect(adjustedFields).toEqual(["brushDynamics"]);
     expect(() => JSON.stringify(snapshot.brushDynamics)).not.toThrow();
   });
 
+  it("테이퍼·PNG 팁 설정이 라이브러리 JSON 왕복 후에도 동일하다", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("dry-media"),
+      seed: 777,
+      taper: {
+        enabled: true,
+        startLength: 0.11,
+        endLength: 0.19,
+        minSizeRatio: 0.22,
+        minOpacityRatio: 0.4,
+        curve: 1.2,
+      },
+      tip: { shape: "flake", softness: 0.28 },
+    });
+    const { snapshot } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushDynamics: JSON.parse(JSON.stringify(dynamics)),
+    });
+    expect(snapshot.brushDynamics).toEqual(dynamics);
+    expect(snapshot.brushDynamics.taper.enabled).toBe(true);
+    expect(snapshot.brushDynamics.tip.shape).toBe("flake");
+  });
+
   it("키 순서가 달라도 이미 정규화된 동역학은 보정된 것으로 표시하지 않는다", () => {
     const reordered = {
+      tip: validSnapshot.brushDynamics.tip,
+      taper: validSnapshot.brushDynamics.taper,
       roundness: validSnapshot.brushDynamics.roundness,
       angle: validSnapshot.brushDynamics.angle,
       scatter: validSnapshot.brushDynamics.scatter,

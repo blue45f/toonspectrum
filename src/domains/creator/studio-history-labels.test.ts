@@ -89,6 +89,31 @@ describe("describeHistoryStep — 요소 추가/삭제", () => {
     const after = repage(before, "p1", { elements: [el("e2", { type: "image" })] });
     expect(describeHistoryStep(before, after)).toBe("요소 구성 변경");
   });
+
+  it("2개 이상 삭제 + 이미지 1개 추가면 '레이어 병합'", () => {
+    const before: HistorySnapshot = [
+      page("p1", [el("a", { type: "image" }), el("b", { type: "image" }), el("c")]),
+    ];
+    const after = repage(before, "p1", {
+      elements: [el("c"), el("merged", { type: "image" })],
+    });
+    expect(describeHistoryStep(before, after)).toBe("레이어 병합");
+  });
+
+  it("3개 이상 삭제 + 이미지 1개 추가면 '보이는 레이어 병합'", () => {
+    const before: HistorySnapshot = [
+      page("p1", [
+        el("a", { type: "image" }),
+        el("b", { type: "image" }),
+        el("c", { type: "image" }),
+        el("d"),
+      ]),
+    ];
+    const after = repage(before, "p1", {
+      elements: [el("d"), el("flat", { type: "image" })],
+    });
+    expect(describeHistoryStep(before, after)).toBe("보이는 레이어 병합");
+  });
 });
 
 describe("describeHistoryStep — 요소 패치(이동/크기/내용 등)", () => {

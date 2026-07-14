@@ -236,8 +236,14 @@ function diffElements(
 
   if (added.length > 0 || removed.length > 0) {
     let label: string;
-    if (added.length > 0 && removed.length > 0) label = "요소 구성 변경";
-    else if (added.length > 0) label = `${elementSubject(added)} 추가`;
+    if (added.length > 0 && removed.length > 0) {
+      // Raster merge / flatten: 2+ sources removed, single composite image added.
+      if (removed.length >= 2 && added.length === 1 && added[0]?.type === "image") {
+        label = removed.length >= 3 ? "보이는 레이어 병합" : "레이어 병합";
+      } else {
+        label = "요소 구성 변경";
+      }
+    } else if (added.length > 0) label = `${elementSubject(added)} 추가`;
     else label = `${elementSubject(removed)} 삭제`;
     return { label, onlyTextEdits: false, onlyGroupEdits: false };
   }

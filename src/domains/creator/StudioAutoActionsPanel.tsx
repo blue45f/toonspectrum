@@ -2,12 +2,14 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  Circle,
   Download,
   FileStack,
   Layers3,
   MousePointer2,
   Play,
   ScanSearch,
+  Square,
   Upload,
   WandSparkles,
   X,
@@ -46,6 +48,11 @@ export interface StudioAutoActionsPanelProps {
   status?: string | null;
   busy: boolean;
   error: string | null;
+  /** Macro session recording into an Auto Action set. */
+  macroRecording?: boolean;
+  macroCommandCount?: number;
+  onStartMacroRecord?: () => void;
+  onStopMacroRecord?: () => void;
   onClose: () => void;
   onScopeChange: (scope: StudioAutoActionScope) => void;
   onSelectedPageIdsChange: (pageIds: readonly string[]) => void;
@@ -99,6 +106,10 @@ export function StudioAutoActionsPanel({
   status = null,
   busy,
   error,
+  macroRecording = false,
+  macroCommandCount = 0,
+  onStartMacroRecord,
+  onStopMacroRecord,
   onClose,
   onScopeChange,
   onSelectedPageIdsChange,
@@ -209,6 +220,35 @@ export function StudioAutoActionsPanel({
                       .catch(() => setFileError("Action Set 파일을 읽지 못했습니다."));
                   }}
                 />
+                {onStartMacroRecord && onStopMacroRecord ? (
+                  <button
+                    type="button"
+                    onClick={() => (macroRecording ? onStopMacroRecord() : onStartMacroRecord())}
+                    disabled={busy}
+                    aria-pressed={macroRecording}
+                    className={[
+                      "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45",
+                      macroRecording
+                        ? "border-bad/45 bg-bad/15 text-bad hover:bg-bad/25"
+                        : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                    ].join(" ")}
+                    title={
+                      macroRecording
+                        ? "녹음을 멈추고 Action Set으로 저장합니다."
+                        : "허용된 레이어·레터링 조작을 매크로로 녹음합니다."
+                    }
+                  >
+                    {macroRecording ? (
+                      <>
+                        <Square size={13} aria-hidden /> 녹음 종료 ({macroCommandCount})
+                      </>
+                    ) : (
+                      <>
+                        <Circle size={13} className="fill-bad text-bad" aria-hidden /> 매크로 녹음
+                      </>
+                    )}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -227,6 +267,15 @@ export function StudioAutoActionsPanel({
                 </button>
               </div>
             </div>
+            {macroRecording ? (
+              <p
+                role="status"
+                className="mt-3 flex items-center gap-2 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[0.7rem] font-semibold text-bad"
+              >
+                <Circle size={10} className="fill-bad animate-pulse" aria-hidden />
+                녹음 중 — 불투명도·표시·잠금·블렌드·글자 크기/색 변경이 Action Set에 쌓입니다 ({macroCommandCount}단계).
+              </p>
+            ) : null}
 
             {actionSet ? (
               <ol className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="Auto Action 명령 목록">

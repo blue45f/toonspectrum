@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { screentoneDotsForStroke } from "./studio-brush";
-import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsPresetSettings,
+  type StudioBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
+import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
 import {
   SVG_EXPORT_MIME,
@@ -35,6 +40,14 @@ function rectEl(over: Partial<Extract<SvgExportEl, { type: "draw" }>> = {}): Ext
     fill: "#ff0000",
     ...over,
   };
+}
+
+/** Legacy solid-ellipse dab path — isolates affine/opacity geometry from textured tip stamps. */
+function ellipseDynamics(preset: StudioBrushDynamicsPresetId) {
+  return normalizeStudioBrushDynamicsSettings({
+    ...studioBrushDynamicsPresetSettings(preset),
+    tip: { shape: "round", softness: 0.35 },
+  });
 }
 
 interface DynamicEllipseAttributes {
@@ -284,7 +297,7 @@ describe("도형 직렬화", () => {
       tiltYs: [0, 6, 24, 4],
       twists: [0, 45, 180, 355],
       tangentialPressures: [0, 0.2, -0.25, 0],
-      brushDynamics: studioBrushDynamicsPresetSettings("dry-media"),
+      brushDynamics: ellipseDynamics("dry-media"),
       stroke: "#3a2218",
       strokeWidth: 9,
     });
@@ -305,7 +318,7 @@ describe("도형 직렬화", () => {
       brush: "dry-media",
       points: [8, 12, 32, 18, 58, 10],
       pressures: [0.3, 0.8, 0.5],
-      brushDynamics: studioBrushDynamicsPresetSettings("dry-media"),
+      brushDynamics: ellipseDynamics("dry-media"),
       stroke: "#4455aa",
       strokeWidth: 22,
     });
@@ -336,7 +349,8 @@ describe("도형 직렬화", () => {
       stroke: "#336699",
       strokeWidth: 32,
       opacity: 0.7,
-      // brushDynamics 미설정은 실제 구형 획/기본 도구처럼 airbrush 기본 preset을 사용한다.
+      // 타원 dab 경로로 고정해 저농도 opacity 포맷을 검증한다(텍스처 팁은 multi-circle).
+      brushDynamics: ellipseDynamics("airbrush"),
     })]));
 
     // default opacity .3×.25, flow .18×.35, toolbar .7 = .0033075. 부동소수점의 마지막
@@ -358,12 +372,44 @@ describe("도형 직렬화", () => {
       tiltYs: [0],
       stroke: "#21160f",
       strokeWidth: 0.1,
+      brushDynamics: ellipseDynamics("dry-media"),
     })]));
 
     // serializeDraw의 안전 최소 strokeWidth=1에서 dab radius는 .25, tilt roundness는 .112다.
     // Canvas geometry: ry=.25×.112=.028(SVG 좌표 포맷 .03), 독립 clamp라면 잘못된 .25가 된다.
     expect(svg).toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.03"[^>]*transform="rotate\((?!0 )/);
     expect(svg).not.toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.25"/);
+  });
+
+  it("PNG 알파 팁 스탬프 — grain tip과 커스텀 알파 맵을 결정적 circle stamp로 내보낸다", () => {
+    const custom = studioBrushTipAlphaMapToBase64("hard", 0.2, 16);
+    const stamped = rectEl({
+      id: "tip-stamp-svg",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [0, 0, 40, 0],
+      pressures: [0.6, 0.6],
+      stroke: "#221100",
+      strokeWidth: 10,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        ...studioBrushDynamicsPresetSettings("dry-media"),
+        taper: { enabled: false },
+        tip: {
+          shape: "grain",
+          softness: 0.35,
+          alphaMapBase64: custom.alphaMapBase64,
+          alphaMapSize: custom.alphaMapSize,
+        },
+        spacing: { base: 12, mappings: [] },
+        scatter: { base: 0 },
+      }),
+    });
+    const first = exportPageToSvg(page([stamped])).svg;
+    const second = exportPageToSvg(page([stamped])).svg;
+    expect(first).toBe(second);
+    expect(first).not.toContain("<ellipse ");
+    expect((first.match(/<circle /g) ?? []).length).toBeGreaterThan(4);
+    expect(first).toContain('fill="#221100"');
   });
 
   it("입자 브러시 세로 대칭 — 원본 dab의 산포와 타원 축을 다시 추첨하지 않고 정확히 반사한다", () => {
@@ -378,6 +424,7 @@ describe("도형 직렬화", () => {
       tiltYs: [20],
       stroke: "#352116",
       strokeWidth: 8,
+      brushDynamics: ellipseDynamics("dry-media"),
       symmetry: { type: "vertical", centerX: 50, centerY: 50 },
     });
     const first = exportPageToSvg(page([dynamic])).svg;
@@ -422,6 +469,7 @@ describe("도형 직렬화", () => {
       tiltYs: [20],
       stroke: "#352116",
       strokeWidth: 8,
+      brushDynamics: ellipseDynamics("dry-media"),
       symmetry: { type: "radial", centerX: 50, centerY: 50, radialCount: 4 },
     });
     const first = exportPageToSvg(page([dynamic])).svg;
@@ -456,6 +504,7 @@ describe("도형 직렬화", () => {
       tiltYs: [20],
       stroke: "#352116",
       strokeWidth: 8,
+      brushDynamics: ellipseDynamics("dry-media"),
       symmetry: { type: "kaleidoscope", centerX: 50, centerY: 50, radialCount: 3 },
     });
     const first = exportPageToSvg(page([dynamic])).svg;

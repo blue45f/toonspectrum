@@ -4,12 +4,61 @@
  * 동일한 Konva 노드 props(드래그·선택·드래그종료, 리사이즈 변환)를 한 곳으로 모은다.
  * 반환 객체를 각 노드에 스프레드한다 — 동작은 기존 인라인 핸들러와 바이트 동일.
  * 타입별로 다른 onTransformEnd(텍스트=fontSize, 스티커=fontSize 등)는 추출하지 않고 각 노드에 인라인 유지.
+ *
+ * Soft-lock: optional onInteractionBegin/End claim live collaboration resources for the gesture.
  */
 import type Konva from "konva";
 
 type DragEvt = Konva.KonvaEventObject<DragEvent>;
 type XfEvt = Konva.KonvaEventObject<Event>;
 type BoundFunc = (pos: Konva.Vector2d) => Konva.Vector2d;
+
+export type StudioNodeInteractionGuards = {
+  /** Return false to cancel drag/transform start (e.g. soft-lock deny). */
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
+};
+
+function attachInteractionGuards(
+  base: Record<string, unknown>,
+  guards: StudioNodeInteractionGuards | undefined
+): Record<string, unknown> {
+  if (!guards?.onInteractionBegin && !guards?.onInteractionEnd) return base;
+  const { onInteractionBegin, onInteractionEnd } = guards;
+  const prevDragEnd = base.onDragEnd as ((e: DragEvt) => void) | undefined;
+  const prevXfEnd = base.onTransformEnd as ((e: XfEvt) => void) | undefined;
+  return {
+    ...base,
+    onDragStart: (e: DragEvt) => {
+      if (onInteractionBegin && !onInteractionBegin()) {
+        e.target.stopDrag();
+      }
+    },
+    onTransformStart: (e: XfEvt) => {
+      if (onInteractionBegin && !onInteractionBegin()) {
+        // Transformer will not apply if the node rejects interaction; stop any active transform.
+        const node = e.target;
+        if (typeof (node as Konva.Node & { stopDrag?: () => void }).stopDrag === "function") {
+          (node as Konva.Node & { stopDrag: () => void }).stopDrag();
+        }
+      }
+    },
+    onDragEnd: (e: DragEvt) => {
+      try {
+        prevDragEnd?.(e);
+      } finally {
+        onInteractionEnd?.();
+      }
+    },
+    onTransformEnd: (e: XfEvt) => {
+      try {
+        prevXfEnd?.(e);
+      } finally {
+        onInteractionEnd?.();
+      }
+    },
+  };
+}
 
 /**
  * 이미지·프레임처럼 width/height 로 리사이즈되는 노드의 공통 props.
@@ -20,9 +69,11 @@ export function resizableNodeProps<T>(opts: {
   dragBoundFunc?: BoundFunc;
   onSelect: () => void;
   onChange: (patch: T) => void;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
-  const { draggable, dragBoundFunc, onSelect, onChange } = opts;
-  return {
+  const { draggable, dragBoundFunc, onSelect, onChange, onInteractionBegin, onInteractionEnd } = opts;
+  const base = {
     draggable,
     dragBoundFunc,
     onMouseDown: onSelect,
@@ -37,6 +88,7 @@ export function resizableNodeProps<T>(opts: {
       onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() } as T);
     },
   };
+  return attachInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
 }
 
 /**
@@ -50,9 +102,11 @@ export function textNodeProps<T>(opts: {
   onSelect: () => void;
   onEdit: (id: string) => void;
   onPatch: (id: string, patch: T) => void;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }) {
-  const { id, draggable, dragBoundFunc, onSelect, onEdit, onPatch } = opts;
-  return {
+  const { id, draggable, dragBoundFunc, onSelect, onEdit, onPatch, onInteractionBegin, onInteractionEnd } = opts;
+  const base = {
     draggable,
     dragBoundFunc,
     onMouseDown: onSelect,
@@ -61,4 +115,5 @@ export function textNodeProps<T>(opts: {
     onDblTap: () => onEdit(id),
     onDragEnd: (e: DragEvt) => onPatch(id, { x: e.target.x(), y: e.target.y() } as T),
   };
+  return attachInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
 }

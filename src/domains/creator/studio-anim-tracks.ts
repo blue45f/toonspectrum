@@ -29,10 +29,24 @@ function clamp(n: number, min: number, max: number): number {
 
 // ── 데이터 모델 ──────────────────────────────────────────────────────
 
+/** Optional transform pose for tweened motion (x/y/rot/scale relative offsets). */
+export interface StudioAnimTransform {
+  x: number;
+  y: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+export type StudioAnimEase = "linear" | "ease-in-out";
+
 /** 트랙(레이어) 하나의 키프레임 하나. frameIndex는 공유 타임라인 위의 절대 위치(0..frameCount-1). */
 export interface StudioAnimKeyframe {
   frameIndex: number;
   frame: StudioAnimFrame; // src만 실제로 쓰인다. durationMs는 이 모델에서 무시(문서 상단 사유 참고).
+  /** Optional transform at this keyframe; omitted tracks keep static layout. */
+  transform?: StudioAnimTransform;
+  ease?: StudioAnimEase;
 }
 
 /**
@@ -136,6 +150,63 @@ export function resolveTrackFrameAt(track: StudioAnimKeyframe[], globalIndex: nu
   return best;
 }
 
+export function normalizeStudioAnimTransform(value?: Partial<StudioAnimTransform> | null): StudioAnimTransform {
+  return {
+    x: Number.isFinite(value?.x) ? (value!.x as number) : 0,
+    y: Number.isFinite(value?.y) ? (value!.y as number) : 0,
+    rotation: Number.isFinite(value?.rotation) ? (value!.rotation as number) : 0,
+    scaleX: Number.isFinite(value?.scaleX) ? clamp(value!.scaleX as number, 0.01, 32) : 1,
+    scaleY: Number.isFinite(value?.scaleY) ? clamp(value!.scaleY as number, 0.01, 32) : 1,
+  };
+}
+
+export function easeStudioAnimProgress(t: number, ease: StudioAnimEase = "linear"): number {
+  const x = clamp(t, 0, 1);
+  if (ease === "ease-in-out") {
+    return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  }
+  return x;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/**
+ * Interpolate transform between surrounding keyframes that define transform.
+ * Held when only one side exists; identity when none.
+ */
+export function resolveTrackTransformAt(
+  track: StudioAnimKeyframe[],
+  globalIndex: number
+): StudioAnimTransform {
+  if (!track.length) return normalizeStudioAnimTransform();
+  let prev: StudioAnimKeyframe | null = null;
+  let next: StudioAnimKeyframe | null = null;
+  for (const keyframe of track) {
+    if (keyframe.transform === undefined) continue;
+    if (keyframe.frameIndex <= globalIndex) prev = keyframe;
+    if (keyframe.frameIndex >= globalIndex && next === null) next = keyframe;
+  }
+  if (prev && next && prev.frameIndex !== next.frameIndex && prev.transform && next.transform) {
+    const span = next.frameIndex - prev.frameIndex;
+    const rawT = (globalIndex - prev.frameIndex) / span;
+    const t = easeStudioAnimProgress(rawT, next.ease ?? prev.ease ?? "linear");
+    const a = normalizeStudioAnimTransform(prev.transform);
+    const b = normalizeStudioAnimTransform(next.transform);
+    return {
+      x: lerp(a.x, b.x, t),
+      y: lerp(a.y, b.y, t),
+      rotation: lerp(a.rotation, b.rotation, t),
+      scaleX: lerp(a.scaleX, b.scaleX, t),
+      scaleY: lerp(a.scaleY, b.scaleY, t),
+    };
+  }
+  if (prev?.transform) return normalizeStudioAnimTransform(prev.transform);
+  if (next?.transform) return normalizeStudioAnimTransform(next.transform);
+  return normalizeStudioAnimTransform();
+}
+
 /**
  * "합성 순서(composite-order) 헬퍼" — zOrderIds(반드시 BACK→FRONT, 즉 StudioPage의 elements
  * 배열 그대로. 레이어 패널 표시용으로 뒤집은 배열을 넘기면 안 된다)를 그 순서 그대로 순회하며
@@ -154,6 +225,26 @@ export function resolveTimelineComposite(
     if (!track) continue;
     const resolved = resolveTrackFrameAt(track, globalIndex);
     if (resolved) result.set(id, resolved);
+  }
+  return result;
+}
+
+/**
+ * Preview-only transform poses for tracks that define keyframe.transform.
+ * Empty map when no track has transform data at this frame. Pure.
+ */
+export function resolveTimelineTransforms(
+  doc: AnimationTimelineDoc,
+  zOrderIds: readonly string[],
+  globalIndex: number
+): Map<string, StudioAnimTransform> {
+  const result = new Map<string, StudioAnimTransform>();
+  for (const id of zOrderIds) {
+    const track = doc.tracks[id];
+    if (!track?.length) continue;
+    const hasTransform = track.some((keyframe) => keyframe.transform !== undefined);
+    if (!hasTransform) continue;
+    result.set(id, resolveTrackTransformAt(track, globalIndex));
   }
   return result;
 }

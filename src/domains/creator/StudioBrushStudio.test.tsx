@@ -53,7 +53,11 @@ describe("StudioBrushStudio", () => {
   });
 
   it("renders deterministic rotated elliptical dabs from the shipped planner", () => {
-    const settings = studioBrushDynamicsPresetSettings("dry-media");
+    // Solid ellipse path: force round tip so preview matches Canvas ellipse geometry.
+    const settings = {
+      ...studioBrushDynamicsPresetSettings("dry-media"),
+      tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
+    };
     const first = renderToStaticMarkup(
       <StudioBrushDynamicsPreview settings={settings} strokeWidth={9} color="#3a2218" />
     );
@@ -70,6 +74,7 @@ describe("StudioBrushStudio", () => {
     const preset = studioBrushDynamicsPresetSettings("dry-media");
     const settings = {
       ...preset,
+      tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
       width: {
         ...preset.width,
         mappings: [{

@@ -13,6 +13,8 @@ import {
   updateStudioBrushDynamicsMapping,
   updateStudioBrushDynamicsPropertyBase,
   updateStudioBrushDynamicsRatio,
+  updateStudioBrushDynamicsTaper,
+  updateStudioBrushDynamicsTip,
 } from "./studio-brush-dynamics-editor";
 
 describe("studio brush dynamics editor", () => {
@@ -63,5 +65,24 @@ describe("studio brush dynamics editor", () => {
       roundness: preset.roundness,
     }).reduce((sum, property) => sum + property.mappings.length, 0);
     expect(studioBrushDynamicsActiveMappingCount(preset)).toBe(expected);
+  });
+
+  it("updates shared taper and PNG tip stamp settings through the editor helpers", () => {
+    const base = studioBrushDynamicsPresetSettings("ink-particle");
+    const tapered = updateStudioBrushDynamicsTaper(base, {
+      enabled: true,
+      startLength: 0.2,
+      endLength: 0.3,
+      minSizeRatio: 0.15,
+    });
+    expect(tapered.taper).toMatchObject({
+      enabled: true,
+      startLength: 0.2,
+      endLength: 0.3,
+      minSizeRatio: 0.15,
+    });
+    const tipped = updateStudioBrushDynamicsTip(tapered, { shape: "star", softness: 0.55 });
+    expect(tipped.tip).toMatchObject({ shape: "star", softness: 0.55, alphaMapBase64: null });
+    expect(studioBrushDynamicsPresetMatch(tipped)).toBeNull();
   });
 });

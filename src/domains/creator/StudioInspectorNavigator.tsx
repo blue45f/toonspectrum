@@ -27,6 +27,11 @@ import {
   type StudioInspectorPrimarySection,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import {
+  STUDIO_FOCUS_RING,
+  StudioContextPill,
+  StudioEmptyState,
+} from "./studio-panel-ui";
 
 import { cn } from "@/lib/utils";
 
@@ -73,8 +78,7 @@ const DOCUMENT_TABS: readonly {
   { id: "navigator", label: "미니맵", icon: Map },
 ];
 
-const tabFocusClass =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+const tabFocusClass = STUDIO_FOCUS_RING;
 
 function safeLayerCount(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
@@ -165,19 +169,30 @@ export function StudioInspectorNavigator({
     globalThis.requestAnimationFrame?.(() => searchToggleRef.current?.focus());
   }
 
+  const summary = contextualSummary({ layout, selectionLabel, drawing });
+  const summaryTone =
+    layout.primary === "publish"
+      ? "accent"
+      : hasSelection || drawing
+        ? "good"
+        : "neutral";
+
   return (
     <section
       aria-labelledby={titleId}
-      className="sticky top-0 z-30 -mx-1 rounded-xl border border-line bg-panel/95 p-2 shadow-lg backdrop-blur"
+      className="sticky top-0 z-30 -mx-1 rounded-xl border border-line bg-panel/95 p-2 shadow-[0_8px_28px_oklch(0.12_0.01_70/0.35)] backdrop-blur supports-[backdrop-filter]:bg-panel/88"
       data-testid="studio-inspector-navigator"
     >
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-1">
         <div className="min-w-0">
-          <h2 id={titleId} className="truncate text-xs font-bold text-fg">
-            작업 패널
-          </h2>
-          <p className="mt-0.5 truncate text-[0.62rem] text-fg-3">
-            {contextualSummary({ layout, selectionLabel, drawing })}
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 id={titleId} className="truncate text-xs font-bold tracking-tight text-fg">
+              작업 패널
+            </h2>
+            <StudioContextPill tone={summaryTone}>{summary}</StudioContextPill>
+          </div>
+          <p className="mt-1 truncate text-[0.62rem] text-fg-3">
+            속성 · 레이어 · 페이지 · 게시를 한곳에서 전환합니다
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -190,7 +205,7 @@ export function StudioInspectorNavigator({
             aria-label={searchOpen ? "패널 찾기 닫기" : "패널과 기능 찾기"}
             title="패널과 기능 찾기"
             className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg lg:size-10 pointer-coarse:size-11",
+              "grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-10 pointer-coarse:size-11",
               searchOpen && "border-accent bg-accent-soft text-accent",
               tabFocusClass
             )}
@@ -204,7 +219,7 @@ export function StudioInspectorNavigator({
               aria-label="속성 시트 닫기"
               data-autofocus
               className={cn(
-                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:hidden",
+                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:hidden",
                 tabFocusClass
               )}
             >
@@ -217,7 +232,7 @@ export function StudioInspectorNavigator({
       <div
         role="tablist"
         aria-label="스튜디오 작업 패널"
-        className="grid grid-cols-4 gap-1 rounded-lg border border-line/70 bg-canvas/45 p-1"
+        className="grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-canvas/55 p-1"
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -232,15 +247,21 @@ export function StudioInspectorNavigator({
               onClick={() => navigate({ primary: tab.id })}
               onKeyDown={moveTabFocus}
               className={cn(
-                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[0.62rem] font-semibold transition-colors lg:min-h-10 pointer-coarse:min-h-11",
+                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[0.62rem] font-semibold transition-colors duration-150 lg:min-h-10 pointer-coarse:min-h-11",
                 active
-                  ? "bg-raised text-fg shadow-sm"
+                  ? "bg-raised text-fg shadow-sm ring-1 ring-accent/25"
                   : "text-fg-3 hover:bg-card hover:text-fg-2",
                 tabFocusClass
               )}
             >
-              <Icon size={15} aria-hidden />
+              <Icon size={15} className={active ? "text-accent" : undefined} aria-hidden />
               <span className="truncate">{tab.label}</span>
+              {active ? (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-2 bottom-0.5 h-0.5 rounded-full bg-accent"
+                />
+              ) : null}
               {tab.id === "layers" && normalizedLayerCount > 0 ? (
                 <span className="absolute right-1 top-1 rounded-full bg-accent-soft px-1 text-[0.52rem] font-bold tabular-nums text-accent">
                   {normalizedLayerCount > 99 ? "99+" : normalizedLayerCount}
@@ -270,10 +291,10 @@ export function StudioInspectorNavigator({
                 onClick={() => navigate({ primary: "properties", image: tab.id })}
                 onKeyDown={moveTabFocus}
                 className={cn(
-                  "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border px-3 text-[0.65rem] font-semibold transition-colors lg:min-h-9 lg:px-2 pointer-coarse:min-h-11 pointer-coarse:px-3",
+                  "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border px-3 text-[0.65rem] font-semibold transition-colors duration-150 lg:min-h-9 lg:px-2 pointer-coarse:min-h-11 pointer-coarse:px-3",
                   active
-                    ? "border-accent bg-accent-soft text-accent"
-                    : "border-line bg-card/60 text-fg-3 hover:bg-raised hover:text-fg-2",
+                    ? "border-accent bg-accent-soft text-accent shadow-sm"
+                    : "border-line bg-card/60 text-fg-3 hover:border-line-strong hover:bg-raised hover:text-fg-2",
                   tabFocusClass
                 )}
               >
@@ -304,10 +325,10 @@ export function StudioInspectorNavigator({
                 onClick={() => navigate({ primary: "document", document: tab.id })}
                 onKeyDown={moveTabFocus}
                 className={cn(
-                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.65rem] font-semibold transition-colors lg:min-h-9 pointer-coarse:min-h-11",
+                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 text-[0.65rem] font-semibold transition-colors duration-150 lg:min-h-9 pointer-coarse:min-h-11",
                   active
-                    ? "border-accent bg-accent-soft text-accent"
-                    : "border-line bg-card/60 text-fg-3 hover:bg-raised hover:text-fg-2",
+                    ? "border-accent bg-accent-soft text-accent shadow-sm"
+                    : "border-line bg-card/60 text-fg-3 hover:border-line-strong hover:bg-raised hover:text-fg-2",
                   tabFocusClass
                 )}
               >
@@ -322,7 +343,7 @@ export function StudioInspectorNavigator({
       {searchOpen ? (
         <div
           id={`${searchInputId}-panel`}
-          className="mt-2 overflow-hidden rounded-lg border border-line bg-card shadow-xl"
+          className="mt-2 overflow-hidden rounded-xl border border-line bg-card shadow-xl"
         >
           <label htmlFor={searchInputId} className="sr-only">
             패널과 기능 검색
@@ -368,11 +389,13 @@ export function StudioInspectorNavigator({
                   type="button"
                   onClick={() => navigate(action.route, true)}
                   className={cn(
-                    "flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-raised",
+                    "flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 hover:bg-raised",
                     tabFocusClass
                   )}
                 >
-                  <FileUp size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                  <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
+                    <FileUp size={13} aria-hidden />
+                  </span>
                   <span className="min-w-0">
                     <span className="block text-xs font-semibold text-fg-2">
                       {action.label}
@@ -384,9 +407,11 @@ export function StudioInspectorNavigator({
                 </button>
               ))
             ) : (
-              <p className="px-3 py-5 text-center text-xs text-fg-3">
-                일치하는 패널이 없습니다.
-              </p>
+              <StudioEmptyState
+                className="border-0 bg-transparent py-6 shadow-none"
+                title="일치하는 패널이 없습니다"
+                description="채우기, 마스크, 레이어, 게시처럼 작업 이름을 짧게 입력해 보세요."
+              />
             )}
           </div>
         </div>

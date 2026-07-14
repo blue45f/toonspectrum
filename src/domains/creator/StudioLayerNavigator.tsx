@@ -94,7 +94,13 @@ export type StudioLayerNavigatorAction =
   | { type: "move-group"; groupId: string; direction: "up" | "down" }
   | { type: "ungroup"; groupId: string }
   /** 선택 ID 집합 전체를 하나의 삭제 의도로 전달한다. 잠금·히스토리·선택 정리는 상위 문서 어댑터 책임이다. */
-  | { type: "delete-items"; ids: readonly string[] };
+  | { type: "delete-items"; ids: readonly string[] }
+  /** Merge selected layer with the one below (toward BACK). */
+  | { type: "merge-down"; id: string }
+  /** Merge all selected layers (2+). */
+  | { type: "merge-selected"; ids: readonly string[] }
+  /** Flatten all visible unlocked layers into one group plan (non-destructive group until raster bake). */
+  | { type: "flatten-visible" };
 
 export interface StudioLayerNavigatorProps {
   /** 문서의 BACK→FRONT 레이어. zIndex를 기준으로 FRONT→BACK 표시 순서를 안정적으로 만든다. */
@@ -798,20 +804,20 @@ export function StudioLayerNavigator({
 
   return (
     <section
-      className="relative flex h-full min-h-0 flex-col rounded-xl border border-line bg-panel/45"
+      className="relative flex h-full min-h-0 flex-col rounded-xl border border-line bg-panel/50 shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.03)]"
       aria-label="전문 레이어 내비게이터"
       data-page-key={pageKey}
       data-studio-shortcut-boundary="true"
     >
-      <div className="border-b border-line/70 p-2.5">
+      <div className="border-b border-line/70 bg-panel/70 p-2.5">
         <div className="flex items-center gap-2">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent" aria-hidden>
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15" aria-hidden>
             <Layers3 size={16} />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xs font-bold text-fg">레이어 {stats.total}</h3>
-              <span id={resultStatusId} role="status" aria-live="polite" className="text-[0.62rem] text-fg-3">
+              <h3 className="text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
+              <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
                 결과 {results.length}
               </span>
             </div>
@@ -1423,6 +1429,30 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
+                disabled={readOnly || batchSelectedIds.length < 2}
+                onClick={() => {
+                  onAction({ type: "merge-selected", ids: batchSelectedIds });
+                  setActionTarget(null);
+                }}
+                className={compactControl}
+                title="선택한 레이어를 하나로 묶습니다"
+              >
+                <Layers3 size={13} /> 선택 병합
+              </button>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  onAction({ type: "flatten-visible" });
+                  setActionTarget(null);
+                }}
+                className={compactControl}
+                title="표시 중인 레이어를 평탄화 그룹으로 묶습니다"
+              >
+                <Grid2X2 size={13} /> 표시 평탄화
+              </button>
+              <button
+                type="button"
                 disabled={readOnly || batchSelectedIds.length === 0}
                 onClick={() => {
                   onAction({ type: "delete-items", ids: batchSelectedIds });
@@ -1553,6 +1583,30 @@ export function StudioLayerNavigator({
                   {STUDIO_LAYER_COLORS.map((color) => <option key={color} value={color}>{STUDIO_LAYER_COLOR_LABELS[color]}</option>)}
                 </select>
               </label>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  onAction({ type: "merge-down", id: activeItem.id });
+                  setActionTarget(null);
+                }}
+                className={compactControl}
+                title="아래 레이어와 병합"
+              >
+                <Layers3 size={13} /> 아래로 병합
+              </button>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  onAction({ type: "flatten-visible" });
+                  setActionTarget(null);
+                }}
+                className={compactControl}
+                title="표시 레이어 평탄화"
+              >
+                <Grid2X2 size={13} /> 평탄화
+              </button>
               <button
                 type="button"
                 disabled={readOnly}

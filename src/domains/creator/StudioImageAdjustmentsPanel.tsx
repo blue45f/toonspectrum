@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { isIdentityCurveChannels, normalizeCurve, type CurvePoint, type CurveRgbChannels } from "./studio-curves";
+import { createStudioEffectId, type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import { type LayerStylePatch } from "./studio-layer-styles";
 import {
   isIdentityLevelsChannels,
@@ -15,8 +16,15 @@ import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 import type { El, ImageEl } from "./StudioPage";
 
+function createLookEffectId(lookId: string): StudioEffectId {
+  return createStudioEffectId("look", lookId);
+}
+
 const StudioCurvePanel = lazy(() =>
   import("./StudioCurvePanel").then((mod) => ({ default: mod.StudioCurvePanel }))
+);
+const StudioSmartFiltersPanel = lazy(() =>
+  import("./StudioSmartFiltersPanel").then((mod) => ({ default: mod.StudioSmartFiltersPanel }))
 );
 const StudioImageFilterPanel = lazy(() =>
   import("./StudioImageFilterPanel").then((mod) => ({ default: mod.StudioImageFilterPanel }))
@@ -39,6 +47,9 @@ interface StudioImageAdjustmentsPanelProps {
   filterClipboard: Partial<ImageFilterFields> | null;
   onSetFilterClipboard: (value: Partial<ImageFilterFields> | null) => void;
   onPatch: (patch: Partial<El>) => void;
+  effectFavoriteState: StudioEffectFavoriteState;
+  onToggleEffectFavorite: (effectId: StudioEffectId) => void;
+  onRememberEffectRecent: (effectId: StudioEffectId) => void;
 }
 
 type DeferredAdjustmentSectionProps = Pick<StudioImageAdjustmentsPanelProps, "selected" | "onPatch">;
@@ -586,6 +597,9 @@ export function StudioImageAdjustmentsPanel({
   filterClipboard,
   onSetFilterClipboard,
   onPatch,
+  effectFavoriteState,
+  onToggleEffectFavorite,
+  onRememberEffectRecent,
 }: StudioImageAdjustmentsPanelProps) {
   // 채널(r/g/b) 곡선·레벨 필드(curveCh/levelsCh) — ImageEl 타입 선언에는 아직 없어
   // ImageFilterFields로 읽는다(런타임은 같은 요소 객체라 patchEl 스프레드로 그대로 왕복된다).
@@ -594,13 +608,25 @@ export function StudioImageAdjustmentsPanel({
     <>
       <AdjustmentSection title="룩 프리셋" defaultOpen>
         <StudioLooksPanel
-          onApplyLook={(look: StudioLook) => onPatch({ ...looksResetPatch(), ...look.patch } as Partial<El>)}
+          onApplyLook={(look: StudioLook) => {
+            onRememberEffectRecent(createLookEffectId(look.id));
+            onPatch({ ...looksResetPatch(), ...look.patch } as Partial<El>);
+          }}
           onCopy={() => onSetFilterClipboard(extractFilterFields(selected))}
           onPaste={() => {
             if (filterClipboard) onPatch({ ...looksResetPatch(), ...filterClipboard } as Partial<El>);
           }}
           onResetAll={() => onPatch(looksResetPatch() as Partial<El>)}
           canPaste={!!filterClipboard}
+          favoriteState={effectFavoriteState}
+          onToggleFavorite={onToggleEffectFavorite}
+        />
+      </AdjustmentSection>
+
+      <AdjustmentSection title="스마트 필터" defaultOpen>
+        <StudioSmartFiltersPanel
+          stack={selected.smartFilters}
+          onChange={(smartFilters) => onPatch({ smartFilters } as Partial<El>)}
         />
       </AdjustmentSection>
 

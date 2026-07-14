@@ -12,6 +12,7 @@ import {
   studioBrushDynamicsSeedFromKey,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSettingsEqual,
+  studioBrushTaperFactors,
   type StudioBrushDynamicsRecipe,
   type StudioBrushDynamicsSettings,
   type StudioDynamicBrushPlan,
@@ -658,5 +659,111 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(plan.dabs).toHaveLength(1);
     expect(plan.dabs[0]!.sourceX).toBe(-1_000_000);
     expect(plan.capped).toBe(true);
+  });
+
+  it("applies shared start/end taper so both ends are thinner than the mid-stroke", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      width: { base: 10, mappings: [] },
+      opacity: { base: 1, mappings: [] },
+      spacing: { base: 5, mappings: [] },
+      scatter: { base: 0 },
+      taper: {
+        enabled: true,
+        startLength: 0.25,
+        endLength: 0.25,
+        minSizeRatio: 0.2,
+        minOpacityRatio: 0.5,
+        curve: 1,
+      },
+      tip: { shape: "round" },
+    });
+    const plan = planStudioDynamicBrush({
+      points: [0, 0, 100, 0],
+      pressures: Array(21).fill(0.7),
+      baseWidth: 10,
+      baseOpacity: 1,
+      settings,
+      seed: 7,
+    });
+    const mid = plan.dabs.find((dab) => dab.progress > 0.45 && dab.progress < 0.55)
+      ?? plan.dabs[Math.floor(plan.dabs.length / 2)]!;
+    const first = plan.dabs[0]!;
+    const last = plan.dabs.at(-1)!;
+    expect(first.size).toBeLessThan(mid.size);
+    expect(last.size).toBeLessThan(mid.size);
+    expect(first.opacity).toBeLessThan(mid.opacity);
+    expect(last.opacity).toBeLessThan(mid.opacity);
+    expect(first.progress).toBe(0);
+    expect(last.progress).toBe(1);
+
+    const replay = planStudioDynamicBrush({
+      points: [0, 0, 100, 0],
+      pressures: Array(21).fill(0.7),
+      baseWidth: 10,
+      baseOpacity: 1,
+      settings,
+      seed: 7,
+    });
+    expect(replay).toEqual(plan);
+  });
+
+  it("skips taper on zero-length point taps so a single dab keeps full size", () => {
+    const plan = planStudioDynamicBrush({
+      points: [5, 5],
+      pressures: [0.5],
+      baseWidth: 12,
+      baseOpacity: 0.9,
+      settings: {
+        width: { mappings: [] },
+        opacity: { mappings: [] },
+        taper: {
+          enabled: true,
+          startLength: 0.4,
+          endLength: 0.4,
+          minSizeRatio: 0.1,
+          minOpacityRatio: 0.1,
+        },
+      },
+    });
+    expect(plan.dabs).toHaveLength(1);
+    expect(plan.dabs[0]!.size).toBe(12);
+    expect(plan.dabs[0]!.opacity).toBe(0.9);
+  });
+
+  it("normalizes taper + tip and keeps them in the canonical serialization", () => {
+    const normalized = normalizeStudioBrushDynamicsSettings({
+      taper: { enabled: true, startLength: 0.9, minSizeRatio: -1, curve: 99 },
+      tip: { shape: "grain", softness: 2, alphaMapSize: 3 },
+    });
+    expect(normalized.taper).toMatchObject({
+      enabled: true,
+      startLength: 0.5,
+      minSizeRatio: 0,
+      curve: 8,
+    });
+    expect(normalized.tip).toMatchObject({ shape: "grain", softness: 1, alphaMapSize: 8 });
+    expect(JSON.parse(serializeStudioBrushDynamicsSettingsCanonical(normalized))).toMatchObject({
+      taper: normalized.taper,
+      tip: normalized.tip,
+    });
+    expect(studioBrushTaperFactors(0, normalized.taper).size).toBe(0);
+    expect(studioBrushTaperFactors(0.5, normalized.taper).size).toBe(1);
+  });
+
+  it("ships commercial presets with taper and textured tip stamp settings", () => {
+    for (const id of ["ink-particle", "airbrush", "dry-media"] as const) {
+      const preset = studioBrushDynamicsPresetSettings(id);
+      expect(preset.taper.enabled).toBe(true);
+      expect(preset.tip.shape).not.toBe("round");
+      const plan = planStudioDynamicBrush({
+        points: [0, 0, 60, 0],
+        pressures: [0.5, 0.5],
+        baseWidth: preset.width.base,
+        baseOpacity: preset.opacity.base,
+        settings: preset,
+      });
+      expect(plan.dabs.length).toBeGreaterThan(1);
+      expect(plan.settings.tip.shape).toBe(preset.tip.shape);
+    }
   });
 });

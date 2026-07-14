@@ -6,12 +6,19 @@
  *
  * 1. normalize PointerEvent-compatible samples,
  * 2. map pressure/speed/tilt/twist/direction to a deterministic dab recipe,
- * 3. resample a polyline by arc length into a bounded list of render-ready dabs.
+ * 3. resample a polyline by arc length into a bounded list of render-ready dabs,
+ * 4. apply shared start/end taper and attach PNG-alpha tip stamp settings for consumers.
  *
  * Every public input/output type contains only JSON-compatible data. Random variation never uses
  * Math.random: a stroke seed and dab index fully determine jitter and scatter, so reopening,
  * collaboration replay and export all reproduce the same stroke.
  */
+
+import {
+  normalizeStudioBrushTipSettings,
+  type NormalizedStudioBrushTipSettings,
+  type StudioBrushTipSettings,
+} from "./studio-brush-tip-stamp";
 
 export const STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION = 1 as const;
 
@@ -30,6 +37,14 @@ export const DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS = 1024;
 export const STUDIO_BRUSH_DYNAMICS_RATIO_LIMITS = {
   spacing: { min: 0.01, max: 16 },
   scatter: { min: 0, max: 16 },
+} as const;
+
+/** Shared stroke-start / stroke-end taper (CSP / Procreate style tip thinning). */
+export const STUDIO_BRUSH_TAPER_LIMITS = {
+  length: { min: 0, max: 0.5 },
+  minSizeRatio: { min: 0, max: 1 },
+  minOpacityRatio: { min: 0, max: 1 },
+  curve: { min: 0.05, max: 8 },
 } as const;
 
 const MAX_POINTER_SPEED = 64;
@@ -82,6 +97,30 @@ export interface StudioBrushDynamicsPropertySettings {
   jitter?: StudioBrushDynamicsJitterSettings | null;
 }
 
+/** Shared start/end taper along stroke arc length (progress 0..1). */
+export interface StudioBrushTaperSettings {
+  enabled?: boolean;
+  /** Fraction of stroke length for the start taper zone (0..0.5). */
+  startLength?: number;
+  /** Fraction of stroke length for the end taper zone (0..0.5). */
+  endLength?: number;
+  /** Size multiplier at a fully tapered tip. */
+  minSizeRatio?: number;
+  /** Opacity multiplier at a fully tapered tip. */
+  minOpacityRatio?: number;
+  /** Power curve for taper falloff (>1 = longer thin tip, <1 = faster recovery). */
+  curve?: number;
+}
+
+export interface NormalizedStudioBrushTaperSettings {
+  enabled: boolean;
+  startLength: number;
+  endLength: number;
+  minSizeRatio: number;
+  minOpacityRatio: number;
+  curve: number;
+}
+
 /** JSON-persistable user settings. `size` is accepted as an alias for `width`. */
 export interface StudioBrushDynamicsSettings {
   version?: number;
@@ -93,6 +132,10 @@ export interface StudioBrushDynamicsSettings {
   spacingRatio?: number | null;
   /** Scatter radius as a tip-width ratio. Set null to use scatter.base as absolute px. */
   scatterRatio?: number | null;
+  /** Shared start/end taper applied after property mappings. */
+  taper?: StudioBrushTaperSettings | null;
+  /** PNG-alpha tip stamp shape (procedural or custom alpha map). */
+  tip?: StudioBrushTipSettings | null;
   width?: StudioBrushDynamicsPropertySettings;
   size?: StudioBrushDynamicsPropertySettings;
   opacity?: StudioBrushDynamicsPropertySettings;
@@ -147,6 +190,8 @@ export interface NormalizedStudioBrushDynamicsSettings {
   maxSpeed: number;
   spacingRatio: number | null;
   scatterRatio: number | null;
+  taper: NormalizedStudioBrushTaperSettings;
+  tip: NormalizedStudioBrushTipSettings;
   width: NormalizedStudioBrushDynamicsProperty;
   opacity: NormalizedStudioBrushDynamicsProperty;
   flow: NormalizedStudioBrushDynamicsProperty;
@@ -274,6 +319,15 @@ const PROPERTY_SALTS: Record<DynamicsPropertyName, number> = {
   roundness: 0x9b05_688c,
 };
 
+const INTERNAL_DEFAULT_TAPER: NormalizedStudioBrushTaperSettings = {
+  enabled: false,
+  startLength: 0.12,
+  endLength: 0.18,
+  minSizeRatio: 0.2,
+  minOpacityRatio: 0.55,
+  curve: 1,
+};
+
 const INTERNAL_DEFAULT_SETTINGS: NormalizedStudioBrushDynamicsSettings = {
   version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
   seed: 1,
@@ -281,6 +335,8 @@ const INTERNAL_DEFAULT_SETTINGS: NormalizedStudioBrushDynamicsSettings = {
   maxSpeed: 1.6,
   spacingRatio: 0.34,
   scatterRatio: null,
+  taper: { ...INTERNAL_DEFAULT_TAPER },
+  tip: normalizeStudioBrushTipSettings(),
   width: {
     base: 6,
     min: STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.min,
@@ -323,6 +379,15 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     description: "필압과 속도에 반응하는 미세 잉크 입자와 방향성 펜촉",
     settings: {
       seed: 101,
+      taper: {
+        enabled: true,
+        startLength: 0.1,
+        endLength: 0.16,
+        minSizeRatio: 0.18,
+        minOpacityRatio: 0.5,
+        curve: 1.05,
+      },
+      tip: { shape: "hard", softness: 0.22 },
       width: {
         base: 8,
         mappings: [{ source: "pressure", from: 0.22, to: 1.55 }],
@@ -354,6 +419,15 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     description: "낮은 flow와 넓은 산포로 여러 번 쌓아 올리는 부드러운 분사",
     settings: {
       seed: 202,
+      taper: {
+        enabled: true,
+        startLength: 0.06,
+        endLength: 0.1,
+        minSizeRatio: 0.45,
+        minOpacityRatio: 0.35,
+        curve: 0.9,
+      },
+      tip: { shape: "soft", softness: 0.85 },
       width: {
         base: 32,
         mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
@@ -375,6 +449,15 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     description: "크레용·목탄처럼 압력과 속도에 따라 끊기고 거칠어지는 마른 획",
     settings: {
       seed: 303,
+      taper: {
+        enabled: true,
+        startLength: 0.08,
+        endLength: 0.14,
+        minSizeRatio: 0.28,
+        minOpacityRatio: 0.4,
+        curve: 1.15,
+      },
+      tip: { shape: "grain", softness: 0.4 },
       width: {
         base: 6,
         mappings: [{ source: "pressure", from: 0.15, to: 1.45 }],
@@ -447,6 +530,14 @@ function cloneProperty(property: NormalizedStudioBrushDynamicsProperty): Normali
   };
 }
 
+function cloneTaper(taper: NormalizedStudioBrushTaperSettings): NormalizedStudioBrushTaperSettings {
+  return { ...taper };
+}
+
+function cloneTip(tip: NormalizedStudioBrushTipSettings): NormalizedStudioBrushTipSettings {
+  return { ...tip };
+}
+
 function cloneNormalizedSettings(
   settings: NormalizedStudioBrushDynamicsSettings
 ): NormalizedStudioBrushDynamicsSettings {
@@ -457,6 +548,8 @@ function cloneNormalizedSettings(
     maxSpeed: settings.maxSpeed,
     spacingRatio: settings.spacingRatio,
     scatterRatio: settings.scatterRatio,
+    taper: cloneTaper(settings.taper),
+    tip: cloneTip(settings.tip),
     width: cloneProperty(settings.width),
     opacity: cloneProperty(settings.opacity),
     flow: cloneProperty(settings.flow),
@@ -464,6 +557,70 @@ function cloneNormalizedSettings(
     scatter: cloneProperty(settings.scatter),
     angle: cloneProperty(settings.angle),
     roundness: cloneProperty(settings.roundness),
+  };
+}
+
+function normalizeTaper(value: unknown): NormalizedStudioBrushTaperSettings {
+  if (value === null) return cloneTaper(INTERNAL_DEFAULT_TAPER);
+  const source = asRecord(value);
+  if (!source) return cloneTaper(INTERNAL_DEFAULT_TAPER);
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : INTERNAL_DEFAULT_TAPER.enabled,
+    startLength: clamp(
+      finiteNumber(source.startLength, INTERNAL_DEFAULT_TAPER.startLength),
+      STUDIO_BRUSH_TAPER_LIMITS.length.min,
+      STUDIO_BRUSH_TAPER_LIMITS.length.max
+    ),
+    endLength: clamp(
+      finiteNumber(source.endLength, INTERNAL_DEFAULT_TAPER.endLength),
+      STUDIO_BRUSH_TAPER_LIMITS.length.min,
+      STUDIO_BRUSH_TAPER_LIMITS.length.max
+    ),
+    minSizeRatio: clamp(
+      finiteNumber(source.minSizeRatio, INTERNAL_DEFAULT_TAPER.minSizeRatio),
+      STUDIO_BRUSH_TAPER_LIMITS.minSizeRatio.min,
+      STUDIO_BRUSH_TAPER_LIMITS.minSizeRatio.max
+    ),
+    minOpacityRatio: clamp(
+      finiteNumber(source.minOpacityRatio, INTERNAL_DEFAULT_TAPER.minOpacityRatio),
+      STUDIO_BRUSH_TAPER_LIMITS.minOpacityRatio.min,
+      STUDIO_BRUSH_TAPER_LIMITS.minOpacityRatio.max
+    ),
+    curve: clamp(
+      finiteNumber(source.curve, INTERNAL_DEFAULT_TAPER.curve),
+      STUDIO_BRUSH_TAPER_LIMITS.curve.min,
+      STUDIO_BRUSH_TAPER_LIMITS.curve.max
+    ),
+  };
+}
+
+/**
+ * Multiplier for size/opacity at a given arc-length progress (0=start, 1=end).
+ * Disabled taper returns 1 for both channels.
+ */
+export function studioBrushTaperFactors(
+  progress: number,
+  taper: NormalizedStudioBrushTaperSettings
+): { size: number; opacity: number } {
+  if (!taper.enabled) return { size: 1, opacity: 1 };
+  const tProgress = clamp01(progress);
+  let size = 1;
+  let opacity = 1;
+
+  const applyZone = (distanceFromTip: number, zoneLength: number) => {
+    if (zoneLength <= 0) return;
+    if (distanceFromTip >= zoneLength) return;
+    const linear = clamp01(distanceFromTip / zoneLength);
+    const eased = Math.pow(linear, taper.curve);
+    size *= taper.minSizeRatio + (1 - taper.minSizeRatio) * eased;
+    opacity *= taper.minOpacityRatio + (1 - taper.minOpacityRatio) * eased;
+  };
+
+  applyZone(tProgress, taper.startLength);
+  applyZone(1 - tProgress, taper.endLength);
+  return {
+    size: clamp(size, 0, 8),
+    opacity: clamp01(opacity),
   };
 }
 
@@ -586,6 +743,8 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
     maxSpeed: clamp(finiteNumber(source.maxSpeed, INTERNAL_DEFAULT_SETTINGS.maxSpeed), 0.01, MAX_POINTER_SPEED),
     spacingRatio,
     scatterRatio,
+    taper: normalizeTaper(source.taper),
+    tip: normalizeStudioBrushTipSettings(source.tip),
     width,
     opacity: normalizeProperty(source.opacity, INTERNAL_DEFAULT_SETTINGS.opacity, "opacity"),
     flow: normalizeProperty(source.flow, INTERNAL_DEFAULT_SETTINGS.flow, "flow"),
@@ -967,6 +1126,8 @@ function settingsForPlan(input: Partial<StudioDynamicBrushPlanInput>): Normalize
   return {
     ...settings,
     seed: uint32(input.seed, settings.seed),
+    taper: cloneTaper(settings.taper),
+    tip: cloneTip(settings.tip),
     width: { ...settings.width, base: width },
     opacity: { ...settings.opacity, base: opacity },
     spacing: { ...settings.spacing, base: spacing },
@@ -1039,10 +1200,22 @@ export function planStudioDynamicBrush(
     ? buildDistances(true)
     : naturalDistances;
 
+  // Point taps and zero-length runs have no travel axis, so shared start/end taper would
+  // incorrectly force the minimum tip size on the only dab.
+  const applyStrokeTaper = totalLength > POINT_EPSILON;
   const dabs = distances.map((distance, index): StudioDynamicBrushDab => {
     const station = stationAtDistance(points, cumulative, totalLength, distance);
     const sample = normalizeStudioBrushDynamicsSample(sampleForStation(station, index, input, settings), settings);
     const recipe = resolveNormalizedStudioBrushDynamics(sample, settings);
+    const taper = applyStrokeTaper
+      ? studioBrushTaperFactors(station.progress, settings.taper)
+      : { size: 1, opacity: 1 };
+    const size = clamp(
+      recipe.size * taper.size,
+      STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.min,
+      STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.max
+    );
+    const opacity = clamp01(recipe.opacity * taper.opacity);
     return {
       index,
       progress: station.progress,
@@ -1050,8 +1223,8 @@ export function planStudioDynamicBrush(
       sourceY: station.y,
       x: station.x + recipe.scatterOffsetX,
       y: station.y + recipe.scatterOffsetY,
-      size: recipe.size,
-      opacity: recipe.opacity,
+      size,
+      opacity,
       flow: recipe.flow,
       spacing: recipe.spacing,
       scatter: recipe.scatter,
