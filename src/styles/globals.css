@@ -588,8 +588,59 @@ html[data-studio-canvas-only="true"] body {
   --studio-surface-1: oklch(0.178 0.009 68);
   --studio-surface-2: oklch(0.205 0.01 66);
   --studio-surface-3: oklch(0.235 0.011 64);
+  /* Stacking scale — see studio-z-index.ts */
+  --studio-z-canvas-hud: 10;
+  --studio-z-tool-rail: 20;
+  --studio-z-tool-belt: 30;
+  --studio-z-options: 40;
+  --studio-z-menubar: 50;
+  --studio-z-menubar-menu: 60;
+  --studio-z-tool-popover: 70;
+  --studio-z-modal: 80;
+  --studio-z-confirm: 90;
+  --studio-z-workspace: 100;
+  --studio-z-help: 110;
   color-scheme: dark;
   font-feature-settings: "ss01" on, "cv11" on;
+  /* Own stacking context so studio menus never fight site header isolation rules. */
+  isolation: isolate;
+  position: relative;
+  z-index: 1;
+}
+
+/* Site route-stage rainbow band must not paint over studio menus (was fixed z-80). */
+html[data-studio-app="true"] .route-stage::before,
+body[data-studio-app="true"] .route-stage::before,
+[data-studio-app="true"] .route-stage::before {
+  display: none !important;
+}
+
+/* Chrome layer stacking — menubar MUST exceed options or File menu paints under the strip */
+[data-studio-app-menubar="true"] {
+  position: relative;
+  z-index: var(--studio-z-menubar, 50);
+}
+[data-studio-draw-options="true"],
+[data-studio-select-options="true"] {
+  position: relative;
+  z-index: var(--studio-z-options, 40);
+}
+[data-studio-tool-belt="true"] {
+  z-index: var(--studio-z-tool-belt, 30);
+}
+[data-studio-tool-rail="true"] {
+  position: relative;
+  z-index: var(--studio-z-tool-rail, 20);
+}
+[data-studio-status-bar="true"] {
+  z-index: var(--studio-z-canvas-hud, 10);
+}
+[data-studio-main-menu="true"] {
+  position: relative;
+  z-index: 1;
+}
+[data-studio-main-menu="true"] [role="menu"] {
+  z-index: var(--studio-z-menubar-menu, 60);
 }
 
 /* Soften default editor text rendering */

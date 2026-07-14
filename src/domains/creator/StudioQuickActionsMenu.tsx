@@ -130,7 +130,7 @@ export function StudioQuickActionsCustomizationSheet({
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-actions-customize-title"
-      className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[min(42rem,calc(100dvh-1rem))] w-auto max-w-xl overflow-y-auto rounded-2xl border border-line bg-panel text-fg shadow-2xl sm:bottom-4"
+      className="fixed inset-x-2 bottom-2 z-[71] mx-auto max-h-[min(42rem,calc(100dvh-1rem))] w-auto max-w-xl overflow-y-auto rounded-2xl border border-line bg-panel text-fg shadow-2xl sm:bottom-4"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
@@ -429,7 +429,7 @@ export function StudioQuickActionsMenu({
   const overlay = (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-[80] text-fg"
+      className="fixed inset-0 z-[70] text-fg"
       style={{
         paddingTop: "max(0.75rem, env(safe-area-inset-top))",
         paddingRight: "max(0.75rem, env(safe-area-inset-right))",

@@ -133,7 +133,7 @@ export function StudioToolBelt({
       data-studio-tool-belt="true"
       className={cn(
         // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
-        "sticky top-0 z-30 flex max-w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto",
+        "sticky top-0 z-[30] flex max-w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto",
         "border-b border-line bg-panel/95 px-2 py-1.5",
         "shadow-[0_1px_0_oklch(0.2_0.01_70/0.08)] backdrop-blur-md",
         "[-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -162,7 +162,7 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
-        "flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2.5 border-b border-line px-3",
+        "relative z-[50] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2.5 border-b border-line px-3",
         "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
@@ -709,7 +709,7 @@ export function StudioStatusBar({
       aria-label={ariaLabel}
       data-studio-status-bar="true"
       className={cn(
-        "pointer-events-auto absolute bottom-3.5 left-3.5 z-20 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1.5",
+        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1.5",
         "rounded-2xl px-3 py-2 text-[0.68rem] font-semibold tracking-tight text-fg-2",
         className
       )}

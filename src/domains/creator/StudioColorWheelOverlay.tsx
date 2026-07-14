@@ -91,7 +91,7 @@ export function StudioColorWheelOverlay({ open, center, colors, onSelect, onClos
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-50"
+      className="fixed inset-0 z-[70]"
       style={{ touchAction: "none" }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

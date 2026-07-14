@@ -78,7 +78,7 @@ export function StudioSelectOptionsBar({
       aria-label="선택 옵션"
       data-studio-select-options="true"
       className={cn(
-        "flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-3",
+        "relative z-[40] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-3",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}

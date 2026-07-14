@@ -251,7 +251,7 @@ export function StudioReferencePanel({ open, onClose }: StudioReferencePanelProp
     <div
       role="region"
       aria-label="참고 이미지 패널"
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
+      className="fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
       style={{ left: settings.x, top: settings.y, width: settings.width, height: settings.height }}
     >
       <header

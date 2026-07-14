@@ -15456,13 +15456,11 @@ function StudioCuttoonEditor() {
   // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
   const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
-  // 그룹 팝오버 공통 위치·크기 — 개별 메뉴 팝오버와 동일한 z-[60]·max-h-[calc(100dvh-13rem)] 관례
-  // (2026-07-04 통일)를 그대로 물려받는다. 그룹별로 제각각이던 폭(w-64~w-80)은 그룹 안에서 가장 넓은
-  // 멤버 기준으로 통일해 서브탭 전환 시 팝오버 크기가 튀지 않게 한다.
+  // 그룹 팝오버 — z-[70] (toolPopover). Menubar menus sit at 60; full modals at 80+.
+  // Always `fixed` so they still paint when the legacy toolbelt is parked off-screen on desktop.
   const groupPopoverClass = (width: "w-72" | "w-80") =>
     cn(
-      // Always fixed under chrome so main-menu opens work even when the legacy toolbelt is off-screen.
-      "fixed inset-x-2 top-[6.5rem] z-[80] max-h-[min(70dvh,32rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
+      "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(70dvh,32rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );
 
@@ -17248,7 +17246,7 @@ function StudioCuttoonEditor() {
             {exportMenuOpen && (
               <Suspense
                 fallback={
-                  <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
+                  <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-[60] sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
                     내보내기 옵션을 여는 중...
                   </div>
                 }
@@ -17313,7 +17311,7 @@ function StudioCuttoonEditor() {
                     globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
                   }
                 }}
-                className="fixed inset-x-2 top-20 z-[70] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] lg:pb-2 [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+                className="fixed inset-x-2 top-20 z-[60] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:z-[60] lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] lg:pb-2 [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
               >
                 <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
                   <span>
@@ -19038,7 +19036,7 @@ function StudioCuttoonEditor() {
             <MessageCircle size={14} /> 말풍선
           </button>
           {menu === "bubble" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg">
+            <div className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:z-[70] lg:mt-1 lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg">
               <div className="mb-2 flex items-start gap-2 px-1 pt-1">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
                   <MessageCircle size={17} aria-hidden />

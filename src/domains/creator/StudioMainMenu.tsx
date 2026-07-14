@@ -94,7 +94,7 @@ function MenuDropdown({
           id={panelId}
           role="menu"
           aria-label={group.label}
-          className="absolute left-0 top-full z-[80] mt-2 min-w-[14.5rem] overflow-hidden rounded-2xl border border-line bg-panel py-1.5"
+          className="absolute left-0 top-full z-[60] mt-2 min-w-[14.5rem] overflow-hidden rounded-2xl border border-line bg-panel py-1.5"
         >
           {group.items.map((item) => {
             const Icon = item.icon;

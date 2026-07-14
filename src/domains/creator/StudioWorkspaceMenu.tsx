@@ -838,7 +838,7 @@ export function StudioWorkspaceMenu({
 
   return (
     <div
-      className={cn("relative inline-flex", open && "z-[100]")}
+      className={cn("relative inline-flex", open && "z-[100] isolate")}
       data-testid="studio-workspace-menu"
       data-studio-shortcut-boundary="true"
       onKeyDownCapture={stopNonDialogShortcutPropagation}
@@ -886,7 +886,7 @@ export function StudioWorkspaceMenu({
           onClick={() => {
             if (!pendingWorkspaceId) closeMenu();
           }}
-          className="fixed inset-0 z-[79] cursor-default bg-canvas/75 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-0 z-[99] cursor-default bg-canvas/75 backdrop-blur-[1px] lg:hidden"
         />
 
         <section
@@ -901,7 +901,7 @@ export function StudioWorkspaceMenu({
           onKeyDownCapture={handleDialogKeyDownCapture}
           onKeyUpCapture={(event) => event.stopPropagation()}
           className={cn(
-            "fixed inset-x-2 z-[80] flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden rounded-lg border border-line-strong bg-panel shadow-xl",
+            "fixed inset-x-2 z-[100] flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden rounded-lg border border-line-strong bg-panel shadow-xl",
             "top-[max(0.5rem,env(safe-area-inset-top))] bottom-[max(0.5rem,env(safe-area-inset-bottom))]",
             "lg:absolute lg:inset-x-auto lg:bottom-auto lg:right-0 lg:top-[calc(100%+0.5rem)] lg:h-auto lg:max-h-[min(42rem,calc(100dvh-5rem))] lg:w-96"
           )}

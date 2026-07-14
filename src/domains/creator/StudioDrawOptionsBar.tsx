@@ -174,7 +174,7 @@ export function StudioDrawOptionsBar({
       data-studio-draw-options="true"
       className={cn(
         // Primary icons stay in view; secondary chips can scroll. End cluster is sticky.
-        "relative flex h-[3.25rem] min-h-[3.25rem] shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
+        "relative z-[40] flex h-[3.25rem] min-h-[3.25rem] shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
         "[scrollbar-width:thin] [scrollbar-color:oklch(0.42_0.02_70/0.4)_transparent]",
         className
       )}
