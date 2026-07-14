@@ -58,6 +58,10 @@ export interface StudioSavedBrush extends StudioBrushSnapshot {
   name: string;
   createdAt: number;
   updatedAt: number;
+  /** 모바일/데스크톱 빠른 선반의 상단에 고정할지 여부. 내보내기 파일에는 포함하지 않는 기기별 UI 메타데이터다. */
+  pinned: boolean;
+  /** 마지막으로 실제 적용한 시각. null이면 아직 적용하지 않은 브러시다. */
+  lastUsedAt: number | null;
 }
 
 export interface BrushLibraryStorage {
@@ -65,9 +69,67 @@ export interface BrushLibraryStorage {
   setItem(key: string, value: string): void;
 }
 
+/** 보안 샌드박스·사생활 보호 모드에서 localStorage 속성 접근 자체가 던지는 경우까지 막는다. */
+export function browserBrushLibraryStorage(): BrushLibraryStorage | null {
+  try {
+    return typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export const BRUSH_LIBRARY_KEY = "toonspectrum-studio-brush-library";
+export const BRUSH_LIBRARY_STORAGE_VERSION = 1;
 export const MAX_BRUSHES = 40; // studio-palette-library.ts의 MAX_PALETTES와 동일한 상한 정책을 따른다.
+export const MAX_QUICK_BRUSHES = 8; // Procreate Recent와 같은, 한 번에 기억하기 좋은 빠른 접근 상한.
 export const DEFAULT_BRUSH_NAME = "이름 없는 브러시";
+
+export type BrushLibraryReadStatus =
+  | "ok"
+  | "empty"
+  | "unavailable"
+  | "read-error"
+  | "corrupt"
+  | "unsupported-version";
+
+export interface BrushLibraryReadResult {
+  brushes: StudioSavedBrush[];
+  status: BrushLibraryReadStatus;
+}
+
+type BrushMutationFailureStatus = "storage-error" | "library-unreadable";
+
+export interface BrushSaveResult {
+  brushes: StudioSavedBrush[];
+  status: "saved" | "full" | BrushMutationFailureStatus;
+}
+
+export interface DeletedBrushRecord {
+  brush: StudioSavedBrush;
+  index: number;
+}
+
+export interface BrushDeleteResult {
+  brushes: StudioSavedBrush[];
+  deleted: DeletedBrushRecord | null;
+  status: "deleted" | "missing" | BrushMutationFailureStatus;
+}
+
+export interface BrushRestoreResult {
+  brushes: StudioSavedBrush[];
+  status: "restored" | "full" | BrushMutationFailureStatus;
+}
+
+export interface BrushDuplicateResult {
+  brushes: StudioSavedBrush[];
+  brush: StudioSavedBrush | null;
+  status: "duplicated" | "full" | "missing" | BrushMutationFailureStatus;
+}
+
+export interface BrushUpdateResult {
+  brushes: StudioSavedBrush[];
+  status: "updated" | "missing" | "unchanged" | BrushMutationFailureStatus;
+}
 
 export const BRUSH_STROKE_WIDTH_RANGE = [1, 48] as const;
 export const BRUSH_OPACITY_RANGE = [0.1, 1] as const;
@@ -267,60 +329,198 @@ function normalizeStoredBrush(v: unknown): StudioSavedBrush | null {
     name: o.name,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
+    // v1~v3 레코드에는 두 메타데이터가 없으므로 false/null로 무손실 마이그레이션한다.
+    pinned: o.pinned === true || o.favorite === true,
+    lastUsedAt:
+      typeof o.lastUsedAt === "number" && Number.isFinite(o.lastUsedAt)
+        ? o.lastUsedAt
+        : null,
     ...snapshot,
   };
 }
 
 // ── 저장소 CRUD (studio-palette-library.ts와 동일한 패턴) ──────────────
 
-/** 저장된 브러시 목록(최근 저장·가져오기 순). 저장소 부재·파싱 실패 시 []. */
+/**
+ * 저장소를 상태까지 포함해 읽는다. 깨진 JSON·미래 버전·부분 손상은 빈 라이브러리와 구분한다.
+ * 호출부가 이 결과를 무시하고 덮어쓰지 않도록 모든 mutation은 이 함수를 거친다.
+ * 기존 배열 저장 형식은 무손실 마이그레이션을 위해 계속 읽되, 다음 정상 쓰기부터 버전 envelope로 바꾼다.
+ */
+export function readBrushLibrary(storage: BrushLibraryStorage | null | undefined): BrushLibraryReadResult {
+  if (!storage) return { brushes: [], status: "unavailable" };
+  let raw: string | null;
+  try {
+    raw = storage.getItem(BRUSH_LIBRARY_KEY);
+  } catch {
+    return { brushes: [], status: "read-error" };
+  }
+  if (!raw) return { brushes: [], status: "empty" };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { brushes: [], status: "corrupt" };
+  }
+
+  let records: unknown[];
+  if (Array.isArray(parsed)) {
+    records = parsed;
+  } else if (parsed && typeof parsed === "object") {
+    const envelope = parsed as Record<string, unknown>;
+    if (!("version" in envelope)) {
+      return { brushes: [], status: "corrupt" };
+    }
+    if (envelope.version !== BRUSH_LIBRARY_STORAGE_VERSION) {
+      return { brushes: [], status: "unsupported-version" };
+    }
+    if (!Array.isArray(envelope.brushes)) {
+      return { brushes: [], status: "corrupt" };
+    }
+    records = envelope.brushes;
+  } else {
+    return { brushes: [], status: "corrupt" };
+  }
+
+  const brushes: StudioSavedBrush[] = [];
+  let invalidRecordFound = false;
+  const ids = new Set<string>();
+  for (const value of records) {
+    const brush = normalizeStoredBrush(value);
+    if (!brush || ids.has(brush.id)) {
+      invalidRecordFound = true;
+      continue;
+    }
+    ids.add(brush.id);
+    brushes.push(brush);
+  }
+  if (invalidRecordFound) return { brushes, status: "corrupt" };
+  return { brushes, status: brushes.length === 0 ? "empty" : "ok" };
+}
+
+/** 표시용 호환 API. 저장소 오류 상태가 필요한 mutation/복구 UI는 readBrushLibrary를 사용한다. */
 export function listBrushes(storage: BrushLibraryStorage | null | undefined): StudioSavedBrush[] {
-  if (!storage) return [];
+  return readBrushLibrary(storage).brushes;
+}
+
+function mutationFailureStatus(status: BrushLibraryReadStatus): BrushMutationFailureStatus | null {
+  if (status === "ok" || status === "empty") return null;
+  return status === "unavailable" ? "storage-error" : "library-unreadable";
+}
+
+function persist(storage: BrushLibraryStorage | null | undefined, brushes: StudioSavedBrush[]): boolean {
+  if (!storage) return false;
   try {
-    const raw = storage.getItem(BRUSH_LIBRARY_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((value) => {
-      const brush = normalizeStoredBrush(value);
-      return brush ? [brush] : [];
-    });
+    storage.setItem(BRUSH_LIBRARY_KEY, JSON.stringify({
+      version: BRUSH_LIBRARY_STORAGE_VERSION,
+      brushes,
+    }));
+    return true;
   } catch {
-    return [];
+    return false;
   }
 }
 
-function persist(storage: BrushLibraryStorage | null | undefined, brushes: StudioSavedBrush[]): void {
-  if (!storage) return;
-  try {
-    storage.setItem(BRUSH_LIBRARY_KEY, JSON.stringify(brushes));
-  } catch {
-    // 저장 실패(쿼터 초과·시크릿 모드 등) — 무시. 팔레트 라이브러리와 동일한 정책.
+/**
+ * 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞).
+ * 신규 저장이 상한에 닿으면 가장 오래된 브러시를 몰래 버리지 않고 full을 반환한다. 기존 id 갱신은
+ * 40/40에서도 허용한다. UI는 이 결과로 삭제/내보내기 안내를 표면화할 수 있다.
+ */
+export function saveBrushWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  brush: StudioSavedBrush
+): BrushSaveResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const current = read.brushes;
+  const replacesExisting = current.some((candidate) => candidate.id === brush.id);
+  if (!replacesExisting && current.length >= MAX_BRUSHES) {
+    return { brushes: current, status: "full" };
   }
+  const next = [brush, ...current.filter((b) => b.id !== brush.id)];
+  if (!persist(storage, next)) return { brushes: current, status: "storage-error" };
+  return { brushes: next, status: "saved" };
 }
 
-/** 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞). 새 목록 반환. */
+/** 배열만 필요한 기존 호출부를 위한 호환 래퍼. 신규 UI는 saveBrushWithResult로 full을 안내한다. */
 export function saveBrush(storage: BrushLibraryStorage | null | undefined, brush: StudioSavedBrush): StudioSavedBrush[] {
-  const next = [brush, ...listBrushes(storage).filter((b) => b.id !== brush.id)].slice(0, MAX_BRUSHES);
-  persist(storage, next);
-  return next;
+  return saveBrushWithResult(storage, brush).brushes;
 }
 
 /** 이름 변경(목록 순서는 유지 — 저장과 달리 맨 앞으로 옮기지 않는다). 빈 이름은 무시(원본 목록 그대로 반환). */
 export function renameBrush(storage: BrushLibraryStorage | null | undefined, id: string, name: string): StudioSavedBrush[] {
+  return renameBrushWithResult(storage, id, name).brushes;
+}
+
+/** 이름 변경 결과를 명시해 missing·저장소 장애를 UI가 정상 성공과 구분하게 한다. */
+export function renameBrushWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string,
+  name: string
+): BrushUpdateResult {
   const trimmed = name.trim();
-  const current = listBrushes(storage);
-  if (!trimmed) return current;
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const current = read.brushes;
+  if (!trimmed) return { brushes: current, status: "unchanged" };
+  if (!current.some((brush) => brush.id === id)) {
+    return { brushes: current, status: "missing" };
+  }
   const next = current.map((b) => (b.id === id ? { ...b, name: trimmed, updatedAt: Date.now() } : b));
-  persist(storage, next);
-  return next;
+  return persist(storage, next)
+    ? { brushes: next, status: "updated" }
+    : { brushes: current, status: "storage-error" };
 }
 
 /** 삭제. 새 목록 반환. */
 export function deleteBrush(storage: BrushLibraryStorage | null | undefined, id: string): StudioSavedBrush[] {
-  const next = listBrushes(storage).filter((b) => b.id !== id);
-  persist(storage, next);
-  return next;
+  return deleteBrushWithRecord(storage, id).brushes;
+}
+
+/** 삭제된 레코드와 원래 위치를 함께 돌려줘 비모달 실행취소가 동일 id/메타데이터를 복구하게 한다. */
+export function deleteBrushWithRecord(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string
+): BrushDeleteResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) {
+    return { brushes: read.brushes, deleted: null, status: readFailure };
+  }
+  const current = read.brushes;
+  const index = current.findIndex((brush) => brush.id === id);
+  if (index < 0) return { brushes: current, deleted: null, status: "missing" };
+  const deleted: DeletedBrushRecord = { brush: current[index], index };
+  const next = current.filter((brush) => brush.id !== id);
+  if (!persist(storage, next)) {
+    return { brushes: current, deleted: null, status: "storage-error" };
+  }
+  return { brushes: next, deleted, status: "deleted" };
+}
+
+/** deleteBrushWithRecord가 보존한 위치에 브러시를 복원한다. 삭제 뒤 다른 탭에서 용량이 찼다면 거부한다. */
+export function restoreDeletedBrush(
+  storage: BrushLibraryStorage | null | undefined,
+  deleted: DeletedBrushRecord
+): BrushRestoreResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const current = read.brushes;
+  const withoutDuplicate = current.filter((brush) => brush.id !== deleted.brush.id);
+  if (withoutDuplicate.length >= MAX_BRUSHES && withoutDuplicate.length === current.length) {
+    return { brushes: current, status: "full" };
+  }
+  const index = Math.max(0, Math.min(deleted.index, withoutDuplicate.length));
+  const next = [
+    ...withoutDuplicate.slice(0, index),
+    deleted.brush,
+    ...withoutDuplicate.slice(index),
+  ];
+  if (!persist(storage, next)) return { brushes: current, status: "storage-error" };
+  return { brushes: next, status: "restored" };
 }
 
 /** 현재 라이브 브러시 설정(snapshot)에 이름을 붙여 저장 대상 레코드로 만든다. 절대 던지지 않는다
@@ -333,8 +533,153 @@ export function createBrush(name: string, snapshot: StudioBrushSnapshot): Studio
     name: name.trim() || DEFAULT_BRUSH_NAME,
     createdAt: now,
     updatedAt: now,
+    pinned: false,
+    lastUsedAt: now,
     ...safe,
   };
+}
+
+/** 라이브러리 안에서 충돌하지 않는 `이름 2`, `이름 3` 형태의 복제 이름을 만든다. */
+export function duplicateBrushName(name: string, existingNames: Iterable<string>): string {
+  const normalized = name.trim() || DEFAULT_BRUSH_NAME;
+  const base = normalized.replace(/\s+\d+$/u, "").trim() || DEFAULT_BRUSH_NAME;
+  const names = new Set(Array.from(existingNames, (candidate) => candidate.trim()));
+  let suffix = 2;
+  while (names.has(`${base} ${suffix}`)) suffix += 1;
+  return `${base} ${suffix}`;
+}
+
+/** 기존 브러시를 독립 id/시각/메타데이터로 복제해 원본 바로 다음에 둔다. */
+export function duplicateBrush(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string
+): BrushDuplicateResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) {
+    return { brushes: read.brushes, brush: null, status: readFailure };
+  }
+  const current = read.brushes;
+  const index = current.findIndex((brush) => brush.id === id);
+  if (index < 0) return { brushes: current, brush: null, status: "missing" };
+  if (current.length >= MAX_BRUSHES) return { brushes: current, brush: null, status: "full" };
+  const now = Date.now();
+  const source = current[index];
+  const brush: StudioSavedBrush = {
+    ...source,
+    id: crypto.randomUUID(),
+    name: duplicateBrushName(source.name, current.map((candidate) => candidate.name)),
+    createdAt: now,
+    updatedAt: now,
+    pinned: false,
+    lastUsedAt: null,
+  };
+  const next = [...current.slice(0, index + 1), brush, ...current.slice(index + 1)];
+  if (!persist(storage, next)) {
+    return { brushes: current, brush: null, status: "storage-error" };
+  }
+  return { brushes: next, brush, status: "duplicated" };
+}
+
+/** 빠른 선반 고정 상태를 전환한다. 브러시 본문 수정 시각은 건드리지 않는다. */
+export function toggleBrushPinned(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string
+): StudioSavedBrush[] {
+  return toggleBrushPinnedWithResult(storage, id).brushes;
+}
+
+export function toggleBrushPinnedWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string
+): BrushUpdateResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const current = read.brushes;
+  if (!current.some((brush) => brush.id === id)) {
+    return { brushes: current, status: "missing" };
+  }
+  const next = current.map((brush) =>
+    brush.id === id ? { ...brush, pinned: !brush.pinned } : brush
+  );
+  return persist(storage, next)
+    ? { brushes: next, status: "updated" }
+    : { brushes: current, status: "storage-error" };
+}
+
+/** 브러시를 캔버스 설정에 적용한 시각을 기록한다. */
+export function markBrushUsed(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string,
+  usedAt = Date.now()
+): StudioSavedBrush[] {
+  return markBrushUsedWithResult(storage, id, usedAt).brushes;
+}
+
+export function markBrushUsedWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string,
+  usedAt = Date.now()
+): BrushUpdateResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const current = read.brushes;
+  if (!current.some((brush) => brush.id === id)) {
+    return { brushes: current, status: "missing" };
+  }
+  const next = current.map((brush) =>
+    brush.id === id ? { ...brush, lastUsedAt: usedAt } : brush
+  );
+  return persist(storage, next)
+    ? { brushes: next, status: "updated" }
+    : { brushes: current, status: "storage-error" };
+}
+
+function brushActivityAt(brush: StudioSavedBrush): number {
+  return brush.lastUsedAt ?? brush.updatedAt;
+}
+
+/** 전체 라이브러리: 고정 → 최근 적용 → 최근 수정 순. 입력 배열은 변경하지 않는다. */
+export function sortBrushesForLibrary(brushes: readonly StudioSavedBrush[]): StudioSavedBrush[] {
+  return [...brushes].sort((a, b) =>
+    Number(b.pinned) - Number(a.pinned)
+    || brushActivityAt(b) - brushActivityAt(a)
+    || b.createdAt - a.createdAt
+  );
+}
+
+/** 모바일/컴팩트 선반: 고정 또는 사용 이력이 있는 브러시만, 고정 우선으로 최대 8개. */
+export function selectQuickBrushes(
+  brushes: readonly StudioSavedBrush[],
+  limit = MAX_QUICK_BRUSHES
+): StudioSavedBrush[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  return sortBrushesForLibrary(
+    brushes.filter((brush) => brush.pinned || brush.lastUsedAt !== null)
+  ).slice(0, Math.floor(limit));
+}
+
+/** 현재 라이브 설정이 저장 브러시와 정확히 같은지 판별해 편집 뒤 선택 강조가 자동으로 풀리게 한다. */
+export function brushMatchesSnapshot(
+  brush: StudioSavedBrush,
+  snapshot: StudioBrushSnapshot
+): boolean {
+  return brush.brushId === snapshot.brushId
+    && brush.strokeWidth === snapshot.strokeWidth
+    && brush.brushOpacity === snapshot.brushOpacity
+    && brush.color.toLowerCase() === snapshot.color.toLowerCase()
+    && brush.stabilizer === snapshot.stabilizer
+    && brush.stabilizerMode === snapshot.stabilizerMode
+    && brush.postCorrection === snapshot.postCorrection
+    && brush.preserveCorners === snapshot.preserveCorners
+    && brush.pressureCurve === snapshot.pressureCurve
+    && brush.useVelocityPressure === snapshot.useVelocityPressure
+    && brush.velocitySensitivity === snapshot.velocitySensitivity
+    && brush.tiltEnabled === snapshot.tiltEnabled
+    && brush.tipAngle === snapshot.tipAngle
+    && brush.tipRoundness === snapshot.tipRoundness;
 }
 
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
@@ -409,6 +754,8 @@ export function importBrushFromJson(
       name: rawName || fallbackName?.trim() || DEFAULT_BRUSH_NAME,
       createdAt: now,
       updatedAt: now,
+      pinned: false,
+      lastUsedAt: null,
       ...snapshot,
     },
     adjustedFields,

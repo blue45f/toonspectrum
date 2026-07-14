@@ -236,6 +236,17 @@ import {
   smoothStrokePoints,
   type CalligraphyStylusInput,
 } from "./studio-brush";
+import {
+  browserBrushLibraryStorage,
+  brushMatchesSnapshot,
+  BRUSH_LIBRARY_KEY,
+  listBrushes,
+  markBrushUsedWithResult,
+  restoreDeletedBrush,
+  type DeletedBrushRecord,
+  type StudioBrushSnapshot,
+  type StudioSavedBrush,
+} from "./studio-brush-library";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import {
   bubbleShapeCanvasPointToLocal,
@@ -358,6 +369,11 @@ import {
   loadStudioSvgExportModule,
 } from "./studio-document-export-loaders";
 import { isCompleteStudioDrawOp } from "./studio-draw-completion";
+import {
+  adjustStudioBrushOpacity,
+  adjustStudioBrushWidth,
+  resolveStudioDrawingShortcut,
+} from "./studio-drawing-shortcuts";
 import {
   advanceStudioDraftIdentityScope,
   createStudioDraftIdentityScope,
@@ -818,6 +834,7 @@ import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSpl
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
+import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
@@ -1097,6 +1114,13 @@ const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
 );
+const BRUSH_DELETE_UNDO_MS = 10_000;
+
+interface PendingBrushDelete {
+  id: string;
+  deleted: DeletedBrushRecord;
+  expiresAt: number;
+}
 const StudioScrollPreviewPanel = lazyRetry(
   () => import("./StudioScrollPreviewPanel").then((mod) => ({ default: mod.StudioScrollPreviewPanel })),
   "StudioScrollPreviewPanel"
@@ -4655,8 +4679,8 @@ function StudioCuttoonEditor() {
       viewport.removeEventListener("scroll", updateInset);
     };
   }, [isMobile]);
-  // 모바일에서 열려 있는 바텀시트(페이지 목록 / 속성 / 브러시 설정). null=캔버스 전체.
-  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw">(null);
+  // 모바일에서 열려 있는 바텀시트(페이지 / 속성 / 빠른 브러시 / 브러시 관리). null=캔버스 전체.
+  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw" | "brushes">(null);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionsAnchor, setQuickActionsAnchor] = useState({ x: 180, y: 320 });
   const [quickActionsPreferences, setQuickActionsPreferences] = useState<StudioQuickActionsPreferences>(() =>
@@ -4665,8 +4689,11 @@ function StudioCuttoonEditor() {
   const pagesSheetRef = useRef<HTMLDivElement>(null);
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);
+  const brushManagerSheetRef = useRef<HTMLDivElement>(null);
+  const mobileBrushDockButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
+  const previousMobileSheetRef = useRef<typeof mobileSheet>(null);
   const mobileSheetAutofocusTargetRef = useRef<"default" | "publish-title">("default");
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
@@ -4679,6 +4706,12 @@ function StudioCuttoonEditor() {
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
     if (!isMobile) {
+      const returnTarget = sheetReturnFocusRef.current;
+      if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
+        returnTarget.focus({ preventScroll: true });
+      }
+      sheetReturnFocusRef.current = null;
+      previousMobileSheetRef.current = null;
       setMobileSheet(null);
       setQuickActionsOpen(false);
     }
@@ -4688,18 +4721,30 @@ function StudioCuttoonEditor() {
     if (!isMobile) return;
     if (!mobileSheet) {
       mobileSheetAutofocusTargetRef.current = "default";
-      sheetReturnFocusRef.current?.focus?.();
+      const returnTarget = sheetReturnFocusRef.current;
+      const focusTarget = returnTarget?.isConnected && !returnTarget.closest("[inert]")
+        ? returnTarget
+        : mobileBrushDockButtonRef.current;
+      focusTarget?.focus({ preventScroll: true });
       sheetReturnFocusRef.current = null;
+      previousMobileSheetRef.current = null;
       return;
     }
-    sheetReturnFocusRef.current = document.activeElement as HTMLElement | null;
+    if (!previousMobileSheetRef.current) {
+      sheetReturnFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    }
+    previousMobileSheetRef.current = mobileSheet;
     const id = requestAnimationFrame(() => {
       const sheet =
         mobileSheet === "pages"
           ? pagesSheetRef.current
           : mobileSheet === "draw"
             ? drawSheetRef.current
-            : propsSheetRef.current;
+            : mobileSheet === "brushes"
+              ? brushManagerSheetRef.current
+              : propsSheetRef.current;
       const preferredTarget =
         mobileSheet === "props" && mobileSheetAutofocusTargetRef.current === "publish-title"
           ? titleInputRef.current
@@ -5061,6 +5106,29 @@ function StudioCuttoonEditor() {
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [drawingShortcutNotice, setDrawingShortcutNotice] = useState<{ id: number; message: string } | null>(null);
+  const drawingShortcutNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawingShortcutNoticeSequenceRef = useRef(0);
+  const activeDrawingShortcutNoticeMessageRef = useRef<string | null>(null);
+  function announceDrawingShortcut(message: string) {
+    if (activeDrawingShortcutNoticeMessageRef.current === message) return;
+    activeDrawingShortcutNoticeMessageRef.current = message;
+    if (drawingShortcutNoticeTimerRef.current) {
+      globalThis.clearTimeout(drawingShortcutNoticeTimerRef.current);
+    }
+    drawingShortcutNoticeSequenceRef.current += 1;
+    setDrawingShortcutNotice({ id: drawingShortcutNoticeSequenceRef.current, message });
+    drawingShortcutNoticeTimerRef.current = globalThis.setTimeout(() => {
+      activeDrawingShortcutNoticeMessageRef.current = null;
+      setDrawingShortcutNotice(null);
+      drawingShortcutNoticeTimerRef.current = null;
+    }, 1_400);
+  }
+  useEffect(() => () => {
+    if (drawingShortcutNoticeTimerRef.current) {
+      globalThis.clearTimeout(drawingShortcutNoticeTimerRef.current);
+    }
+  }, []);
   const [color, setColor] = useState("#7c5cfc");
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
@@ -5195,6 +5263,127 @@ function StudioCuttoonEditor() {
   const [tiltEnabled, setTiltEnabled] = useState<boolean>(true);
   const [tipAngle, setTipAngle] = useState<number>(-30);
   const [tipRoundness, setTipRoundness] = useState<number>(0.24);
+  // 데스크톱 관리 패널과 모바일 퀵 선반이 같은 배열을 소비한다. 같은 탭의 localStorage 변경은
+  // storage 이벤트를 발생시키지 않으므로 StudioPage가 단일 source of truth를 소유한다.
+  const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
+    listBrushes(browserBrushLibraryStorage())
+  );
+  const [appliedSavedBrushId, setAppliedSavedBrushId] = useState<string | null>(null);
+  const [pendingBrushDeletes, setPendingBrushDeletes] = useState<PendingBrushDelete[]>([]);
+  const [pausedBrushDeleteId, setPausedBrushDeleteId] = useState<string | null>(null);
+  const brushUndoToastRef = useRef<HTMLDivElement>(null);
+  const brushUndoButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const handleBrushStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== BRUSH_LIBRARY_KEY) return;
+      setSavedBrushes(listBrushes(browserBrushLibraryStorage()));
+    };
+    globalThis.addEventListener("storage", handleBrushStorage);
+    return () => globalThis.removeEventListener("storage", handleBrushStorage);
+  }, []);
+  useEffect(() => {
+    const active = pendingBrushDeletes.filter((pending) => pending.id !== pausedBrushDeleteId);
+    if (active.length === 0) return;
+    const nextExpiry = Math.min(...active.map((pending) => pending.expiresAt));
+    const timer = globalThis.setTimeout(() => {
+      const now = Date.now();
+      setPendingBrushDeletes((current) =>
+        current.filter((pending) => pending.id === pausedBrushDeleteId || pending.expiresAt > now)
+      );
+    }, Math.max(0, nextExpiry - Date.now()));
+    return () => globalThis.clearTimeout(timer);
+  }, [pausedBrushDeleteId, pendingBrushDeletes]);
+
+  function queueBrushDelete(deleted: DeletedBrushRecord) {
+    const pending: PendingBrushDelete = {
+      id: crypto.randomUUID(),
+      deleted,
+      expiresAt: Date.now() + BRUSH_DELETE_UNDO_MS,
+    };
+    setPendingBrushDeletes((current) => [...current, pending]);
+    globalThis.requestAnimationFrame?.(() => brushUndoButtonRef.current?.focus({ preventScroll: true }));
+  }
+
+  function undoBrushDelete(pending: PendingBrushDelete) {
+    const result = restoreDeletedBrush(browserBrushLibraryStorage(), pending.deleted);
+    if (result.status === "full") {
+      announceDrawingShortcut("브러시가 40개라 삭제를 복구하지 못했어요.");
+      return;
+    }
+    if (result.status === "library-unreadable") {
+      announceDrawingShortcut("저장된 브러시 데이터를 읽지 못해 삭제 복구를 중단했어요.");
+      return;
+    }
+    if (result.status === "storage-error") {
+      announceDrawingShortcut("브라우저 저장소 오류로 삭제를 복구하지 못했어요.");
+      return;
+    }
+    setSavedBrushes(result.brushes);
+    setPendingBrushDeletes((current) => current.filter((candidate) => candidate.id !== pending.id));
+    setPausedBrushDeleteId((current) => current === pending.id ? null : current);
+    announceDrawingShortcut(`“${pending.deleted.brush.name}” 브러시를 복구했어요.`);
+  }
+
+  const currentBrushSnapshot: StudioBrushSnapshot = {
+    brushId: brush,
+    strokeWidth,
+    brushOpacity,
+    color,
+    stabilizer,
+    stabilizerMode,
+    postCorrection,
+    preserveCorners,
+    pressureCurve,
+    useVelocityPressure,
+    velocitySensitivity,
+    tiltEnabled,
+    tipAngle,
+    tipRoundness,
+  };
+  const appliedSavedBrush = appliedSavedBrushId
+    ? savedBrushes.find((savedBrush) => savedBrush.id === appliedSavedBrushId) ?? null
+    : null;
+  const activeSavedBrushId =
+    appliedSavedBrush && brushMatchesSnapshot(appliedSavedBrush, currentBrushSnapshot)
+      ? appliedSavedBrush.id
+      : null;
+  useEffect(() => {
+    if (appliedSavedBrushId && !activeSavedBrushId) setAppliedSavedBrushId(null);
+  }, [activeSavedBrushId, appliedSavedBrushId]);
+
+  function applySavedBrush(saved: StudioSavedBrush) {
+    setTool("draw");
+    setDrawMode("pen");
+    setBrush(saved.brushId);
+    setStrokeWidth(saved.strokeWidth);
+    setBrushOpacity(saved.brushOpacity);
+    setColor(saved.color);
+    setStabilizer(saved.stabilizer);
+    setStabilizerMode(saved.stabilizerMode);
+    setPostCorrection(saved.postCorrection);
+    setPreserveCorners(saved.preserveCorners);
+    setPressureCurve(saved.pressureCurve);
+    setUseVelocityPressure(saved.useVelocityPressure);
+    setVelocitySensitivity(saved.velocitySensitivity);
+    setTiltEnabled(saved.tiltEnabled);
+    setTipAngle(saved.tipAngle);
+    setTipRoundness(saved.tipRoundness);
+    setAppliedSavedBrushId(saved.id);
+    const used = markBrushUsedWithResult(browserBrushLibraryStorage(), saved.id);
+    if (used.status === "updated") {
+      setSavedBrushes(used.brushes);
+    } else if (used.status === "missing") {
+      setSavedBrushes(used.brushes);
+      setAppliedSavedBrushId(null);
+      announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
+    } else if (used.status === "library-unreadable") {
+      announceDrawingShortcut("브러시는 적용했지만 저장 데이터를 읽지 못해 최근 사용 기록은 남기지 못했어요.");
+    } else if (used.status === "storage-error") {
+      announceDrawingShortcut("브러시는 적용했지만 브라우저 저장소 오류로 최근 사용 기록은 남기지 못했어요.");
+    }
+  }
+  const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
+  drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
   const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(400);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
@@ -9896,18 +10085,41 @@ function StudioCuttoonEditor() {
     shortcutRef.current = (e: KeyboardEvent) => {
       // 탭·메뉴·캔버스 내부 위젯이 이미 소비한 키는 전역 원고 편집 명령으로 다시 실행하지 않는다.
       if (e.defaultPrevented) return;
+      if (e.isComposing || e.keyCode === 229) return;
       const target = e.target as HTMLElement | null;
       const typing = !!target && (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.tagName === "SELECT" ||
-        target.isContentEditable
+        target.isContentEditable ||
+        target.getAttribute("role") === "textbox"
       );
       const insideShortcutBoundary =
-        target instanceof Element && target.closest("[data-studio-shortcut-boundary='true']") !== null;
-      if (typing || insideShortcutBoundary || editing) return;
+        target instanceof Element
+        && target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
+      // 포커스를 아직 모달 안으로 옮기지 못한 첫 프레임에도 Delete/Undo/B/E가 뒤 원고에 닿지 않게,
+      // 이벤트 target뿐 아니라 열린 modal 자체를 전역 파괴 명령의 경계로 취급한다.
+      const openModals = typeof document === "undefined"
+        ? []
+        : [...document.querySelectorAll<HTMLElement>("[aria-modal='true']")].filter(
+            (modal) => !modal.hidden && !modal.inert && modal.getClientRects().length > 0
+          );
+      if (typing || editing) return;
+      if (openModals.length > 0) {
+        if (
+          e.key === "Escape"
+          && mobileSheet
+          && openModals.every((modal) => modal.dataset.studioMobileSheet === "true")
+        ) {
+          e.preventDefault();
+          setMobileSheet(null);
+        }
+        return;
+      }
+      if (insideShortcutBoundary) return;
       if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
       const mod = e.metaKey || e.ctrlKey;
+      const drawingShortcut = resolveStudioDrawingShortcut(e);
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -9936,6 +10148,47 @@ function StudioCuttoonEditor() {
       } else if (mod && e.key === "0") {
         e.preventDefault();
         setZoom(1);
+      } else if (drawingShortcut) {
+        e.preventDefault();
+        if (activeSurfaceReviewLockedRef.current) {
+          if (!e.repeat) {
+            announceDrawingShortcut(
+              collaborationDocumentLocked
+                ? collaborationLockMessage()
+                : "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 그릴 수 있어요."
+            );
+          }
+          return;
+        }
+        if (drawingShortcut.type === "select-pen") {
+          drawingShortcutStateRef.current.tool = "draw";
+          drawingShortcutStateRef.current.drawMode = "pen";
+          setTool("draw");
+          setDrawMode("pen");
+          announceDrawingShortcut("펜");
+        } else if (drawingShortcut.type === "toggle-eraser") {
+          const currentDrawing = drawingShortcutStateRef.current;
+          const nextMode = currentDrawing.tool === "draw" && currentDrawing.drawMode === "eraser" ? "pen" : "eraser";
+          currentDrawing.tool = "draw";
+          currentDrawing.drawMode = nextMode;
+          setTool("draw");
+          setDrawMode(nextMode);
+          announceDrawingShortcut(nextMode === "eraser" ? "지우개" : "펜");
+        } else if (drawingShortcut.type === "adjust-width") {
+          const currentDrawing = drawingShortcutStateRef.current;
+          const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta);
+          if (nextWidth === currentDrawing.strokeWidth) return;
+          currentDrawing.strokeWidth = nextWidth;
+          setStrokeWidth(nextWidth);
+          if (!e.repeat) announceDrawingShortcut(`브러시 크기 ${nextWidth}px`);
+        } else {
+          const currentDrawing = drawingShortcutStateRef.current;
+          const nextOpacity = adjustStudioBrushOpacity(currentDrawing.brushOpacity, drawingShortcut.delta);
+          if (nextOpacity === currentDrawing.brushOpacity) return;
+          currentDrawing.brushOpacity = nextOpacity;
+          setBrushOpacity(nextOpacity);
+          if (!e.repeat) announceDrawingShortcut(`브러시 불투명도 ${Math.round(nextOpacity * 100)}%`);
+        }
       } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
         e.preventDefault();
         toggleAdvancedFill();
@@ -15541,6 +15794,10 @@ function StudioCuttoonEditor() {
     }
   }
 
+  const pendingBrushDelete = pendingBrushDeletes.length > 0
+    ? pendingBrushDeletes[pendingBrushDeletes.length - 1]
+    : null;
+
   return (
     <StudioLiveCollaborationProvider
       workId={workId}
@@ -15574,6 +15831,45 @@ function StudioCuttoonEditor() {
           : undefined
       }
     >
+    {pendingBrushDelete ? (
+      <div
+        ref={brushUndoToastRef}
+        className="fixed left-1/2 z-[90] flex w-[min(calc(100vw-1.5rem),28rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-warn/40 bg-panel/95 p-2 pl-3 text-xs text-fg shadow-2xl backdrop-blur"
+        style={{
+          bottom: isMobile
+            ? `calc(7.5rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`
+            : "1.5rem",
+        }}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        onPointerEnter={() => setPausedBrushDeleteId(pendingBrushDelete.id)}
+        onPointerLeave={() => {
+          if (!brushUndoToastRef.current?.contains(document.activeElement)) {
+            setPausedBrushDeleteId(null);
+          }
+        }}
+        onFocusCapture={() => setPausedBrushDeleteId(pendingBrushDelete.id)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setPausedBrushDeleteId(null);
+          }
+        }}
+      >
+        <span className="min-w-0 flex-1 leading-relaxed">
+          <strong className="font-semibold">“{pendingBrushDelete.deleted.brush.name}” 삭제됨</strong>
+          {pendingBrushDeletes.length > 1 ? ` · 복구 가능 ${pendingBrushDeletes.length}건` : ""}
+        </span>
+        <button
+          ref={brushUndoButtonRef}
+          type="button"
+          onClick={() => undoBrushDelete(pendingBrushDelete)}
+          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/15 px-3 font-bold text-warn hover:bg-warn/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <Undo2 size={14} aria-hidden /> 삭제 취소
+        </button>
+      </div>
+    ) : null}
     <Container
       size="wide"
       style={mobileImmersive ? { padding: "0.25rem" } : undefined}
@@ -16797,24 +17093,28 @@ function StudioCuttoonEditor() {
         </button>
         <button
           type="button"
+          disabled={activeSurfaceReviewLocked}
+          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
           onClick={() => {
             setTool("draw");
             setDrawMode("pen");
             setMenu(null);
           }}
-          className={toolBtn(tool === "draw" && drawMode === "pen")}
+          className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
           aria-pressed={tool === "draw" && drawMode === "pen"}
         >
           <Pencil size={14} /> 펜
         </button>
         <button
           type="button"
+          disabled={activeSurfaceReviewLocked}
+          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
           onClick={() => {
             setTool("draw");
             setDrawMode("eraser");
             setMenu(null);
           }}
-          className={toolBtn(tool === "draw" && drawMode === "eraser")}
+          className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
           aria-pressed={tool === "draw" && drawMode === "eraser"}
         >
           <Eraser size={14} /> 지우개
@@ -17891,6 +18191,7 @@ function StudioCuttoonEditor() {
           ref={pagesSheetRef}
           role={isMobile ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
+          data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
           aria-label={isMobile ? "페이지 목록" : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
           className={cn(
@@ -20224,6 +20525,22 @@ function StudioCuttoonEditor() {
             />
           )}
 
+          <div
+            className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {drawingShortcutNotice ? (
+              <span
+                key={drawingShortcutNotice.id}
+                className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
+              >
+                {drawingShortcutNotice.message}
+              </span>
+            ) : null}
+          </div>
+
           <button
             type="button"
             onClick={() => setQuickStartOpen(true)}
@@ -20533,6 +20850,7 @@ function StudioCuttoonEditor() {
           ref={propsSheetRef}
           role={isMobile ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
+          data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           aria-label={isMobile ? "속성" : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
@@ -22918,38 +23236,12 @@ function StudioCuttoonEditor() {
               {drawMode === "pen" && (
                 <Suspense fallback={null}>
                   <StudioBrushLibraryPanel
-                    currentSnapshot={{
-                      brushId: brush,
-                      strokeWidth,
-                      brushOpacity,
-                      color,
-                      stabilizer,
-                      stabilizerMode,
-                      postCorrection,
-                      preserveCorners,
-                      pressureCurve,
-                      useVelocityPressure,
-                      velocitySensitivity,
-                      tiltEnabled,
-                      tipAngle,
-                      tipRoundness,
-                    }}
-                    onApplyBrush={(saved) => {
-                      setBrush(saved.brushId);
-                      setStrokeWidth(saved.strokeWidth);
-                      setBrushOpacity(saved.brushOpacity);
-                      setColor(saved.color);
-                      setStabilizer(saved.stabilizer);
-                      setStabilizerMode(saved.stabilizerMode);
-                      setPostCorrection(saved.postCorrection);
-                      setPreserveCorners(saved.preserveCorners);
-                      setPressureCurve(saved.pressureCurve);
-                      setUseVelocityPressure(saved.useVelocityPressure);
-                      setVelocitySensitivity(saved.velocitySensitivity);
-                      setTiltEnabled(saved.tiltEnabled);
-                      setTipAngle(saved.tipAngle);
-                      setTipRoundness(saved.tipRoundness);
-                    }}
+                    currentSnapshot={currentBrushSnapshot}
+                    brushes={savedBrushes}
+                    activeBrushId={activeSavedBrushId}
+                    onBrushesChange={setSavedBrushes}
+                    onApplyBrush={applySavedBrush}
+                    onBrushDeleted={queueBrushDelete}
                   />
                 </Suspense>
               )}
@@ -23578,6 +23870,49 @@ function StudioCuttoonEditor() {
           </div>
         )}
 
+        {/* 모바일 전용 브러시 관리자 — 일반 속성 패널을 거치지 않고 저장·고정·복제·내보내기에 바로 접근한다. */}
+        {isMobile && mobileSheet === "brushes" ? (
+          <div
+            ref={brushManagerSheetRef}
+            role="dialog"
+            aria-modal="true"
+            data-studio-mobile-sheet="true"
+            aria-label="내 브러시 관리"
+            data-studio-shortcut-boundary="true"
+            className="fixed inset-x-0 z-50 mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl lg:hidden"
+            style={{
+              bottom: mobileKeyboardInset,
+              maxHeight: `calc(100dvh - 1rem - ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="sticky top-0 z-10 -mx-3 mb-2 flex min-h-14 items-center justify-between border-b border-line bg-panel/95 px-3 backdrop-blur">
+              <div>
+                <p className="text-sm font-bold text-fg">내 브러시 관리</p>
+                <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileSheet("draw")}
+                className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="브러시 관리 닫기"
+                data-autofocus
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <Suspense fallback={<p className="py-6 text-center text-xs text-fg-3">브러시를 불러오는 중…</p>}>
+              <StudioBrushLibraryPanel
+                currentSnapshot={currentBrushSnapshot}
+                brushes={savedBrushes}
+                activeBrushId={activeSavedBrushId}
+                onBrushesChange={setSavedBrushes}
+                onApplyBrush={applySavedBrush}
+                onBrushDeleted={queueBrushDelete}
+              />
+            </Suspense>
+          </div>
+        ) : null}
+
         {/* 모바일 브러시 설정 시트 — 드로잉 도크 바로 위에 떠서 도구를 보며 굵기·색·프리셋·도형을 조절한다.
             도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
         {isMobile && (
@@ -23587,7 +23922,7 @@ function StudioCuttoonEditor() {
             aria-label="브러시 설정"
             aria-modal={false}
             className={cn(
-              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-h-[44vh] max-w-[34rem] overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
               mobileSheet === "draw"
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
@@ -23595,16 +23930,17 @@ function StudioCuttoonEditor() {
             inert={mobileSheet === "draw" ? undefined : true}
             style={{
               bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
             }}
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 flex min-h-14 items-center justify-between border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
               <p className="text-sm font-semibold text-fg">
                 {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
               </p>
               <button
                 type="button"
                 onClick={() => setMobileSheet(null)}
-                className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+                className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 aria-label="브러시 설정 닫기"
                 data-autofocus
               >
@@ -23631,7 +23967,7 @@ function StudioCuttoonEditor() {
                     }}
                     aria-pressed={active}
                     className={cn(
-                      "flex min-h-[2.25rem] items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors",
+                      "flex min-h-11 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors",
                       active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
                     )}
                   >
@@ -23643,33 +23979,41 @@ function StudioCuttoonEditor() {
 
             {/* 펜 프리셋 — 가로 스크롤 칩(굵기·투명도·색 기본값 적용) */}
             {drawMode === "pen" && (
-              <div className="mb-2.5">
-                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">브러시</p>
-                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {BRUSH_PRESETS.map((p) => {
-                    const active = brush === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          setBrush(p.id);
-                          setStrokeWidth(p.defaultWidth);
-                          setBrushOpacity(p.defaultOpacity);
-                          if (p.defaultColor) setColor(p.defaultColor);
-                        }}
-                        aria-pressed={active}
-                        className={cn(
-                          "min-h-[2.25rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
-                          active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                        )}
-                      >
-                        {p.name}
-                      </button>
-                    );
-                  })}
+              <>
+                <StudioSavedBrushShelf
+                  brushes={savedBrushes}
+                  activeBrushId={activeSavedBrushId}
+                  onApply={applySavedBrush}
+                  onManage={() => setMobileSheet("brushes")}
+                />
+                <div className="mb-2.5">
+                  <p className="mb-1 text-[0.7rem] font-medium text-fg-3">기본 브러시</p>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {BRUSH_PRESETS.map((p) => {
+                      const active = brush === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setBrush(p.id);
+                            setStrokeWidth(p.defaultWidth);
+                            setBrushOpacity(p.defaultOpacity);
+                            if (p.defaultColor) setColor(p.defaultColor);
+                          }}
+                          aria-pressed={active}
+                          className={cn(
+                            "min-h-[2.75rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
+                            active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* 색상 — 지우개에선 의미 없으니 숨김 */}
@@ -23685,7 +24029,7 @@ function StudioCuttoonEditor() {
                       aria-label={`색상 ${swatch}`}
                       aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
                       className={cn(
-                        "size-8 rounded-lg transition-transform active:scale-95",
+                        "size-11 rounded-xl transition-transform active:scale-95",
                         color.toLowerCase() === swatch.toLowerCase()
                           ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
                           : "border border-line/60"
@@ -23694,7 +24038,7 @@ function StudioCuttoonEditor() {
                     />
                   ))}
                   <label
-                    className="relative grid size-8 cursor-pointer place-items-center overflow-hidden rounded-lg border border-line shadow-sm"
+                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
                     title="사용자 정의 색상"
                     style={{ background: color }}
                   >
@@ -23702,6 +24046,7 @@ function StudioCuttoonEditor() {
                       type="color"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
+                      aria-label="사용자 정의 브러시 색상"
                       className="absolute inset-0 size-full cursor-pointer opacity-0"
                     />
                     <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
@@ -23724,7 +24069,7 @@ function StudioCuttoonEditor() {
                     max={48}
                     value={strokeWidth}
                     onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                    className="h-8 w-full accent-accent"
+                    className="h-11 w-full accent-accent"
                     aria-label="브러시 굵기 슬라이더"
                   />
                   <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
@@ -23738,12 +24083,12 @@ function StudioCuttoonEditor() {
                     onChange={(event) =>
                       setStrokeWidth(Math.min(48, Math.max(1, Number(event.target.value) || 1)))
                     }
-                    className="min-h-10 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                   />
                   <button
                     type="button"
                     onClick={() => setStrokeWidth(drawMode === "eraser" ? 18 : 4)}
-                    className="min-h-10 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                    className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
                     aria-label="브러시 굵기 기본값으로 초기화"
                   >
                     초기화
@@ -23764,7 +24109,7 @@ function StudioCuttoonEditor() {
                       step={5}
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
-                      className="h-8 w-full accent-accent"
+                      className="h-11 w-full accent-accent"
                       aria-label="브러시 투명도 슬라이더"
                     />
                     <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
@@ -23779,12 +24124,12 @@ function StudioCuttoonEditor() {
                       onChange={(event) =>
                         setBrushOpacity(Math.min(100, Math.max(10, Number(event.target.value) || 10)) / 100)
                       }
-                      className="min-h-10 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                     />
                     <button
                       type="button"
                       onClick={() => setBrushOpacity(1)}
-                      className="min-h-10 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                      className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
                       aria-label="브러시 투명도 100퍼센트로 초기화"
                     >
                       초기화
@@ -23821,7 +24166,7 @@ function StudioCuttoonEditor() {
 
             {drawMode === "pen" && brush === "calligraphy" ? (
               <div className="mt-2.5 space-y-2.5 border-t border-line/60 pt-2.5">
-                <div
+                <label
                   className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-card/55 px-3"
                 >
                   <span>
@@ -23837,7 +24182,7 @@ function StudioCuttoonEditor() {
                     aria-label="스타일러스 기울기 반영"
                     className="size-5 shrink-0 rounded accent-accent"
                   />
-                </div>
+                </label>
                 <div>
                   <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
                     <span>기본 촉 각도</span>
@@ -23901,7 +24246,7 @@ function StudioCuttoonEditor() {
                         aria-pressed={active}
                         title={item.label}
                         className={cn(
-                          "flex min-h-[2.25rem] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
+                          "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
                           active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
                         )}
                       >
@@ -23912,7 +24257,7 @@ function StudioCuttoonEditor() {
                 </div>
                 <label
                   className={cn(
-                    "mt-2 flex min-h-[2.5rem] items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
+                    "mt-2 flex min-h-11 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
                     drawShape === "line"
                       ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
                       : shapeFill
@@ -23960,6 +24305,8 @@ function StudioCuttoonEditor() {
               </button>
               <button
                 type="button"
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
                 onClick={() => {
                   // 펜이 이미 활성이면 같은 버튼으로 브러시 설정 시트를 연다(굵기·색·프리셋).
                   if (tool === "draw" && drawMode === "pen") {
@@ -23972,13 +24319,15 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "pen"}
-                className={mobileDrawToolBtn(tool === "draw" && drawMode === "pen")}
+                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "pen"), "disabled:opacity-40")}
               >
                 <Pencil size={19} aria-hidden />
                 <span>펜</span>
               </button>
               <button
                 type="button"
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
                 onClick={() => {
                   setTool("draw");
                   setDrawMode("eraser");
@@ -23986,13 +24335,15 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "eraser"}
-                className={mobileDrawToolBtn(tool === "draw" && drawMode === "eraser")}
+                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "eraser"), "disabled:opacity-40")}
               >
                 <Eraser size={19} aria-hidden />
                 <span>지우개</span>
               </button>
               <button
                 type="button"
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
                 onClick={() => {
                   // 도형이 이미 활성이면 같은 버튼으로 도형/색 설정 시트를 연다.
                   if (tool === "draw" && drawMode === "shape") {
@@ -24005,13 +24356,14 @@ function StudioCuttoonEditor() {
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "shape"}
-                className={mobileDrawToolBtn(tool === "draw" && drawMode === "shape")}
+                className={cn(mobileDrawToolBtn(tool === "draw" && drawMode === "shape"), "disabled:opacity-40")}
               >
                 <Square size={18} aria-hidden />
                 <span>도형</span>
               </button>
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <button
+                ref={mobileBrushDockButtonRef}
                 type="button"
                 onClick={undo}
                 disabled={hi === 0 || collaborationDocumentLocked}
@@ -24043,9 +24395,9 @@ function StudioCuttoonEditor() {
                   }
                   setMobileSheet((s) => (s === "draw" ? null : "draw"));
                 }}
-                aria-pressed={mobileSheet === "draw"}
+                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-label="브러시 설정 (굵기·색·프리셋)"
-                className={mobileDrawToolBtn(mobileSheet === "draw")}
+                className={mobileDrawToolBtn(mobileSheet === "draw" || mobileSheet === "brushes")}
               >
                 <span
                   aria-hidden

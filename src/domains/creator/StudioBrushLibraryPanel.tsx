@@ -1,24 +1,33 @@
-// 브러시 라이브러리 패널 — StudioPaletteLibraryPanel.tsx(색상 팔레트 저장/불러오기)의 브러시 버전.
-// "그리기 도구 설정" 패널 안에 인라인으로 얹히는 자기완결형(self-contained) 하위 섹션이다(팔레트
-// 패널과 달리 툴바 드롭다운으로 뜨는 floating 오버레이가 아니라, 이미 열려 있는 패널의 일부이므로
-// position:fixed/absolute를 쓰지 않는다 — 자세한 배치는 docs/studio-brush-library-integration.md 참고).
-//
-// 이름 붙은 브러시 설정(펜 종류·크기·투명도·색상·손떨림 보정·필압 옵션)을 저장·이름변경·삭제하고,
-// 이 앱 전용 JSON 포맷으로 가져오기/내보내기 한다. 캔버스 제스처를 가로채지 않으므로(그냥 상태
-// 스냅샷 저장/적용) disarmAllPixelTools() 대상에 포함되지 않는다.
-import { Download, Pencil, Save, Upload, X } from "lucide-react";
-import { useState, type ChangeEvent, type KeyboardEvent } from "react";
+// 브러시 라이브러리 패널 — StudioPage가 소유하는 단일 목록을 데스크톱/모바일과 공유하는
+// controlled consumer다. 이름 붙은 브러시 설정을 저장·고정·복제·이름변경·안전 삭제하고,
+// 앱 전용 JSON 포맷으로 가져오기/내보내기 한다.
+import {
+  Check,
+  Copy,
+  Download,
+  Pencil,
+  Pin,
+  Save,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
+  browserBrushLibraryStorage,
   brushFileName,
   createBrush,
-  deleteBrush,
+  deleteBrushWithRecord,
+  duplicateBrush,
   importBrushFromJson,
-  listBrushes,
-  renameBrush,
-  saveBrush,
+  MAX_BRUSHES,
+  renameBrushWithResult,
+  saveBrushWithResult,
+  sortBrushesForLibrary,
+  toggleBrushPinnedWithResult,
   writeBrushJson,
+  type DeletedBrushRecord,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
@@ -27,12 +36,12 @@ import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
 import { cx } from "@/lib/cx";
 
-const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024; // 2MB — studio-palette-library 가져오기와 동일한 저비용 가드.
+const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
 const PREVIEW_SWATCH_MIN = 10;
 const PREVIEW_SWATCH_MAX = 30;
 
 function brushPresetLabel(brushId: string): string {
-  return BRUSH_PRESETS.find((p) => p.id === brushId)?.name ?? brushId;
+  return BRUSH_PRESETS.find((preset) => preset.id === brushId)?.name ?? brushId;
 }
 
 function stabilizerModeLabel(mode: StudioSavedBrush["stabilizerMode"]): string {
@@ -40,60 +49,156 @@ function stabilizerModeLabel(mode: StudioSavedBrush["stabilizerMode"]): string {
 }
 
 function previewSize(strokeWidth: number): number {
-  // strokeWidth(1~48)를 스와치 지름(10~30px)으로 매핑 — 실제 굵기 비율이 아니라 "대충 느낌"만 준다.
-  return Math.round(PREVIEW_SWATCH_MIN + (Math.min(48, Math.max(1, strokeWidth)) / 48) * (PREVIEW_SWATCH_MAX - PREVIEW_SWATCH_MIN));
+  return Math.round(
+    PREVIEW_SWATCH_MIN
+      + (Math.min(48, Math.max(1, strokeWidth)) / 48) * (PREVIEW_SWATCH_MAX - PREVIEW_SWATCH_MIN)
+  );
 }
+
+const storageErrorMessage = "브러시를 이 브라우저에 저장하지 못했어요. 저장소 권한이나 여유 공간을 확인해주세요.";
+const libraryUnreadableMessage = "저장된 브러시 데이터를 안전하게 읽지 못해 변경을 막았어요. 브라우저 저장 데이터를 백업한 뒤 복구해주세요.";
+const capacityMessage = `브러시가 ${MAX_BRUSHES}/${MAX_BRUSHES}개예요. 기존 브러시를 내보낸 뒤 삭제하면 새 브러시를 저장할 수 있어요.`;
 
 export interface StudioBrushLibraryPanelProps {
-  /** 현재 캔버스에서 실제로 그리기에 쓰이는 라이브 브러시 설정 스냅샷. "현재 브러시 저장"이 이 값을 이름 붙여 저장한다. */
   currentSnapshot: StudioBrushSnapshot;
-  /** 저장된 브러시를 고르면 호출 — 어떤 setter를 호출해 되돌릴지는 전적으로 호출부(StudioPage)가 결정한다(onPickColor와 동일한 위임 패턴). */
+  brushes: StudioSavedBrush[];
+  activeBrushId?: string | null;
+  onBrushesChange: (brushes: StudioSavedBrush[]) => void;
   onApplyBrush: (brush: StudioSavedBrush) => void;
+  onBrushDeleted: (deleted: DeletedBrushRecord) => void;
 }
 
-export function StudioBrushLibraryPanel({ currentSnapshot, onApplyBrush }: StudioBrushLibraryPanelProps) {
-  // lazy 초기화 — StudioPaletteLibraryPanel과 동일하게 마운트 시점에 동기 로드(이 컴포넌트 자체가
-  // lazyRetry로 필요할 때만 로드되므로 이미 "필요할 때만"이다).
-  const [brushes, setBrushes] = useState<StudioSavedBrush[]>(() => listBrushes(globalThis.localStorage));
+export function StudioBrushLibraryPanel({
+  currentSnapshot,
+  brushes,
+  activeBrushId = null,
+  onBrushesChange,
+  onApplyBrush,
+  onBrushDeleted,
+}: StudioBrushLibraryPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const saveTriggerRef = useRef<HTMLButtonElement>(null);
+  const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const orderedBrushes = sortBrushesForLibrary(brushes);
+
+  function setMutationError(status: "storage-error" | "library-unreadable") {
+    setError(status === "library-unreadable" ? libraryUnreadableMessage : storageErrorMessage);
+    setDoneMsg(null);
+  }
 
   function handleDelete(id: string) {
-    setBrushes(deleteBrush(globalThis.localStorage, id));
+    setError(null);
+    setDoneMsg(null);
+    const result = deleteBrushWithRecord(browserBrushLibraryStorage(), id);
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+      return;
+    }
+    if (!result.deleted) return;
+    onBrushesChange(result.brushes);
+    onBrushDeleted(result.deleted);
   }
 
-  function startRename(b: StudioSavedBrush) {
-    setRenamingId(b.id);
-    setRenamingName(b.name);
+  function handleTogglePinned(id: string) {
+    setError(null);
+    setDoneMsg(null);
+    const result = toggleBrushPinnedWithResult(browserBrushLibraryStorage(), id);
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+      return;
+    }
+    if (result.status === "updated") onBrushesChange(result.brushes);
   }
 
-  function commitRename() {
+  function handleDuplicate(id: string) {
+    setError(null);
+    setDoneMsg(null);
+    const result = duplicateBrush(browserBrushLibraryStorage(), id);
+    if (result.status === "full") {
+      setError(capacityMessage);
+      return;
+    }
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+      return;
+    }
+    if (result.status !== "duplicated" || !result.brush) return;
+    onBrushesChange(result.brushes);
+    setDoneMsg(`"${result.brush.name}" 브러시를 복제했어요.`);
+    setError(null);
+    setRenamingId(result.brush.id);
+    setRenamingName(result.brush.name);
+  }
+
+  function startRename(brush: StudioSavedBrush, trigger: HTMLButtonElement) {
+    renameReturnFocusRef.current = trigger;
+    setRenamingId(brush.id);
+    setRenamingName(brush.name);
+  }
+
+  function finishRenameFocus() {
+    globalThis.requestAnimationFrame?.(() => {
+      if (renameReturnFocusRef.current?.isConnected) {
+        renameReturnFocusRef.current.focus({ preventScroll: true });
+      }
+      renameReturnFocusRef.current = null;
+    });
+  }
+
+  function commitRename(restoreFocus = false) {
     if (!renamingId) return;
-    setBrushes(renameBrush(globalThis.localStorage, renamingId, renamingName));
+    setError(null);
+    setDoneMsg(null);
+    const result = renameBrushWithResult(browserBrushLibraryStorage(), renamingId, renamingName);
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+    } else if (result.status === "updated") {
+      onBrushesChange(result.brushes);
+    }
     setRenamingId(null);
+    if (restoreFocus) finishRenameFocus();
   }
 
-  function handleRenameKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") commitRename();
-    else if (e.key === "Escape") setRenamingId(null);
+  function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") commitRename(true);
+    else if (event.key === "Escape") {
+      setRenamingId(null);
+      finishRenameFocus();
+    }
+  }
+
+  function storeNewBrush(brush: StudioSavedBrush, successMessage: string) {
+    const result = saveBrushWithResult(browserBrushLibraryStorage(), brush);
+    if (result.status === "full") {
+      setError(capacityMessage);
+      return false;
+    }
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+      return false;
+    }
+    onBrushesChange(result.brushes);
+    setError(null);
+    setDoneMsg(successMessage);
+    return true;
   }
 
   function handleSaveCurrent() {
-    const created = createBrush(newName, currentSnapshot); // createBrush는 절대 던지지 않는다(항상 clamp/보정).
-    setBrushes(saveBrush(globalThis.localStorage, created));
-    setError(null);
-    setDoneMsg(`"${created.name}" 브러시를 저장했어요.`);
+    const created = createBrush(newName, currentSnapshot);
+    if (!storeNewBrush(created, `"${created.name}" 브러시를 저장했어요.`)) return;
     setNewName("");
     setCreatorOpen(false);
+    globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
   }
 
-  function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // 같은 파일 재선택 시에도 onChange가 다시 발생하도록 즉시 리셋(StudioPaletteLibraryPanel과 동일 관례).
+  function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
     setError(null);
     setDoneMsg(null);
@@ -102,8 +207,8 @@ export function StudioBrushLibraryPanel({ currentSnapshot, onApplyBrush }: Studi
       return;
     }
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result;
+    reader.onload = (loadEvent) => {
+      const text = loadEvent.target?.result;
       if (typeof text !== "string") {
         setError("브러시 설정 파일을 읽지 못했어요.");
         return;
@@ -111,167 +216,185 @@ export function StudioBrushLibraryPanel({ currentSnapshot, onApplyBrush }: Studi
       try {
         const fallbackName = file.name.replace(/\.json$/i, "");
         const { brush: imported, adjustedFields } = importBrushFromJson(text, fallbackName);
-        setBrushes(saveBrush(globalThis.localStorage, imported));
         const parts = [`"${imported.name}" 브러시를 가져왔어요.`];
-        if (adjustedFields.length > 0) parts.push(`일부 값(${adjustedFields.join(", ")})은 범위를 벗어나 기본값으로 보정했어요.`);
-        setDoneMsg(parts.join(" "));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "브러시 설정 파일을 가져오지 못했어요.");
+        if (adjustedFields.length > 0) {
+          parts.push(`일부 값(${adjustedFields.join(", ")})은 안전 범위로 보정했어요.`);
+        }
+        storeNewBrush(imported, parts.join(" "));
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "브러시 설정 파일을 가져오지 못했어요.");
       }
     };
     reader.onerror = () => setError("브러시 설정 파일을 읽지 못했어요.");
     reader.readAsText(file);
   }
 
-  function handleExport(b: StudioSavedBrush) {
-    downloadBlob(new Blob([writeBrushJson(b)], { type: "application/json;charset=utf-8" }), brushFileName(b));
+  function handleExport(brush: StudioSavedBrush) {
+    downloadBlob(
+      new Blob([writeBrushJson(brush)], { type: "application/json;charset=utf-8" }),
+      brushFileName(brush)
+    );
   }
 
   return (
-    <div className="space-y-1.5 pt-1.5 border-t border-line/35">
+    <section className="space-y-2 border-t border-line/35 pt-2" aria-label="내 브러시 라이브러리">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-medium text-fg-3">내 브러시 — 저장·가져오기(.json)·내보내기</p>
-        <label className="flex shrink-0 cursor-pointer items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised">
-          <Upload size={10} /> 가져오기
-          <input type="file" accept=".json,application/json" className="hidden" onChange={handleImportFile} />
+        <div>
+          <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시</p>
+          <p className="text-[0.6rem] tabular-nums text-fg-3">{brushes.length}/{MAX_BRUSHES} · 고정과 최근 사용 우선</p>
+        </div>
+        <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:min-h-8">
+          <Upload size={12} aria-hidden /> 가져오기
+          <input
+            type="file"
+            accept=".json,application/json"
+            aria-label="브러시 설정 가져오기"
+            className="sr-only"
+            onChange={handleImportFile}
+          />
         </label>
       </div>
 
-      {error && (
-        <p className="text-[0.64rem] text-bad" role="alert">
-          {error}
-        </p>
-      )}
-      {doneMsg && !error && (
-        <p className="text-[0.64rem] text-good" role="status">
-          {doneMsg}
-        </p>
-      )}
+      {error ? <p className="text-[0.64rem] leading-relaxed text-bad" role="alert">{error}</p> : null}
+      {doneMsg && !error ? <p className="text-[0.64rem] leading-relaxed text-good" role="status">{doneMsg}</p> : null}
 
       <button
+        ref={saveTriggerRef}
         type="button"
-        onClick={() => setCreatorOpen((v) => !v)}
+        onClick={() => setCreatorOpen((open) => !open)}
         aria-expanded={creatorOpen}
         className={cx(
-          "flex w-full items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-[0.66rem] font-semibold transition-colors hover:bg-raised",
-          creatorOpen ? "bg-raised text-fg-2" : "text-fg-2"
+          "flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line text-[0.68rem] font-semibold transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-9",
+          creatorOpen ? "bg-raised text-fg" : "text-fg-2"
         )}
       >
-        <Save size={11} /> 현재 브러시 저장
+        <Save size={13} aria-hidden /> 현재 브러시 저장
       </button>
-      {creatorOpen && (
+      {creatorOpen ? (
         <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
           <input
             type="text"
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={(event) => setNewName(event.target.value)}
             placeholder="브러시 이름"
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- 저장 폼은 사용자 액션으로만 열리고, 곧바로 이름을 입력할 것이므로 즉시 포커스가 정답
+            aria-label="새 브러시 이름"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- 명시적 저장 동작 뒤 열리는 짧은 이름 입력 단계다.
             autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSaveCurrent();
-              else if (e.key === "Escape") setCreatorOpen(false);
+            onKeyDown={(event) => {
+              if (event.key === "Enter") handleSaveCurrent();
+              else if (event.key === "Escape") {
+                setCreatorOpen(false);
+                globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
+              }
             }}
-            className="h-7 rounded border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent"
+            className="h-11 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent lg:h-8"
           />
-          <button
-            type="button"
-            onClick={handleSaveCurrent}
-            className="rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90"
-          >
+          <button type="button" onClick={handleSaveCurrent} className="min-h-11 rounded-lg bg-accent text-[0.68rem] font-semibold text-on-accent hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8">
             저장
           </button>
         </div>
-      )}
+      ) : null}
 
-      {brushes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-line px-2 py-3 text-center text-[0.64rem] leading-relaxed text-fg-3">
-          저장된 브러시가 없어요. 위에서 현재 설정을 저장하거나 .json 파일을 가져와보세요.
+      {orderedBrushes.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.64rem] leading-relaxed text-fg-3">
+          현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요.
         </p>
       ) : (
-        <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto pr-1">
-          {brushes.map((b) => (
-            <div key={b.id} className="rounded-lg border border-line bg-card px-1.5 py-1.5">
-              <div className="mb-1 flex items-center gap-0.5">
-                {renamingId === b.id ? (
+        <ul className="space-y-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
+          {orderedBrushes.map((brush) => (
+            <li
+              key={brush.id}
+              className={cx(
+                "rounded-xl border bg-card p-2 transition-colors",
+                activeBrushId === brush.id ? "border-accent/70 bg-accent-soft/20" : "border-line"
+              )}
+            >
+              <div className="mb-1.5 flex min-h-8 items-center gap-1">
+                {renamingId === brush.id ? (
                   <input
                     type="text"
                     value={renamingName}
-                    onChange={(e) => setRenamingName(e.target.value)}
-                    onBlur={commitRename}
+                    onChange={(event) => setRenamingName(event.target.value)}
+                    aria-label={`${brush.name} 새 이름`}
+                    onBlur={() => commitRename(false)}
                     onKeyDown={handleRenameKeyDown}
-                    // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opens only on user action; focusing it immediately is correct edit-on-demand UX
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- 사용자가 복제/이름 변경을 요청한 직후의 인라인 편집이다.
                     autoFocus
-                    className="min-w-0 flex-1 rounded border border-accent bg-panel px-1 py-0.5 text-[0.68rem] text-fg outline-none"
+                    className="min-h-11 min-w-0 flex-1 rounded-md border border-accent bg-panel px-2 py-1 text-[0.7rem] text-fg outline-none lg:min-h-8"
                   />
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-[0.68rem] font-medium text-fg" title={b.name}>
-                    {b.name}
+                  <span className="min-w-0 flex-1 truncate text-[0.7rem] font-semibold text-fg" title={brush.name}>
+                    {brush.name}
                   </span>
                 )}
+                {activeBrushId === brush.id ? (
+                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.55rem] font-bold text-accent">
+                    <Check size={10} strokeWidth={3} aria-hidden /> 사용 중
+                  </span>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => startRename(b)}
-                  aria-label={`${b.name} 이름 변경`}
-                  title="이름 변경"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-accent"
+                  onClick={() => handleTogglePinned(brush.id)}
+                  aria-label={`${brush.name} ${brush.pinned ? "고정 해제" : "빠른 선반에 고정"}`}
+                  aria-pressed={brush.pinned}
+                  title={brush.pinned ? "고정 해제" : "빠른 선반에 고정"}
+                  className={cx(
+                    "grid size-11 shrink-0 place-items-center rounded-lg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:size-8",
+                    brush.pinned ? "text-accent" : "text-fg-3"
+                  )}
                 >
-                  <Pencil size={10} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport(b)}
-                  aria-label={`${b.name} 내보내기`}
-                  title="JSON으로 내보내기"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-accent"
-                >
-                  <Download size={10} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(b.id)}
-                  aria-label={`${b.name} 브러시 삭제`}
-                  title="삭제"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-bad"
-                >
-                  <X size={10} />
+                  <Pin size={14} className={brush.pinned ? "fill-current" : undefined} aria-hidden />
                 </button>
               </div>
+
               <button
                 type="button"
-                onClick={() => onApplyBrush(b)}
-                title={`${b.name} 불러오기`}
-                className="flex w-full items-center gap-1.5 rounded border border-line/60 bg-panel/50 px-1.5 py-1 text-left transition-colors hover:border-accent hover:bg-accent-soft/30"
+                onClick={() => onApplyBrush(brush)}
+                aria-pressed={activeBrushId === brush.id}
+                aria-label={`${brush.name} 브러시 적용, ${brushPresetLabel(brush.brushId)}, ${brush.strokeWidth}px, ${Math.round(brush.brushOpacity * 100)}퍼센트`}
+                className="flex min-h-12 w-full items-center gap-2 rounded-lg border border-line/60 bg-panel/50 px-2 text-left transition-colors hover:border-accent hover:bg-accent-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 <span
-                  className="shrink-0 rounded-full border border-line"
+                  className="grid shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-[linear-gradient(135deg,#f8fafc_0_50%,#242936_50%_100%)] p-px"
                   style={{
-                    width: previewSize(b.strokeWidth),
-                    height: previewSize(b.strokeWidth),
-                    background: b.color,
-                    opacity: Math.max(0.15, b.brushOpacity),
+                    width: previewSize(brush.strokeWidth),
+                    height: previewSize(brush.strokeWidth),
                   }}
                   aria-hidden
-                />
-                <span className="min-w-0 flex-1 text-[0.6rem] leading-tight text-fg-3">
-                  <span className="block truncate">{brushPresetLabel(b.brushId)}</span>
-                  <span className="numeral block">
-                    {b.strokeWidth}px · {Math.round(b.brushOpacity * 100)}%
-                  </span>
-                  <span className="block">
-                    {stabilizerModeLabel(b.stabilizerMode)} {b.stabilizer} · 후보정 {b.postCorrection}
-                  </span>
-                  {b.brushId === "calligraphy" ? (
-                    <span className="numeral block">
-                      촉 {Math.round(b.tipAngle)}° · 원형도 {Math.round(b.tipRoundness * 100)}%
-                    </span>
-                  ) : null}
+                >
+                  <span
+                    className="block size-full rounded-full"
+                    style={{
+                      background: brush.color,
+                      opacity: brush.brushOpacity,
+                    }}
+                  />
+                </span>
+                <span className="min-w-0 flex-1 text-[0.62rem] leading-snug text-fg-3">
+                  <span className="block truncate text-fg-2">{brushPresetLabel(brush.brushId)} · {brush.strokeWidth}px · {Math.round(brush.brushOpacity * 100)}%</span>
+                  <span className="block">{stabilizerModeLabel(brush.stabilizerMode)} {brush.stabilizer} · 후보정 {brush.postCorrection}</span>
+                  {brush.brushId === "calligraphy" ? <span className="block">촉 {Math.round(brush.tipAngle)}° · 원형도 {Math.round(brush.tipRoundness * 100)}%</span> : null}
                 </span>
               </button>
-            </div>
+
+              <div className="mt-1.5 grid grid-cols-4 gap-1 border-t border-line/50 pt-1.5">
+                <button type="button" onClick={() => handleDuplicate(brush.id)} aria-label={`${brush.name} 복제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Copy size={12} aria-hidden /> 복제
+                </button>
+                <button type="button" onClick={(event) => startRename(brush, event.currentTarget)} aria-label={`${brush.name} 이름 변경`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Pencil size={12} aria-hidden /> 이름
+                </button>
+                <button type="button" onClick={() => handleExport(brush)} aria-label={`${brush.name} 내보내기`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Download size={12} aria-hidden /> 내보내기
+                </button>
+                <button type="button" onClick={() => handleDelete(brush.id)} aria-label={`${brush.name} 브러시 삭제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Trash2 size={12} aria-hidden /> 삭제
+                </button>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </section>
   );
 }

@@ -3,17 +3,30 @@ import { describe, it, expect } from "vitest";
 import {
   BRUSH_EXPORT_KIND,
   BRUSH_LIBRARY_KEY,
+  BRUSH_LIBRARY_STORAGE_VERSION,
   BRUSH_OPACITY_RANGE,
   BRUSH_STROKE_WIDTH_RANGE,
   brushFileName,
+  brushMatchesSnapshot,
   createBrush,
   deleteBrush,
+  deleteBrushWithRecord,
+  duplicateBrush,
+  duplicateBrushName,
   importBrushFromJson,
   listBrushes,
+  markBrushUsed,
+  markBrushUsedWithResult,
   MAX_BRUSHES,
+  readBrushLibrary,
   renameBrush,
+  restoreDeletedBrush,
   sanitizeBrushSnapshot,
   saveBrush,
+  saveBrushWithResult,
+  selectQuickBrushes,
+  sortBrushesForLibrary,
+  toggleBrushPinned,
   writeBrushJson,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
@@ -51,6 +64,8 @@ const brush = (id: string, createdAt = 1): StudioSavedBrush => ({
   name: `브러시 ${id}`,
   createdAt,
   updatedAt: createdAt,
+  pinned: false,
+  lastUsedAt: null,
   ...validSnapshot,
 });
 
@@ -172,6 +187,8 @@ describe("createBrush", () => {
     expect(b.strokeWidth).toBe(12);
     expect(typeof b.id).toBe("string");
     expect(b.createdAt).toBe(b.updatedAt);
+    expect(b.pinned).toBe(false);
+    expect(b.lastUsedAt).toBe(b.createdAt);
   });
 
   it("빈 이름은 DEFAULT_BRUSH_NAME으로 대체한다", () => {
@@ -232,6 +249,106 @@ describe("listBrushes", () => {
       preserveCorners: true,
     });
   });
+
+  it("v1~v3 저장 브러시에 선반 메타데이터가 없어도 고정 해제·미사용으로 마이그레이션한다", () => {
+    const legacy = brush("legacy-meta") as Partial<StudioSavedBrush>;
+    delete legacy.pinned;
+    delete legacy.lastUsedAt;
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
+    expect(listBrushes(s)[0]).toMatchObject({ pinned: false, lastUsedAt: null });
+  });
+
+  it("유효하지 않은 선반 메타데이터는 안전한 기본값으로 정규화한다", () => {
+    const raw = { ...brush("bad-meta"), pinned: "yes", lastUsedAt: Number.POSITIVE_INFINITY };
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([raw]) });
+    expect(listBrushes(s)[0]).toMatchObject({ pinned: false, lastUsedAt: null });
+  });
+});
+
+describe("readBrushLibrary", () => {
+  it("버전 envelope와 레거시 배열 저장 형식을 모두 읽는다", () => {
+    const envelope = fakeStorage({
+      [BRUSH_LIBRARY_KEY]: JSON.stringify({
+        version: BRUSH_LIBRARY_STORAGE_VERSION,
+        brushes: [brush("envelope")],
+      }),
+    });
+    const legacy = fakeStorage({
+      [BRUSH_LIBRARY_KEY]: JSON.stringify([brush("legacy")]),
+    });
+
+    expect(readBrushLibrary(envelope)).toMatchObject({
+      status: "ok",
+      brushes: [{ id: "envelope" }],
+    });
+    expect(readBrushLibrary(legacy)).toMatchObject({
+      status: "ok",
+      brushes: [{ id: "legacy" }],
+    });
+  });
+
+  it.each([
+    {
+      name: "깨진 JSON",
+      raw: "{not json",
+      expectedReadStatus: "corrupt",
+      expectedBrushIds: [],
+    },
+    {
+      name: "brushes가 배열이 아닌 envelope",
+      raw: JSON.stringify({ version: BRUSH_LIBRARY_STORAGE_VERSION, brushes: { id: "not-an-array" } }),
+      expectedReadStatus: "corrupt",
+      expectedBrushIds: [],
+    },
+    {
+      name: "미지원 미래 버전",
+      raw: JSON.stringify({ version: BRUSH_LIBRARY_STORAGE_VERSION + 1, brushes: [] }),
+      expectedReadStatus: "unsupported-version",
+      expectedBrushIds: [],
+    },
+    {
+      name: "일부 레코드가 손상된 배열",
+      raw: JSON.stringify([brush("valid"), { id: "invalid" }]),
+      expectedReadStatus: "corrupt",
+      expectedBrushIds: ["valid"],
+    },
+  ])("$name을 읽은 mutation은 기존 데이터를 덮어쓰지 않는다", ({ raw, expectedReadStatus, expectedBrushIds }) => {
+    let setItemCalls = 0;
+    const storage = {
+      getItem: () => raw,
+      setItem: () => {
+        setItemCalls += 1;
+      },
+    };
+
+    const read = readBrushLibrary(storage);
+    expect(read.status).toBe(expectedReadStatus);
+    expect(read.brushes.map((item) => item.id)).toEqual(expectedBrushIds);
+
+    const result = saveBrushWithResult(storage, brush("new"));
+    expect(result.status).toBe("library-unreadable");
+    expect(result.brushes.map((item) => item.id)).toEqual(expectedBrushIds);
+    expect(setItemCalls).toBe(0);
+  });
+
+  it("getItem이 던지면 mutation은 setItem을 호출하지 않고 library-unreadable을 반환한다", () => {
+    let setItemCalls = 0;
+    const storage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        setItemCalls += 1;
+      },
+    };
+
+    expect(readBrushLibrary(storage)).toEqual({ brushes: [], status: "read-error" });
+    expect(saveBrushWithResult(storage, brush("new"))).toEqual({
+      brushes: [],
+      status: "library-unreadable",
+    });
+    expect(setItemCalls).toBe(0);
+  });
 });
 
 describe("saveBrush", () => {
@@ -251,12 +368,37 @@ describe("saveBrush", () => {
     expect(next[0].createdAt).toBe(2);
   });
 
-  it(`최대 ${MAX_BRUSHES}개로 제한`, () => {
+  it(`최대 ${MAX_BRUSHES}개에서 새 항목을 거부하고 기존 항목을 자동 삭제하지 않는다`, () => {
     const s = fakeStorage();
     let result: StudioSavedBrush[] = [];
-    for (let i = 0; i < MAX_BRUSHES + 5; i++) result = saveBrush(s, brush(`b${i}`, i));
+    for (let i = 0; i < MAX_BRUSHES; i++) result = saveBrush(s, brush(`b${i}`, i));
+    const overflow = saveBrushWithResult(s, brush("overflow", 999));
+    expect(overflow.status).toBe("full");
+    expect(overflow.brushes.map((item) => item.id)).not.toContain("overflow");
     expect(result).toHaveLength(MAX_BRUSHES);
-    expect(result[0].id).toBe(`b${MAX_BRUSHES + 4}`);
+    expect(result.map((item) => item.id)).toContain("b0");
+    expect(listBrushes(s)).toHaveLength(MAX_BRUSHES);
+  });
+
+  it(`최대 ${MAX_BRUSHES}개여도 같은 id 갱신은 허용한다`, () => {
+    const s = fakeStorage();
+    for (let i = 0; i < MAX_BRUSHES; i++) saveBrush(s, brush(`b${i}`, i));
+    const updated = { ...brush("b0", 999), name: "갱신됨" };
+    const result = saveBrushWithResult(s, updated);
+    expect(result.status).toBe("saved");
+    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+    expect(result.brushes[0]).toMatchObject({ id: "b0", name: "갱신됨" });
+  });
+
+  it("저장소 쓰기가 실패하면 성공으로 가장하지 않고 원본 목록을 유지한다", () => {
+    const s = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+    const result = saveBrushWithResult(s, brush("a"));
+    expect(result).toEqual({ brushes: [], status: "storage-error" });
   });
 
   it("저장소에 영속된다", () => {
@@ -311,6 +453,103 @@ describe("deleteBrush", () => {
   });
 });
 
+describe("빠른 선반·복제·삭제 취소", () => {
+  it("고정 브러시를 먼저, 나머지는 최근 사용순으로 최대 8개 반환하며 입력을 바꾸지 않는다", () => {
+    const source = Array.from({ length: 10 }, (_, index) => ({
+      ...brush(`b${index}`, index),
+      pinned: index === 1 || index === 4,
+      lastUsedAt: index === 9 ? null : index * 10,
+    }));
+    const before = source.map((item) => item.id);
+    const quick = selectQuickBrushes(source);
+    expect(quick).toHaveLength(8);
+    expect(quick.slice(0, 2).map((item) => item.id)).toEqual(["b4", "b1"]);
+    expect(quick[2].id).toBe("b8");
+    expect(quick.map((item) => item.id)).not.toContain("b9");
+    expect(source.map((item) => item.id)).toEqual(before);
+  });
+
+  it("고정 토글과 최근 적용 시각 기록을 저장한다", () => {
+    const s = fakeStorage();
+    saveBrush(s, brush("a"));
+    const pinned = toggleBrushPinned(s, "a");
+    expect(pinned[0].pinned).toBe(true);
+    const used = markBrushUsed(s, "a", 1234);
+    expect(used[0].lastUsedAt).toBe(1234);
+    expect(listBrushes(s)[0]).toMatchObject({ pinned: true, lastUsedAt: 1234 });
+  });
+
+  it("최근 사용 시각 저장이 실패하면 storage-error와 영속된 원본을 명시적으로 반환한다", () => {
+    const original = brush("a");
+    const storage = {
+      getItem: () => JSON.stringify({
+        version: BRUSH_LIBRARY_STORAGE_VERSION,
+        brushes: [original],
+      }),
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+
+    const result = markBrushUsedWithResult(storage, "a", 1234);
+    expect(result.status).toBe("storage-error");
+    expect(result.brushes).toEqual([original]);
+    expect(result.brushes[0].lastUsedAt).toBeNull();
+  });
+
+  it("복제 이름은 충돌을 건너뛰고 기존 숫자 접미사도 정규화한다", () => {
+    expect(duplicateBrushName("먹펜", ["먹펜", "먹펜 2", "먹펜 3"])).toBe("먹펜 4");
+    expect(duplicateBrushName("먹펜 2", ["먹펜", "먹펜 2"])).toBe("먹펜 3");
+  });
+
+  it("원본 바로 다음에 독립 브러시를 복제하고 고정·최근 메타데이터는 초기화한다", () => {
+    const s = fakeStorage();
+    saveBrush(s, { ...brush("a"), pinned: true, lastUsedAt: 100 });
+    saveBrush(s, brush("b"));
+    const result = duplicateBrush(s, "a");
+    expect(result.status).toBe("duplicated");
+    expect(result.brush).toMatchObject({ name: "브러시 a 2", pinned: false, lastUsedAt: null });
+    expect(result.brush?.id).not.toBe("a");
+    expect(result.brushes.map((item) => item.id)).toEqual(["b", "a", result.brush?.id]);
+  });
+
+  it("40개에서 복제를 거부하고 모든 원본을 유지한다", () => {
+    const s = fakeStorage();
+    for (let index = 0; index < MAX_BRUSHES; index++) saveBrush(s, brush(`b${index}`));
+    const result = duplicateBrush(s, "b0");
+    expect(result.status).toBe("full");
+    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+  });
+
+  it("삭제 receipt로 동일 id와 원래 위치를 복원한다", () => {
+    const s = fakeStorage();
+    saveBrush(s, brush("a"));
+    saveBrush(s, brush("b"));
+    saveBrush(s, brush("c"));
+    const removed = deleteBrushWithRecord(s, "b");
+    expect(removed.status).toBe("deleted");
+    expect(removed.deleted).toMatchObject({ brush: { id: "b" }, index: 1 });
+    const restored = restoreDeletedBrush(s, removed.deleted!);
+    expect(restored.status).toBe("restored");
+    expect(restored.brushes.map((item) => item.id)).toEqual(["c", "b", "a"]);
+  });
+
+  it("전체 목록도 고정과 최근 사용순으로 안정 정렬한다", () => {
+    const ordered = sortBrushesForLibrary([
+      { ...brush("old", 1), lastUsedAt: 10 },
+      { ...brush("pinned", 2), pinned: true, lastUsedAt: 2 },
+      { ...brush("recent", 3), lastUsedAt: 30 },
+    ]);
+    expect(ordered.map((item) => item.id)).toEqual(["pinned", "recent", "old"]);
+  });
+
+  it("현재 스냅샷과 모든 물리 속성이 같을 때만 활성 브러시로 판별한다", () => {
+    const saved = brush("match");
+    expect(brushMatchesSnapshot(saved, validSnapshot)).toBe(true);
+    expect(brushMatchesSnapshot(saved, { ...validSnapshot, strokeWidth: 13 })).toBe(false);
+  });
+});
+
 describe("writeBrushJson / importBrushFromJson 왕복", () => {
   it("kind 필드를 포함한 JSON을 만든다", () => {
     const out = writeBrushJson(brush("a"));
@@ -324,6 +563,8 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.tiltEnabled).toBe(true);
     expect(parsed.tipAngle).toBe(-35);
     expect(parsed.tipRoundness).toBe(0.3);
+    expect(parsed).not.toHaveProperty("pinned");
+    expect(parsed).not.toHaveProperty("lastUsedAt");
   });
 
   it("왕복하면 같은 스냅샷을 얻는다(adjustedFields 없음)", () => {
@@ -334,6 +575,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(imported.brushId).toBe(original.brushId);
     expect(imported.strokeWidth).toBe(original.strokeWidth);
     expect(imported.color).toBe(original.color);
+    expect(imported).toMatchObject({ pinned: false, lastUsedAt: null });
     expect(adjustedFields).toEqual([]);
     expect(imported.id).not.toBe(original.id); // 가져오기는 새 id를 발급한다(같은 id 충돌 방지)
   });

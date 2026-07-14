@@ -1,7 +1,8 @@
 // 창작 스튜디오 키보드 단축키 도움말 — "?" 키 또는 단축키 버튼으로 토글.
 // StudioPage 내부 상태에 의존하지 않는 자체완결 모달(open/onClose만 받음).
 import { X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
+import { createPortal } from "react-dom";
 
 interface ShortcutRow {
   keys: string;
@@ -15,6 +16,16 @@ interface ShortcutGroup {
 
 // 표시는 macOS ⌘ 기준 + Windows/Linux는 Ctrl로 읽으면 됨.
 const GROUPS: ShortcutGroup[] = [
+  {
+    title: "드로잉",
+    rows: [
+      { keys: "B", label: "펜으로 전환" },
+      { keys: "E", label: "펜·지우개 전환" },
+      { keys: "[ · ]", label: "브러시 크기 ±1px" },
+      { keys: "⇧ [ · ⇧ ]", label: "브러시 크기 ±5px" },
+      { keys: "⌥ [ · ⌥ ]", label: "불투명도 ±5%" },
+    ],
+  },
   {
     title: "편집",
     rows: [
@@ -49,52 +60,108 @@ const GROUPS: ShortcutGroup[] = [
 ];
 
 export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
-  // Escape 로 닫기 (키보드 접근성) — open 일 때만 동작.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const closeFromEffect = useEffectEvent(onClose);
+
+  // 진짜 modal 계약: 포커스 진입·순환·복원, 배경 inert, 스크롤 잠금을 한 생명주기로 관리한다.
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    if (!open || typeof document === "undefined") return;
+    openerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    const overlay = overlayRef.current;
+    const inertStates: Array<readonly [HTMLElement, boolean]> = [];
+    for (const child of document.body.children) {
+      if (!(child instanceof HTMLElement) || child === overlay) continue;
+      inertStates.push([child, child.inert]);
+      child.inert = true;
+    }
+    const focusFrame = requestAnimationFrame(() => closeButtonRef.current?.focus({ preventScroll: true }));
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" || event.key === "?") {
+        event.preventDefault();
+        closeFromEffect();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) ?? [])].filter((element) => !element.hidden && element.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus({ preventScroll: true });
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
+      for (const [element, wasInert] of inertStates) element.inert = wasInert;
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   if (!open) return null;
-  return (
-    // 클릭으로 닫히는 백드롭(presentational). 키보드 닫기는 Escape(위 useEffect)와 onKeyDown으로 제공한다.
-    // 전체화면 백드롭을 포커스 가능한 위젯으로 만들면 UX가 나빠지므로 no-static-element-interactions 만 한정 비활성화.
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+  const content = (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-6"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
+      ref={overlayRef}
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-canvas/75 p-4 backdrop-blur-sm sm:p-6"
     >
-      {/* dialog 패널의 onClick은 백드롭으로의 클릭 전파만 막는 가드라 호출 동작이 없다. */}
-      {/* 키보드 닫기는 Escape(useEffect)와 닫기 버튼으로 제공되므로 패널엔 키 리스너가 필요 없다. */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="단축키 도움말 닫기"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
       <div
-        className="w-full max-w-md rounded-2xl border border-line bg-panel p-4 shadow-xl"
+        ref={dialogRef}
+        className="relative z-10 max-h-[min(80vh,42rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-panel p-4 shadow-xl"
         role="dialog"
         aria-modal="true"
-        aria-label="키보드 단축키"
-        onClick={(e) => e.stopPropagation()}
+        aria-labelledby="studio-shortcuts-title"
+        data-studio-shortcut-boundary="true"
+        tabIndex={-1}
       >
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-bold text-fg">키보드 단축키</p>
+          <p id="studio-shortcuts-title" className="text-sm font-bold text-fg">키보드 단축키</p>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="grid size-7 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className="grid size-11 place-items-center rounded-xl border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:size-9"
           >
             <X size={14} />
           </button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {GROUPS.map((g) => (
-            <div key={g.title} className={g.title === "보기" ? "sm:col-span-2" : undefined}>
+            <div key={g.title}>
               <p className="mb-1.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{g.title}</p>
               <ul className="space-y-1">
                 {g.rows.map((r) => (
@@ -109,8 +176,11 @@ export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose:
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[0.6rem] leading-relaxed text-fg-3">Windows·Linux에서는 ⌘ 대신 Ctrl을 사용하세요. 입력창에 포커스가 있을 땐 단축키가 비활성화됩니다.</p>
+        <p className="mt-3 text-[0.62rem] leading-relaxed text-fg-3">
+          Windows·Linux에서는 ⌘ 대신 Ctrl, ⌥ 대신 Alt를 사용하세요. 입력창·대화상자·검토 또는 협업 잠금 중에는 드로잉 단축키가 비활성화됩니다.
+        </p>
       </div>
     </div>
   );
+  return typeof document === "undefined" ? content : createPortal(content, document.body);
 }
