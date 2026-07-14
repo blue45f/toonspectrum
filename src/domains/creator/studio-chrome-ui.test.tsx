@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  StudioAppMenubar,
   StudioDockButton,
+  StudioEdgeRailButton,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
   StudioToolBelt,
@@ -28,7 +30,7 @@ describe("studio chrome UI", () => {
     );
     expect(html).toContain('role="group"');
     expect(html).toContain('aria-label="그리기 도구"');
-    expect(html).toContain("rounded-xl");
+    expect(html).toContain("rounded-lg");
     expect(html).toContain("border-line");
   });
 
@@ -42,6 +44,27 @@ describe("studio chrome UI", () => {
     expect(html).toContain('data-studio-tool-belt="true"');
     expect(html).toContain("스튜디오 도구");
     expect(html).toContain("sticky");
+    expect(html).toContain("flex-nowrap");
+  });
+
+  it("renders a compact app menubar for canvas-max chrome", () => {
+    const html = renderToStaticMarkup(
+      <StudioAppMenubar>
+        <span>스튜디오</span>
+      </StudioAppMenubar>
+    );
+    expect(html).toContain('data-studio-app-menubar="true"');
+    expect(html).toContain("min-h-9");
+    expect(html).toContain("스튜디오");
+  });
+
+  it("renders edge rail buttons for collapsed docks", () => {
+    const html = renderToStaticMarkup(
+      <StudioEdgeRailButton side="left" label="페이지" icon={Folder} onClick={() => {}} />
+    );
+    expect(html).toContain('data-studio-edge-rail="left"');
+    expect(html).toContain("페이지");
+    expect(html).toContain("페이지 펼치기");
   });
 
   it("renders menu popover header and subtabs with icons", () => {

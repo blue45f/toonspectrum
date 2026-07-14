@@ -33,13 +33,13 @@ export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
 export const STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces";
 
 export const STUDIO_WORKSPACE_LEFT_PANEL_WIDTH = Object.freeze({
-  minimum: 132,
-  default: 176,
+  minimum: 128,
+  default: 160,
   maximum: 360,
 });
 export const STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH = Object.freeze({
-  minimum: 248,
-  default: 304,
+  minimum: 240,
+  default: 280,
   maximum: 720,
 });
 

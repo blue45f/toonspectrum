@@ -3,8 +3,11 @@
  *
  * Competitor mapping (names not cloned):
  * - CSP / Fresco: labeled tool groups + strong separators
- * - Procreate: icon-first primary tools, secondary menus
+ * - Procreate / Figma: icon-first primary tools, edge-dock shell, single-row belt
  * - Magma: sticky menu header + subtab chips
+ *
+ * Canvas-max policy: chrome is dense, flush, and sticky — never steals vertical
+ * space with marketing headers or multi-row wrap on desktop.
  *
  * Pure presentation only — no document state.
  */
@@ -25,10 +28,15 @@ import { cn } from "@/lib/utils";
 /* eslint-disable react-refresh/only-export-components -- chrome tokens shared with StudioPage toolbar shell */
 export const STUDIO_ICON_SIZE = {
   subtab: 13,
-  tool: 15,
-  dock: 19,
-  header: 16,
+  tool: 16,
+  toolCompact: 15,
+  dock: 18,
+  header: 15,
+  rail: 14,
 } as const;
+
+/** Default stroke for small chrome icons — slightly thicker reads cleaner at 14–16px. */
+export const STUDIO_ICON_STROKE = 1.75;
 
 /** Horizontal hairline between tool groups (CSP-style tool belt). */
 export function StudioToolbarDivider({
@@ -44,15 +52,15 @@ export function StudioToolbarDivider({
         role="separator"
         aria-label={label}
         className={cn(
-          "mx-0.5 hidden h-8 shrink-0 items-center gap-1.5 self-center lg:inline-flex",
+          "mx-0.5 hidden h-7 shrink-0 items-center gap-1 self-center lg:inline-flex",
           className
         )}
       >
-        <span aria-hidden className="h-6 w-px bg-line-strong/70" />
-        <span className="select-none text-[0.6rem] font-bold uppercase tracking-[0.1em] text-fg-3">
+        <span aria-hidden className="h-5 w-px bg-line-strong/70" />
+        <span className="select-none text-[0.55rem] font-bold uppercase tracking-[0.12em] text-fg-3">
           {label}
         </span>
-        <span aria-hidden className="h-6 w-px bg-line-strong/70" />
+        <span aria-hidden className="h-5 w-px bg-line-strong/70" />
       </span>
     );
   }
@@ -60,7 +68,7 @@ export function StudioToolbarDivider({
     <span
       role="separator"
       aria-hidden
-      className={cn("mx-0.5 h-6 w-px shrink-0 self-center bg-line-strong/60", className)}
+      className={cn("mx-0.5 h-5 w-px shrink-0 self-center bg-line-strong/55", className)}
     />
   );
 }
@@ -83,15 +91,20 @@ export function StudioToolbarCluster({
       role="group"
       aria-label={label}
       className={cn(
-        "flex max-w-full shrink-0 flex-col items-stretch gap-0.5",
+        "flex max-w-full shrink-0 flex-col items-stretch gap-px",
         className
       )}
     >
-      <div className="flex max-w-full items-center gap-1 rounded-xl border border-line/60 bg-card/40 p-0.5 shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.04)]">
+      <div
+        className={cn(
+          "flex max-w-full items-center gap-0.5 rounded-lg border border-line/55 bg-card/35 p-px",
+          "shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.035)]"
+        )}
+      >
         {children}
       </div>
       {showCaption ? (
-        <span className="hidden select-none px-1 text-center text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-fg-3 lg:block">
+        <span className="hidden select-none px-0.5 text-center text-[0.52rem] font-semibold uppercase tracking-[0.1em] text-fg-3 lg:block">
           {label}
         </span>
       ) : null}
@@ -115,10 +128,38 @@ export function StudioToolBelt({
       aria-label={ariaLabel}
       data-studio-tool-belt="true"
       className={cn(
-        "sticky top-0 z-30 flex max-w-full flex-nowrap items-center gap-1.5 overflow-x-auto",
-        "rounded-none border-b border-line bg-panel/95 px-2 py-1.5 shadow-[0_1px_0_oklch(0.2_0.01_70/0.06)]",
+        // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
+        "sticky top-0 z-30 flex max-w-full shrink-0 flex-nowrap items-center gap-1 overflow-x-auto",
+        "border-b border-line bg-panel/97 px-1.5 py-1",
+        "shadow-[0_1px_0_oklch(0.2_0.01_70/0.06)] backdrop-blur-sm",
         "[-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        "lg:flex-wrap lg:overflow-visible lg:rounded-none lg:px-3 lg:py-2",
+        "lg:gap-1.5 lg:px-2 lg:py-1",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Compact app menubar above the tool belt — title + file actions, one thin strip. */
+export function StudioAppMenubar({
+  children,
+  className,
+  "aria-label": ariaLabel = "스튜디오 메뉴",
+}: {
+  children: ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}): ReactElement {
+  return (
+    <div
+      role="banner"
+      aria-label={ariaLabel}
+      data-studio-app-menubar="true"
+      className={cn(
+        "flex min-h-9 shrink-0 flex-nowrap items-center gap-1.5 border-b border-line/80 bg-panel px-2 py-1",
+        "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >
@@ -155,15 +196,22 @@ export function StudioToolButton({
       type={type}
       disabled={disabled}
       aria-label={showLabel ? undefined : label}
+      title={showLabel ? undefined : label}
       className={cn(
         studioToolButtonClass(active, { dense: true }),
+        !showLabel && "justify-center px-2",
         accented && !active && "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40",
         disabled && "cursor-not-allowed opacity-40",
         className
       )}
       {...rest}
     >
-      <Icon size={STUDIO_ICON_SIZE.tool} aria-hidden className="shrink-0" />
+      <Icon
+        size={showLabel ? STUDIO_ICON_SIZE.toolCompact : STUDIO_ICON_SIZE.tool}
+        strokeWidth={STUDIO_ICON_STROKE}
+        aria-hidden
+        className="shrink-0"
+      />
       {showLabel ? <span className="truncate">{label}</span> : null}
       {chevron ? (
         <span
@@ -193,19 +241,19 @@ export function StudioMenuPopoverHeader({
   return (
     <div
       className={cn(
-        "mb-2 flex min-w-0 items-start gap-2.5 rounded-xl border border-line/80 bg-canvas/50 px-2.5 py-2",
+        "mb-1.5 flex min-w-0 items-start gap-2 rounded-lg border border-line/80 bg-canvas/45 px-2 py-1.5",
         className
       )}
     >
       {Icon ? (
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15">
-          <Icon size={STUDIO_ICON_SIZE.header} aria-hidden />
+        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent ring-1 ring-accent/15">
+          <Icon size={STUDIO_ICON_SIZE.header} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
         </span>
       ) : null}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-bold tracking-tight text-fg">{title}</p>
+        <p className="truncate text-[0.72rem] font-bold tracking-tight text-fg">{title}</p>
         {description ? (
-          <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3 text-pretty">{description}</p>
+          <p className="mt-0.5 text-[0.6rem] leading-snug text-fg-3 text-pretty">{description}</p>
         ) : null}
       </div>
     </div>
@@ -239,7 +287,7 @@ export function StudioMenuSubtabs({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "sticky top-0 z-10 -mx-0.5 mb-2 flex flex-wrap gap-1 border-b border-line/70 bg-panel pb-2",
+        "sticky top-0 z-10 -mx-0.5 mb-1.5 flex flex-wrap gap-0.5 border-b border-line/70 bg-panel pb-1.5",
         className
       )}
     >
@@ -257,15 +305,60 @@ export function StudioMenuSubtabs({
             onClick={() => onSelect(item.id)}
             className={cn(
               studioSegmentChipClass(active),
+              "text-[0.68rem]",
               item.disabled && "cursor-not-allowed opacity-40"
             )}
           >
-            <Icon size={STUDIO_ICON_SIZE.subtab} aria-hidden className="shrink-0" />
+            <Icon size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="shrink-0" />
             {item.label}
           </button>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Collapsed edge rail (Figma/CSP style) — thin vertical strip that re-opens a dock.
+ * Prefer over wide rounded cards when panels are collapsed so canvas stays wide.
+ */
+export function StudioEdgeRailButton({
+  label,
+  side,
+  onClick,
+  icon: Icon,
+  className,
+  title,
+}: {
+  label: string;
+  side: "left" | "right";
+  onClick: () => void;
+  icon?: LucideIcon;
+  className?: string;
+  title?: string;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title ?? `${label} 펼치기`}
+      aria-label={`${label} 펼치기`}
+      data-studio-edge-rail={side}
+      className={cn(
+        "group hidden w-8 shrink-0 flex-col items-center gap-2 border-line bg-panel/90 py-3 text-fg-3",
+        "transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
+        side === "left" && "border-r",
+        side === "right" && "border-l",
+        "lg:flex",
+        className
+      )}
+    >
+      {Icon ? (
+        <Icon size={STUDIO_ICON_SIZE.rail} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="opacity-80 group-hover:opacity-100" />
+      ) : null}
+      <span className="text-[0.62rem] font-bold tracking-wide [writing-mode:vertical-rl]">{label}</span>
+    </button>
   );
 }
 
@@ -314,7 +407,10 @@ export const StudioDockButton = forwardRef<
       )}
       {...rest}
     >
-      {swatch ?? (Icon ? <Icon size={STUDIO_ICON_SIZE.dock} aria-hidden /> : null)}
+      {swatch ??
+        (Icon ? (
+          <Icon size={STUDIO_ICON_SIZE.dock} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+        ) : null)}
       <span>{label}</span>
     </button>
   );
@@ -349,7 +445,7 @@ export function StudioDockNavButton({
       )}
       {...rest}
     >
-      <Icon size={17} aria-hidden />
+      <Icon size={17} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
       <span>{label}</span>
     </button>
   );
@@ -385,7 +481,7 @@ export function StudioContextActionButton({
       )}
       {...rest}
     >
-      <Icon size={16} aria-hidden />
+      <Icon size={16} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
       {label}
     </button>
   );

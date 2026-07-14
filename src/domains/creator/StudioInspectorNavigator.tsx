@@ -180,22 +180,22 @@ export function StudioInspectorNavigator({
   return (
     <section
       aria-labelledby={titleId}
-      className="sticky top-0 z-30 -mx-1 rounded-xl border border-line bg-panel/95 p-2 shadow-[0_8px_28px_oklch(0.12_0.01_70/0.35)] backdrop-blur supports-[backdrop-filter]:bg-panel/88"
+      className="sticky top-0 z-30 -mx-0.5 rounded-lg border border-line bg-panel/95 p-1.5 shadow-[0_6px_20px_oklch(0.12_0.01_70/0.28)] backdrop-blur supports-[backdrop-filter]:bg-panel/90"
       data-testid="studio-inspector-navigator"
     >
-      <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-1">
+      <div className="mb-1.5 flex min-w-0 items-center justify-between gap-1.5 px-0.5">
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <h2 id={titleId} className="truncate text-xs font-bold tracking-tight text-fg">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h2 id={titleId} className="truncate text-[0.7rem] font-bold tracking-tight text-fg">
               작업 패널
             </h2>
             <StudioContextPill tone={summaryTone}>{summary}</StudioContextPill>
           </div>
-          <p className="mt-1 truncate text-[0.62rem] text-fg-3">
+          <p className="mt-0.5 truncate text-[0.58rem] text-fg-3 lg:sr-only">
             속성 · 레이어 · 페이지 · 게시를 한곳에서 전환합니다
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             ref={searchToggleRef}
             type="button"
@@ -205,12 +205,12 @@ export function StudioInspectorNavigator({
             aria-label={searchOpen ? "패널 찾기 닫기" : "패널과 기능 찾기"}
             title="패널과 기능 찾기"
             className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-10 pointer-coarse:size-11",
+              "grid size-9 shrink-0 place-items-center rounded-md border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-8 pointer-coarse:size-11",
               searchOpen && "border-accent bg-accent-soft text-accent",
               tabFocusClass
             )}
           >
-            {searchOpen ? <X size={16} aria-hidden /> : <Search size={16} aria-hidden />}
+            {searchOpen ? <X size={15} strokeWidth={1.75} aria-hidden /> : <Search size={15} strokeWidth={1.75} aria-hidden />}
           </button>
           {onRequestClose ? (
             <button
@@ -219,11 +219,11 @@ export function StudioInspectorNavigator({
               aria-label="속성 시트 닫기"
               data-autofocus
               className={cn(
-                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:hidden",
+                "grid size-9 shrink-0 place-items-center rounded-md text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:hidden",
                 tabFocusClass
               )}
             >
-              <X size={17} aria-hidden />
+              <X size={16} strokeWidth={1.75} aria-hidden />
             </button>
           ) : null}
         </div>
@@ -232,7 +232,7 @@ export function StudioInspectorNavigator({
       <div
         role="tablist"
         aria-label="스튜디오 작업 패널"
-        className="grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-canvas/55 p-1"
+        className="grid grid-cols-4 gap-0.5 rounded-lg border border-line/70 bg-canvas/55 p-0.5"
       >
         {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
@@ -247,14 +247,14 @@ export function StudioInspectorNavigator({
               onClick={() => navigate({ primary: tab.id })}
               onKeyDown={moveTabFocus}
               className={cn(
-                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[0.62rem] font-semibold transition-colors duration-150 lg:min-h-10 pointer-coarse:min-h-11",
+                "relative flex min-h-10 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6rem] font-semibold transition-colors duration-150 lg:min-h-9 pointer-coarse:min-h-11",
                 active
                   ? "bg-raised text-fg shadow-sm ring-1 ring-accent/25"
                   : "text-fg-3 hover:bg-card hover:text-fg-2",
                 tabFocusClass
               )}
             >
-              <Icon size={15} className={active ? "text-accent" : undefined} aria-hidden />
+              <Icon size={15} strokeWidth={1.75} className={active ? "text-accent" : undefined} aria-hidden />
               <span className="truncate">{tab.label}</span>
               {active ? (
                 <span

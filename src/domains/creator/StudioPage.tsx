@@ -320,6 +320,8 @@ import {
   StudioDockNavButton,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
+  StudioAppMenubar,
+  StudioEdgeRailButton,
   StudioToolBelt,
   StudioToolbarCluster,
   StudioToolbarDivider,
@@ -15057,7 +15059,8 @@ function StudioCuttoonEditor() {
   // 멤버 기준으로 통일해 서브탭 전환 시 팝오버 크기가 튀지 않게 한다.
   const groupPopoverClass = (width: "w-72" | "w-80") =>
     cn(
-      "fixed inset-x-2 top-[4.5rem] z-[60] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-none lg:max-w-[calc(100vw-1.5rem)] lg:overflow-visible lg:shadow-lg",
+      // Anchored under the denser tool belt (menubar ~36px + belt ~40px).
+      "fixed inset-x-2 top-[5.5rem] z-[60] max-h-[calc(100dvh-8rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:mt-1 lg:max-h-[min(70dvh,32rem)] lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
@@ -16439,38 +16442,32 @@ function StudioCuttoonEditor() {
     ) : null}
     <Container
       size="wide"
-      style={mobileImmersive ? { padding: "0.25rem" } : undefined}
       className={cn(
-        "py-3 lg:py-6",
-        !(isFullscreen || maximized || mobileImmersive || canvasOnlyMode) &&
-          "xl:max-w-[1700px] 2xl:max-w-[2200px]",
-        (isFullscreen || maximized || mobileImmersive || canvasOnlyMode) && "max-w-none",
-        maximized && !mobileImmersive && "px-3 py-3",
-        canvasOnlyMode && "flex h-full min-h-0 flex-col px-1 py-1",
-        mobileImmersive && "flex h-full min-h-0 flex-col px-1 py-1"
+        // Canvas-max draw-app shell: full-bleed, no marketing padding or max-width cap.
+        "flex min-h-0 flex-1 flex-col max-w-none px-0 py-0",
+        (isFullscreen || maximized) && "min-h-0"
       )}
     >
-      <div
+      <StudioAppMenubar
         className={cn(
-          "mb-2.5 flex flex-wrap items-end justify-between gap-3 lg:mb-4",
           canvasOnlyMode && "hidden",
-          mobileImmersive && "mb-1.5 block shrink-0"
+          mobileImmersive && "min-h-8 gap-1 px-1.5 py-0.5"
         )}
       >
         <div
           className={cn(
-            "flex min-w-0 flex-1 flex-wrap items-end gap-2.5",
+            "flex min-w-0 shrink-0 items-center gap-1.5",
             mobileImmersive && "hidden"
           )}
         >
-          <div className="min-w-0">
-            {/* 모바일: 제목 축소 + 설명문 숨김(캔버스 세로 공간 확보). 데스크톱은 기존 그대로. */}
-            <h1 className="text-lg font-bold tracking-tight lg:text-2xl">창작 스튜디오</h1>
-            <p className="mt-1 hidden text-sm text-fg-3 lg:block">
-              이미지·말풍선·스티커·펜으로 컷툰을 만들고 창작 게시판에 올려보세요.
-              {displayLinkedTitleId && <span className="ml-1 text-accent">· 웹툰 팬 창작으로 연결됨</span>}
-            </p>
-          </div>
+          <h1 className="shrink-0 text-[0.8125rem] font-bold tracking-tight text-fg lg:text-sm">
+            스튜디오
+          </h1>
+          {displayLinkedTitleId ? (
+            <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
+              팬 창작
+            </span>
+          ) : null}
           {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
             <StudioWorkspaceMenu
               key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
@@ -16481,25 +16478,26 @@ function StudioCuttoonEditor() {
               onApplyLayout={applyStudioWorkspaceLayout}
             />
           ) : (
-            <span role="status" className="inline-flex min-h-11 items-center text-xs text-fg-3">
-              계정 작업공간 전환 중…
+            <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
+              작업공간 전환 중…
             </span>
           )}
           {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
             <span
               role="status"
               title={workspaceSyncNotice}
-              className="max-w-56 truncate text-[0.6875rem] font-medium text-cool"
+              className="max-w-40 truncate text-[0.62rem] font-medium text-cool"
             >
               {workspaceSyncNotice}
             </span>
           ) : null}
         </div>
-        {/* 모바일: 액션 버튼을 한 줄 가로 스크롤로 압축(모든 기능 유지하되 세로를 잡아먹지 않게). 데스크톱은 wrap. */}
+        <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line sm:block" />
+        {/* 파일·내보내기 액션 — 한 줄 가로 스크롤, 세로 공간 0. */}
         <div
           className={cn(
-            "flex max-w-full flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:flex-wrap lg:overflow-visible",
-            mobileImmersive && "w-full gap-1"
+            "flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            mobileImmersive && "w-full gap-0.5"
           )}
         >
           {isMobile ? (
@@ -16970,26 +16968,27 @@ function StudioCuttoonEditor() {
             </button>
           ) : null}
         </div>
-      </div>
+      </StudioAppMenubar>
 
       <div
         data-studio-global-status-rail
         className={cn(
+          "shrink-0 px-2",
           mobileImmersive
-            ? "max-h-[min(24dvh,10rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-            : "contents"
+            ? "max-h-[min(24dvh,10rem)] overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+            : "empty:hidden"
         )}
       >
         {densityShowsStatusRail && error ? (
-          <div role="status" className="mb-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{error}</div>
+          <div role="status" className="my-1 rounded-lg border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-xs text-bad">{error}</div>
         ) : null}
         {densityShowsStatusRail && layerMergeBusy ? (
-          <div role="status" className="mb-3 rounded-xl border border-accent/35 bg-accent-soft/30 px-3 py-2 text-sm text-fg-2">
+          <div role="status" className="my-1 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">
             레이어를 병합하는 중…
           </div>
         ) : null}
         {densityShowsStatusRail && macroSession.recording ? (
-          <div role="status" className="mb-3 rounded-xl border border-bad/30 bg-bad/10 px-3 py-2 text-sm font-semibold text-bad">
+          <div role="status" className="my-1 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-1.5 text-xs font-semibold text-bad">
             매크로 녹음 중 · {macroSession.commands.length}단계
           </div>
         ) : null}
@@ -16999,7 +16998,7 @@ function StudioCuttoonEditor() {
             aria-live="polite"
             aria-busy={!workHydrated}
             className={cn(
-              "mb-3 flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm",
+              "my-1 flex min-h-9 items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs",
               collaborationDocumentLocked
                 ? "border-warn/40 bg-warn/10 text-fg"
                 : "border-good/35 bg-good/10 text-fg"
@@ -17043,23 +17042,23 @@ function StudioCuttoonEditor() {
           </div>
         ) : null}
         {!loggedIn && !mobileImmersive && !canvasOnlyMode && (
-          <div className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
+          <div className="my-1 rounded-lg border border-line bg-card/60 px-2.5 py-1.5 text-xs text-fg-2">
             만든 작품을 게시하려면 로그인이 필요해요. (편집은 로그인 없이도 가능)
           </div>
         )}
         <StudioPublishContextBanner context={publishContext} />
       </div>
 
-      {/* Draw-app tool belt — full-width sticky chrome (no site GNB). Mobile: horizontal scroll. */}
+      {/* Draw-app tool belt — full-width sticky chrome (no site GNB). Single-row scroll. */}
       <StudioToolBelt
         className={cn(
           canvasOnlyMode && "hidden",
-          mobileImmersive && "shrink-0 py-1"
+          mobileImmersive && "shrink-0"
         )}
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
-        <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-9 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
-        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-line/70 bg-card/80 p-0.5" role="group" aria-label="화면 밀도">
+        <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
+        <div className="flex shrink-0 items-center gap-px rounded-md border border-line/70 bg-card/70 p-px" role="group" aria-label="화면 밀도">
           {(["simple", "full", "focus"] as const).map((mode) => (
             <button
               key={mode}
@@ -17069,7 +17068,7 @@ function StudioCuttoonEditor() {
               aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
               onClick={() => setStudioUiDensity(mode)}
               className={cn(
-                "min-h-9 rounded-lg px-2.5 text-[0.68rem] font-semibold transition-colors pointer-coarse:min-h-11",
+                "min-h-8 rounded px-2 text-[0.65rem] font-semibold transition-colors pointer-coarse:min-h-11",
                 uiDensityMode === mode
                   ? "bg-accent text-on-accent shadow-sm"
                   : "text-fg-3 hover:bg-raised hover:text-fg-2"
@@ -18627,18 +18626,19 @@ function StudioCuttoonEditor() {
           <GanttChartSquare size={14} />
         </button>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
-        {/* 줌·화면 맞춤·전체화면 — 모바일은 하단 도구막대가 대체하므로 숨김 */}
-        <div className="hidden items-center gap-1 lg:flex">
+        {/* 줌·화면 맞춤·캔버스 최대화 — 모바일은 하단 도구막대가 대체 */}
+        <StudioToolbarCluster label="화면·캔버스" className="ml-auto hidden lg:flex">
           <button
             type="button"
             onClick={() => setZoom((z) => clampZoom(z - 0.1))}
             disabled={zoom <= ZOOM_MIN}
             className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
             title="축소"
+            aria-label="축소"
           >
-            <Minus size={12} />
+            <Minus size={13} strokeWidth={1.75} />
           </button>
-          <span className="text-[10px] font-bold text-fg-3 w-10 text-center tabular-nums">
+          <span className="w-9 text-center text-[0.62rem] font-bold tabular-nums text-fg-3">
             {Math.round(zoom * 100)}%
           </span>
           <button
@@ -18647,8 +18647,9 @@ function StudioCuttoonEditor() {
             disabled={zoom >= ZOOM_MAX}
             className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
             title="확대"
+            aria-label="확대"
           >
-            <Plus size={12} />
+            <Plus size={13} strokeWidth={1.75} />
           </button>
           <button
             type="button"
@@ -18656,7 +18657,7 @@ function StudioCuttoonEditor() {
               setScale(1);
               setZoom(1);
             }}
-            className={cn(toolBtn(false), "h-8 text-[10px] font-semibold px-2")}
+            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             title="화면 100% 맞춤"
           >
             100%
@@ -18671,11 +18672,12 @@ function StudioCuttoonEditor() {
                 setZoom(1);
               }
             }}
-            className={cn(toolBtn(false), "h-8 text-[10px] font-semibold px-2")}
+            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             title="너비에 맞춤"
           >
             맞춤
           </button>
+          <StudioToolbarDivider />
           <button
             type="button"
             onClick={() => {
@@ -18687,7 +18689,7 @@ function StudioCuttoonEditor() {
             aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
             className={cn(
               toolBtn(!visibleLeftPanelOpen && !visibleRightPanelOpen),
-              "hidden h-8 gap-1 px-2 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 lg:inline-flex"
+              "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
             )}
             title={
               presentationPanelsHidden
@@ -18695,47 +18697,37 @@ function StudioCuttoonEditor() {
                 : "집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
             }
           >
-            <Maximize2 size={12} /> 넓게
+            <Maximize2 size={13} strokeWidth={1.75} /> 넓게
           </button>
           <button
             type="button"
             onClick={toggleMaximize}
             aria-pressed={maximized}
-            className={cn(
-              toolBtn(maximized),
-              "hidden h-8 px-2 text-[10px] font-semibold lg:inline-flex"
-            )}
+            className={cn(toolBtn(maximized), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             title="브라우저 맞춤 — 브라우저 창을 꽉 채워 작업 (ESC로 복원)"
           >
-            {maximized ? "복원" : "브라우저 맞춤"}
+            {maximized ? "복원" : "맞춤창"}
           </button>
           <button
             type="button"
             onClick={toggleFullscreen}
             aria-pressed={isFullscreen}
-            className={cn(
-              toolBtn(isFullscreen),
-              "hidden h-8 px-2 text-[10px] font-semibold lg:inline-flex"
-            )}
+            className={cn(toolBtn(isFullscreen), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             title="전체화면 — 창작 스튜디오를 모니터 전체로 (ESC로 종료)"
           >
-            {isFullscreen ? "창 모드" : "전체화면"}
+            {isFullscreen ? "창" : "전체"}
           </button>
           <button
             type="button"
             onClick={enterCanvasOnlyMode}
             aria-pressed={canvasOnlyMode}
-            className={cn(
-              toolBtn(canvasOnlyMode),
-              "hidden h-8 gap-1 px-2 text-[10px] font-semibold lg:inline-flex"
-            )}
+            className={cn(toolBtn(canvasOnlyMode), "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold")}
             title="캔버스만 보기 — 제목·툴바·양쪽 패널을 잠시 숨기고 Esc로 복원"
           >
-            <Minimize2 size={12} /> 캔버스만
+            <Minimize2 size={13} strokeWidth={1.75} /> 캔버스
           </button>
-          <span className="mx-0.5 h-5 w-px bg-line" />
           <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
-        </div>
+        </StudioToolbarCluster>
       </StudioToolBelt>
 
       {pageEditLocked && !masterEditMode ? (
@@ -18762,9 +18754,10 @@ function StudioCuttoonEditor() {
 
       <div
         className={cn(
-          "flex flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:flex-row lg:pb-0",
-          canvasOnlyMode && "min-h-0 flex-1 gap-0 overflow-hidden",
-          mobileImmersive && "min-h-0 flex-1 gap-0 overflow-hidden"
+          // Edge-dock workspace: flush panels + canvas (no inter-column gaps).
+          "flex min-h-0 flex-1 flex-col gap-0 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:flex-row lg:overflow-hidden lg:pb-0",
+          canvasOnlyMode && "overflow-hidden",
+          mobileImmersive && "overflow-hidden"
         )}
       >
         {/* 모바일 바텀시트 백드롭 — 탭하면 닫힘 */}
@@ -18776,17 +18769,15 @@ function StudioCuttoonEditor() {
             className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm lg:hidden"
           />
         )}
-        {/* 왼쪽: 페이지 목록 사이드바 (접으면 얇은 레일로) */}
+        {/* 왼쪽: 페이지 목록 — 접히면 아이콘 엣지 레일 */}
         {!visibleLeftPanelOpen && !presentationPanelsHidden && (
-          <button
-            type="button"
+          <StudioEdgeRailButton
+            side="left"
+            label="페이지"
+            icon={LayoutTemplate}
             onClick={() => setLeftPanelOpen(true)}
-            className="hidden w-7 flex-shrink-0 flex-col items-center gap-2 rounded-2xl border border-line bg-panel/20 py-3 text-fg-3 transition-colors hover:bg-raised lg:flex"
             title="페이지 목록 펼치기"
-          >
-            <ChevronRight size={14} />
-            <span className="text-[0.68rem] font-semibold [writing-mode:vertical-rl]">페이지</span>
-          </button>
+          />
         )}
         <div
           ref={pagesSheetRef}
@@ -18796,24 +18787,24 @@ function StudioCuttoonEditor() {
           aria-label={isMobile ? "페이지 목록" : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
           className={cn(
-            "flex flex-col gap-2 border border-line p-3",
+            "flex flex-col gap-1.5 border border-line p-2",
             // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
-            // 데스크톱: 인라인 컬럼(드래그로 너비 조절)
-            "lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:bg-panel/20 lg:pb-3 lg:shadow-none lg:transition-none lg:translate-y-0",
+            // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
+            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
             !visibleLeftPanelOpen && "lg:hidden"
           )}
           style={
             isMobile
               ? { bottom: mobileKeyboardInset }
-              : { width: leftResize.width, minWidth: 132 }
+              : { width: leftResize.width, minWidth: 128 }
           }
         >
           {/* 모바일 시트 손잡이 */}
           <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
-          <div className="flex items-center justify-between border-b border-line/50 pb-2">
-            <span className="flex items-center gap-1 text-xs font-bold text-fg-2">
+          <div className="flex flex-wrap items-center justify-between gap-1 border-b border-line/50 pb-1.5">
+            <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
               <button
                 type="button"
                 onClick={() => setLeftPanelOpen(false)}
@@ -18822,7 +18813,7 @@ function StudioCuttoonEditor() {
               >
                 <ChevronLeft size={13} />
               </button>
-              페이지 목록
+              페이지
               <button
                 type="button"
                 onClick={() => setMobileSheet(null)}
@@ -18875,7 +18866,7 @@ function StudioCuttoonEditor() {
               마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
             </button>
           </div>
-          <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[56vh] lg:max-h-[calc(100dvh-24rem)] pr-1">
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto max-h-[56vh] pr-0.5 lg:max-h-none">
             {pages.map((p, idx) => {
               const isActive = p.id === currentPageId;
               const dropIndicator = pageDnd.indicatorFor(idx);
@@ -18886,7 +18877,7 @@ function StudioCuttoonEditor() {
                   {...pageDnd.itemProps(idx)}
                   title="드래그하여 순서 변경"
                   className={cn(
-                    "relative flex w-full flex-col gap-1 rounded-xl border p-2 transition-all hover:bg-raised/50",
+                    "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50",
                     isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
                     pageDnd.dragIndex === idx && "opacity-50"
                   )}
@@ -19130,12 +19121,13 @@ function StudioCuttoonEditor() {
           <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
         )}
 
-        {/* 중앙: 캔버스 영역 (editor shell) */}
+        {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <div
           className={cn(
-            "relative min-w-0 flex-1 lg:min-w-[22rem]",
-            canvasOnlyMode && "flex min-h-0 flex-col overflow-hidden",
-            mobileImmersive && "flex min-h-0 flex-col overflow-hidden"
+            "relative min-h-0 min-w-0 flex-1 lg:min-w-[16rem]",
+            "flex flex-col overflow-hidden",
+            canvasOnlyMode && "overflow-hidden",
+            mobileImmersive && "overflow-hidden"
           )}
           data-studio-logical-w={CANVAS_W}
         >
@@ -21522,17 +21514,15 @@ function StudioCuttoonEditor() {
           <PanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="속성 패널 너비 조절" />
         )}
 
-        {/* 사이드: 속성 + 게시 정보 (접으면 얇은 레일로) */}
+        {/* 사이드: 속성 + 게시 — 접히면 아이콘 엣지 레일 */}
         {!visibleRightPanelOpen && !presentationPanelsHidden && (
-          <button
-            type="button"
+          <StudioEdgeRailButton
+            side="right"
+            label="속성"
+            icon={SlidersHorizontal}
             onClick={() => setRightPanelOpen(true)}
-            className="hidden w-7 flex-shrink-0 flex-col items-center gap-2 rounded-2xl border border-line bg-panel/40 py-3 text-fg-3 transition-colors hover:bg-raised lg:flex"
             title="속성 패널 펼치기"
-          >
-            <ChevronLeft size={14} />
-            <span className="text-[0.68rem] font-semibold [writing-mode:vertical-rl]">속성</span>
-          </button>
+          />
         )}
         <aside
           ref={propsSheetRef}
@@ -21542,12 +21532,11 @@ function StudioCuttoonEditor() {
           aria-label={isMobile ? "속성" : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
-            "flex min-h-0 flex-col gap-3 overscroll-contain [scrollbar-gutter:stable]",
+            "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
-            // 데스크톱: 뷰포트 안에서 독립 스크롤하는 고정 높이 도크. 사이드바가 문서 전체 높이를
-            // 밀어내지 않아 긴 웹툰 캔버스와 패널 스크롤이 서로 독립적이다.
-            "lg:sticky lg:top-2 lg:z-auto lg:max-h-[calc(100dvh-21rem)] lg:min-h-[20rem] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:transition-none lg:translate-y-0",
+            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            // 데스크톱: 뷰포트 높이 엣지 도크 — 메뉴바+툴벨트 높이만 빼고 캔버스와 나란히 채움.
+            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             !visibleRightPanelOpen && "lg:hidden",
             inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden"
@@ -21555,21 +21544,22 @@ function StudioCuttoonEditor() {
           style={
             isMobile
               ? { bottom: mobileKeyboardInset }
-              : { width: rightResize.width, minWidth: 248 }
+              : { width: rightResize.width, minWidth: 240 }
           }
         >
           {/* 모바일 시트 손잡이. 닫기는 스크롤해도 남는 작업 패널 헤더에 둔다. */}
           <div className="flex items-center justify-center lg:hidden">
             <div className="mx-auto h-1 w-10 rounded-full bg-line" />
           </div>
-          <div className="hidden justify-end lg:flex">
+          <div className="hidden items-center justify-between gap-1 lg:flex">
+            <span className="text-[0.65rem] font-bold uppercase tracking-[0.08em] text-fg-3">인스펙터</span>
             <button
               type="button"
               onClick={() => setRightPanelOpen(false)}
-              className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
+              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg"
               title="속성 패널 접기"
             >
-              접기 <ChevronRight size={13} />
+              접기 <ChevronRight size={12} />
             </button>
           </div>
           <StudioInspectorNavigator
