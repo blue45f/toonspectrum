@@ -20218,7 +20218,7 @@ function StudioCuttoonEditor() {
                   type="button"
                   className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
                   aria-label="축소"
-                  onClick={() => setZoom((z) => Math.max(0.25, Math.round((z - 0.1) * 10) / 10))}
+                  onClick={() => setZoom((z) => clampZoom(z - 0.1))}
                 >
                   −
                 </button>
@@ -20229,7 +20229,7 @@ function StudioCuttoonEditor() {
                   type="button"
                   className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
                   aria-label="확대"
-                  onClick={() => setZoom((z) => Math.min(4, Math.round((z + 0.1) * 10) / 10))}
+                  onClick={() => setZoom((z) => clampZoom(z + 0.1))}
                 >
                   +
                 </button>
