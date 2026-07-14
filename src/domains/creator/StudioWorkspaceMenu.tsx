@@ -61,7 +61,6 @@ import {
   type StudioWorkspaceState,
 } from "./studio-workspaces";
 
-import { useIsMobile } from "@/components/use-media-query";
 import { cn } from "@/lib/utils";
 
 export interface StudioWorkspaceMenuProps {
@@ -237,7 +236,6 @@ export function StudioWorkspaceMenu({
   onStateChange,
   onApplyLayout,
 }: StudioWorkspaceMenuProps) {
-  const isMobile = useIsMobile();
   const dialogId = useId();
   const titleId = useId();
   const descriptionId = useId();
