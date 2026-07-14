@@ -233,6 +233,8 @@ import {
   buildCalligraphySegments,
   gpenSegmentWidths,
   normalizeCalligraphyStylusInput,
+  pressureCurvePresetId,
+  pressureCurveValueForPreset,
   processFreehandPoints,
   processPencilPoints,
   resampleStrokePressures,
@@ -819,6 +821,7 @@ import {
   SCENARIO_BEAT_TYPES,
   type ScenarioBeatType,
 } from "./studio-story-beats";
+import { buildShiftConstrainedFreehandPoints } from "./studio-stroke-constrain";
 import {
   DEFAULT_SHAPE_PARAMS,
   effectiveCornerRadius,
@@ -5563,6 +5566,10 @@ function StudioCuttoonEditor() {
     }
   }, []);
   const [color, setColor] = useState("#7c5cfc");
+  /** Photoshop/CSP foreground-background pair — X swaps. */
+  const [secondaryColor, setSecondaryColor] = useState("#ffffff");
+  /** View-only horizontal flip for checking drawing balance (Magma/CSP). */
+  const [canvasFlipH, setCanvasFlipH] = useState(false);
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const recentColorsLoadRef = useRef<Promise<void> | null>(null);
@@ -10845,6 +10852,31 @@ function StudioCuttoonEditor() {
           return next;
         });
         announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+      } else if (
+        !mod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.repeat &&
+        (e.key === "x" || e.key === "X") &&
+        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
+      ) {
+        // Photoshop/CSP: swap foreground / background colors.
+        e.preventDefault();
+        setColor(secondaryColor);
+        setSecondaryColor(color);
+        announceDrawingShortcut("색 교체");
+      } else if (
+        !mod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.repeat &&
+        (e.key === "h" || e.key === "H") &&
+        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
+      ) {
+        // Magma: flip canvas horizontally (view only).
+        e.preventDefault();
+        setCanvasFlipH((v) => !v);
+        announceDrawingShortcut("캔버스 반전");
       } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
         e.preventDefault();
         toggleAdvancedFill();
@@ -14193,6 +14225,30 @@ function StudioCuttoonEditor() {
 
     let targetX = pos.x;
     let targetY = pos.y;
+    // Commercial freehand + Shift: force a clean straight line from stroke origin (0/45/90°).
+    // Applied before perspective/isometric so the artist's explicit Shift intent wins.
+    if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
+      const startX = current.points[0] ?? pos.x;
+      const startY = current.points[1] ?? pos.y;
+      const constrained = buildShiftConstrainedFreehandPoints(startX, startY, pos.x, pos.y);
+      const endX = constrained[2] ?? pos.x;
+      const endY = constrained[3] ?? pos.y;
+      const startPressure = current.pressures?.[0] ?? pressure;
+      const nextShift: DrawEl = {
+        ...current,
+        points: [startX, startY, endX, endY],
+        pressures: [startPressure, pressure],
+        // Straight-line preview is two points — drop variable-length stylus sample arrays.
+        tiltXs: undefined,
+        tiltYs: undefined,
+        twists: undefined,
+        speeds: undefined,
+        tangentialPressures: undefined,
+      };
+      drawingRef.current = nextShift;
+      scheduleDraft(nextShift);
+      return;
+    }
     if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
       // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
       // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
@@ -17490,7 +17546,8 @@ function StudioCuttoonEditor() {
             strokeWidth={strokeWidth}
             brushOpacity={brushOpacity}
             stabilizer={stabilizer}
-            stabilizerModeLabel={stabilizerMode}
+            stabilizerMode={stabilizerMode}
+            onStabilizerModeChange={setStabilizerMode}
             color={color}
             recentSwatches={DRAW_COLOR_SWATCHES}
             brushSlots={brushSlotsState.slots}
@@ -17504,7 +17561,27 @@ function StudioCuttoonEditor() {
             onStrokeWidthChange={setStrokeWidth}
             onOpacityChange={setBrushOpacity}
             onStabilizerChange={setStabilizer}
+            postCorrection={postCorrection}
+            onPostCorrectionChange={setPostCorrection}
+            pressureCurveId={pressureCurvePresetId(pressureCurve)}
+            onPressureCurveChange={(id) => setPressureCurve(pressureCurveValueForPreset(id))}
             onColorChange={setColor}
+            secondaryColor={secondaryColor}
+            onSecondaryColorChange={setSecondaryColor}
+            onSwapColors={() => {
+              setColor(secondaryColor);
+              setSecondaryColor(color);
+              announceDrawingShortcut("색 교체");
+            }}
+            canvasFlipH={canvasFlipH}
+            onToggleCanvasFlipH={() => setCanvasFlipH((v) => !v)}
+            onOpenBrushStudio={() => {
+              setTool("draw");
+              setDrawMode("pen");
+              setRightPanelOpen(true);
+              setMobileSheet(isMobile ? "draw" : null);
+              openInspectorRoute({ primary: "properties" });
+            }}
             onToggleQuickShape={() => {
               const next = !quickShapeActive;
               if (next) disarmAllPixelTools();
@@ -20215,8 +20292,9 @@ function StudioCuttoonEditor() {
             // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
             // touch events, and a second touch cancels an unfinished finger stroke above.
             style={{ touchAction: tool === "draw" ? "none" : "auto" }}
-            scaleX={effScale}
+            scaleX={canvasFlipH ? -effScale : effScale}
             scaleY={effScale}
+            x={canvasFlipH ? CANVAS_W * effScale : 0}
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}

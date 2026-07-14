@@ -3,7 +3,7 @@
  * Brush kit · size · opacity · stabilizer · color · smart shape.
  * Pure presentation.
  */
-import { Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles } from "lucide-react";
+import { ArrowLeftRight, Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles, Wand2 } from "lucide-react";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 
 export type StudioDrawModeUi = "pen" | "eraser" | "shape";
 export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+export type StudioStabilizerModeUi = "standard" | "adaptive" | "precision";
+export type StudioPressureCurveUi = "soft" | "linear" | "firm";
 
 export interface StudioDrawOptionsBarProps {
   drawMode: StudioDrawModeUi;
@@ -23,19 +25,30 @@ export interface StudioDrawOptionsBarProps {
   strokeWidth: number;
   brushOpacity: number;
   stabilizer: number;
-  stabilizerModeLabel?: string;
+  stabilizerMode?: StudioStabilizerModeUi;
+  postCorrection?: number;
+  pressureCurveId?: StudioPressureCurveUi;
   color: string;
+  secondaryColor?: string;
   recentSwatches?: readonly string[];
   brushSlots?: readonly (StudioBrushSlot | null)[];
   symmetryType?: StudioSymmetryUi;
   quickShapeActive: boolean;
+  canvasFlipH?: boolean;
   compactBrushes?: boolean;
   onSelectBrush: (item: StudioBrushTrayItem) => void;
   onStrokeWidthChange: (n: number) => void;
   onOpacityChange: (n: number) => void;
   onStabilizerChange: (n: number) => void;
+  onStabilizerModeChange?: (mode: StudioStabilizerModeUi) => void;
+  onPostCorrectionChange?: (n: number) => void;
+  onPressureCurveChange?: (id: StudioPressureCurveUi) => void;
   onColorChange: (hex: string) => void;
+  onSecondaryColorChange?: (hex: string) => void;
+  onSwapColors?: () => void;
   onToggleQuickShape: () => void;
+  onToggleCanvasFlipH?: () => void;
+  onOpenBrushStudio?: () => void;
   onSetDrawMode?: (mode: StudioDrawModeUi) => void;
   onRecallBrushSlot?: (index: number) => void;
   onAssignBrushSlot?: (index: number) => void;
@@ -71,19 +84,30 @@ export function StudioDrawOptionsBar({
   strokeWidth,
   brushOpacity,
   stabilizer,
-  stabilizerModeLabel,
+  stabilizerMode = "adaptive",
+  postCorrection = 0,
+  pressureCurveId = "linear",
   color,
+  secondaryColor = "#ffffff",
   recentSwatches = [],
   brushSlots = [],
   symmetryType = "none",
   quickShapeActive,
+  canvasFlipH = false,
   compactBrushes = true,
   onSelectBrush,
   onStrokeWidthChange,
   onOpacityChange,
   onStabilizerChange,
+  onStabilizerModeChange,
+  onPostCorrectionChange,
+  onPressureCurveChange,
   onColorChange,
+  onSecondaryColorChange,
+  onSwapColors,
   onToggleQuickShape,
+  onToggleCanvasFlipH,
+  onOpenBrushStudio,
   onSetDrawMode,
   onRecallBrushSlot,
   onAssignBrushSlot,
@@ -210,7 +234,7 @@ export function StudioDrawOptionsBar({
         <span className="w-8 tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1.5 text-[0.65rem] font-semibold text-fg-3" title={stabilizerModeLabel}>
+      <label className="flex shrink-0 items-center gap-1.5 text-[0.65rem] font-semibold text-fg-3" title="라이브 손떨림 보정 강도">
         <span className="select-none">보정</span>
         <input
           type="range"
@@ -224,11 +248,87 @@ export function StudioDrawOptionsBar({
         <span className="w-4 tabular-nums text-fg-2">{stabilizer}</span>
       </label>
 
+      {onStabilizerModeChange ? (
+        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="보정 방식">
+          {(
+            [
+              { id: "standard" as const, label: "표준" },
+              { id: "adaptive" as const, label: "적응" },
+              { id: "precision" as const, label: "정밀" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={stabilizerMode === item.id}
+              title={`보정 방식: ${item.label}`}
+              onClick={() => onStabilizerModeChange(item.id)}
+              className={cn(
+                "h-7 rounded px-1.5 text-[0.58rem] font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                stabilizerMode === item.id
+                  ? "bg-raised text-fg ring-1 ring-accent/40"
+                  : "text-fg-3 hover:bg-raised/70"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {onPostCorrectionChange ? (
+        <label className="flex shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3" title="획 끝난 뒤 곡선 다듬기">
+          <span className="select-none">후처리</span>
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={1}
+            value={postCorrection}
+            onChange={(e) => onPostCorrectionChange(Number(e.target.value))}
+            className="w-12 accent-accent sm:w-16"
+          />
+          <span className="w-4 tabular-nums text-fg-2">{postCorrection}</span>
+        </label>
+      ) : null}
+
+      {onPressureCurveChange ? (
+        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="필압 반응">
+          {(
+            [
+              { id: "soft" as const, label: "민감" },
+              { id: "linear" as const, label: "기본" },
+              { id: "firm" as const, label: "단단" },
+            ] as const
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={pressureCurveId === item.id}
+              title={`필압: ${item.label}`}
+              onClick={() => onPressureCurveChange(item.id)}
+              className={cn(
+                "h-7 rounded px-1.5 text-[0.58rem] font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                pressureCurveId === item.id
+                  ? "bg-raised text-fg ring-1 ring-accent/40"
+                  : "text-fg-3 hover:bg-raised/70"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {drawMode !== "eraser" ? (
         <>
           <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
           <div className="flex shrink-0 items-center gap-1" aria-label="색상">
-            {recentSwatches.slice(0, 6).map((swatch) => (
+            {recentSwatches.slice(0, 5).map((swatch) => (
               <button
                 key={swatch}
                 type="button"
@@ -245,22 +345,91 @@ export function StudioDrawOptionsBar({
                 style={{ background: swatch }}
               />
             ))}
-            <label
-              className="relative size-6 cursor-pointer overflow-hidden rounded-md border border-line shadow-sm"
-              title="색 선택"
-              style={{ background: color }}
-            >
-              <span className="sr-only">브러시 색 선택</span>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => onColorChange(e.target.value)}
-                className="absolute inset-0 size-full cursor-pointer opacity-0"
-                aria-label="브러시 색 선택"
-              />
-            </label>
+            <div className="relative size-7">
+              {onSecondaryColorChange ? (
+                <label
+                  className="absolute bottom-0 right-0 size-4 cursor-pointer overflow-hidden rounded border border-line shadow-sm"
+                  title="보조 색 (X로 교체)"
+                  style={{ background: secondaryColor }}
+                >
+                  <span className="sr-only">보조 색</span>
+                  <input
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => onSecondaryColorChange(e.target.value)}
+                    className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    aria-label="보조 색"
+                  />
+                </label>
+              ) : null}
+              <label
+                className="absolute left-0 top-0 size-5 cursor-pointer overflow-hidden rounded-md border border-line shadow-sm"
+                title="주 색"
+                style={{ background: color }}
+              >
+                <span className="sr-only">브러시 색 선택</span>
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => onColorChange(e.target.value)}
+                  className="absolute inset-0 size-full cursor-pointer opacity-0"
+                  aria-label="브러시 색 선택"
+                />
+              </label>
+            </div>
+            {onSwapColors ? (
+              <button
+                type="button"
+                onClick={onSwapColors}
+                title="주/보조 색 교체 (X)"
+                aria-label="주 색과 보조 색 교체"
+                className={cn(
+                  "grid size-7 place-items-center rounded border border-line text-fg-3 hover:bg-raised hover:text-fg",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING
+                )}
+              >
+                <ArrowLeftRight size={12} aria-hidden />
+              </button>
+            ) : null}
           </div>
         </>
+      ) : null}
+
+      {onToggleCanvasFlipH ? (
+        <button
+          type="button"
+          aria-pressed={canvasFlipH}
+          onClick={onToggleCanvasFlipH}
+          title="캔버스 좌우 반전 (그리기 확인용)"
+          className={cn(
+            "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[0.6rem] font-bold",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            canvasFlipH
+              ? "border-accent bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          )}
+        >
+          <FlipHorizontal2 size={13} aria-hidden />
+          반전
+        </button>
+      ) : null}
+
+      {onOpenBrushStudio ? (
+        <button
+          type="button"
+          onClick={onOpenBrushStudio}
+          title="브러시 스튜디오 — 필압·도장·촉 고급 설정"
+          className={cn(
+            "inline-flex h-7 items-center gap-1 rounded-md border border-line bg-card px-1.5 text-[0.6rem] font-bold text-fg-2 hover:bg-raised",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING
+          )}
+        >
+          <Wand2 size={13} aria-hidden />
+          고급
+        </button>
       ) : null}
 
       {onSymmetryTypeChange ? (
