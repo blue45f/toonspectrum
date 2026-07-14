@@ -99,6 +99,7 @@ import {
   Wind,
   SquareSplitHorizontal,
   Mountain,
+  Shapes,
 } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -878,6 +879,7 @@ import {
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBrushStudio } from "./StudioBrushStudio";
+import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
@@ -2176,6 +2178,10 @@ function QuickStartPanel({
   onOpenCharacter,
   onOpenBubble,
   onOpenPublish,
+  onSmartShape,
+  onStartDraw,
+  onBrushKit,
+  onCollabFocus,
 }: {
   onDismiss: () => void;
   onExample: () => void;
@@ -2183,28 +2189,65 @@ function QuickStartPanel({
   onOpenCharacter: () => void;
   onOpenBubble: () => void;
   onOpenPublish: () => void;
+  onSmartShape: () => void;
+  onStartDraw: () => void;
+  onBrushKit: () => void;
+  onCollabFocus: () => void;
 }) {
+  // Multi-tool inspired starters (AutoDraw / Canva / Picsart / Express / Magma IA — not clones).
   const steps = [
     {
-      label: "① 템플릿 고르기",
-      hint: "컷 모양부터 잡으면 시작이 쉬워요.",
+      id: "template",
+      label: "템플릿 고르기",
+      hint: "컷 레이아웃부터 — 빈 화면 부담을 줄여요.",
       icon: LayoutTemplate,
       onClick: onOpenTemplate,
     },
     {
-      label: "② 캐릭터 넣기",
-      hint: "2D 캐릭터를 바로 넣고, VRM도 쓸 수 있어요.",
+      id: "smart-shape",
+      label: "스마트 도형",
+      hint: "낙서를 선·원·사각형으로 자동 다듬어요.",
+      icon: Shapes,
+      onClick: onSmartShape,
+    },
+    {
+      id: "draw",
+      label: "바로 그리기",
+      hint: "펜을 켜고 스케치부터 — 초보자 친화.",
+      icon: Pencil,
+      onClick: onStartDraw,
+    },
+    {
+      id: "brush-kit",
+      label: "브러시 키트",
+      hint: "연필·마커·형광·붓을 한눈에 고르세요.",
+      icon: Palette,
+      onClick: onBrushKit,
+    },
+    {
+      id: "collab-focus",
+      label: "집중 레이아웃",
+      hint: "패널을 접고 캔버스·도구만 남겨요.",
+      icon: Maximize2,
+      onClick: onCollabFocus,
+    },
+    {
+      id: "character",
+      label: "캐릭터 넣기",
+      hint: "2D 캐릭터·VRM을 바로 올려요.",
       icon: Smile,
       onClick: onOpenCharacter,
     },
     {
-      label: "③ 말풍선·대사",
-      hint: "대사는 더블클릭해서 바꿔요.",
+      id: "bubble",
+      label: "말풍선·대사",
+      hint: "더블클릭으로 대사를 바꿔요.",
       icon: MessageCircle,
       onClick: onOpenBubble,
     },
     {
-      label: "④ 게시하기",
+      id: "publish",
+      label: "게시하기",
       hint: "제목을 적고 작품으로 올려요.",
       icon: Send,
       onClick: onOpenPublish,
@@ -2212,11 +2255,16 @@ function QuickStartPanel({
   ];
 
   return (
-    <div className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4">
+    <div
+      data-studio-creative-starter="true"
+      className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-xl backdrop-blur sm:top-6 sm:p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold">빠른 시작</p>
-          <p className="mt-1 max-w-[46ch] text-xs leading-relaxed text-fg-3">처음이라면 예시를 불러오거나, 아래 순서대로 하나씩 눌러보세요.</p>
+          <p className="text-sm font-bold">창작 시작 허브</p>
+          <p className="mt-1 max-w-[48ch] text-xs leading-relaxed text-fg-3">
+            예시·템플릿·스마트 도형·브러시 키트로 바로 시작하세요. 협업 집중 레이아웃도 한 탭.
+          </p>
         </div>
         <button
           type="button"
@@ -2249,10 +2297,10 @@ function QuickStartPanel({
           const Icon = step.icon;
           return (
             <button
-              key={step.label}
+              key={step.id}
               type="button"
               onClick={step.onClick}
-              className="group flex min-h-[4.75rem] items-center gap-3 rounded-xl border border-line bg-card px-3 py-3 text-left transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="group flex min-h-[4.25rem] items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 text-left transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
                 <Icon size={18} aria-hidden />
@@ -18351,28 +18399,19 @@ function StudioCuttoonEditor() {
               <>
                 <div
                   className={cn(
-                    "flex items-center gap-1 bg-panel/30 rounded-lg p-0.5 border border-line/40",
+                    "min-w-0 max-w-[min(36rem,55vw)]",
                     drawMode !== "pen" && "invisible pointer-events-none"
                   )}
-                  aria-label="브러시 프리셋"
                   aria-hidden={drawMode !== "pen"}
                 >
-                  {BRUSH_PRESETS.map((p) => {
-                    const active = brush === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => applyBuiltInBrushPreset(p)}
-                        className={cn(
-                          "h-7 px-2 text-xs font-semibold rounded-md transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                          active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised hover:text-fg"
-                        )}
-                      >
-                        {p.name}
-                      </button>
-                    );
-                  })}
+                  <StudioBrushTray
+                    activeBrushId={brush}
+                    compact={uiDensityMode === "simple" || uiDensityMode === "focus"}
+                    onSelect={(item) => {
+                      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
+                      if (preset) applyBuiltInBrushPreset(preset);
+                    }}
+                  />
                 </div>
                 <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode !== "pen" && "invisible")} />
               </>
@@ -19177,6 +19216,19 @@ function StudioCuttoonEditor() {
               active={eyedropperActive}
               onClick={() => {
                 setEyedropperActive((v) => !v);
+                setMenu(null);
+              }}
+            />
+            <StudioRailToolButton
+              icon={Shapes}
+              label="스마트 도형 — 낙서를 선·원·사각형으로 다듬기"
+              active={quickShapeActive}
+              accented
+              onClick={() => {
+                setQuickShapeActive((v) => !v);
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
                 setMenu(null);
               }}
             />
@@ -21365,6 +21417,31 @@ function StudioCuttoonEditor() {
               }}
               onOpenBubble={() => openQuickStartMenu("bubble")}
               onOpenPublish={openPublishStep}
+              onSmartShape={() => {
+                dismissQuickStart();
+                setQuickShapeActive(true);
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
+              }}
+              onStartDraw={() => {
+                dismissQuickStart();
+                setTool("draw");
+                setDrawMode("pen");
+                applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pen") ?? BRUSH_PRESETS[0]);
+              }}
+              onBrushKit={() => {
+                dismissQuickStart();
+                setTool("draw");
+                setDrawMode("pen");
+                applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
+              }}
+              onCollabFocus={() => {
+                dismissQuickStart();
+                setStudioUiDensity("focus");
+                setLeftPanelOpen(false);
+                setRightPanelOpen(false);
+              }}
             />
           )}
 
@@ -21380,6 +21457,12 @@ function StudioCuttoonEditor() {
                 className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
               >
                 {drawingShortcutNotice.message}
+              </span>
+            ) : null}
+            {quickShapeActive && tool === "draw" && drawMode === "pen" && !drawingShortcutNotice ? (
+              <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
+                <Shapes size={12} aria-hidden />
+                스마트 도형 켜짐 · 그려서 잠시 멈추면 다듬어요
               </span>
             ) : null}
           </div>
