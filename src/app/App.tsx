@@ -102,7 +102,7 @@ function useKmasEntryMerge() {
 /**
  * Studio 모바일은 2단 하단 도크와 선택 컨텍스트 바를 직접 소유한다. 그 위에 전역 설정
  * 버튼을 다시 띄우면 375px 화면에서 핵심 도구를 가리므로 모바일에서만 숨긴다. 데스크톱은
- * 작업 영역과 충돌하지 않아 전역 사운드·테마·언어 접근을 그대로 유지한다.
+ * 테마·언어 접근을 유지한다(클릭 이펙트·BGM 컨트롤은 제거됨).
  */
 function WebFloatingControls() {
   const { pathname } = useLocation();
@@ -111,6 +111,8 @@ function WebFloatingControls() {
   return (
     <FloatingControls
       placement="bottom-left"
+      showSound={false}
+      showBgm={false}
       className={hideOnMobile ? "max-md:hidden" : undefined}
     />
   );

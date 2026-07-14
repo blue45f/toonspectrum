@@ -1,5 +1,5 @@
-import { useAmbientBgm, useFx } from "@toonspectrum/core/fx";
-import { Languages, Moon, Music, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
+import { useFx } from "@toonspectrum/core/fx";
+import { Languages, Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/lib/cx";
@@ -9,35 +9,19 @@ import { useTheme } from "@/lib/theme";
 /**
  * FloatingControls — 웹(/)·토스(apps/toss) **공유** 플로팅 컨트롤 클러스터.
  *
- * 단일 출처(NO fork): 사운드(SFX)·BGM·다크모드·언어 토글을 하나의 클러스터로 묶는다.
- * 좁은 화면(모바일)에선 콘텐츠를 가리지 않도록 **단일 토글(⚙)로 접어** 면적을 최소화하고,
- * 탭하면 컨트롤들이 위로 펼쳐진다. 넓은 화면(데스크톱)에선 펼친 행을 그대로 노출하되 무동작 시
- * 부드럽게 물러난다(opacity↓). 어떤 컨트롤을 노출할지는 prop 으로만 갈라 채널 차이를 표현한다
- *  - 웹  : 사운드 + BGM + 다크모드 + 언어(기본값 전부 ON).
- *  - 토스: 사운드 + BGM 만(`showTheme={false} showLang={false}` — 토스 미니앱은 단일 다크 테마).
+ * 다크모드·언어·(선택) 효과음 토글. 전역 클릭 이펙트·BGM 컨트롤은 제품에서 제거됨.
+ *  - 웹  : 다크모드 + 언어(기본). 사운드 토글은 기본 숨김.
+ *  - 토스: 필요 시 showSound 만 켤 수 있음.
  *
- * 모든 토글 훅(테마·언어·오디오)은 프레임워크 비종속 zustand/fx 스토어라 양 채널에서 안전하다.
- * 노출 안 되는 컨트롤도 훅은 호출되지만(React 규칙) 렌더만 건너뛴다 — 부작용/구독 비용은 미미.
- *
- * 자동 숨김(데스크톱):
- *  - 마운트 후 `hideAfterMs`(기본 4000) 지나면 흐려지며 물러난다(완전 제거 X — 포인터 이벤트 유지).
- *  - 클러스터 hover / 내부 포커스 / 근접 포인터 이동 / 스크롤 시 다시 노출 + 타이머 리셋.
- *  - prefers-reduced-motion 사용자는 opacity 전환만 무효화되고(항상 보임) 토글은 그대로 동작.
- *
- * 접근성: 토글은 각각 aria-pressed/aria-label, 언어는 role="group". 모바일 접힘 패널은
- * aria-expanded 토글 버튼으로 펼친다. 숨김 상태에서도 DOM 에 남아 키보드 포커스로 즉시 복귀.
- *
- * @example 토스 App (사운드 + BGM 만, 하단 탭바 위로 띄움)
- *   import { FloatingControls } from "@/components/FloatingControls";
- *   <FloatingControls showTheme={false} showLang={false} placement="above-nav" />
- *
- * @example 웹 App (전체)
+ * @example 웹 App
  *   <FloatingControls placement="bottom-left" />
  */
 export interface FloatingControlsProps {
-  /** 사운드(SFX) 토글 노출. 기본 true. */
+  /** 사운드(SFX) 토글 노출. 기본 false (클릭 이펙트 제거 후 불필요). */
   showSound?: boolean;
-  /** BGM 토글 노출. 기본 true. */
+  /**
+   * @deprecated BGM 컨트롤은 제거됨. prop 은 호환용으로 무시된다.
+   */
   showBgm?: boolean;
   /** 다크/주간 테마 토글 노출. 기본 true(토스는 false). */
   showTheme?: boolean;
@@ -90,8 +74,8 @@ const COLLAPSIBLE: Record<NonNullable<FloatingControlsProps["placement"]>, boole
 };
 
 export function FloatingControls({
-  showSound = true,
-  showBgm = true,
+  showSound = false,
+  showBgm: _showBgm = false,
   showTheme = true,
   showLang = true,
   placement = "bottom-left",
@@ -99,18 +83,12 @@ export function FloatingControls({
   wakeRadiusPx = 120,
   className,
 }: FloatingControlsProps) {
+  void _showBgm;
   const theme = useTheme((s) => s.theme);
   const toggleTheme = useTheme((s) => s.toggle);
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
   const fx = useFx();
-  const {
-    enabled: bgmOn,
-    mood: bgmMood,
-    artist: bgmArtist,
-    toggle: toggleBgm,
-    next: nextBgm,
-  } = useAmbientBgm();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
   const isDark = theme === "dark";
@@ -164,18 +142,10 @@ export function FloatingControls({
     fx.setSfxEnabled(!soundOn);
   };
 
-  const handleBgmClick = (e: React.MouseEvent) => {
-    if (bgmOn && e.shiftKey) {
-      nextBgm();
-    } else {
-      toggleBgm();
-    }
-  };
-
   // 펼쳐진 컨트롤들(데스크톱 행 / 모바일 펼침 패널 공용).
   const controls = (
     <>
-      {/* 사운드(SFX) — 클릭 'tick' 등 효과음 on/off(영속). 자기 자신은 data-no-sfx */}
+      {/* 선택적 SFX 토글 — 기본 비노출. 전역 클릭 이펙트/BGM UI 는 제거됨. */}
       {showSound && (
         <button
           type="button"
@@ -191,45 +161,6 @@ export function FloatingControls({
         >
           {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
         </button>
-      )}
-
-      {/* 배경음악(보컬 플레이리스트, 합성 BGM 폴백) — 기본 OFF, 첫 클릭에서 언락 */}
-      {showBgm && (
-        <div className="inline-flex items-center gap-1">
-          <button
-            type="button"
-            onClick={handleBgmClick}
-            aria-label={bgmOn ? "배경음악 끄기" : "배경음악 켜기"}
-            aria-pressed={bgmOn}
-            title={bgmOn ? `배경음악 켜짐 · 현재: ${bgmMood} (Shift+클릭시 다음 트랙)` : "보컬 배경음악 켜기"}
-            data-no-sfx
-            className={cx(
-              PILL,
-              bgmOn ? "border-accent/45 text-accent" : "border-line text-fg-2 hover:text-fg"
-            )}
-          >
-            <Music size={16} className={bgmOn ? "animate-pulse" : "opacity-70"} />
-          </button>
-          {bgmOn && (
-            <button
-              type="button"
-              onClick={() => nextBgm()}
-              title={`다음 트랙으로 전환 (현재: ${bgmMood}${bgmArtist ? ` — ${bgmArtist}` : ""})`}
-              className="inline-flex h-11 max-w-52 items-center gap-1.5 rounded-full border border-line bg-panel/95 px-2.5 text-xs font-semibold text-fg-2 shadow-lg backdrop-blur hover:bg-raised hover:text-fg"
-            >
-              <span aria-hidden>↻</span>
-              <span className="flex min-w-0 flex-col items-start leading-tight">
-                <span className="block max-w-40 truncate">{bgmMood}</span>
-                {/* 크레딧(아티스트) — Pixabay Content License 는 표기 의무가 없지만 출처를 UI 로 존중 표기. */}
-                {bgmArtist && (
-                  <span className="block max-w-40 truncate text-[10px] font-medium text-fg-3">
-                    {bgmArtist} · Pixabay
-                  </span>
-                )}
-              </span>
-            </button>
-          )}
-        </div>
       )}
 
       {/* 다크/주간 테마 토글 — 토스에선 showTheme={false} */}

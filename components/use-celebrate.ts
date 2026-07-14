@@ -20,7 +20,7 @@ export interface CelebrateOptions {
 /**
  * 성공 순간의 축하 피드백(파티클 버스트 + SFX + 햅틱)을 한 번에 발화하는 훅(웹·토스 공유).
  *
- * 접근성은 AppShell.useClickVisualFeedback 과 동일한 규약을 따른다:
+ * 전역 클릭 이펙트는 제거됨. celebrate 는 명시적 호출(구독/북마크 등)에만 쓴다:
  * prefers-reduced-motion 사용자는 시각 모션(파티클)만 생략하고, 사용자가 명시적으로
  * opt-in 한 오디오 피드백과 햅틱(비시각 촉각)은 유지한다.
  */

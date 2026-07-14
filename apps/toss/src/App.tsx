@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isTossLoginAvailable, tossLoginFlow, useSession } from "@/src/compat/auth-session-store";
 
-import { FloatingControls } from "@/components/FloatingControls";
 import { RandomIntro } from "@/components/RandomIntro";
 import { AppShell } from "@/src/app/AppShell";
 
@@ -324,15 +323,7 @@ function TossChrome() {
         <BannerAd format="banner" gap={0} placement="above-nav" variant="expanded" />
       )}
       {!immersive && <BottomNav tab={tab} onNavigate={handleNavigate} />}
-      {/* 공유 자동 숨김 플로팅 컨트롤 — 토스는 사운드 + BGM 만(다크모드/언어 토글 없음).
-          광고가 있으면 표준 배너까지 피해 올리고, 몰입형 에디터에선 자체 도구막대와 겹치지 않게 숨긴다. */}
-      {!immersive && (
-        <FloatingControls
-          showTheme={false}
-          showLang={false}
-          placement={persistentBanner ? "above-ad-nav" : "above-nav"}
-        />
-      )}
+      {/* 전역 클릭 이펙트·BGM·사운드 플로팅 컨트롤 제거(제품 정책). 테마/언어는 토스 미지원. */}
     </>
   );
 }
