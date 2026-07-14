@@ -26,12 +26,8 @@ export const PANEL_LABEL_ROW =
 export const PANEL_RANGE_CLASS = "w-24 pointer-coarse:w-32 pointer-coarse:h-6 accent-accent cursor-pointer";
 export const PANEL_READOUT_CLASS =
   "w-8 pointer-coarse:w-9 text-right text-[0.72rem] pointer-coarse:text-[0.75rem] tabular-nums text-fg-3";
-export const PANEL_CHIP_CLASS = cn(
-  "min-h-6 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2",
-  STUDIO_EASE,
-  "hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]",
-  STUDIO_FOCUS_RING
-);
+export const PANEL_CHIP_CLASS =
+  "min-h-6 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /** 툴바 도구 버튼 — 활성은 accent soft, 비활성은 card. */
 export function studioToolButtonClass(active: boolean, options?: { dense?: boolean }): string {
@@ -103,7 +99,7 @@ export function StudioSectionHeader({
       <div className="min-w-0">
         <h3 className="truncate text-sm font-bold tracking-tight text-fg text-pretty">{title}</h3>
         {description ? (
-          <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">{description}</p>
+          <p className="mt-0.5 text-[0.7rem] leading-relaxed text-fg-3 text-pretty">{description}</p>
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -139,7 +135,7 @@ export function StudioEmptyState({
       ) : null}
       <p className="text-xs font-semibold text-fg-2 text-pretty">{title}</p>
       {description ? (
-        <p className="mx-auto mt-1.5 max-w-[28ch] text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
+        <p className="mx-auto mt-1.5 max-w-[28ch] text-[0.7rem] leading-relaxed text-fg-3 text-pretty">
           {description}
         </p>
       ) : null}
@@ -159,7 +155,7 @@ export function StudioContextPill({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center truncate rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold tabular-nums",
+        "inline-flex max-w-full items-center truncate rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold tabular-nums",
         tone === "accent" && "border-accent/40 bg-accent-soft text-accent",
         tone === "good" && "border-good/35 bg-good/10 text-good",
         tone === "warn" && "border-warn/40 bg-warn/10 text-warn",
