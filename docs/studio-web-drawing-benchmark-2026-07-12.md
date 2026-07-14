@@ -105,6 +105,38 @@ lock, 요소 add/update/delete operation stream, 필요한 요소에만 세밀�
 - 375×812 모바일 시트가 하단 도크와 겹치지 않고 독립 스크롤됨을 확인
 - 브라우저 콘솔 오류·경고 0건
 
+## 2026-07-14 상용급 선 보정·입력 정확성 체크포인트
+
+Clip Studio Paint의 [Correction 설정](https://help.clip-studio.com/en-us/manual_en/810_subtools/C.htm),
+Krita의 [Freehand Brush Tool](https://docs.krita.org/en/reference_manual/tools/freehand_brush.html),
+Procreate의 [Brush Studio 안정화 설정](https://help.procreate.com/procreate/handbook/5.4/brushes/brush-studio-settings),
+Photoshop의 [Stroke smoothing](https://helpx.adobe.com/sg/photoshop/desktop/repair-retouch/clean-restore-images/create-smoother-more-polished-brush-strokes-with-stroke-smoothing.html)을
+공식 동작 근거로 대조했다. 경쟁사의 명칭·화면·알고리즘을 복제하지 않고, 브라우저의 coalesced/predicted
+PointerEvent 경계와 ToonSpectrum의 결정적 문서 모델에 맞게 다음 기능으로 번역했다.
+
+- **세 가지 라이브 보정 방식**: 기존 고정 응답인 `표준`, 느린 디테일에서는 보정을 강화하고 빠른 플릭에서는
+  지연을 줄이는 `속도 적응`, 원형 데드존을 가진 가상 가이드 끈 방식의 `정밀 추적`을 제공한다. 표준/적응
+  응답은 샘플 사이 선형 이동을 연속시간 EMA로 적분하고, 속도와 정밀 반경은 CSS 화면 좌표로 환산해
+  60/120/240Hz 포인터 샘플 주기와 캔버스 줌 배율이 달라도 조작감을 유지한다.
+- **입력 보정과 후보정 분리**: 펜을 움직이는 동안의 안정화와 펜을 놓은 뒤의 좌표 정리를 별도 0~10 값으로
+  저장한다. 후보정은 넓은 이웃의 진행 방향을 검사해 의도적인 각점을 그대로 둘 수 있다.
+- **실제 시간 기반 마우스·터치 필압**: 캔버스 좌표의 샘플 간 거리가 아니라 PointerEvent의 CSS 화면 좌표와
+  `timeStamp`로 px/ms를 계산한다. 확대 배율과 60/120/240Hz 샘플 밀도 차이가 굵기를 바꾸는 문제를 줄였다.
+- **필압 곡선 의미 수정**: 엔진의 `pressure^exponent`와 UI를 일치시켜 `민감하게=0.65`, `기본=1`,
+  `단단하게=1.8`로 제공한다. 약한 힘에 빠르게 반응하는 설정과 더 눌러야 굵어지는 설정이 이름대로 동작한다.
+- **모바일 동등 조작**: 데스크톱 검사기와 모바일 드로잉 시트가 같은 공용 선 보정·필압 입력 컴포넌트를
+  사용한다. 모바일은 44px 이상 행과 큰 슬라이더를 유지하면서 표준/적응/정밀 모드를 모두 바꿀 수 있다.
+- **브러시 프리셋 v3**: 안정화 방식, 후보정 강도, 각점 보존을 사용자 브러시에 저장하고 JSON으로 왕복한다.
+  v2 이하 데이터는 `속도 적응 / 후보정 4 / 각점 보존` 기본값으로 안전하게 마이그레이션한다.
+- **한 점 탭 보존**: 점묘·짧은 스타일러스 탭·지우개 탭을 유효한 한 획/한 undo로 커밋하고, 캔버스와 SVG에서
+  같은 압력 굵기의 원으로 렌더한다.
+- **수채 SVG 보존**: 수채 획을 일반 펜 path로 내보내지 않고, 기존 결정적 수채 플래너의 core/diffuse dab과
+  방사 그라데이션을 SVG primitive로 직렬화한다.
+
+다음 브러시 엔진 우선순위는 압력·기울기·속도·진행률 센서를 크기/불투명도/유량/간격/각도에 독립 연결하는
+다이내믹 매트릭스, 공통 시작·끝 테이퍼, PNG 알파 팁·간격·산포·질감 스탬프 엔진 순이다. ABR은 비공개
+포맷 호환으로 분리하고, 먼저 ToonSpectrum 자체 브러시 문서 모델과 PNG 팁 저작을 완성한다.
+
 ## 2026-07-12 팀 역할·초대 기반 체크포인트
 
 Magma의 역할·권한 장점을 그대로 이름만 복제하지 않고, 이후 서버 댓글·presence·원격 커서·소프트

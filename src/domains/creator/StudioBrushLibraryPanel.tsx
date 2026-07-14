@@ -23,6 +23,7 @@ import {
   type StudioSavedBrush,
 } from "./studio-brush-library";
 import { downloadBlob } from "./studio-export";
+import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
 import { cx } from "@/lib/cx";
 
@@ -32,6 +33,10 @@ const PREVIEW_SWATCH_MAX = 30;
 
 function brushPresetLabel(brushId: string): string {
   return BRUSH_PRESETS.find((p) => p.id === brushId)?.name ?? brushId;
+}
+
+function stabilizerModeLabel(mode: StudioSavedBrush["stabilizerMode"]): string {
+  return STUDIO_STABILIZER_MODES.find((candidate) => candidate.id === mode)?.label ?? mode;
 }
 
 function previewSize(strokeWidth: number): number {
@@ -252,6 +257,9 @@ export function StudioBrushLibraryPanel({ currentSnapshot, onApplyBrush }: Studi
                   <span className="block truncate">{brushPresetLabel(b.brushId)}</span>
                   <span className="numeral block">
                     {b.strokeWidth}px · {Math.round(b.brushOpacity * 100)}%
+                  </span>
+                  <span className="block">
+                    {stabilizerModeLabel(b.stabilizerMode)} {b.stabilizer} · 후보정 {b.postCorrection}
                   </span>
                   {b.brushId === "calligraphy" ? (
                     <span className="numeral block">

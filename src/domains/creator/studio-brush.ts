@@ -26,8 +26,41 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];
 
+export const BRUSH_PRESSURE_CURVE_PRESETS = [
+  { id: "soft", label: "민감하게", exponent: 0.65, description: "약한 압력에도 굵기가 빠르게 올라옵니다." },
+  { id: "linear", label: "기본", exponent: 1, description: "입력 필압을 그대로 반영합니다." },
+  { id: "firm", label: "단단하게", exponent: 1.8, description: "더 눌러야 굵기가 크게 올라옵니다." },
+] as const;
+
+export type BrushPressureCurvePresetId = (typeof BRUSH_PRESSURE_CURVE_PRESETS)[number]["id"];
+
+export function pressureCurvePresetId(value: unknown): BrushPressureCurvePresetId {
+  const safe = finiteNumber(value, 1);
+  let closest: (typeof BRUSH_PRESSURE_CURVE_PRESETS)[number] = BRUSH_PRESSURE_CURVE_PRESETS[0];
+  let distance = Math.abs(safe - closest.exponent);
+  for (const preset of BRUSH_PRESSURE_CURVE_PRESETS.slice(1)) {
+    const nextDistance = Math.abs(safe - preset.exponent);
+    if (nextDistance < distance) {
+      closest = preset;
+      distance = nextDistance;
+    }
+  }
+  return closest.id;
+}
+
+export function pressureCurveValueForPreset(id: unknown): number {
+  return BRUSH_PRESSURE_CURVE_PRESETS.find((preset) => preset.id === id)?.exponent ?? 1;
+}
+
 // 손떨림 보정 강도 범위(0=끔 ~ 10=최대).
 export const STABILIZER_MAX = 10;
+
+export interface SmoothStrokeOptions {
+  /** true면 넓은 이웃에서 검출한 의도적인 각점을 이동평균으로 둥글리지 않는다. */
+  preserveCorners?: boolean;
+  /** 진행 방향 변화가 이 각도 이상이면 각점으로 본다. 기본 55°. */
+  cornerThresholdDeg?: number;
+}
 
 /** 캘리그래피 펜촉의 수동 폴백 설정. roundness는 단축/장축 비율(0.08~1). */
 export interface CalligraphyTipSettings {
@@ -72,9 +105,14 @@ export interface BrushPressureSampleInput {
   pointerType?: unknown;
   rawPressure?: unknown;
   distance?: unknown;
+  /** 샘플 사이 실제 경과 시간(ms). 있으면 distance를 px/ms 속도로 정규화한다. */
+  elapsedMs?: unknown;
   velocityFallbackEnabled?: boolean;
   velocitySensitivity?: unknown;
   pressureCurve?: unknown;
+  /** 속도 폴백이 최소 압력에 도달하는 CSS px/ms. */
+  maxVelocity?: unknown;
+  /** elapsedMs가 없는 레거시 호출용 샘플 간 최대 거리. */
   maxDistance?: unknown;
   fallbackPressure?: unknown;
 }
@@ -172,8 +210,10 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
     basePressure = rawPressure;
   } else if (input.velocityFallbackEnabled) {
     const distance = Math.max(0, finiteNumber(input.distance, 0));
-    const maxDistance = Math.max(0.001, finiteNumber(input.maxDistance, 28));
-    const speedRatio = clamp01(distance / maxDistance);
+    const elapsedMs = finiteNumber(input.elapsedMs, Number.NaN);
+    const speedRatio = elapsedMs > 0
+      ? clamp01((distance / clamp(elapsedMs, 1, 100)) / Math.max(0.01, finiteNumber(input.maxVelocity, 1.6)))
+      : clamp01(distance / Math.max(0.001, finiteNumber(input.maxDistance, 28)));
     const sensitivity = clamp01(finiteNumber(input.velocitySensitivity, 0.65));
     basePressure = 1 - speedRatio * sensitivity * 0.75;
   } else {
@@ -385,18 +425,78 @@ export function stabilizePoint(
  * 점 개수를 보존(필압 배열과 1:1 정렬 유지)하고 양 끝점은 고정한다.
  * strength 0~10: 0이면 입력 배열을 그대로 반환.
  */
-export function smoothStrokePoints(points: number[], strength: number): number[] {
+export function smoothStrokePoints(
+  points: number[],
+  strength: number,
+  options: SmoothStrokeOptions = {}
+): number[] {
   const s = Math.round(clampStrength(strength));
   if (s === 0 || points.length < 6) return points;
 
   const radius = Math.max(1, Math.ceil(s / 3)); // 1~4
   const passes = s >= 6 ? 2 : 1;
   const count = Math.floor(points.length / 2);
+  const cornerIndices = new Set<number>();
+  if (options.preserveCorners && count >= 5) {
+    const threshold = clamp(finiteNumber(options.cornerThresholdDeg, 55), 20, 160);
+    const neighborhood = Math.max(2, radius * 2);
+    const localSpan = Math.min(2, radius);
+    const turnAt = (index: number, span: number): number => {
+      const beforeIndex = Math.max(0, index - span);
+      const afterIndex = Math.min(count - 1, index + span);
+      if (beforeIndex === index || afterIndex === index) return 0;
+      const beforeX = points[beforeIndex * 2];
+      const beforeY = points[beforeIndex * 2 + 1];
+      const x = points[index * 2];
+      const y = points[index * 2 + 1];
+      const afterX = points[afterIndex * 2];
+      const afterY = points[afterIndex * 2 + 1];
+      if (
+        beforeX === undefined || beforeY === undefined || x === undefined || y === undefined
+        || afterX === undefined || afterY === undefined
+      ) {
+        return 0;
+      }
+      const incomingX = x - beforeX;
+      const incomingY = y - beforeY;
+      const outgoingX = afterX - x;
+      const outgoingY = afterY - y;
+      const incomingLength = Math.hypot(incomingX, incomingY);
+      const outgoingLength = Math.hypot(outgoingX, outgoingY);
+      if (incomingLength <= Number.EPSILON || outgoingLength <= Number.EPSILON) return 0;
+      const cosine = clamp(
+        (incomingX * outgoingX + incomingY * outgoingY) / (incomingLength * outgoingLength),
+        -1,
+        1
+      );
+      return (Math.acos(cosine) * 180) / Math.PI;
+    };
+    const localTurns = Array.from({ length: count }, (_, index) => turnAt(index, localSpan));
+    for (let i = 1; i < count - 1; i++) {
+      const wideTurn = turnAt(i, neighborhood);
+      const localTurn = localTurns[i] ?? 0;
+      const adjacentAverage = ((localTurns[i - 1] ?? 0) + (localTurns[i + 1] ?? 0)) / 2;
+      // 넓은 창에서 방향이 크게 바뀌더라도 원호처럼 곡률이 일정하면 각점이 아니다. 실제
+      // 모서리는 좁은 창의 회전량이 충분하고 주변보다 뚜렷한 피크를 이룰 때만 보존한다.
+      if (
+        wideTurn >= threshold
+        && localTurn >= threshold * 0.6
+        && localTurn >= adjacentAverage + 12
+      ) {
+        cornerIndices.add(i);
+      }
+    }
+  }
 
   let current = points;
   for (let pass = 0; pass < passes; pass++) {
     const out = current.slice();
     for (let i = 1; i < count - 1; i++) {
+      if (cornerIndices.has(i)) {
+        out[i * 2] = points[i * 2]!;
+        out[i * 2 + 1] = points[i * 2 + 1]!;
+        continue;
+      }
       let sx = 0;
       let sy = 0;
       let total = 0;

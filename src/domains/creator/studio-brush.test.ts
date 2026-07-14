@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BRUSH_PRESETS,
+  BRUSH_PRESSURE_CURVE_PRESETS,
   STABILIZER_MAX,
   buildCalligraphySegments,
   gpenSegmentWidths,
@@ -9,6 +10,8 @@ import {
   polylineLength,
   processFreehandPoints,
   processPencilPoints,
+  pressureCurvePresetId,
+  pressureCurveValueForPreset,
   resampleStrokePressures,
   resolveBrushPressureSample,
   sanitizeCalligraphyTipSettings,
@@ -103,6 +106,18 @@ describe("캘리그래피 스타일러스 정규화", () => {
 });
 
 describe("resolveBrushPressureSample", () => {
+  it("maps user-facing pressure presets to mathematically correct exponents", () => {
+    expect(BRUSH_PRESSURE_CURVE_PRESETS.map((preset) => preset.id)).toEqual(["soft", "linear", "firm"]);
+    expect(pressureCurveValueForPreset("soft")).toBe(0.65);
+    expect(pressureCurveValueForPreset("linear")).toBe(1);
+    expect(pressureCurveValueForPreset("firm")).toBe(1.8);
+    expect(pressureCurveValueForPreset("unknown")).toBe(1);
+    expect(pressureCurvePresetId(0.64)).toBe("soft");
+    expect(pressureCurvePresetId(1.02)).toBe("linear");
+    expect(pressureCurvePresetId(1.81)).toBe("firm");
+    expect(pressureCurvePresetId(Number.NaN)).toBe("linear");
+  });
+
   it.each([0.2, 0.5, 0.9])("prioritizes valid pen hardware pressure %s over velocity fallback", (pressure) => {
     expect(
       resolveBrushPressureSample({
@@ -151,6 +166,38 @@ describe("resolveBrushPressureSample", () => {
       Math.sqrt(0.5),
       10
     );
+  });
+
+  it("uses real px/ms speed when elapsed time is available", () => {
+    const eightMs = resolveBrushPressureSample({
+      pointerType: "mouse",
+      distance: 12,
+      elapsedMs: 8,
+      velocityFallbackEnabled: true,
+      velocitySensitivity: 1,
+      pressureCurve: 1,
+    });
+    const sixteenMs = resolveBrushPressureSample({
+      pointerType: "mouse",
+      distance: 24,
+      elapsedMs: 16,
+      velocityFallbackEnabled: true,
+      velocitySensitivity: 1,
+      pressureCurve: 1,
+    });
+    expect(eightMs).toBeCloseTo(sixteenMs, 10);
+    expect(eightMs).toBeLessThan(1);
+  });
+
+  it("keeps the distance fallback for old callers without timestamps", () => {
+    expect(resolveBrushPressureSample({
+      pointerType: "mouse",
+      distance: 14,
+      maxDistance: 28,
+      velocityFallbackEnabled: true,
+      velocitySensitivity: 1,
+      pressureCurve: 1,
+    })).toBeCloseTo(0.625, 10);
   });
 });
 
@@ -333,6 +380,51 @@ describe("smoothStrokePoints (커밋 시점 이동평균 스무딩)", () => {
   it("passes through tiny strokes untouched", () => {
     const tiny = [0, 0, 4, 4];
     expect(smoothStrokePoints(tiny, 9)).toBe(tiny);
+  });
+
+  it("preserves an intentional sharp corner when requested", () => {
+    const elbow = [
+      0, 0,
+      10, 0,
+      20, 0,
+      30, 0,
+      40, 0,
+      40, 10,
+      40, 20,
+      40, 30,
+      40, 40,
+    ];
+    const rounded = smoothStrokePoints(elbow, 9);
+    const preserved = smoothStrokePoints(elbow, 9, { preserveCorners: true });
+    expect(rounded[8]).not.toBe(40);
+    expect(rounded[9]).not.toBe(0);
+    expect(preserved[8]).toBe(40);
+    expect(preserved[9]).toBe(0);
+    expect(preserved).toHaveLength(elbow.length);
+  });
+
+  it("does not mistake a smooth arc for a sequence of sharp corners", () => {
+    const arc = Array.from({ length: 25 }, (_, index) => {
+      const angle = (Math.PI * index) / 24;
+      return [120 + Math.cos(angle) * 80, 120 + Math.sin(angle) * 80];
+    }).flat();
+    const ordinary = smoothStrokePoints(arc, 10, { preserveCorners: false });
+    const cornerAware = smoothStrokePoints(arc, 10, { preserveCorners: true });
+    expect(cornerAware).toHaveLength(ordinary.length);
+    cornerAware.forEach((value, index) => {
+      expect(value).toBeCloseTo(ordinary[index] ?? 0, 10);
+    });
+  });
+
+  it("sanitizes a malformed corner threshold without changing endpoints", () => {
+    const points = [0, 0, 10, 0, 20, 10, 20, 20, 20, 30];
+    const result = smoothStrokePoints(points, 8, {
+      preserveCorners: true,
+      cornerThresholdDeg: Number.NaN,
+    });
+    expect(result.slice(0, 2)).toEqual(points.slice(0, 2));
+    expect(result.slice(-2)).toEqual(points.slice(-2));
+    expect(result.every(Number.isFinite)).toBe(true);
   });
 });
 

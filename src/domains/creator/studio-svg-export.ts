@@ -69,6 +69,10 @@ import {
   type StrokeStyle,
 } from "./studio-stroke-shapes";
 import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "./studio-text-path";
+import {
+  planWatercolorBrushDabs,
+  watercolorBrushSeedFromKey,
+} from "./studio-watercolor-brush";
 
 import type { BubbleVariant } from "./studio-assets";
 
@@ -742,6 +746,35 @@ function serializeFreehand(
   opacityAttr: string
 ): string {
   const brush = el.brush ?? "pen";
+
+  if (points.length === 2 && brush !== "watercolor" && brush !== "screentone") {
+    const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+    const pressureAware = brush === "pen"
+      || brush === "gpen"
+      || brush === "calligraphy"
+      || brush === "marker";
+    const width = pressureAware ? strokeWidth * (0.3 + pressure * 1.4) : strokeWidth;
+    return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, width / 2))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+  }
+
+  if (brush === "watercolor") {
+    const dabs = planWatercolorBrushDabs({
+      points: processFreehandPoints(points),
+      pressures: el.pressures,
+      baseWidth: strokeWidth,
+      seed: watercolorBrushSeedFromKey(el.id),
+      maxDabs: 512,
+    });
+    if (dabs.length === 0) return "";
+    const diffuseId = nextId(ctx, "sw");
+    ctx.defs.push(
+      `<radialGradient id="${diffuseId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="45%" stop-color="${escapeXml(stroke)}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
+    );
+    const circles = dabs.map((dab) => (
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${dab.role === "diffuse" ? `url(#${diffuseId})` : escapeXml(stroke)}" opacity="${fmt(dab.opacity)}"/>`
+    )).join("");
+    return `<g${opacityAttr}>${circles}</g>`;
+  }
 
   if (brush === "calligraphy") {
     const smoothed = processFreehandPoints(points);

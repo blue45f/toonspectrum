@@ -234,8 +234,6 @@ import {
   screentoneDotsForStroke,
   shouldAppendStrokePoint,
   smoothStrokePoints,
-  stabilizePoint,
-  STABILIZER_MAX,
   type CalligraphyStylusInput,
 } from "./studio-brush";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
@@ -359,6 +357,7 @@ import {
   loadStudioPsdImportModule,
   loadStudioSvgExportModule,
 } from "./studio-document-export-loaders";
+import { isCompleteStudioDrawOp } from "./studio-draw-completion";
 import {
   advanceStudioDraftIdentityScope,
   createStudioDraftIdentityScope,
@@ -735,6 +734,15 @@ import {
   type ShapeParams,
   type StrokeStyle,
 } from "./studio-stroke-shapes";
+import {
+  createStudioPointerVelocityState,
+  createStudioStrokeStabilizerState,
+  sampleStudioPointerVelocity,
+  stabilizeStudioStrokeSample,
+  type StudioPointerVelocityState,
+  type StudioStabilizerMode,
+  type StudioStrokeStabilizerState,
+} from "./studio-stroke-stabilizer";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import { planWatercolorBrushDabs, watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
 import {
@@ -773,6 +781,7 @@ import {
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioBrushInputControls } from "./StudioBrushInputControls";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
@@ -794,6 +803,7 @@ import {
   type StudioLayerNavigatorAction,
 } from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
+import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import {
   StudioLivePresenceDockConnected,
   StudioRemoteCursorOverlay,
@@ -2157,14 +2167,6 @@ function drawBounds(points: number[]) {
   };
 }
 
-function isCompleteDrawOp(el: DrawEl) {
-  const kind = el.kind ?? "freehand";
-  if (kind === "freehand") return el.points.length >= 4;
-  const box = drawBounds(el.points);
-  if (kind === "line") return Math.hypot((el.points[2] ?? 0) - (el.points[0] ?? 0), (el.points[3] ?? 0) - (el.points[1] ?? 0)) >= 3;
-  return box.width >= 3 && box.height >= 3;
-}
-
 function getSymmetricPoints(
   points: number[],
   symmetry: { type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope"; centerX: number; centerY: number; radialCount?: number } | undefined
@@ -2392,6 +2394,30 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
 
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
+
+          if (points.length === 2 && brush !== "watercolor" && brush !== "screentone") {
+            const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+            const pressureAware = el.mode === "eraser"
+              || brush === "pen"
+              || brush === "gpen"
+              || brush === "calligraphy"
+              || brush === "marker";
+            const width = pressureAware
+              ? strokeWidth * (0.3 + pressure * 1.4)
+              : strokeWidth;
+            return (
+              <KCircle
+                key={index}
+                x={points[0]}
+                y={points[1]}
+                radius={Math.max(0.35, width / 2)}
+                fill={stroke}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
 
           if (brush === "calligraphy" && el.mode !== "eraser") {
             const smoothed = processFreehandPoints(points);
@@ -5160,6 +5186,9 @@ function StudioCuttoonEditor() {
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
   const [stabilizer, setStabilizer] = useState<number>(6);
+  const [stabilizerMode, setStabilizerMode] = useState<StudioStabilizerMode>("adaptive");
+  const [postCorrection, setPostCorrection] = useState<number>(4);
+  const [preserveCorners, setPreserveCorners] = useState<boolean>(true);
   const [pressureCurve, setPressureCurve] = useState<number>(1.0);
   const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(true);
   const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
@@ -6278,6 +6307,8 @@ function StudioCuttoonEditor() {
   const trRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef<Record<string, Konva.Node | null>>({});
   const drawingRef = useRef<DrawEl | null>(null);
+  const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
+  const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
   // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
   const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
@@ -12312,6 +12343,8 @@ function StudioCuttoonEditor() {
     }
     drawingPointerSessionRef.current = null;
     drawingPointerCaptureTargetRef.current = null;
+    drawingStabilizerRef.current = null;
+    drawingVelocityRef.current = null;
   }
   function discardDrawingPointerSession() {
     drawingRef.current = null;
@@ -12803,6 +12836,12 @@ function StudioCuttoonEditor() {
       drawingPointerSessionRef.current = pointerSession;
       drawingPointerCaptureTargetRef.current = pointerSample.target as StudioPointerCaptureTarget | null;
       tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
+      drawingStabilizerRef.current = drawMode === "shape"
+        ? null
+        : createStudioStrokeStabilizerState({ x: pos.x, y: pos.y, timeStamp: pointerSample.timeStamp });
+      drawingVelocityRef.current = drawMode === "shape"
+        ? null
+        : createStudioPointerVelocityState(pointerSample);
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
@@ -13207,10 +13246,14 @@ function StudioCuttoonEditor() {
     if (!current) return;
     const rawLastX = current.points[current.points.length - 2] ?? pos.x;
     const rawLastY = current.points[current.points.length - 1] ?? pos.y;
+    const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(pointerSample);
+    const velocitySample = sampleStudioPointerVelocity(previousVelocity, pointerSample);
+    drawingVelocityRef.current = velocitySample.state;
     const pressure = resolveBrushPressureSample({
       pointerType: pointerSample.pointerType,
       rawPressure: pointerSample.pressure,
-      distance: Math.hypot(pos.x - rawLastX, pos.y - rawLastY),
+      distance: velocitySample.distance,
+      elapsedMs: velocitySample.elapsedMs,
       velocityFallbackEnabled: useVelocityPressure,
       velocitySensitivity,
       pressureCurve,
@@ -13236,12 +13279,19 @@ function StudioCuttoonEditor() {
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     }
-    if (stabilizer > 0 && current.points.length >= 2) {
-      // 손떨림 보정 1단계: 입력 시점 끌림 보정(순수 함수, studio-brush) — 원근 투영 다음 단계.
-      const lastX = current.points[current.points.length - 2]!;
-      const lastY = current.points[current.points.length - 1]!;
-      [targetX, targetY] = stabilizePoint(lastX, lastY, targetX, targetY, stabilizer);
-    }
+    const liveStabilizerState = drawingStabilizerRef.current
+      ?? createStudioStrokeStabilizerState({
+        x: rawLastX,
+        y: rawLastY,
+        timeStamp: pointerSample.timeStamp,
+      });
+    const stabilized = stabilizeStudioStrokeSample(
+      liveStabilizerState,
+      { x: targetX, y: targetY, timeStamp: pointerSample.timeStamp },
+      { strength: stabilizer, mode: stabilizerMode, coordinateScale: effScale }
+    );
+    drawingStabilizerRef.current = stabilized.state;
+    [targetX, targetY] = stabilized.point;
 
     const lastX = current.points[current.points.length - 2] ?? targetX;
     const lastY = current.points[current.points.length - 1] ?? targetY;
@@ -13292,6 +13342,8 @@ function StudioCuttoonEditor() {
         // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
         const authoritativePerspectiveRay = perspectiveRayRef.current;
         const authoritativeIsometricRay = isometricAxisRayRef.current;
+        const authoritativeStabilizer = drawingStabilizerRef.current;
+        const authoritativeVelocity = drawingVelocityRef.current;
         try {
           for (const sample of batch.predicted) {
             stage.setPointersPositions(sample);
@@ -13305,6 +13357,8 @@ function StudioCuttoonEditor() {
           drawingRef.current = authoritativeDrawing;
           perspectiveRayRef.current = authoritativePerspectiveRay;
           isometricAxisRayRef.current = authoritativeIsometricRay;
+          drawingStabilizerRef.current = authoritativeStabilizer;
+          drawingVelocityRef.current = authoritativeVelocity;
         }
       }
     } finally {
@@ -13321,11 +13375,15 @@ function StudioCuttoonEditor() {
         // authoritatively so a fast flick keeps its final tail; predictions remain preview-only.
         consumeFreehandPointerBatch(stage, pointerEvent, false);
       }
-      if (drawingRef.current && isCompleteDrawOp(drawingRef.current)) {
+      if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         let finished = drawingRef.current;
-        // 손떨림 보정 2단계: 프리핸드 스트로크 확정 시 이동평균 스무딩(점 개수·필압 정렬 보존).
-        if ((finished.kind ?? "freehand") === "freehand" && stabilizer > 0) {
-          finished = { ...finished, points: smoothStrokePoints(finished.points, stabilizer) };
+        // 라이브 입력 안정화와 독립된 후보정. 각점 보존을 켜면 말풍선·의상 모서리처럼 의도적인
+        // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
+        if ((finished.kind ?? "freehand") === "freehand" && postCorrection > 0) {
+          finished = {
+            ...finished,
+            points: smoothStrokePoints(finished.points, postCorrection, { preserveCorners }),
+          };
         }
         // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
         commit([...elements, finished]);
@@ -22866,6 +22924,9 @@ function StudioCuttoonEditor() {
                       brushOpacity,
                       color,
                       stabilizer,
+                      stabilizerMode,
+                      postCorrection,
+                      preserveCorners,
                       pressureCurve,
                       useVelocityPressure,
                       velocitySensitivity,
@@ -22879,6 +22940,9 @@ function StudioCuttoonEditor() {
                       setBrushOpacity(saved.brushOpacity);
                       setColor(saved.color);
                       setStabilizer(saved.stabilizer);
+                      setStabilizerMode(saved.stabilizerMode);
+                      setPostCorrection(saved.postCorrection);
+                      setPreserveCorners(saved.preserveCorners);
                       setPressureCurve(saved.pressureCurve);
                       setUseVelocityPressure(saved.useVelocityPressure);
                       setVelocitySensitivity(saved.velocitySensitivity);
@@ -23013,22 +23077,16 @@ function StudioCuttoonEditor() {
                   </span>
                 </label>
 
-                {/* 손떨림 보정 (Stabilizer) — 0(끔)~10(최대). 입력 끌림 + 확정 시 이동평균 스무딩 */}
-                <label className="flex items-center justify-between gap-2 text-sm text-fg-2 pt-1.5 border-t border-line/35">
-                  <span title="선화를 보정하여 부드러운 드로잉을 지원합니다. (0=끔 ~ 10=최대, 그리는 중 끌림 + 선 확정 시 스무딩)">손떨림 보정</span>
-                  <span className="flex items-center gap-1.5">
-                    <input
-                      type="range"
-                      min={0}
-                      max={STABILIZER_MAX}
-                      step={1}
-                      value={stabilizer}
-                      onChange={(e) => setStabilizer(Number(e.target.value))}
-                      className="w-24 accent-accent cursor-pointer"
-                    />
-                    <span className="w-8 text-right text-xs tabular-nums text-fg-3">{stabilizer}</span>
-                  </span>
-                </label>
+                <StudioLineCorrectionControls
+                  stabilizer={stabilizer}
+                  onStabilizerChange={setStabilizer}
+                  mode={stabilizerMode}
+                  onModeChange={setStabilizerMode}
+                  postCorrection={postCorrection}
+                  onPostCorrectionChange={setPostCorrection}
+                  preserveCorners={preserveCorners}
+                  onPreserveCornersChange={setPreserveCorners}
+                />
 
                 {drawMode === "pen" && (
                   <Suspense fallback={null}>
@@ -23048,61 +23106,14 @@ function StudioCuttoonEditor() {
                   </Suspense>
                 )}
 
-                {/* 속도 기반 필압 (Velocity Pressure) */}
-                <div className="pt-1.5 border-t border-line/35 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className="text-sm text-fg-2"
-                      title="스타일러스 필압을 쓸 수 없는 마우스·터치 입력에서만 이동 속도로 선 굵기를 보완합니다."
-                    >
-                      마우스 속도 필압
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={useVelocityPressure}
-                      onChange={(e) => setUseVelocityPressure(e.target.checked)}
-                      className="accent-accent size-4 cursor-pointer rounded"
-                    />
-                  </div>
-
-                  {useVelocityPressure && (
-                    <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1">
-                      <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
-                        <span>감도 조절</span>
-                        <span className="flex items-center gap-1.5">
-                          <input
-                            type="range"
-                            min={0.1}
-                            max={1.0}
-                            step={0.05}
-                            value={velocitySensitivity}
-                            onChange={(e) => setVelocitySensitivity(Number(e.target.value))}
-                            className="w-20 accent-accent cursor-pointer"
-                          />
-                          <span className="w-8 text-right tabular-nums">{Math.round(velocitySensitivity * 100)}%</span>
-                        </span>
-                      </label>
-                    </div>
-                  )}
-
-                  <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
-                    <span title="필압 변화 민감도를 설정합니다.">필압 곡선</span>
-                    <select
-                      value={Math.abs(pressureCurve - 1.0) < 0.05 ? "linear" : Math.abs(pressureCurve - 1.8) < 0.05 ? "soft" : "hard"}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "linear") setPressureCurve(1.0);
-                        else if (val === "soft") setPressureCurve(1.8);
-                        else if (val === "hard") setPressureCurve(0.65);
-                      }}
-                      className="rounded border border-line bg-card px-1.5 py-0.5 text-xs text-fg focus-visible:outline focus-visible:outline-accent"
-                    >
-                      <option value="linear">기본 (선형)</option>
-                      <option value="soft">부드럽게 (Soft)</option>
-                      <option value="hard">단단하게 (Hard)</option>
-                    </select>
-                  </label>
-                </div>
+                <StudioBrushInputControls
+                  useVelocityPressure={useVelocityPressure}
+                  onUseVelocityPressureChange={setUseVelocityPressure}
+                  velocitySensitivity={velocitySensitivity}
+                  onVelocitySensitivityChange={setVelocitySensitivity}
+                  pressureCurve={pressureCurve}
+                  onPressureCurveChange={setPressureCurve}
+                />
 
                 {drawMode === "pen" && brush === "calligraphy" ? (
                   <div className="space-y-2 border-t border-line/35 pt-2.5">
@@ -23782,6 +23793,31 @@ function StudioCuttoonEditor() {
                 </div>
               )}
             </div>
+
+            {drawMode !== "shape" ? (
+              <>
+                <StudioLineCorrectionControls
+                  density="touch"
+                  stabilizer={stabilizer}
+                  onStabilizerChange={setStabilizer}
+                  mode={stabilizerMode}
+                  onModeChange={setStabilizerMode}
+                  postCorrection={postCorrection}
+                  onPostCorrectionChange={setPostCorrection}
+                  preserveCorners={preserveCorners}
+                  onPreserveCornersChange={setPreserveCorners}
+                />
+                <StudioBrushInputControls
+                  density="touch"
+                  useVelocityPressure={useVelocityPressure}
+                  onUseVelocityPressureChange={setUseVelocityPressure}
+                  velocitySensitivity={velocitySensitivity}
+                  onVelocitySensitivityChange={setVelocitySensitivity}
+                  pressureCurve={pressureCurve}
+                  onPressureCurveChange={setPressureCurve}
+                />
+              </>
+            ) : null}
 
             {drawMode === "pen" && brush === "calligraphy" ? (
               <div className="mt-2.5 space-y-2.5 border-t border-line/60 pt-2.5">

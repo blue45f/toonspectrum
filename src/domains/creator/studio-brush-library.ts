@@ -11,6 +11,11 @@
 
 import { BRUSH_PRESETS, STABILIZER_MAX } from "./studio-brush";
 import { normalizeHexColor } from "./studio-color-utils";
+import {
+  isStudioStabilizerMode,
+  normalizeStudioStabilizerMode,
+  type StudioStabilizerMode,
+} from "./studio-stroke-stabilizer";
 
 // ── 브러시 설정 스냅샷 ───────────────────────────────────────────────────
 // StudioPage.tsx의 "그리기 도구 설정" 패널에서 drawMode === "pen"일 때 실제로 그리기에 쓰이는
@@ -27,7 +32,13 @@ export interface StudioBrushSnapshot {
   color: string;
   /** StudioPage의 `stabilizer` state에 대응(0~STABILIZER_MAX). */
   stabilizer: number;
-  /** StudioPage의 `pressureCurve` state에 대응. UI는 1.0(선형)/1.8(부드럽게)/0.65(단단하게) 중 하나만
+  /** 라이브 입력 보정 알고리즘. 표준/속도 적응/정밀 추적. */
+  stabilizerMode: StudioStabilizerMode;
+  /** 펜을 놓은 뒤 적용하는 독립 후보정 강도(0~STABILIZER_MAX). */
+  postCorrection: number;
+  /** 후보정이 의도적인 각점을 둥글리지 않도록 보존할지 여부. */
+  preserveCorners: boolean;
+  /** StudioPage의 `pressureCurve` state에 대응. UI는 0.65(민감하게)/1.0(선형)/1.8(단단하게) 중 하나만
    *  설정하지만, 저장 데이터가 다른 값이어도 동작은 하므로 0.3~3 범위로만 clamp한다. */
   pressureCurve: number;
   /** StudioPage의 `useVelocityPressure` state에 대응. */
@@ -71,6 +82,9 @@ const DEFAULT_SNAPSHOT: StudioBrushSnapshot = {
   brushOpacity: 1,
   color: "#7c5cfc",
   stabilizer: 6,
+  stabilizerMode: "adaptive",
+  postCorrection: 4,
+  preserveCorners: true,
   pressureCurve: 1.0,
   useVelocityPressure: true,
   velocitySensitivity: 0.65,
@@ -135,6 +149,18 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     adjustedFields
   );
   const stabilizer = clampedNumberField(o, "stabilizer", 0, STABILIZER_MAX, DEFAULT_SNAPSHOT.stabilizer, adjustedFields);
+  const postCorrection = clampedNumberField(
+    o,
+    "postCorrection",
+    0,
+    STABILIZER_MAX,
+    DEFAULT_SNAPSHOT.postCorrection,
+    adjustedFields
+  );
+  const stabilizerMode = isStudioStabilizerMode(o.stabilizerMode)
+    ? o.stabilizerMode
+    : normalizeStudioStabilizerMode(DEFAULT_SNAPSHOT.stabilizerMode);
+  if (!isStudioStabilizerMode(o.stabilizerMode)) adjustedFields.push("stabilizerMode");
   const pressureCurve = clampedNumberField(
     o,
     "pressureCurve",
@@ -176,6 +202,14 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     useVelocityPressure = DEFAULT_SNAPSHOT.useVelocityPressure;
   }
 
+  let preserveCorners: boolean;
+  if (typeof o.preserveCorners === "boolean") {
+    preserveCorners = o.preserveCorners;
+  } else {
+    adjustedFields.push("preserveCorners");
+    preserveCorners = DEFAULT_SNAPSHOT.preserveCorners;
+  }
+
   let tiltEnabled: boolean;
   if (typeof o.tiltEnabled === "boolean") {
     tiltEnabled = o.tiltEnabled;
@@ -200,6 +234,9 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       brushOpacity,
       color,
       stabilizer,
+      stabilizerMode,
+      postCorrection,
+      preserveCorners,
       pressureCurve,
       useVelocityPressure,
       velocitySensitivity,
@@ -303,7 +340,7 @@ export function createBrush(name: string, snapshot: StudioBrushSnapshot): Studio
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
 export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
-export const BRUSH_EXPORT_VERSION = 2;
+export const BRUSH_EXPORT_VERSION = 3;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
@@ -316,6 +353,9 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     brushOpacity: brush.brushOpacity,
     color: brush.color,
     stabilizer: brush.stabilizer,
+    stabilizerMode: brush.stabilizerMode,
+    postCorrection: brush.postCorrection,
+    preserveCorners: brush.preserveCorners,
     pressureCurve: brush.pressureCurve,
     useVelocityPressure: brush.useVelocityPressure,
     velocitySensitivity: brush.velocitySensitivity,

@@ -201,6 +201,41 @@ describe("도형 직렬화", () => {
     expect(svg).toContain('stroke-linecap="round"');
   });
 
+  it("한 점 탭 — 필압 굵기의 원으로 보존한다", () => {
+    const dot = rectEl({
+      id: "dot-1",
+      kind: "freehand",
+      points: [12, 34],
+      pressures: [0.75],
+      stroke: "#123456",
+      strokeWidth: 10,
+    });
+    const { svg, skipped } = exportPageToSvg(page([dot]));
+    expect(svg).toContain('<circle cx="12" cy="34"');
+    expect(svg).toContain('fill="#123456"');
+    expect(svg).toContain('r="6.75"');
+    expect(skipped).toEqual([]);
+  });
+
+  it("수채 번짐 — 결정적 core/diffuse dab과 방사 그라데이션을 보존한다", () => {
+    const watercolor = rectEl({
+      id: "watercolor-svg-1",
+      kind: "freehand",
+      brush: "watercolor",
+      points: [0, 0, 20, 5, 40, 0],
+      pressures: [0.2, 0.6, 0.9],
+      stroke: "#336699",
+      strokeWidth: 24,
+    });
+    const first = exportPageToSvg(page([watercolor]));
+    const second = exportPageToSvg(page([watercolor]));
+    expect(first.svg).toBe(second.svg);
+    expect(first.svg).toContain("<radialGradient");
+    expect(first.svg).toContain('stop-color="#336699"');
+    expect((first.svg.match(/<circle /g) ?? []).length).toBeGreaterThan(2);
+    expect(first.skipped).toEqual([]);
+  });
+
   it("형광펜 — multiply 혼합과 사각 끝을 유지한다", () => {
     const hl = rectEl({ id: "h1", kind: "freehand", brush: "highlighter", points: [0, 0, 10, 0, 20, 10, 30, 30] });
     const { svg } = exportPageToSvg(page([hl]));

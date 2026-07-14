@@ -2,7 +2,7 @@
  * scripts/verify-studio-launch.mts
  * Committed, reproducible harness for Verification plan step 2.
  * - Spawns `vite preview`
- * - Two successive headless runs via Playwright API
+ * - Two successive desktop headless runs plus one mobile drawing run via Playwright API
  * - addInitScript to dismiss quick-start overlay
  * - Asserts Konva/canvas surface present with target webtoon dims
  * - Performs a driven interaction using shipped UI (click "예시로 시작" or "추가")
@@ -44,6 +44,18 @@ interface RunResult {
   };
   errCount: number;
   shot: string;
+}
+
+interface MobileRunResult {
+  ok: boolean;
+  immersive: boolean;
+  controlsReady: boolean;
+  noPanelDockOverlap: boolean;
+  dotRecorded: boolean;
+  dotRendered: boolean;
+  errCount: number;
+  shot: string;
+  dotShot: string;
 }
 
 function log(msg: string) {
@@ -189,6 +201,128 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   return { ok, stageInfo: { logicalW, hasKonvaSurface, pageDelta }, errCount: consoleErrors.length, shot };
 }
 
+async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRunResult> {
+  const shot = join(SCRATCH, "studio-launch-mobile-drawing.png");
+  const dotShot = join(SCRATCH, "studio-launch-mobile-dot.png");
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const consoleErrors: string[] = [];
+
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const location = message.location().url;
+    const text = location ? `${message.text()} @ ${location}` : message.text();
+    if (!isExpectedStaticPreviewApiError(text)) consoleErrors.push(text);
+  });
+  page.on("pageerror", (error) => consoleErrors.push(String(error)));
+
+  await page.addInitScript(({ quickStartKey, mobileHintKey }) => {
+    try {
+      window.localStorage.setItem(quickStartKey, "1");
+      window.localStorage.setItem(mobileHintKey, "1");
+    } catch {}
+  }, {
+    quickStartKey: QUICKSTART_KEY,
+    mobileHintKey: "toonspectrum-studio-mobile-hint-dismissed",
+  });
+
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+  const dock = page.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
+  await dock.waitFor({ state: "visible", timeout: 8000 });
+  const editorRoot = page.locator('[data-studio-editor="true"]');
+  await page
+    .locator('[data-studio-editor="true"][data-studio-mobile-immersive="true"]')
+    .waitFor({ state: "attached", timeout: 3000 });
+
+  await page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }).click();
+  const sheet = page.getByRole("dialog", { name: "브러시 설정" });
+  await sheet.waitFor({ state: "visible", timeout: 3000 });
+
+  const lineCorrection = sheet.getByRole("region", { name: "선 보정" });
+  const pressureInput = sheet.getByRole("region", { name: "필압 입력" });
+  await lineCorrection.scrollIntoViewIfNeeded();
+  await pressureInput.scrollIntoViewIfNeeded();
+  const controlsReady =
+    (await lineCorrection.count()) === 1 &&
+    (await pressureInput.count()) === 1 &&
+    await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled() &&
+    await sheet.getByRole("combobox", { name: "필압 반응" }).isEnabled();
+
+  const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
+  const mobileImmersivePreference = await page.evaluate(() =>
+    window.sessionStorage.getItem("toonspectrum-studio-mobile-immersive:v1")
+  );
+  const immersiveRootReady = mobileImmersiveValue === "true";
+  const siteBrandVisible = await page
+    .locator('header a[href="/"]')
+    .filter({ hasText: "툰스펙트럼" })
+    .isVisible()
+    .catch(() => false);
+  const siteFooterVisible = await page.getByRole("contentinfo").isVisible().catch(() => false);
+  const immersive =
+    immersiveRootReady &&
+    !siteBrandVisible &&
+    !siteFooterVisible;
+  const sheetBox = await sheet.boundingBox();
+  const dockBox = await dock.boundingBox();
+  const noPanelDockOverlap = Boolean(
+    sheetBox && dockBox && sheetBox.y + sheetBox.height <= dockBox.y + 1
+  );
+
+  await page.screenshot({ path: shot, fullPage: false });
+
+  await sheet.getByRole("button", { name: "브러시 설정 닫기" }).click();
+  const stage = page.locator(".konvajs-content").first();
+  const stageBox = await stage.boundingBox();
+  const stageBeforeDot = stageBox ? await stage.screenshot() : null;
+  if (stageBox) {
+    await page.mouse.click(
+      stageBox.x + stageBox.width * 0.5,
+      stageBox.y + Math.min(stageBox.height * 0.35, 240)
+    );
+    await page.waitForTimeout(200);
+  }
+  const dotRecorded = await dock.getByRole("button", { name: "실행취소" }).isEnabled();
+  const stageAfterDot = stageBox ? await stage.screenshot() : null;
+  const dotRendered = Boolean(
+    stageBeforeDot && stageAfterDot && !stageBeforeDot.equals(stageAfterDot)
+  );
+  await page.screenshot({ path: dotShot, fullPage: false });
+
+  const ok =
+    immersive &&
+    controlsReady &&
+    noPanelDockOverlap &&
+    dotRecorded &&
+    dotRendered &&
+    consoleErrors.length === 0;
+  log(
+    `mobile: immersive=${immersive} root=${immersiveRootReady} ` +
+    `rootValue=${mobileImmersiveValue} preference=${mobileImmersivePreference} ` +
+    `siteBrand=${siteBrandVisible} siteFooter=${siteFooterVisible} controlsReady=${controlsReady} ` +
+    `noPanelDockOverlap=${noPanelDockOverlap} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
+    `consoleErrors=${consoleErrors.length}`
+  );
+  if (!ok) {
+    for (const [index, message] of consoleErrors.slice(0, 8).entries()) {
+      log(`mobile consoleError[${index}]: ${message}`);
+    }
+  }
+
+  await ctx.close();
+  return {
+    ok,
+    immersive,
+    controlsReady,
+    noPanelDockOverlap,
+    dotRecorded,
+    dotRendered,
+    errCount: consoleErrors.length,
+    shot,
+    dotShot,
+  };
+}
+
 async function main() {
   mkdirSync(SCRATCH, { recursive: true });
   const port = await findFreePort();
@@ -225,12 +359,17 @@ async function main() {
       }
     }
 
+    const mobile = await runMobileDrawing(browser, url);
+    if (!mobile.ok) {
+      throw new Error("studio mobile drawing verification failed");
+    }
+
     await browser.close();
     browser = null;
 
-    log("BOTH RUNS OK");
-    log(`screenshots: ${results.map(r => r.shot).join(" ")}`);
-    console.log(JSON.stringify({ runs: results }, null, 2));
+    log("DESKTOP AND MOBILE RUNS OK");
+    log(`screenshots: ${[...results.map(r => r.shot), mobile.shot, mobile.dotShot].join(" ")}`);
+    console.log(JSON.stringify({ runs: results, mobile }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     try { server.kill("SIGKILL"); } catch {}

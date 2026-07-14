@@ -35,6 +35,9 @@ const validSnapshot: StudioBrushSnapshot = {
   brushOpacity: 0.8,
   color: "#ff0000",
   stabilizer: 4,
+  stabilizerMode: "precision",
+  postCorrection: 7,
+  preserveCorners: true,
   pressureCurve: 1.8,
   useVelocityPressure: true,
   velocitySensitivity: 0.5,
@@ -65,6 +68,9 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toContain("brushId");
     expect(adjustedFields).toContain("color");
     expect(adjustedFields).toContain("useVelocityPressure");
+    expect(adjustedFields).toContain("stabilizerMode");
+    expect(adjustedFields).toContain("postCorrection");
+    expect(adjustedFields).toContain("preserveCorners");
     expect(adjustedFields).toContain("tiltEnabled");
     expect(adjustedFields).toContain("tipAngle");
     expect(adjustedFields).toContain("tipRoundness");
@@ -120,6 +126,19 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, useVelocityPressure: "yes" });
     expect(snapshot.useVelocityPressure).toBe(true);
     expect(adjustedFields).toEqual(["useVelocityPressure"]);
+  });
+
+  it("선 보정 모드·후보정·각점 보존을 정규화한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      stabilizerMode: "unknown",
+      postCorrection: 999,
+      preserveCorners: "yes",
+    });
+    expect(snapshot.stabilizerMode).toBe("adaptive");
+    expect(snapshot.postCorrection).toBe(10);
+    expect(snapshot.preserveCorners).toBe(true);
+    expect(adjustedFields).toEqual(["postCorrection", "stabilizerMode", "preserveCorners"]);
   });
 
   it("펜촉 틸트 설정을 타입과 안전 범위로 정규화한다", () => {
@@ -197,6 +216,20 @@ describe("listBrushes", () => {
       tiltEnabled: true,
       tipAngle: -30,
       tipRoundness: 0.24,
+    });
+  });
+
+  it("v2 저장 브러시에 새 선 보정 필드가 없어도 안전 기본값으로 마이그레이션한다", () => {
+    const legacy = brush("legacy-v2") as Partial<StudioSavedBrush>;
+    delete legacy.stabilizerMode;
+    delete legacy.postCorrection;
+    delete legacy.preserveCorners;
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
+    expect(listBrushes(s)[0]).toMatchObject({
+      id: "legacy-v2",
+      stabilizerMode: "adaptive",
+      postCorrection: 4,
+      preserveCorners: true,
     });
   });
 });
@@ -285,6 +318,9 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.kind).toBe(BRUSH_EXPORT_KIND);
     expect(parsed.name).toBe("브러시 a");
     expect(parsed.brushId).toBe("gpen");
+    expect(parsed.stabilizerMode).toBe("precision");
+    expect(parsed.postCorrection).toBe(7);
+    expect(parsed.preserveCorners).toBe(true);
     expect(parsed.tiltEnabled).toBe(true);
     expect(parsed.tipAngle).toBe(-35);
     expect(parsed.tipRoundness).toBe(0.3);
