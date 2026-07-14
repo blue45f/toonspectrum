@@ -5,8 +5,8 @@ import {
   recordStudioMacroCommand,
   startStudioMacroRecording,
   stopStudioMacroRecording,
-  studioMacroSessionToAutoActionSet,
 } from "./studio-macro-recorder";
+import { studioMacroSessionToAutoActionSet } from "./studio-macro-to-auto-actions";
 
 describe("studio macro recorder", () => {
   it("records only while active and converts to auto-action commands", () => {

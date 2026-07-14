@@ -519,11 +519,6 @@ import {
   type StudioLayerMergePlan,
 } from "./studio-layer-merge";
 import {
-  bakeStudioMergeComposite,
-  planStudioMergeBakeMode,
-  type StudioMergeBakeImageSource,
-} from "./studio-layer-merge-bake";
-import {
   normalizeStudioLayerColor,
   normalizeStudioLayerRole,
 } from "./studio-layer-navigator";
@@ -554,7 +549,6 @@ import {
   recordStudioMacroCommand,
   startStudioMacroRecording,
   stopStudioMacroRecording,
-  studioMacroSessionToAutoActionSet,
   type StudioMacroSession,
 } from "./studio-macro-recorder";
 import {
@@ -4337,8 +4331,9 @@ function StudioCuttoonEditor() {
     setAutoActionStatus("매크로 녹음을 시작했어요. 레이어·레터링 조작이 기록됩니다.");
     setAutoActionError(null);
   }
-  function stopMacroRecord() {
+  async function stopMacroRecord() {
     const stopped = stopStudioMacroRecording(macroSession);
+    const { studioMacroSessionToAutoActionSet } = await import("./studio-macro-to-auto-actions");
     const actionSet = studioMacroSessionToAutoActionSet(stopped);
     setMacroSession(createStudioMacroSession(stopped.name));
     setAutoActionSet(actionSet);
@@ -9452,7 +9447,11 @@ function StudioCuttoonEditor() {
     setLayerMergeBusy(true);
     try {
       const plan: StudioLayerMergePlan = result.plan;
-      const sources: StudioMergeBakeImageSource[] = plan.removeIds
+      const {
+        bakeStudioMergeComposite,
+        planStudioMergeBakeMode,
+      } = await import("./studio-layer-merge-bake");
+      const sources = plan.removeIds
         .map((id) => elements.find((element) => element.id === id))
         .filter((element): element is El => Boolean(element))
         .map((element) => {
@@ -25432,7 +25431,7 @@ function StudioCuttoonEditor() {
             macroRecording={macroSession.recording}
             macroCommandCount={macroSession.commands.length}
             onStartMacroRecord={startMacroRecord}
-            onStopMacroRecord={stopMacroRecord}
+            onStopMacroRecord={() => void stopMacroRecord()}
             onClose={() => {
               if (!autoActionBusy) setAutoActionsOpen(false);
             }}

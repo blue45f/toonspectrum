@@ -1,14 +1,8 @@
 /**
- * Session macro recorder → Auto Action command list.
- * Records high-level allowlisted commands only (no pointer streams).
+ * Session macro recorder — high-level allowlisted commands only (no pointer streams).
+ * Auto Action conversion lives in studio-macro-to-auto-actions.ts so StudioPage can keep
+ * the heavy auto-actions module out of the static Studio route chunk.
  */
-
-import {
-  STUDIO_AUTO_ACTION_BLEND_MODES,
-  normalizeStudioAutoActionSet,
-  type StudioAutoActionCommand,
-  type StudioAutoActionSet,
-} from "./studio-auto-actions";
 
 export const STUDIO_MACRO_RECORDER_VERSION = 1 as const;
 export const STUDIO_MACRO_MAX_COMMANDS = 80;
@@ -104,56 +98,4 @@ export function recordStudioMacroCommand(
     ...session,
     commands: [...session.commands, normalized],
   };
-}
-
-function macroCommandToAutoAction(
-  command: StudioMacroCommand,
-  index: number
-): StudioAutoActionCommand | null {
-  const id = `macro-${index + 1}`;
-  switch (command.type) {
-    case "set-opacity":
-      return { id, enabled: true, type: "element.set-opacity", opacity: command.opacity };
-    case "set-hidden":
-      return { id, enabled: true, type: "element.set-hidden", hidden: command.hidden };
-    case "set-locked":
-      return { id, enabled: true, type: "element.set-locked", locked: command.locked };
-    case "set-blend-mode": {
-      const blendMode = (STUDIO_AUTO_ACTION_BLEND_MODES as readonly string[]).includes(command.blendMode)
-        ? (command.blendMode as (typeof STUDIO_AUTO_ACTION_BLEND_MODES)[number])
-        : "source-over";
-      return { id, enabled: true, type: "element.set-blend-mode", blendMode };
-    }
-    case "lettering-font-size":
-      return { id, enabled: true, type: "lettering.set-size", fontSize: command.fontSize };
-    case "lettering-color":
-      return { id, enabled: true, type: "lettering.set-color", color: command.color };
-    default:
-      return null;
-  }
-}
-
-/** Convert a finished recording into an Auto Action set for dry-run/apply. */
-export function studioMacroSessionToAutoActionSet(session: StudioMacroSession): StudioAutoActionSet {
-  const commands: StudioAutoActionCommand[] = [];
-  session.commands.forEach((command, index) => {
-    const action = macroCommandToAutoAction(command, index);
-    if (action) commands.push(action);
-  });
-  if (commands.length === 0) {
-    // Schema requires min(1) command — synthesize a no-op opacity keep for empty recordings.
-    commands.push({
-      id: "macro-empty-1",
-      enabled: false,
-      type: "element.set-opacity",
-      opacity: 1,
-    });
-  }
-  return normalizeStudioAutoActionSet({
-    kind: "toonspectrum-studio-auto-actions",
-    version: 1,
-    id: `macro-set-${session.startedAt ?? 0}`,
-    name: session.name,
-    commands,
-  });
 }
