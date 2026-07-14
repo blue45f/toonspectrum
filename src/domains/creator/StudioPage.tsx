@@ -878,7 +878,6 @@ import {
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBrushStudio } from "./StudioBrushStudio";
-import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
@@ -889,7 +888,6 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
-import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
 import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
@@ -909,7 +907,6 @@ import {
 import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
-import { StudioMainMenu, type StudioMainMenuGroup } from "./StudioMainMenu";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
@@ -984,6 +981,7 @@ import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
+import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type {
   GeneratedAssetQuality,
@@ -1191,6 +1189,18 @@ const StudioPuppetWarpPanel = lazyRetry(
 const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
   "StudioQuickShapePanel"
+);
+const StudioMainMenu = lazyRetry(
+  () => import("./StudioMainMenu").then((mod) => ({ default: mod.StudioMainMenu })),
+  "StudioMainMenu"
+);
+const StudioDrawOptionsBar = lazyRetry(
+  () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
+  "StudioDrawOptionsBar"
+);
+const StudioBrushTray = lazyRetry(
+  () => import("./StudioBrushTray").then((mod) => ({ default: mod.StudioBrushTray })),
+  "StudioBrushTray"
 );
 const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
@@ -16813,10 +16823,12 @@ function StudioCuttoonEditor() {
         </div>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line sm:block" />
         {/* Magma/CSP application menu — desktop; replaces the cluttered horizontal toolbelt IA */}
-        <StudioMainMenu
-          groups={studioMainMenuGroups}
-          className={cn("hidden min-w-0 lg:flex", mobileImmersive && "!hidden")}
-        />
+        <Suspense fallback={null}>
+          <StudioMainMenu
+            groups={studioMainMenuGroups}
+            className={cn("hidden min-w-0 lg:flex", mobileImmersive && "!hidden")}
+          />
+        </Suspense>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line lg:block" />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
@@ -17374,38 +17386,40 @@ function StudioCuttoonEditor() {
 
       {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP/Magma properties strip). */}
       {tool === "draw" && !canvasOnlyMode ? (
-        <StudioDrawOptionsBar
-          className={cn(mobileImmersive && "order-first")}
-          drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
-          brushId={brush}
-          strokeWidth={strokeWidth}
-          brushOpacity={brushOpacity}
-          stabilizer={stabilizer}
-          stabilizerModeLabel={stabilizerMode}
-          color={color}
-          recentSwatches={DRAW_COLOR_SWATCHES}
-          quickShapeActive={quickShapeActive}
-          compactBrushes={uiDensityMode !== "full"}
-          onSelectBrush={(item) => {
-            const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
-            if (preset) applyBuiltInBrushPreset(preset);
-          }}
-          onStrokeWidthChange={setStrokeWidth}
-          onOpacityChange={setBrushOpacity}
-          onStabilizerChange={setStabilizer}
-          onColorChange={setColor}
-          onToggleQuickShape={() => {
-            const next = !quickShapeActive;
-            if (next) disarmAllPixelTools();
-            setQuickShapeActive(next);
-          }}
-          onSetDrawMode={(mode) => {
-            if (mode === "shape") return;
-            setTool("draw");
-            setDrawMode(mode);
-            setEyedropperActive(false);
-          }}
-        />
+        <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
+          <StudioDrawOptionsBar
+            className={cn(mobileImmersive && "order-first")}
+            drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
+            brushId={brush}
+            strokeWidth={strokeWidth}
+            brushOpacity={brushOpacity}
+            stabilizer={stabilizer}
+            stabilizerModeLabel={stabilizerMode}
+            color={color}
+            recentSwatches={DRAW_COLOR_SWATCHES}
+            quickShapeActive={quickShapeActive}
+            compactBrushes={uiDensityMode !== "full"}
+            onSelectBrush={(item) => {
+              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
+              if (preset) applyBuiltInBrushPreset(preset);
+            }}
+            onStrokeWidthChange={setStrokeWidth}
+            onOpacityChange={setBrushOpacity}
+            onStabilizerChange={setStabilizer}
+            onColorChange={setColor}
+            onToggleQuickShape={() => {
+              const next = !quickShapeActive;
+              if (next) disarmAllPixelTools();
+              setQuickShapeActive(next);
+            }}
+            onSetDrawMode={(mode) => {
+              if (mode === "shape") return;
+              setTool("draw");
+              setDrawMode(mode);
+              setEyedropperActive(false);
+            }}
+          />
+        </Suspense>
       ) : null}
 
       {/* Legacy tool belt: primary on mobile; off-screen host on desktop so popovers still mount. */}
@@ -18712,14 +18726,16 @@ function StudioCuttoonEditor() {
                   )}
                   aria-hidden={drawMode !== "pen"}
                 >
-                  <StudioBrushTray
-                    activeBrushId={brush}
-                    compact={uiDensityMode === "simple" || uiDensityMode === "focus"}
-                    onSelect={(item) => {
-                      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
-                      if (preset) applyBuiltInBrushPreset(preset);
-                    }}
-                  />
+                  <Suspense fallback={null}>
+                    <StudioBrushTray
+                      activeBrushId={brush}
+                      compact={uiDensityMode === "simple" || uiDensityMode === "focus"}
+                      onSelect={(item) => {
+                        const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
+                        if (preset) applyBuiltInBrushPreset(preset);
+                      }}
+                    />
+                  </Suspense>
                 </div>
                 <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode !== "pen" && "invisible")} />
               </>
