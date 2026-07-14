@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   canBeginStudioLiveMutation,
   findConflictingStudioLiveLock,
+  planStudioLiveHeldResourceClear,
+  planStudioLiveHeldResourceReplace,
   selfHoldsStudioLiveLock,
   studioLiveElementResource,
   studioLiveMutationResources,
@@ -77,5 +79,60 @@ describe("studio live mutation guard", () => {
     });
     expect(deniedElement.ok).toBe(false);
     if (!deniedElement.ok) expect(deniedElement.lock.resource).toBe("element:p1:e2");
+  });
+
+  it("planStudioLiveHeldResourceReplace always releases prior holds before new claims", () => {
+    const plan = planStudioLiveHeldResourceReplace(
+      ["page:p1", "element:p1:a"],
+      ["page:p1", "element:p1:b"]
+    );
+    expect(plan.toRelease).toEqual(["page:p1", "element:p1:a"]);
+    expect(plan.toClaim).toEqual(["page:p1", "element:p1:b"]);
+    expect(plan.held).toEqual(["page:p1", "element:p1:b"]);
+  });
+
+  it("planStudioLiveHeldResourceClear releases every tracked resource", () => {
+    const plan = planStudioLiveHeldResourceClear(["page:p1", "element:p1:a"]);
+    expect(plan.toRelease).toEqual(["page:p1", "element:p1:a"]);
+    expect(plan.held).toEqual([]);
+  });
+
+  it("claim/release contract: simulated room never strands after replace+clear", () => {
+    const claimed = new Set<string>();
+    const room = {
+      claimLock(resource: string) {
+        claimed.add(resource);
+      },
+      releaseLock(resource: string) {
+        claimed.delete(resource);
+      },
+    };
+    let held: string[] = [];
+    // First edit claim
+    {
+      const next = studioLiveMutationResources({ pageId: "p1", elementIds: null });
+      const plan = planStudioLiveHeldResourceReplace(held, next);
+      for (const resource of plan.toRelease) room.releaseLock(resource);
+      for (const resource of plan.toClaim) room.claimLock(resource);
+      held = [...plan.held];
+    }
+    expect([...claimed].sort()).toEqual(["page:p1"]);
+    // Nested/aborted re-claim for element edit must release page-only first then re-claim
+    {
+      const next = studioLiveMutationResources({ pageId: "p1", elementIds: ["e9"] });
+      const plan = planStudioLiveHeldResourceReplace(held, next);
+      for (const resource of plan.toRelease) room.releaseLock(resource);
+      for (const resource of plan.toClaim) room.claimLock(resource);
+      held = [...plan.held];
+    }
+    expect([...claimed].sort()).toEqual(["element:p1:e9", "page:p1"]);
+    // Early-exit path: clear must empty room
+    {
+      const plan = planStudioLiveHeldResourceClear(held);
+      for (const resource of plan.toRelease) room.releaseLock(resource);
+      held = [...plan.held];
+    }
+    expect(held).toEqual([]);
+    expect(claimed.size).toBe(0);
   });
 });

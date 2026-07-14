@@ -131,3 +131,45 @@ export function selfHoldsStudioLiveLock(
   }
   return false;
 }
+
+/**
+ * Plan replace of the local held-resource set before claiming a new edit.
+ * Always release previous holds first so nested/aborted claims cannot strand leases.
+ * Pure — callers apply `toRelease` then `toClaim` against the room.
+ */
+export function planStudioLiveHeldResourceReplace(
+  previouslyHeld: readonly string[] | null | undefined,
+  nextResources: readonly string[] | null | undefined
+): {
+  toRelease: readonly string[];
+  toClaim: readonly string[];
+  held: readonly string[];
+} {
+  const prev: string[] = [];
+  const seenPrev = new Set<string>();
+  for (const resource of previouslyHeld ?? []) {
+    if (typeof resource !== "string" || resource.length === 0 || seenPrev.has(resource)) continue;
+    seenPrev.add(resource);
+    prev.push(resource);
+  }
+  const next: string[] = [];
+  const seenNext = new Set<string>();
+  for (const resource of nextResources ?? []) {
+    if (typeof resource !== "string" || resource.length === 0 || seenNext.has(resource)) continue;
+    seenNext.add(resource);
+    next.push(resource);
+  }
+  return {
+    toRelease: prev,
+    toClaim: next,
+    held: next,
+  };
+}
+
+/** Clear held set (release everything). Pure companion to endLiveResourceEdit. */
+export function planStudioLiveHeldResourceClear(
+  previouslyHeld: readonly string[] | null | undefined
+): { toRelease: readonly string[]; held: readonly string[] } {
+  const plan = planStudioLiveHeldResourceReplace(previouslyHeld, []);
+  return { toRelease: plan.toRelease, held: plan.held };
+}

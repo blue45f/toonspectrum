@@ -541,6 +541,8 @@ import {
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   canBeginStudioLiveMutation,
+  planStudioLiveHeldResourceClear,
+  planStudioLiveHeldResourceReplace,
   studioLiveMutationResources,
 } from "./studio-live-mutation-guard";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
@@ -4309,18 +4311,26 @@ function StudioCuttoonEditor() {
       pageId: activePage.id,
       elementIds,
     });
-    for (const resource of resources) {
+    // Release any previously held leases before claiming a new set — never overwrite untracked.
+    const plan = planStudioLiveHeldResourceReplace(
+      studioLiveHeldResourcesRef.current,
+      resources
+    );
+    for (const resource of plan.toRelease) {
+      room.releaseLock(resource);
+    }
+    for (const resource of plan.toClaim) {
       room.claimLock(resource);
     }
-    studioLiveHeldResourcesRef.current = resources;
+    studioLiveHeldResourcesRef.current = [...plan.held];
     return true;
   }
   function endLiveResourceEdit() {
     const room = studioLiveRoomRef.current;
-    const held = studioLiveHeldResourcesRef.current;
-    studioLiveHeldResourcesRef.current = [];
-    if (!room || held.length === 0) return;
-    for (const resource of held) room.releaseLock(resource);
+    const plan = planStudioLiveHeldResourceClear(studioLiveHeldResourcesRef.current);
+    studioLiveHeldResourcesRef.current = [...plan.held];
+    if (!room || plan.toRelease.length === 0) return;
+    for (const resource of plan.toRelease) room.releaseLock(resource);
   }
   function nodeInteractionBegin(elementId: string): boolean {
     return beginLiveResourceEdit([elementId]);
@@ -13509,7 +13519,11 @@ function StudioCuttoonEditor() {
         return;
       }
       const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
+      // Every early exit after a successful begin must release — stranded claimLock is collab-unsafe.
+      if (!pos) {
+        endLiveResourceEdit();
+        return;
+      }
       setSelectedId(null);
 
       const pressure = resolveBrushPressureSample({
