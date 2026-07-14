@@ -20024,6 +20024,34 @@ function StudioCuttoonEditor() {
                 {pageDisplayName(activePage, activePageIndex)}
               </span>
               <span aria-hidden className="h-3 w-px bg-line" />
+              <span className="tabular-nums text-fg-3" title="현재 도구">
+                {tool === "draw"
+                  ? drawMode === "eraser"
+                    ? `지우개 ${strokeWidth}px`
+                    : drawMode === "shape"
+                      ? `도형 · ${drawShape}`
+                      : `${brush} · ${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`
+                  : tool === "select"
+                    ? selected
+                      ? `선택 · ${elementLabel(selected)}`
+                      : "선택"
+                    : tool}
+              </span>
+              {tool === "draw" && symmetryType !== "none" ? (
+                <>
+                  <span aria-hidden className="h-3 w-px bg-line" />
+                  <span className="font-bold text-accent" title="대칭 그리기">
+                    대칭:{symmetryType === "vertical" ? "세로" : symmetryType === "horizontal" ? "가로" : symmetryType === "radial" ? "방사" : "만화경"}
+                  </span>
+                </>
+              ) : null}
+              {tool === "draw" && quickShapeActive ? (
+                <>
+                  <span aria-hidden className="h-3 w-px bg-line" />
+                  <span className="font-bold text-accent">스마트도형</span>
+                </>
+              ) : null}
+              <span aria-hidden className="h-3 w-px bg-line" />
               <div className="flex items-center gap-px" role="group" aria-label="레이아웃 모드">
                 {(["focus", "simple", "full"] as const).map((mode) => (
                   <button
@@ -20058,6 +20086,17 @@ function StudioCuttoonEditor() {
                 title="너비에 맞춤"
               >
                 맞춤
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (canvasOnlyMode) setCanvasOnlyMode(false);
+                  else enterCanvasOnlyMode();
+                }}
+                className="rounded px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                title="Tab — 캔버스만 / 도구 토글"
+              >
+                {canvasOnlyMode ? "도구" : "Tab"}
               </button>
             </StudioStatusBar>
           ) : null}
