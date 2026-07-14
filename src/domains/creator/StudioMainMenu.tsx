@@ -18,7 +18,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
-import { STUDIO_Z_CLASS } from "./studio-z-index";
+import { STUDIO_Z } from "./studio-z-index";
 
 import { cn } from "@/lib/utils";
 
@@ -44,12 +44,31 @@ export interface StudioMainMenuProps {
   className?: string;
 }
 
+type MenuCoords = { top: number; left: number; minWidth: number };
+
+function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
+  if (!btn) {
+    return { top: 48, left: 8, minWidth: 248 };
+  }
+  const rect = btn.getBoundingClientRect();
+  const minWidth = Math.max(248, rect.width + 48);
+  let left = rect.left;
+  if (typeof window !== "undefined") {
+    left = Math.min(left, window.innerWidth - minWidth - 8);
+    left = Math.max(8, left);
+  }
+  return {
+    top: rect.bottom + 6,
+    left,
+    minWidth,
+  };
+}
+
 function MenuDropdown({
   group,
   open,
   onOpen,
   onClose,
-  /** Magma-style: when any sibling menu is open, pointer-enter opens this one. */
   barActive,
 }: {
   group: StudioMainMenuGroup;
@@ -61,67 +80,59 @@ function MenuDropdown({
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number; minWidth: number } | null>(
-    null
-  );
+  // Keep last coords so the panel can paint on the same frame as open=true
+  // (do not gate portal on a second useState tick).
+  const [coords, setCoords] = useState<MenuCoords>(() => measureTrigger(null));
 
   const updateCoords = () => {
-    const btn = buttonRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const minWidth = Math.max(248, rect.width + 48);
-    let left = rect.left;
-    if (typeof window !== "undefined") {
-      left = Math.min(left, window.innerWidth - minWidth - 8);
-      left = Math.max(8, left);
-    }
-    setCoords({
-      top: rect.bottom + 6,
-      left,
-      minWidth,
-    });
+    setCoords(measureTrigger(buttonRef.current));
   };
 
   useLayoutEffect(() => {
-    if (!open) {
-      setCoords(null);
-      return;
-    }
+    if (!open) return;
     updateCoords();
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      const t = e.target as Node;
-      if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-      // Clicking another menu trigger is handled by that trigger's onOpen — don't steal it.
-      const otherTrigger = (e.target as HTMLElement | null)?.closest?.(
-        "[data-studio-main-menu-trigger]"
-      );
-      if (otherTrigger) return;
-      onClose();
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    function onReposition() {
-      updateCoords();
-    }
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onReposition);
-    window.addEventListener("scroll", onReposition, true);
+    // Defer outside-dismiss so the opening click cannot immediately close the panel.
+    let remove: (() => void) | undefined;
+    const attachTimer = window.setTimeout(() => {
+      function onDoc(e: PointerEvent) {
+        const t = e.target as Node | null;
+        if (!t) return;
+        if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+        const otherTrigger = (e.target as HTMLElement | null)?.closest?.(
+          "[data-studio-main-menu-trigger]"
+        );
+        if (otherTrigger) return;
+        onClose();
+      }
+      function onKey(e: KeyboardEvent) {
+        if (e.key === "Escape") onClose();
+      }
+      function onReposition() {
+        updateCoords();
+      }
+      document.addEventListener("pointerdown", onDoc, true);
+      document.addEventListener("keydown", onKey);
+      window.addEventListener("resize", onReposition);
+      window.addEventListener("scroll", onReposition, true);
+      remove = () => {
+        document.removeEventListener("pointerdown", onDoc, true);
+        document.removeEventListener("keydown", onKey);
+        window.removeEventListener("resize", onReposition);
+        window.removeEventListener("scroll", onReposition, true);
+      };
+    }, 0);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onReposition);
-      window.removeEventListener("scroll", onReposition, true);
+      window.clearTimeout(attachTimer);
+      remove?.();
     };
   }, [open, onClose]);
 
   const menu =
-    open && coords && typeof document !== "undefined"
+    open && typeof document !== "undefined"
       ? createPortal(
           <div
             ref={menuRef}
@@ -130,15 +141,15 @@ function MenuDropdown({
             aria-label={group.label}
             data-studio-main-menu-panel="true"
             className={cn(
-              // Portaled to body — use menubarMenu layer (above options/toolbelt, below full modals).
               "fixed max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
-              "[scrollbar-width:thin]",
-              STUDIO_Z_CLASS.menubarMenu
+              "[scrollbar-width:thin]"
             )}
             style={{
               top: coords.top,
               left: coords.left,
               minWidth: coords.minWidth,
+              // Body-level: beat studio shell / overflow chrome (options strip, absolute leftovers).
+              zIndex: STUDIO_Z.workspace,
             }}
           >
             {group.items.map((item) => {
@@ -188,9 +199,15 @@ function MenuDropdown({
       : null;
 
   return (
-    <div className="relative shrink-0" onMouseEnter={() => {
-      if (barActive && !open) onOpen();
-    }}>
+    <div
+      className="relative shrink-0"
+      onMouseEnter={() => {
+        if (barActive && !open) {
+          setCoords(measureTrigger(buttonRef.current));
+          onOpen();
+        }
+      }}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -198,6 +215,11 @@ function MenuDropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
+        onPointerDown={(e) => {
+          // Capture coords before open so the first paint is already positioned.
+          if (e.button !== 0) return;
+          if (!open) setCoords(measureTrigger(buttonRef.current));
+        }}
         onClick={() => (open ? onClose() : onOpen())}
         className={cn(
           "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[0.78rem] font-semibold tracking-tight",

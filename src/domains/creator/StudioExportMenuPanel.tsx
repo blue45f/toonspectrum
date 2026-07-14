@@ -287,8 +287,13 @@ export function StudioExportMenuPanel({
     }
   }
 
+  // Always fixed (never absolute): menubar uses overflow-x-auto which clips absolute
+  // children to the chrome row — File → 내보내기 then looked like a dead click.
   return (
-    <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-[60] sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
+    <div
+      data-studio-export-menu-panel="true"
+      className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
+    >
       <div className="mb-2.5">
         <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
         <div className="flex flex-wrap gap-1">

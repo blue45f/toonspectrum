@@ -7684,7 +7684,12 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (!exportMenuOpen) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+      const t = e.target as Node | null;
+      if (!t) return;
+      // Panel may portal to body — also accept data-studio-export-menu-panel hits.
+      if (exportMenuRef.current?.contains(t)) return;
+      if ((t as Element).closest?.("[data-studio-export-menu-panel]")) return;
+      setExportMenuOpen(false);
     };
     globalThis.addEventListener("pointerdown", handlePointerDown);
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
@@ -7693,9 +7698,11 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (!projectActionsOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (!projectActionsRef.current?.contains(event.target as Node)) {
-        setProjectActionsOpen(false);
-      }
+      const t = event.target as Node | null;
+      if (!t) return;
+      if (projectActionsRef.current?.contains(t)) return;
+      if ((t as Element).closest?.("[data-studio-project-actions-menu]")) return;
+      setProjectActionsOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -17394,38 +17401,44 @@ function StudioCuttoonEditor() {
             >
               <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
             </button>
-            {exportMenuOpen && (
-              <Suspense
-                fallback={
-                  <div className="fixed inset-x-2 top-48 z-[60] max-h-[calc(100dvh-13rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-[60] sm:mt-1.5 sm:w-72 sm:max-h-none sm:overflow-visible">
-                    내보내기 옵션을 여는 중...
-                  </div>
-                }
-              >
-                <StudioExportMenuPanel
-                  canvasWidth={CANVAS_W}
-                  canvasHeight={canvasH}
-                  exportScale={exportScale}
-                  exportFormat={exportFormat}
-                  exportTransparent={exportTransparent}
-                  exportPresetId={exportPresetId}
-                  watermark={watermark}
-                  isExporting={isExporting}
-                  exportTitle={title}
-                  pageCount={pages.length}
-                  pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
-                  capturePagesForPreset={handleCapturePagesForPreset}
-                  exportCurrentPageToSvg={exportCurrentPageToSvg}
-                  exportCurrentPageToPsd={exportCurrentPageToPsd}
-                  setExportScale={setExportScale}
-                  setExportFormat={setExportFormat}
-                  setExportTransparent={setExportTransparent}
-                  setExportPresetId={setExportPresetId}
-                  setWatermark={setWatermark}
-                  onCopyToClipboard={handleCopyToClipboard}
-                />
-              </Suspense>
-            )}
+            {exportMenuOpen && typeof document !== "undefined"
+              ? createPortal(
+                  <Suspense
+                    fallback={
+                      <div
+                        data-studio-export-menu-panel="true"
+                        className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
+                      >
+                        내보내기 옵션을 여는 중...
+                      </div>
+                    }
+                  >
+                    <StudioExportMenuPanel
+                      canvasWidth={CANVAS_W}
+                      canvasHeight={canvasH}
+                      exportScale={exportScale}
+                      exportFormat={exportFormat}
+                      exportTransparent={exportTransparent}
+                      exportPresetId={exportPresetId}
+                      watermark={watermark}
+                      isExporting={isExporting}
+                      exportTitle={title}
+                      pageCount={pages.length}
+                      pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
+                      capturePagesForPreset={handleCapturePagesForPreset}
+                      exportCurrentPageToSvg={exportCurrentPageToSvg}
+                      exportCurrentPageToPsd={exportCurrentPageToPsd}
+                      setExportScale={setExportScale}
+                      setExportFormat={setExportFormat}
+                      setExportTransparent={setExportTransparent}
+                      setExportPresetId={setExportPresetId}
+                      setWatermark={setWatermark}
+                      onCopyToClipboard={handleCopyToClipboard}
+                    />
+                  </Suspense>,
+                  document.body
+                )
+              : null}
           </div>
           <div ref={projectActionsRef} className="relative shrink-0">
             <button
@@ -17451,9 +17464,11 @@ function StudioCuttoonEditor() {
                 aria-hidden
               />
             </button>
-            {projectActionsOpen ? (
+            {projectActionsOpen && typeof document !== "undefined"
+              ? createPortal(
               <div
                 id="studio-project-actions-menu"
+                data-studio-project-actions-menu="true"
                 role="dialog"
                 aria-label="프로젝트 작업"
                 onClickCapture={(event) => {
@@ -17462,7 +17477,7 @@ function StudioCuttoonEditor() {
                     globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
                   }
                 }}
-                className="fixed inset-x-2 top-20 z-[60] grid max-h-[calc(100dvh-6rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 lg:absolute lg:inset-x-auto lg:right-0 lg:top-full lg:z-[60] lg:mt-1.5 lg:w-[min(36rem,calc(100vw-2rem))] lg:pb-2 [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(36rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
               >
                 <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
                   <span>
@@ -17748,8 +17763,10 @@ function StudioCuttoonEditor() {
           >
             <Files size={14} /> 게시 패키지
           </button>
-              </div>
-            ) : null}
+              </div>,
+              document.body
+            )
+            : null}
           </div>
           <button
             type="button"

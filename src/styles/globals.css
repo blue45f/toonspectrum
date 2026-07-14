@@ -594,7 +594,7 @@ html[data-studio-canvas-only="true"] body {
   --studio-z-tool-belt: 30;
   --studio-z-options: 40;
   --studio-z-menubar: 50;
-  --studio-z-menubar-menu: 60;
+  --studio-z-menubar-menu: 100;
   --studio-z-tool-popover: 70;
   --studio-z-modal: 80;
   --studio-z-confirm: 90;
@@ -641,7 +641,12 @@ body[data-studio-app="true"] .route-stage::before,
 }
 /* Portaled main-menu panels attach to body — must beat chrome without fighting site isolation */
 [data-studio-main-menu-panel="true"] {
-  z-index: var(--studio-z-menubar-menu, 60) !important;
+  z-index: var(--studio-z-workspace, 100) !important;
+}
+/* Export / project panels also portal to body (menubar overflow clips absolute children). */
+[data-studio-export-menu-panel="true"],
+[data-studio-project-actions-menu="true"] {
+  z-index: var(--studio-z-workspace, 100) !important;
 }
 /* Fixed tool popovers (assets / bg / AI) */
 [data-studio-tool-popover="true"] {

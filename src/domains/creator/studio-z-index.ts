@@ -11,11 +11,11 @@
  *   30  tool belt (legacy / mobile host)
  *   40  draw / select options strips
  *   50  app menubar (must stay above options so dropdowns win)
- *   60  menubar-affiliated dropdowns (export, project, main menu panels)
  *   70  tool-group popovers (assets / bg / style / AI)
  *   80  full-screen studio modals (storyboard, 3D, checkpoints…)
  *   90  confirm / legal / critical banners
- *  100  workspace menu (must top most chrome menus)
+ *  100  workspace + portaled File/Edit/export/project menus (body-level;
+ *       absolute dropdowns inside menubar overflow were clipped to ~0 height)
  *  110  shortcuts help / brush studio
  *  120  emergency legal notices
  */
@@ -26,7 +26,8 @@ export const STUDIO_Z = {
   toolBelt: 30,
   optionsStrip: 40,
   menubar: 50,
-  menubarMenu: 60,
+  /** Body-portaled File/Edit/export/project — above chrome, not clipped by menubar scroll. */
+  menubarMenu: 100,
   toolPopover: 70,
   modal: 80,
   confirm: 90,
@@ -44,7 +45,7 @@ export const STUDIO_Z_CLASS = {
   toolBelt: "z-30",
   optionsStrip: "z-[40]",
   menubar: "z-[50]",
-  menubarMenu: "z-[60]",
+  menubarMenu: "z-[100]",
   toolPopover: "z-[70]",
   modal: "z-[80]",
   confirm: "z-[90]",
