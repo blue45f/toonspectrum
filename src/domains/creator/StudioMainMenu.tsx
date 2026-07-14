@@ -71,19 +71,22 @@ function MenuDropdown({
         aria-controls={open ? panelId : undefined}
         onClick={() => (open ? onClose() : onOpen())}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[0.75rem] font-medium tracking-tight",
+          "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[0.78rem] font-semibold tracking-tight",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           open
-            ? "bg-raised text-fg shadow-[inset_0_0_0_1px_oklch(0.42_0.013_64/0.35)]"
-            : "text-fg-2 hover:bg-raised/70 hover:text-fg"
+            ? "bg-raised text-fg shadow-[inset_0_0_0_1px_oklch(0.45_0.014_64/0.4)]"
+            : "text-fg-2 hover:bg-raised/80 hover:text-fg"
         )}
       >
         {group.label}
         <ChevronDown
-          size={12}
+          size={13}
           aria-hidden
-          className={cn("opacity-45 transition-transform duration-150", open && "rotate-180 opacity-80")}
+          className={cn(
+            "opacity-50 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            open && "rotate-180 opacity-90"
+          )}
         />
       </button>
       {open ? (
@@ -91,7 +94,7 @@ function MenuDropdown({
           id={panelId}
           role="menu"
           aria-label={group.label}
-          className="absolute left-0 top-full z-[80] mt-1.5 min-w-[13.5rem] overflow-hidden rounded-xl border border-line bg-panel py-1.5"
+          className="absolute left-0 top-full z-[80] mt-2 min-w-[14.5rem] overflow-hidden rounded-2xl border border-line bg-panel py-1.5"
         >
           {group.items.map((item) => {
             const Icon = item.icon;
@@ -107,7 +110,7 @@ function MenuDropdown({
                     onClose();
                   }}
                   className={cn(
-                    "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[0.75rem] font-medium",
+                    "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-[0.78rem] font-medium",
                     STUDIO_EASE,
                     STUDIO_FOCUS_RING,
                     item.danger && "text-bad",
@@ -116,16 +119,20 @@ function MenuDropdown({
                       : "text-fg-2 hover:bg-raised hover:text-fg"
                   )}
                 >
-                  {Icon ? <Icon size={14} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-75" /> : null}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {Icon ? (
+                    <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
+                  ) : (
+                    <span aria-hidden className="size-[15px] shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
                   {item.shortcut ? (
-                    <span className="shrink-0 rounded border border-line/80 bg-canvas/50 px-1.5 py-0.5 text-[0.6rem] font-semibold tabular-nums text-fg-3">
+                    <span className="shrink-0 rounded-md border border-line/70 bg-canvas/55 px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums tracking-wide text-fg-3">
                       {item.shortcut}
                     </span>
                   ) : null}
                 </button>
                 {item.separatorAfter ? (
-                  <div role="separator" className="mx-3 my-1.5 h-px bg-line/70" />
+                  <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
                 ) : null}
               </div>
             );

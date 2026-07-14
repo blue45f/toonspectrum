@@ -101,8 +101,8 @@ export function StudioToolbarCluster({
     >
       <div
         className={cn(
-          "flex max-w-full items-center gap-0.5 rounded-lg border border-line/55 bg-card/35 p-px",
-          "shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.035)]"
+          "flex max-w-full items-center gap-0.5 rounded-xl border border-line/50 bg-card/40 p-0.5",
+          "shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]"
         )}
       >
         {children}
@@ -133,11 +133,11 @@ export function StudioToolBelt({
       data-studio-tool-belt="true"
       className={cn(
         // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
-        "sticky top-0 z-30 flex max-w-full shrink-0 flex-nowrap items-center gap-1 overflow-x-auto",
-        "border-b border-line bg-panel/97 px-1.5 py-1",
-        "shadow-[0_1px_0_oklch(0.2_0.01_70/0.06)] backdrop-blur-sm",
+        "sticky top-0 z-30 flex max-w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto",
+        "border-b border-line bg-panel/95 px-2 py-1.5",
+        "shadow-[0_1px_0_oklch(0.2_0.01_70/0.08)] backdrop-blur-md",
         "[-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        "lg:gap-1.5 lg:px-2 lg:py-1",
+        "lg:gap-2 lg:px-2.5 lg:py-1.5",
         className
       )}
     >
@@ -162,7 +162,7 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
-        "flex h-10 min-h-10 shrink-0 flex-nowrap items-center gap-2 border-b border-line px-2.5",
+        "flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2.5 border-b border-line px-3",
         "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
@@ -514,8 +514,8 @@ export function StudioVerticalToolRail({
       data-studio-tool-rail="true"
       className={cn(
         // xl: slightly wider like Krita docker / Ibis tool column
-        "hidden w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain",
-        "border-r border-line py-2 xl:w-12 xl:gap-1.5 xl:py-2.5",
+        "hidden w-12 shrink-0 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain",
+        "border-r border-line py-2.5 xl:w-[3.25rem] xl:gap-2 xl:py-3",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "lg:flex",
         className
@@ -550,18 +550,18 @@ export function StudioToolIdentity({
       title={detail ? `${title} — ${detail}` : title}
     >
       {Icon ? (
-        <span className="grid size-6 place-items-center rounded-md bg-canvas/50 text-accent">
-          <Icon size={14} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+        <span className="grid size-7 place-items-center rounded-lg bg-canvas/60 text-accent shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.18)]">
+          <Icon size={15} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
         </span>
       ) : null}
       <span className="min-w-0 leading-tight">
-        <span className="block truncate text-[0.68rem] font-bold tracking-tight text-fg">{title}</span>
+        <span className="block truncate text-[0.72rem] font-bold tracking-tight text-fg">{title}</span>
         {detail ? (
-          <span className="block truncate text-[0.55rem] font-medium text-fg-3">{detail}</span>
+          <span className="block truncate text-[0.58rem] font-medium text-fg-3">{detail}</span>
         ) : null}
       </span>
       {shortcut ? (
-        <kbd className="ml-0.5 hidden rounded border border-line/80 bg-canvas/40 px-1 py-px text-[0.52rem] font-semibold tabular-nums text-fg-3 sm:inline">
+        <kbd className="ml-0.5 hidden rounded-md border border-line/70 bg-canvas/50 px-1.5 py-0.5 text-[0.55rem] font-semibold tabular-nums text-fg-3 sm:inline">
           {shortcut}
         </kbd>
       ) : null}
@@ -625,13 +625,13 @@ export function StudioRailToolButton({
       title={label}
       aria-pressed={active}
       className={cn(
-        "relative grid size-9 place-items-center rounded-xl border border-transparent xl:size-10",
+        "relative grid size-10 place-items-center rounded-2xl border border-transparent xl:size-11",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active
-          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.28)]"
+          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.32),0_1px_6px_oklch(0.72_0.185_42/0.12)]"
           : accented
-            ? "text-accent hover:bg-accent-soft/45"
+            ? "text-accent hover:bg-accent-soft/50"
             : "text-fg-2 hover:bg-raised hover:text-fg",
         disabled && "cursor-not-allowed opacity-35",
         className
@@ -639,10 +639,10 @@ export function StudioRailToolButton({
       {...rest}
     >
       <Icon
-        size={17}
+        size={18}
         strokeWidth={STUDIO_ICON_STROKE}
         aria-hidden
-        className={cn(active && "text-accent", "xl:scale-105")}
+        className={cn(active && "text-accent")}
       />
       {grouped ? (
         <span
@@ -709,8 +709,8 @@ export function StudioStatusBar({
       aria-label={ariaLabel}
       data-studio-status-bar="true"
       className={cn(
-        "pointer-events-auto absolute bottom-3 left-3 z-20 flex max-w-[min(100%,42rem)] flex-wrap items-center gap-1.5",
-        "rounded-2xl px-2.5 py-1.5 text-[0.65rem] font-semibold tracking-tight text-fg-2",
+        "pointer-events-auto absolute bottom-3.5 left-3.5 z-20 flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1.5",
+        "rounded-2xl px-3 py-2 text-[0.68rem] font-semibold tracking-tight text-fg-2",
         className
       )}
     >

@@ -36,7 +36,7 @@ describe("studio chrome UI", () => {
     );
     expect(html).toContain('role="group"');
     expect(html).toContain('aria-label="그리기 도구"');
-    expect(html).toContain("rounded-lg");
+    expect(html).toContain("rounded-xl");
     expect(html).toContain("border-line");
   });
 
@@ -60,7 +60,7 @@ describe("studio chrome UI", () => {
       </StudioAppMenubar>
     );
     expect(html).toContain('data-studio-app-menubar="true"');
-    expect(html).toContain("h-10");
+    expect(html).toContain("h-11");
     expect(html).toContain("스튜디오");
   });
 

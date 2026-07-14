@@ -182,17 +182,17 @@ export function StudioBrushTray({
               title={`${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               className={cn(
-                // Ibis/Sketchbook: slightly taller tactile tiles with clearer stroke preview
-                "flex h-10 min-w-[2.9rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1",
+                // Ibis/Sketchbook: tactile tiles with clearer stroke preview
+                "flex h-11 min-w-[3.05rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
-                  ? "border-accent/50 bg-accent text-on-accent"
-                  : "border-transparent bg-canvas/25 text-fg-2 hover:border-line/80 hover:bg-raised hover:text-fg"
+                  ? "border-accent/55 bg-accent text-on-accent"
+                  : "border-line/40 bg-canvas/35 text-fg-2 hover:border-line/80 hover:bg-raised hover:text-fg"
               )}
             >
               <BrushPreviewGlyph item={item} active={active} />
-              <span className="text-[0.55rem] font-bold leading-none tracking-tight">{item.shortName}</span>
+              <span className="text-[0.56rem] font-bold leading-none tracking-tight">{item.shortName}</span>
             </button>
           );
         })}

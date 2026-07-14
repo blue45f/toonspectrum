@@ -32,15 +32,15 @@ export const PANEL_CHIP_CLASS =
 /** 툴바 도구 버튼 — 활성은 accent soft, 비활성은 quiet. dense = canvas-max draw-app belt. */
 export function studioToolButtonClass(active: boolean, options?: { dense?: boolean }): string {
   return cn(
-    "inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border font-medium tracking-tight",
+    "inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border font-semibold tracking-tight",
     STUDIO_EASE,
     STUDIO_FOCUS_RING,
     options?.dense
-      ? "h-8 gap-1 px-2 text-[0.7rem] pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:gap-1.5 pointer-coarse:px-2.5 pointer-coarse:text-[0.8125rem]"
+      ? "h-9 gap-1.5 px-2.5 text-[0.72rem] pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:gap-1.5 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]"
       : cn("h-9 gap-1.5 px-2.5 text-xs", STUDIO_TOUCH_TARGET, "pointer-coarse:px-3"),
     active
-      ? "border-accent/45 bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.14)]"
-      : "border-transparent bg-transparent text-fg-2 hover:border-line/80 hover:bg-raised hover:text-fg"
+      ? "border-accent/50 bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.16),0_1px_4px_oklch(0.72_0.185_42/0.1)]"
+      : "border-transparent bg-transparent text-fg-2 hover:border-line/70 hover:bg-raised/90 hover:text-fg"
   );
 }
 

@@ -90,16 +90,16 @@ function SizePreview({ size, color }: { size: number; color: string }): ReactEle
   return (
     <span
       aria-hidden
-      className="grid size-7 place-items-center rounded-md border border-line bg-canvas"
+      className="grid size-8 place-items-center rounded-xl border border-line/80 bg-canvas/80 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]"
       title={`크기 ${size}px`}
     >
       <span
-        className="rounded-full"
+        className="rounded-full shadow-[0_1px_3px_oklch(0.1_0.01_70/0.35)]"
         style={{
           width: d,
           height: d,
           backgroundColor: color,
-          opacity: 0.92,
+          opacity: 0.95,
         }}
       />
     </span>
@@ -174,9 +174,8 @@ export function StudioDrawOptionsBar({
       data-studio-draw-options="true"
       className={cn(
         // Primary icons stay in view; secondary chips can scroll. End cluster is sticky.
-        // h-12: Ibis/MediBang-style slightly taller tool options for touch + clarity.
-        "relative flex h-12 min-h-12 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2",
-        "[scrollbar-width:thin] [scrollbar-color:oklch(0.45_0.02_70/0.45)_transparent]",
+        "relative flex h-[3.25rem] min-h-[3.25rem] shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
+        "[scrollbar-width:thin] [scrollbar-color:oklch(0.42_0.02_70/0.4)_transparent]",
         className
       )}
     >
@@ -204,11 +203,11 @@ export function StudioDrawOptionsBar({
               title={label}
               onClick={() => onSetDrawMode(id)}
               className={cn(
-                "inline-flex h-8 items-center gap-1 rounded-md px-2 text-[0.68rem] font-semibold",
+                "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.7rem] font-semibold",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 drawMode === id
-                  ? "bg-accent text-on-accent shadow-sm"
+                  ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.25)]"
                   : "text-fg-2 hover:bg-raised hover:text-fg"
               )}
             >
@@ -240,12 +239,12 @@ export function StudioDrawOptionsBar({
                   else if (onAssignBrushSlot) onAssignBrushSlot(index);
                 }}
                 className={cn(
-                  "grid size-7 place-items-center rounded border text-[0.6rem] font-bold tabular-nums",
+                  "grid size-7 place-items-center rounded-lg border text-[0.6rem] font-bold tabular-nums",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   slot
-                    ? "border-line bg-card text-fg-2 hover:border-accent/50 hover:bg-raised"
-                    : "border-dashed border-line/70 text-fg-3 hover:bg-raised/60",
+                    ? "border-line/80 bg-card text-fg-2 hover:border-accent/45 hover:bg-raised"
+                    : "border-dashed border-line/60 text-fg-3 hover:bg-raised/70",
                   !slot && !onAssignBrushSlot && "opacity-40"
                 )}
               >
@@ -372,12 +371,12 @@ export function StudioDrawOptionsBar({
               aria-pressed={active}
               onClick={() => onStrokeWidthChange(chip.width)}
               className={cn(
-                "grid h-7 min-w-7 place-items-center rounded-md px-1 text-[0.58rem] font-bold tabular-nums",
+                "grid h-7 min-w-7 place-items-center rounded-lg px-1.5 text-[0.6rem] font-bold tabular-nums",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
-                  ? "bg-accent text-on-accent shadow-sm"
-                  : "bg-card text-fg-3 ring-1 ring-line/80 hover:bg-raised hover:text-fg"
+                  ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.28)]"
+                  : "bg-card/90 text-fg-3 ring-1 ring-line/70 hover:bg-raised hover:text-fg"
               )}
             >
               {chip.label}

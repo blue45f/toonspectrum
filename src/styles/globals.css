@@ -574,32 +574,43 @@ html[data-studio-canvas-only="true"] body {
 }
 
 /* ============================================================
-   Studio draw-app chrome — multi-product IA (names not cloned)
-   Krita: dense pro docks · MediBang: comic tool clarity
-   FireAlpaca: light/fast chrome · Ibis: tactile brush HUD
-   Sketchbook: quiet canvas-first · Concepts: clean status chips
-   Kleki: zero-friction start · Pixlr: polished web panels
-   Hierarchy: canvas hero; chrome is warm-ink panel only.
+   Studio draw-app chrome v3 — refined commercial surfaces
+   Goal: less “dev tool”, more CSP/Procreate/Sketchbook polish.
+   Still warm-ink + persimmon; canvas remains the hero.
    ============================================================ */
 [data-studio-editor="true"] {
-  --studio-chrome-h: 2.5rem;
-  --studio-rail-w: 2.75rem;
+  --studio-chrome-h: 2.75rem;
+  --studio-rail-w: 3rem;
   --studio-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --studio-chrome-glow: inset 0 1px 0 oklch(0.95 0.01 85 / 0.045);
-  --studio-chrome-edge: oklch(0.305 0.012 64 / 0.92);
+  --studio-chrome-glow: inset 0 1px 0 oklch(0.97 0.012 85 / 0.06);
+  --studio-chrome-edge: oklch(0.34 0.014 64 / 0.75);
+  --studio-surface-0: oklch(0.155 0.008 70);
+  --studio-surface-1: oklch(0.178 0.009 68);
+  --studio-surface-2: oklch(0.205 0.01 66);
+  --studio-surface-3: oklch(0.235 0.011 64);
+  color-scheme: dark;
+  font-feature-settings: "ss01" on, "cv11" on;
+}
+
+/* Soften default editor text rendering */
+[data-studio-editor="true"],
+[data-studio-app-shell="true"] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 [data-studio-app-menubar="true"] {
   background:
     linear-gradient(
       180deg,
-      oklch(0.212 0.011 66 / 0.99) 0%,
-      oklch(0.182 0.009 68 / 0.99) 100%
+      oklch(0.218 0.011 66 / 0.98) 0%,
+      oklch(0.178 0.009 68 / 0.99) 100%
     );
   border-bottom-color: var(--studio-chrome-edge);
   box-shadow:
     var(--studio-chrome-glow),
-    inset 0 -1px 0 oklch(0.12 0.01 70 / 0.28);
+    0 1px 0 oklch(0.1 0.01 70 / 0.35);
 }
 
 [data-studio-draw-options="true"],
@@ -607,169 +618,294 @@ html[data-studio-canvas-only="true"] body {
   background:
     linear-gradient(
       180deg,
-      oklch(0.2 0.01 67 / 0.98) 0%,
-      oklch(0.172 0.009 68 / 0.98) 100%
+      oklch(0.208 0.0105 67 / 0.97) 0%,
+      oklch(0.168 0.009 68 / 0.98) 100%
     );
-  border-bottom-color: oklch(0.305 0.012 64 / 0.88);
+  border-bottom-color: oklch(0.32 0.013 64 / 0.7);
   box-shadow: var(--studio-chrome-glow);
 }
 
-/* Krita/Pixlr tool-options identity strip */
+/* Tool identity — refined pill */
 [data-studio-tool-identity="true"] {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 1.85rem;
-  padding: 0.15rem 0.55rem 0.15rem 0.35rem;
-  border-radius: 0.55rem;
-  border: 1px solid oklch(0.34 0.013 64 / 0.75);
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.65rem 0.2rem 0.3rem;
+  border-radius: 0.7rem;
+  border: 1px solid oklch(0.38 0.014 64 / 0.55);
   background:
     linear-gradient(
-      135deg,
-      oklch(0.24 0.012 64 / 0.75) 0%,
-      oklch(0.2 0.01 66 / 0.55) 100%
+      145deg,
+      oklch(0.255 0.012 64 / 0.85) 0%,
+      oklch(0.2 0.01 66 / 0.65) 100%
     );
-  box-shadow: inset 0 1px 0 oklch(0.95 0.01 85 / 0.04);
+  box-shadow:
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.07),
+    0 1px 2px oklch(0.08 0.01 70 / 0.25);
 }
 
 [data-studio-tool-rail="true"] {
   background:
     linear-gradient(
       180deg,
-      oklch(0.188 0.0095 68) 0%,
-      oklch(0.168 0.009 68) 100%
+      oklch(0.192 0.0095 68) 0%,
+      oklch(0.162 0.009 68) 100%
     );
   border-right-color: var(--studio-chrome-edge);
-  box-shadow: inset -1px 0 0 oklch(0.12 0.01 70 / 0.2);
+  box-shadow:
+    inset -1px 0 0 oklch(0.1 0.01 70 / 0.22),
+    2px 0 16px oklch(0.08 0.01 70 / 0.12);
 }
 
-/* Sketchbook/Krita floating status glass */
+/* Floating status — premium glass */
 [data-studio-status-bar="true"] {
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
   background:
     linear-gradient(
-      165deg,
-      oklch(0.22 0.011 66 / 0.94) 0%,
-      oklch(0.175 0.009 68 / 0.93) 100%
+      160deg,
+      oklch(0.24 0.012 66 / 0.88) 0%,
+      oklch(0.17 0.009 68 / 0.9) 100%
     );
-  border: 1px solid oklch(0.38 0.013 64 / 0.85);
+  border: 1px solid oklch(0.42 0.014 64 / 0.55);
   box-shadow:
-    0 10px 32px oklch(0.08 0.01 70 / 0.5),
-    0 0 0 1px oklch(0.12 0.01 70 / 0.2),
-    inset 0 1px 0 oklch(0.95 0.01 85 / 0.055);
+    0 12px 40px oklch(0.06 0.01 70 / 0.55),
+    0 0 0 1px oklch(0.1 0.01 70 / 0.25),
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.08);
 }
 
-/* Ibis/Krita tool rail — accent spine on active tool */
+/* Rail active spine */
 [data-studio-tool-rail="true"] button[aria-pressed="true"] {
   position: relative;
 }
 [data-studio-tool-rail="true"] button[aria-pressed="true"]::before {
   content: "";
   position: absolute;
-  left: 1px;
-  top: 16%;
-  bottom: 16%;
+  left: 2px;
+  top: 18%;
+  bottom: 18%;
   width: 2.5px;
   border-radius: 999px;
   background: var(--color-accent);
-  box-shadow: 0 0 8px oklch(0.72 0.185 42 / 0.45);
+  box-shadow: 0 0 10px oklch(0.72 0.185 42 / 0.5);
+}
+[data-studio-tool-rail="true"] button {
+  transition:
+    background-color 160ms var(--studio-ease),
+    color 160ms var(--studio-ease),
+    transform 160ms var(--studio-ease),
+    box-shadow 160ms var(--studio-ease);
+}
+[data-studio-tool-rail="true"] button:hover:not(:disabled) {
+  transform: translateY(-0.5px);
+}
+[data-studio-tool-rail="true"] button:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.97);
 }
 
-/* FireAlpaca-light range track — precise thumbs */
+/* Premium range track */
 [data-studio-editor="true"] input[type="range"].studio-range,
 [data-studio-draw-options="true"] input[type="range"] {
   appearance: none;
-  height: 0.32rem;
+  height: 0.28rem;
   border-radius: 999px;
   background:
     linear-gradient(
       90deg,
-      oklch(0.32 0.02 50 / 0.55) 0%,
-      oklch(0.28 0.012 64) 40%,
+      oklch(0.72 0.185 42 / 0.35) 0%,
+      oklch(0.3 0.012 64) 42%,
       oklch(0.26 0.012 64) 100%
     );
   outline: none;
+  transition: filter 150ms var(--studio-ease);
+}
+[data-studio-editor="true"] input[type="range"].studio-range:hover,
+[data-studio-draw-options="true"] input[type="range"]:hover {
+  filter: brightness(1.08);
 }
 [data-studio-editor="true"] input[type="range"].studio-range::-webkit-slider-thumb,
 [data-studio-draw-options="true"] input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.95rem;
+  height: 0.95rem;
   border-radius: 999px;
-  background: oklch(0.94 0.012 85);
-  border: 2px solid oklch(0.72 0.185 42 / 0.65);
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      oklch(0.98 0.01 85) 0%,
+      oklch(0.9 0.012 80) 100%
+    );
+  border: 2px solid oklch(0.72 0.185 42 / 0.7);
   box-shadow:
-    0 1px 4px oklch(0.1 0.01 70 / 0.5),
-    inset 0 1px 0 oklch(1 0 0 / 0.35);
+    0 2px 6px oklch(0.08 0.01 70 / 0.55),
+    inset 0 1px 0 oklch(1 0 0 / 0.45);
   cursor: pointer;
+  transition: transform 120ms var(--studio-ease);
+}
+[data-studio-editor="true"] input[type="range"].studio-range::-webkit-slider-thumb:hover,
+[data-studio-draw-options="true"] input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.08);
 }
 [data-studio-editor="true"] input[type="range"].studio-range::-moz-range-thumb,
 [data-studio-draw-options="true"] input[type="range"]::-moz-range-thumb {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.95rem;
+  height: 0.95rem;
   border-radius: 999px;
   background: oklch(0.94 0.012 85);
-  border: 2px solid oklch(0.72 0.185 42 / 0.65);
+  border: 2px solid oklch(0.72 0.185 42 / 0.7);
   cursor: pointer;
 }
 
-/* Menu dropdown polish (Pixlr panel depth) */
+/* Main menu dropdown — soft panel */
 [data-studio-main-menu="true"] [role="menu"] {
-  box-shadow:
-    0 14px 44px oklch(0.08 0.01 70 / 0.58),
-    0 0 0 1px oklch(0.34 0.012 64 / 0.7);
-  backdrop-filter: blur(8px);
-}
-
-/* Option control cluster — MediBang/Pixlr grouped tools */
-.studio-opt-cluster {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  border-radius: 0.55rem;
-  border: 1px solid oklch(0.32 0.012 64 / 0.8);
+  border-radius: 0.9rem;
+  border-color: oklch(0.38 0.014 64 / 0.65) !important;
   background:
     linear-gradient(
       180deg,
-      oklch(0.225 0.011 66 / 0.65) 0%,
-      oklch(0.2 0.01 66 / 0.5) 100%
-    );
-  padding: 0.15rem;
-  box-shadow: inset 0 1px 0 oklch(0.95 0.01 85 / 0.035);
+      oklch(0.21 0.01 66 / 0.98) 0%,
+      oklch(0.175 0.009 68 / 0.99) 100%
+    ) !important;
+  box-shadow:
+    0 18px 50px oklch(0.06 0.01 70 / 0.62),
+    0 0 0 1px oklch(0.32 0.012 64 / 0.55),
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.06);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  padding: 0.4rem !important;
+}
+[data-studio-main-menu="true"] [role="menuitem"] {
+  border-radius: 0.55rem !important;
+  transition:
+    background-color 140ms var(--studio-ease),
+    color 140ms var(--studio-ease);
+}
+[data-studio-main-menu="true"] button[aria-haspopup="menu"] {
+  border-radius: 0.55rem;
+  letter-spacing: -0.01em;
+  transition:
+    background-color 140ms var(--studio-ease),
+    color 140ms var(--studio-ease),
+    box-shadow 140ms var(--studio-ease);
 }
 
-/* Ibis-style brush HUD pills on status bar */
+/* Grouped control clusters */
+.studio-opt-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: 0.7rem;
+  border: 1px solid oklch(0.36 0.013 64 / 0.55);
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.24 0.011 66 / 0.72) 0%,
+      oklch(0.2 0.01 66 / 0.55) 100%
+    );
+  padding: 0.18rem;
+  box-shadow:
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.05),
+    0 1px 2px oklch(0.08 0.01 70 / 0.18);
+}
+
+/* HUD pills */
 [data-studio-hud-pill="true"] {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  min-height: 1.45rem;
-  padding: 0.1rem 0.45rem;
+  gap: 0.35rem;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid oklch(0.36 0.013 64 / 0.75);
-  background: oklch(0.22 0.011 66 / 0.75);
+  border: 1px solid oklch(0.4 0.014 64 / 0.5);
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.25 0.012 66 / 0.75) 0%,
+      oklch(0.2 0.01 66 / 0.65) 100%
+    );
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  box-shadow: inset 0 1px 0 oklch(0.97 0.01 85 / 0.05);
 }
 
-/* Brush tray tiles — Sketchbook/Ibis tactile chips */
+/* Brush tray tiles */
 [data-studio-brush-tray="true"] [role="option"] {
-  box-shadow: inset 0 1px 0 oklch(0.95 0.01 85 / 0.03);
+  box-shadow: inset 0 1px 0 oklch(0.97 0.01 85 / 0.04);
+  transition:
+    background-color 140ms var(--studio-ease),
+    border-color 140ms var(--studio-ease),
+    color 140ms var(--studio-ease),
+    transform 140ms var(--studio-ease),
+    box-shadow 140ms var(--studio-ease);
+}
+[data-studio-brush-tray="true"] [role="option"]:hover {
+  transform: translateY(-1px);
 }
 [data-studio-brush-tray="true"] [role="option"][aria-selected="true"] {
   box-shadow:
-    0 1px 0 oklch(0.72 0.185 42 / 0.28),
-    inset 0 1px 0 oklch(0.95 0.01 85 / 0.12);
+    0 2px 8px oklch(0.72 0.185 42 / 0.28),
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.16);
 }
 
-/* Canvas viewport — Concepts quiet work surface */
+/* Canvas work surface */
 [data-studio-canvas-viewport] {
   background:
     radial-gradient(
-      120% 80% at 50% 40%,
-      oklch(0.175 0.01 70 / 0.55) 0%,
-      oklch(0.145 0.008 70) 55%,
-      oklch(0.13 0.008 70) 100%
+      110% 90% at 50% 38%,
+      oklch(0.185 0.01 70 / 0.65) 0%,
+      oklch(0.148 0.008 70) 48%,
+      oklch(0.125 0.008 70) 100%
     );
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.35 0.012 64 / 0.55) transparent;
+}
+[data-studio-canvas-viewport]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-studio-canvas-viewport]::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.012 64 / 0.55);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+[data-studio-canvas-viewport]::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.014 64 / 0.65);
+  background-clip: padding-box;
+}
+
+/* App shell: subtle vignette so chrome feels layered */
+[data-studio-app-shell="true"] {
+  background:
+    radial-gradient(
+      140% 100% at 50% 0%,
+      oklch(0.2 0.01 66 / 0.35) 0%,
+      transparent 45%
+    ),
+    var(--color-canvas, oklch(0.155 0.008 70));
+}
+
+/* End cluster on draw options — cleaner sticky dock */
+[data-studio-draw-options-end="true"] {
+  border-left-color: oklch(0.36 0.013 64 / 0.55) !important;
+  background:
+    linear-gradient(
+      90deg,
+      oklch(0.175 0.009 68 / 0.2) 0%,
+      oklch(0.175 0.009 68 / 0.96) 18%,
+      oklch(0.175 0.009 68 / 0.98) 100%
+    ) !important;
+  box-shadow: -12px 0 18px -10px oklch(0.08 0.01 70 / 0.55);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  [data-studio-tool-rail="true"] button,
+  [data-studio-brush-tray="true"] [role="option"],
+  [data-studio-main-menu="true"] [role="menuitem"],
+  [data-studio-editor="true"] input[type="range"].studio-range::-webkit-slider-thumb {
+    transition: none !important;
+    transform: none !important;
+  }
 }
