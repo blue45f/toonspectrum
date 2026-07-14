@@ -3,7 +3,18 @@
  * Tool identity · brush kit · size · opacity · stabilizer · color · smart shape.
  * Pure presentation.
  */
-import { ArrowLeftRight, Eraser, FlipHorizontal2, Pencil, Shapes, Sparkles, Wand2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Eraser,
+  FlipHorizontal2,
+  Lock,
+  LockOpen,
+  Pencil,
+  Shapes,
+  Sparkles,
+  Star,
+  Wand2,
+} from "lucide-react";
 
 import {
   BRUSH_PRESETS,
@@ -59,6 +70,17 @@ export interface StudioDrawOptionsBarProps {
   onRecallBrushSlot?: (index: number) => void;
   onAssignBrushSlot?: (index: number) => void;
   onSymmetryTypeChange?: (type: StudioSymmetryUi) => void;
+  /** Procreate: keep size when switching brushes. */
+  sizeLocked?: boolean;
+  opacityLocked?: boolean;
+  onToggleSizeLock?: () => void;
+  onToggleOpacityLock?: () => void;
+  /** Ibis/Procreate recent built-in brush ids (newest first). */
+  recentBrushIds?: readonly string[];
+  favoriteBrushIds?: readonly string[];
+  onToggleFavoriteBrush?: (brushId: string) => void;
+  onSelectRecentBrush?: (brushId: string) => void;
+  onCycleStabilizer?: () => void;
   shapeSlot?: ReactNode;
   className?: string;
 }
@@ -118,6 +140,15 @@ export function StudioDrawOptionsBar({
   onRecallBrushSlot,
   onAssignBrushSlot,
   onSymmetryTypeChange,
+  sizeLocked = false,
+  opacityLocked = false,
+  onToggleSizeLock,
+  onToggleOpacityLock,
+  recentBrushIds = [],
+  favoriteBrushIds = [],
+  onToggleFavoriteBrush,
+  onSelectRecentBrush,
+  onCycleStabilizer,
   shapeSlot,
   className,
 }: StudioDrawOptionsBarProps): ReactElement {
@@ -129,8 +160,12 @@ export function StudioDrawOptionsBar({
       ? `${strokeWidth}px`
       : drawMode === "shape"
         ? "드래그로 그리기"
-        : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`;
+        : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%${sizeLocked ? " · 크기잠금" : ""}${opacityLocked ? " · 불투명잠금" : ""}`;
   const IdentityIcon = drawMode === "eraser" ? Eraser : Pencil;
+  const isFavorite = favoriteBrushIds.includes(brushId);
+  const recentPresets = recentBrushIds
+    .map((id) => BRUSH_PRESETS.find((preset) => preset.id === id))
+    .filter((preset): preset is (typeof BRUSH_PRESETS)[number] => Boolean(preset));
 
   return (
     <div
@@ -231,9 +266,98 @@ export function StudioDrawOptionsBar({
         />
       ) : null}
 
+      {/* Ibis/Procreate recent strip */}
+      {drawMode === "pen" && recentPresets.length > 0 && onSelectRecentBrush ? (
+        <div
+          className="flex shrink-0 items-center gap-0.5"
+          role="group"
+          aria-label="최근 브러시"
+        >
+          {recentPresets.slice(0, 4).map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              title={`최근: ${preset.name}`}
+              aria-pressed={brushId === preset.id}
+              onClick={() => onSelectRecentBrush(preset.id)}
+              className={cn(
+                "max-w-[3.5rem] truncate rounded-md px-1.5 py-1 text-[0.55rem] font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                brushId === preset.id
+                  ? "bg-accent text-on-accent"
+                  : "bg-card text-fg-3 ring-1 ring-line/70 hover:bg-raised hover:text-fg"
+              )}
+            >
+              {preset.name.replace(/\(.*\)/, "").trim().slice(0, 4)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {drawMode === "pen" && onToggleFavoriteBrush ? (
+        <button
+          type="button"
+          title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가 (CSP/Ibis)"}
+          aria-pressed={isFavorite}
+          aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+          onClick={() => onToggleFavoriteBrush(brushId)}
+          className={cn(
+            "grid size-7 place-items-center rounded-md border",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            isFavorite
+              ? "border-accent/50 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          )}
+        >
+          <Star size={13} strokeWidth={1.75} fill={isFavorite ? "currentColor" : "none"} aria-hidden />
+        </button>
+      ) : null}
+
       <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line sm:block" />
 
       <SizePreview size={strokeWidth} color={drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color} />
+
+      {/* Procreate size / opacity locks */}
+      {onToggleSizeLock ? (
+        <button
+          type="button"
+          title={sizeLocked ? "크기 잠금 해제 (Shift+S)" : "크기 잠금 — 브러시 전환 시 크기 유지 (Shift+S)"}
+          aria-pressed={sizeLocked}
+          aria-label="브러시 크기 잠금"
+          onClick={onToggleSizeLock}
+          className={cn(
+            "grid size-7 place-items-center rounded-md border",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            sizeLocked
+              ? "border-accent/50 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          )}
+        >
+          {sizeLocked ? <Lock size={12} aria-hidden /> : <LockOpen size={12} aria-hidden />}
+        </button>
+      ) : null}
+      {onToggleOpacityLock ? (
+        <button
+          type="button"
+          title={opacityLocked ? "불투명 잠금 해제 (Alt+S)" : "불투명 잠금 — 브러시 전환 시 농도 유지 (Alt+S)"}
+          aria-pressed={opacityLocked}
+          aria-label="브러시 불투명도 잠금"
+          onClick={onToggleOpacityLock}
+          className={cn(
+            "grid size-7 place-items-center rounded-md border text-[0.55rem] font-bold",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            opacityLocked
+              ? "border-accent/50 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          )}
+        >
+          %
+        </button>
+      ) : null}
 
       {/* Canva/Express-style size chips — one-tap brush scale */}
       <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="브러시 크기 프리셋">
@@ -290,7 +414,7 @@ export function StudioDrawOptionsBar({
         <span className="w-7 tabular-nums text-[0.68rem] text-fg">{Math.round(brushOpacity * 100)}%</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도">
+      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도 (S: 단계 순환 · SAI/CSP)">
         <span className="select-none">보정</span>
         <input
           type="range"
@@ -301,7 +425,21 @@ export function StudioDrawOptionsBar({
           onChange={(e) => onStabilizerChange(Number(e.target.value))}
           className="studio-range w-12 sm:w-14"
         />
-        <span className="w-4 tabular-nums text-[0.68rem] text-fg">{stabilizer}</span>
+        {onCycleStabilizer ? (
+          <button
+            type="button"
+            title="보정 강도 순환 (S)"
+            onClick={onCycleStabilizer}
+            className={cn(
+              "w-5 rounded tabular-nums text-[0.68rem] font-bold text-fg hover:bg-raised",
+              STUDIO_FOCUS_RING
+            )}
+          >
+            {stabilizer}
+          </button>
+        ) : (
+          <span className="w-4 tabular-nums text-[0.68rem] text-fg">{stabilizer}</span>
+        )}
       </label>
 
       {/* Secondary drawing science — hide under xl so icons/color stay exposed on laptop widths */}

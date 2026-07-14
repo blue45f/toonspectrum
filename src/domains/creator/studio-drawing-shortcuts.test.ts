@@ -85,6 +85,21 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "Tab" })).toEqual({ type: "toggle-chrome" });
     expect(resolveStudioDrawingShortcut({ code: "Tab", metaKey: true })).toBeNull();
   });
+
+  it("CSP/Photoshop/Procreate 계열 색·보정·잠금 단축키를 해석한다", () => {
+    expect(resolveStudioDrawingShortcut({ code: "KeyX" })).toEqual({ type: "swap-colors" });
+    expect(resolveStudioDrawingShortcut({ code: "KeyD" })).toEqual({ type: "default-colors" });
+    expect(resolveStudioDrawingShortcut({ code: "KeyS" })).toEqual({ type: "cycle-stabilizer" });
+    expect(resolveStudioDrawingShortcut({ code: "KeyS", shiftKey: true })).toEqual({
+      type: "toggle-size-lock",
+    });
+    expect(resolveStudioDrawingShortcut({ code: "KeyS", altKey: true })).toEqual({
+      type: "toggle-opacity-lock",
+    });
+    expect(resolveStudioDrawingShortcut({ code: "KeyF" })).toEqual({ type: "toggle-canvas-flip-h" });
+    // Cmd+D is document duplicate — not default colors
+    expect(resolveStudioDrawingShortcut({ code: "KeyD", metaKey: true })).toBeNull();
+  });
 });
 
 describe("드로잉 단축키 수치 조절", () => {

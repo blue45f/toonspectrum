@@ -700,6 +700,16 @@ import {
   type StudioPointerCaptureTarget,
   type StudioStrokePointerSession,
 } from "./studio-pointer-input";
+import {
+  applyBrushPresetWithLocks,
+  cycleStudioStabilizerStrength,
+  loadStudioProDrawPrefs,
+  rememberRecentBrushId,
+  saveStudioProDrawPrefs,
+  studioProDrawStorage,
+  toggleFavoriteBrushId,
+  type StudioProDrawPrefs,
+} from "./studio-pro-draw-prefs";
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
 import {
@@ -5722,6 +5732,10 @@ function StudioCuttoonEditor() {
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
     )
   );
+  /** Procreate size/opacity lock + Ibis recent/favorites for built-in brushes. */
+  const [proDrawPrefs, setProDrawPrefs] = useState<StudioProDrawPrefs>(() =>
+    loadStudioProDrawPrefs(studioProDrawStorage())
+  );
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
   const [stabilizer, setStabilizer] = useState<number>(6);
@@ -5860,19 +5874,30 @@ function StudioCuttoonEditor() {
   }
 
   function applyBuiltInBrushPreset(preset: BrushPreset) {
-    setBrush(preset.id);
-    setStrokeWidth(preset.defaultWidth);
-    setBrushOpacity(preset.defaultOpacity);
-    if (preset.defaultColor) setColor(preset.defaultColor);
+    // Procreate/CSP: size & opacity locks keep current values when switching brushes.
+    const applied = applyBrushPresetWithLocks(preset, proDrawPrefs, {
+      strokeWidth,
+      brushOpacity,
+      color,
+    });
+    setBrush(applied.brushId);
+    setStrokeWidth(applied.strokeWidth);
+    setBrushOpacity(applied.brushOpacity);
+    if (applied.color !== color) setColor(applied.color);
     const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
     if (dynamicsId) {
       setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
     }
+    setProDrawPrefs((prev) => {
+      const next = rememberRecentBrushId(prev, preset.id);
+      saveStudioProDrawPrefs(studioProDrawStorage(), next);
+      return next;
+    });
     setBrushSlotsState((prev) => {
       const next = rememberStudioBrushSlot(prev, {
-        brushId: preset.id,
-        strokeWidth: preset.defaultWidth,
-        brushOpacity: preset.defaultOpacity,
+        brushId: applied.brushId,
+        strokeWidth: applied.strokeWidth,
+        brushOpacity: applied.brushOpacity,
       });
       saveStudioBrushSlotsState(
         typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
@@ -10836,6 +10861,39 @@ function StudioCuttoonEditor() {
           setTool("draw");
           setDrawMode(nextMode);
           announceDrawingShortcut(nextMode === "eraser" ? "지우개" : "펜");
+        } else if (drawingShortcut.type === "swap-colors") {
+          setColor(secondaryColor);
+          setSecondaryColor(color);
+          announceDrawingShortcut("색 교체");
+        } else if (drawingShortcut.type === "default-colors") {
+          setColor("#1a1a1a");
+          setSecondaryColor("#f5f0e8");
+          announceDrawingShortcut("기본 색 (먹·종이)");
+        } else if (drawingShortcut.type === "cycle-stabilizer") {
+          setStabilizer((prev) => {
+            const next = cycleStudioStabilizerStrength(prev);
+            announceDrawingShortcut(`보정 ${next}`);
+            return next;
+          });
+        } else if (drawingShortcut.type === "toggle-canvas-flip-h") {
+          setCanvasFlipH((v) => {
+            announceDrawingShortcut(v ? "캔버스 반전 해제" : "캔버스 좌우 반전");
+            return !v;
+          });
+        } else if (drawingShortcut.type === "toggle-size-lock") {
+          setProDrawPrefs((prev) => {
+            const next = { ...prev, sizeLocked: !prev.sizeLocked };
+            saveStudioProDrawPrefs(studioProDrawStorage(), next);
+            announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
+            return next;
+          });
+        } else if (drawingShortcut.type === "toggle-opacity-lock") {
+          setProDrawPrefs((prev) => {
+            const next = { ...prev, opacityLocked: !prev.opacityLocked };
+            saveStudioProDrawPrefs(studioProDrawStorage(), next);
+            announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
+            return next;
+          });
         } else if (drawingShortcut.type === "adjust-width") {
           const currentDrawing = drawingShortcutStateRef.current;
           const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta);
@@ -17732,6 +17790,46 @@ function StudioCuttoonEditor() {
               announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
             }}
             onSymmetryTypeChange={setSymmetryType}
+            sizeLocked={proDrawPrefs.sizeLocked}
+            opacityLocked={proDrawPrefs.opacityLocked}
+            onToggleSizeLock={() => {
+              setProDrawPrefs((prev) => {
+                const next = { ...prev, sizeLocked: !prev.sizeLocked };
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
+                return next;
+              });
+            }}
+            onToggleOpacityLock={() => {
+              setProDrawPrefs((prev) => {
+                const next = { ...prev, opacityLocked: !prev.opacityLocked };
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
+                return next;
+              });
+            }}
+            recentBrushIds={proDrawPrefs.recentBrushIds}
+            favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
+            onToggleFavoriteBrush={(brushId) => {
+              setProDrawPrefs((prev) => {
+                const next = toggleFavoriteBrushId(prev, brushId);
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                const nowFav = next.favoriteBrushIds.includes(brushId);
+                announceDrawingShortcut(nowFav ? "즐겨찾기 추가" : "즐겨찾기 해제");
+                return next;
+              });
+            }}
+            onSelectRecentBrush={(brushId) => {
+              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+              if (preset) applyBuiltInBrushPreset(preset);
+            }}
+            onCycleStabilizer={() => {
+              setStabilizer((prev) => {
+                const next = cycleStudioStabilizerStrength(prev);
+                announceDrawingShortcut(`보정 ${next}`);
+                return next;
+              });
+            }}
           />
         </Suspense>
       ) : null}
