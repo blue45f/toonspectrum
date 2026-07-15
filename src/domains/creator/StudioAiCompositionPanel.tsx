@@ -28,6 +28,8 @@ export function StudioAiCompositionPanel({
   settings,
   transport,
   configured,
+  sceneText,
+  onSceneTextChange,
   onInsertAsNote,
   onOperationStart,
   onOperationSettled,
@@ -35,6 +37,9 @@ export function StudioAiCompositionPanel({
   settings: StudioAiSettings;
   transport?: StudioTextAiTransport;
   configured: boolean;
+  /** Controlled scene draft (parent may inject presets). */
+  sceneText?: string;
+  onSceneTextChange?: (value: string) => void;
   /** 제안 텍스트를 캔버스에 메모(텍스트 요소)로 추가하고 싶을 때만 넘긴다 — 선택 사항. */
   onInsertAsNote?: (text: string) => void;
   /** 중앙 provenance가 실제 네트워크 요청 전에 pending을 남길 수 있게 한다. */
@@ -42,14 +47,16 @@ export function StudioAiCompositionPanel({
   /** 결과 본문·원문 오류 대신 구조화 결과와 안전한 실제 공급자 정보만 전달한다. */
   onOperationSettled?: (settlement: StudioAiCompositionOperationSettlement) => void;
 }) {
-  const [sceneText, setSceneText] = useState("");
+  const [localSceneText, setLocalSceneText] = useState("");
+  const sceneTextValue = sceneText ?? localSceneText;
+  const setSceneTextValue = onSceneTextChange ?? setLocalSceneText;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const run = async () => {
-    const prompt = sceneText.trim();
+    const prompt = sceneTextValue.trim();
     if (busy || !prompt) return;
     setBusy(true);
     setError(null);
@@ -96,22 +103,22 @@ export function StudioAiCompositionPanel({
       )}
 
       <textarea
-        value={sceneText}
-        onChange={(e) => setSceneText(e.target.value.slice(0, 800))}
+        value={sceneTextValue}
+        onChange={(e) => setSceneTextValue(e.target.value.slice(0, 800))}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();
         }}
         placeholder="예: 주인공이 교실 문을 벌컥 열고 들어와 반 아이들과 눈이 마주친다. &quot;나 전학왔어.&quot;"
         rows={3}
         disabled={!configured || busy}
-        className="h-16 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
+        className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
       />
 
       <button
         type="button"
         onClick={() => void run()}
-        disabled={!configured || busy || !sceneText.trim()}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={!configured || busy || !sceneTextValue.trim()}
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Clapperboard size={14} />}
         {busy ? "구상하는 중…" : "구도 제안 받기"}

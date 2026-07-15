@@ -132,6 +132,12 @@ import {
   type StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
 import {
+  loadStudioAiRecentPrompts,
+  pushStudioAiRecentPrompt,
+  type StudioAiAssistToolId,
+  type StudioAiRecentPromptsState,
+} from "./studio-ai-assist-ux";
+import {
   colorizeLineArt,
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
@@ -1337,6 +1343,10 @@ const StudioScrollPreviewPanel = lazyRetry(
 const StudioEmeresLibraryPanel = lazyRetry(
   () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
   "StudioEmeresLibraryPanel"
+);
+const StudioAiAssistHub = lazyRetry(
+  () => import("./StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
+  "StudioAiAssistHub"
 );
 const StudioAiBackgroundPanel = lazyRetry(
   () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
@@ -9268,6 +9278,13 @@ function StudioCuttoonEditor() {
   const [aiBgSize, setAiBgSize] = useState<StudioAiImageSize>(DEFAULT_STUDIO_AI_IMAGE_SIZE);
   const [aiBgBusy, setAiBgBusy] = useState(false);
   const [aiBgError, setAiBgError] = useState<string | null>(null);
+  /** Tabbed AI assist hub — which tool card is open. */
+  const [aiAssistTool, setAiAssistTool] = useState<StudioAiAssistToolId>("background");
+  const [aiRecentPrompts, setAiRecentPrompts] = useState<StudioAiRecentPromptsState>(() =>
+    loadStudioAiRecentPrompts(globalThis.localStorage)
+  );
+  /** Composition panel draft (lifted so hub presets can fill it). */
+  const [aiCompositionDraft, setAiCompositionDraft] = useState("");
   const [aiColorizePrompt, setAiColorizePrompt] = useState("파스텔톤 웹툰 셀 채색, 부드러운 그림자와 하이라이트");
   const [aiColorizeBusy, setAiColorizeBusy] = useState(false);
   const [aiColorizeError, setAiColorizeError] = useState<string | null>(null);
@@ -11883,7 +11900,30 @@ function StudioCuttoonEditor() {
   function onGenerateAiBackground() {
     const prompt = aiBgPrompt.trim();
     if (!prompt || aiBgBusy || !isStudioAiConfigured(aiSettings)) return;
+    setAiRecentPrompts(pushStudioAiRecentPrompt(globalThis.localStorage, "background", prompt));
     runWithAiNotice(() => void executeAiBackgroundGenerate(prompt, aiBgSize));
+  }
+
+  function applyAiAssistPresetPrompt(tool: StudioAiAssistToolId, prompt: string) {
+    switch (tool) {
+      case "background":
+        setAiBgPrompt(prompt);
+        break;
+      case "character":
+        setAiCharacterPrompt(prompt);
+        break;
+      case "dialogue":
+        setAiDialogueSuggestSituation(prompt);
+        break;
+      case "palette":
+        setAiPaletteSuggestMood(prompt);
+        break;
+      case "composition":
+        setAiCompositionDraft(prompt);
+        break;
+      default:
+        break;
+    }
   }
 
   // AI 자동 채색 실행 — elId/srcAtRequestTime을 호출 시점에 캡처해 넘긴다(await 도중 선택이 바뀌어도
@@ -20090,151 +20130,182 @@ function StudioCuttoonEditor() {
               />
               {menu === "aiAssist" && (
                 <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
-                  {/* AI 어시스트 서브탭 전용 내부 스크롤 — 그룹 팝오버 자체는(desktop lg:) overflow-visible로
-                      풀려 있어서(중첩 select/드롭다운이 잘리지 않게), 배경생성/캐릭터일관성/구도제안/대사제안/
-                      팔레트추천 5개 섹션이 쌓이면 뷰포트 아래 푸터 영역까지 내려가 isolate 스택 컨텍스트 때문에
-                      푸터 텍스트가 위에 겹쳐 보이는 렌더 깨짐이 있었다(2026-07-05 발견). 섹션이 늘어날수록
-                      재발하므로 여기서 독립적으로 높이를 제한해 항상 팝오버 자체 안에서 스크롤되게 한다. */}
-                  <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto pr-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        preloadStudioIntegrationsSettingsPanel();
-                        setMenu("integrations");
-                      }}
-                      onMouseEnter={preloadStudioIntegrationsSettingsPanel}
-                      onFocus={preloadStudioIntegrationsSettingsPanel}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-line bg-panel/50 px-3 py-2 text-left transition-colors hover:bg-raised"
-                    >
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
-                        <Settings2 size={14} />
-                        AI 어시스트 설정
-                      </span>
-                      <span
-                        className={cn(
-                          "inline-flex shrink-0 items-center gap-1 text-[0.65rem] font-medium",
-                          textAiConfigured ? "text-good" : "text-fg-3"
-                        )}
-                      >
-                        {textAiConfigured ? (
-                          <>
-                            <CheckCircle2 size={12} />
-                            {textAiTransport.mode === "server"
-                              ? `${activeServerAiProviderLabel} 연결됨`
-                              : "내 API 연결됨"}
-                          </>
-                        ) : (
-                          serverAiStatus?.configured ? "로그인 또는 API 키 필요" : "API 키 등록 필요"
-                        )}
-                        <ChevronRight size={12} />
-                      </span>
-                    </button>
-                    {textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
-                      <div className="rounded-xl border border-line bg-card/35 p-2.5">
-                        <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
-                          <span>텍스트 AI 제공자</span>
-                          <select
-                            value={serverAiProvider}
-                            onChange={(event) =>
-                              updateServerAiProvider(event.target.value as StudioServerAiProviderPreference)
+                  <StudioAiAssistHub
+                    activeTool={aiAssistTool}
+                    onToolChange={setAiAssistTool}
+                    imageConfigured={isStudioAiConfigured(aiSettings)}
+                    textConfigured={textAiConfigured}
+                    connectionOk={textAiConfigured || isStudioAiConfigured(aiSettings)}
+                    connectionLabel={
+                      textAiConfigured
+                        ? textAiTransport.mode === "server"
+                          ? `${activeServerAiProviderLabel} 연결됨`
+                          : "내 API 연결됨"
+                        : isStudioAiConfigured(aiSettings)
+                          ? "이미지 API 연결됨"
+                          : serverAiStatus?.configured
+                            ? "로그인 또는 API 키 필요"
+                            : "API 키 등록 필요"
+                    }
+                    onOpenSettings={() => {
+                      preloadStudioIntegrationsSettingsPanel();
+                      setMenu("integrations");
+                    }}
+                    onPreloadSettings={preloadStudioIntegrationsSettingsPanel}
+                    recentState={aiRecentPrompts}
+                    onApplyPresetPrompt={applyAiAssistPresetPrompt}
+                    providerSlot={
+                      textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
+                        <div className="rounded-xl border border-line bg-card/35 p-2.5">
+                          <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
+                            <span>텍스트 AI 제공자</span>
+                            <select
+                              value={serverAiProvider}
+                              onChange={(event) =>
+                                updateServerAiProvider(event.target.value as StudioServerAiProviderPreference)
+                              }
+                              className="min-h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
+                              aria-label="서버 텍스트 AI 제공자"
+                            >
+                              <option value="auto">자동 전환</option>
+                              <option
+                                value="zai"
+                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "zai")}
+                              >
+                                Z.ai
+                              </option>
+                              <option
+                                value="deepseek"
+                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "deepseek")}
+                              >
+                                DeepSeek
+                              </option>
+                            </select>
+                          </label>
+                          <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">
+                            잔액·패키지 한도 소진 시 다른 제공자로 전환합니다. 일반 오류는 이중 과금을 막기 위해
+                            자동 재전송하지 않아요.
+                          </p>
+                        </div>
+                      ) : null
+                    }
+                    toolPanel={
+                      <>
+                        {aiAssistTool === "background" ? (
+                          <StudioAiBackgroundPanel
+                            configured={isStudioAiConfigured(aiSettings)}
+                            prompt={aiBgPrompt}
+                            onPromptChange={setAiBgPrompt}
+                            size={aiBgSize}
+                            onSizeChange={setAiBgSize}
+                            busy={aiBgBusy}
+                            error={aiBgError}
+                            onGenerate={onGenerateAiBackground}
+                          />
+                        ) : null}
+                        {aiAssistTool === "character" ? (
+                          <StudioAiCharacterConsistencyPanel
+                            configured={isStudioAiConfigured(aiSettings)}
+                            hasReference={selected?.type === "image"}
+                            referenceThumbnail={selected?.type === "image" ? selected.src : null}
+                            prompt={aiCharacterPrompt}
+                            onPromptChange={setAiCharacterPrompt}
+                            busy={aiCharacterBusy}
+                            error={aiCharacterError}
+                            onGenerate={() => {
+                              const prompt = aiCharacterPrompt.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "character", prompt)
+                                );
+                              }
+                              onGenerateAiCharacter();
+                            }}
+                          />
+                        ) : null}
+                        {aiAssistTool === "composition" ? (
+                          <StudioAiCompositionPanel
+                            settings={aiSettings}
+                            transport={textAiTransport}
+                            configured={textAiConfigured}
+                            sceneText={aiCompositionDraft}
+                            onSceneTextChange={setAiCompositionDraft}
+                            onInsertAsNote={insertAiCompositionNote}
+                            onOperationStart={(prompt) => {
+                              setAiRecentPrompts(
+                                pushStudioAiRecentPrompt(globalThis.localStorage, "composition", prompt)
+                              );
+                              const provider = pendingTextAiProviderContext();
+                              return beginTrackedStudioAiOperation("composition", {
+                                kind: "text",
+                                task: "composition",
+                                provider: provider.provider,
+                                model: provider.model,
+                                transport: provider.transport,
+                                promptVersion: 1,
+                                prompt,
+                                target: { pageId: activePage.id },
+                                references: [],
+                              });
+                            }}
+                            onOperationSettled={({ operationId, result, textProvenance }) => {
+                              settleTrackedTextAiOperation(operationId, result, textProvenance);
+                            }}
+                          />
+                        ) : null}
+                        {aiAssistTool === "dialogue" ? (
+                          <StudioDialogueSuggestPanel
+                            configured={textAiConfigured}
+                            situationText={aiDialogueSuggestSituation}
+                            onSituationTextChange={setAiDialogueSuggestSituation}
+                            hasContext={activePage.elements.some(
+                              (el) => (el.type === "bubble" || el.type === "text") && el.text.trim().length > 0
+                            )}
+                            includeContext={aiDialogueSuggestIncludeContext}
+                            onIncludeContextChange={setAiDialogueSuggestIncludeContext}
+                            busy={aiDialogueSuggestBusy}
+                            error={aiDialogueSuggestError}
+                            candidates={aiDialogueSuggestCandidates}
+                            onGenerate={() => {
+                              const prompt = aiDialogueSuggestSituation.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "dialogue", prompt)
+                                );
+                              }
+                              void executeSuggestDialogueLines();
+                            }}
+                            canInsertToSelected={
+                              !!selected && (selected.type === "bubble" || selected.type === "text")
                             }
-                            className="min-h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
-                            aria-label="서버 텍스트 AI 제공자"
-                          >
-                            <option value="auto">자동 전환</option>
-                            <option
-                              value="zai"
-                              disabled={!configuredServerAiProviders.some((provider) => provider.id === "zai")}
-                            >
-                              Z.ai
-                            </option>
-                            <option
-                              value="deepseek"
-                              disabled={!configuredServerAiProviders.some((provider) => provider.id === "deepseek")}
-                            >
-                              DeepSeek
-                            </option>
-                          </select>
-                        </label>
-                        <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">
-                          자동 또는 직접 선택한 제공자가 잔액·패키지 한도 소진을 명시하면 구성된 다른 AI로
-                          전환합니다. 일반 속도 제한·인증·장애·네트워크 끊김은 이중 과금과 설정 오류 은폐를
-                          막기 위해 자동 재전송하지 않습니다.
-                        </p>
-                      </div>
-                    ) : null}
-                    <StudioAiBackgroundPanel
-                      configured={isStudioAiConfigured(aiSettings)}
-                      prompt={aiBgPrompt}
-                      onPromptChange={setAiBgPrompt}
-                      size={aiBgSize}
-                      onSizeChange={setAiBgSize}
-                      busy={aiBgBusy}
-                      error={aiBgError}
-                      onGenerate={onGenerateAiBackground}
-                    />
-                    <StudioAiCharacterConsistencyPanel
-                      configured={isStudioAiConfigured(aiSettings)}
-                      hasReference={selected?.type === "image"}
-                      referenceThumbnail={selected?.type === "image" ? selected.src : null}
-                      prompt={aiCharacterPrompt}
-                      onPromptChange={setAiCharacterPrompt}
-                      busy={aiCharacterBusy}
-                      error={aiCharacterError}
-                      onGenerate={onGenerateAiCharacter}
-                    />
-                    <StudioAiCompositionPanel
-                      settings={aiSettings}
-                      transport={textAiTransport}
-                      configured={textAiConfigured}
-                      onInsertAsNote={insertAiCompositionNote}
-                      onOperationStart={(prompt) => {
-                        const provider = pendingTextAiProviderContext();
-                        return beginTrackedStudioAiOperation("composition", {
-                          kind: "text",
-                          task: "composition",
-                          provider: provider.provider,
-                          model: provider.model,
-                          transport: provider.transport,
-                          promptVersion: 1,
-                          prompt,
-                          target: { pageId: activePage.id },
-                          references: [],
-                        });
-                      }}
-                      onOperationSettled={({ operationId, result, textProvenance }) => {
-                        settleTrackedTextAiOperation(operationId, result, textProvenance);
-                      }}
-                    />
-                    <StudioDialogueSuggestPanel
-                      configured={textAiConfigured}
-                      situationText={aiDialogueSuggestSituation}
-                      onSituationTextChange={setAiDialogueSuggestSituation}
-                      hasContext={activePage.elements.some(
-                        (el) => (el.type === "bubble" || el.type === "text") && el.text.trim().length > 0
-                      )}
-                      includeContext={aiDialogueSuggestIncludeContext}
-                      onIncludeContextChange={setAiDialogueSuggestIncludeContext}
-                      busy={aiDialogueSuggestBusy}
-                      error={aiDialogueSuggestError}
-                      candidates={aiDialogueSuggestCandidates}
-                      onGenerate={() => void executeSuggestDialogueLines()}
-                      canInsertToSelected={!!selected && (selected.type === "bubble" || selected.type === "text")}
-                      onAddToScript={addDialogueSuggestionToScript}
-                      onInsertToSelected={insertDialogueSuggestionToSelected}
-                    />
-                    <StudioPaletteSuggestPanel
-                      configured={textAiConfigured}
-                      moodText={aiPaletteSuggestMood}
-                      onMoodTextChange={setAiPaletteSuggestMood}
-                      busy={aiPaletteSuggestBusy}
-                      error={aiPaletteSuggestError}
-                      suggestion={aiPaletteSuggestion}
-                      savedMessage={aiPaletteSuggestSavedMsg}
-                      onGenerate={() => void executeSuggestColorPalette()}
-                      onSaveToLibrary={saveSuggestedPaletteToLibrary}
-                    />
-                  </div>
+                            onAddToScript={addDialogueSuggestionToScript}
+                            onInsertToSelected={insertDialogueSuggestionToSelected}
+                          />
+                        ) : null}
+                        {aiAssistTool === "palette" ? (
+                          <StudioPaletteSuggestPanel
+                            configured={textAiConfigured}
+                            moodText={aiPaletteSuggestMood}
+                            onMoodTextChange={setAiPaletteSuggestMood}
+                            busy={aiPaletteSuggestBusy}
+                            error={aiPaletteSuggestError}
+                            suggestion={aiPaletteSuggestion}
+                            savedMessage={aiPaletteSuggestSavedMsg}
+                            onGenerate={() => {
+                              const prompt = aiPaletteSuggestMood.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "palette", prompt)
+                                );
+                              }
+                              void executeSuggestColorPalette();
+                            }}
+                            onSaveToLibrary={saveSuggestedPaletteToLibrary}
+                          />
+                        ) : null}
+                      </>
+                    }
+                  />
                 </Suspense>
               )}
               {menu === "stockImage" && (

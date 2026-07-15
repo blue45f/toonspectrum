@@ -1,9 +1,11 @@
-// AI 자동 채색 패널 — 선택된 이미지(선화 등)를 텍스트 지시와 함께 채색 요청한다.
-// StudioBgRemoveButton/StudioLineCleanupPanel과 동일한 "선택 이미지 → one-shot 변환 → src 교체"
-// 관례를 따르되, 실제 colorizeLineArt() 호출·AI 고지 게이팅은 부모(StudioPage.tsx)가 수행한다
-// (busy/error/prompt를 부모가 소유 — StudioAiBackgroundPanel과 동일 이유, §3 참고). "selected.type
-// === 'image'" 섹션에 마운트되므로 항상 선택된 이미지가 있다는 전제로 렌더된다.
+// AI 자동 채색 패널 — 선택 선화 이미지를 텍스트 지시로 채색.
+// Presentation only; colorize + notice gate owned by parent.
 import { Loader2, Wand2 } from "lucide-react";
+
+import { STUDIO_AI_COLORIZE_PRESETS } from "./studio-ai-assist-ux";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+
+import { cn } from "@/lib/utils";
 
 export function StudioAiColorizePanel({
   configured,
@@ -23,17 +25,39 @@ export function StudioAiColorizePanel({
   const canRun = configured && !busy && prompt.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-panel/50 p-3">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
-        <Wand2 size={14} />
+    <div
+      className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3"
+      data-studio-ai-colorize-panel="true"
+    >
+      <div className="flex items-center gap-1.5 text-sm font-bold text-fg">
+        <Wand2 size={14} className="text-accent" aria-hidden />
         AI 자동 채색
       </div>
 
       {!configured && (
         <p className="text-[0.63rem] leading-relaxed text-fg-3">
-          AI 어시스트 설정(툴바 &quot;AI 어시스트&quot;)에서 API 키를 등록하면 이 기능을 쓸 수 있어요.
+          AI 어시스트 설정에서 이미지 API 키를 등록하면 쓸 수 있어요.
         </p>
       )}
+
+      <div className="flex flex-wrap gap-1">
+        {STUDIO_AI_COLORIZE_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            title={preset.prompt}
+            disabled={!configured || busy}
+            onClick={() => onPromptChange(preset.prompt)}
+            className={cn(
+              "rounded-full border border-line bg-card px-2 py-0.5 text-[0.6rem] font-semibold text-fg-3",
+              STUDIO_FOCUS_RING,
+              "hover:border-accent/40 hover:text-fg disabled:opacity-50"
+            )}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
 
       <input
         type="text"
@@ -44,20 +68,26 @@ export function StudioAiColorizePanel({
         }}
         placeholder="예: 파스텔톤 웹툰 셀 채색, 부드러운 그림자"
         disabled={!configured || busy}
-        className="w-full rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
+        className="w-full rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
       />
 
       <button
         type="button"
         onClick={onColorize}
         disabled={!canRun}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+        className={cn(
+          "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-on-accent",
+          STUDIO_EASE,
+          "hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+        )}
       >
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-        {busy ? "채색하는 중…" : "AI 채색"}
+        {busy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Wand2 size={14} aria-hidden />}
+        {busy ? "채색하는 중…" : "선택 이미지 채색"}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {error && (
+        <p className="rounded-lg border border-bad/35 bg-bad/10 px-2 py-1.5 text-xs text-bad">{error}</p>
+      )}
     </div>
   );
 }
